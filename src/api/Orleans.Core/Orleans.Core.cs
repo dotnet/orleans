@@ -1279,7 +1279,6 @@ namespace Orleans.Messaging
 
         public System.Threading.Tasks.Task InitializeGatewayListProvider() { throw null; }
     }
-
 }
 
 namespace Orleans.Metadata
@@ -1660,22 +1659,74 @@ namespace Orleans.Runtime
 
     public partial interface IManagementGrain : IGrainWithIntegerKey, IGrain, IAddressable, IVersionManager
     {
+        [Alias("329F9A1B")]
+        System.Threading.Tasks.Task ForceActivationCollection(SiloAddress[] hostsIds, System.TimeSpan ageLimit, System.Threading.CancellationToken cancellationToken);
+        [Alias("ForceActivationCollectionOnSilos")]
         System.Threading.Tasks.Task ForceActivationCollection(SiloAddress[] hostsIds, System.TimeSpan ageLimit);
+        [Alias("54E6D1D1")]
+        System.Threading.Tasks.Task ForceActivationCollection(System.TimeSpan ageLimit, System.Threading.CancellationToken cancellationToken);
+        [Alias("ForceActivationCollection")]
         System.Threading.Tasks.Task ForceActivationCollection(System.TimeSpan ageLimit);
+        [Alias("5922EB76")]
+        System.Threading.Tasks.Task ForceGarbageCollection(SiloAddress[] hostsIds, System.Threading.CancellationToken cancellationToken);
+        [Alias("ForceGarbageCollection")]
         System.Threading.Tasks.Task ForceGarbageCollection(SiloAddress[] hostsIds);
+        [Alias("B761B345")]
+        System.Threading.Tasks.Task ForceRuntimeStatisticsCollection(SiloAddress[] siloAddresses, System.Threading.CancellationToken cancellationToken);
+        [Alias("ForceRuntimeStatisticsCollection")]
         System.Threading.Tasks.Task ForceRuntimeStatisticsCollection(SiloAddress[] siloAddresses);
+        [Alias("317D82B6")]
+        System.Threading.Tasks.ValueTask<SiloAddress?> GetActivationAddress(IAddressable reference, System.Threading.CancellationToken cancellationToken);
+        [Alias("GetActivationAddress")]
         System.Threading.Tasks.ValueTask<SiloAddress?> GetActivationAddress(IAddressable reference);
+        [Alias("3DB7923B")]
+        System.Threading.Tasks.ValueTask<System.Collections.Generic.List<GrainId>> GetActiveGrains(GrainType type, System.Threading.CancellationToken cancellationToken);
+        [Alias("GetActiveGrains")]
         System.Threading.Tasks.ValueTask<System.Collections.Generic.List<GrainId>> GetActiveGrains(GrainType type);
+        [Alias("0A1C0D82")]
+        System.Threading.Tasks.Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[]? types, SiloAddress[]? hostsIds, System.Threading.CancellationToken cancellationToken);
+        [Alias("GetDetailedGrainStatistics")]
         System.Threading.Tasks.Task<DetailedGrainStatistic[]> GetDetailedGrainStatistics(string[]? types = null, SiloAddress[]? hostsIds = null);
+        [Alias("CC6CCBC3")]
+        System.Threading.Tasks.Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive, System.Threading.CancellationToken cancellationToken);
+        [Alias("GetDetailedHosts")]
         System.Threading.Tasks.Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false);
+        [Alias("AEDE93F6")]
+        System.Threading.Tasks.Task<int> GetGrainActivationCount(GrainReference grainReference, System.Threading.CancellationToken cancellationToken);
+        [Alias("GetGrainActivationCount")]
         System.Threading.Tasks.Task<int> GetGrainActivationCount(GrainReference grainReference);
+        [Alias("0F06E027")]
+        System.Threading.Tasks.Task<System.Collections.Generic.List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[]? hostsIds, System.Threading.CancellationToken cancellationToken);
+        [Alias("GetGrainCallFrequencies")]
         System.Threading.Tasks.Task<System.Collections.Generic.List<GrainCallFrequency>> GetGrainCallFrequencies(SiloAddress[]? hostsIds = null);
+        [Alias("4C0864C2")]
+        System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive, System.Threading.CancellationToken cancellationToken);
+        [Alias("GetHosts")]
         System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false);
+        [Alias("2D761B36")]
+        System.Threading.Tasks.Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] hostsIds, System.Threading.CancellationToken cancellationToken);
+        [Alias("GetRuntimeStatistics")]
         System.Threading.Tasks.Task<SiloRuntimeStatistics[]> GetRuntimeStatistics(SiloAddress[] hostsIds);
+        [Alias("GetSimpleGrainStatistics")]
         System.Threading.Tasks.Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics();
+        [Alias("3CFF788C")]
+        System.Threading.Tasks.Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds, System.Threading.CancellationToken cancellationToken);
+        [Alias("GetSimpleGrainStatisticsOnSilos")]
         System.Threading.Tasks.Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(SiloAddress[] hostsIds);
+        [Alias("ACCE9D6A")]
+        System.Threading.Tasks.Task<SimpleGrainStatistic[]> GetSimpleGrainStatistics(System.Threading.CancellationToken cancellationToken);
+        [Alias("GetTotalActivationCount")]
         System.Threading.Tasks.Task<int> GetTotalActivationCount();
+        [Alias("D7365B43")]
+        System.Threading.Tasks.Task<int> GetTotalActivationCount(System.Threading.CancellationToken cancellationToken);
+        [Alias("54FE0FEC")]
+        System.Threading.Tasks.ValueTask ResetGrainCallFrequencies(SiloAddress[]? hostsIds, System.Threading.CancellationToken cancellationToken);
+        [Alias("ResetGrainCallFrequencies")]
         System.Threading.Tasks.ValueTask ResetGrainCallFrequencies(SiloAddress[]? hostsIds = null);
+        [Alias("F67965CC")]
+        System.Threading.Tasks.Task<object?[]> SendControlCommandToProvider<T>(string providerName, int command, object? arg, System.Threading.CancellationToken cancellationToken)
+            where T : Providers.IControllable;
+        [Alias("SendControlCommandToProvider")]
         System.Threading.Tasks.Task<object?[]> SendControlCommandToProvider<T>(string providerName, int command, object? arg = null)
             where T : Providers.IControllable;
     }
@@ -2172,8 +2223,17 @@ namespace Orleans.Storage
 
     public partial interface IMemoryStorageGrain : IGrainWithIntegerKey, IGrain, Runtime.IAddressable
     {
+        [Alias("B7CADD03")]
+        System.Threading.Tasks.Task DeleteStateAsync<T>(string grainStoreKey, string? eTag, System.Threading.CancellationToken cancellationToken);
+        [Alias("DeleteStateAsync")]
         System.Threading.Tasks.Task DeleteStateAsync<T>(string grainStoreKey, string? eTag);
+        [Alias("45659318")]
+        System.Threading.Tasks.Task<IGrainState<T>?> ReadStateAsync<T>(string grainStoreKey, System.Threading.CancellationToken cancellationToken);
+        [Alias("ReadStateAsync")]
         System.Threading.Tasks.Task<IGrainState<T>?> ReadStateAsync<T>(string grainStoreKey);
+        [Alias("7CC6CA25")]
+        System.Threading.Tasks.Task<string> WriteStateAsync<T>(string grainStoreKey, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken);
+        [Alias("WriteStateAsync")]
         System.Threading.Tasks.Task<string> WriteStateAsync<T>(string grainStoreKey, IGrainState<T> grainState);
     }
 
@@ -2597,6 +2657,24 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IVersionManager_GrainReference_43FA2410 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IVersionManager_GrainReference_43FA2410>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IVersionManager_GrainReference_43FA2410(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IVersionManager_GrainReference_43FA2410 instance) { }
+
+        public Invokable_IVersionManager_GrainReference_43FA2410 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IVersionManager_GrainReference_43FA2410 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IVersionManager_GrainReference_43FA2410 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IVersionManager_GrainReference_4AAEAFCE : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IVersionManager_GrainReference_4AAEAFCE>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IVersionManager_GrainReference_4AAEAFCE(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -2651,6 +2729,42 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IVersionManager_GrainReference_A8C6E71E : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IVersionManager_GrainReference_A8C6E71E>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IVersionManager_GrainReference_A8C6E71E(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IVersionManager_GrainReference_A8C6E71E instance) { }
+
+        public Invokable_IVersionManager_GrainReference_A8C6E71E ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IVersionManager_GrainReference_A8C6E71E instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IVersionManager_GrainReference_A8C6E71E value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IVersionManager_GrainReference_B74B8970 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IVersionManager_GrainReference_B74B8970>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IVersionManager_GrainReference_B74B8970(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IVersionManager_GrainReference_B74B8970 instance) { }
+
+        public Invokable_IVersionManager_GrainReference_B74B8970 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IVersionManager_GrainReference_B74B8970 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IVersionManager_GrainReference_B74B8970 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IVersionManager_GrainReference_C01C4EE8 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IVersionManager_GrainReference_C01C4EE8>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IVersionManager_GrainReference_C01C4EE8(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -2663,6 +2777,24 @@ namespace OrleansCodeGen.Orleans
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IVersionManager_GrainReference_C01C4EE8 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IVersionManager_GrainReference_EECAE3DE : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IVersionManager_GrainReference_EECAE3DE>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IVersionManager_GrainReference_EECAE3DE(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IVersionManager_GrainReference_EECAE3DE instance) { }
+
+        public Invokable_IVersionManager_GrainReference_EECAE3DE ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IVersionManager_GrainReference_EECAE3DE instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IVersionManager_GrainReference_EECAE3DE value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -2873,6 +3005,16 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IVersionManager_GrainReference_43FA2410 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IVersionManager_GrainReference_43FA2410>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IVersionManager_GrainReference_43FA2410(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IVersionManager_GrainReference_43FA2410 DeepCopy(Invokable_IVersionManager_GrainReference_43FA2410 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IVersionManager_GrainReference_4AAEAFCE : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IVersionManager_GrainReference_4AAEAFCE>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IVersionManager_GrainReference_4AAEAFCE(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -2903,11 +3045,41 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IVersionManager_GrainReference_A8C6E71E : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IVersionManager_GrainReference_A8C6E71E>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IVersionManager_GrainReference_A8C6E71E(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IVersionManager_GrainReference_A8C6E71E DeepCopy(Invokable_IVersionManager_GrainReference_A8C6E71E original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IVersionManager_GrainReference_B74B8970 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IVersionManager_GrainReference_B74B8970>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IVersionManager_GrainReference_B74B8970(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IVersionManager_GrainReference_B74B8970 DeepCopy(Invokable_IVersionManager_GrainReference_B74B8970 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IVersionManager_GrainReference_C01C4EE8 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IVersionManager_GrainReference_C01C4EE8>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IVersionManager_GrainReference_C01C4EE8(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public Invokable_IVersionManager_GrainReference_C01C4EE8 DeepCopy(Invokable_IVersionManager_GrainReference_C01C4EE8 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IVersionManager_GrainReference_EECAE3DE : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IVersionManager_GrainReference_EECAE3DE>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IVersionManager_GrainReference_EECAE3DE(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IVersionManager_GrainReference_EECAE3DE DeepCopy(Invokable_IVersionManager_GrainReference_EECAE3DE original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -3491,7 +3663,47 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "4AAEAFCE" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "90AB9D5E" })]
+    public sealed partial class Invokable_IVersionManager_GrainReference_43FA2410 : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Runtime.GrainInterfaceType arg0;
+        public global::Orleans.Versions.Selector.VersionSelectorStrategy arg1;
+        public System.Threading.CancellationToken arg2;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "SetSelectorStrategy" })]
     public sealed partial class Invokable_IVersionManager_GrainReference_4AAEAFCE : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Versions.Selector.VersionSelectorStrategy arg0;
@@ -3523,7 +3735,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "8F5C15A9" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "SetCompatibilityStrategy" })]
     public sealed partial class Invokable_IVersionManager_GrainReference_8F5C15A9 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Versions.Compatibility.CompatibilityStrategy arg0;
@@ -3555,7 +3767,7 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "90AB9D5E" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "SetSelectorStrategyForInterface" })]
     public sealed partial class Invokable_IVersionManager_GrainReference_90AB9D5E : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.GrainInterfaceType arg0;
@@ -3588,7 +3800,86 @@ namespace OrleansCodeGen.Orleans
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "4AAEAFCE" })]
+    public sealed partial class Invokable_IVersionManager_GrainReference_A8C6E71E : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Versions.Selector.VersionSelectorStrategy arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "C01C4EE8" })]
+    public sealed partial class Invokable_IVersionManager_GrainReference_B74B8970 : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Runtime.GrainInterfaceType arg0;
+        public global::Orleans.Versions.Compatibility.CompatibilityStrategy arg1;
+        public System.Threading.CancellationToken arg2;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "SetCompatibilityStrategyForInterface" })]
     public sealed partial class Invokable_IVersionManager_GrainReference_C01C4EE8 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.GrainInterfaceType arg0;
@@ -3616,6 +3907,45 @@ namespace OrleansCodeGen.Orleans
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.IVersionManager), "8F5C15A9" })]
+    public sealed partial class Invokable_IVersionManager_GrainReference_EECAE3DE : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Versions.Compatibility.CompatibilityStrategy arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
     }
 }
 
@@ -4207,6 +4537,24 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_0EAD6AA7 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_0EAD6AA7>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_0EAD6AA7(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_0EAD6AA7 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_0EAD6AA7 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_0EAD6AA7 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_0EAD6AA7 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_0F06E027 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_0F06E027>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IManagementGrain_GrainReference_0F06E027(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4219,6 +4567,40 @@ namespace OrleansCodeGen.Orleans.Runtime
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_0F06E027 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_23DED572 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_23DED572>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_23DED572(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_23DED572 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_23DED572 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_23DED572 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_23DED572 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_27B76410 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_27B76410>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_27B76410 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_27B76410 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_27B76410 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_27B76410 value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -4279,6 +4661,22 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_3628B844 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_3628B844>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_3628B844 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_3628B844 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_3628B844 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_3628B844 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_3CFF788C : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_3CFF788C>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IManagementGrain_GrainReference_3CFF788C(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4315,6 +4713,40 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_3F1A8669 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_3F1A8669>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_3F1A8669(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_3F1A8669 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_3F1A8669 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_3F1A8669 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_3F1A8669 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_4208E55B_1<T> : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_4208E55B_1<T>>, global::Orleans.Serialization.Codecs.IFieldCodec where T : global::Orleans.Providers.IControllable
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_4208E55B_1<T> instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_4208E55B_1<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_4208E55B_1<T> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_4208E55B_1<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_4C0864C2 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_4C0864C2>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_4C0864C2 instance) { }
@@ -4325,6 +4757,42 @@ namespace OrleansCodeGen.Orleans.Runtime
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_4C0864C2 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_4C2438F7 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_4C2438F7>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_4C2438F7(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_4C2438F7 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_4C2438F7 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_4C2438F7 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_4C2438F7 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_4ED55CFF : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_4ED55CFF>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_4ED55CFF(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_4ED55CFF instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_4ED55CFF ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_4ED55CFF instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_4ED55CFF value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -4365,6 +4833,24 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_584D0ED6 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_584D0ED6>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_584D0ED6(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_584D0ED6 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_584D0ED6 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_584D0ED6 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_584D0ED6 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_5922EB76 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_5922EB76>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IManagementGrain_GrainReference_5922EB76(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4377,6 +4863,60 @@ namespace OrleansCodeGen.Orleans.Runtime
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_5922EB76 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_5A76BD19 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_5A76BD19>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_5A76BD19(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_5A76BD19 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_5A76BD19 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_5A76BD19 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_5A76BD19 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_6C27A568 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_6C27A568>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_6C27A568(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_6C27A568 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_6C27A568 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_6C27A568 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_6C27A568 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_882D215C : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_882D215C>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_882D215C(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_882D215C instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_882D215C ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_882D215C instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_882D215C value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -4417,6 +4957,22 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_B15A0F47 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_B15A0F47>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_B15A0F47 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_B15A0F47 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_B15A0F47 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_B15A0F47 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_B761B345 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_B761B345>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IManagementGrain_GrainReference_B761B345(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4451,6 +5007,24 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_D3C155A6 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_D3C155A6>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_D3C155A6(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_D3C155A6 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_D3C155A6 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_D3C155A6 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_D3C155A6 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_D7365B43 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_D7365B43>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_D7365B43 instance) { }
@@ -4467,6 +5041,38 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_DDBA9C54 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_DDBA9C54>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_DDBA9C54 instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_DDBA9C54 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_DDBA9C54 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_DDBA9C54 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_F3F2786D : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_F3F2786D>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_F3F2786D instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_F3F2786D ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_F3F2786D instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_F3F2786D value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_F67965CC_1<T> : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_F67965CC_1<T>>, global::Orleans.Serialization.Codecs.IFieldCodec where T : global::Orleans.Providers.IControllable
     {
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_F67965CC_1<T> instance) { }
@@ -4477,6 +5083,24 @@ namespace OrleansCodeGen.Orleans.Runtime
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_F67965CC_1<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IManagementGrain_GrainReference_FB06532F : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IManagementGrain_GrainReference_FB06532F>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IManagementGrain_GrainReference_FB06532F(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IManagementGrain_GrainReference_FB06532F instance) { }
+
+        public Invokable_IManagementGrain_GrainReference_FB06532F ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IManagementGrain_GrainReference_FB06532F instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IManagementGrain_GrainReference_FB06532F value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -4550,11 +5174,39 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_0EAD6AA7 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_0EAD6AA7>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_0EAD6AA7(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_0EAD6AA7 DeepCopy(Invokable_IManagementGrain_GrainReference_0EAD6AA7 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_0F06E027 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_0F06E027>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IManagementGrain_GrainReference_0F06E027(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public Invokable_IManagementGrain_GrainReference_0F06E027 DeepCopy(Invokable_IManagementGrain_GrainReference_0F06E027 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_23DED572 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_23DED572>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_23DED572(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_23DED572 DeepCopy(Invokable_IManagementGrain_GrainReference_23DED572 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_27B76410 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_27B76410>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IManagementGrain_GrainReference_27B76410 DeepCopy(Invokable_IManagementGrain_GrainReference_27B76410 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -4590,6 +5242,14 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_3628B844 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_3628B844>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IManagementGrain_GrainReference_3628B844 DeepCopy(Invokable_IManagementGrain_GrainReference_3628B844 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_3CFF788C : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_3CFF788C>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IManagementGrain_GrainReference_3CFF788C(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4608,9 +5268,47 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_3F1A8669 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_3F1A8669>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_3F1A8669(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_3F1A8669 DeepCopy(Invokable_IManagementGrain_GrainReference_3F1A8669 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_4208E55B_1<T> : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_4208E55B_1<T>>, global::Orleans.Serialization.Cloning.IDeepCopier where T : global::Orleans.Providers.IControllable
+    {
+        public Invokable_IManagementGrain_GrainReference_4208E55B_1<T> DeepCopy(Invokable_IManagementGrain_GrainReference_4208E55B_1<T> original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_4C0864C2 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_4C0864C2>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Invokable_IManagementGrain_GrainReference_4C0864C2 DeepCopy(Invokable_IManagementGrain_GrainReference_4C0864C2 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_4C2438F7 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_4C2438F7>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_4C2438F7(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_4C2438F7 DeepCopy(Invokable_IManagementGrain_GrainReference_4C2438F7 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_4ED55CFF : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_4ED55CFF>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_4ED55CFF(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_4ED55CFF DeepCopy(Invokable_IManagementGrain_GrainReference_4ED55CFF original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -4634,11 +5332,49 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_584D0ED6 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_584D0ED6>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_584D0ED6(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_584D0ED6 DeepCopy(Invokable_IManagementGrain_GrainReference_584D0ED6 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_5922EB76 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_5922EB76>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IManagementGrain_GrainReference_5922EB76(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public Invokable_IManagementGrain_GrainReference_5922EB76 DeepCopy(Invokable_IManagementGrain_GrainReference_5922EB76 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_5A76BD19 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_5A76BD19>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IManagementGrain_GrainReference_5A76BD19 DeepCopy(Invokable_IManagementGrain_GrainReference_5A76BD19 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_6C27A568 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_6C27A568>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_6C27A568(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_6C27A568 DeepCopy(Invokable_IManagementGrain_GrainReference_6C27A568 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_882D215C : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_882D215C>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_882D215C(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_882D215C DeepCopy(Invokable_IManagementGrain_GrainReference_882D215C original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -4662,6 +5398,14 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_B15A0F47 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_B15A0F47>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IManagementGrain_GrainReference_B15A0F47 DeepCopy(Invokable_IManagementGrain_GrainReference_B15A0F47 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_B761B345 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_B761B345>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IManagementGrain_GrainReference_B761B345(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -4680,9 +5424,35 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_D3C155A6 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_D3C155A6>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_D3C155A6(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_D3C155A6 DeepCopy(Invokable_IManagementGrain_GrainReference_D3C155A6 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_D7365B43 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_D7365B43>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Invokable_IManagementGrain_GrainReference_D7365B43 DeepCopy(Invokable_IManagementGrain_GrainReference_D7365B43 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_DDBA9C54 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_DDBA9C54>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IManagementGrain_GrainReference_DDBA9C54 DeepCopy(Invokable_IManagementGrain_GrainReference_DDBA9C54 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_F3F2786D : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_F3F2786D>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IManagementGrain_GrainReference_F3F2786D DeepCopy(Invokable_IManagementGrain_GrainReference_F3F2786D original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -4696,7 +5466,17 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "0A1C0D82" })]
+    public sealed partial class Copier_Invokable_IManagementGrain_GrainReference_FB06532F : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IManagementGrain_GrainReference_FB06532F>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IManagementGrain_GrainReference_FB06532F(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IManagementGrain_GrainReference_FB06532F DeepCopy(Invokable_IManagementGrain_GrainReference_FB06532F original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetDetailedGrainStatistics" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_0A1C0D82 : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.DetailedGrainStatistic[]>
     {
         public string[] arg0;
@@ -4729,7 +5509,46 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "0F06E027" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "317D82B6" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_0EAD6AA7 : global::Orleans.Runtime.Request<global::Orleans.Runtime.SiloAddress>
+    {
+        public global::Orleans.Runtime.IAddressable arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.ValueTask<global::Orleans.Runtime.SiloAddress> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetGrainCallFrequencies" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_0F06E027 : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.List<global::Orleans.Runtime.GrainCallFrequency>>
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
@@ -4761,7 +5580,84 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "2D761B36" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "54FE0FEC" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_23DED572 : global::Orleans.Runtime.Request
+    {
+        public global::Orleans.Runtime.SiloAddress[] arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.ValueTask InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "ACCE9D6A" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_27B76410 : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.SimpleGrainStatistic[]>
+    {
+        public System.Threading.CancellationToken arg0;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<global::Orleans.Runtime.SimpleGrainStatistic[]> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetRuntimeStatistics" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_2D761B36 : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.SiloRuntimeStatistics[]>
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
@@ -4793,7 +5689,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "317D82B6" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetActivationAddress" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_317D82B6 : global::Orleans.Runtime.Request<global::Orleans.Runtime.SiloAddress>
     {
         public global::Orleans.Runtime.IAddressable arg0;
@@ -4825,7 +5721,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "329F9A1B" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "ForceActivationCollectionOnSilos" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_329F9A1B : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
@@ -4858,7 +5754,46 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "3CFF788C" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "54E6D1D1" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_3628B844 : global::Orleans.Runtime.TaskRequest
+    {
+        public System.TimeSpan arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetSimpleGrainStatisticsOnSilos" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_3CFF788C : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.SimpleGrainStatistic[]>
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
@@ -4890,7 +5825,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "3DB7923B" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetActiveGrains" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_3DB7923B : global::Orleans.Runtime.Request<System.Collections.Generic.List<global::Orleans.Runtime.GrainId>>
     {
         public global::Orleans.Runtime.GrainType arg0;
@@ -4922,7 +5857,88 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "4C0864C2" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "0A1C0D82" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_3F1A8669 : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.DetailedGrainStatistic[]>
+    {
+        public string[] arg0;
+        public global::Orleans.Runtime.SiloAddress[] arg1;
+        public System.Threading.CancellationToken arg2;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<global::Orleans.Runtime.DetailedGrainStatistic[]> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "F67965CC" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_4208E55B_1<T> : global::Orleans.Runtime.TaskRequest<object[]> where T : global::Orleans.Providers.IControllable
+    {
+        public string arg0;
+        public int arg1;
+        public object arg2;
+        public System.Threading.CancellationToken arg3;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<object[]> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetHosts" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_4C0864C2 : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.Dictionary<global::Orleans.Runtime.SiloAddress, global::Orleans.Runtime.SiloStatus>>
     {
         public bool arg0;
@@ -4954,7 +5970,85 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "54E6D1D1" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "AEDE93F6" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_4C2438F7 : global::Orleans.Runtime.TaskRequest<int>
+    {
+        public global::Orleans.Runtime.GrainReference arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "2D761B36" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_4ED55CFF : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.SiloRuntimeStatistics[]>
+    {
+        public global::Orleans.Runtime.SiloAddress[] arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<global::Orleans.Runtime.SiloRuntimeStatistics[]> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "ForceActivationCollection" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_54E6D1D1 : global::Orleans.Runtime.TaskRequest
     {
         public System.TimeSpan arg0;
@@ -4986,7 +6080,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "54FE0FEC" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "ResetGrainCallFrequencies" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_54FE0FEC : global::Orleans.Runtime.Request
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
@@ -5018,7 +6112,46 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "5922EB76" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "3CFF788C" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_584D0ED6 : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.SimpleGrainStatistic[]>
+    {
+        public global::Orleans.Runtime.SiloAddress[] arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<global::Orleans.Runtime.SimpleGrainStatistic[]> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "ForceGarbageCollection" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_5922EB76 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
@@ -5050,7 +6183,124 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "ACCE9D6A" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "3DB7923B" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_5A76BD19 : global::Orleans.Runtime.Request<System.Collections.Generic.List<global::Orleans.Runtime.GrainId>>
+    {
+        public global::Orleans.Runtime.GrainType arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.ValueTask<System.Collections.Generic.List<global::Orleans.Runtime.GrainId>> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "5922EB76" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_6C27A568 : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Runtime.SiloAddress[] arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "0F06E027" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_882D215C : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.List<global::Orleans.Runtime.GrainCallFrequency>>
+    {
+        public global::Orleans.Runtime.SiloAddress[] arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<System.Collections.Generic.List<global::Orleans.Runtime.GrainCallFrequency>> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetSimpleGrainStatistics" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_ACCE9D6A : global::Orleans.Runtime.TaskRequest<global::Orleans.Runtime.SimpleGrainStatistic[]>
     {
         public override void Dispose() { }
@@ -5075,7 +6325,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "AEDE93F6" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetGrainActivationCount" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_AEDE93F6 : global::Orleans.Runtime.TaskRequest<int>
     {
         public global::Orleans.Runtime.GrainReference arg0;
@@ -5107,7 +6357,45 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "B761B345" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "D7365B43" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_B15A0F47 : global::Orleans.Runtime.TaskRequest<int>
+    {
+        public System.Threading.CancellationToken arg0;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "ForceRuntimeStatisticsCollection" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_B761B345 : global::Orleans.Runtime.TaskRequest
     {
         public global::Orleans.Runtime.SiloAddress[] arg0;
@@ -5139,7 +6427,7 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "CC6CCBC3" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetDetailedHosts" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_CC6CCBC3 : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipEntry[]>
     {
         public bool arg0;
@@ -5171,7 +6459,47 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "D7365B43" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "329F9A1B" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_D3C155A6 : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Runtime.SiloAddress[] arg0;
+        public System.TimeSpan arg1;
+        public System.Threading.CancellationToken arg2;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "GetTotalActivationCount" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_D7365B43 : global::Orleans.Runtime.TaskRequest<int>
     {
         public override void Dispose() { }
@@ -5196,7 +6524,85 @@ namespace OrleansCodeGen.Orleans.Runtime
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "F67965CC" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "4C0864C2" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_DDBA9C54 : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.Dictionary<global::Orleans.Runtime.SiloAddress, global::Orleans.Runtime.SiloStatus>>
+    {
+        public bool arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<global::Orleans.Runtime.SiloAddress, global::Orleans.Runtime.SiloStatus>> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "CC6CCBC3" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_F3F2786D : global::Orleans.Runtime.TaskRequest<global::Orleans.MembershipEntry[]>
+    {
+        public bool arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<global::Orleans.MembershipEntry[]> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "SendControlCommandToProvider" })]
     public sealed partial class Invokable_IManagementGrain_GrainReference_F67965CC_1<T> : global::Orleans.Runtime.TaskRequest<object[]> where T : global::Orleans.Providers.IControllable
     {
         public string arg0;
@@ -5225,6 +6631,45 @@ namespace OrleansCodeGen.Orleans.Runtime
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Runtime.IManagementGrain), "B761B345" })]
+    public sealed partial class Invokable_IManagementGrain_GrainReference_FB06532F : global::Orleans.Runtime.TaskRequest
+    {
+        public global::Orleans.Runtime.SiloAddress[] arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
     }
 }
 
@@ -5314,6 +6759,24 @@ namespace OrleansCodeGen.Orleans.Storage
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T> : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T>>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T> instance) { }
+
+        public Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IMemoryStorageGrain_GrainReference_7CC6CA25_1<T> : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMemoryStorageGrain_GrainReference_7CC6CA25_1<T>>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IMemoryStorageGrain_GrainReference_7CC6CA25_1(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5348,6 +6811,38 @@ namespace OrleansCodeGen.Orleans.Storage
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T> : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T>>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T> instance) { }
+
+        public Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T> : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T>>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T> instance) { }
+
+        public Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_BadProviderConfigException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Storage.BadProviderConfigException, global::Orleans.Runtime.OrleansException>
     {
         public Copier_BadProviderConfigException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
@@ -5374,6 +6869,16 @@ namespace OrleansCodeGen.Orleans.Storage
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T> : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T> DeepCopy(Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T> original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IMemoryStorageGrain_GrainReference_7CC6CA25_1<T> : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStorageGrain_GrainReference_7CC6CA25_1<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IMemoryStorageGrain_GrainReference_7CC6CA25_1(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -5392,7 +6897,23 @@ namespace OrleansCodeGen.Orleans.Storage
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Storage.IMemoryStorageGrain), "45659318" })]
+    public sealed partial class Copier_Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T> : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T> DeepCopy(Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T> original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T> : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T> DeepCopy(Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T> original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Storage.IMemoryStorageGrain), "ReadStateAsync" })]
     public sealed partial class Invokable_IMemoryStorageGrain_GrainReference_45659318_1<T> : global::Orleans.Runtime.TaskRequest<global::Orleans.IGrainState<T>>
     {
         public string arg0;
@@ -5425,6 +6946,46 @@ namespace OrleansCodeGen.Orleans.Storage
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Storage.IMemoryStorageGrain), "7CC6CA25" })]
+    public sealed partial class Invokable_IMemoryStorageGrain_GrainReference_7AABA8EE_1<T> : global::Orleans.Runtime.TaskRequest<string>
+    {
+        public string arg0;
+        public global::Orleans.IGrainState<T> arg1;
+        public System.Threading.CancellationToken arg2;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<string> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Storage.IMemoryStorageGrain), "WriteStateAsync" })]
     public sealed partial class Invokable_IMemoryStorageGrain_GrainReference_7CC6CA25_1<T> : global::Orleans.Runtime.TaskRequest<string>
     {
         public string arg0;
@@ -5457,7 +7018,7 @@ namespace OrleansCodeGen.Orleans.Storage
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Storage.IMemoryStorageGrain), "B7CADD03" })]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Storage.IMemoryStorageGrain), "DeleteStateAsync" })]
     public sealed partial class Invokable_IMemoryStorageGrain_GrainReference_B7CADD03_1<T> : global::Orleans.Runtime.TaskRequest
     {
         public string arg0;
@@ -5485,5 +7046,84 @@ namespace OrleansCodeGen.Orleans.Storage
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Storage.IMemoryStorageGrain), "45659318" })]
+    public sealed partial class Invokable_IMemoryStorageGrain_GrainReference_C35A3029_1<T> : global::Orleans.Runtime.TaskRequest<global::Orleans.IGrainState<T>>
+    {
+        public string arg0;
+        public System.Threading.CancellationToken arg1;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<global::Orleans.IGrainState<T>> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Storage.IMemoryStorageGrain), "B7CADD03" })]
+    public sealed partial class Invokable_IMemoryStorageGrain_GrainReference_D4AA4A76_1<T> : global::Orleans.Runtime.TaskRequest
+    {
+        public string arg0;
+        public string arg1;
+        public System.Threading.CancellationToken arg2;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
     }
 }

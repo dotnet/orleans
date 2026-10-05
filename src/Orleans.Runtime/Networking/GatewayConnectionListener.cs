@@ -7,7 +7,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Connections.Transport;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class GatewayConnectionListener(
@@ -32,20 +31,21 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionCommon _connectionShared = connectionShared;
         private readonly ConnectionPreambleHelper _connectionPreambleHelper = connectionPreambleHelper;
         private readonly OverloadDetector _overloadDetector = overloadDetector;
-        private readonly Gateway _gateway = messageCenter.Gateway;
+        private readonly Gateway? _gateway = messageCenter.Gateway;
 
         protected override Connection CreateConnection(MessageTransport transport)
         {
+            var gateway = _gateway!;
             return new GatewayInboundConnection(
                 transport,
-                _gateway,
+                gateway,
                 _overloadDetector,
                 _localSiloDetails,
                 ConnectionOptions,
                 _messageCenter,
                 _connectionShared,
                 _connectionPreambleHelper,
-                _gateway.GatewayInstruments);
+                gateway.GatewayInstruments);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

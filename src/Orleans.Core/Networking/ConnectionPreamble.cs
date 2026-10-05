@@ -8,7 +8,6 @@ using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     [GenerateSerializer, Immutable]
@@ -21,10 +20,10 @@ namespace Orleans.Runtime.Messaging
         public GrainId NodeIdentity { get; init; }
 
         [Id(2)]
-        public SiloAddress SiloAddress { get; init; }
+        public SiloAddress? SiloAddress { get; init; }
 
         [Id(3)]
-        public string ClusterId { get; init; }
+        public string ClusterId { get; init; } = null!;
     }
 
     internal sealed class ConnectionPreambleHelper
@@ -165,7 +164,8 @@ namespace Orleans.Runtime.Messaging
                 {
                     buffer.Skip(sizeof(int));
                     using var preambleBuffer = buffer.ConsumeSlice(_preambleLength);
-                    var preamble = _preambleSerializer.Deserialize(preambleBuffer);
+                    var preamble = _preambleSerializer.Deserialize(preambleBuffer)
+                        ?? throw new InvalidOperationException("Received a null connection preamble.");
                     _completion.SetResult(preamble);
 
                     return true;

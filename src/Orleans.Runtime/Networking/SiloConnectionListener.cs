@@ -7,7 +7,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Connections.Transport;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class SiloConnectionListener(

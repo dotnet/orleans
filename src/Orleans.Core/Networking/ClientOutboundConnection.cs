@@ -7,7 +7,6 @@ using Orleans.Configuration;
 using Orleans.Messaging;
 using Orleans.Connections.Transport;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed partial class ClientOutboundConnection : Connection
@@ -59,7 +58,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override async Task RunAsyncCore()
         {
-            Exception error = default;
+            Exception? error = default;
             try
             {
                 this.messageCenter.OnGatewayConnectionOpen();
@@ -118,7 +117,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        protected override void RetryMessage(Message msg, Exception ex = null)
+        protected override void RetryMessage(Message msg, Exception? ex = null)
         {
             if (msg == null) return;
 
@@ -176,7 +175,7 @@ namespace Orleans.Runtime.Messaging
             SkipEnabledCheck = true,
             Message = "Established connection to {Silo} with protocol version {ProtocolVersion}"
         )]
-        private static partial void LogInformationEstablishedConnection(ILogger logger, SiloAddress silo, string protocolVersion);
+        private static partial void LogInformationEstablishedConnection(ILogger logger, SiloAddress? silo, string protocolVersion);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

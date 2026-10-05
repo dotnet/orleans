@@ -762,6 +762,8 @@ namespace Orleans.Serialization.Buffers
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
+        public ArcBufferReader(ArcBufferWriter writer) { }
+
         public int Length { get { throw null; } }
 
         public readonly void Consume(System.Span<byte> output) { }
@@ -784,10 +786,12 @@ namespace Orleans.Serialization.Buffers
     [Immutable]
     public sealed partial class ArcBufferWriter : System.Buffers.IBufferWriter<byte>, System.IDisposable
     {
-        public const int MinimumPageSize = 1024;
+        public const int MinimumPageSize = 16384;
         public int Length { get { throw null; } }
 
         public ArcBufferReader Reader { get { throw null; } }
+
+        public int UnconsumedLength { get { throw null; } }
 
         public void AdvanceReader(int count) { }
 

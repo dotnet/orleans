@@ -118,7 +118,7 @@ namespace Orleans.TestingHost
 
         public InProcessSiloHandle? GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
 
-        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress silo = null) { throw null; }
+        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress? silo = null) { throw null; }
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
@@ -391,7 +391,7 @@ namespace Orleans.TestingHost
 
         public ITestClusterPortAllocator PortAllocator { get { throw null; } }
 
-        public SiloHandle Primary { get { throw null; } }
+        public SiloHandle? Primary { get { throw null; } }
 
         public System.Collections.Generic.IReadOnlyList<SiloHandle> SecondarySilos { get { throw null; } }
 
@@ -427,7 +427,7 @@ namespace Orleans.TestingHost
 
         public SiloHandle? GetSiloForAddress(Runtime.SiloAddress siloAddress) { throw null; }
 
-        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress silo = null) { throw null; }
+        public System.IServiceProvider GetSiloServiceProvider(Runtime.SiloAddress? silo = null) { throw null; }
 
         public System.Threading.Tasks.Task InitializeClientAsync() { throw null; }
 
