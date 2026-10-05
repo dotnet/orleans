@@ -1,5 +1,3 @@
-#nullable enable
-
 using System;
 using System.Net.Security;
 using System.Security.Authentication;

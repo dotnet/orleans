@@ -1,5 +1,3 @@
-#nullable enable
-
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Connections;

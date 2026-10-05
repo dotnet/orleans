@@ -1,5 +1,3 @@
-#nullable enable
-
 namespace Orleans.Connections.Transport;
 
 /// <summary>

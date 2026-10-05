@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 
-#nullable enable
 namespace Orleans.Runtime.Messaging
 {
     internal class ConnectionLogScope : IReadOnlyList<KeyValuePair<string, object?>>

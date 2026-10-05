@@ -7,7 +7,6 @@ using Orleans.Caching;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 
-#nullable enable annotations
 namespace Orleans.Runtime.Messaging
 {
     /// <summary>

@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
