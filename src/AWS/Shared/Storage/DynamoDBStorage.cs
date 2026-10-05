@@ -981,6 +981,51 @@ namespace Orleans.Transactions.DynamoDB
         }
 
         /// <summary>
+        /// Whether a table holds an entry matching a filter expression, scanning it page by page and stopping at the first.
+        /// </summary>
+        /// <param name="tableName">The name of the table to scan</param>
+        /// <param name="filterExpression">The filter expression</param>
+        /// <param name="attributes">The attributes used on the expression</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns><see langword="true"/> when an entry matches</returns>
+        internal async Task<bool> AnyAsync(string tableName, string filterExpression, Dictionary<string, AttributeValue> attributes, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                Dictionary<string, AttributeValue>? exclusiveStartKey = null;
+                do
+                {
+                    var request = new ScanRequest
+                    {
+                        TableName = tableName,
+                        Limit = 100,
+                        ConsistentRead = true,
+                        FilterExpression = filterExpression,
+                        ExpressionAttributeValues = attributes,
+                        Select = Select.COUNT,
+                        ExclusiveStartKey = exclusiveStartKey,
+                    };
+
+                    var response = await _ddbClient.ScanAsync(request, cancellationToken);
+                    if (response.Count > 0)
+                    {
+                        return true;
+                    }
+
+                    exclusiveStartKey = response.LastEvaluatedKey;
+                }
+                while (exclusiveStartKey is { Count: > 0 });
+
+                return false;
+            }
+            catch (Exception exc) when (exc is not OperationCanceledException)
+            {
+                LogWarningFailedToReadTable(_logger, exc, tableName);
+                throw new OrleansException($"Failed to read table {tableName}: {exc.Message}", exc);
+            }
+        }
+
+        /// <summary>
         /// Crete or replace multiple entries in a DynamoDB table (Batch put)
         /// </summary>
         /// <param name="tableName">The name of the table to search for the entry</param>
