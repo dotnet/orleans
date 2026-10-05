@@ -26,6 +26,8 @@ namespace Orleans.Configuration
 
         public int InitStage { get { throw null; } set { } }
 
+        public bool? MigrateLegacyKeys { get { throw null; } set { } }
+
         public int ReadCapacityUnits { get { throw null; } set { } }
 
         public string ServiceId { get { throw null; } set { } }
@@ -35,6 +37,8 @@ namespace Orleans.Configuration
         public System.TimeSpan? TimeToLive { get { throw null; } set { } }
 
         public bool UpdateIfExists { get { throw null; } set { } }
+
+        public bool? UseClusterServiceId { get { throw null; } set { } }
 
         public bool UseProvisionedThroughput { get { throw null; } set { } }
 
