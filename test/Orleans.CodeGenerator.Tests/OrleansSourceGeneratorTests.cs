@@ -2268,18 +2268,30 @@ public class DemoClass
             """);
         var managed = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "false" });
         var native = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        var tree = compilation.SyntaxTrees.Single();
+        var frameworkSymbolCompilation = compilation.ReplaceSyntaxTree(tree,
+            tree.WithRootAndOptions(tree.GetRoot(TestContext.Current.CancellationToken),
+                ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols("NET5_0_OR_GREATER")));
+        var frameworkSymbol = RunSourceGenerator(frameworkSymbolCompilation);
 
         Assert.Empty(managed.Diagnostics);
         Assert.Empty(native.Diagnostics);
+        Assert.Empty(frameworkSymbol.Diagnostics);
         Assert.Equal(
             managed.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
                 .Select(static source => (source.HintName, Source: source.SourceText.ToString())),
             native.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
                 .Select(static source => (source.HintName, Source: source.SourceText.ToString())));
+        Assert.Equal(
+            managed.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
+                .Select(static source => (source.HintName, Source: source.SourceText.ToString())),
+            frameworkSymbol.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
+                .Select(static source => (source.HintName, Source: source.SourceText.ToString())));
         var source = ConcatenateGeneratedSources(managed);
         Assert.Contains("IResponseInvokable", source);
         Assert.Contains("IRawResponseWriter", source);
         Assert.Contains("AddRawResponseReader", source);
+        Assert.DoesNotContain("#if NET5_0_OR_GREATER", source);
         Assert.DoesNotContain("RuntimeFeature", source);
         Assert.DoesNotContain("UseGeneratedSerializerContexts", source);
         Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
@@ -2387,6 +2399,10 @@ public class DemoClass
         Assert.DoesNotContain("RuntimeFeature.IsDynamicCodeSupported", source);
         Assert.Contains("codecDependencies: new global::System.Type[]", source);
         Assert.Contains("copierDependencies: new global::System.Type[]", source);
+        var integerResponseRegistration = Assert.Single(source.Split('\n'), static line =>
+            line.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<int>,", StringComparison.Ordinal));
+        Assert.Contains("codecDependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Codecs.Int32Codec) }", integerResponseRegistration);
+        Assert.Contains("copierDependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Cloning.ShallowCopier<int>) }", integerResponseRegistration);
         Assert.DoesNotContain("GetService<global::Orleans.Serialization.Codecs.IFieldCodec<", source);
         Assert.DoesNotContain("GetService<global::Orleans.Serialization.Cloning.IDeepCopier<", source);
         Assert.DoesNotContain("RequireExplicitTypeRegistration", source);

@@ -678,10 +678,25 @@ namespace Orleans.Serialization.Serializers
 
         // Inferred defaults preserve an automatic caller's DI boundary instead of starting a transaction inside it.
         private bool IsDefaultServiceEligible(Type service)
-            => !(_manifest.IsDefaultSerializerService(service)
-                    && OrleansGeneratedCodeHelper.GetConstructionScope(this) is { IsPending: false })
-                && (!_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract)
-                    || IsDefaultContractEligible(contract, []));
+            => !_manifest.IsDefaultSerializerService(service)
+                || (OrleansGeneratedCodeHelper.GetConstructionScope(this) is not { IsPending: false }
+                    && IsDefaultImplementationEligible(service)
+                    && (!_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract)
+                        || IsDefaultContractEligible(contract, [])));
+
+        private bool IsDefaultImplementationEligible(Type implementation)
+        {
+            if (_manifest.DefaultSerializerImplementationServices.TryGetValue(implementation, out var services))
+            {
+                foreach (var service in services)
+                {
+                    if (!_manifest.IsDefaultSerializerService(service)) return false;
+                    if (_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract)
+                        && !IsDefaultContractImplementationEligible(contract)) return false;
+                }
+            }
+            return true;
+        }
 
         private bool IsProviderService(Type serviceType)
             => serviceType != typeof(object)
@@ -691,6 +706,30 @@ namespace Orleans.Serialization.Serializers
         private bool IsDefaultContractEligible(TypeManifestOptions.DefaultSerializerContract contract, HashSet<Type> visited)
         {
             if (!_manifest.IsDefaultSerializerService(contract.Service) || !visited.Add(contract.Service)) return true;
+            if (!IsDefaultContractImplementationEligible(contract)) return false;
+            foreach (var dependency in contract.Dependencies)
+            {
+                if (_manifest.SerializerServiceFactories.ContainsKey(dependency) && !_manifest.IsDefaultSerializerService(dependency))
+                    continue;
+                if (!IsDefaultImplementationEligible(dependency)) return false;
+                if (_manifest.DefaultSerializerContracts.TryGetValue(dependency, out var required))
+                {
+                    if (!IsDefaultContractEligible(required, visited)) return false;
+                }
+                else if (!_manifest.SerializerServiceFactories.ContainsKey(dependency)
+                    && !IsProviderService(dependency)
+                    && dependency != typeof(IServiceProvider)
+                    && dependency != typeof(IServiceProviderIsService)
+                    && !(dependency == typeof(IServiceProviderIsKeyedService) && _serviceProvider is IKeyedServiceProvider))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private bool IsDefaultContractImplementationEligible(TypeManifestOptions.DefaultSerializerContract contract)
+        {
             var role = contract.Service.IsConstructedGenericType ? contract.Service.GetGenericTypeDefinition() : null;
             var target = role is null ? contract.Service : contract.Service.GenericTypeArguments[0];
             if (role is not null && contract.Implementation is { } implementation)
@@ -702,21 +741,6 @@ namespace Orleans.Serialization.Serializers
                 }
                 else if ((role == typeof(IFieldCodec<>) || role == typeof(IDeepCopier<>))
                     && TrySelectImplementation(typeof(IConverter<,>), target, searchType, out _, out _, materializeImplementation: false))
-                {
-                    return false;
-                }
-            }
-            foreach (var dependency in contract.Dependencies)
-            {
-                if (_manifest.DefaultSerializerContracts.TryGetValue(dependency, out var required))
-                {
-                    if (!IsDefaultContractEligible(required, visited)) return false;
-                }
-                else if (!_manifest.SerializerServiceFactories.ContainsKey(dependency)
-                    && !IsProviderService(dependency)
-                    && dependency != typeof(IServiceProvider)
-                    && dependency != typeof(IServiceProviderIsService)
-                    && !(dependency == typeof(IServiceProviderIsKeyedService) && _serviceProvider is IKeyedServiceProvider))
                 {
                     return false;
                 }

@@ -51,6 +51,7 @@ namespace Orleans.Serialization.Configuration
         internal Dictionary<Type, Type> CopierFactoryServices { get; } = new();
         internal Dictionary<Type, Func<ICodecProvider, object>> SerializerServiceFactories { get; } = new();
         internal Dictionary<Type, DefaultSerializerContract> DefaultSerializerContracts { get; } = new();
+        internal Dictionary<Type, HashSet<Type>> DefaultSerializerImplementationServices { get; } = new();
         internal Dictionary<Type, DefaultSerializerContract> DefaultCodecFactoryContracts { get; } = new();
         internal Dictionary<Type, DefaultSerializerContract> DefaultCopierFactoryContracts { get; } = new();
         internal Dictionary<Type, Func<ICodecProvider, IRawResponseReader>> RawResponseReaderFactories { get; } = new();
@@ -124,6 +125,8 @@ namespace Orleans.Serialization.Configuration
             var registerCodec = !SerializerServiceFactories.ContainsKey(typeof(IFieldCodec<T>));
             var registerCopier = !SerializerServiceFactories.ContainsKey(typeof(IDeepCopier<T>));
             RegisterSerializerFactories(codecFactory, copierFactory, isDefault: true);
+            RegisterDefaultImplementationService(typeof(IFieldCodec<T>), typeof(TCodec));
+            RegisterDefaultImplementationService(typeof(IDeepCopier<T>), typeof(TCopier));
             if (registerCodec)
             {
                 RegisterDefaultContract(typeof(IFieldCodec<T>), typeof(TCodec), compatibleCodecType, codecDependencies);
@@ -230,10 +233,21 @@ namespace Orleans.Serialization.Configuration
             dependencies = CopyDefaultDependencies(dependencies);
             var register = !SerializerServiceFactories.ContainsKey(typeof(TService));
             AddDefaultSerializerService(factory);
+            RegisterDefaultImplementationService(typeof(TService), typeof(TImplementation));
             if (register) RegisterDefaultContract(typeof(TService), typeof(TImplementation), compatibleImplementationType, dependencies);
         }
 
         internal bool IsDefaultSerializerService(Type type) => _defaultSerializerServices.Contains(type);
+
+        private void RegisterDefaultImplementationService(Type service, Type implementation)
+        {
+            if (service == implementation) return;
+            if (!DefaultSerializerImplementationServices.TryGetValue(implementation, out var services))
+            {
+                DefaultSerializerImplementationServices.Add(implementation, services = new());
+            }
+            services.Add(service);
+        }
 
         private void RegisterDefaultContract(Type service, Type? implementation, Type? compatible, Type[]? dependencies)
         {
