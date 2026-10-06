@@ -7,7 +7,7 @@ ms.topic: how-to
 
 # Configure Orleans Journaling
 
-Configure a default journal storage provider on every silo that hosts grains or activation-scoped features using <xref:Orleans.Journaling.IDurableStateManager>. Additional named providers give journal consumers independent storage namespaces alongside default grain journaling. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
+Configure the journal storage providers selected by grains or activation-scoped features using <xref:Orleans.Journaling.IDurableStateManager> on every silo that hosts those grain types. Named providers give grain types and standalone journal consumers independent storage namespaces. Grain types without an explicit selection use `Default`. Provider registration also adds the core Journaling services, durable-state factories and keyed services, activation lifecycle integration, JSON format, and Orleans binary reader.
 
 The Journaling packages are pre-release alpha packages and their APIs carry diagnostic `ORLEANSEXP005`.
 
@@ -63,8 +63,8 @@ it contains work.
 Configure each journal storage binding under `Orleans:Journaling:{name}`.
 `ProviderType` selects its storage provider, and `ServiceKey` selects its Azure
 or Redis client from dependency injection. Orleans passes each entry's name and
-configuration section to the registered provider builder. Use `Default` as the
-name for grain journaling; other names configure additional storage bindings.
+configuration section to the registered provider builder. Use `Default` for grain
+types with the default selection, and additional names for selected storage bindings.
 
 For example, these entries configure the default journal and an archive with
 separate registered Redis clients and key prefixes:
@@ -90,6 +90,38 @@ separate registered Redis clients and key prefixes:
 
 The equivalent environment-variable key for the archive client is
 `Orleans__Journaling__archive__ServiceKey`.
+
+### Select storage per grain type
+
+Apply <xref:Orleans.Journaling.JournalStorageProviderAttribute> to a grain class to
+select its registered, ordinal, case-sensitive provider name. Orleans publishes
+the selection in grain-type metadata and resolves it when creating the activation's
+shared state manager. An inherited attribute supplies the base class's selection;
+an attribute on a derived grain class supplies that type's selection.
+
+Register the same names and physical namespaces on every silo hosting the grain
+types. For example, two named Azure Blob providers can use separate containers
+alongside the default container:
+
+:::code language="csharp" source="./snippets/journaling/GrainJournalProviders.cs" id="configure_grain_providers":::
+
+Both <xref:Orleans.Journaling.DurableGrain> helpers and constructor injection use
+the selected provider:
+
+:::code language="csharp" source="./snippets/journaling/GrainJournalProviders.cs" id="select_grain_providers":::
+
+All injected durable values, collections, and journaling-backed
+<xref:Orleans.Runtime.IPersistentState`1> share that activation's manager and write
+boundary. The provider stays fixed for the activation's lifetime. Invalid or
+unregistered selections fail with a configuration error identifying the grain type
+and provider before journal data is accessed.
+
+Recovery reads the selected physical namespace using the grain's existing journal
+identity. Changing a grain type's selection directs new activations to the new
+namespace. For grain types with existing journals, plan a deliberate data migration
+or cutover: stop writes to the old namespace, transfer and verify journals with
+their metadata, and deploy the new selection consistently across silos. Include
+the provider selection and namespace in the rollback plan.
 
 For Durable Jobs, <xref:Orleans.Hosting.DurableJobsExtensions.UseJournaledDurableJobs*>
 selects the journaled implementation.

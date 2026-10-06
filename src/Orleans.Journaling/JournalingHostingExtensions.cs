@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Journaling.Json;
+using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 
@@ -21,6 +22,8 @@ public static class JournalingHostingExtensions
     /// <remarks>
     /// Resolving the standard grain-scoped <see cref="IDurableStateManager"/> enrolls it in the grain lifecycle.
     /// Its registered durable states recover during <see cref="GrainLifecycleStage.SetupState"/>, before grain activation.
+    /// <see cref="JournalStorageProviderAttribute"/> selects the provider for all durable state in an activation.
+    /// Grain types without an explicit selection use <see cref="ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME"/>.
     /// Managers created through <see cref="IJournaledStateManagerFactory"/> have caller-owned initialization and disposal.
     /// </remarks>
     public static ISiloBuilder AddJournaling(this ISiloBuilder builder)
@@ -33,10 +36,33 @@ public static class JournalingHostingExtensions
                 : JournalingInstruments.CreateForDirectConstruction());
         builder.Services.TryAddSingleton<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournaledStateManager>(static services =>
-            new DurableStateManager(
+        {
+            var context = services.GetRequiredService<IGrainContext>();
+            var properties = services.GetRequiredService<GrainPropertiesResolver>().GetGrainProperties(context.GrainId.Type);
+            var providerName = properties.Properties.TryGetValue(JournalStorageProviderAttribute.PropertyKey, out var selection)
+                ? selection
+                : ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
+            if (string.IsNullOrWhiteSpace(providerName))
+            {
+                throw new OrleansConfigurationException(
+                    $"Journal storage provider '{providerName}' for grain type '{context.GrainId.Type}' must have a non-empty name.");
+            }
+
+            var storageProvider = string.Equals(providerName, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal)
+                ? services.GetService<IJournalStorageProvider>()
+                : services.GetKeyedService<IJournalStorageProvider>(providerName);
+            if (storageProvider is null)
+            {
+                throw new OrleansConfigurationException(
+                    $"Journal storage provider '{providerName}' selected for grain type '{context.GrainId.Type}' is not registered. " +
+                    "Register it using AddJournalStorage or a provider-specific registration method.");
+            }
+
+            return new DurableStateManager(
                 services.GetRequiredService<JournaledStateManagerShared>(),
-                services.GetRequiredService<IJournalStorageProvider>(),
-                services.GetRequiredService<IGrainContext>()));
+                storageProvider,
+                context);
+        });
         builder.Services.TryAddScoped<IDurableStateManager>(static services => (IDurableStateManager)services.GetRequiredService<IJournaledStateManager>());
         builder.Services.TryAddSingleton<IJournaledStateManagerFactory>(static services =>
             services.GetKeyedService<IJournaledStateManagerFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME)
