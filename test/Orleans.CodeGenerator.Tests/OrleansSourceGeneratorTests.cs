@@ -2242,6 +2242,49 @@ public class DemoClass
     }
 
     [Fact]
+    public async Task RpcResponseFactoriesEmitIdenticalSourcesForManagedAndNativePublishing()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey
+            {
+                Task<Payload> Reference();
+                ValueTask<int> Integer();
+                Task<List<Payload>> Collection();
+                Task Done();
+            }
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; set; }
+                [Id(1)] public Payload Next { get; set; }
+            }
+            [GenerateSerializerContext<Payload>]
+            public partial class Context : Orleans.Serialization.SerializerContext { }
+            """);
+        var managed = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "false" });
+        var native = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+
+        Assert.Empty(managed.Diagnostics);
+        Assert.Empty(native.Diagnostics);
+        Assert.Equal(
+            managed.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
+                .Select(static source => (source.HintName, Source: source.SourceText.ToString())),
+            native.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
+                .Select(static source => (source.HintName, Source: source.SourceText.ToString())));
+        var source = ConcatenateGeneratedSources(managed);
+        Assert.Contains("IResponseInvokable", source);
+        Assert.Contains("IRawResponseWriter", source);
+        Assert.Contains("AddRawResponseReader", source);
+        Assert.DoesNotContain("RuntimeFeature", source);
+        Assert.DoesNotContain("UseGeneratedSerializerContexts", source);
+        Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
+    }
+
+    [Fact]
     public async Task RpcResponseFactoriesGenerateConcreteClosedGraph()
     {
         var compilation = await CreateCompilation("""
@@ -2257,7 +2300,7 @@ public class DemoClass
                 Task<System.Collections.Generic.KeyValuePair<string, string>> Pair();
             }
             [GenerateSerializer, Alias("rpc.payload")]
-            public sealed class Payload
+            public class Payload
             {
                 [Id(0)] public int Value { get; set; }
                 [Id(1)] public Payload Next { get; set; }
@@ -2271,6 +2314,8 @@ public class DemoClass
         Assert.Contains("new global::Orleans.Serialization.Invocation.PooledResponseCopier<int, global::Orleans.Serialization.Cloning.ShallowCopier<int>>", source);
         Assert.Contains("PooledResponseCodec<global::TestProject.Payload, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
         Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(provider)", source);
+        Assert.Contains("AddDefaultSerializerService<global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.Payload>, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
+        Assert.Contains("AddDefaultSerializerService<global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.Payload>, global::OrleansCodeGen.TestProject.Copier_Payload>", source);
         Assert.Contains("new global::Orleans.Serialization.Codecs.KeyValuePairCodec<string, string>", source);
         Assert.Contains("new global::Orleans.Serialization.Codecs.KeyValuePairCopier<string, string>", source);
         Assert.Contains("caller => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Codec_Payload>(caller, provider)", source);
@@ -2284,7 +2329,7 @@ public class DemoClass
         Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
         Assert.DoesNotContain("MakeGenericType", source);
         Assert.DoesNotContain("WellKnownTypeAliases", source);
-        Assert.Contains("WellKnownTypeAliases.Add(\"rpc.payload\"", ConcatenateGeneratedSources(result));
+        Assert.Contains("WellKnownTypeAliases.TryGetValue(\"rpc.payload\"", ConcatenateGeneratedSources(result));
         Assert.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>", source);
         Assert.Contains("AbstractTypeSerializer<global::Orleans.Serialization.Invocation.Response>", source);
         Assert.Contains("global::Orleans.Serialization.Codecs.ObjectCopier.DeepCopy(input, context)", source);
@@ -2745,10 +2790,7 @@ public class DemoClass
         Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
         var assembly = System.Reflection.Assembly.Load(image.ToArray());
         var run = assembly.GetType("RootProof")!.GetMethod("Run")!;
-        var rejected = Assert.Throws<System.Reflection.TargetInvocationException>(() => run.Invoke(null, [false]));
-        var error = Assert.IsType<InvalidOperationException>(rejected.InnerException);
-        Assert.Contains("Dependency injection cannot resolve", error.Message);
-        Assert.Contains("graph is unpublished", error.Message);
+        Assert.Equal(true, run.Invoke(null, [false]));
         Assert.Equal(true, run.Invoke(null, [true]));
     }
 
