@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.Model;
 using Orleans.Serialization;
 
 namespace Orleans.CodeGenerator.Tests;
@@ -2282,6 +2283,68 @@ public class DemoClass
         Assert.DoesNotContain("RuntimeFeature", source);
         Assert.DoesNotContain("UseGeneratedSerializerContexts", source);
         Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcResponseFactoriesGenerateForMetadataOnlyCompilation(bool referenceAssembly)
+    {
+        var library = await CreateCompilation("""
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace MetadataContracts;
+            public interface IResponses : IGrainWithIntegerKey
+            {
+                Task<string> Reference(List<int> values);
+                ValueTask<int[]> Array();
+                Task Done();
+            }
+            """, "MetadataContracts");
+        using var image = new System.IO.MemoryStream();
+        var emitted = library.Emit(image,
+            options: new Microsoft.CodeAnalysis.Emit.EmitOptions(metadataOnly: referenceAssembly, includePrivateMembers: !referenceAssembly),
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+
+        var compilation = (await CreateCompilation(string.Empty, "MetadataConsumer"))
+            .AddReferences(
+                MetadataReference.CreateFromImage(image.ToArray()),
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location));
+        var metadataCompilation = compilation.RemoveAllSyntaxTrees();
+        Assert.Empty(metadataCompilation.SyntaxTrees);
+        var interfaceType = metadataCompilation.GetTypeByMetadataName("MetadataContracts.IResponses");
+        Assert.NotNull(interfaceType);
+        var model = ModelExtractor.ExtractProxyInterfaceModel(interfaceType, metadataCompilation, TestContext.Current.CancellationToken);
+        Assert.NotNull(model);
+        var options = SourceGeneratorOptionsParser.ParseOptions(TestCompilationHelper.CreateOptionsProvider(
+            new Dictionary<string, string> { ["build_property.publishaot"] = "true" }).GlobalOptions);
+        var names = RpcResponseHolderGenerator.GetNames(metadataCompilation, [model], options, TestContext.Current.CancellationToken);
+        var preparation = ProxySourceOutputGenerator.CreateProxyOutputPreparation(
+            metadataCompilation, [model], options, names, TestContext.Current.CancellationToken);
+        Assert.Empty(preparation.Diagnostics);
+
+        var responses = RpcResponseGenerator.Generate(
+            metadataCompilation, preparation.ProxyOutputModels, options, names, TestContext.Current.CancellationToken);
+        var baseline = RpcResponseGenerator.Generate(
+            compilation, preparation.ProxyOutputModels, options, names, TestContext.Current.CancellationToken);
+        Assert.Equal(baseline, responses);
+        Assert.NotEmpty(responses);
+        Assert.All(responses, static output => Assert.Null(output.Diagnostic));
+        var responseSource = Assert.Single(responses, static output =>
+            output.SourceEntry is { HintName: var hintName } && hintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal))
+            .SourceEntry!.Value.Source;
+        Assert.Contains("ListCopier<int>", responseSource);
+        Assert.Contains("AddRawResponseReader<string>", responseSource);
+        Assert.Contains("AddRawResponseReader<int[]>", responseSource);
+        Assert.Contains("CompletedResponse", responseSource);
+
+        var sources = preparation.SourceOutputs.Concat(responses);
+        var outputCompilation = metadataCompilation.AddSyntaxTrees(sources.Select(static output =>
+            CSharpSyntaxTree.ParseText(output.SourceEntry!.Value.Source, path: output.SourceEntry.Value.HintName)));
+        Assert.Empty(outputCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
     }
 
     [Fact]
