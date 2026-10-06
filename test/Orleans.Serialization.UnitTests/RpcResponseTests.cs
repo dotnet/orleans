@@ -147,6 +147,33 @@ public sealed class RpcResponseTests : IDisposable
     }
 
     [Fact]
+    public void MultidimensionalArrayTransportAndCopyPreserveConcreteTypeCyclesAndAliases()
+    {
+        var shared = new List<int> { 47, 59 };
+        var original = new object[1, 3];
+        original[0, 0] = original;
+        original[0, 1] = shared;
+        original[0, 2] = shared;
+
+        var copy = _services.GetRequiredService<DeepCopier>().Copy(original);
+        var serializer = _services.GetRequiredService<Serializer>();
+        var result = Assert.IsType<object[,]>(serializer.Deserialize<object[,]>(serializer.SerializeToArray(original)));
+
+        Assert.NotSame(original, copy);
+        Assert.Same(copy, copy[0, 0]);
+        Assert.NotSame(shared, copy[0, 1]);
+        Assert.Same(copy[0, 1], copy[0, 2]);
+        Assert.Equal(new[] { 47, 59 }, Assert.IsType<List<int>>(copy[0, 1]));
+        Assert.NotSame(original, result);
+        Assert.Same(result, result[0, 0]);
+        Assert.Same(result[0, 1], result[0, 2]);
+        Assert.Equal(new[] { 47, 59 }, Assert.IsType<List<int>>(result[0, 1]));
+        shared.Clear();
+        Assert.Equal(new[] { 47, 59 }, Assert.IsType<List<int>>(copy[0, 1]));
+        Assert.Equal(new[] { 47, 59 }, Assert.IsType<List<int>>(result[0, 1]));
+    }
+
+    [Fact]
     public void CompoundAliasTraversalPreservesPrefixesAndAddClearsThem()
     {
         var tree = Orleans.Serialization.TypeSystem.CompoundTypeAliasTree.Create();

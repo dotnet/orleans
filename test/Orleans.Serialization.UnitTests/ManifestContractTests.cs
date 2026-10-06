@@ -431,6 +431,20 @@ public class ManifestContractTests
     }
 
     [Fact]
+    public void LegacyOpenConverterDiscoveryPreservesItsParameterizedArraySurrogate()
+    {
+        var options = new TypeManifestOptions();
+        options.AddConverter(typeof(GenericConverter<,>));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        object?[] arguments = [typeof(GenericTarget<string, int>), typeof(GenericTarget<,>), null, null];
+
+        Assert.Equal(true, typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+        Assert.Equal(typeof(GenericSurrogate<(int, string)[]>), Assert.IsAssignableFrom<Type>(arguments[2]).GetGenericArguments()[1]);
+        Assert.IsType<GenericConverter<string, int>>(Assert.Single(Assert.IsType<object[]>(arguments[3])));
+    }
+
+    [Fact]
     public void LegacyClosedConverterDiscoveryPreservesItsArraySurrogate()
     {
         var options = new TypeManifestOptions();
