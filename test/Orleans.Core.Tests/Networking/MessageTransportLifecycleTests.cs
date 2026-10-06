@@ -614,9 +614,18 @@ public class MessageTransportLifecycleTests
         listener.Stop();
     }
 
-    [Fact]
-    public async Task SocketMessageTransport_ReadFin_InterruptsBlockedWrite()
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(true, (int)LinuxIoUringReceiveMode.OneShot)]
+    [InlineData(true, (int)LinuxIoUringReceiveMode.Adaptive)]
+    [InlineData(true, (int)LinuxIoUringReceiveMode.Multishot)]
+    public async Task SocketMessageTransport_ReadFin_InterruptsBlockedWrite(bool useLinuxIoUring, int? receiveMode)
     {
+        if (useLinuxIoUring && !IsIoUringTestEnabled())
+        {
+            return;
+        }
+
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TimeSpan.FromSeconds(10));
         using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -627,7 +636,11 @@ public class MessageTransportLifecycleTests
         await client.ConnectAsync(listener.LocalEndPoint!, cancellation.Token);
         using var peer = await accept;
         peer.ReceiveBufferSize = 1024;
-        await using var transport = new SocketMessageTransport(client, NullLogger.Instance);
+        await using var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring,
+            receiveMode is { } mode ? (LinuxIoUringReceiveMode)mode : null);
         using var request = new BufferedWriteRequest(new byte[2 * 1024 * 1024]);
         var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = transport.Closed.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), closed);
@@ -641,6 +654,59 @@ public class MessageTransportLifecycleTests
 
         await closed.Task.WaitAsync(cancellation.Token);
         Assert.NotNull(await Record.ExceptionAsync(() => request.Completion));
+    }
+
+    [Theory]
+    [InlineData((int)LinuxIoUringReceiveMode.OneShot)]
+    [InlineData((int)LinuxIoUringReceiveMode.Adaptive)]
+    [InlineData((int)LinuxIoUringReceiveMode.Multishot)]
+    public async Task SocketMessageTransport_LinuxIoUringReadFin_KeepsDescriptorUntilSenderRetires(int receiveMode)
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromSeconds(10));
+        var (listener, client, peer) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (peer)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: (LinuxIoUringReceiveMode)receiveMode))
+        {
+            var sender = new PausedSocketSender();
+            typeof(SocketMessageTransport)
+                .GetField("_largeSocketSender", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(transport, sender);
+            using var writeRequest = new BufferedWriteRequest(new byte[64 * 1024], useMultipleBuffers: true);
+            using var readRequest = new FixedLengthReadRequest(1);
+            transport.Start();
+            try
+            {
+                Assert.True(transport.EnqueueWrite(writeRequest));
+                await sender.Started.Task.WaitAsync(cancellation.Token);
+                Assert.True(transport.EnqueueRead(readRequest));
+                peer.Shutdown(SocketShutdown.Send);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => readRequest.Completion.WaitAsync(cancellation.Token));
+
+                Assert.False(client.SafeHandle.IsClosed);
+                Assert.False(writeRequest.Completion.IsCompleted);
+            }
+            finally
+            {
+                sender.Release();
+            }
+
+            await Assert.ThrowsAsync<IOException>(() => writeRequest.Completion.WaitAsync(cancellation.Token));
+            await transport.CloseAsync(null, cancellation.Token);
+            Assert.True(client.SafeHandle.IsClosed);
+        }
     }
 
     [Theory]
@@ -682,6 +748,72 @@ public class MessageTransportLifecycleTests
         {
             listener.Stop();
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpMessageTransport_IoUringOptionPreservesStartupAndSocketOptions(bool useLinuxIoUring)
+    {
+        if (useLinuxIoUring && !IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromSeconds(10));
+        const string ListenerName = "test";
+        var tcpOptions = Substitute.For<IOptionsMonitor<TcpMessageTransportOptions>>();
+        var options = new TcpMessageTransportOptions
+        {
+            FastPath = false,
+            UseLinuxIoUring = useLinuxIoUring
+        };
+        tcpOptions.CurrentValue.Returns(options);
+        tcpOptions.Get(ListenerName).Returns(options);
+        var listenerOptions = Substitute.For<IOptionsMonitor<TcpMessageTransportListenerOptions>>();
+        listenerOptions.Get(ListenerName).Returns(new TcpMessageTransportListenerOptions
+        {
+            Endpoint = new IPEndPoint(IPAddress.Loopback, 0)
+        });
+        await using var listener = new TcpMessageTransportListener(
+            ListenerName,
+            tcpOptions,
+            listenerOptions,
+            NullLoggerFactory.Instance);
+        await listener.BindAsync(cancellation.Token);
+        var listenSocket = (Socket)typeof(TcpMessageTransportListener)
+            .GetField("_listenSocket", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(listener)!;
+        var accept = listener.AcceptAsync(cancellation.Token).AsTask();
+        var connector = new TcpMessageTransportConnector(tcpOptions, NullLoggerFactory.Instance);
+        await using var client = await connector.CreateAsync(listenSocket.LocalEndPoint!, cancellation.Token);
+        await using var server = await accept;
+        Assert.NotNull(server);
+
+        foreach (var transport in new[] { client, server })
+        {
+            Assert.IsType<SocketMessageTransport>(transport);
+            var socket = (Socket)typeof(SocketMessageTransport)
+                .GetField("_socket", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(transport)!;
+            var sender = typeof(SocketMessageTransport)
+                .GetField("_socketSender", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(transport);
+            Assert.Equal(useLinuxIoUring ? typeof(LinuxIoUringSocketSender) : typeof(SocketSender), sender!.GetType());
+            Assert.True(socket.NoDelay);
+            Assert.NotEqual(0, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)!);
+        }
+
+        byte[] payload = [1, 2, 3, 4, 5];
+        using var readRequest = new FixedLengthReadRequest(payload.Length);
+        using var writeRequest = new BufferedWriteRequest(payload);
+        Assert.True(server.EnqueueRead(readRequest));
+        Assert.True(client.EnqueueWrite(writeRequest));
+        Assert.Equal(payload, await readRequest.Completion.WaitAsync(cancellation.Token));
+        await writeRequest.Completion.WaitAsync(cancellation.Token);
+        await client.CloseAsync(null, cancellation.Token);
+        await server.CloseAsync(null, cancellation.Token);
     }
 
     [Theory]
@@ -2054,10 +2186,11 @@ public class MessageTransportLifecycleTests
         using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
         await connect;
         var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+        var closed = transport.Closed;
 
         await transport.DisposeAsync();
 
-        Assert.True(transport.Closed.IsCancellationRequested);
+        Assert.True(closed.IsCancellationRequested);
     }
 
     [Fact]
@@ -2084,10 +2217,11 @@ public class MessageTransportLifecycleTests
             NullLogger.Instance,
             useLinuxIoUring: true,
             linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Multishot);
+        var closed = transport.Closed;
 
         await transport.DisposeAsync();
 
-        Assert.True(transport.Closed.IsCancellationRequested);
+        Assert.True(closed.IsCancellationRequested);
     }
 
     [Fact]
@@ -2829,6 +2963,32 @@ public class MessageTransportLifecycleTests
         public void Dispose()
         {
         }
+    }
+
+    private sealed class PausedSocketSender : ISocketSender
+    {
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly IOException _error = new("Write failed");
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int BytesTransferred => 0;
+        public SocketError SocketError => SocketError.SocketError;
+        public Exception Error => _error;
+        public bool HasError => true;
+        public ValueTask SendAsync(Socket socket, List<ArraySegment<byte>> buffers, bool buffersArePinned, bool useZeroCopy)
+            => SendAsyncCore();
+        public ValueTask SendAsync(Socket socket, ReadOnlyMemory<byte> memory, bool bufferIsPinned, bool useZeroCopy)
+            => SendAsyncCore();
+
+        private async ValueTask SendAsyncCore()
+        {
+            Started.TrySetResult();
+            await _release.Task;
+            throw _error;
+        }
+
+        public void Release() => _release.TrySetResult();
+        public void Dispose() => Release();
     }
 
     private sealed class TrackingTransport : MessageTransport

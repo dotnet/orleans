@@ -60,6 +60,27 @@ Console.WriteLine($"Response: {response}");
 await host.WaitForShutdownAsync();
 ```
 
+## Linux io_uring transport
+
+The TCP transport can opt into Linux `io_uring` by setting `ORLEANS_USE_IO_URING=1`
+before starting a client or silo. The equivalent runtime switch is
+`Orleans.Connections.Transport.Sockets.UseIoUring`. The default remains the .NET
+socket transport.
+
+This transport requires a little-endian 64-bit Linux process, Linux kernel 6.1
+or later, and `liburing.so.2`. The host or container must permit `io_uring` system
+calls. Enabling the transport on an unsupported Linux host fails connection
+creation instead of silently falling back. TCP endpoint configuration,
+keepalive settings, and TLS middleware apply to both transports.
+
+On Linux 6.12 or later, receives adapt between one-shot and multishot operations.
+Set `ORLEANS_IO_URING_MULTISHOT=0` to use only one-shot receives,
+`ORLEANS_IO_URING_MULTISHOT=1` to promote after consecutive large frames, or
+`ORLEANS_IO_URING_MULTISHOT=force` to require multishot receives. Multishot receives
+require kernel support for incremental provided-buffer rings. During shutdown,
+the transport retires pending operations before releasing their buffers and
+socket descriptor.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)

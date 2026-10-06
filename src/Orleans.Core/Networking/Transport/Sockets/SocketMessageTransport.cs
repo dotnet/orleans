@@ -899,6 +899,7 @@ exit:
             }
 
             _shutdownReason ??= error;
+            ShutdownSocket();
             await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
 
             if (isGracefulTermination)
@@ -1016,6 +1017,7 @@ exit:
             }
 
             _shutdownReason ??= error;
+            ShutdownSocket();
             await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
 
             if (isGracefulTermination)
@@ -1153,7 +1155,16 @@ exit:
             }
 
             _shutdownReason ??= error;
-            Shutdown();
+            if (_useLinuxIoUring)
+            {
+                // Keep the descriptor valid until pending sends and zero-copy notifications retire.
+                ShutdownSocket();
+            }
+            else
+            {
+                Shutdown();
+            }
+
             await _connectionClosingCts.CancelAsync().ConfigureAwait(false);
 
             if (isGracefulTermination)
