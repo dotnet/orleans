@@ -671,16 +671,17 @@ namespace Orleans.Serialization.Serializers
         }
 
         private bool IsDefaultCodecEligible(Type type)
-            => !_manifest.DefaultCodecFactoryContracts.TryGetValue(type, out var contract)
-                || IsDefaultContractEligible(contract, []);
+            => IsDefaultServiceEligible(_manifest.CodecFactoryServices[type]);
 
         private bool IsDefaultCopierEligible(Type type)
-            => !_manifest.DefaultCopierFactoryContracts.TryGetValue(type, out var contract)
-                || IsDefaultContractEligible(contract, []);
+            => IsDefaultServiceEligible(_manifest.CopierFactoryServices[type]);
 
+        // Inferred defaults preserve an automatic caller's DI boundary instead of starting a transaction inside it.
         private bool IsDefaultServiceEligible(Type service)
-            => !_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract)
-                || IsDefaultContractEligible(contract, []);
+            => !(_manifest.IsDefaultSerializerService(service)
+                    && OrleansGeneratedCodeHelper.GetConstructionScope(this) is { IsPending: false })
+                && (!_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract)
+                    || IsDefaultContractEligible(contract, []));
 
         private bool IsProviderService(Type serviceType)
             => serviceType != typeof(object)

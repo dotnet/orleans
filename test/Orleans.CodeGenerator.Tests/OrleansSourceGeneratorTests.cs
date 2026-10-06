@@ -2362,6 +2362,35 @@ public class DemoClass
     }
 
     [Theory]
+    [InlineData("void", "System.IO.Stream")]
+    [InlineData("Task", "System.IO.Stream")]
+    [InlineData("void", "System.Collections.Generic.Dictionary<string, int>")]
+    [InlineData("Task", "System.Collections.Generic.Dictionary<string, int>")]
+    public async Task RpcArgumentFactoriesDiagnoseRequiredArgumentConstructionGraph(string returnType, string argumentType)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IArguments : IGrainWithIntegerKey
+            {
+                {{returnType}} Send({{argumentType}} value);
+            }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        var diagnostic = Assert.Single(result.Diagnostics);
+
+        Assert.Equal("ORLEANS0116", diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("argument type", diagnostic.GetMessage());
+        Assert.Contains(argumentType, diagnostic.GetMessage());
+        Assert.Contains("argument's closed codec, copier, and required serialization services", diagnostic.GetMessage());
+        Assert.DoesNotContain("response result", diagnostic.GetMessage());
+        Assert.DoesNotContain("Response<TResult>", diagnostic.GetMessage());
+        Assert.NotEqual(Location.None, diagnostic.Location);
+    }
+
+    [Theory]
     [InlineData("System.Collections.Generic.Dictionary<string, int>")]
     [InlineData("System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, int>>")]
     public async Task RpcResponseFactoriesRequireExplicitDictionaryComparerContract(string resultType)
@@ -2452,14 +2481,14 @@ public class DemoClass
         {
             var resultType = compilation.GetTypeByMetadataName($"CombinedGraph.{name}")!;
             Assert.True(SerializerFactoryGenerator.TryCreate(services, [response.Construct(resultType)],
-                TestContext.Current.CancellationToken, out var individual, out var failure), failure?.Reason);
+                TestContext.Current.CancellationToken, out var individual, out var failure, useDefaultFactories: true), failure?.Reason);
             Assert.Equal(membersPerResult + 2, individual.Registrations.Count);
         }
         if (membersPerResult == 510)
         {
             Assert.True(SerializerFactoryGenerator.TryCreate(services,
                 new[] { "First", "Second" }.Select(name => response.Construct(compilation.GetTypeByMetadataName($"CombinedGraph.{name}")!)),
-                TestContext.Current.CancellationToken, out var combined, out var failure), failure?.Reason);
+                TestContext.Current.CancellationToken, out var combined, out var failure, useDefaultFactories: true), failure?.Reason);
             Assert.Equal(1024, combined.Registrations.Count);
         }
         var result = RunSourceGenerator(compilation, new Dictionary<string, string>
