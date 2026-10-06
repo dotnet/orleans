@@ -241,8 +241,12 @@ namespace Orleans.Serialization.Serializers
                         var target = legacyDescription is { } shape
                             ? shape.Type
                             : genericArgument;
+                        var surrogateDescription = genericType == typeof(IConverter<,>)
+                            ? SerializationType.FromType(@interface.GetGenericArguments()[1], type.GetGenericArguments())
+                            : null;
                         candidates.Add((target, type,
-                            new SerializationContract(genericType, target, null, TargetDescription: legacyDescription), legacyOrders[i]));
+                            new SerializationContract(genericType, target, null,
+                                SurrogateDescription: surrogateDescription, TargetDescription: legacyDescription), legacyOrders[i]));
                     }
                 }
             }
@@ -1159,43 +1163,17 @@ namespace Orleans.Serialization.Serializers
             return codecType != null ? (IFieldCodec)GetServiceOrCreateInstance(codecType, constructorArguments) : null;
         }
 
-#if NET5_0_OR_GREATER
-        [UnconditionalSuppressMessage("Trimming", "IL2070",
-            Justification = "Legacy converter registrations preserve implementation interfaces through AddConverter(Type). The selected implementation boundary erases that annotation; explicit contracts use their stored surrogate descriptions instead.")]
-        [UnconditionalSuppressMessage("Trimming", "IL2075",
-            Justification = "Legacy converter registrations preserve implementation interfaces through AddConverter(Type). Materialization erases the registration annotation; explicit contracts use their stored surrogate descriptions instead.")]
-#endif
         private bool TryGetSurrogateCodec(Type fieldType, Type searchType, [NotNullWhen(true)] out Type? surrogateCodecType, [NotNullWhen(true)] out object[]? constructorArguments)
         {
             if (TrySelectImplementation(typeof(IConverter<,>), fieldType, searchType, out var converterType, out var registration))
             {
-                Type? surrogate = null;
-                if (registration.RegistrationOrder is not null)
+                var arguments = converterType.IsGenericType ? converterType.GetGenericArguments() : Array.Empty<Type>();
+                var surrogate = registration.SurrogateDescription is { } description
+                    ? ResolveSerializationTypeCore(description, arguments, allowArrayShapes: registration.RegistrationOrder is null)
+                    : registration.SurrogateType!;
+                if (surrogate.IsGenericTypeDefinition)
                 {
-                    var arguments = converterType.IsGenericType ? converterType.GetGenericArguments() : Array.Empty<Type>();
-                    surrogate = registration.SurrogateDescription is { } description
-                        ? ResolveSerializationType(description, arguments)
-                        : registration.SurrogateType!;
-                    if (surrogate.IsGenericTypeDefinition)
-                    {
-                        surrogate = ConstructGenericImplementation(surrogate, arguments);
-                    }
-                }
-                else
-                {
-                    foreach (var @interface in converterType.GetInterfaces())
-                    {
-                        if (@interface.IsConstructedGenericType && @interface.GetGenericTypeDefinition() == typeof(IConverter<,>)
-                            && @interface.GenericTypeArguments[0] == fieldType)
-                        {
-                            surrogate = @interface.GenericTypeArguments[1];
-                        }
-                    }
-                }
-
-                if (surrogate is null)
-                {
-                    throw new InvalidOperationException($"A registered type converter {converterType} does not implement {typeof(IConverter<,>)}");
+                    surrogate = ConstructGenericImplementation(surrogate, arguments);
                 }
 
                 constructorArguments = new object[] { GetServiceOrCreateInstance(converterType) };
@@ -1354,6 +1332,9 @@ namespace Orleans.Serialization.Serializers
         }
 
         private Type ResolveSerializationType(SerializationType description, Type[] parameters)
+            => ResolveSerializationTypeCore(description, parameters, allowArrayShapes: false);
+
+        private Type ResolveSerializationTypeCore(SerializationType description, Type[] parameters, bool allowArrayShapes)
         {
             if (description.ParameterIndex >= 0)
             {
@@ -1367,6 +1348,16 @@ namespace Orleans.Serialization.Serializers
 
             if (description.ArrayRank > 0)
             {
+                if (allowArrayShapes
+#if NET7_0_OR_GREATER
+                    && RuntimeFeature.IsDynamicCodeSupported
+#endif
+                    )
+                {
+                    var element = ResolveSerializationTypeCore(description.Arguments[0], parameters, allowArrayShapes);
+                    return description.ArrayRank == 1 ? element.MakeArrayType() : element.MakeArrayType(description.ArrayRank);
+                }
+
                 throw new NotSupportedException(
                     "Supply a source-known closed array type using SerializationType.Create(typeof(ClosedArray)) or an explicit closed converter registration when resolving executable serialization metadata. Array descriptions are structural matching patterns.");
             }
@@ -1380,7 +1371,7 @@ namespace Orleans.Serialization.Serializers
             var arguments = new Type[description.Arguments.Length];
             for (var i = 0; i < arguments.Length; i++)
             {
-                arguments[i] = ResolveSerializationType(description.Arguments[i], parameters);
+                arguments[i] = ResolveSerializationTypeCore(description.Arguments[i], parameters, allowArrayShapes);
             }
 
             return ConstructGenericImplementation(type, arguments);
