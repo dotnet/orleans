@@ -86,11 +86,17 @@ namespace Orleans.Storage
 
         public IGrainStorageSerializer Serializer { get { throw null; } set { } }
 
+        public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState) { throw null; }
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
+        public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState) { throw null; }
+
+        public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainReference, IGrainState<T> grainState) { throw null; }
     }

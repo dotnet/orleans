@@ -84,6 +84,16 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 }
 ```
 
+## Cancellation
+
+The token-aware read, write, and clear operations forward the caller's
+`CancellationToken` to ADO.NET connection opening, command execution, and result
+reading. Clear operations also use that token when reading the current record
+before clearing or deleting it. The database driver determines how in-flight
+cancellation is handled. Caller cancellation propagates as an
+`OperationCanceledException`; successful operations update the grain state's
+ETag and record-existence metadata.
+
 ## Database Setup
 
 Before using the ADO.NET provider, you need to set up the necessary database tables. Scripts for different database systems are available in the Orleans source repository:
