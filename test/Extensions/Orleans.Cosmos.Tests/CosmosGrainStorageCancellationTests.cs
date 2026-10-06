@@ -269,22 +269,36 @@ public sealed class CosmosGrainStorageCancellationTests
     }
 
     [Theory]
-    [InlineData("Read")]
-    [InlineData("Write")]
-    [InlineData("Clear")]
-    public async Task StorageFailuresRetainWrapping(string operation)
+    [InlineData("Read", false, false)]
+    [InlineData("Write", false, false)]
+    [InlineData("Clear", false, false)]
+    [InlineData("Read", true, false)]
+    [InlineData("Write", true, false)]
+    [InlineData("Clear", true, false)]
+    [InlineData("Read", true, true)]
+    [InlineData("Write", true, true)]
+    [InlineData("Clear", true, true)]
+    public async Task StorageFailuresRetainWrapping(string operation, bool sdkCancellation, bool legacy)
     {
         using var harness = new StorageHarness();
-        harness.Container.ReturnsForAll(Task.FromException<ItemResponse<GrainStateEntity<TestState>>>(
-            new InvalidOperationException("storage failure")));
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        Exception failure = sdkCancellation
+            ? new OperationCanceledException("storage failure", new CancellationToken(canceled: true))
+            : new InvalidOperationException("storage failure");
+        harness.Container.ReturnsForAll(Task.FromException<ItemResponse<GrainStateEntity<TestState>>>(failure));
         var state = CreateState("original-etag");
         var original = Assert.IsType<TestState>(state.State);
 
-        var exception = await Assert.ThrowsAsync<WrappedException>(
-            () => Invoke(harness.Storage, operation, state, TestContext.Current.CancellationToken));
+        Assert.False(cancellation.IsCancellationRequested);
+        var task = legacy
+            ? InvokeLegacy(harness.Storage, operation, state)
+            : Invoke(harness.Storage, operation, state, cancellation.Token);
+        var exception = await Assert.ThrowsAsync<WrappedException>(() => task);
 
+        Assert.False(cancellation.IsCancellationRequested);
+        Assert.True(task.IsFaulted);
         Assert.Contains("storage failure", exception.Message);
-        Assert.Contains(nameof(InvalidOperationException), exception.OriginalExceptionType);
+        Assert.Contains(failure.GetType().Name, exception.OriginalExceptionType);
         AssertPreservedState(state, original, "original-etag");
     }
 

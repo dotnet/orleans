@@ -113,7 +113,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
             WrappedException.CreateAndRethrow(dce);
             throw;
         }
-        catch (Exception exc) when (exc is not OperationCanceledException)
+        catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogErrorReadingState(exc, grainType, id);
             WrappedException.CreateAndRethrow(exc);
@@ -190,7 +190,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         {
             throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState.ETag);
         }
-        catch (Exception exc) when (exc is not OperationCanceledException)
+        catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogErrorWritingState(exc, grainType, id);
             WrappedException.CreateAndRethrow(exc);
@@ -284,7 +284,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
         {
             throw new CosmosConditionNotSatisfiedException(grainType, grainId, _options.ContainerName, "Unknown", grainState.ETag ?? "Unknown");
         }
-        catch (Exception exc) when (exc is not OperationCanceledException)
+        catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogErrorClearingState(exc, grainType, id);
             WrappedException.CreateAndRethrow(exc);
