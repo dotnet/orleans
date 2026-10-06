@@ -530,12 +530,22 @@ internal static class SerializerFactoryGenerator
             if (hasBaseCodec)
             {
                 result.Append("options.").Append(addService).Append("<global::Orleans.Serialization.Serializers.IBaseCodec<")
-                    .Append(typeName).Append(">>(static provider => ").Append(Resolve(registration.Codec)).AppendLine(");");
+                    .Append(typeName).Append('>');
+                if (useDefaultFactories) result.Append(", ").Append(registration.Codec);
+                result.Append(">(static provider => ").Append(Resolve(registration.Codec));
+                if (useDefaultFactories)
+                    result.Append(", dependencies: ").Append(DefaultDependencyServices(registration.Dependencies, codec: true));
+                result.AppendLine(");");
             }
             if (hasBaseCopier)
             {
                 result.Append("options.").Append(addService).Append("<global::Orleans.Serialization.Cloning.IBaseCopier<")
-                    .Append(typeName).Append(">>(static provider => ").Append(Resolve(registration.Copier)).AppendLine(");");
+                    .Append(typeName).Append('>');
+                if (useDefaultFactories) result.Append(", ").Append(registration.Copier);
+                result.Append(">(static provider => ").Append(Resolve(registration.Copier));
+                if (useDefaultFactories)
+                    result.Append(", dependencies: ").Append(DefaultDependencyServices(registration.Dependencies, codec: false));
+                result.AppendLine(");");
             }
 
             foreach (var array in registration.CanonicalArrays)
@@ -903,16 +913,6 @@ internal static class SerializerFactoryGenerator
         codec = codecDefinition.Construct([.. type.TypeArguments]);
         copier = copierDefinition.Construct([.. type.TypeArguments]);
         return true;
-    }
-
-    private static void ConstructGeneratedModel(Registration registration, IGeneratorServices services)
-    {
-        var codecDeclaration = new SerializerGenerator(services).Generate(registration.Model!);
-        var copierDeclaration = new CopierGenerator(services).GenerateCopier(registration.Model!, new());
-        registration.CodecConstruction = ConstructGenerated(registration.Codec, codecDeclaration);
-        registration.CopierConstruction = copierDeclaration is null
-            ? $"new {registration.Copier}()"
-            : ConstructGenerated(registration.Copier, copierDeclaration);
     }
 
     private static string ConstructReferenced(string name, INamedTypeSymbol implementation, bool preferCompleteConstructor = false)
