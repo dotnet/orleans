@@ -123,7 +123,6 @@ namespace Orleans.Storage
             => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
 
         /// <inheritdoc/>
-        /// <remarks>The supplied cancellation token is forwarded to the AWS SDK read request.</remarks>
         public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -170,7 +169,6 @@ namespace Orleans.Storage
             => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
 
         /// <inheritdoc/>
-        /// <remarks>The supplied cancellation token is forwarded to the AWS SDK conditional insert or update request.</remarks>
         public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -186,15 +184,11 @@ namespace Orleans.Storage
                 ConvertToStorageFormat(grainState.State, record);
                 await WriteStateInternal(grainState, record, cancellationToken);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
             catch (ConditionalCheckFailedException exc)
             {
                 throw new InconsistentStateException($"Inconsistent grain state: {exc}");
             }
-            catch (Exception exc)
+            catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorWritingGrainState(logger, exc, grainType, grainId, grainState.ETag, this.options.TableName);
                 throw;
@@ -287,10 +281,6 @@ namespace Orleans.Storage
             => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
 
         /// <inheritdoc/>
-        /// <remarks>
-        /// The supplied cancellation token is forwarded to the AWS SDK request.
-        /// <see cref="DynamoDBStorageOptions.DeleteStateOnClear"/> selects deletion or clearing by writing a null state.
-        /// </remarks>
         public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -338,15 +328,11 @@ namespace Orleans.Storage
                     grainState.RecordExists = false;
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
             catch (ConditionalCheckFailedException exc)
             {
                 throw new InconsistentStateException($"Inconsistent grain state: {exc}");
             }
-            catch (Exception exc)
+            catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorClearingGrainState(logger, exc, operation, grainType, grainId, grainState.ETag, this.options.TableName);
                 throw;
