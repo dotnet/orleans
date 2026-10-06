@@ -78,6 +78,7 @@ namespace Orleans.Runtime.Messaging
             }
 
             _requests ??= [];
+            TrackedRequest? existingRequest = null;
             if (request.GatewayRequestAttempt == 0)
             {
                 request.GatewayRequestAttempt = Interlocked.Increment(ref _nextAttempt);
@@ -88,28 +89,54 @@ namespace Orleans.Runtime.Messaging
             {
                 return false;
             }
+            else
+            {
+                existingRequest = current;
+            }
 
             var cacheInvalidationHeader = CopyCacheInvalidationHeader(request);
-            var trackedRequest = new TrackedRequest(
-                request.Id,
-                request.GatewayRequestAttempt,
-                request.IsSystemMessage,
-                request.IsReadOnly,
-                request.IsAlwaysInterleave,
-                request.SendingSilo,
-                request.SendingGrain,
-                targetSilo,
-                request.TargetGrain,
-                request.ForwardCount,
-                cacheInvalidationHeader,
-                timeProvider.GetTimestamp(),
-                explicitTimeToLive.HasValue,
-                retentionPeriod);
+            TrackedRequest trackedRequest;
+            if (existingRequest is { } existing)
+            {
+                var previousTargetSilos = existing.PreviousTargetSilos is { } previous
+                    ? new List<SiloAddress>(previous)
+                    : [];
+                if (!targetSilo.Equals(existing.TargetSilo))
+                {
+                    previousTargetSilos.Add(existing.TargetSilo);
+                }
+
+                trackedRequest = existing with
+                {
+                    TargetSilo = targetSilo,
+                    TargetGrain = request.TargetGrain,
+                    ForwardCount = request.ForwardCount,
+                    CacheInvalidationHeader = cacheInvalidationHeader,
+                    PreviousTargetSilos = previousTargetSilos,
+                };
+            }
+            else
+            {
+                trackedRequest = new TrackedRequest(
+                    request.Id,
+                    request.GatewayRequestAttempt,
+                    request.IsSystemMessage,
+                    request.IsReadOnly,
+                    request.IsAlwaysInterleave,
+                    request.SendingSilo,
+                    request.SendingGrain,
+                    targetSilo,
+                    request.TargetGrain,
+                    request.ForwardCount,
+                    cacheInvalidationHeader,
+                    timeProvider.GetTimestamp(),
+                    explicitTimeToLive.HasValue,
+                    retentionPeriod);
+            }
 
             _requests[request.Id] = trackedRequest;
             _releasedAttempts?.Remove(request.Id);
-            _forwardingUpdates?.Remove(request.Id);
-            _deferredResponses?.Remove(request.Id);
+            ClearAuxiliaryState(request.Id);
             return true;
         }
 
@@ -212,9 +239,18 @@ namespace Orleans.Runtime.Messaging
                     _deferredResponses[response.Id] = responses = [];
                 }
 
-                responses.RemoveAll(item => item.SendingSilo?.Equals(responseSilo) is true);
+                for (var i = responses.Count - 1; i >= 0; i--)
+                {
+                    if (responses[i].SendingSilo?.Equals(responseSilo) is true)
+                    {
+                        responses[i].Dispose();
+                        responses.RemoveAt(i);
+                    }
+                }
+
                 if (responses.Count >= _maxDeferredResponses)
                 {
+                    responses[0].Dispose();
                     responses.RemoveAt(0);
                 }
 
@@ -299,7 +335,7 @@ namespace Orleans.Runtime.Messaging
                             || response.ForwardCount == trackedRequest.ForwardCount)) is { } response)
             {
                 requests.Remove(requestId);
-                ClearAuxiliaryState(requestId);
+                ClearAuxiliaryState(requestId, response);
                 completedResponse = response;
             }
 
@@ -387,7 +423,7 @@ namespace Orleans.Runtime.Messaging
 
             requests.Clear();
             _forwardingUpdates?.Clear();
-            _deferredResponses?.Clear();
+            DisposeDeferredResponses();
         }
 
         internal List<Message>? RemoveForSilo(SiloAddress silo)
@@ -473,13 +509,40 @@ namespace Orleans.Runtime.Messaging
             _requests?.Clear();
             _releasedAttempts?.Clear();
             _forwardingUpdates?.Clear();
-            _deferredResponses?.Clear();
+            DisposeDeferredResponses();
         }
 
-        private void ClearAuxiliaryState(CorrelationId requestId)
+        private void ClearAuxiliaryState(CorrelationId requestId, Message? retainedResponse = null)
         {
             _forwardingUpdates?.Remove(requestId);
-            _deferredResponses?.Remove(requestId);
+            if (_deferredResponses?.Remove(requestId, out var responses) is true)
+            {
+                foreach (var response in responses)
+                {
+                    if (!ReferenceEquals(response, retainedResponse))
+                    {
+                        response.Dispose();
+                    }
+                }
+            }
+        }
+
+        private void DisposeDeferredResponses()
+        {
+            if (_deferredResponses is not { } deferredResponses)
+            {
+                return;
+            }
+
+            foreach (var responses in deferredResponses.Values)
+            {
+                foreach (var response in responses)
+                {
+                    response.Dispose();
+                }
+            }
+
+            deferredResponses.Clear();
         }
 
         private bool TryConsumeReleasedAttempt(CorrelationId requestId, long attempt)

@@ -438,6 +438,7 @@ namespace Orleans.Runtime.Messaging
                 && msg.Result == Message.ResponseTypes.Status
                 && !client.IsConnected)
             {
+                msg.Dispose();
                 return true;
             }
 
@@ -617,6 +618,10 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 EmitRequestTrackingStopped(requestTrackingStopped);
+                if (completionResult == GatewayInFlightRequestTracker.CompletionResult.Superseded)
+                {
+                    message.Dispose();
+                }
             }
 
             private void UpdateForwardedRequest(
@@ -733,6 +738,11 @@ namespace Orleans.Runtime.Messaging
                         message.GatewayRequestAttempt,
                         message.TargetSilo,
                         message.ForwardCount);
+                    message.Dispose();
+                }
+                else if (!sendUntracked && requestToReject is null)
+                {
+                    message.Dispose();
                 }
 
                 if (requestToReject is not null)

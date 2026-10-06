@@ -419,6 +419,32 @@ public class GatewayInFlightRequestTrackerTests
     }
 
     [Fact]
+    public void SameAttemptForwardPreservesRetentionAndPreviousDestination()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var tracker = CreateTracker(timeProvider, TimeSpan.FromSeconds(30));
+        var request = CreateMessage(1, Message.Directions.Request, Silo1);
+        Assert.True(tracker.Track(request));
+        timeProvider.Advance(TimeSpan.FromSeconds(29));
+        var forwarded = CreateMessage(1, Message.Directions.Request, Silo2);
+        forwarded.GatewayRequestAttempt = request.GatewayRequestAttempt;
+        forwarded.ForwardCount = 1;
+
+        Assert.True(tracker.Track(forwarded));
+        var staleResponse = CreateResponse(request, Message.ResponseTypes.Success);
+        staleResponse.SendingSilo = Silo1;
+        staleResponse.ForwardCount = 0;
+        Assert.Equal(
+            GatewayInFlightRequestTracker.CompletionResult.Superseded,
+            tracker.TryComplete(staleResponse));
+
+        timeProvider.Advance(TimeSpan.FromSeconds(1));
+        Assert.False(tracker.CanRetry(forwarded));
+        Assert.True(tracker.TryRemoveExpiredAttempt(forwarded));
+        Assert.False(tracker.HasEntries);
+    }
+
+    [Fact]
     public void TransportRetryPreservesOriginalRetentionDeadline()
     {
         var timeProvider = new FakeTimeProvider();
