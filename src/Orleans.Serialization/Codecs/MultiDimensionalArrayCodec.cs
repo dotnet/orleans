@@ -13,17 +13,19 @@ namespace Orleans.Serialization.Codecs
     /// <summary>
     /// Serializer for multi-dimensional arrays.
     /// </summary>
+    /// <typeparam name="TArray">The concrete array type.</typeparam>
     /// <typeparam name="T">The array element type.</typeparam>
-    internal sealed class MultiDimensionalArrayCodec<T> : IGeneralizedCodec
+    internal sealed class MultiDimensionalArrayCodec<TArray, T> : IGeneralizedCodec
     {
         private readonly Type DimensionFieldType = typeof(int[]);
         private readonly Type CodecElementType = typeof(T);
+        private readonly Type _arrayType = typeof(TArray);
 
         private readonly IFieldCodec<int[]> _intArrayCodec;
         private readonly IFieldCodec<T> _elementCodec;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MultiDimensionalArrayCodec{T}"/> class.
+        /// Initializes a new instance of the <see cref="MultiDimensionalArrayCodec{TArray, T}"/> class.
         /// </summary>
         /// <param name="intArrayCodec">The int array codec.</param>
         /// <param name="elementCodec">The element codec.</param>
@@ -92,7 +94,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (field.WireType == WireType.Reference)
             {
-                return ReferenceCodec.ReadReference<T[], TInput>(ref reader, field);
+                return ReferenceCodec.ReadReference(ref reader, _arrayType);
             }
 
             field.EnsureWireTypeTagDelimited();
@@ -122,7 +124,11 @@ namespace Orleans.Serialization.Codecs
 
                             // Multi-dimensional arrays must be indexed using indexing arrays, so create one now.
                             indices = new int[rank];
-                            result = Array.CreateInstance(CodecElementType, lengths);
+#if NET10_0_OR_GREATER
+                            result = Array.CreateInstanceFromArrayType(_arrayType, lengths);
+#else
+                            result = Array.CreateInstance(_arrayType.GetElementType()!, lengths);
+#endif
                             ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
                             break;
                         }
@@ -239,7 +245,11 @@ namespace Orleans.Serialization.Codecs
                 lowerBounds[i] = originalArray.GetLowerBound(i);
             }
 
+#if NET10_0_OR_GREATER
+            result = Array.CreateInstanceFromArrayType(type, lengths, lowerBounds);
+#else
             result = Array.CreateInstance(elementType!, lengths, lowerBounds);
+#endif
             context.RecordCopy(original, result);
 
             if (rank == 1)

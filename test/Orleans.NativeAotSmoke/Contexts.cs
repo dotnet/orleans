@@ -1,0 +1,32 @@
+using Orleans.Serialization.ContextSmoke;
+
+
+ContextContracts.NestedCollectionsRoundTripAndCopy();
+ContextContracts.NonSealedModelBaseServicesAliasCanonicalInstances();
+ContextContracts.GeneratedFactoriesComposeWithMetadataAndReflection();
+ContextContracts.GeneratedModelsTraverseDependencies();
+ContextContracts.CanonicalValueSerializerUsesGeneratedCodec();
+ContextContracts.GenericArraysRoundTripAndCopy();
+ContextContracts.GenericArrayCyclesPreserveIdentity();
+ContextContracts.CollectionDependenciesHonorSelectedCustomRegistrations();
+ContextContracts.NullableRootCyclesPreserveCopyIdentity();
+ContextContracts.NullableRootFailureRollsBackAndRetriesCanonically();
+ContextContracts.ReferencedGeneratedModelsTraverseDependencies();
+ContextContracts.NullableArrayAndEnumRoundTrip();
+ContextContracts.RecursiveModelsPreserveIdentity();
+ContextContracts.MutualRecursionPreservesIdentity();
+ContextContracts.CollectionRecursionPreservesIdentity();
+ContextContracts.DuplicateContextsAndConcurrentResolution();
+ContextContracts.MissingTypesAndCustomComparersFailClearly();
+ContextContracts.ModelAliasesAndTypeIdsRoundTrip();
+StaticFactoryContracts.FactoryCyclesBeforeInstanceConstructionFaultGraphAndRetry();
+StaticFactoryContracts.CyclicConstructionPublishesCompletedGraphs();
+StaticFactoryContracts.FailedCyclicConstructionRollsBack();
+StaticFactoryContracts.CaughtNestedFailureFaultsTheWholeGraph();
+StaticFactoryContracts.DirectProviderServicesRemainGraphOwned();
+StaticFactoryContracts.GeneratedMetadataCollectionsComposeWithClosedFactories();
+StaticFactoryContracts.MixedCyclesPublishCompletedGraphs();
+StaticFactoryContracts.FailedMixedCyclesRollBackFromBothRoots();
+StaticFactoryContracts.GeneratedMixedCyclesPreserveObjectGraphsFromBothRoots();
+StaticFactoryContracts.MixedNullableTupleCyclesDeferOptionalQueries();
+Console.WriteLine("Serializer context contracts passed: nested collections, generated models, value types, cycles, identity, concurrency, and diagnostics.");

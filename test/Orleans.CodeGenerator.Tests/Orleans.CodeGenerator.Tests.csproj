@@ -18,6 +18,9 @@
 
   <ItemGroup>
     <!-- due to Verify.XunitV3 requiring newer versions of these libraries -->
+    <Compile Include="..\Orleans.NativeAotSmoke\Contexts.Contracts.cs" Link="Contexts.Contracts.cs" />
+    <Compile Include="..\Orleans.NativeAotSmoke\Factories.Contracts.cs" Link="Factories.Contracts.cs" />
+    <Compile Include="..\Orleans.NativeAotSmoke\Factories.Review.cs" Link="Factories.Review.cs" />
     <PackageReference Include="System.IO.Hashing" />
     <PackageReference Include="System.CodeDom" />
     <PackageReference Include="Verify.XunitV3" />
@@ -33,6 +36,8 @@
     <ProjectReference Include="..\..\src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="..\..\src\Orleans.Serialization.FSharp\Orleans.Serialization.FSharp.csproj" />
     <ProjectReference Include="..\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
+    <ProjectReference Include="..\..\docs\site\src\content\docs\host\configuration-guide\snippets\serializer-contexts\SerializerContexts.csproj"
+                      Condition="'$(TargetFramework)' == 'net10.0'" />
   </ItemGroup>
 
 
