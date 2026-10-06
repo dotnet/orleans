@@ -405,12 +405,11 @@ internal partial class FirestoreDataManager
             this._db.RunTransactionAsync(transactionScope, options: null, cancellationToken: cancellationToken),
             cancellationToken);
 
-    public Task<bool> EntityExists(string id, CancellationToken cancellationToken = default)
+    public async Task<bool> EntityExists(string id, CancellationToken cancellationToken = default)
     {
         var document = this.GetCollection().Document(id);
-        return this.ExecuteTransaction(
-            async transaction => (await transaction.GetSnapshotAsync(document, transaction.CancellationToken)).Exists,
-            cancellationToken);
+        var snapshot = await ExecuteWithCancellation(document.GetSnapshotAsync(cancellationToken), cancellationToken);
+        return snapshot.Exists;
     }
 
     private static void ValidateEntity<TEntity>(TEntity entity, bool updating = false) where TEntity : FirestoreEntity, new()
