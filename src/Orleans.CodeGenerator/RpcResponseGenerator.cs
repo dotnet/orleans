@@ -39,13 +39,20 @@ internal static class RpcResponseGenerator
             return [];
         }
 
+        var bindingTree = compilation.SyntaxTrees.FirstOrDefault();
+        if (bindingTree is null)
+        {
+            bindingTree = CSharpSyntaxTree.Create(SyntaxFactory.CompilationUnit());
+            compilation = compilation.AddSyntaxTrees(bindingTree);
+        }
+
         var services = new GeneratorServices(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
         var responseDefinition = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
         var resolver = new TypeSymbolResolver(compilation);
         var proxyContext = new ProxyGenerationContext(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options), responseNames);
         ProxySourceOutputGenerator.PopulateProxyInterfaces(proxyContext, resolver,
             proxies.Select(static proxy => proxy.ProxyInterface).ToImmutableArray(), cancellationToken);
-        var binding = compilation.GetSemanticModel(compilation.SyntaxTrees.First());
+        var binding = compilation.GetSemanticModel(bindingTree);
         var results = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
         var arguments = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
         var hasCompletionMethods = false;
