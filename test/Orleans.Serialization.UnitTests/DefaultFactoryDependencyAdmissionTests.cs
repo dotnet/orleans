@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -112,6 +113,30 @@ public sealed class DefaultFactoryDependencyAdmissionTests
         Assert.False(provider.IsConstructionPending);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExplicitActivatorContract_SelectsContractAwareParentConstruction(bool explicitFirst)
+    {
+        var options = new TypeManifestOptions();
+        if (explicitFirst) RegisterExplicit();
+        options.AddDefaultSerializerService<CanonicalActivator>(static _ => new());
+        options.AddDefaultSerializerService<IActivator<Target>, CanonicalActivator>(
+            static provider => OrleansGeneratedCodeHelper.GetService<CanonicalActivator>(null!, provider));
+        options.AddDefaultSerializerService<ActivatingRoot>(
+            static _ => throw new InvalidOperationException("The canonical parent must yield to the explicit child contract."),
+            [typeof(CanonicalActivator)]);
+        if (!explicitFirst) RegisterExplicit();
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Microsoft.Extensions.Options.Options.Create(options));
+
+        Assert.False(provider.TryGetSerializerService(typeof(ActivatingRoot), out _));
+        Assert.False(provider.IsConstructionPending);
+
+        void RegisterExplicit() => options.AddSerializerService<IActivator<Target>>(
+            static _ => throw new InvalidOperationException("Admission examines the declared dependency without constructing it."));
+    }
+
     private static void RegisterDefaults(TypeManifestOptions options, State state)
     {
         options.AddSerializer(typeof(DependentCodec));
@@ -142,6 +167,13 @@ public sealed class DefaultFactoryDependencyAdmissionTests
 
     private sealed class FailingRoot
     {
+    }
+
+    private sealed class ActivatingRoot;
+
+    private sealed class CanonicalActivator : IActivator<Target>
+    {
+        public Target Create() => new();
     }
 
     public sealed class DependentCodec : IFieldCodec<Target>

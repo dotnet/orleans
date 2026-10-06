@@ -223,6 +223,103 @@ public sealed class RpcResponseTests : IDisposable
         Assert.IsType<PooledResponseCopier<int, ShallowCopier<int>>>(provider.GetDeepCopier<Response<int>>());
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void InferredResponseParentsHonorExplicitChildFactories(
+        bool explicitFirst, bool describeCanonicalServices, bool consumeChildContracts)
+    {
+        foreach (var untyped in new[] { false, true })
+        {
+            var payloadCodec = new DelegatingCodec<int>(new Int32Codec());
+            var payloadCopier = new TransformingIntCopier();
+            var codecCalls = 0;
+            var copierCalls = 0;
+            var options = new TypeManifestOptions();
+            options.AddSerializer(typeof(PooledResponseCodec<>), typeof(Response<>));
+            options.AddCopier(typeof(PooledResponseCopier<>), typeof(Response<>));
+            if (explicitFirst) RegisterExplicit();
+            if (describeCanonicalServices)
+            {
+                options.AddDefaultSerializerService<Int32Codec>(static _ => new(), []);
+                options.AddDefaultSerializerService<ShallowCopier<int>>(static _ => new(), []);
+            }
+            else
+            {
+                options.AddDefaultSerializerService<Int32Codec>(static _ => new());
+                options.AddDefaultSerializerService<ShallowCopier<int>>(static _ => new());
+            }
+            options.AddDefaultSerializer<int, Int32Codec, ShallowCopier<int>>(
+                static provider => OrleansGeneratedCodeHelper.GetService<Int32Codec>(null!, provider),
+                static provider => OrleansGeneratedCodeHelper.GetService<ShallowCopier<int>>(null!, provider));
+            if (consumeChildContracts) RegisterParent<IFieldCodec<int>, IDeepCopier<int>>();
+            else RegisterParent<Int32Codec, ShallowCopier<int>>();
+            if (!explicitFirst) RegisterExplicit();
+            using var services = new ServiceCollection().AddSerializer()
+                .AddSingleton<Microsoft.Extensions.Options.IOptions<TypeManifestOptions>>(Microsoft.Extensions.Options.Options.Create(options))
+                .BuildServiceProvider();
+            var provider = services.GetRequiredService<CodecProvider>();
+            var codec = untyped
+                ? Assert.IsAssignableFrom<IFieldCodec<Response<int>>>(provider.GetCodec(typeof(Response<int>)))
+                : provider.GetCodec<Response<int>>();
+            var copier = untyped
+                ? Assert.IsAssignableFrom<IDeepCopier<Response<int>>>(provider.GetDeepCopier(typeof(Response<int>)))
+                : provider.GetDeepCopier<Response<int>>();
+            if (!consumeChildContracts)
+            {
+                Assert.IsType<PooledResponseCodec<int>>(codec);
+                Assert.IsType<PooledResponseCopier<int>>(copier);
+            }
+
+            using var response = (Response<int>)Response.FromResult(42);
+            var bytes = Write(codec, response);
+            using var session = _services.GetRequiredService<SerializerSessionPool>().GetSession();
+            var reader = Reader.Create(bytes, session);
+            using var roundTrip = codec.ReadValue(ref reader, reader.ReadFieldHeader());
+            Assert.NotNull(roundTrip);
+            Assert.Equal(42, roundTrip.TypedResult);
+            Assert.Equal(1, payloadCodec.Writes);
+            Assert.Equal(1, payloadCodec.Reads);
+            using var context = _services.GetRequiredService<CopyContextPool>().GetContext();
+            using var copy = copier.DeepCopy(response, context);
+            Assert.Equal(43, copy.TypedResult);
+            Assert.Equal(1, payloadCopier.Copies);
+            Assert.Equal(consumeChildContracts ? 1 : 0, codecCalls);
+            Assert.Equal(consumeChildContracts ? 1 : 0, copierCalls);
+            Assert.Same(payloadCodec, provider.GetCodec<int>());
+            Assert.Same(payloadCopier, provider.GetDeepCopier<int>());
+            Assert.False(provider.IsConstructionPending);
+
+            void RegisterExplicit() => options.AddSerializer<int>(_ => payloadCodec, _ => payloadCopier);
+
+            void RegisterParent<TCodec, TCopier>()
+                where TCodec : class, IFieldCodec<int>
+                where TCopier : class, IDeepCopier<int>
+            {
+                options.AddDefaultSerializerService<PooledResponseCodec<int, TCodec>>(provider =>
+                {
+                    codecCalls++;
+                    return new(OrleansGeneratedCodeHelper.GetService<TCodec>(null!, provider));
+                }, [typeof(TCodec)]);
+                options.AddDefaultSerializerService<PooledResponseCopier<int, TCopier>>(provider =>
+                {
+                    copierCalls++;
+                    return new(OrleansGeneratedCodeHelper.GetService<TCopier>(null!, provider));
+                }, [typeof(TCopier)]);
+                options.AddDefaultSerializer<Response<int>, PooledResponseCodec<int, TCodec>, PooledResponseCopier<int, TCopier>>(
+                    static provider => OrleansGeneratedCodeHelper.GetService<PooledResponseCodec<int, TCodec>>(null!, provider),
+                    static provider => OrleansGeneratedCodeHelper.GetService<PooledResponseCopier<int, TCopier>>(null!, provider),
+                    codecDependencies: [typeof(TCodec)], copierDependencies: [typeof(TCopier)]);
+            }
+        }
+    }
+
     [Fact]
     public void InferredResponseFactoriesInspectDefinitionsWithoutMaterializingLegacyImplementations()
     {
@@ -727,17 +824,21 @@ public sealed class RpcResponseTests : IDisposable
 
     [Theory]
     [InlineData("PayloadCodec")]
+    [InlineData("PayloadCopier")]
     [InlineData("ResponseCodec")]
     [InlineData("ResponseCopier")]
     public async Task GeneratedResponseHolderHonorsCustomResultAndResponseServices(string service)
     {
         var payloadCodec = new DelegatingCodec<int>(new Int32Codec());
+        var payloadCopier = new TransformingIntCopier();
         var responseCodec = new DelegatingCodec<Response<int>>(new PooledResponseCodec<int, Int32Codec>(new Int32Codec()));
         var responseCopier = new TransformingResponseCopier();
         using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
         {
             if (service == "PayloadCodec")
                 options.AddSerializer<int>(_ => payloadCodec, _ => new ShallowCopier<int>());
+            else if (service == "PayloadCopier")
+                options.AddSerializer<int>(static _ => new Int32Codec(), _ => payloadCopier);
             else if (service == "ResponseCodec")
                 options.AddSerializer<Response<int>>(_ => responseCodec, _ => new PooledResponseCopier<int, ShallowCopier<int>>(new ShallowCopier<int>()));
             else
@@ -750,8 +851,10 @@ public sealed class RpcResponseTests : IDisposable
         using var result = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
             provider, contexts, services.GetRequiredService<DeepCopier>().GetCopier<Response>());
 
+        Assert.Null(result.Exception);
         Assert.IsType<Response<int>>(result);
-        Assert.Equal(service == "ResponseCopier" ? 43 : 42, result.GetResult<int>());
+        Assert.Equal(service is "PayloadCopier" or "ResponseCopier" ? 43 : 42, result.GetResult<int>());
+        Assert.Equal(service == "PayloadCopier" ? 1 : 0, payloadCopier.Copies);
         Assert.Equal(service == "ResponseCopier" ? 1 : 0, responseCopier.Copies);
         Assert.False(provider.TryGetRawResponseReader(typeof(int), out _));
         if (service == "PayloadCodec") Assert.Same(payloadCodec, provider.GetCodec<int>());
@@ -800,11 +903,31 @@ public sealed class RpcResponseTests : IDisposable
 
     private sealed class DelegatingCodec<T>(IFieldCodec<T> codec) : IFieldCodec<T>
     {
+        public int Writes { get; private set; }
+        public int Reads { get; private set; }
         public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
             [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, [System.Diagnostics.CodeAnalysis.AllowNull] T value)
-            where TBufferWriter : IBufferWriter<byte> => codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
+            where TBufferWriter : IBufferWriter<byte>
+        {
+            Writes++;
+            codec.WriteField(ref writer, fieldIdDelta, expectedType, value);
+        }
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
-        public T ReadValue<TInput>(ref Reader<TInput> reader, Field field) => codec.ReadValue(ref reader, field);
+        public T ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            Reads++;
+            return codec.ReadValue(ref reader, field);
+        }
+    }
+
+    private sealed class TransformingIntCopier : IDeepCopier<int>
+    {
+        public int Copies { get; private set; }
+        public int DeepCopy(int input, CopyContext context)
+        {
+            Copies++;
+            return input + 1;
+        }
     }
 
     private sealed class TransformingResponseCopier : IDeepCopier<Response<int>>

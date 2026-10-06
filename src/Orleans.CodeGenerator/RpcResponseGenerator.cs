@@ -226,7 +226,6 @@ internal static class RpcResponseGenerator
             source.AppendLine($"options.AddDefaultSerializer<{name}>(static provider => {resolve}, static provider => {resolve});");
             source.AppendLine($"options.AddRawResponseReader<{type}>(static provider => {resolve});");
         }
-        source.AppendLine("#if NET5_0_OR_GREATER");
         if (graph is not null)
         {
             source.AppendLine(graph.ConfigurationStatements);
@@ -256,7 +255,6 @@ internal static class RpcResponseGenerator
             source.AppendLine("options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.CompletedResponse));");
         }
 
-        source.AppendLine("#endif");
         source.AppendLine("}");
         source.AppendLine("private sealed class CompletedResponseActivator : global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.Invocation.CompletedResponse>");
         source.AppendLine("{");
