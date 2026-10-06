@@ -147,10 +147,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static TService UnwrapService<TService>(object caller, TService service)
         {
             var state = ResolutionState.Value!;
+            var callerProvider = state.Provider;
+            var serviceProvider = service is IServiceHolder<TService> holder ? holder.Provider as ICodecProvider : null;
 
             try
             {
-                state.Enter(caller);
+                state.Enter(caller, serviceProvider);
 
                 foreach (var c in state.Callers)
                 {
@@ -165,7 +167,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             }
             catch (Exception exception)
             {
-                if (state.Provider is CodecProvider provider) provider.RecordConstructionFailure(exception);
+                if ((callerProvider ?? state.Provider) is CodecProvider provider) provider.RecordConstructionFailure(exception);
                 throw;
             }
             finally

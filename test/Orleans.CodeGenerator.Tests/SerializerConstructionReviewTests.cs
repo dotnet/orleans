@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization;
@@ -16,6 +17,209 @@ namespace Orleans.CodeGenerator.Tests;
 [TestArea("CodeGen")]
 public sealed class SerializerConstructionReviewTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DiFirstRecursiveListServicesReuseCanonicalSingletons(bool copierFirst)
+    {
+        var node = new DiFirstNode { Value = 42 };
+        node.Children = [node, node];
+        node.Alias = node.Children;
+        var (restored, copied) = ResolveDiFirstListServices(node.Children, copierFirst);
+        foreach (var result in new[] { restored, copied })
+        {
+            Assert.Equal(42, result[0].Value);
+            Assert.Same(result, result[0].Children);
+            Assert.Same(result, result[0].Alias);
+            Assert.Same(result[0], result[1]);
+        }
+        copied[0].Value = 23;
+        Assert.Equal(42, node.Value);
+        Assert.Equal(23, copied[1].Value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DiFirstGenericRecursiveListServicesReuseCanonicalSingletons(bool copierFirst)
+    {
+        var node = new DiFirstGenericNode<int> { Value = 42 };
+        node.Children = [node, node];
+        node.Alias = node.Children;
+        var (restored, copied) = ResolveDiFirstListServices(node.Children, copierFirst);
+        foreach (var result in new[] { restored, copied })
+        {
+            Assert.Equal(42, result[0].Value);
+            Assert.Same(result, result[0].Children);
+            Assert.Same(result, result[0].Alias);
+            Assert.Same(result[0], result[1]);
+        }
+        copied[0].Value = 23;
+        Assert.Equal(42, node.Value);
+        Assert.Equal(23, copied[1].Value);
+    }
+
+    private static (List<TNode> Restored, List<TNode> Copied) ResolveDiFirstListServices<TNode>(List<TNode> input, bool copierFirst) where TNode : class
+    {
+        var codecCalls = 0;
+        var copierCalls = 0;
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.AddSingleton<ListCodec<TNode>>(services =>
+        {
+            Assert.Equal(1, ++codecCalls);
+            return new ListCodec<TNode>(services.GetRequiredService<IFieldCodec<TNode>>());
+        });
+        registrations.AddSingleton<ListCopier<TNode>>(services =>
+        {
+            Assert.Equal(1, ++copierCalls);
+            return new ListCopier<TNode>(services.GetRequiredService<IDeepCopier<TNode>>());
+        });
+        using var services = registrations.BuildServiceProvider();
+        if (copierFirst) _ = services.GetRequiredService<ListCopier<TNode>>();
+        else _ = services.GetRequiredService<ListCodec<TNode>>();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var codec = services.GetRequiredService<ListCodec<TNode>>();
+        var copier = services.GetRequiredService<ListCopier<TNode>>();
+        var nodeCodec = provider.GetCodec<TNode>();
+        var nodeCopier = provider.GetDeepCopier<TNode>();
+        Assert.Same(codec, provider.GetCodec<List<TNode>>());
+        Assert.Same(copier, provider.GetDeepCopier<List<TNode>>());
+        Assert.Same(codec, Assert.Single(nodeCodec.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic),
+            field => field.FieldType == typeof(ListCodec<TNode>)).GetValue(nodeCodec));
+        Assert.Same(copier, Assert.Single(nodeCopier.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic),
+            field => field.FieldType == typeof(ListCopier<TNode>)).GetValue(nodeCopier));
+        Assert.Equal(1, codecCalls);
+        Assert.Equal(1, copierCalls);
+        var serializer = services.GetRequiredService<Serializer>();
+        var restored = serializer.Deserialize<List<TNode>>(serializer.SerializeToArray(input))!;
+        var copied = services.GetRequiredService<DeepCopier>().Copy(input)!;
+        Assert.NotSame(input, restored);
+        Assert.NotSame(input, copied);
+        Assert.NotSame(input[0], restored[0]);
+        Assert.NotSame(input[0], copied[0]);
+        Assert.Equal(1, codecCalls);
+        Assert.Equal(1, copierCalls);
+        return (restored, copied);
+    }
+
+    [GenerateSerializer]
+    public sealed class DiFirstNode
+    {
+        [Id(0)] public int Value { get; set; }
+        [Id(1)] public List<DiFirstNode> Children { get; set; } = new();
+        [Id(2)] public List<DiFirstNode> Alias { get; set; } = new();
+    }
+
+    [GenerateSerializer]
+    public sealed class DiFirstGenericNode<T>
+    {
+        [Id(0)] public T Value { get; set; } = default!;
+        [Id(1)] public List<DiFirstGenericNode<T>> Children { get; set; } = new();
+        [Id(2)] public List<DiFirstGenericNode<T>> Alias { get; set; } = new();
+    }
+
+    [Fact]
+    public void ForeignHoldersKeepCallerOwnershipInItsOriginalProvider()
+    {
+        var leaf = new ForeignHolderLeaf();
+        var secondRegistrations = new ServiceCollection().AddSerializer();
+        secondRegistrations.AddSingleton(leaf);
+        secondRegistrations.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddFieldCodec(typeof(ForeignHolderLeaf));
+            options.AddCopier(typeof(ForeignHolderLeaf));
+        });
+        using var second = secondRegistrations.BuildServiceProvider();
+        var codecHolder = second.GetRequiredService<IFieldCodec<ForeignHolderValue>>();
+        var copierHolder = second.GetRequiredService<IDeepCopier<ForeignHolderValue>>();
+        var firstRegistrations = new ServiceCollection().AddSerializer();
+        firstRegistrations.Configure<TypeManifestOptions>(options =>
+            options.AddSerializerService<ForeignHolderRoot>(_ => new ForeignHolderRoot(codecHolder, copierHolder)));
+        using var first = firstRegistrations.BuildServiceProvider();
+        var firstProvider = first.GetRequiredService<CodecProvider>();
+        var secondProvider = second.GetRequiredService<CodecProvider>();
+        var root = OrleansGeneratedCodeHelper.GetService<ForeignHolderRoot>(null!, firstProvider);
+        Assert.Same(leaf, root.Codec);
+        Assert.Same(leaf, root.Copier);
+        Assert.NotSame(root, root.Codec);
+        Assert.NotSame(root, root.Copier);
+        Assert.Same(leaf, secondProvider.GetCodec<ForeignHolderValue>());
+        Assert.Same(leaf, secondProvider.GetDeepCopier<ForeignHolderValue>());
+        Assert.Same(root, OrleansGeneratedCodeHelper.GetService<ForeignHolderRoot>(null!, firstProvider));
+    }
+
+    [Fact]
+    public void CaughtForeignHolderFailureFaultsTheCallerGraphAndRetriesFreshDependencies()
+    {
+        var error = new InvalidOperationException("Foreign holder construction failed.");
+        var secondRegistrations = new ServiceCollection().AddSerializer();
+        secondRegistrations.AddSingleton<ForeignHolderLeaf>(_ => throw error);
+        secondRegistrations.Configure<TypeManifestOptions>(options => options.AddFieldCodec(typeof(ForeignHolderLeaf)));
+        using var second = secondRegistrations.BuildServiceProvider();
+        var holder = second.GetRequiredService<IFieldCodec<ForeignHolderValue>>();
+        var attempts = 0;
+        var leaves = 0;
+        Leaf? failedLeaf = null;
+        InvalidOperationException? caught = null;
+        var firstRegistrations = new ServiceCollection().AddSerializer();
+        firstRegistrations.Configure<TypeManifestOptions>(options =>
+        {
+            options.AddSerializerService<Leaf>(_ => new Leaf(++leaves));
+            options.AddSerializerService<Root>(provider =>
+            {
+                var leaf = OrleansGeneratedCodeHelper.GetService<Leaf>(null!, provider);
+                if (++attempts == 1)
+                {
+                    failedLeaf = leaf;
+                    try
+                    {
+                        _ = OrleansGeneratedCodeHelper.UnwrapService(new ForeignHolderLeaf(), holder);
+                    }
+                    catch (InvalidOperationException exception)
+                    {
+                        caught = exception;
+                    }
+                }
+                return new Root(leaf);
+            });
+        });
+        using var first = firstRegistrations.BuildServiceProvider();
+        var provider = first.GetRequiredService<CodecProvider>();
+        var failure = Assert.Throws<InvalidOperationException>(() => OrleansGeneratedCodeHelper.GetService<Root>(null!, provider));
+        Assert.Same(error, failure);
+        Assert.Same(caught, failure);
+        var root = OrleansGeneratedCodeHelper.GetService<Root>(null!, provider);
+        Assert.Equal(2, attempts);
+        Assert.Equal(2, leaves);
+        Assert.NotSame(failedLeaf, root.Leaf);
+        Assert.Same(root.Leaf, OrleansGeneratedCodeHelper.GetService<Leaf>(null!, provider));
+        Assert.Same(root, OrleansGeneratedCodeHelper.GetService<Root>(null!, provider));
+    }
+
+    public sealed class ForeignHolderValue;
+
+    public class ForeignHolderLeaf : IFieldCodec<ForeignHolderValue>, IDeepCopier<ForeignHolderValue>
+    {
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType,
+            [System.Diagnostics.CodeAnalysis.AllowNull] ForeignHolderValue value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> => throw new NotSupportedException();
+        public ForeignHolderValue ReadValue<TInput>(ref Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field)
+            => throw new NotSupportedException();
+        public ForeignHolderValue? DeepCopy(ForeignHolderValue? input, CopyContext context) => throw new NotSupportedException();
+    }
+
+    private sealed class ForeignHolderRoot : ForeignHolderLeaf
+    {
+        public IFieldCodec<ForeignHolderValue> Codec { get; }
+        public IDeepCopier<ForeignHolderValue> Copier { get; }
+        public ForeignHolderRoot(IFieldCodec<ForeignHolderValue> codec, IDeepCopier<ForeignHolderValue> copier)
+        {
+            Codec = OrleansGeneratedCodeHelper.UnwrapService(this, codec);
+            Copier = OrleansGeneratedCodeHelper.UnwrapService(this, copier);
+        }
+    }
+
     [Fact]
     public void InitializationCallbacksResolveClosedServicesUnderTheExistingInitializationLock()
     {

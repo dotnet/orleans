@@ -181,6 +181,7 @@ namespace Orleans.Serialization
             }
 
             public IActivator<T> Value => _activator ?? CacheCompleted(_activatorProvider, _activatorProvider.GetActivator<T>(), ref _activator);
+            public object Provider => _activatorProvider;
 
             public T Create() => Value.Create();
         }
@@ -201,6 +202,7 @@ namespace Orleans.Serialization
             public TField ReadValue<TInput>(ref Reader<TInput> reader, Field field) => Value.ReadValue(ref reader, field);
 
             public IFieldCodec<TField> Value => _codec ?? CacheCompleted(_codecProvider, _codecProvider.GetCodec<TField>(), ref _codec);
+            public object Provider => _codecProvider;
         }
 
         private sealed class BaseCodecHolder<TField> : IBaseCodec<TField>, IServiceHolder<IBaseCodec<TField>> where TField : class
@@ -218,6 +220,7 @@ namespace Orleans.Serialization
             public void Deserialize<TInput>(ref Reader<TInput> reader, TField value) => Value.Deserialize(ref reader, value);
 
             public IBaseCodec<TField> Value => _baseCodec ?? CacheCompleted(_provider, _provider.GetBaseCodec<TField>(), ref _baseCodec);
+            public object Provider => _provider;
         }
 
         private sealed class ValueSerializerHolder<TField> : IValueSerializer<TField>, IServiceHolder<IValueSerializer<TField>> where TField : struct
@@ -235,6 +238,7 @@ namespace Orleans.Serialization
             public void Deserialize<TInput>(ref Reader<TInput> reader, scoped ref TField value) => Value.Deserialize(ref reader, ref value);
 
             public IValueSerializer<TField> Value => _serializer ?? CacheCompleted(_provider, _provider.GetValueSerializer<TField>(), ref _serializer);
+            public object Provider => _provider;
         }
 
         internal sealed class CopierHolder<T> : IDeepCopier<T>, IServiceHolder<IDeepCopier<T>>, IOptionalDeepCopier
@@ -256,6 +260,7 @@ namespace Orleans.Serialization
             public bool IsShallowCopyable() => (Value as IOptionalDeepCopier)?.IsShallowCopyable() ?? false;
 
             public IDeepCopier<T> Value => _copier ?? CacheCompleted(_codecProvider, _codecProvider.GetDeepCopier<T>(), ref _copier);
+            public object Provider => _codecProvider;
         }
 
         private sealed class BaseCopierHolder<T> : IBaseCopier<T>, IServiceHolder<IBaseCopier<T>> where T : class
@@ -271,6 +276,7 @@ namespace Orleans.Serialization
             public void DeepCopy(T original, T copy, CopyContext context) => Value.DeepCopy(original, copy, context);
 
             public IBaseCopier<T> Value => _copier ?? CacheCompleted(_codecProvider, _codecProvider.GetBaseCopier<T>(), ref _copier);
+            public object Provider => _codecProvider;
         }
 
         private static TService CacheCompleted<TService>(object provider, TService value, ref TService? slot) where TService : class
@@ -291,5 +297,10 @@ namespace Orleans.Serialization
         /// </summary>
         /// <value>The service.</value>
         T Value { get; }
+
+        /// <summary>
+        /// Gets the provider which resolves the held service.
+        /// </summary>
+        object Provider { get; }
     }
 }
