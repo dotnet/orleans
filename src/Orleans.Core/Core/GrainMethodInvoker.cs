@@ -24,7 +24,7 @@ namespace Orleans.Runtime
         private readonly IGrainContext grainContext;
         private readonly ICodecProvider codecProvider;
         private readonly CopyContextPool copyContexts;
-        private Response? ownedResponse;
+        private Response? response;
         private List<Response>? otherOwnedResponses;
         private int stage;
 
@@ -77,78 +77,51 @@ namespace Orleans.Runtime
             set => Response = Response.FromResult(value);
         }
 
-        public Response? Response { get; set; }
+        public Response? Response
+        {
+            get => response;
+            set
+            {
+                if (ReferenceEquals(response, value)) return;
+                if (response is { } previous)
+                {
+                    (otherOwnedResponses ??= []).Add(previous);
+                }
+
+                if (value is not null && otherOwnedResponses is { } others)
+                {
+                    for (var i = others.Count - 1; i >= 0; i--)
+                    {
+                        if (ReferenceEquals(value, others[i])) others.RemoveAt(i);
+                    }
+                }
+
+                response = value;
+            }
+        }
 
         internal Response TakeResponse()
         {
-            var response = Response!;
-            if (ReferenceEquals(response, ownedResponse))
-            {
-                ownedResponse = null;
-            }
-
-            if (otherOwnedResponses is { } others)
-            {
-                for (var i = others.Count - 1; i >= 0; i--)
-                {
-                    if (ReferenceEquals(response, others[i]))
-                    {
-                        others.RemoveAt(i);
-                    }
-                }
-            }
-
-            Response = null;
-            return response;
+            var result = response!;
+            response = null;
+            return result;
         }
 
         public void Dispose()
         {
-            var response = ownedResponse;
-            ownedResponse = null;
-            var current = Response;
-            Response = null;
+            var current = response;
+            response = null;
+            var others = otherOwnedResponses;
+            otherOwnedResponses = null;
             try
             {
-                if (current is not null && !ReferenceEquals(current, response)
-                    && (otherOwnedResponses is null || !otherOwnedResponses.Exists(entry => ReferenceEquals(current, entry))))
-                {
-                    current.Dispose();
-                }
+                current?.Dispose();
             }
             finally
             {
-                try
-                {
-                    response?.Dispose();
-                }
-                finally
-                {
-                    if (otherOwnedResponses is { } others)
-                    {
-                        otherOwnedResponses = null;
-                        foreach (var entry in others) entry.Dispose();
-                    }
-                }
+                if (others is not null)
+                    foreach (var entry in others) entry.Dispose();
             }
-        }
-
-        private void SetOwnedResponse(Response response)
-        {
-            if (ownedResponse is { } previous && !ReferenceEquals(previous, response))
-            {
-                (otherOwnedResponses ??= []).Add(previous);
-            }
-
-            if (otherOwnedResponses is { } others)
-            {
-                for (var i = others.Count - 1; i >= 0; i--)
-                {
-                    if (ReferenceEquals(response, others[i])) others.RemoveAt(i);
-                }
-            }
-
-            ownedResponse = Response = response;
         }
 
         public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
@@ -215,14 +188,14 @@ namespace Orleans.Runtime
                     // Propagate exceptions to other filters.
                     if (response.Exception is { } exception)
                     {
-                        SetOwnedResponse(response);
+                        Response = response;
                         ExceptionDispatchInfo.Capture(exception).Throw();
                     }
 
                     if (request is not IResponseInvokable)
                         response = ResponseCopyBoundary.CopyAndDispose(response, this.responseCopier);
 
-                    SetOwnedResponse(response);
+                    Response = response;
 
                     return;
                 }

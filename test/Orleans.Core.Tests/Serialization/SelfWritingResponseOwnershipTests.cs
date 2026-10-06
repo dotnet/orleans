@@ -246,6 +246,78 @@ public sealed class SelfWritingResponseOwnershipTests
     }
 
     [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, false, true, true)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, true, true, false)]
+    [InlineData(false, true, true, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, false, false, true)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, true, false, true)]
+    [InlineData(true, true, true, false)]
+    [InlineData(true, true, true, true)]
+    public async Task FilterReplacesMultipleResponses_ReturnsEveryLease(bool observer, bool invokeRoot, bool restoreFirst, bool throwAfterSelection)
+    {
+        var counts = new Counts();
+        var failure = new InvalidOperationException("after selecting multiple responses");
+        var filter = new CallbackFilter(async context =>
+        {
+            if (invokeRoot) await context.Invoke();
+            var codec = Assert.IsAssignableFrom<LegacyRequest>(context.Request).Codec;
+            var first = CountedResponse.Rent(new Payload { Values = [47] }, counts, codec);
+            var second = CountedResponse.Rent(new Payload { Values = [59] }, counts, codec);
+            context.Response = first;
+            context.Response = first;
+            context.Response = second;
+            context.Response = null;
+            context.Response = restoreFirst ? first : second;
+            if (throwAfterSelection) throw failure;
+        });
+        await using var fixture = new SendFixture(counts, filter);
+        var request = new DirectRequest(new Payload { Values = [17] }, counts);
+
+        using var response = await fixture.Invoke(request, observer);
+
+        Assert.Equal((invokeRoot ? 1 : 0) + (throwAfterSelection ? 0 : 1), counts.PayloadCopies);
+        Assert.Equal(throwAfterSelection ? 0 : 1, counts.ResponseCopies);
+        Assert.Equal((invokeRoot ? 1 : 0) + 2 + (throwAfterSelection ? 0 : 1), counts.Rents);
+        Assert.Equal(counts.Rents - (throwAfterSelection ? 0 : 1), counts.Returns);
+        if (throwAfterSelection)
+        {
+            Assert.Same(failure, response.Exception);
+        }
+        else
+        {
+            Assert.Null(response.Exception);
+            Assert.Equal(new[] { restoreFirst ? 47 : 59 }, Assert.IsType<Payload>(response.Result).Values);
+            await fixture.AssertFrameRoundTrip(response);
+            response.Dispose();
+        }
+        Assert.Equal(counts.Rents, counts.Returns);
+
+        var rented = new List<CountedResponse>();
+        try
+        {
+            for (var i = 0; i < counts.Rents; i++)
+            {
+                var holder = ResponsePool.GetGenerated<CountedResponse>();
+                Assert.DoesNotContain(rented, existing => ReferenceEquals(existing, holder));
+                rented.Add(holder);
+            }
+        }
+        finally
+        {
+            foreach (var holder in rented) ResponsePool.ReturnGenerated(holder);
+        }
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task FilterRestoresEarlierRoot_IsolatesSelectedResultAndDisposesOtherRoot(bool observer)
