@@ -118,7 +118,7 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
         {
             throw CreateInconsistentStateException(nameof(WriteStateAsync), stateName, grainId, grainState.ETag, ex);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogWriteError(ex, grainId, grainState.ETag);
             throw;
@@ -184,7 +184,7 @@ internal partial class FirestoreGrainStorage : IGrainStorage, ILifecycleParticip
         {
             throw CreateInconsistentStateException(nameof(ClearStateAsync), stateName, grainId, grainState.ETag, ex);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogClearError(ex, operation, stateName, grainId, grainState.ETag);
             throw;

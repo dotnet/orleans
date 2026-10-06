@@ -229,6 +229,38 @@ public sealed class FirestoreGrainStorageCancellationTests
         Assert.Contains(failure, fixture.Errors);
     }
 
+    [Theory]
+    [InlineData("Write", false, false)]
+    [InlineData("Write", false, true)]
+    [InlineData("Clear", false, false)]
+    [InlineData("Clear", false, true)]
+    [InlineData("Clear", true, false)]
+    [InlineData("Clear", true, true)]
+    public async Task UnrequestedSdkCancellationPreservesExceptionStateAndErrorLogging(string operation, bool deleteStateOnClear, bool legacy)
+    {
+        var fixture = new Fixture(deleteStateOnClear);
+        var failure = new OperationCanceledException("SDK cancellation", new CancellationToken(canceled: true));
+        fixture.Client.Failure = failure;
+        var state = CreateState(ETag);
+        var original = state.State;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+
+#pragma warning disable xUnit1051 // Verify diagnostics for both legacy None and cancellation-aware calls.
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => legacy
+                ? Invoke(fixture.Storage, operation, state)
+                : Invoke(fixture.Storage, operation, state, cancellation.Token));
+#pragma warning restore xUnit1051
+
+        Assert.False(cancellation.IsCancellationRequested);
+        Assert.Same(failure, exception);
+        Assert.Equal(failure.CancellationToken, exception.CancellationToken);
+        AssertUnchangedState(state, original, ETag);
+        Assert.Equal(legacy ? CancellationToken.None : cancellation.Token, Assert.Single(fixture.Client.Requests).Token);
+        Assert.Same(failure, Assert.Single(fixture.Errors));
+        Assert.Equal(0, fixture.Activations);
+    }
+
     private static GrainState<State> CreateState(string? etag) => new(new State { Value = 7 }, etag) { RecordExists = true };
 
     private static Task Invoke(IGrainStorage storage, string operation, GrainState<State> state, CancellationToken token) => operation switch
