@@ -71,8 +71,13 @@ namespace Orleans.Storage
         /// <exception cref="ArgumentNullException">
         /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
         /// </exception>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ArgumentNullException.ThrowIfNull(grainType);
             ArgumentNullException.ThrowIfNull(grainState);
 
@@ -82,7 +87,7 @@ namespace Orleans.Storage
             LogTraceReadingGrainState(grainType, pk, grainId, this.options.TableName);
             string partitionKey = pk;
             string rowKey = AzureTableUtils.SanitizeTableProperty(grainType);
-            var entity = await tableDataManager.Read(partitionKey, rowKey).ConfigureAwait(false);
+            var entity = await tableDataManager.Read(partitionKey, rowKey, cancellationToken).ConfigureAwait(false);
             if (entity is not null)
             {
                 var loadedState = ConvertFromStorageFormat<T>(entity);
@@ -103,8 +108,13 @@ namespace Orleans.Storage
         /// <exception cref="ArgumentNullException">
         /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
         /// </exception>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ArgumentNullException.ThrowIfNull(grainType);
             ArgumentNullException.ThrowIfNull(grainState);
 
@@ -122,11 +132,11 @@ namespace Orleans.Storage
             ConvertToStorageFormat(grainState.State, entity);
             try
             {
-                await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                await DoOptimisticUpdate(() => tableDataManager.Write(entity, cancellationToken), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                 grainState.ETag = entity.ETag.ToString();
                 grainState.RecordExists = true;
             }
-            catch (Exception exc)
+            catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorWriteGrainState(grainType, grainId, grainState.ETag, this.options.TableName, exc);
                 throw;
@@ -143,8 +153,13 @@ namespace Orleans.Storage
         /// <exception cref="ArgumentNullException">
         /// <paramref name="grainType"/> or <paramref name="grainState"/> is <see langword="null"/>.
         /// </exception>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             ArgumentNullException.ThrowIfNull(grainType);
             ArgumentNullException.ThrowIfNull(grainState);
 
@@ -164,19 +179,19 @@ namespace Orleans.Storage
                 if (this.options.DeleteStateOnClear)
                 {
                     operation = "Deleting";
-                    await DoOptimisticUpdate(() => tableDataManager.Delete(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Delete(entity, cancellationToken), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                     grainState.ETag = null;
                 }
                 else
                 {
-                    await DoOptimisticUpdate(() => tableDataManager.Write(entity), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
+                    await DoOptimisticUpdate(() => tableDataManager.Write(entity, cancellationToken), grainType, grainId, this.options.TableName, grainState.ETag).ConfigureAwait(false);
                     grainState.ETag = entity.ETag.ToString(); // Update in-memory data to the new ETag
                 }
 
                 grainState.RecordExists = false;
                 grainState.State = CreateInstance<T>();
             }
-            catch (Exception exc)
+            catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorClearingGrainState(operation, grainType, grainId, grainState.ETag!, this.options.TableName, exc);
                 throw;
@@ -406,12 +421,12 @@ namespace Orleans.Storage
                 return tableManager.InitTableAsync(cancellationToken);
             }
 
-            public async Task<TableEntity?> Read(string partitionKey, string rowKey)
+            public async Task<TableEntity?> Read(string partitionKey, string rowKey, CancellationToken cancellationToken)
             {
                 LogTraceReadingPartitionKeyRowKey(partitionKey, rowKey, TableName);
                 try
                 {
-                    var data = await tableManager.ReadSingleTableEntryAsync(partitionKey, rowKey).ConfigureAwait(false);
+                    var data = await tableManager.ReadSingleTableEntryAsync(partitionKey, rowKey, cancellationToken).ConfigureAwait(false);
                     if (data.Entity == null)
                     {
                         LogTraceDataNotFoundReading(partitionKey, rowKey, TableName);
@@ -436,18 +451,19 @@ namespace Orleans.Storage
                 }
             }
 
-            public async Task Write(TableEntity entity)
+            public async Task Write(TableEntity entity, CancellationToken cancellationToken)
             {
                 LogTraceWritingPartitionKeyRowKey(entity.PartitionKey, entity.RowKey, TableName, entity.ETag.ToString());
 
                 string eTag = string.IsNullOrEmpty(entity.ETag.ToString()) ?
-                    await tableManager.CreateTableEntryAsync(entity).ConfigureAwait(false) :
-                    await tableManager.UpdateTableEntryAsync(entity, entity.ETag).ConfigureAwait(false);
+                    await tableManager.CreateTableEntryAsync(entity, cancellationToken).ConfigureAwait(false) :
+                    await tableManager.UpdateTableEntryAsync(entity, entity.ETag, cancellationToken).ConfigureAwait(false);
                 entity.ETag = new ETag(eTag);
             }
 
-            public async Task Delete(TableEntity entity)
+            public async Task Delete(TableEntity entity, CancellationToken cancellationToken)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (string.IsNullOrWhiteSpace(entity.ETag.ToString()))
                 {
                     LogTraceNotAttemptingDelete(entity.PartitionKey, entity.RowKey, TableName, entity.ETag.ToString());
@@ -455,7 +471,7 @@ namespace Orleans.Storage
                 }
 
                 LogTraceWritingPartitionKeyRowKey(entity.PartitionKey, entity.RowKey, TableName, entity.ETag.ToString());
-                await tableManager.DeleteTableEntryAsync(entity, entity.ETag).ConfigureAwait(false);
+                await tableManager.DeleteTableEntryAsync(entity, entity.ETag, cancellationToken).ConfigureAwait(false);
                 entity.ETag = default;
             }
 
