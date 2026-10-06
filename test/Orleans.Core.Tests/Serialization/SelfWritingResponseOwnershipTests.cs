@@ -36,6 +36,31 @@ namespace UnitTests.Serialization;
 [TestCategory("BVT"), TestCategory("Serialization")]
 public sealed class SelfWritingResponseOwnershipTests
 {
+    [Fact]
+    public void MigrationArgumentCodec_RetainsOrdinaryHostDependencyResolution()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var codec = provider.GetCodec<List<GrainMigrationPackage>>();
+        var activator = provider.GetActivator<MigrationContext>();
+        using var migration = activator.Create();
+        var sessions = services.GetRequiredService<SerializerSessionPool>();
+
+        Assert.Same(sessions, migration._sessionPool);
+        Assert.Same(codec, provider.GetCodec<List<GrainMigrationPackage>>());
+        Assert.False(provider.IsConstructionPending);
+        using var session = sessions.GetSession();
+        var output = new ArrayBufferWriter<byte>();
+        var writer = Writer.Create(output, session);
+        var source = new List<GrainMigrationPackage>
+        {
+            new() { GrainId = GrainId.Create("migration-test", "target"), MigrationContext = migration }
+        };
+        codec.WriteField(ref writer, 0, typeof(List<GrainMigrationPackage>), source);
+        writer.Commit();
+        Assert.True(output.WrittenCount > 0);
+    }
+
     [Theory]
     [InlineData(false, false, "Distinct")]
     [InlineData(false, true, "Distinct")]

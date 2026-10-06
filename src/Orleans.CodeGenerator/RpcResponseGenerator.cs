@@ -19,6 +19,14 @@ internal static class RpcResponseGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor UnsupportedArgument = new(
+        DiagnosticRuleId.UnsupportedRpcResponseFactory,
+        new LocalizableResourceString("UnsupportedRpcArgumentFactoryTitle", Resources.ResourceManager, typeof(Resources)),
+        new LocalizableResourceString("UnsupportedRpcArgumentFactoryMessageFormat", Resources.ResourceManager, typeof(Resources)),
+        "Usage",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     internal static ImmutableArray<SourceOutputResult> Generate(
         Compilation compilation,
         ImmutableArray<ProxyOutputModel> proxies,
@@ -130,7 +138,7 @@ internal static class RpcResponseGenerator
             var method = entry.Value;
             if (RpcResponseHolderGenerator.TryDescribe(services, resultType, out var holderCodec, out var holderCopier))
                 responseHolders.Add(resultType, (holderCodec, holderCopier));
-            if (SerializerFactoryGenerator.TryCreate(services, [responseDefinition.Construct(resultType)], cancellationToken, out var candidate, out var failure))
+            if (SerializerFactoryGenerator.TryCreate(services, [responseDefinition.Construct(resultType)], cancellationToken, out var candidate, out var failure, useDefaultFactories: true))
             {
                 var dictionary = candidate.Registrations.Keys.OfType<INamedTypeSymbol>()
                     .FirstOrDefault(type => SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, dictionaryDefinition));
@@ -172,7 +180,7 @@ internal static class RpcResponseGenerator
             }
             else
             {
-                Report(argument.Value, argument.Key, failure?.Reason ?? "the argument graph requires an explicit closed construction contract");
+                ReportArgument(argument.Value, argument.Key, failure?.Reason ?? "the argument graph requires an explicit closed construction contract");
             }
         }
 
@@ -286,6 +294,16 @@ internal static class RpcResponseGenerator
             {
                 output.Add(SourceOutputResult.FromDiagnostic(Diagnostic.Create(
                     UnsupportedResponse, method.Locations.FirstOrDefault(), method.ToDisplayString(), resultType.ToDisplayString(), reason)));
+            }
+
+        }
+
+        void ReportArgument(IMethodSymbol method, ITypeSymbol argumentType, string reason)
+        {
+            if (options.ValidateRpcResponseFactories)
+            {
+                output.Add(SourceOutputResult.FromDiagnostic(Diagnostic.Create(
+                    UnsupportedArgument, method.Locations.FirstOrDefault(), method.ToDisplayString(), argumentType.ToDisplayString(), reason)));
             }
         }
     }

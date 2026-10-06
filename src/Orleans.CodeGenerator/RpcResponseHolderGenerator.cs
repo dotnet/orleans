@@ -73,7 +73,7 @@ internal static class RpcResponseHolderGenerator
     {
         codec = copier = "";
         if (ContainsParameter(resultType)) return false;
-        if (SerializerFactoryGenerator.TryCreate(services, [resultType], CancellationToken.None, out var graph, out _))
+        if (SerializerFactoryGenerator.TryCreate(services, [resultType], CancellationToken.None, out var graph, out _, useDefaultFactories: true))
         {
             if (graph.Registrations.Keys.OfType<INamedTypeSymbol>().Any(type =>
                 SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, services.Compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2"))))

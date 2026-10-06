@@ -47,6 +47,8 @@ namespace Orleans.Serialization.Configuration
 
         internal Dictionary<Type, Func<ICodecProvider, IFieldCodec>> CodecFactories { get; } = new();
         internal Dictionary<Type, Func<ICodecProvider, IDeepCopier>> CopierFactories { get; } = new();
+        internal Dictionary<Type, Type> CodecFactoryServices { get; } = new();
+        internal Dictionary<Type, Type> CopierFactoryServices { get; } = new();
         internal Dictionary<Type, Func<ICodecProvider, object>> SerializerServiceFactories { get; } = new();
         internal Dictionary<Type, DefaultSerializerContract> DefaultSerializerContracts { get; } = new();
         internal Dictionary<Type, DefaultSerializerContract> DefaultCodecFactoryContracts { get; } = new();
@@ -145,6 +147,8 @@ namespace Orleans.Serialization.Configuration
                 Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IFieldCodec<T>>(null!, provider));
             CopierFactories.TryAdd(typeof(T), static provider =>
                 Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<T>>(null!, provider));
+            CodecFactoryServices.TryAdd(typeof(T), typeof(IFieldCodec<T>));
+            CopierFactoryServices.TryAdd(typeof(T), typeof(IDeepCopier<T>));
             AddSerializerServiceFactory(typeof(IFieldCodec<T>), codecFactory, isDefault);
             AddSerializerServiceFactory(typeof(IDeepCopier<T>), copierFactory, isDefault);
             if (DefaultSerializerContracts.TryGetValue(typeof(IFieldCodec<T>), out var codecContract))

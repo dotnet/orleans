@@ -150,4 +150,10 @@
   <data name="UnsupportedRpcResponseFactoryMessageFormat" xml:space="preserve">
     <value>RPC method '{0}' requires response result '{1}': {2}; register the closed Response&lt;TResult&gt; types in a serializer context for this contract</value>
   </data>
+  <data name="UnsupportedRpcArgumentFactoryTitle" xml:space="preserve">
+    <value>RPC argument requires a closed construction graph</value>
+  </data>
+  <data name="UnsupportedRpcArgumentFactoryMessageFormat" xml:space="preserve">
+    <value>RPC method '{0}' requires a closed construction graph for argument type '{1}': {2}; register the argument's closed codec, copier, and required serialization services in a serializer context for this contract</value>
+  </data>
 </root>
