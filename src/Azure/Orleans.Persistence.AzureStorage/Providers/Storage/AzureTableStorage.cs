@@ -136,11 +136,7 @@ namespace Orleans.Storage
                 grainState.ETag = entity.ETag.ToString();
                 grainState.RecordExists = true;
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exc)
+            catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorWriteGrainState(grainType, grainId, grainState.ETag, this.options.TableName, exc);
                 throw;
@@ -195,11 +191,7 @@ namespace Orleans.Storage
                 grainState.RecordExists = false;
                 grainState.State = CreateInstance<T>();
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exc)
+            catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorClearingGrainState(operation, grainType, grainId, grainState.ETag!, this.options.TableName, exc);
                 throw;

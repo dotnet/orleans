@@ -178,11 +178,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     var opResult = await Table.AddEntityAsync(data, cancellationToken);
                     return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception exc)
+                catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     CheckAlertWriteError(operation, data, null, exc);
                     throw;
@@ -341,11 +337,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                     //The ETag of data is needed in further operations.
                     return opResult.Headers.ETag.GetValueOrDefault().ToString();
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception exc)
+                catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     CheckAlertWriteError(operation, data, null, exc);
                     throw;
@@ -399,11 +391,7 @@ namespace Orleans.GrainDirectory.AzureStorage
                         throw new RequestFailedException(response.Status, "Resource not found", response.ReasonPhrase, null);
                     }
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception exc)
+                catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     LogWarningDeleteTableEntry(Logger, exc, data, TableName);
                     throw;

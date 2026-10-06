@@ -170,6 +170,35 @@ public sealed class AzureTableGrainStorageCancellationTests
     }
 
     [Theory]
+    [MemberData(nameof(SdkCases))]
+    public async Task SdkCancellation_WithoutCallerCancellation_PreservesStateAndErrorLogging(Branch branch, string? etag)
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var sdkCancellation = new CancellationTokenSource();
+        sdkCancellation.Cancel();
+        var fixture = await Fixture.CreateAsync(branch);
+        var state = CreateState(etag, recordExists: true);
+        var original = Assert.IsType<Dictionary<string, int>>(state.State);
+        var failure = new OperationCanceledException("SDK cancellation.", sdkCancellation.Token);
+        fixture.Table.Expect(branch, etag, cancellation.Token);
+        fixture.Table.Completion.SetException(failure);
+
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+            () => Invoke(fixture.Storage, branch, state, cancellation.Token));
+
+        Assert.Same(failure, exception);
+        Assert.Equal(sdkCancellation.Token, exception.CancellationToken);
+        Assert.False(cancellation.IsCancellationRequested);
+        Assert.Equal(1, fixture.Table.OperationCalls);
+        AssertUnchanged(state, original, etag, recordExists: true);
+        Assert.Equal(IsWrite(branch) ? 1 : 0, fixture.Serializer.SerializeCalls);
+        Assert.Equal(0, fixture.Serializer.DeserializeCalls);
+        Assert.Equal(0, fixture.Activators.Calls);
+        Assert.Equal(branch == Branch.Read ? 0 : 2, fixture.Logger.StorageErrors.Count);
+        Assert.All(fixture.Logger.StorageErrors, entry => Assert.Same(failure, entry.Exception));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData(" ")]
