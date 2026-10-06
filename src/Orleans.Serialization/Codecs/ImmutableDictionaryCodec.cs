@@ -68,8 +68,8 @@ namespace Orleans.Serialization.Codecs
     public sealed class ImmutableDictionaryCopier<TKey, TValue> : IDeepCopier<ImmutableDictionary<TKey, TValue>>, IOptionalDeepCopier where TKey : notnull
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<TKey>? _keyCopier;
-        private readonly IDeepCopier<TValue>? _valueCopier;
+        private readonly IDeepCopier<TKey> _keyCopier;
+        private readonly IDeepCopier<TValue> _valueCopier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableDictionaryCopier{TKey, TValue}"/> class.
@@ -107,8 +107,8 @@ namespace Orleans.Serialization.Codecs
             var shallowValues = OrleansGeneratedCodeHelper.IsShallowCopyable(_valueCopier);
             var items = new List<KeyValuePair<TKey, TValue>>(input.Count);
             foreach (var item in input)
-                items.Add(new(shallowKeys ? item.Key : _keyCopier!.DeepCopy(item.Key, context)!,
-                    shallowValues ? item.Value : _valueCopier!.DeepCopy(item.Value, context)!));
+                items.Add(new(shallowKeys ? item.Key : _keyCopier.DeepCopy(item.Key, context),
+                    shallowValues ? item.Value : _valueCopier.DeepCopy(item.Value, context)!));
 
             var res = ImmutableDictionary.CreateRange(input.KeyComparer, input.ValueComparer, items);
             context.RecordCopy(input, res);

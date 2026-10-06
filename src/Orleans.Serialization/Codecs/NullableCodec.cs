@@ -72,7 +72,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class NullableCopier<T> : IDeepCopier<T?>, IOptionalDeepCopier where T : struct
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T>? _copier;
+        private readonly IDeepCopier<T> _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="NullableCopier{T}"/> class.
@@ -86,9 +86,9 @@ namespace Orleans.Serialization.Codecs
             ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier));
 
         [return: NotNullIfNotNull(nameof(input))]
-        object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input is null || IsShallowCopyable() ? input : _copier!.DeepCopy(input, context);
+        object? IDeepCopier.DeepCopy(object? input, CopyContext context) => input is null || IsShallowCopyable() ? input : _copier.DeepCopy(input, context);
 
         /// <inheritdoc/>
-        public T? DeepCopy(T? input, CopyContext context) => input is null || IsShallowCopyable() ? input : _copier!.DeepCopy(input.GetValueOrDefault(), context);
+        public T? DeepCopy(T? input, CopyContext context) => input is null || IsShallowCopyable() ? input : _copier.DeepCopy(input.GetValueOrDefault(), context);
     }
 }

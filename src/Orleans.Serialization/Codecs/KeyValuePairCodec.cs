@@ -93,8 +93,8 @@ namespace Orleans.Serialization.Codecs
     public sealed class KeyValuePairCopier<TKey, TValue> : IDeepCopier<KeyValuePair<TKey, TValue>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<TKey>? _keyCopier;
-        private readonly IDeepCopier<TValue>? _valueCopier;
+        private readonly IDeepCopier<TKey> _keyCopier;
+        private readonly IDeepCopier<TValue> _valueCopier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="KeyValuePairCopier{TKey, TValue}"/> class.

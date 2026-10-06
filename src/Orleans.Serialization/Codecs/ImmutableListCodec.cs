@@ -51,7 +51,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class ImmutableListCopier<T> : IDeepCopier<ImmutableList<T>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T>? _copier;
+        private readonly IDeepCopier<T> _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableListCopier{T}"/> class.
@@ -82,7 +82,7 @@ namespace Orleans.Serialization.Codecs
 
             var items = new List<T>(input.Count);
             foreach (var item in input)
-                items.Add(_copier!.DeepCopy(item, context)!);
+                items.Add(_copier.DeepCopy(item, context)!);
 
             var res = ImmutableList.CreateRange(items);
             context.RecordCopy(input, res);

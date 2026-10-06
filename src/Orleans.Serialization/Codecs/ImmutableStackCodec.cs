@@ -53,7 +53,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class ImmutableStackCopier<T> : IDeepCopier<ImmutableStack<T>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T>? _copier;
+        private readonly IDeepCopier<T> _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableStackCopier{T}"/> class.
@@ -84,7 +84,7 @@ namespace Orleans.Serialization.Codecs
 
             var items = new List<T>();
             foreach (var item in input)
-                items.Add(_copier!.DeepCopy(item, context)!);
+                items.Add(_copier.DeepCopy(item, context)!);
 
             var res = ImmutableStack.CreateRange(items);
             context.RecordCopy(input, res);

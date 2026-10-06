@@ -54,7 +54,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class ImmutableArrayCopier<T> : IDeepCopier<ImmutableArray<T>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T>? _copier;
+        private readonly IDeepCopier<T> _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableArrayCopier{T}"/> class.
@@ -81,7 +81,7 @@ namespace Orleans.Serialization.Codecs
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(context);
 
-            return IsShallowCopyable() || input.IsDefaultOrEmpty ? input : ImmutableArray.CreateRange(input, (i, s) => s._copier!.DeepCopy(i, s.context)!, (_copier, context));
+            return IsShallowCopyable() || input.IsDefaultOrEmpty ? input : ImmutableArray.CreateRange(input, (i, s) => s._copier.DeepCopy(i, s.context)!, (_copier, context));
         }
     }
 }

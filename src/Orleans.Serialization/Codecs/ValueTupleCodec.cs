@@ -128,7 +128,7 @@ namespace Orleans.Serialization.Codecs
     public sealed class ValueTupleCopier<T> : IDeepCopier<ValueTuple<T>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T>? _copier;
+        private readonly IDeepCopier<T> _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T}"/> class.
@@ -148,7 +148,7 @@ namespace Orleans.Serialization.Codecs
         {
             if (IsShallowCopyable()) return input;
 
-            input.Item1 = _copier!.DeepCopy(input.Item1, context)!;
+            input.Item1 = _copier.DeepCopy(input.Item1, context)!;
             return input;
         }
     }
@@ -234,8 +234,8 @@ namespace Orleans.Serialization.Codecs
     public sealed class ValueTupleCopier<T1, T2> : IDeepCopier<ValueTuple<T1, T2>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2}"/> class.
@@ -358,9 +358,9 @@ namespace Orleans.Serialization.Codecs
     public sealed class ValueTupleCopier<T1, T2, T3> : IDeepCopier<ValueTuple<T1, T2, T3>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3}"/> class.
@@ -498,10 +498,10 @@ namespace Orleans.Serialization.Codecs
     public sealed class ValueTupleCopier<T1, T2, T3, T4> : IDeepCopier<ValueTuple<T1, T2, T3, T4>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4}"/> class.
@@ -651,11 +651,11 @@ namespace Orleans.Serialization.Codecs
     public sealed class ValueTupleCopier<T1, T2, T3, T4, T5> : IDeepCopier<ValueTuple<T1, T2, T3, T4, T5>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
-        private readonly IDeepCopier<T5>? _copier5;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
+        private readonly IDeepCopier<T5> _copier5;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4, T5}"/> class.
@@ -819,12 +819,12 @@ namespace Orleans.Serialization.Codecs
     public sealed class ValueTupleCopier<T1, T2, T3, T4, T5, T6> : IDeepCopier<ValueTuple<T1, T2, T3, T4, T5, T6>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
-        private readonly IDeepCopier<T5>? _copier5;
-        private readonly IDeepCopier<T6>? _copier6;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
+        private readonly IDeepCopier<T5> _copier5;
+        private readonly IDeepCopier<T6> _copier6;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4, T5, T6}"/> class.
@@ -1002,13 +1002,13 @@ namespace Orleans.Serialization.Codecs
     public sealed class ValueTupleCopier<T1, T2, T3, T4, T5, T6, T7> : IDeepCopier<ValueTuple<T1, T2, T3, T4, T5, T6, T7>>, IOptionalDeepCopier
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
-        private readonly IDeepCopier<T5>? _copier5;
-        private readonly IDeepCopier<T6>? _copier6;
-        private readonly IDeepCopier<T7>? _copier7;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
+        private readonly IDeepCopier<T5> _copier5;
+        private readonly IDeepCopier<T6> _copier6;
+        private readonly IDeepCopier<T7> _copier7;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4, T5, T6, T7}"/> class.
@@ -1199,14 +1199,14 @@ namespace Orleans.Serialization.Codecs
     public sealed class ValueTupleCopier<T1, T2, T3, T4, T5, T6, T7, T8> : IDeepCopier<ValueTuple<T1, T2, T3, T4, T5, T6, T7, T8>>, IOptionalDeepCopier where T8 : struct
     {
         private int _shallowCopyable;
-        private readonly IDeepCopier<T1>? _copier1;
-        private readonly IDeepCopier<T2>? _copier2;
-        private readonly IDeepCopier<T3>? _copier3;
-        private readonly IDeepCopier<T4>? _copier4;
-        private readonly IDeepCopier<T5>? _copier5;
-        private readonly IDeepCopier<T6>? _copier6;
-        private readonly IDeepCopier<T7>? _copier7;
-        private readonly IDeepCopier<T8>? _copier8;
+        private readonly IDeepCopier<T1> _copier1;
+        private readonly IDeepCopier<T2> _copier2;
+        private readonly IDeepCopier<T3> _copier3;
+        private readonly IDeepCopier<T4> _copier4;
+        private readonly IDeepCopier<T5> _copier5;
+        private readonly IDeepCopier<T6> _copier6;
+        private readonly IDeepCopier<T7> _copier7;
+        private readonly IDeepCopier<T8> _copier8;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueTupleCopier{T1, T2, T3, T4, T5, T6, T7, T8}"/> class.
