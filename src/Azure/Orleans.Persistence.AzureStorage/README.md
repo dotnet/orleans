@@ -104,6 +104,11 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 }
 ```
 
+## Cancellation
+Azure Table grain storage forwards the `CancellationToken` supplied to persistent-state `ReadStateAsync`, `WriteStateAsync`, and `ClearStateAsync` calls to the Azure SDK, including insert, replace, and delete requests.
+
+A canceled write or clear request can have committed in Azure before cancellation is observed. Reload persistent state before retrying to obtain the current state and ETag.
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
