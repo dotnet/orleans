@@ -119,8 +119,13 @@ namespace Orleans.Storage
 
         /// <summary> Read state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.ReadStateAsync{T}(string, GrainId, IGrainState{T})"/>
-        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => ReadStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ReadStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainId);
@@ -143,7 +148,7 @@ namespace Orleans.Storage
                         ETag = int.Parse(fields[ETAG_PROPERTY_NAME].N, NumberStyles.Integer, CultureInfo.InvariantCulture),
                         State = fields.TryGetValue(BINARY_STATE_PROPERTY_NAME, out var propertyName) ? propertyName.B?.ToArray() : null,
                     };
-                }).ConfigureAwait(false);
+                }, cancellationToken).ConfigureAwait(false);
 
             if (record != null)
             {
@@ -160,8 +165,13 @@ namespace Orleans.Storage
 
         /// <summary> Write state data function for this storage provider. </summary>
         /// <see cref="IGrainStorage.WriteStateAsync{T}(string, GrainId, IGrainState{T})"/>
-        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => WriteStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task WriteStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainId);
@@ -172,20 +182,20 @@ namespace Orleans.Storage
             try
             {
                 ConvertToStorageFormat(grainState.State, record);
-                await WriteStateInternal(grainState, record);
+                await WriteStateInternal(grainState, record, cancellationToken);
             }
             catch (ConditionalCheckFailedException exc)
             {
                 throw new InconsistentStateException($"Inconsistent grain state: {exc}");
             }
-            catch (Exception exc)
+            catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorWritingGrainState(logger, exc, grainType, grainId, grainState.ETag, this.options.TableName);
                 throw;
             }
         }
 
-        private async Task WriteStateInternal<T>(IGrainState<T> grainState, GrainStateRecord record, bool clear = false)
+        private async Task WriteStateInternal<T>(IGrainState<T> grainState, GrainStateRecord record, CancellationToken cancellationToken, bool clear = false)
         {
             var fields = new Dictionary<string, AttributeValue>();
             if (this.options.TimeToLive.HasValue)
@@ -216,7 +226,7 @@ namespace Orleans.Storage
                     fields.Add(GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue(record.GrainReference));
                     fields.Add(GRAIN_TYPE_PROPERTY_NAME, new AttributeValue(record.GrainType));
                     var expression = $"attribute_not_exists({GRAIN_REFERENCE_PROPERTY_NAME}) AND attribute_not_exists({GRAIN_TYPE_PROPERTY_NAME})";
-                    await this.storage.PutEntryAsync(this.options.TableName, fields, expression).ConfigureAwait(false);
+                    await this.storage.PutEntryAsync(this.options.TableName, fields, cancellationToken, expression).ConfigureAwait(false);
                 }
                 else
                 {
@@ -227,7 +237,7 @@ namespace Orleans.Storage
                     };
                     var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = currentEtag.ToString(CultureInfo.InvariantCulture) } } };
                     var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
-                    await this.storage.UpsertEntryAsync(this.options.TableName, keys, fields, expression, conditionalValues).ConfigureAwait(false);
+                    await this.storage.UpsertEntryAsync(this.options.TableName, keys, fields, cancellationToken, expression, conditionalValues).ConfigureAwait(false);
                 }
             }
             else if (string.IsNullOrWhiteSpace(grainState.ETag))
@@ -237,7 +247,7 @@ namespace Orleans.Storage
                 fields.Add(ETAG_PROPERTY_NAME, new AttributeValue { N = "0" });
 
                 var expression = $"attribute_not_exists({GRAIN_REFERENCE_PROPERTY_NAME}) AND attribute_not_exists({GRAIN_TYPE_PROPERTY_NAME})";
-                await this.storage.PutEntryAsync(this.options.TableName, fields, expression).ConfigureAwait(false);
+                await this.storage.PutEntryAsync(this.options.TableName, fields, cancellationToken, expression).ConfigureAwait(false);
             }
             else
             {
@@ -253,7 +263,7 @@ namespace Orleans.Storage
 
                 var conditionalValues = new Dictionary<string, AttributeValue> { { CURRENT_ETAG_ALIAS, new AttributeValue { N = currentEtag.ToString(CultureInfo.InvariantCulture) } } };
                 var expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
-                await this.storage.UpsertEntryAsync(this.options.TableName, keys, fields, expression, conditionalValues).ConfigureAwait(false);
+                await this.storage.UpsertEntryAsync(this.options.TableName, keys, fields, cancellationToken, expression, conditionalValues).ConfigureAwait(false);
             }
 
             grainState.ETag = newEtag.ToString(CultureInfo.InvariantCulture);
@@ -267,8 +277,13 @@ namespace Orleans.Storage
         /// cleared by overwriting with default / null values.
         /// </remarks>
         /// <see cref="IGrainStorage.ClearStateAsync{T}(string, GrainId, IGrainState{T})"/>
-        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+        public Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState)
+            => ClearStateAsync(grainType, grainId, grainState, CancellationToken.None);
+
+        /// <inheritdoc/>
+        public async Task ClearStateAsync<T>(string grainType, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (this.storage == null) throw new ArgumentException("GrainState-Table property not initialized");
 
             string partitionKey = GetKeyString(grainId);
@@ -303,12 +318,12 @@ namespace Orleans.Storage
                         expression = $"{ETAG_PROPERTY_NAME} = {CURRENT_ETAG_ALIAS}";
                     }
 
-                    await this.storage.DeleteEntryAsync(this.options.TableName, keys, expression, conditionalValues).ConfigureAwait(false);
+                    await this.storage.DeleteEntryAsync(this.options.TableName, keys, cancellationToken, expression, conditionalValues).ConfigureAwait(false);
                     ResetGrainState(grainState);
                 }
                 else
                 {
-                    await WriteStateInternal(grainState, record, true);
+                    await WriteStateInternal(grainState, record, cancellationToken, true);
                     grainState.State = CreateInstance<T>();
                     grainState.RecordExists = false;
                 }
@@ -317,7 +332,7 @@ namespace Orleans.Storage
             {
                 throw new InconsistentStateException($"Inconsistent grain state: {exc}");
             }
-            catch (Exception exc)
+            catch (Exception exc) when (exc is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 LogErrorClearingGrainState(logger, exc, operation, grainType, grainId, grainState.ETag, this.options.TableName);
                 throw;
