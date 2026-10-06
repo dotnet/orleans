@@ -693,11 +693,19 @@ namespace Orleans.Serialization.Serializers
             if (!_manifest.IsDefaultSerializerService(contract.Service) || !visited.Add(contract.Service)) return true;
             var role = contract.Service.IsConstructedGenericType ? contract.Service.GetGenericTypeDefinition() : null;
             var target = role is null ? contract.Service : contract.Service.GenericTypeArguments[0];
-            if (role is not null && contract.Implementation is { } implementation
-                && TrySelectImplementation(role, target, target.IsConstructedGenericType ? target.GetGenericTypeDefinition() : target,
-                    out var selected, out _, materializeImplementation: false)
-                && !MatchesDefaultImplementation(selected, implementation, contract.CompatibleImplementation, target))
-                return false;
+            if (role is not null && contract.Implementation is { } implementation)
+            {
+                var searchType = target.IsConstructedGenericType ? target.GetGenericTypeDefinition() : target;
+                if (TrySelectImplementation(role, target, searchType, out var selected, out _, materializeImplementation: false))
+                {
+                    if (!MatchesDefaultImplementation(selected, implementation, contract.CompatibleImplementation, target)) return false;
+                }
+                else if ((role == typeof(IFieldCodec<>) || role == typeof(IDeepCopier<>))
+                    && TrySelectImplementation(typeof(IConverter<,>), target, searchType, out _, out _, materializeImplementation: false))
+                {
+                    return false;
+                }
+            }
             foreach (var dependency in contract.Dependencies)
             {
                 if (_manifest.DefaultSerializerContracts.TryGetValue(dependency, out var required))
