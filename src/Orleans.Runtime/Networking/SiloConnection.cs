@@ -301,6 +301,14 @@ namespace Orleans.Runtime.Messaging
             }
             else
             {
+                if (msg.Direction == Message.Directions.Response
+                    && msg.TargetGrain.IsClient()
+                    && msg.TargetSilo is { } unavailableGateway)
+                {
+                    _ = this.messageCenter.ReaddressResponse(msg, unavailableGateway);
+                    return;
+                }
+
                 this.MessagingTrace.OnSiloDropSendingMessage(this.LocalSiloAddress, msg, reason);
                 msg.Dispose();
             }

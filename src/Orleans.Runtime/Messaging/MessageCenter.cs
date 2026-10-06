@@ -406,10 +406,17 @@ namespace Orleans.Runtime.Messaging
             }
 
             if (message.TargetSilo is { } currentTargetSilo
-                && currentTargetSilo.Equals(unavailableTargetSilo)
-                && messageCenter.Gateway?.TryQueueResponseToKnownClient(message) is true)
+                && currentTargetSilo.Equals(unavailableTargetSilo))
             {
-                return;
+                if (message.GatewayRequestAttempt < 0)
+                {
+                    message.GatewayRequestAttempt = -message.GatewayRequestAttempt;
+                }
+
+                if (messageCenter.Gateway?.TryQueueResponseToKnownClient(message) is true)
+                {
+                    return;
+                }
             }
 
             if (message.TargetSilo is not { } targetSilo
@@ -881,6 +888,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 else if (IsForwardedClientRequestUpdate(msg))
                 {
+                    msg.Dispose();
                     return;
                 }
                 else if (msg.Direction == Message.Directions.Response)

@@ -1,9 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Reflection;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Connections;
+using Orleans.Connections.Transport;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Messaging;
@@ -421,7 +422,7 @@ namespace UnitTests.MembershipTests
             var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
             var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
             var deadSilo = HostedCluster.SecondarySilos[0];
-            var destination = new RecordingConnection();
+            var destination = new RecordingConnection(primaryServices.GetRequiredService<ConnectionCommon>());
             var original = new Message
             {
                 Id = new CorrelationId(2),
@@ -501,7 +502,7 @@ namespace UnitTests.MembershipTests
                 await manager.GetConnection(HostedCluster.SecondarySilos[0].SiloAddress));
             var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
             var targetSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 0), 1);
-            var destination = new RecordingConnection();
+            var destination = new RecordingConnection(services.GetRequiredService<ConnectionCommon>());
             var request = new Message
             {
                 Id = new CorrelationId(-2),
@@ -592,7 +593,7 @@ namespace UnitTests.MembershipTests
             var gateway = primaryServices.GetRequiredService<MessageCenter>().Gateway!;
             var clientId = Assert.Single(((IConnectedClientCollection)gateway).GetConnectedClientIds());
             var deadSilo = HostedCluster.SecondarySilos[0];
-            var destination = new RecordingConnection();
+            var destination = new RecordingConnection(primaryServices.GetRequiredService<ConnectionCommon>());
             var original = new Message
             {
                 Id = new CorrelationId(3),
@@ -675,7 +676,7 @@ namespace UnitTests.MembershipTests
 
             using var subscription = GatewayEvents.AllEvents.Subscribe(new ThrowingGatewayEventObserver());
 
-            client.SendRequest(request, new RecordingConnection());
+            client.SendRequest(request, new RecordingConnection(primaryServices.GetRequiredService<ConnectionCommon>()));
 
             Assert.Equal(0, gateway.TrackedRequestClientCount);
         }
@@ -746,12 +747,14 @@ namespace UnitTests.MembershipTests
             }
         }
 
-        private sealed class RecordingConnection()
-            : Connection(new DefaultConnectionContext(), static _ => Task.CompletedTask, shared: null!)
+        private sealed class RecordingConnection(ConnectionCommon shared)
+            : Connection(new RecordingMessageTransport(), shared)
         {
             public List<Message> Messages { get; } = [];
 
             protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+
+            protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
 
             protected override IMessageCenter MessageCenter => null!;
 
@@ -761,15 +764,26 @@ namespace UnitTests.MembershipTests
 
             protected override void RetryMessage(Message msg, Exception? ex = null) => throw new NotSupportedException();
 
-            protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) =>
+            protected internal override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) =>
                 throw new NotSupportedException();
 
-            protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) =>
+            protected internal override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) =>
                 throw new NotSupportedException();
 
-            protected override void OnReceivedMessage(Message message) => throw new NotSupportedException();
+            protected internal override void OnReceivedMessage(Message message) => throw new NotSupportedException();
+        }
 
-            protected override void OnSendMessageFailure(Message message, string error) => throw new NotSupportedException();
+        private sealed class RecordingMessageTransport : MessageTransport
+        {
+            public override CancellationToken Closed => default;
+
+            public override IFeatureCollection Features { get; } = new FeatureCollection();
+
+            public override bool EnqueueRead(ReadRequest request) => false;
+
+            public override bool EnqueueWrite(WriteRequest request) => false;
+
+            public override ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default) => default;
         }
 
         private sealed class ThrowingGatewayEventObserver : IObserver<GatewayEvents.GatewayEvent>
