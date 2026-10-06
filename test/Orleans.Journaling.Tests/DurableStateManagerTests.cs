@@ -527,6 +527,7 @@ public sealed class DurableStateManagerTests
         var builder = new TestSiloBuilder();
         builder.Services.AddSerializer();
         builder.Services.AddLogging();
+        builder.Services.AddSingleton(JournalingTestBase.CreateGrainPropertiesResolver());
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, TimeProvider.System);
         builder.Services.Configure<JournaledStateManagerOptions>(
             options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
