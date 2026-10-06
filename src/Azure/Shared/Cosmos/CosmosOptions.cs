@@ -1,4 +1,7 @@
 using System.Net;
+#if ORLEANS_PERSISTENCE
+using System.Threading;
+#endif
 using Azure;
 using Azure.Core;
 
@@ -136,17 +139,48 @@ public interface ICosmosOperationExecutor
     /// <param name="arg">The argument to pass to delegate invocations.</param>
     /// <returns>The result of invoking the delegate.</returns>
     Task<TResult> ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg);
+
+#if ORLEANS_PERSISTENCE
+    /// <summary>
+    /// Executes the provided Cosmos DB operation with cancellation.
+    /// </summary>
+    /// <typeparam name="TArg">The function argument.</typeparam>
+    /// <typeparam name="TResult">The result value.</typeparam>
+    /// <param name="func">The delegate to execute.</param>
+    /// <param name="arg">The argument to pass to delegate invocations.</param>
+    /// <param name="cancellationToken">The token used to cancel the operation and retry waits.</param>
+    /// <returns>The result of invoking the delegate.</returns>
+    /// <remarks>
+    /// The default implementation delegates to the existing executor after checking for cancellation.
+    /// Executors can implement this overload to cancel their retry waits.
+    /// </remarks>
+    Task<TResult> ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return ExecuteOperation(func, arg);
+    }
+#endif
 }
 
 internal sealed class DefaultCosmosOperationExecutor : ICosmosOperationExecutor
 {
     public static readonly DefaultCosmosOperationExecutor Instance = new();
     private const HttpStatusCode TOO_MANY_REQUESTS = (HttpStatusCode)429;
+#if ORLEANS_PERSISTENCE
+    public Task<TResult> ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg)
+        => ExecuteOperation(func, arg, CancellationToken.None);
+
+    public async Task<TResult> ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg, CancellationToken cancellationToken)
+#else
     public async Task<TResult> ExecuteOperation<TArg, TResult>(Func<TArg, Task<TResult>> func, TArg arg)
+#endif
     {
         // From:  https://blogs.msdn.microsoft.com/bigdatasupport/2015/09/02/dealing-with-requestratetoolarge-errors-in-azure-documentdb-and-testing-performance/
         while (true)
         {
+#if ORLEANS_PERSISTENCE
+            cancellationToken.ThrowIfCancellationRequested();
+#endif
             TimeSpan sleepTime;
             try
             {
@@ -161,7 +195,11 @@ internal sealed class DefaultCosmosOperationExecutor : ICosmosOperationExecutor
                 sleepTime = dce.RetryAfter ?? TimeSpan.Zero;
             }
 
+#if ORLEANS_PERSISTENCE
+            await Task.Delay(sleepTime, cancellationToken).ConfigureAwait(false);
+#else
             await Task.Delay(sleepTime);
+#endif
         }
     }
 }
