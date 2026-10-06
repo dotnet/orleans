@@ -83,11 +83,17 @@ namespace Orleans.Persistence.Cosmos
     {
         public CosmosGrainStorage(string name, CosmosGrainStorageOptions options, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.IServiceProvider serviceProvider, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, IDocumentIdProvider documentIdProvider, Serialization.Serializers.IActivatorProvider activatorProvider) { }
 
+        public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ClearStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 
         public void Participate(Runtime.ISiloLifecycle lifecycle) { }
 
+        public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ReadStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task WriteStateAsync<T>(string grainType, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
     }
@@ -158,6 +164,7 @@ namespace Orleans.Persistence.Cosmos
 
     public partial interface ICosmosOperationExecutor
     {
+        System.Threading.Tasks.Task<TResult> ExecuteOperation<TArg, TResult>(System.Func<TArg, System.Threading.Tasks.Task<TResult>> func, TArg arg, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<TResult> ExecuteOperation<TArg, TResult>(System.Func<TArg, System.Threading.Tasks.Task<TResult>> func, TArg arg);
     }
 

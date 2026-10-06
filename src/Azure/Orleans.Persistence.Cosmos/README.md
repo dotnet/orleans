@@ -72,6 +72,20 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 ```
 
 ## Documentation
+### Cancellation
+`CosmosGrainStorage` forwards the token supplied to `ReadStateAsync`,
+`WriteStateAsync`, or `ClearStateAsync` to Cosmos DB requests, including the read
+used to validate a clear and the create or replace used to clear a document.
+The default operation executor also uses the token for throttling retry waits.
+Cancellation exceptions propagate to the caller, and successful requests update
+the grain state's metadata. A pre-canceled call preserves the current state and
+completes before resolving document identifiers or sending a request.
+
+Custom operation executors can implement the cancellation-aware `ExecuteOperation`
+overload to cancel their retry waits. Existing executors remain compatible through
+the interface's default implementation, and tokenless storage calls use
+`CancellationToken.None`.
+
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
 - [Grain Persistence](https://dotnet.github.io/orleans/docs/grains/grain-persistence/)
