@@ -76,12 +76,6 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 }
 ```
 
-## Cancellation
-
-DynamoDB grain storage forwards the token supplied to `ReadStateAsync`, `WriteStateAsync`, and `ClearStateAsync` to the AWS SDK request. This covers conditional inserts and updates, as well as both `DeleteStateOnClear` modes. A pre-canceled token cancels the operation before serialization or storage access. When an SDK request reports cancellation, the caller receives the cancellation exception and the supplied grain state, ETag, and record-existence flag remain unchanged.
-
-Legacy overloads use `CancellationToken.None`. After a successful SDK request, the provider applies the completed operation's state and ETag changes.
-
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
