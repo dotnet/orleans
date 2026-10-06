@@ -105,6 +105,11 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 ```
 
 ## Documentation
+### Azure Blob operation cancellation
+Azure Blob grain storage forwards the cancellation token supplied to `ReadStateAsync`, `WriteStateAsync`, and `ClearStateAsync` to Azure SDK requests, streaming serialization, and content reads. Container creation and retried writes use the same token. An operation started with an already-canceled token completes with cancellation before accessing storage or changing the supplied grain state.
+
+Successful operations update the grain state's ETag and record status to reflect the storage result. Caller cancellation propagates as `OperationCanceledException` and preserves the last-known grain state when the operation is interrupted.
+
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
 - [Grain Persistence](https://dotnet.github.io/orleans/docs/grains/grain-persistence/)
