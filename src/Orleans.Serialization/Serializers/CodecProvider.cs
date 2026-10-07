@@ -23,6 +23,7 @@ namespace Orleans.Serialization.Serializers
     public sealed class CodecProvider : ICodecProvider
     {
         private static readonly Type ObjectType = typeof(object);
+        private static readonly Invocation.ConcurrentObjectPool<HashSet<Type>> DefaultAdmissionVisitedPool = new() { MaxPoolSize = 1 };
 
 #if NET9_0_OR_GREATER
         private readonly Lock _initializationLock = new();
@@ -678,11 +679,34 @@ namespace Orleans.Serialization.Serializers
 
         // Inferred defaults preserve an automatic caller's DI boundary instead of starting a transaction inside it.
         private bool IsDefaultServiceEligible(Type service)
-            => !_manifest.IsDefaultSerializerService(service)
-                || (OrleansGeneratedCodeHelper.GetConstructionScope(this) is not { IsPending: false }
-                    && IsDefaultImplementationEligible(service)
-                    && (!_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract)
-                        || IsDefaultContractEligible(contract, [])));
+        {
+            if (!_manifest.IsDefaultSerializerService(service))
+            {
+                return true;
+            }
+
+            if (OrleansGeneratedCodeHelper.GetConstructionScope(this) is { IsPending: false }
+                || !IsDefaultImplementationEligible(service))
+            {
+                return false;
+            }
+
+            if (!_manifest.DefaultSerializerContracts.TryGetValue(service, out var contract))
+            {
+                return true;
+            }
+
+            var visited = DefaultAdmissionVisitedPool.Get();
+            try
+            {
+                return IsDefaultContractEligible(contract, visited);
+            }
+            finally
+            {
+                visited.Clear();
+                DefaultAdmissionVisitedPool.Return(visited);
+            }
+        }
 
         private bool IsDefaultImplementationEligible(Type implementation)
         {
