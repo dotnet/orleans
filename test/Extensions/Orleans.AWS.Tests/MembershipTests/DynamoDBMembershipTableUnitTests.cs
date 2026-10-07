@@ -1070,6 +1070,16 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Fact]
+        public void ConcurrentReadConformanceWorkloadCrossesQueryPageAfterCleanup()
+        {
+            const int maximumQueryPageBytes = 1024 * 1024;
+            const int cleanedRows = 2;
+            Assert.True(
+                (DynamoDBMembershipTableTest.ConcurrentReadRowCount - cleanedRows) * DynamoDBMembershipTableTest.ConcurrentReadRowPadding
+                    > maximumQueryPageBytes);
+        }
+
+        [Fact]
         public async Task ReadAllReturnsCompleteViewWhenMutationFollowsQuery()
         {
             var reads = 0;

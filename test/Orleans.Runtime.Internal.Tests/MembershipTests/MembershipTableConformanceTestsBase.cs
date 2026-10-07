@@ -10,6 +10,8 @@ public abstract class MembershipTableConformanceTestsBase
     protected abstract MembershipTableTestFixture CreateConformanceFixture();
 
     protected virtual int ConformanceConcurrencyRowCount => 128;
+    // Padding is appended to HostName and must fit the provider's persisted string limit.
+    protected virtual int ConformanceConcurrencyRowPadding => 0;
 
     protected virtual void WriteConformanceOutput(string message)
         => TestContext.Current.TestOutputHelper?.WriteLine(message);
@@ -33,7 +35,8 @@ public abstract class MembershipTableConformanceTestsBase
                     fixture,
                     seed: 17,
                     output: WriteConformanceOutput,
-                    concurrencyRowCount: ConformanceConcurrencyRowCount),
+                    concurrencyRowCount: ConformanceConcurrencyRowCount,
+                    concurrencyRowPadding: ConformanceConcurrencyRowPadding),
                 cancellationToken),
             TestContext.Current.CancellationToken);
 

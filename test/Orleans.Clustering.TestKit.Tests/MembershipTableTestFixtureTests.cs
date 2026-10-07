@@ -540,6 +540,8 @@ public sealed class MembershipTableTestFixtureTests
         Assert.Throws<ArgumentException>(() => new MembershipTableTestRunner(fixture));
         await fixture.InitializeAsync(TestContext.Current.CancellationToken);
         Assert.Throws<ArgumentOutOfRangeException>(() => new MembershipTableTestRunner(fixture, concurrencyRowCount: 2));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MembershipTableTestRunner(fixture, 0, null, 3, -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MembershipTableTestRunner(fixture, 0, null, 3, 256 * 1024 + 1));
         Assert.Equal(3, backend.CreatedHandles);
         await fixture.DisposeAsync();
         await Assert.ThrowsAsync<ObjectDisposedException>(() => fixture.InitializeAsync(TestContext.Current.CancellationToken).AsTask());

@@ -6,7 +6,9 @@ using System.Net;
 using System.Net.Sockets;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -400,6 +402,72 @@ public class MessageTransportLifecycleTests
         await closeTask.WaitAsync(TestContext.Current.CancellationToken);
 
         shared.Dispose();
+    }
+
+    [Theory]
+    [InlineData(nameof(ConnectionClosedException), LogLevel.Information)]
+    [InlineData(nameof(ConnectionAbortedException), LogLevel.Error)]
+    [InlineData(nameof(OperationCanceledException), LogLevel.Error)]
+    [InlineData(nameof(InvalidOperationException), LogLevel.Error)]
+    public async Task MessageWriteRequest_TransportCloseReroutesPendingMessages(string exceptionType, LogLevel expectedLogLevel)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var serviceProvider = CreateServiceProvider();
+        var logger = Substitute.For<ILogger>();
+        logger.IsEnabled(Arg.Any<LogLevel>()).Returns(true);
+        var loggerFactory = Substitute.For<ILoggerFactory>();
+        loggerFactory.CreateLogger("Orleans.Connections").Returns(logger);
+        using var shared = CreateMessageHandlerShared(serviceProvider, loggerFactory);
+        await using var transport = new CancelableTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(serviceProvider, shared), shared.MessageCenter);
+        using var first = new Message { Direction = Message.Directions.Request, BodyObject = new byte[] { 1 } };
+        using var second = new Message { Direction = Message.Directions.Response, BodyObject = new byte[] { 2 } };
+        var request = shared.GetSendMessageHandler(connection);
+        request.WriteMessage(first);
+        request.WriteMessage(second);
+        request.CompleteWriting();
+        Assert.True(transport.EnqueueWrite(request));
+        Exception error = exceptionType switch
+        {
+            nameof(ConnectionClosedException) => new ConnectionClosedException(),
+            nameof(ConnectionAbortedException) => new ConnectionAbortedException(),
+            nameof(OperationCanceledException) => new OperationCanceledException(),
+            nameof(InvalidOperationException) => new InvalidOperationException(),
+            _ => throw new ArgumentOutOfRangeException(nameof(exceptionType))
+        };
+
+        await transport.CloseAsync(error, cancellationToken);
+
+        var retries = new[]
+        {
+            await connection.Retries.Reader.ReadAsync(cancellationToken),
+            await connection.Retries.Reader.ReadAsync(cancellationToken)
+        };
+        foreach (var message in new[] { first, second })
+        {
+            var retried = Assert.Single(retries, retry => ReferenceEquals(message, retry.Message));
+            Assert.Same(error, retried.Error);
+        }
+
+        Assert.False(connection.Retries.Reader.TryRead(out _));
+        Assert.Equal(0, connection.SentMessageCount);
+        Assert.Equal(new byte[] { 1 }, Assert.IsType<byte[]>(first.BodyObject));
+        Assert.Equal(new byte[] { 2 }, Assert.IsType<byte[]>(second.BodyObject));
+        var reused = shared.GetSendMessageHandler();
+        Assert.Same(request, reused);
+        Assert.Equal(0, reused.MessageCount);
+        Assert.Equal(0, reused.Buffers.Length);
+        reused.Reset();
+
+        var log = Assert.Single(logger.ReceivedCalls(), call =>
+            call.GetMethodInfo().Name == nameof(ILogger.Log)
+            && ReferenceEquals(call.GetArguments()[3], error));
+        Assert.Equal(expectedLogLevel, log.GetArguments()[0]);
+        Assert.DoesNotContain(logger.ReceivedCalls(), call =>
+            call.GetMethodInfo().Name == nameof(ILogger.Log)
+            && (LogLevel)call.GetArguments()[0]! > expectedLogLevel);
+
+        await connection.CloseAsync(null).WaitAsync(cancellationToken);
     }
 
     [Fact]
@@ -799,7 +867,7 @@ public class MessageTransportLifecycleTests
         .AddTransient(sp => new MessageSerializer(sp.GetRequiredService<SerializerSessionPool>(), options ?? new SiloMessagingOptions()))
         .BuildServiceProvider();
 
-    private static MessageHandlerShared CreateMessageHandlerShared(IServiceProvider serviceProvider)
+    private static MessageHandlerShared CreateMessageHandlerShared(IServiceProvider serviceProvider, ILoggerFactory? loggerFactory = null)
     {
         var messagingInstruments = serviceProvider.GetRequiredService<MessagingInstruments>();
         var messagingTrace = new MessagingTrace(
@@ -808,7 +876,7 @@ public class MessageTransportLifecycleTests
             serviceProvider.GetRequiredService<MessagingProcessingInstruments>());
         return new(
             messagingTrace,
-            new ConnectionTrace(NullLoggerFactory.Instance),
+            new ConnectionTrace(loggerFactory ?? NullLoggerFactory.Instance),
             () => serviceProvider.GetRequiredService<MessageSerializer>(),
             new MessageFactory(serviceProvider.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, messagingTrace),
             Substitute.For<IMessageCenter>(),
@@ -885,9 +953,27 @@ public class MessageTransportLifecycleTests
             CloseCalled = true;
             var error = closeException ?? new ConnectionClosedException();
             _read?.OnCanceled();
-            _write?.SetException(error);
+            var write = _write;
+            _write = null;
+            write?.SetException(error);
             return default;
         }
+    }
+
+    private sealed class RetryTrackingConnection(MessageTransport transport, ConnectionCommon shared, IMessageCenter messageCenter)
+        : Connection(transport, shared)
+    {
+        public Channel<(Message Message, Exception? Error)> Retries { get; } =
+            Channel.CreateUnbounded<(Message, Exception?)>();
+        public int SentMessageCount { get; private set; }
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+        protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
+        protected override IMessageCenter MessageCenter => messageCenter;
+        protected override bool PrepareMessageForSend(Message msg) => true;
+        protected override void RetryMessage(Message msg, Exception? ex = null) => Retries.Writer.TryWrite((msg, ex));
+        protected internal override void OnReceivedMessage(Message message) { }
+        protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
+        protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) => SentMessageCount++;
     }
 
     private sealed class CapturingTransport : MessageTransport
