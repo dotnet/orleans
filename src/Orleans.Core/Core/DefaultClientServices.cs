@@ -88,6 +88,7 @@ namespace Orleans
             services.TryAddFromExisting<IClusterConnectionStatusListener, OutsideRuntimeClient>();
             services.TryAddSingleton<GrainFactory>();
             services.TryAddSingleton<GrainInterfaceTypeToGrainTypeResolver>();
+            services.TryAddSingleton<GrainTypeAvailability>();
             services.TryAddSingleton<GrainReferenceActivator>();
             services.AddSingleton<IGrainReferenceActivatorProvider, GrainReferenceActivatorProvider>();
             services.AddSingleton<IGrainReferenceActivatorProvider, UntypedGrainReferenceActivatorProvider>();
