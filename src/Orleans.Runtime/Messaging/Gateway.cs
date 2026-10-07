@@ -600,7 +600,15 @@ namespace Orleans.Runtime.Messaging
                     && message.GatewayForwardingSource is { } forwardingSource
                     && message.SendingSilo is { } forwardingTarget)
                 {
-                    UpdateForwardedRequest(message, forwardingSource, forwardingTarget);
+                    try
+                    {
+                        UpdateForwardedRequest(message, forwardingSource, forwardingTarget);
+                    }
+                    finally
+                    {
+                        message.Dispose();
+                    }
+
                     return;
                 }
 
@@ -747,7 +755,14 @@ namespace Orleans.Runtime.Messaging
 
                 if (requestToReject is not null)
                 {
-                    RejectClaimedRequest(requestToReject, message.TargetSilo!);
+                    try
+                    {
+                        RejectClaimedRequest(requestToReject, message.TargetSilo!);
+                    }
+                    finally
+                    {
+                        message.Dispose();
+                    }
                 }
             }
 
@@ -831,18 +846,25 @@ namespace Orleans.Runtime.Messaging
 
             public void RejectRequest(Message request, SiloAddress deadSilo)
             {
-                Message? requestToReject;
-                bool requestTrackingStopped;
-                lock (_requestLock)
+                try
                 {
-                    _pendingRequests.TryClaimForRejection(request, deadSilo, out requestToReject);
-                    requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
-                }
+                    Message? requestToReject;
+                    bool requestTrackingStopped;
+                    lock (_requestLock)
+                    {
+                        _pendingRequests.TryClaimForRejection(request, deadSilo, out requestToReject);
+                        requestTrackingStopped = UnregisterRequestTrackingIfEmptyCore();
+                    }
 
-                EmitRequestTrackingStopped(requestTrackingStopped);
-                if (requestToReject is not null)
+                    EmitRequestTrackingStopped(requestTrackingStopped);
+                    if (requestToReject is not null)
+                    {
+                        RejectClaimedRequest(requestToReject, deadSilo);
+                    }
+                }
+                finally
                 {
-                    RejectClaimedRequest(requestToReject, deadSilo);
+                    request.Dispose();
                 }
             }
 
@@ -862,15 +884,22 @@ namespace Orleans.Runtime.Messaging
 
             private Message? TryRejectClaimedRequestCore(Message request, SiloAddress deadSilo)
             {
-                if (_pendingRequests.Contains(request.Id))
+                try
                 {
-                    return null;
-                }
+                    if (_pendingRequests.Contains(request.Id))
+                    {
+                        return null;
+                    }
 
-                _gateway._messagingInstruments.OnRejectedMessage(request);
-                var rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
-                SendSyntheticResponse(rejection);
-                return rejection;
+                    _gateway._messagingInstruments.OnRejectedMessage(request);
+                    var rejection = _gateway.CreateDeadSiloRejection(request, deadSilo);
+                    SendSyntheticResponse(rejection);
+                    return rejection;
+                }
+                finally
+                {
+                    request.Dispose();
+                }
             }
 
             private void EmitDeadSiloRequestRejected(Message rejection)

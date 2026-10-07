@@ -702,18 +702,26 @@ namespace Orleans.Runtime.Messaging
         {
             if (destination is null)
             {
-                var reason = exception is null
-                    ? "Target silo is known to be dead"
-                    : $"Exception while forwarding message: {exception}";
-                exception ??= new SiloUnavailableException();
-                _messagingInstruments.OnRejectedMessage(message);
-                var rejection = messageFactory.CreateRejectionResponse(
-                    message,
-                    Message.RejectionTypes.Transient,
-                    reason,
-                    exception);
-                rejection.RequestContextData = null;
-                SendMessage(rejection);
+                try
+                {
+                    var reason = exception is null
+                        ? "Target silo is known to be dead"
+                        : $"Exception while forwarding message: {exception}";
+                    exception ??= new SiloUnavailableException();
+                    _messagingInstruments.OnRejectedMessage(message);
+                    var rejection = messageFactory.CreateRejectionResponse(
+                        message,
+                        Message.RejectionTypes.Transient,
+                        reason,
+                        exception);
+                    rejection.RequestContextData = null;
+                    SendMessage(rejection);
+                }
+                finally
+                {
+                    message.Dispose();
+                }
+
                 return;
             }
 
@@ -737,26 +745,38 @@ namespace Orleans.Runtime.Messaging
             static async Task SendForwardingUpdateAsync(MessageCenter messageCenter, Message update)
             {
                 var failureLogged = false;
-                while (!update.IsExpired
-                    && !messageCenter.stopped
-                    && update.TargetSilo is { } targetSilo
-                    && !messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
+                var sent = false;
+                try
                 {
-                    try
+                    while (!update.IsExpired
+                        && !messageCenter.stopped
+                        && update.TargetSilo is { } targetSilo
+                        && !messageCenter.siloStatusOracle.IsDeadSilo(targetSilo))
                     {
-                        var ingressConnection = await messageCenter.connectionManager.GetConnection(targetSilo);
-                        ingressConnection.Send(update);
-                        return;
-                    }
-                    catch (Exception exception)
-                    {
-                        if (!failureLogged)
+                        try
                         {
-                            LogWarningForwardingUpdateFailed(messageCenter.log, exception, update.Id);
-                            failureLogged = true;
+                            var ingressConnection = await messageCenter.connectionManager.GetConnection(targetSilo);
+                            ingressConnection.Send(update);
+                            sent = true;
+                            return;
                         }
+                        catch (Exception exception)
+                        {
+                            if (!failureLogged)
+                            {
+                                LogWarningForwardingUpdateFailed(messageCenter.log, exception, update.Id);
+                                failureLogged = true;
+                            }
 
-                        await Task.Delay(TimeSpan.FromMilliseconds(100));
+                            await Task.Delay(TimeSpan.FromMilliseconds(100));
+                        }
+                    }
+                }
+                finally
+                {
+                    if (!sent)
+                    {
+                        update.Dispose();
                     }
                 }
             }
@@ -764,14 +784,21 @@ namespace Orleans.Runtime.Messaging
 
         internal void RejectForwardedClientRequest(Message message, string reason, Exception exception)
         {
-            _messagingInstruments.OnRejectedMessage(message);
-            var rejection = messageFactory.CreateRejectionResponse(
-                message,
-                Message.RejectionTypes.Transient,
-                reason,
-                exception);
-            rejection.RequestContextData = null;
-            SendMessage(rejection);
+            try
+            {
+                _messagingInstruments.OnRejectedMessage(message);
+                var rejection = messageFactory.CreateRejectionResponse(
+                    message,
+                    Message.RejectionTypes.Transient,
+                    reason,
+                    exception);
+                rejection.RequestContextData = null;
+                SendMessage(rejection);
+            }
+            finally
+            {
+                message.Dispose();
+            }
         }
 
         private void ResendMessageImpl(
