@@ -2486,10 +2486,115 @@ public class DemoClass
         Assert.Equal("ORLEANS0116", diagnostic.Id);
         Assert.Contains("comparer contract", diagnostic.GetMessage());
         Assert.Contains("Dictionary", diagnostic.GetMessage());
-        Assert.DoesNotContain(native.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal));
+        var shared = Assert.Single(native.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>", shared);
+        Assert.DoesNotContain("PooledResponseCodec<", shared);
         var jit = RunSourceGenerator(compilation);
         Assert.Empty(jit.Diagnostics);
         Assert.Contains(jit.GeneratedSources, static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Task<Dictionary<string, int>> Get();")]
+    [InlineData("ValueTask<Dictionary<string, int>> Get();")]
+    [InlineData("Task<List<Dictionary<string, int>>> Get();")]
+    [InlineData("Task<T> Get<T>();")]
+    [InlineData("ValueTask<T> Get<T>();")]
+    public async Task RpcResponseFactoriesKeepSharedGraphForExplicitOnlyContracts(string declaration)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IExplicit : IGrainWithIntegerKey { {{declaration}} }
+            """);
+        var managed = RunSourceGenerator(compilation);
+        var native = RunSourceGenerator(compilation, new Dictionary<string, string>
+        {
+            ["build_property.publishaot"] = "true",
+            ["build_property.orleansvalidaterpcresponsefactories"] = "false",
+        });
+        Assert.Empty(managed.Diagnostics);
+        Assert.Empty(native.Diagnostics);
+        var source = Assert.Single(native.GeneratedSources,
+            static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Equal(1, CountOccurrences(source, "options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>"));
+        Assert.Contains("new ResponseFieldCodec()", source);
+        Assert.Contains("new ResponseFieldCopier()", source);
+        Assert.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.CompletedResponse>", source);
+        Assert.DoesNotContain("PooledResponseCodec<", source);
+        Assert.Equal(ConcatenateGeneratedSources(managed), ConcatenateGeneratedSources(native));
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(native.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText, path: item.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public async Task ExplicitOnlyRpcGraphResolvesAndExecutesRuntimeResponseCopier()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IExplicit : IGrainWithIntegerKey { Task<Dictionary<string, int>> Get(); }
+            """, $"ExplicitResponseProof{Guid.NewGuid():N}");
+        var generated = RunSourceGenerator(compilation, new Dictionary<string, string>
+        {
+            ["build_property.publishaot"] = "true",
+            ["build_property.orleansvalidaterpcresponsefactories"] = "false",
+        });
+        Assert.Empty(generated.Diagnostics);
+        var exercise = $$"""
+            using System;
+            using System.Collections.Generic;
+            using Microsoft.Extensions.DependencyInjection;
+            using Microsoft.Extensions.Options;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Cloning;
+            using Orleans.Serialization.Codecs;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Invocation;
+            using Orleans.Serialization.Serializers;
+            public static class ExplicitResponseProof
+            {
+                public static bool Run()
+                {
+                    var options = new TypeManifestOptions();
+                    ((IConfigureOptions<TypeManifestOptions>)new OrleansCodeGen.{{compilation.AssemblyName}}.RpcResponseFactories()).Configure(options);
+                    var codec = new DictionaryCodec<string, int>(new StringCodec(), new Int32Codec());
+                    var copier = new DictionaryCopier<string, int>(new ShallowCopier<string>(), new ShallowCopier<int>());
+                    options.AddSerializer<Response<Dictionary<string, int>>>(
+                        _ => new PooledResponseCodec<Dictionary<string, int>, DictionaryCodec<string, int>>(codec),
+                        _ => new PooledResponseCopier<Dictionary<string, int>, DictionaryCopier<string, int>>(copier));
+                    using var services = new ServiceCollection().BuildServiceProvider();
+                    var provider = new CodecProvider(services, Options.Create(options));
+                    using var contexts = new CopyContextPool(provider);
+                    var runtimeCopier = new DeepCopier<Response>(provider.GetDeepCopier<Response>(), contexts);
+                    var original = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Key"] = 47 };
+                    using var response = Response.FromResult(original);
+                    using var copied = runtimeCopier.Copy(response);
+                    var result = copied.GetResult<Dictionary<string, int>>();
+                    original.Clear();
+                    return provider.GetCodec<Response>().GetType().Assembly == typeof(ExplicitResponseProof).Assembly
+                        && provider.GetDeepCopier<Response>().GetType().Assembly == typeof(ExplicitResponseProof).Assembly
+                        && !ReferenceEquals(response, copied) && !ReferenceEquals(original, result)
+                        && ReferenceEquals(StringComparer.OrdinalIgnoreCase, result.Comparer)
+                        && result.Count == 1 && result["key"] == 47;
+                }
+            }
+            """;
+        var output = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText, path: item.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("ExplicitResponseProof")!.GetMethod("Run")!.Invoke(null, null));
     }
 
     [Fact]

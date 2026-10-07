@@ -49,7 +49,7 @@ internal static class RpcResponseGenerator
         var constructorServices = GetConstructorServices(preparation.SourceOutputs, cancellationToken);
         var results = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
         var arguments = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
-        var hasCompletionMethods = false;
+        var hasResponseMethods = false;
         var output = ImmutableArray.CreateBuilder<SourceOutputResult>();
         foreach (var proxy in proxies)
         {
@@ -95,10 +95,10 @@ internal static class RpcResponseGenerator
                     continue;
                 }
 
+                hasResponseMethods = true;
                 if (SymbolEqualityComparer.Default.Equals(returnType, services.LibraryTypes.Task)
                     || SymbolEqualityComparer.Default.Equals(returnType, services.LibraryTypes.ValueTask))
                 {
-                    hasCompletionMethods = true;
                     continue;
                 }
 
@@ -160,7 +160,6 @@ internal static class RpcResponseGenerator
             }
         }
 
-        var hasResponseRoots = supportedResults.Count > 0 || metadataModelRoots.Count > 0 || hasCompletionMethods;
         foreach (var argument in arguments.OrderBy(static entry => entry.Key.ToDisplayString(), StringComparer.Ordinal))
         {
             if (coveredConstructionTypes.Contains(argument.Key)) continue;
@@ -180,7 +179,7 @@ internal static class RpcResponseGenerator
             }
         }
 
-        if (supportedResults.Count == 0 && metadataModelRoots.Count == 0 && argumentRoots.Count == 0 && responseHolders.Count == 0 && !hasCompletionMethods)
+        if (supportedResults.Count == 0 && metadataModelRoots.Count == 0 && argumentRoots.Count == 0 && responseHolders.Count == 0 && !hasResponseMethods)
         {
             return output.ToImmutable();
         }
@@ -234,7 +233,7 @@ internal static class RpcResponseGenerator
                 source.AppendLine(metadataRoot.ConfigurationStatements);
             }
         }
-        if (hasResponseRoots)
+        if (hasResponseMethods)
         {
             source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCodec>(static provider => new ResponseFieldCodec());");
             source.AppendLine("options.AddDefaultSerializerService<ResponseFieldCopier>(static provider => new ResponseFieldCopier());");
