@@ -71,6 +71,8 @@ public class GrainDirectoryOptions
     /// Each partition's starting boundary must remain stable throughout the silo's membership.
     /// Orleans treats the returned array as read-only.
     /// The function is captured when the distributed directory is created and can be invoked concurrently on different silos.
+    /// If the function throws or returns an invalid result, directory membership processing stops and membership reads
+    /// and refresh calls throw <see cref="OrleansConfigurationException"/>. Correct the configuration and restart the affected silos.
     /// By default, a single partition uses <see cref="SiloAddress.GetConsistentHashCode()"/>, and multiple partitions use
     /// <see cref="SiloAddress.GetUniformHashCodes(int)"/> in hash-generation order.
     /// To retain the mapping used by Orleans 10.1 distributed-directory clusters, configure

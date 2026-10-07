@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -19,25 +20,37 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates;
     private readonly int _partitionsPerSilo;
     private readonly Func<SiloAddress, int, uint[]> _getRingBoundaries;
+    private DirectoryMembershipSnapshot _currentView = DirectoryMembershipSnapshot.Default;
 
-    public DirectoryMembershipSnapshot CurrentView { get; private set; } = DirectoryMembershipSnapshot.Default;
+    public DirectoryMembershipSnapshot CurrentView
+    {
+        get
+        {
+            if (_runTask.IsFaulted)
+            {
+                _runTask.GetAwaiter().GetResult();
+            }
+
+            return _currentView;
+        }
+    }
 
     public int PartitionsPerSilo => _partitionsPerSilo;
 
-    public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => _viewUpdates;
+    public IAsyncEnumerable<DirectoryMembershipSnapshot> ViewUpdates => GetViewUpdates();
 
     public IClusterMembershipService ClusterMembershipService { get; }
 
     public async ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken)
     {
-        if (version == default || CurrentView.Version < version)
+        if (CurrentView.Version < version || version == default)
         {
             await ClusterMembershipService.Refresh(version, cancellationToken);
         }
 
         if (CurrentView.Version < version)
         {
-            await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
+            await foreach (var view in ViewUpdates.WithCancellation(cancellationToken))
             {
                 if (view.Version >= version)
                 {
@@ -47,6 +60,17 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         }
 
         return CurrentView;
+    }
+
+    private async IAsyncEnumerable<DirectoryMembershipSnapshot> GetViewUpdates([EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await foreach (var view in _viewUpdates.WithCancellation(cancellationToken))
+        {
+            yield return view;
+        }
+
+        // Propagate the processor's failure to current and future subscribers.
+        await _runTask;
     }
 
     public DirectoryMembershipService(
@@ -63,7 +87,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         _viewUpdates = new(
             DirectoryMembershipSnapshot.Default,
             (previous, proposed) => proposed.Version >= previous.Version,
-            update => CurrentView = update);
+            update => _currentView = update);
         ClusterMembershipService = clusterMembershipService;
         _grainFactory = grainFactory;
         _logger = logger;
@@ -81,11 +105,22 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                 {
                     await foreach (var update in ClusterMembershipService.MembershipUpdates.WithCancellation(_shutdownCts.Token))
                     {
-                        var view = new DirectoryMembershipSnapshot(update, _grainFactory, _partitionsPerSilo, _getRingBoundaries);
+                        DirectoryMembershipSnapshot view;
+                        try
+                        {
+                            view = new DirectoryMembershipSnapshot(update, _grainFactory, _partitionsPerSilo, _getRingBoundaries);
+                        }
+                        catch (Exception exception)
+                        {
+                            throw new OrleansConfigurationException(
+                                $"Failed to construct grain directory membership version '{update.Version}' using the configured partition boundaries.",
+                                exception);
+                        }
+
                         _viewUpdates.Publish(view);
                     }
                 }
-                catch (Exception exception)
+                catch (Exception exception) when (exception is not OrleansConfigurationException)
                 {
                     if (!_shutdownCts.IsCancellationRequested)
                     {
@@ -93,6 +128,15 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                     }
                 }
             }
+        }
+        catch (OrleansConfigurationException exception)
+        {
+            if (!_shutdownCts.IsCancellationRequested)
+            {
+                LogErrorProcessingMembershipUpdates(exception);
+            }
+
+            throw;
         }
         finally
         {
