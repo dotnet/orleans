@@ -29,8 +29,14 @@ internal static class SerializerFactoryGenerator
         {
             var result = new Registration(Type)
             {
-                Codec = Codec, Copier = Copier, CodecConstruction = CodecConstruction, CopierConstruction = CopierConstruction,
-                Model = Model, ResponseResult = ResponseResult, ReferencedCodec = ReferencedCodec, ReferencedCopier = ReferencedCopier
+                Codec = Codec,
+                Copier = Copier,
+                CodecConstruction = CodecConstruction,
+                CopierConstruction = CopierConstruction,
+                Model = Model,
+                ResponseResult = ResponseResult,
+                ReferencedCodec = ReferencedCodec,
+                ReferencedCopier = ReferencedCopier
             };
             result.Dependencies.AddRange(Dependencies);
             result.CanonicalArrays.AddRange(CanonicalArrays);
