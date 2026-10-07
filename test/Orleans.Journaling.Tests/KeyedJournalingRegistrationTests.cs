@@ -564,6 +564,8 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
     private sealed class DelegatingStateManager(IJournaledStateManager inner) : IJournaledStateManager
     {
+        public IList<IJournaledStateHook> Hooks => inner.Hooks;
+
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
         public void RegisterStateMachine(string name, IStateMachine state) => inner.RegisterStateMachine(name, state);
         public bool TryGetStateMachine(string name, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IStateMachine? state)

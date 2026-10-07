@@ -727,6 +727,8 @@ public partial class JournaledJobShardManagerTests
 
     private sealed class TrackingJournaledStateManager(IJournaledStateManager inner) : IJournaledStateManager
     {
+        public IList<IJournaledStateHook> Hooks => inner.Hooks;
+
         public int DisposeCalls { get; private set; }
         public long PendingWriteByteCount => inner.PendingWriteByteCount;
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => inner.InitializeAsync(cancellationToken);
