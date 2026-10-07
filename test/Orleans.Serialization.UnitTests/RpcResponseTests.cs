@@ -901,6 +901,96 @@ public sealed class RpcResponseTests : IDisposable
         Assert.Equal(42, reused.GetResult<int>());
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task GeneratedResponseHolderHonorsCanonicalResponseSubclasses(bool interfaceServices, bool customCodec)
+    {
+        var counts = new SubclassCounts();
+        ResponseCodec codec = interfaceServices
+            ? new CustomRawResponseCodec<IFieldCodec<int>>(new Int32Codec(), counts)
+            : new CustomRawResponseCodec<Int32Codec>(new Int32Codec(), counts);
+        IDeepCopier<Response<int>> copier = interfaceServices
+            ? new CustomResponseSubclassCopier<IDeepCopier<int>>(new ShallowCopier<int>(), counts)
+            : new CustomResponseSubclassCopier<ShallowCopier<int>>(new ShallowCopier<int>(), counts);
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+            options.AddSerializer<Response<int>>(
+                _ => customCodec ? (IFieldCodec<Response<int>>)codec : new PooledResponseCodec<int, Int32Codec>(new Int32Codec()),
+                _ => customCodec ? new PooledResponseCopier<int, ShallowCopier<int>>(new ShallowCopier<int>()) : copier)))
+            .BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var contexts = services.GetRequiredService<CopyContextPool>();
+        using var invokable = CreateInvokable("Integer");
+        invokable.SetTarget(new TargetHolder(new RpcResponseTarget()));
+
+        using var response = await invokable.InvokeAndCopy(provider, contexts, services.GetRequiredService<DeepCopier>().GetCopier<Response>());
+
+        Assert.IsType<Response<int>>(response);
+        Assert.Equal(customCodec ? 42 : 43, response.GetResult<int>());
+        Assert.Equal(customCodec ? 0 : 1, counts.Copies);
+        Assert.False(provider.TryGetRawResponseReader(typeof(int), out _));
+        if (customCodec)
+        {
+            Assert.Same(codec, provider.GetCodec<Response<int>>());
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var session = services.GetRequiredService<SerializerSessionPool>().GetSession())
+            {
+                var writer = Writer.Create(buffer, session);
+                ((ResponseCodec)provider.GetCodec(response.GetType())).WriteRaw(ref writer, response);
+                writer.Commit();
+            }
+            using var readSession = services.GetRequiredService<SerializerSessionPool>().GetSession();
+            var reader = Reader.Create(buffer.WrittenMemory, readSession);
+            var field = reader.ReadFieldHeader();
+            using var decoded = (Response)codec.ReadRaw(ref reader, ref field);
+            Assert.Equal(142, decoded.GetResult<int>());
+            Assert.Equal(1, counts.Writes);
+            Assert.Equal(1, counts.Reads);
+        }
+        else
+        {
+            Assert.Same(copier, provider.GetDeepCopier<Response<int>>());
+        }
+    }
+
+    private sealed class SubclassCounts
+    {
+        public int Writes;
+        public int Reads;
+        public int Copies;
+    }
+
+    private sealed class CustomRawResponseCodec<TCodec>(TCodec codec, SubclassCounts counts) : PooledResponseCodec<int, TCodec>(codec)
+        where TCodec : class, IFieldCodec<int>
+    {
+        public override void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer, object value)
+        {
+            counts.Writes++;
+            using var transformed = Response.FromResult(((Response<int>)value).TypedResult + 100);
+            base.WriteRaw(ref writer, transformed);
+        }
+        public override object ReadRaw<TInput>(ref Reader<TInput> reader, scoped ref Field field)
+        {
+            counts.Reads++;
+            return base.ReadRaw(ref reader, ref field);
+        }
+    }
+
+    private sealed class CustomResponseSubclassCopier<TCopier>(TCopier copier, SubclassCounts counts)
+        : PooledResponseCopier<int, TCopier>(copier), IDeepCopier<Response<int>>
+        where TCopier : class, IDeepCopier<int>
+    {
+        [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
+        public new Response<int>? DeepCopy(Response<int>? input, CopyContext context)
+        {
+            if (input is null) return null;
+            counts.Copies++;
+            return (Response<int>)Response.FromResult(input.TypedResult + 1);
+        }
+    }
+
     private sealed class DelegatingCodec<T>(IFieldCodec<T> codec) : IFieldCodec<T>
     {
         public int Writes { get; private set; }

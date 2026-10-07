@@ -154,10 +154,10 @@ internal static class RpcResponseHolderGenerator
                     var responseCodec = provider.GetCodec<global::Orleans.Serialization.Invocation.Response<{{type}}>>();
                     var responseCopier = provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<{{type}}>>();
                     IsSupported = _codec is not null && _copier is not null
-                        && (responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<{{type}}, {{codec}}>
-                            || responseCodec is global::Orleans.Serialization.Invocation.PooledResponseCodec<{{type}}, global::Orleans.Serialization.Codecs.IFieldCodec<{{type}}>>)
-                        && (responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<{{type}}, {{copier}}>
-                            || responseCopier is global::Orleans.Serialization.Invocation.PooledResponseCopier<{{type}}, global::Orleans.Serialization.Cloning.IDeepCopier<{{type}}>>);
+                        && (responseCodec.GetType() == typeof(global::Orleans.Serialization.Invocation.PooledResponseCodec<{{type}}, {{codec}}>)
+                            || responseCodec.GetType() == typeof(global::Orleans.Serialization.Invocation.PooledResponseCodec<{{type}}, global::Orleans.Serialization.Codecs.IFieldCodec<{{type}}>>))
+                        && (responseCopier.GetType() == typeof(global::Orleans.Serialization.Invocation.PooledResponseCopier<{{type}}, {{copier}}>)
+                            || responseCopier.GetType() == typeof(global::Orleans.Serialization.Invocation.PooledResponseCopier<{{type}}, global::Orleans.Serialization.Cloning.IDeepCopier<{{type}}>>));
                 }
                 internal global::Orleans.Serialization.Invocation.Response RentCopied({{type}} value, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
                 {
