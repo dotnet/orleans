@@ -26,16 +26,33 @@ namespace Orleans.Hosting
 
         private static IGrainService GrainServiceFactory(Type serviceType, IServiceProvider services)
         {
-            var grainServiceInterfaceType = Array.Find(serviceType.GetInterfaces(), x => x.GetInterfaces().Contains(typeof(IGrainService)));
-            if (grainServiceInterfaceType is null)
-            {
-                throw new InvalidOperationException(string.Format($"Cannot find an interface on {serviceType.FullName} which implements IGrainService"));
-            }
+            var grainServiceInterfaceType = GetGrainServiceInterface(serviceType);
 
             var typeCode = GrainInterfaceUtils.GetGrainClassTypeCode(grainServiceInterfaceType);
             var grainId = SystemTargetGrainId.CreateGrainServiceGrainId(typeCode, null!, SiloAddress.Zero);
             var grainService = (IGrainService)ActivatorUtilities.CreateInstance(services, serviceType, grainId);
             return grainService;
+        }
+
+        private static Type GetGrainServiceInterface(Type serviceType)
+        {
+            // All interfaces which extend IGrainService, directly or through a parent interface.
+            var candidates = Array.FindAll(serviceType.GetInterfaces(), x => x.GetInterfaces().Contains(typeof(IGrainService)));
+            if (candidates.Length == 0)
+            {
+                throw new InvalidOperationException(string.Format($"Cannot find an interface on {serviceType.FullName} which implements IGrainService"));
+            }
+
+            // Discard any candidate which another candidate extends, leaving the most derived interface(s).
+            var mostDerived = Array.FindAll(candidates, c => !Array.Exists(candidates, other => other != c && other.GetInterfaces().Contains(c)));
+            if (mostDerived.Length == 1)
+            {
+                return mostDerived[0];
+            }
+
+            throw new InvalidOperationException(
+                $"Cannot determine which interface of {serviceType.FullName} identifies the grain service. " +
+                $"Multiple unrelated interfaces extend IGrainService: {string.Join(", ", mostDerived.Select(t => t.FullName))}.");
         }
 
         /// <summary>
