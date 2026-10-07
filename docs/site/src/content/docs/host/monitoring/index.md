@@ -1,7 +1,7 @@
 ---
 title: Orleans observability
 description: Configure OpenTelemetry logging, metrics, and tracing for Orleans.
-ms.date: 08/02/2026
+ms.date: 09/04/2026
 ms.topic: overview
 ---
 
@@ -79,6 +79,7 @@ The example's 10% head-sampling ratio is a starting point, not a universal produ
 ## Next steps
 
 - [Monitor Orleans metrics](metrics.md)
+- [Monitor runtime dissemination](runtime-dissemination.md)
 - [Interpret Orleans signals](signals.md)
 - [Troubleshoot Orleans incidents](troubleshooting.md)
 - [Secure and operate the Orleans Dashboard](../../dashboard/index.md)
