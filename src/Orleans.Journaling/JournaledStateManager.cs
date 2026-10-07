@@ -159,6 +159,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
     {
+        ThrowIfHookReentry();
         cancellationToken.ThrowIfCancellationRequested();
         Task task;
         bool didEnqueue;
@@ -586,7 +587,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         }
                         workItem.SetException(afterHookRunning
                             ? new JournaledStatePostCommitException(hookOperation.Value, exception)
-                            : exception);
+                            : exception is OperationCanceledException && _shutdownCancellation.IsCancellationRequested
+                                ? exception
+                                : new JournaledStatePreCommitException(hookOperation.Value, exception));
                     }
                     catch (Exception exception)
                     {
@@ -1164,6 +1167,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     private async Task StopAsync(CancellationToken cancellationToken)
     {
+        ThrowIfHookReentry();
         lock (_lock)
         {
             _shutdownCancellation.Cancel();
@@ -1201,6 +1205,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask DisposeAsync()
     {
+        ThrowIfHookReentry();
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;

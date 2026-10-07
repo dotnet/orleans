@@ -35,7 +35,8 @@ public interface IJournaledStateHook
     /// <param name="cancellationToken">The token for the owned operation's lifetime.</param>
     /// <returns>A completion representing the prerequisite work.</returns>
     /// <remarks>
-    /// Failure prevents the storage operation and retains pending changes for an explicit retry.
+    /// Failure reports <see cref="JournaledStatePreCommitException"/>, prevents the storage operation,
+    /// and retains pending changes for an explicit retry.
     /// All staged changes must remain safe to commit. Full deletion requires the owner to stop
     /// admission and drain feature operations before queuing deletion.
     /// </remarks>

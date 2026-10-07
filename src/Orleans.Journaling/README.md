@@ -31,7 +31,8 @@ later pending changes retain their separate acknowledgement boundaries.
 
 The token passed to hooks belongs to the owned operation and is canceled by owner
 shutdown. Caller cancellation ends that caller's wait while owned callbacks and
-storage work continue. A before-hook failure preserves pending state for an explicit
+storage work continue. A before-hook failure is reported as
+`JournaledStatePreCommitException` and preserves pending state for an explicit
 retry. An after-hook failure is reported as `JournaledStatePostCommitException`,
 identifies the completed operation, and leaves the manager usable. Remaining after
 hooks still execute, and multiple failures are aggregated. Feature recovery

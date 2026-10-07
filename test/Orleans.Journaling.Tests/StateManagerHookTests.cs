@@ -1,4 +1,6 @@
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -230,8 +232,9 @@ public partial class StateManagerTests
             },
             AfterOperation = (_, _) => after++
         });
-        var caught = await Assert.ThrowsAsync<IOException>(() => InvokeAsync());
-        Assert.Same(failure, caught);
+        var caught = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => InvokeAsync());
+        Assert.Same(failure, caught.InnerException);
+        Assert.Equal(delete ? JournaledStateOperation.Delete : JournaledStateOperation.Write, caught.Operation);
         Assert.Equal(1, state["business"]);
         Assert.Empty(storage.Appends);
         Assert.Equal(0, storage.DeleteCount);
@@ -390,7 +393,9 @@ public partial class StateManagerTests
         state["business"] = 1;
         var failure = await Record.ExceptionAsync(() => manager.WriteStateAsync(TestContext.Current.CancellationToken)
             .AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-        var cause = after ? Assert.IsType<JournaledStatePostCommitException>(failure).InnerException : failure;
+        var cause = after
+            ? Assert.IsType<JournaledStatePostCommitException>(failure).InnerException
+            : Assert.IsType<JournaledStatePreCommitException>(failure).InnerException;
         Assert.Contains("same journal owner", Assert.IsType<InvalidOperationException>(cause).Message, StringComparison.Ordinal);
     }
 
@@ -424,5 +429,27 @@ public partial class StateManagerTests
         public void WritePendingEntries(JournalStreamWriter writer) { }
         public void WriteSnapshot(JournalStreamWriter writer) { }
         public void OnWriteCompleted() => events.Add("ack");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Hooks_FailureOutcomesRoundTripWithOperationAndOriginalCause(bool after)
+    {
+        Exception original = after
+            ? new JournaledStatePostCommitException(JournaledStateOperation.Delete, new IOException("Cleanup failed."))
+            : new JournaledStatePreCommitException(JournaledStateOperation.Snapshot, new IOException("Scheduling failed."));
+        var serializer = ServiceProvider.GetRequiredService<Serializer>();
+        var copy = serializer.Deserialize<Exception>(serializer.SerializeToArray(original));
+        if (after)
+        {
+            Assert.Equal(JournaledStateOperation.Delete, Assert.IsType<JournaledStatePostCommitException>(copy).Operation);
+        }
+        else
+        {
+            Assert.Equal(JournaledStateOperation.Snapshot, Assert.IsType<JournaledStatePreCommitException>(copy).Operation);
+        }
+        Assert.Equal(original.InnerException!.Message, Assert.IsType<IOException>(copy.InnerException).Message);
+        Assert.Equal(original.Message, copy.Message);
     }
 }
