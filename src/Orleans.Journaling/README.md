@@ -9,6 +9,39 @@ Application code uses `IDurableStateManager` to manage the grain's durable state
 `IStateMachine` defines the low-level replay and snapshot protocol for state implementations.
 `IJournaledStateManager` is an independent contract for journal ownership and lifetime operations.
 
+## Persistence hooks
+
+`IJournaledStateManager.Hooks` exposes a mutable list of `IJournaledStateHook`
+objects. Its backing list is allocated on first access. Features can inspect the
+list and add a hook only when an equivalent registration is absent. Modify list
+membership on the owner's logical execution context between persistence operations.
+
+`JournaledStateHook` adapts synchronous `Action<JournaledStateOperation,
+CancellationToken>` callbacks and asynchronous
+`Func<JournaledStateOperation, CancellationToken, ValueTask>` callbacks. A custom
+hook object can carry feature identity and operation-local state. Within each
+delegate adapter, the synchronous callback precedes the asynchronous callback.
+
+Hooks surround actual coalesced writes, snapshots, and deletion. Before callbacks
+establish prerequisites before synchronous capture or storage deletion. After
+callbacks run after storage acknowledgement and state acknowledgement or reset.
+Successful zero-byte writes also complete their callbacks. Prerequisites must cover
+changes which arrive during an asynchronous before callback; captured changes and
+later pending changes retain their separate acknowledgement boundaries.
+
+The token passed to hooks belongs to the owned operation and is canceled by owner
+shutdown. Caller cancellation ends that caller's wait while owned callbacks and
+storage work continue. A before-hook failure preserves pending state for an explicit
+retry. An after-hook failure is reported as `JournaledStatePostCommitException`,
+identifies the completed operation, and leaves the manager usable. Remaining after
+hooks still execute, and multiple failures are aggregated. Feature recovery
+reconciles interrupted post-persistence effects using durable state.
+
+Hook callbacks execute outside the manager lock. Enqueuing another operation on
+the same owner from its callback is rejected to preserve work-loop progress.
+For full deletion, stop feature admission and drain owned work before queuing
+deletion; the after callback can release resources associated with the deleted owner.
+
 ## Getting Started
 To use this package, install it via NuGet:
 
