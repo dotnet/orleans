@@ -1,4 +1,5 @@
 using System.Text;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -23,6 +24,18 @@ internal static class SerializerFactoryGenerator
         public INamedTypeSymbol? ReferencedCodec { get; set; }
         public INamedTypeSymbol? ReferencedCopier { get; set; }
         public List<IArrayTypeSymbol> CanonicalArrays { get; } = [];
+
+        internal Registration Clone()
+        {
+            var result = new Registration(Type)
+            {
+                Codec = Codec, Copier = Copier, CodecConstruction = CodecConstruction, CopierConstruction = CopierConstruction,
+                Model = Model, ResponseResult = ResponseResult, ReferencedCodec = ReferencedCodec, ReferencedCopier = ReferencedCopier
+            };
+            result.Dependencies.AddRange(Dependencies);
+            result.CanonicalArrays.AddRange(CanonicalArrays);
+            return result;
+        }
     }
 
     internal sealed class Graph(IReadOnlyDictionary<ITypeSymbol, Registration> registrations, string configurationStatements)
@@ -32,6 +45,70 @@ internal static class SerializerFactoryGenerator
     }
 
     internal sealed record Failure(ITypeSymbol Type, string Reason);
+
+    private sealed record ServiceConstruction(string Implementation, string Expression, ImmutableArray<string> Dependencies)
+    {
+        internal static ServiceConstruction Create(string implementation, string expression, IEnumerable<string> dependencies)
+            => new(implementation, expression, [.. dependencies
+                .Where(static type => type != "global::Orleans.Serialization.Serializers.ICodecProvider")
+                .Distinct(StringComparer.Ordinal)]);
+    }
+
+    private static void AppendService(StringBuilder source, ServiceConstruction construction, bool useDefaults,
+        string? service = null, bool describeEmptyDependencies = false)
+    {
+        source.Append("options.").Append(useDefaults ? "AddDefaultSerializerService" : "AddSerializerService")
+            .Append('<').Append(service ?? construction.Implementation);
+        if (useDefaults && service is not null) source.Append(", ").Append(construction.Implementation);
+        source.Append(">(static provider => ").Append(service is null ? construction.Expression : Resolve(construction.Implementation));
+        if (useDefaults && (describeEmptyDependencies || !construction.Dependencies.IsEmpty))
+            source.Append(", dependencies: ").Append(DefaultServiceDependencies(construction.Dependencies));
+        source.AppendLine(");");
+    }
+
+    private static void AppendRegistration(StringBuilder source, string type, ServiceConstruction codec, ServiceConstruction copier,
+        bool useDefaults, bool servicesOnly = false, bool describeEmptyDependencies = false)
+    {
+        AppendService(source, codec, useDefaults, describeEmptyDependencies: describeEmptyDependencies);
+        AppendService(source, copier, useDefaults, describeEmptyDependencies: describeEmptyDependencies);
+        if (servicesOnly)
+        {
+            AppendService(source, codec, useDefaults, $"global::Orleans.Serialization.Codecs.IFieldCodec<{type}>", describeEmptyDependencies);
+            AppendService(source, copier, useDefaults, $"global::Orleans.Serialization.Cloning.IDeepCopier<{type}>", describeEmptyDependencies);
+            return;
+        }
+        source.Append("options.").Append(useDefaults ? "AddDefaultSerializer" : "AddSerializer").Append('<').Append(type);
+        if (useDefaults) source.Append(", ").Append(codec.Implementation).Append(", ").Append(copier.Implementation);
+        source.Append(">(static provider => ").Append(Resolve(codec.Implementation))
+            .Append(", static provider => ").Append(Resolve(copier.Implementation));
+        if (useDefaults && (describeEmptyDependencies || !codec.Dependencies.IsEmpty || !copier.Dependencies.IsEmpty))
+            source.Append(", codecDependencies: ").Append(DefaultServiceDependencies(codec.Dependencies))
+                .Append(", copierDependencies: ").Append(DefaultServiceDependencies(copier.Dependencies));
+        source.AppendLine(");");
+    }
+
+    private static void AppendReferencedRegistration(StringBuilder source, ITypeSymbol type, INamedTypeSymbol codec, INamedTypeSymbol copier,
+        bool preferCompleteCodecConstructor = false)
+        => AppendRegistration(source, Name(type),
+            ServiceConstruction.Create(Name(codec), ConstructReferenced(Name(codec), codec, preferCompleteCodecConstructor),
+                ConstructorDependencies(codec, preferCompleteCodecConstructor)),
+            ServiceConstruction.Create(Name(copier), ConstructReferenced(Name(copier), copier), ConstructorDependencies(copier)),
+            useDefaults: true, describeEmptyDependencies: true);
+
+    private static void AppendArgumentMetadata(StringBuilder source, ITypeSymbol type, HashSet<ITypeSymbol> registered, Compilation compilation)
+    {
+        if (!registered.Add(type) || RpcResponsePlan.ContainsTypeParameter(type)
+            || !compilation.IsSymbolAccessibleWithin(type, compilation.Assembly)) return;
+        source.Append("options.AddGenericArgumentMetadata(typeof(").Append(Name(type)).AppendLine("));");
+        if (type is INamedTypeSymbol named)
+        {
+            foreach (var argument in named.TypeArguments) AppendArgumentMetadata(source, argument, registered, compilation);
+        }
+        else if (type is IArrayTypeSymbol array)
+        {
+            AppendArgumentMetadata(source, array.ElementType, registered, compilation);
+        }
+    }
 
     internal static Graph? CreateRpcModelRoot(
         IGeneratorServices services,
@@ -58,6 +135,8 @@ internal static class SerializerFactoryGenerator
         }
 
         var registration = new Registration(type);
+        var argumentMetadata = new StringBuilder();
+        AppendArgumentMetadata(argumentMetadata, type, new(SymbolEqualityComparer.Default), services.Compilation);
         var inspectionCompilation = services.Compilation;
         var inspectionType = type;
         var inspectionLibrary = services.LibraryTypes;
@@ -169,7 +248,7 @@ internal static class SerializerFactoryGenerator
         var responseType = services.Compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!.Construct(type);
         var codec = $"global::Orleans.Serialization.Invocation.PooledResponseCodec<{Name(type)}, {registration.Codec}>";
         var copier = $"global::Orleans.Serialization.Invocation.PooledResponseCopier<{Name(type)}, {registration.Copier}>";
-        var result = new StringBuilder();
+        var result = new StringBuilder(argumentMetadata.ToString());
         foreach (var member in constructionModel.Members)
         {
             var memberName = Name(member.Type);
@@ -220,42 +299,23 @@ internal static class SerializerFactoryGenerator
                 .Append(factory).Append('<').Append(Name(type)).AppendLine(">());");
         }
 
-        result.Append("options.AddDefaultSerializerService<").Append(registration.Codec).Append(">(static provider => ")
-            .Append(registration.CodecConstruction)
-            .Append(", dependencies: ").Append(DefaultServiceDependencies(codecDependencies)).AppendLine(");");
-        result.Append("options.AddDefaultSerializerService<").Append(registration.Copier).Append(">(static provider => ")
-            .Append(registration.CopierConstruction)
-            .Append(", dependencies: ").Append(DefaultServiceDependencies(copierDependencies)).AppendLine(");");
-        result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.IFieldCodec<")
-            .Append(Name(type)).Append(">, ").Append(registration.Codec).Append(">(static provider => ")
-            .Append(Resolve(registration.Codec))
-            .Append(", dependencies: ").Append(DefaultServiceDependencies(codecDependencies)).AppendLine(");");
-        result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.IDeepCopier<")
-            .Append(Name(type)).Append(">, ").Append(registration.Copier).Append(">(static provider => ")
-            .Append(Resolve(registration.Copier))
-            .Append(", dependencies: ").Append(DefaultServiceDependencies(copierDependencies)).AppendLine(");");
+        var codecConstruction = ServiceConstruction.Create(registration.Codec, registration.CodecConstruction, codecDependencies);
+        var copierConstruction = ServiceConstruction.Create(registration.Copier, registration.CopierConstruction, copierDependencies);
+        AppendRegistration(result, Name(type), codecConstruction, copierConstruction, useDefaults: true, servicesOnly: true, describeEmptyDependencies: true);
         if (type.IsValueType && type.TypeKind != TypeKind.Enum)
         {
-            result.Append("options.AddDefaultSerializerService<global::Orleans.Serialization.Serializers.IValueSerializer<")
-                .Append(Name(type)).Append(">, ").Append(registration.Codec).Append(">(static provider => ")
-                .Append(Resolve(registration.Codec))
-                .Append(", dependencies: ").Append(DefaultServiceDependencies(codecDependencies)).AppendLine(");");
+            AppendService(result, codecConstruction, useDefaults: true,
+                $"global::Orleans.Serialization.Serializers.IValueSerializer<{Name(type)}>", describeEmptyDependencies: true);
         }
         if (!includeResponse)
         {
             return new Graph(new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default) { [type] = registration }, result.ToString());
         }
 
-        result.Append("options.AddDefaultSerializerService<").Append(codec).Append(">(static provider => new ")
-            .Append(codec).Append("(caller => ").Append(Resolve(registration.Codec, "caller"))
-            .Append("), dependencies: ").Append(DefaultServiceDependencies([registration.Codec])).AppendLine(");");
-        result.Append("options.AddDefaultSerializerService<").Append(copier).Append(">(static provider => new ")
-            .Append(copier).Append("(caller => ").Append(Resolve(registration.Copier, "caller"))
-            .Append("), dependencies: ").Append(DefaultServiceDependencies([registration.Copier])).AppendLine(");");
-        result.Append("options.AddDefaultSerializer<").Append(Name(responseType)).Append(", ").Append(codec).Append(", ").Append(copier).Append(">(static provider => ")
-            .Append(Resolve(codec)).Append(", static provider => ").Append(Resolve(copier))
-            .Append(", codecDependencies: ").Append(DefaultServiceDependencies([registration.Codec]))
-            .Append(", copierDependencies: ").Append(DefaultServiceDependencies([registration.Copier])).AppendLine(");");
+        AppendRegistration(result, Name(responseType),
+            ServiceConstruction.Create(codec, $"new {codec}(caller => {Resolve(registration.Codec, "caller")})", [registration.Codec]),
+            ServiceConstruction.Create(copier, $"new {copier}(caller => {Resolve(registration.Copier, "caller")})", [registration.Copier]),
+            useDefaults: true, describeEmptyDependencies: true);
         result.Append("options.AddAllowedType(typeof(").Append(Name(responseType)).AppendLine("));");
         return new Graph(new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default) { [type] = registration }, result.ToString());
 
@@ -303,16 +363,7 @@ internal static class SerializerFactoryGenerator
         if (dependency is INamedTypeSymbol tupleType && TryGetTupleServices(services, tupleType, out var tupleCodec, out var tupleCopier))
         {
             foreach (var element in tupleType.TypeArguments) AppendConstructionDependency(services, element, cancellationToken, constructionTypes, result);
-            result.Append("options.AddDefaultSerializerService<").Append(Name(tupleCodec)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(tupleCodec), tupleCodec))
-                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(tupleCodec))).AppendLine(");");
-            result.Append("options.AddDefaultSerializerService<").Append(Name(tupleCopier)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(tupleCopier), tupleCopier))
-                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(tupleCopier))).AppendLine(");");
-            result.Append("options.AddDefaultSerializer<").Append(Name(tupleType)).Append(", ").Append(Name(tupleCodec)).Append(", ").Append(Name(tupleCopier)).Append(">(static provider => ")
-                .Append(Resolve(Name(tupleCodec))).Append(", static provider => ").Append(Resolve(Name(tupleCopier)))
-                    .Append(", codecDependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(tupleCodec)))
-                    .Append(", copierDependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(tupleCopier))).AppendLine(");");
+            AppendReferencedRegistration(result, tupleType, tupleCodec, tupleCopier);
             return;
         }
 
@@ -321,16 +372,7 @@ internal static class SerializerFactoryGenerator
             AppendConstructionDependency(services, arrayType.ElementType, cancellationToken, constructionTypes, result);
             var codec = services.LibraryTypes.ArrayCodec.Construct(arrayType.ElementType);
             var copier = services.LibraryTypes.ArrayCopier.Construct(arrayType.ElementType);
-            result.Append("options.AddDefaultSerializerService<").Append(Name(codec)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(codec), codec))
-                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(codec))).AppendLine(");");
-            result.Append("options.AddDefaultSerializerService<").Append(Name(copier)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(copier), copier))
-                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(copier))).AppendLine(");");
-            result.Append("options.AddDefaultSerializer<").Append(Name(arrayType)).Append(", ").Append(Name(codec)).Append(", ").Append(Name(copier)).Append(">(static provider => ")
-                .Append(Resolve(Name(codec))).Append(", static provider => ").Append(Resolve(Name(copier)))
-                    .Append(", codecDependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(codec)))
-                    .Append(", copierDependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(copier))).AppendLine(");");
+            AppendReferencedRegistration(result, arrayType, codec, copier);
             return;
         }
 
@@ -347,16 +389,7 @@ internal static class SerializerFactoryGenerator
                         || SymbolEqualityComparer.Default.Equals(contract.OriginalDefinition, services.LibraryTypes.ValueSerializer)))
                     AppendConstructionDependency(services, contract.TypeArguments[0], cancellationToken, constructionTypes, result);
             }
-            result.Append("options.AddDefaultSerializerService<").Append(Name(codec)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(codec), codec, preferCompleteConstructor: true))
-                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(codec, preferCompleteConstructor: true))).AppendLine(");");
-            result.Append("options.AddDefaultSerializerService<").Append(Name(copier)).Append(">(static provider => ")
-                .Append(ConstructReferenced(Name(copier), copier))
-                .Append(", dependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(copier))).AppendLine(");");
-            result.Append("options.AddDefaultSerializer<").Append(Name(collection)).Append(", ").Append(Name(codec)).Append(", ").Append(Name(copier)).Append(">(static provider => ")
-                .Append(Resolve(Name(codec))).Append(", static provider => ").Append(Resolve(Name(copier)))
-                .Append(", codecDependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(codec, preferCompleteConstructor: true)))
-                .Append(", copierDependencies: ").Append(DefaultServiceDependencies(ConstructorDependencies(copier))).AppendLine(");");
+            AppendReferencedRegistration(result, collection, codec, copier, preferCompleteCodecConstructor: true);
             return;
         }
 
@@ -433,17 +466,50 @@ internal static class SerializerFactoryGenerator
             foreach (var dependency in registration.Dependencies) pending.Enqueue(dependency);
         }
 
+        return TryBuildGraph(services, registrations, implementationCompilation, cancellationToken, out graph, out failure, useDefaultFactories);
+    }
+
+    internal static bool TryCombine(IGeneratorServices services, IEnumerable<Graph> graphs, CancellationToken cancellationToken,
+        [NotNullWhen(true)] out Graph? graph, [NotNullWhen(false)] out Failure? failure)
+    {
+        var registrations = new Dictionary<ITypeSymbol, Registration>(SymbolEqualityComparer.Default);
+        foreach (var candidate in graphs)
+        {
+            foreach (var entry in candidate.Registrations)
+            {
+                if (registrations.ContainsKey(entry.Key)) continue;
+                if (registrations.Count >= 1024)
+                {
+                    graph = null;
+                    failure = new(entry.Key, "the dependency graph exceeds 1024 closed types; declare a finite serialization graph");
+                    return false;
+                }
+                registrations.Add(entry.Key, entry.Value.Clone());
+            }
+        }
+        var compilation = services.Compilation.WithOptions(services.Compilation.Options.WithMetadataImportOptions(MetadataImportOptions.All));
+        return TryBuildGraph(services, registrations, compilation, cancellationToken, out graph, out failure, useDefaultFactories: true);
+    }
+
+    private static bool TryBuildGraph(IGeneratorServices services, Dictionary<ITypeSymbol, Registration> registrations,
+        Compilation implementationCompilation, CancellationToken cancellationToken,
+        [NotNullWhen(true)] out Graph? graph, [NotNullWhen(false)] out Failure? failure, bool useDefaultFactories)
+    {
+        graph = null;
+        failure = null;
         var serializerGenerator = new SerializerGenerator(services);
         var copierGenerator = new CopierGenerator(services);
         var result = new StringBuilder();
         foreach (var registration in registrations.Values) ResolveResponseImplementations(registration);
         var addService = useDefaultFactories ? "AddDefaultSerializerService" : "AddSerializerService";
-        var addSerializer = useDefaultFactories ? "AddDefaultSerializer" : "AddSerializer";
         var metadataTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        var argumentTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
         var auxiliaryServices = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var registration in registrations.Values.OrderBy(value => Name(value.Type), StringComparer.Ordinal))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            AppendArgumentMetadata(result, registration.Type, argumentTypes, services.Compilation);
             var typeName = Name(registration.Type);
             var hasBaseCodec = false;
             var hasBaseCopier = false;
@@ -516,53 +582,23 @@ internal static class SerializerFactoryGenerator
                 registration.CopierConstruction = $"new {registration.Copier}({string.Join(", ", copierArguments)})";
             }
 
-            result.Append("options.").Append(addService).Append('<').Append(registration.Codec).Append(">(static provider => ")
-                .Append(registration.CodecConstruction);
-            if (useDefaultFactories && codecDependencies.Count > 0)
-                result.Append(", dependencies: ").Append(DefaultServiceDependencies(codecDependencies));
-            result.AppendLine(");");
-            result.Append("options.").Append(addService).Append('<').Append(registration.Copier).Append(">(static provider => ")
-                .Append(registration.CopierConstruction);
-            if (useDefaultFactories && copierDependencies.Count > 0)
-                result.Append(", dependencies: ").Append(DefaultServiceDependencies(copierDependencies));
-            result.AppendLine(");");
-            result.Append("options.").Append(addSerializer).Append('<').Append(typeName);
-            if (useDefaultFactories)
-                result.Append(", ").Append(registration.Codec).Append(", ").Append(registration.Copier);
-            result.Append(">(static provider => ")
-                .Append(Resolve(registration.Codec)).Append(", static provider => ").Append(Resolve(registration.Copier));
-            if (useDefaultFactories && (codecDependencies.Count > 0 || copierDependencies.Count > 0))
-            {
-                result.Append(", codecDependencies: ").Append(DefaultServiceDependencies(codecDependencies))
-                    .Append(", copierDependencies: ").Append(DefaultServiceDependencies(copierDependencies));
-            }
-            result.AppendLine(");");
+            var codecConstruction = ServiceConstruction.Create(registration.Codec, registration.CodecConstruction, codecDependencies);
+            var copierConstruction = ServiceConstruction.Create(registration.Copier, registration.CopierConstruction, copierDependencies);
+            AppendRegistration(result, typeName, codecConstruction, copierConstruction, useDefaultFactories);
             if (registration.Model is { IsValueType: true, IsEnumType: false })
             {
-                result.Append("options.").Append(addService).Append("<global::Orleans.Serialization.Serializers.IValueSerializer<")
-                    .Append(typeName).Append('>');
-                if (useDefaultFactories) result.Append(", ").Append(registration.Codec);
-                result.Append(">(static provider => ").Append(Resolve(registration.Codec)).AppendLine(");");
+                AppendService(result, codecConstruction with { Dependencies = [] }, useDefaultFactories,
+                    $"global::Orleans.Serialization.Serializers.IValueSerializer<{typeName}>");
             }
             if (hasBaseCodec)
             {
-                result.Append("options.").Append(addService).Append("<global::Orleans.Serialization.Serializers.IBaseCodec<")
-                    .Append(typeName).Append('>');
-                if (useDefaultFactories) result.Append(", ").Append(registration.Codec);
-                result.Append(">(static provider => ").Append(Resolve(registration.Codec));
-                if (useDefaultFactories)
-                    result.Append(", dependencies: ").Append(DefaultServiceDependencies(codecDependencies));
-                result.AppendLine(");");
+                AppendService(result, codecConstruction, useDefaultFactories,
+                    $"global::Orleans.Serialization.Serializers.IBaseCodec<{typeName}>", describeEmptyDependencies: true);
             }
             if (hasBaseCopier)
             {
-                result.Append("options.").Append(addService).Append("<global::Orleans.Serialization.Cloning.IBaseCopier<")
-                    .Append(typeName).Append('>');
-                if (useDefaultFactories) result.Append(", ").Append(registration.Copier);
-                result.Append(">(static provider => ").Append(Resolve(registration.Copier));
-                if (useDefaultFactories)
-                    result.Append(", dependencies: ").Append(DefaultServiceDependencies(copierDependencies));
-                result.AppendLine(");");
+                AppendService(result, copierConstruction, useDefaultFactories,
+                    $"global::Orleans.Serialization.Cloning.IBaseCopier<{typeName}>", describeEmptyDependencies: true);
             }
 
             foreach (var array in registration.CanonicalArrays)

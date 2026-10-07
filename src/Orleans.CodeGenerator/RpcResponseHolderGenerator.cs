@@ -1,52 +1,12 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
-using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 namespace Orleans.CodeGenerator;
 
 internal static class RpcResponseHolderGenerator
 {
-    internal static ImmutableArray<(string TypeName, string HolderName)> GetNames(
-        Compilation compilation,
-        ImmutableArray<ProxyInterfaceModel> proxies,
-        SourceGeneratorOptions options,
-        CancellationToken cancellationToken)
-    {
-        if (proxies.IsDefaultOrEmpty)
-        {
-            return [];
-        }
-
-        var services = new GeneratorServices(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
-        var resolver = new TypeSymbolResolver(compilation);
-        var resultTypes = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
-        foreach (var proxy in proxies)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!resolver.TryResolveProxyInterface(proxy, cancellationToken, out var interfaceType))
-            {
-                continue;
-            }
-
-            foreach (var method in interfaceType.GetDeclaredInstanceMembers<IMethodSymbol>()
-                .Concat(interfaceType.AllInterfaces.SelectMany(static type => type.GetDeclaredInstanceMembers<IMethodSymbol>())))
-            {
-                if (method.MethodKind == MethodKind.Ordinary
-                    && method.ReturnType is INamedTypeSymbol { TypeArguments.Length: 1 } returnType
-                    && (SymbolEqualityComparer.Default.Equals(returnType.OriginalDefinition, services.LibraryTypes.Task_1)
-                        || SymbolEqualityComparer.Default.Equals(returnType.OriginalDefinition, services.LibraryTypes.ValueTask_1)))
-                {
-                    resultTypes.Add(returnType.TypeArguments[0].WithNullableAnnotation(NullableAnnotation.None));
-                }
-            }
-        }
-
-        return GetNames(resultTypes.Where(type => TryDescribe(services, type, out _, out _))
-            .Select(static type => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
-    }
-
     internal static ImmutableArray<(string TypeName, string HolderName)> GetNames(IEnumerable<string> resultTypeNames)
     {
         var names = ImmutableArray.CreateBuilder<(string TypeName, string HolderName)>();
@@ -72,7 +32,7 @@ internal static class RpcResponseHolderGenerator
     internal static bool TryDescribe(IGeneratorServices services, ITypeSymbol resultType, out string codec, out string copier)
     {
         codec = copier = "";
-        if (ContainsParameter(resultType)) return false;
+        if (RpcResponsePlan.ContainsTypeParameter(resultType)) return false;
         if (SerializerFactoryGenerator.TryCreate(services, [resultType], CancellationToken.None, out var graph, out _, useDefaultFactories: true))
         {
             if (graph.Registrations.Keys.OfType<INamedTypeSymbol>().Any(type =>
@@ -174,12 +134,11 @@ internal static class RpcResponseHolderGenerator
 
             internal sealed class {{factory}} : global::Orleans.Serialization.Invocation.ResponseCodec,
                 global::Orleans.Serialization.Codecs.IFieldCodec<{{name}}>,
-                global::Orleans.Serialization.Cloning.IDeepCopier<{{name}}>,
-                global::Orleans.Serialization.Invocation.IRawResponseReader
+                global::Orleans.Serialization.Cloning.IDeepCopier<{{name}}>
             {
                 private readonly {{codec}} _codec;
                 private readonly {{copier}} _copier;
-                public bool IsSupported { get; }
+                public override bool IsSupported { get; }
                 internal static {{factory}} Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
                 {
                     provider.GetCodec<{{type}}>();
@@ -217,9 +176,6 @@ internal static class RpcResponseHolderGenerator
                 public override void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, object value)
                     => WriteResult(ref writer, (({{name}})value).Value);
                 public override object ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field)
-                    => ReadResult(ref reader, ref field);
-                global::Orleans.Serialization.Invocation.Response global::Orleans.Serialization.Invocation.IRawResponseReader.ReadRaw<TInput>(
-                    ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field)
                     => ReadResult(ref reader, ref field);
                 private {{name}} ReadResult<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field)
                 {
@@ -266,9 +222,4 @@ internal static class RpcResponseHolderGenerator
             """;
     }
 
-    private static bool ContainsParameter(ITypeSymbol type)
-        => type is ITypeParameterSymbol or IErrorTypeSymbol
-            || type is IArrayTypeSymbol array && ContainsParameter(array.ElementType)
-            || type is INamedTypeSymbol named && (named.TypeArguments.Any(ContainsParameter)
-                || named.ContainingType is { } containing && ContainsParameter(containing));
 }

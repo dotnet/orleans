@@ -11,6 +11,7 @@ using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
@@ -21,6 +22,44 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     /// </summary>
     public static class OrleansGeneratedCodeHelper
     {
+        /// <summary>
+        /// Copies an invocation response and releases its original envelope when the copier returns a different response.
+        /// </summary>
+        /// <param name="response">The owned response to copy.</param>
+        /// <param name="copier">The selected response copier.</param>
+        /// <returns>The response whose ownership is transferred to the caller.</returns>
+        public static Response CopyResponseAndDispose(Response response, DeepCopier<Response> copier)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(copier);
+            return CopyResponseAndDispose(response, copier, static (value, service) => service.Copy(value)!);
+        }
+
+        /// <summary>
+        /// Copies an invocation response using runtime-type dispatch and releases a superseded envelope.
+        /// </summary>
+        /// <param name="response">The owned response to copy.</param>
+        /// <param name="copier">The selected runtime-dispatch copier.</param>
+        /// <returns>The response whose ownership is transferred to the caller.</returns>
+        public static Response CopyResponseAndDispose(Response response, DeepCopier copier)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(copier);
+            return CopyResponseAndDispose(response, copier, static (value, service) => service.Copy(value)!);
+        }
+
+        private static Response CopyResponseAndDispose<TCopier>(Response response, TCopier copier, Func<Response, TCopier, Response> copyResponse)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(response);
+            Response? copy = null;
+            try
+            {
+                return copy = copyResponse(response, copier);
+            }
+            finally
+            {
+                if (!ReferenceEquals(response, copy)) response.Dispose();
+            }
+        }
+
         /// <summary>
         /// Creates the default activator for a statically specified reference type.
         /// </summary>

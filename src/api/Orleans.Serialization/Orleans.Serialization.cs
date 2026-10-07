@@ -3453,6 +3453,8 @@ namespace Orleans.Serialization.Configuration
 
         public void AddFieldCodec(System.Type type) { }
 
+        public void AddGenericArgumentMetadata(System.Type type) { }
+
         public void AddInterface(System.Type type) { }
 
         public void AddInterfaceImplementation(System.Type type) { }
@@ -3500,6 +3502,10 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { }
 
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader) { }
+
+        public static Invocation.Response CopyResponseAndDispose(Invocation.Response response, DeepCopier copier) { throw null; }
+
+        public static Invocation.Response CopyResponseAndDispose(Invocation.Response response, DeepCopier<Invocation.Response> copier) { throw null; }
 
         public static Activators.IActivator<T> CreateDefaultReferenceTypeActivator<T>()
             where T : class { throw null; }
@@ -3691,8 +3697,12 @@ namespace Orleans.Serialization.Invocation
         public override string ToString() { throw null; }
     }
 
-    public abstract partial class ResponseCodec
+    public abstract partial class ResponseCodec : IRawResponseReader
     {
+        public virtual bool IsSupported { get { throw null; } }
+
+        Response IRawResponseReader.ReadRaw<TInput>(ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { throw null; }
+
         public abstract object ReadRaw<TInput>(ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field);
         public abstract void WriteRaw<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, object value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte>;

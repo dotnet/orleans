@@ -151,10 +151,11 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => ModelExtractor.MergeProxyInterfaces(input.Left, input.Right.ReferencedProxyInterfaces))
             .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance);
 
-        var responseNames = allProxyInterfaces
+        var responsePlan = allProxyInterfaces
             .Combine(compilationProvider)
             .Combine(generatorOptions)
-            .Select(static (input, ct) => RpcResponseHolderGenerator.GetNames(input.Left.Right, input.Left.Left, input.Right, ct))
+            .Select(static (input, ct) => RpcResponsePlan.Create(input.Left.Right, input.Left.Left, input.Right, ct));
+        var responseNames = responsePlan.Select(static (plan, _) => plan.Names)
             .WithComparer(ImmutableArrayComparer<(string TypeName, string HolderName)>.Instance);
 
         var preparedProxyOutputs = allProxyInterfaces
@@ -229,10 +230,10 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             GeneratedSourceOutput.EmitSourceOutputResult(productionContext, input);
         });
 
-        var responseOutputs = preparedProxyOutputModels
+        var responseOutputs = preparedProxyOutputs
             .Combine(compilationProvider)
             .Combine(generatorOptions)
-            .Combine(responseNames)
+            .Combine(responsePlan)
             .SelectMany(static (input, ct) => RpcResponseGenerator.Generate(
                 input.Left.Left.Right, input.Left.Left.Left, input.Left.Right, input.Right, ct));
 

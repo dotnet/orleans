@@ -175,16 +175,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                         if (!factory.IsSupported)
                         {
                             var original = await Invoke();
-                            global::Orleans.Serialization.Invocation.Response copy = null;
-                            try
-                            {
-                                return copy = responseCopier.Copy(original);
-                            }
-                            finally
-                            {
-                                if (!global::System.Object.ReferenceEquals(original, copy))
-                                    original.Dispose();
-                            }
+                            return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
                         }
                         {{type}} value = await InvokeInner();
                         return factory.RentCopied(value, contexts);

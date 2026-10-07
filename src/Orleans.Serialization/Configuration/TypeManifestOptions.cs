@@ -44,16 +44,55 @@ namespace Orleans.Serialization.Configuration
         internal Dictionary<Type, List<SerializationContract>> CopierContracts { get; } = new();
         internal Dictionary<Type, List<SerializationContract>> ActivatorContracts { get; } = new();
         internal Dictionary<Type, List<SerializationContract>> ConverterContracts { get; } = new();
+        internal Dictionary<Type, ClosedTypeMetadata> GenericArgumentMetadata { get; } = new();
+        internal sealed record ClosedTypeMetadata(bool HasPublicParameterlessConstructor, Type[] Interfaces);
 
-        internal Dictionary<Type, Func<ICodecProvider, IFieldCodec>> CodecFactories { get; } = new();
-        internal Dictionary<Type, Func<ICodecProvider, IDeepCopier>> CopierFactories { get; } = new();
-        internal Dictionary<Type, Type> CodecFactoryServices { get; } = new();
-        internal Dictionary<Type, Type> CopierFactoryServices { get; } = new();
+        /// <summary>
+        /// Captures the metadata needed to validate a closed type used as a serialization implementation's generic argument.
+        /// </summary>
+        /// <param name="type">The source-known closed type.</param>
+        /// <remarks>
+        /// Register every closed argument, including nested generic arguments and array elements, which can participate
+        /// in a constrained implementation. This permits constraint validation without constructing a generic type.
+        /// Implemented interfaces and their ancestors are captured from this type's interface metadata and do not
+        /// require separate registrations.
+        /// Variant comparisons which traverse a constructed constraint's inherited interfaces also require metadata
+        /// for that closed constraint type, either captured from a registered type's interfaces or explicitly registered.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="type"/> is null.</exception>
+        /// <exception cref="ArgumentException"><paramref name="type"/> contains unbound generic parameters.</exception>
+        public void AddGenericArgumentMetadata(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]
+#endif
+            Type type)
+        {
+            if (type is null) throw new ArgumentNullException(nameof(type));
+            if (type.ContainsGenericParameters) throw new ArgumentException("Generic argument metadata requires a closed type.", nameof(type));
+            if (GenericArgumentMetadata.ContainsKey(type)) return;
+            var interfaces = type.GetInterfaces();
+            GenericArgumentMetadata.Add(type, new(
+                type.IsValueType || type.GetConstructor(Type.EmptyTypes) is not null,
+                interfaces));
+            foreach (var implemented in interfaces)
+            {
+                if (GenericArgumentMetadata.ContainsKey(implemented)) continue;
+                var ancestors = new List<Type>();
+                foreach (var candidate in interfaces)
+                {
+                    if (candidate != implemented && candidate.IsAssignableFrom(implemented)) ancestors.Add(candidate);
+                }
+
+                GenericArgumentMetadata.Add(implemented, new(false, ancestors.ToArray()));
+            }
+        }
+
+        internal Dictionary<Type, ClosedSerializerFactory<IFieldCodec>> CodecFactories { get; } = new();
+        internal Dictionary<Type, ClosedSerializerFactory<IDeepCopier>> CopierFactories { get; } = new();
         internal Dictionary<Type, Func<ICodecProvider, object>> SerializerServiceFactories { get; } = new();
         internal Dictionary<Type, DefaultSerializerContract> DefaultSerializerContracts { get; } = new();
         internal Dictionary<Type, HashSet<Type>> DefaultSerializerImplementationServices { get; } = new();
-        internal Dictionary<Type, DefaultSerializerContract> DefaultCodecFactoryContracts { get; } = new();
-        internal Dictionary<Type, DefaultSerializerContract> DefaultCopierFactoryContracts { get; } = new();
+        internal sealed record ClosedSerializerFactory<TService>(Type ServiceType, Func<ICodecProvider, TService> Factory);
         internal Dictionary<Type, Func<ICodecProvider, IRawResponseReader>> RawResponseReaderFactories { get; } = new();
 
         /// <summary>
@@ -130,12 +169,10 @@ namespace Orleans.Serialization.Configuration
             if (registerCodec)
             {
                 RegisterDefaultContract(typeof(IFieldCodec<T>), typeof(TCodec), compatibleCodecType, codecDependencies);
-                DefaultCodecFactoryContracts.TryAdd(typeof(T), DefaultSerializerContracts[typeof(IFieldCodec<T>)]);
             }
             if (registerCopier)
             {
                 RegisterDefaultContract(typeof(IDeepCopier<T>), typeof(TCopier), compatibleCopierType, copierDependencies);
-                DefaultCopierFactoryContracts.TryAdd(typeof(T), DefaultSerializerContracts[typeof(IDeepCopier<T>)]);
             }
         }
 
@@ -146,18 +183,12 @@ namespace Orleans.Serialization.Configuration
         {
             if (codecFactory is null) throw new ArgumentNullException(nameof(codecFactory));
             if (copierFactory is null) throw new ArgumentNullException(nameof(copierFactory));
-            CodecFactories.TryAdd(typeof(T), static provider =>
-                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IFieldCodec<T>>(null!, provider));
-            CopierFactories.TryAdd(typeof(T), static provider =>
-                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<T>>(null!, provider));
-            CodecFactoryServices.TryAdd(typeof(T), typeof(IFieldCodec<T>));
-            CopierFactoryServices.TryAdd(typeof(T), typeof(IDeepCopier<T>));
+            CodecFactories.TryAdd(typeof(T), new(typeof(IFieldCodec<T>), static provider =>
+                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IFieldCodec<T>>(null!, provider)));
+            CopierFactories.TryAdd(typeof(T), new(typeof(IDeepCopier<T>), static provider =>
+                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<T>>(null!, provider)));
             AddSerializerServiceFactory(typeof(IFieldCodec<T>), codecFactory, isDefault);
             AddSerializerServiceFactory(typeof(IDeepCopier<T>), copierFactory, isDefault);
-            if (DefaultSerializerContracts.TryGetValue(typeof(IFieldCodec<T>), out var codecContract))
-                DefaultCodecFactoryContracts.TryAdd(typeof(T), codecContract);
-            if (DefaultSerializerContracts.TryGetValue(typeof(IDeepCopier<T>), out var copierContract))
-                DefaultCopierFactoryContracts.TryAdd(typeof(T), copierContract);
             ContextTypes.Add(typeof(T));
         }
 

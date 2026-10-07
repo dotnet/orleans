@@ -209,8 +209,16 @@ namespace Orleans.Serialization.Invocation
     /// <summary>
     /// Supports raw serialization of <see cref="Response{TResult}"/> values.
     /// </summary>
-    public abstract class ResponseCodec
+    public abstract class ResponseCodec : IRawResponseReader
     {
+        /// <summary>
+        /// Gets whether this codec supports raw response reading with the selected serialization services.
+        /// </summary>
+        public virtual bool IsSupported => true;
+
+        Response IRawResponseReader.ReadRaw<TInput>(ref Reader<TInput> reader, scoped ref Field field)
+            => (Response)ReadRaw(ref reader, ref field);
+
         /// <summary>
         /// Writes a response without a containing field header.
         /// </summary>

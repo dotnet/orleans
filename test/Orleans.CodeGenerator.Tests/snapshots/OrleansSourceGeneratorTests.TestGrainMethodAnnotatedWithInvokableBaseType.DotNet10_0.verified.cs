@@ -70,16 +70,7 @@ namespace OrleansCodeGen.TestProject
                 if (!factory.IsSupported)
                 {
                     var original = await Invoke();
-                    global::Orleans.Serialization.Invocation.Response copy = null;
-                    try
-                    {
-                        return copy = responseCopier.Copy(original);
-                    }
-                    finally
-                    {
-                        if (!global::System.Object.ReferenceEquals(original, copy))
-                            original.Dispose();
-                    }
+                    return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
                 }
 
                 string value = await InvokeInner();
@@ -286,6 +277,8 @@ namespace OrleansCodeGen.TestProject
             options.AddDefaultSerializerService<RpcResponse_9146C7E3Factory>(static provider => new RpcResponse_9146C7E3Factory(provider));
             options.AddDefaultSerializer<RpcResponse_9146C7E3>(static provider => RpcResponse_9146C7E3Factory.Resolve(provider), static provider => RpcResponse_9146C7E3Factory.Resolve(provider));
             options.AddRawResponseReader<string>(static provider => RpcResponse_9146C7E3Factory.Resolve(provider));
+            options.AddGenericArgumentMetadata(typeof(global::Orleans.Serialization.Invocation.Response<string>));
+            options.AddGenericArgumentMetadata(typeof(string));
             options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCodec<string, global::Orleans.Serialization.Codecs.StringCodec>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCodec<string, global::Orleans.Serialization.Codecs.StringCodec>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.StringCodec>(null !, provider)), dependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Codecs.StringCodec) });
             options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCopier<string, global::Orleans.Serialization.Cloning.ShallowCopier<string>>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCopier<string, global::Orleans.Serialization.Cloning.ShallowCopier<string>>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(null !, provider)), dependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Cloning.ShallowCopier<string>) });
             options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<string>, global::Orleans.Serialization.Invocation.PooledResponseCodec<string, global::Orleans.Serialization.Codecs.StringCodec>, global::Orleans.Serialization.Invocation.PooledResponseCopier<string, global::Orleans.Serialization.Cloning.ShallowCopier<string>>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCodec<string, global::Orleans.Serialization.Codecs.StringCodec>>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCopier<string, global::Orleans.Serialization.Cloning.ShallowCopier<string>>>(null !, provider), codecDependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Codecs.StringCodec) }, copierDependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Cloning.ShallowCopier<string>) });
@@ -389,11 +382,11 @@ namespace OrleansCodeGen.TestProject
         }
     }
 
-    internal sealed class RpcResponse_9146C7E3Factory : global::Orleans.Serialization.Invocation.ResponseCodec, global::Orleans.Serialization.Codecs.IFieldCodec<RpcResponse_9146C7E3>, global::Orleans.Serialization.Cloning.IDeepCopier<RpcResponse_9146C7E3>, global::Orleans.Serialization.Invocation.IRawResponseReader
+    internal sealed class RpcResponse_9146C7E3Factory : global::Orleans.Serialization.Invocation.ResponseCodec, global::Orleans.Serialization.Codecs.IFieldCodec<RpcResponse_9146C7E3>, global::Orleans.Serialization.Cloning.IDeepCopier<RpcResponse_9146C7E3>
     {
         private readonly global::Orleans.Serialization.Codecs.StringCodec _codec;
         private readonly global::Orleans.Serialization.Cloning.ShallowCopier<string> _copier;
-        public bool IsSupported { get; }
+        public override bool IsSupported { get; }
 
         internal static RpcResponse_9146C7E3Factory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
         {
@@ -434,7 +427,6 @@ namespace OrleansCodeGen.TestProject
 
         public override void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, object value) => WriteResult(ref writer, ((RpcResponse_9146C7E3)value).Value);
         public override object ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
-        global::Orleans.Serialization.Invocation.Response global::Orleans.Serialization.Invocation.IRawResponseReader.ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
         private RpcResponse_9146C7E3 ReadResult<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field)
         {
             field.EnsureWireTypeTagDelimited();

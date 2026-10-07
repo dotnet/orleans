@@ -256,7 +256,7 @@ namespace Orleans.Serialization.Serializers
         public IFieldCodec<TField>? TryGetCodec<TField>()
         {
             var fieldType = typeof(TField);
-            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultCodecEligible(fieldType)) return (IFieldCodec<TField>)factory(this);
+            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultServiceEligible(factory.ServiceType)) return (IFieldCodec<TField>)factory.Factory(this);
             if (TryGetCached(_typedCodecs, fieldType, out var existing))
                 return (IFieldCodec<TField>)existing;
 
@@ -284,7 +284,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IFieldCodec? TryGetCodec(Type fieldType)
         {
-            if (fieldType is not null && _manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultCodecEligible(fieldType)) return factory(this);
+            if (fieldType is not null && _manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultServiceEligible(factory.ServiceType)) return factory.Factory(this);
             // If the field type is unavailable, return the void codec which can at least handle references.
             return fieldType is null ? _voidCodec
                 : TryGetCached(_untypedCodecs, fieldType, out var existing) ? existing
@@ -299,7 +299,7 @@ namespace Orleans.Serialization.Serializers
 
         private IFieldCodec? TryCreateCodecInner(Type fieldType)
         {
-            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultCodecEligible(fieldType)) return factory(this);
+            if (_manifest.CodecFactories.TryGetValue(fieldType, out var factory) && IsDefaultServiceEligible(factory.ServiceType)) return factory.Factory(this);
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(fieldType);
@@ -441,7 +441,7 @@ namespace Orleans.Serialization.Serializers
         public IDeepCopier<T>? TryGetDeepCopier<T>()
         {
             var type = typeof(T);
-            if (_manifest.CopierFactories.TryGetValue(type, out var factory) && IsDefaultCopierEligible(type)) return (IDeepCopier<T>)factory(this);
+            if (_manifest.CopierFactories.TryGetValue(type, out var factory) && IsDefaultServiceEligible(factory.ServiceType)) return (IDeepCopier<T>)factory.Factory(this);
             if (TryGetCached(_typedCopiers, type, out var existing))
                 return (IDeepCopier<T>)existing;
 
@@ -469,7 +469,7 @@ namespace Orleans.Serialization.Serializers
         /// <inheritdoc/>
         public IDeepCopier? TryGetDeepCopier(Type fieldType)
         {
-            if (fieldType is not null && _manifest.CopierFactories.TryGetValue(fieldType, out var factory) && IsDefaultCopierEligible(fieldType)) return factory(this);
+            if (fieldType is not null && _manifest.CopierFactories.TryGetValue(fieldType, out var factory) && IsDefaultServiceEligible(factory.ServiceType)) return factory.Factory(this);
             // If the field type is unavailable, return the void copier which can at least handle references.
             return fieldType is null ? _voidCopier
                 : TryGetCached(_untypedCopiers, fieldType, out var existing) ? existing
@@ -485,7 +485,7 @@ namespace Orleans.Serialization.Serializers
 
         private IDeepCopier? TryCreateCopierInner(Type fieldType)
         {
-            if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory) && IsDefaultCopierEligible(fieldType)) return factory(this);
+            if (_manifest.CopierFactories.TryGetValue(fieldType, out var factory) && IsDefaultServiceEligible(factory.ServiceType)) return factory.Factory(this);
             if (!_initialized) Initialize();
 
             ThrowIfUnsupportedType(fieldType);
@@ -669,12 +669,6 @@ namespace Orleans.Serialization.Serializers
             result = ActivatorUtilities.CreateInstance(Services, type, constructorArguments ?? Array.Empty<object>());
             return result;
         }
-
-        private bool IsDefaultCodecEligible(Type type)
-            => IsDefaultServiceEligible(_manifest.CodecFactoryServices[type]);
-
-        private bool IsDefaultCopierEligible(Type type)
-            => IsDefaultServiceEligible(_manifest.CopierFactoryServices[type]);
 
         // Inferred defaults preserve an automatic caller's DI boundary instead of starting a transaction inside it.
         private bool IsDefaultServiceEligible(Type service)
@@ -1262,7 +1256,7 @@ namespace Orleans.Serialization.Serializers
                         }
 
                         var closed = candidate.Implementation;
-                        if (closed.IsGenericTypeDefinition && materializeImplementation)
+                        if (closed.IsGenericTypeDefinition)
                         {
                             var arguments = bindings is null ? targetType.GetGenericArguments() : new Type[bindings.Length];
                             if (bindings is not null)
@@ -1274,19 +1268,26 @@ namespace Orleans.Serialization.Serializers
                                 }
                             }
 
-                            if (arguments.Length != candidate.Implementation.GetGenericArguments().Length)
+                            if (arguments.Length != closed.GetGenericArguments().Length)
+                                ThrowResolutionFailure(new ArgumentException($"Serialization implementation {closed} has a different generic arity from target {targetType}."));
+                            var validation = GenericConstraintValidator.Validate(candidate.Implementation, arguments, _manifest.GenericArgumentMetadata);
+                            if (validation == GenericConstraintValidationResult.Invalid) continue;
+                            if (validation == GenericConstraintValidationResult.Unknown
+                                && (!materializeImplementation || !RuntimeFeature.IsDynamicCodeSupported))
                             {
-                                closed = ConstructGenericImplementation(candidate.Implementation, arguments);
+                                throw new NotSupportedException(
+                                    $"Cannot validate generic constraints for serialization implementation {closed} and target {targetType}. "
+                                    + "Register closed argument and constraint types using TypeManifestOptions.AddGenericArgumentMetadata(typeof(ClosedType)), including nested arguments and array elements.");
                             }
-                            else
+
+                            if (materializeImplementation)
                             {
                                 try
                                 {
                                     closed = MaterializeGenericImplementation(candidate.Implementation, arguments);
                                 }
-                                catch (ArgumentException)
+                                catch (ArgumentException) when (validation == GenericConstraintValidationResult.Unknown)
                                 {
-                                    // The runtime rejected the bound arguments, including generic constraints.
                                     continue;
                                 }
                             }

@@ -2332,15 +2332,16 @@ public class DemoClass
         Assert.NotNull(model);
         var options = SourceGeneratorOptionsParser.ParseOptions(TestCompilationHelper.CreateOptionsProvider(
             new Dictionary<string, string> { ["build_property.publishaot"] = "true" }).GlobalOptions);
-        var names = RpcResponseHolderGenerator.GetNames(metadataCompilation, [model], options, TestContext.Current.CancellationToken);
+        var plan = RpcResponsePlan.Create(metadataCompilation, [model], options, TestContext.Current.CancellationToken);
+        var names = plan.Names;
         var preparation = ProxySourceOutputGenerator.CreateProxyOutputPreparation(
             metadataCompilation, [model], options, names, TestContext.Current.CancellationToken);
         Assert.Empty(preparation.Diagnostics);
 
         var responses = RpcResponseGenerator.Generate(
-            metadataCompilation, preparation.ProxyOutputModels, options, names, TestContext.Current.CancellationToken);
+            metadataCompilation, preparation, options, plan, TestContext.Current.CancellationToken);
         var baseline = RpcResponseGenerator.Generate(
-            compilation, preparation.ProxyOutputModels, options, names, TestContext.Current.CancellationToken);
+            compilation, preparation, options, plan, TestContext.Current.CancellationToken);
         Assert.Equal(baseline, responses);
         Assert.NotEmpty(responses);
         Assert.All(responses, static output => Assert.Null(output.Diagnostic));
@@ -3556,7 +3557,8 @@ public class DemoClass
         var response = Assert.Single(result.GeneratedSources, static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
         var proxy = Assert.Single(result.GeneratedSources, static item => item.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal)).SourceText.ToString();
         Assert.Contains("IRawResponseWriter", response);
-        Assert.Contains("IRawResponseReader", response);
+        Assert.Contains("global::Orleans.Serialization.Invocation.ResponseCodec", response);
+        Assert.Contains("public override bool IsSupported", response);
         Assert.Contains("Int32Codec.WriteField(ref writer, 0, Value)", response);
         Assert.Contains("ResponsePool.GetGenerated<", response);
         Assert.Contains("_factory = null", response);
@@ -3564,9 +3566,7 @@ public class DemoClass
         Assert.Contains("IResponseInvokable.InvokeAndCopy", proxy);
         Assert.Contains("factory.RentCopied(value, contexts)", proxy);
         Assert.Contains("var original = await Invoke();", proxy);
-        Assert.Contains("return copy = responseCopier.Copy(original);", proxy);
-        Assert.Contains("if (!global::System.Object.ReferenceEquals(original, copy))", proxy);
-        Assert.Contains("original.Dispose();", proxy);
+        Assert.Contains("OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier)", proxy);
         Assert.DoesNotContain("MakeGenericType", response);
         var holders = CSharpSyntaxTree.ParseText(response, cancellationToken: TestContext.Current.CancellationToken)
             .GetCompilationUnitRoot(TestContext.Current.CancellationToken).DescendantNodes()

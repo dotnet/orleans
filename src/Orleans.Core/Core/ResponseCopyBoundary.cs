@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 
@@ -22,28 +23,8 @@ internal static class ResponseCopyBoundary
         => CopyAndDispose(await request.Invoke(), responseCopier);
 
     internal static Response CopyAndDispose(Response response, DeepCopier<Response> copier)
-    {
-        Response? copy = null;
-        try
-        {
-            return copy = copier.Copy(response)!;
-        }
-        finally
-        {
-            if (!ReferenceEquals(response, copy)) response.Dispose();
-        }
-    }
+        => OrleansGeneratedCodeHelper.CopyResponseAndDispose(response, copier);
 
     internal static Response CopyAndDispose(Response response, DeepCopier copier)
-    {
-        Response? copy = null;
-        try
-        {
-            return copy = copier.Copy(response)!;
-        }
-        finally
-        {
-            if (!ReferenceEquals(response, copy)) response.Dispose();
-        }
-    }
+        => OrleansGeneratedCodeHelper.CopyResponseAndDispose(response, copier);
 }

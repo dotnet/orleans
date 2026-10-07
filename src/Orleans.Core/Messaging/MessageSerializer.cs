@@ -20,7 +20,6 @@ namespace Orleans.Runtime.Messaging
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
         private const int MaxRequestContextInitialCapacity = 1024;
-        private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = [];
         private readonly Dictionary<Type, IRawResponseReader> _rawResponseReaders = [];
         private readonly CodecProvider _codecProvider;
         private readonly IFieldCodec<GrainAddressCacheUpdate> _activationAddressCodec;
@@ -86,17 +85,13 @@ namespace Orleans.Runtime.Messaging
                 {
                     message.Result = ResponseTypes.None; // reset raw response indicator
                     var fieldType = field.FieldType!;
-                    if (!_rawResponseReaders.TryGetValue(fieldType, out var registered)
-                        && _codecProvider.TryGetRawResponseReader(fieldType, out registered))
-                        _rawResponseReaders.Add(fieldType, registered);
-                    if (registered is not null)
+                    if (!_rawResponseReaders.TryGetValue(fieldType, out var registered))
                     {
-                        message._bodyObject = registered.ReadRaw(ref reader, ref field);
-                        return;
+                        registered = _codecProvider.TryGetRawResponseReader(fieldType, out var generated)
+                            ? generated : GetRawCodec(fieldType);
+                        _rawResponseReaders.Add(fieldType, registered);
                     }
-                    if (!_rawResponseCodecs.TryGetValue(field.FieldType!, out var rawCodec))
-                        rawCodec = GetRawCodec(field.FieldType!);
-                    message._bodyObject = rawCodec.ReadRaw(ref reader, ref field);
+                    message._bodyObject = registered.ReadRaw(ref reader, ref field);
                 }
                 else
                 {
@@ -113,7 +108,6 @@ namespace Orleans.Runtime.Messaging
         private ResponseCodec GetRawCodec(Type fieldType)
         {
             var rawCodec = (ResponseCodec)_codecProvider.GetCodec(typeof(Response<>).MakeGenericType(fieldType));
-            _rawResponseCodecs.Add(fieldType, rawCodec);
             return rawCodec;
         }
 

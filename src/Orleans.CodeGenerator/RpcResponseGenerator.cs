@@ -29,30 +29,24 @@ internal static class RpcResponseGenerator
 
     internal static ImmutableArray<SourceOutputResult> Generate(
         Compilation compilation,
-        ImmutableArray<ProxyOutputModel> proxies,
+        ProxyOutputPreparationResult preparation,
         SourceGeneratorOptions options,
-        ImmutableArray<(string TypeName, string HolderName)> responseNames,
+        RpcResponsePlan plan,
         CancellationToken cancellationToken)
     {
+        var proxies = preparation.ProxyOutputModels;
         if (proxies.IsDefaultOrEmpty)
         {
             return [];
         }
 
-        var bindingTree = compilation.SyntaxTrees.FirstOrDefault();
-        if (bindingTree is null)
-        {
-            bindingTree = CSharpSyntaxTree.Create(SyntaxFactory.CompilationUnit());
-            compilation = compilation.AddSyntaxTrees(bindingTree);
-        }
+        compilation = RpcResponsePlan.WithBindingTree(compilation);
 
         var services = new GeneratorServices(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options));
-        var responseDefinition = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
         var resolver = new TypeSymbolResolver(compilation);
-        var proxyContext = new ProxyGenerationContext(compilation, SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options), responseNames);
-        ProxySourceOutputGenerator.PopulateProxyInterfaces(proxyContext, resolver,
-            proxies.Select(static proxy => proxy.ProxyInterface).ToImmutableArray(), cancellationToken);
-        var binding = compilation.GetSemanticModel(bindingTree);
+        var responseNames = plan.Names.ToImmutableDictionary(static entry => entry.TypeName, static entry => entry.HolderName, StringComparer.Ordinal);
+        var binding = compilation.GetSemanticModel(compilation.SyntaxTrees.First());
+        var constructorServices = GetConstructorServices(preparation.SourceOutputs, cancellationToken);
         var results = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
         var arguments = new Dictionary<ITypeSymbol, IMethodSymbol>(SymbolEqualityComparer.Default);
         var hasCompletionMethods = false;
@@ -65,32 +59,29 @@ internal static class RpcResponseGenerator
                 continue;
             }
 
-            var description = ProxySourceOutputGenerator.GetProxyInterfaceDescription(proxyContext, resolver, proxy.ProxyInterface, cancellationToken);
-            var (proxyClass, _) = new ProxyGenerator(proxyContext, new CopierGenerator(proxyContext)).Generate(description);
-            foreach (var request in proxyClass.Members.OfType<ConstructorDeclarationSyntax>()
-                .SelectMany(static constructor => constructor.DescendantNodes().OfType<InvocationExpressionSyntax>())
-                .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax { Identifier.ValueText: "GetService" } })
-                .Select(static invocation => ((GenericNameSyntax)((MemberAccessExpressionSyntax)invocation.Expression).Name).TypeArgumentList.Arguments.Single()))
+            var methods = interfaceType.GetDeclaredInstanceMembers<IMethodSymbol>()
+                .Concat(interfaceType.AllInterfaces.SelectMany(static type => type.GetDeclaredInstanceMembers<IMethodSymbol>()))
+                .Where(static method => method.MethodKind == MethodKind.Ordinary).ToImmutableArray();
+            constructorServices.TryGetValue(interfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), out var requests);
+            foreach (var request in requests.IsDefault ? [] : requests)
             {
                 if (binding.GetSpeculativeTypeInfo(0, request, SpeculativeBindingOption.BindAsTypeOrNamespace).Type is INamedTypeSymbol service
                     && service.AllInterfaces.Concat([service]).FirstOrDefault(type =>
                         SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, services.LibraryTypes.DeepCopier_1)) is { } copier
-                    && !ContainsTypeParameter(copier.TypeArguments[0]) && !arguments.ContainsKey(copier.TypeArguments[0]))
+                    && !RpcResponsePlan.ContainsTypeParameter(copier.TypeArguments[0]) && !arguments.ContainsKey(copier.TypeArguments[0]))
                 {
-                    arguments.Add(copier.TypeArguments[0], description.Methods[0].Method);
+                    arguments.Add(copier.TypeArguments[0], methods[0]);
                 }
             }
 
-            foreach (var method in interfaceType.GetDeclaredInstanceMembers<IMethodSymbol>()
-                .Concat(interfaceType.AllInterfaces.SelectMany(static type => type.GetDeclaredInstanceMembers<IMethodSymbol>()))
-                .Where(static method => method.MethodKind == MethodKind.Ordinary))
+            foreach (var method in methods)
             {
                 if (method.TypeParameters.Length == 0)
                 {
                     foreach (var parameter in method.Parameters)
                     {
                         var parameterType = parameter.Type.WithNullableAnnotation(NullableAnnotation.None);
-                        if (!ContainsTypeParameter(parameterType) && !services.LibraryTypes.IsShallowCopyable(parameterType)
+                        if (!RpcResponsePlan.ContainsTypeParameter(parameterType) && !services.LibraryTypes.IsShallowCopyable(parameterType)
                             && !arguments.ContainsKey(parameterType))
                         {
                             arguments.Add(parameterType, method);
@@ -120,7 +111,7 @@ internal static class RpcResponseGenerator
                 }
 
                 var resultType = named.TypeArguments[0].WithNullableAnnotation(NullableAnnotation.None);
-                if (ContainsTypeParameter(resultType))
+                if (RpcResponsePlan.ContainsTypeParameter(resultType))
                 {
                     Report(method, resultType, "the result contains an unresolved type parameter");
                     continue;
@@ -143,13 +134,12 @@ internal static class RpcResponseGenerator
         {
             var resultType = entry.Key;
             var method = entry.Value;
-            if (RpcResponseHolderGenerator.TryDescribe(services, resultType, out var holderCodec, out var holderCopier))
+            var description = plan.Results[resultType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)];
+            if (description.Codec is { } holderCodec && description.Copier is { } holderCopier)
                 responseHolders.Add(resultType, (holderCodec, holderCopier));
-            if (SerializerFactoryGenerator.TryCreate(services, [responseDefinition.Construct(resultType)], cancellationToken, out var candidate, out var failure, useDefaultFactories: true))
+            if (description.Graph is { } candidate)
             {
-                var dictionary = candidate.Registrations.Keys.OfType<INamedTypeSymbol>()
-                    .FirstOrDefault(type => SymbolEqualityComparer.Default.Equals(type.OriginalDefinition, dictionaryDefinition));
-                if (dictionary is not null)
+                if (description.Dictionary is { } dictionary)
                 {
                     Report(method, dictionary, "dictionary comparers are selected per value and require an explicit closed registration preserving the comparer contract");
                     continue;
@@ -160,14 +150,13 @@ internal static class RpcResponseGenerator
             }
             else
             {
-                if (!options.ValidateRpcResponseFactories && resultType is INamedTypeSymbol named
-                    && SerializerFactoryGenerator.CreateRpcModelRoot(services, named, cancellationToken) is { } metadataRoot)
+                if (!options.ValidateRpcResponseFactories && description.ModelRoot is { } metadataRoot)
                 {
                     metadataModelRoots.Add(metadataRoot);
                     continue;
                 }
 
-                Report(method, failure.Type, failure.Reason);
+                Report(method, description.Failure!.Type, description.Failure.Reason);
             }
         }
 
@@ -197,7 +186,9 @@ internal static class RpcResponseGenerator
         }
 
         SerializerFactoryGenerator.Graph? graph = null;
-        if (supportedResults.Count > 0 && !SerializerFactoryGenerator.TryCreate(services, supportedResults.Select(type => responseDefinition.Construct(type)), cancellationToken, out graph, out var graphFailure, useDefaultFactories: true))
+        if (supportedResults.Count > 0 && !SerializerFactoryGenerator.TryCombine(services,
+            supportedResults.Select(type => plan.Results[type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)].Graph!),
+            cancellationToken, out graph, out var graphFailure))
         {
             output.Add(SourceOutputResult.FromDiagnostic(Diagnostic.Create(
                 UnsupportedResponse, Location.None, compilation.AssemblyName, graphFailure.Type.ToDisplayString(), graphFailure.Reason)));
@@ -218,7 +209,7 @@ internal static class RpcResponseGenerator
         source.AppendLine("{");
         foreach (var holder in responseHolders)
         {
-            var name = proxyContext.RpcResponseNames[holder.Key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)];
+            var name = responseNames[holder.Key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)];
             var factory = name + "Factory";
             var type = holder.Key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var resolve = $"{factory}.Resolve(provider)";
@@ -279,12 +270,11 @@ internal static class RpcResponseGenerator
         source.AppendLine("}");
         foreach (var holder in responseHolders)
         {
-            var name = proxyContext.RpcResponseNames[holder.Key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)];
+            var name = responseNames[holder.Key.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)];
             source.AppendLine(RpcResponseHolderGenerator.Generate(services, holder.Key, name, holder.Value.Codec, holder.Value.Copier));
         }
         source.AppendLine("}");
         var unit = CSharpSyntaxTree.ParseText(source.ToString(),
-            options: new CSharpParseOptions(preprocessorSymbols: ["NET5_0_OR_GREATER"]),
             cancellationToken: cancellationToken).GetCompilationUnitRoot(cancellationToken);
         var provider = unit.DescendantNodes().OfType<ClassDeclarationSyntax>()
             .Single(static declaration => declaration.Identifier.ValueText == "RpcResponseFactories");
@@ -313,9 +303,26 @@ internal static class RpcResponseGenerator
         }
     }
 
-    private static bool ContainsTypeParameter(ITypeSymbol type)
-        => type is ITypeParameterSymbol or IErrorTypeSymbol
-            || type is IArrayTypeSymbol array && ContainsTypeParameter(array.ElementType)
-            || type is INamedTypeSymbol named && (named.TypeArguments.Any(ContainsTypeParameter)
-                || named.ContainingType is { } containing && ContainsTypeParameter(containing));
+    private static ImmutableDictionary<string, ImmutableArray<TypeSyntax>> GetConstructorServices(
+        ImmutableArray<SourceOutputResult> sources, CancellationToken cancellationToken)
+    {
+        var result = ImmutableDictionary.CreateBuilder<string, ImmutableArray<TypeSyntax>>(StringComparer.Ordinal);
+        foreach (var source in sources)
+        {
+            if (source.SourceEntry is not { } entry) continue;
+            var root = CSharpSyntaxTree.ParseText(entry.SourceText, cancellationToken: cancellationToken).GetRoot(cancellationToken);
+            foreach (var proxy in root.DescendantNodes().OfType<ClassDeclarationSyntax>()
+                .Where(static declaration => declaration.Identifier.ValueText.StartsWith("Proxy_", StringComparison.Ordinal)))
+            {
+                var requests = proxy.Members.OfType<ConstructorDeclarationSyntax>()
+                    .SelectMany(static constructor => constructor.DescendantNodes().OfType<InvocationExpressionSyntax>())
+                    .Where(static invocation => invocation.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax { Identifier.ValueText: "GetService" } })
+                    .Select(static invocation => ((GenericNameSyntax)((MemberAccessExpressionSyntax)invocation.Expression).Name)
+                        .TypeArgumentList.Arguments.Single()).ToImmutableArray();
+                if (proxy.BaseList is not null)
+                    foreach (var contract in proxy.BaseList.Types) result[contract.Type.ToString()] = requests;
+            }
+        }
+        return result.ToImmutable();
+    }
 }
