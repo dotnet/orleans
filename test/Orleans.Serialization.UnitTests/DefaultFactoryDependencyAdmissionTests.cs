@@ -137,6 +137,65 @@ public sealed class DefaultFactoryDependencyAdmissionTests
             static _ => throw new InvalidOperationException("Admission examines the declared dependency without constructing it."));
     }
 
+    [Fact]
+    public void PublishedClosedService_ResolutionDoesNotAllocate()
+    {
+        var dependency = new Dependency();
+        var factoryCalls = 0;
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+        {
+            options.AddSerializerService<Dependency>(_ =>
+            {
+                factoryCalls++;
+                return dependency;
+            });
+        })).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        for (var i = 0; i < 100; i++)
+        {
+            _ = OrleansGeneratedCodeHelper.GetService<Dependency>(null!, provider);
+        }
+
+        Dependency? actual = null;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1_000; i++)
+        {
+            actual = OrleansGeneratedCodeHelper.GetService<Dependency>(null!, provider);
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Same(dependency, actual);
+        Assert.Equal(1, factoryCalls);
+        Assert.Equal(0, allocated);
+        Assert.False(provider.IsConstructionPending);
+    }
+
+    [Fact]
+    public void PublishedClosedService_ReadInsideFaultedGraphPreservesFailure()
+    {
+        var dependency = new Dependency();
+        var failure = new InvalidOperationException("graph failed before reading a published service");
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+        {
+            options.AddSerializerService<Dependency>(_ => dependency);
+            options.AddSerializerService<FailingRoot>(_ => throw failure);
+            options.AddSerializerService<State>(provider =>
+            {
+                Assert.Same(failure, Assert.Throws<InvalidOperationException>(
+                    () => OrleansGeneratedCodeHelper.GetService<FailingRoot>(null!, provider)));
+                _ = OrleansGeneratedCodeHelper.GetService<Dependency>(null!, provider);
+                return new State();
+            });
+        })).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        Assert.Same(dependency, OrleansGeneratedCodeHelper.GetService<Dependency>(null!, provider));
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(
+            () => OrleansGeneratedCodeHelper.GetService<State>(null!, provider)));
+        Assert.False(provider.IsConstructionPending);
+        Assert.Same(dependency, OrleansGeneratedCodeHelper.GetService<Dependency>(null!, provider));
+    }
+
     private static void RegisterDefaults(TypeManifestOptions options, State state)
     {
         options.AddSerializer(typeof(DependentCodec));
