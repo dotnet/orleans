@@ -49,7 +49,10 @@ Standalone journal owners orchestrate manually registered components and never c
 
 Durable collections encode their operation before applying it to the in-memory collection. A codec failure therefore leaves both the journal buffer and collection unchanged.
 
-<xref:Orleans.Journaling.IDurableStateManager.WriteStateAsync*> gathers pending entries from all named states and queues one storage operation. The protected `DurableGrain.WriteStateAsync` helper forwards to that same manager:
+<xref:Orleans.Journaling.IDurableStateManager.WriteStateAsync*> queues a storage operation.
+When that operation executes, the manager establishes registered prerequisites and
+gathers pending entries from all named states. The protected `DurableGrain.WriteStateAsync`
+helper forwards to that same manager:
 
 - **Append** adds the encoded operation batch atomically.
 - **Snapshot replacement** writes the current state of every registered stream and atomically publishes it as the new journal generation.
@@ -67,6 +70,45 @@ preconditions and apply the complete safe-to-commit update synchronously, then r
 Orleans executes that synchronous block on a single activation thread. Another grain turn can run when
 the operation awaits, so keep shared state safe to commit at each await. Any caller's write can include
 staged mutations from other calls.
+
+## Persistence operation hooks
+
+The advanced owner exposes <xref:Orleans.Journaling.IJournaledStateManager.Hooks>,
+a mutable list of <xref:Orleans.Journaling.IJournaledStateHook> objects with a lazily
+allocated backing list. Features can inspect their registrations, compare custom
+hook identity, and add an equivalent hook once. Change list membership on the
+owner's logical execution context between persistence operations.
+
+<xref:Orleans.Journaling.JournaledStateHook> adapts synchronous token-aware delegates
+and asynchronous delegates returning <xref:System.Threading.Tasks.ValueTask>.
+Each adapter invokes its synchronous delegate before its asynchronous delegate.
+Custom hook objects can retain feature identity and operation-local prerequisites.
+
+:::code source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="journal_operation_hooks" language="csharp":::
+
+The manager invokes hooks in registration order around actual coalesced append,
+snapshot, and delete operations. Before callbacks complete before synchronous
+state capture or storage deletion. Their prerequisites cover the changes entering
+that capture, including changes staged while asynchronous preparation awaited.
+After storage succeeds, the manager acknowledges captured state or resets deleted
+state, then invokes after callbacks. Successful zero-byte writes also invoke the
+operation hooks, while state-machine acknowledgement remains tied to stored bytes.
+
+Hook cancellation tokens follow the owned operation's shutdown lifetime. A caller
+which cancels its wait leaves callbacks and storage running to their actual outcome.
+A before-hook failure reports <xref:Orleans.Journaling.JournaledStatePreCommitException>,
+prevents storage execution, and leaves safe pending state available for an explicit
+retry. A post-persistence failure is reported as
+<xref:Orleans.Journaling.JournaledStatePostCommitException>, identifies the completed
+operation, and keeps the owner usable. Remaining after hooks execute, and multiple
+failures are aggregated. Feature recovery reconciles interrupted post-persistence
+effects using committed state.
+
+Callbacks execute outside the manager lock. Calling another persistence operation
+on the same owner from a callback is rejected, preserving progress of its serialized
+work loop. Full deletion starts with stopping admission and draining feature work
+before queuing deletion. An after-delete callback can release the exact resources
+associated with the completed deletion.
 
 ## Consistency and competing writers
 
@@ -129,7 +171,7 @@ The journal owner keeps feature operations quiescent through deletion's storage 
 including when a caller cancels its wait. Successful deletion calls <xref:Orleans.Journaling.IStateMachine.Reset*>
 before completing deletion waiters.
 
-The manager records the first write or delete failure, fences further persistence, faults current
+The manager records the first storage write or delete failure, fences further persistence, faults current
 and queued manager waiters, and requests grain deactivation. Features observe their write failures and
 complete their own operation waiters and resource cleanup through their operation and lifecycle ownership.
 Standalone callers own that cleanup explicitly. A previously captured write retains its actual storage

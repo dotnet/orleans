@@ -9,6 +9,29 @@ using Orleans.Runtime;
 
 namespace Documentation.Grains.Journaling;
 
+// <journal_operation_hooks>
+internal static class JournalHookRegistration
+{
+    internal static void Register(IJournaledStateManager owner, IJournaledStateHook featureHook)
+    {
+        var hooks = owner.Hooks;
+        if (!hooks.Contains(featureHook))
+        {
+            hooks.Add(featureHook);
+        }
+    }
+
+    internal static IJournaledStateHook Create(
+        Func<JournaledStateOperation, CancellationToken, ValueTask> establishPrerequisites,
+        Func<JournaledStateOperation, CancellationToken, ValueTask> completeCommittedWork) =>
+        new JournaledStateHook
+        {
+            BeforeOperationAsync = establishPrerequisites,
+            AfterOperationAsync = completeCommittedWork
+        };
+}
+// </journal_operation_hooks>
+
 // <composed_shopping_cart>
 public interface IShoppingCartGrain : IGrainWithStringKey
 {
