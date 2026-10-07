@@ -95,6 +95,26 @@ public sealed class MembershipTableConformanceTests
                 Assert.Equal($"host-{i}", partition.Rows[MembershipTableTestData.CreateEntry(i).SiloAddress].Item1.HostName);
         }, TestContext.Current.CancellationToken);
     }
+
+    [Fact]
+    public async Task ConcurrentReadSetup_AppliesConfiguredRowPadding()
+    {
+        const int rows = 5;
+        const int rowPadding = 1024;
+        var backend = new IdealizedMembershipBackend();
+        await backend.Fixture().RunAsync(async (fixture, ct) =>
+        {
+            await new MembershipTableTestRunner(fixture, seed: 0, output: null, concurrencyRowCount: rows, concurrencyRowPadding: rowPadding)
+                .SeedConcurrentRows(ct);
+            var partition = backend.Partitions[fixture.ClusterId];
+            for (var i = 1; i <= rows; i++)
+            {
+                Assert.Equal(
+                    $"host-{i}{new string('x', rowPadding)}",
+                    partition.Rows[MembershipTableTestData.CreateEntry(i).SiloAddress].Item1.HostName);
+            }
+        }, TestContext.Current.CancellationToken);
+    }
     [Fact]
     public Task InitializeMembershipTable_RepeatedWithData_PreservesCommittedState() => Run((r, ct) => r.InitializeMembershipTable_RepeatedWithData_PreservesCommittedState(ct));
     [Fact]
