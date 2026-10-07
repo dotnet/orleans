@@ -2749,7 +2749,7 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Transactions.TestKit.INoAttributionGrain), "BC7E3A79" })]
-    public sealed partial class Invokable_INoAttributionGrain_GrainReference_BC7E3A79 : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.List<string>[]>, global::Orleans.Serialization.Invocation.IResponseInvokable
+    public sealed partial class Invokable_INoAttributionGrain_GrainReference_BC7E3A79 : global::Orleans.Runtime.TaskRequest<System.Collections.Generic.List<string>[]>, global::Orleans.Serialization.Invocation.IInvokable, System.IDisposable
     {
         public int arg0;
         public System.Collections.Generic.List<global::Orleans.Transactions.TestKit.ITransactionAttributionGrain>[] arg1;
@@ -2773,7 +2773,7 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
 
         protected override System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 

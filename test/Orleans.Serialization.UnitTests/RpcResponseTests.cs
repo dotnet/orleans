@@ -605,7 +605,7 @@ public sealed class RpcResponseTests : IDisposable
         var target = new RpcResponseTarget();
         using var invokable = CreateInvokable(methodName);
         invokable.SetTarget(new TargetHolder(target));
-        var direct = Assert.IsAssignableFrom<IResponseInvokable>(invokable);
+        var direct = invokable;
         var provider = _services.GetRequiredService<CodecProvider>();
         var contexts = _services.GetRequiredService<CopyContextPool>();
         var compatibility = new CountingResponseCopier();
@@ -682,7 +682,7 @@ public sealed class RpcResponseTests : IDisposable
         var compatibility = new CountingResponseCopier();
         using var invokable = CreateInvokable(methodName);
         invokable.SetTarget(new TargetHolder(target));
-        using var response = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+        using var response = await invokable.InvokeAndCopy(
             provider, contexts, new DeepCopier<Response>(compatibility, contexts));
 
         Assert.IsAssignableFrom<IRawResponseWriter>(response);
@@ -722,7 +722,7 @@ public sealed class RpcResponseTests : IDisposable
         invokable.SetTarget(new TargetHolder(new RpcResponseTarget()));
         var provider = _services.GetRequiredService<CodecProvider>();
         var contexts = _services.GetRequiredService<CopyContextPool>();
-        var direct = Assert.IsAssignableFrom<IResponseInvokable>(invokable);
+        var direct = invokable;
         var response = await direct.InvokeAndCopy(provider, contexts, _services.GetRequiredService<DeepCopier>().GetCopier<Response>());
         var body = new ArrayBufferWriter<byte>();
         var legacy = new ArrayBufferWriter<byte>();
@@ -758,7 +758,7 @@ public sealed class RpcResponseTests : IDisposable
         invokable.SetTarget(new TargetHolder(new RpcResponseTarget { Fail = true }));
         var contexts = _services.GetRequiredService<CopyContextPool>();
         var compatibility = new CountingResponseCopier();
-        using var response = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+        using var response = await invokable.InvokeAndCopy(
             _services.GetRequiredService<CodecProvider>(), contexts, new DeepCopier<Response>(compatibility, contexts));
         Assert.IsType<ExceptionResponse>(response);
         Assert.Equal("response failure", response.Exception!.Message);
@@ -775,7 +775,7 @@ public sealed class RpcResponseTests : IDisposable
         invokable.SetTarget(new TargetHolder(target));
         var provider = _services.GetRequiredService<CodecProvider>();
         var contexts = _services.GetRequiredService<CopyContextPool>();
-        using var response = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+        using var response = await invokable.InvokeAndCopy(
             provider, contexts, _services.GetRequiredService<DeepCopier>().GetCopier<Response>());
         var value = response.GetResult<NativeAotSmoke.RpcResponsePayload>();
         Assert.NotNull(value);
@@ -800,7 +800,7 @@ public sealed class RpcResponseTests : IDisposable
         Assert.Same(copied.Left, copied.Right);
 
         invokable.SetTarget(new TargetHolder(new NullPayloadTarget()));
-        using var empty = await ((IResponseInvokable)invokable).InvokeAndCopy(provider, contexts, _services.GetRequiredService<DeepCopier>().GetCopier<Response>());
+        using var empty = await invokable.InvokeAndCopy(provider, contexts, _services.GetRequiredService<DeepCopier>().GetCopier<Response>());
         Assert.IsAssignableFrom<IRawResponseWriter>(empty);
         Assert.Null(empty.GetResult<NativeAotSmoke.RpcResponsePayload>());
     }
@@ -815,7 +815,7 @@ public sealed class RpcResponseTests : IDisposable
         var target = new RpcResponseTarget();
         using var invokable = CreateInvokable("Payload");
         invokable.SetTarget(new TargetHolder(target));
-        using var result = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+        using var result = await invokable.InvokeAndCopy(
             provider, contexts, services.GetRequiredService<DeepCopier>().GetCopier<Response>());
         Assert.IsType<Response<NativeAotSmoke.RpcResponsePayload>>(result);
         Assert.Same(target.Result, result.GetResult<NativeAotSmoke.RpcResponsePayload>());
@@ -848,7 +848,7 @@ public sealed class RpcResponseTests : IDisposable
         var contexts = services.GetRequiredService<CopyContextPool>();
         using var invokable = CreateInvokable("Integer");
         invokable.SetTarget(new TargetHolder(new RpcResponseTarget()));
-        using var result = await Assert.IsAssignableFrom<IResponseInvokable>(invokable).InvokeAndCopy(
+        using var result = await invokable.InvokeAndCopy(
             provider, contexts, services.GetRequiredService<DeepCopier>().GetCopier<Response>());
 
         Assert.Null(result.Exception);
@@ -869,7 +869,7 @@ public sealed class RpcResponseTests : IDisposable
         invokable.SetTarget(new TargetHolder(new RpcResponseTarget()));
         var provider = _services.GetRequiredService<CodecProvider>();
         var contexts = _services.GetRequiredService<CopyContextPool>();
-        var direct = Assert.IsAssignableFrom<IResponseInvokable>(invokable);
+        var direct = invokable;
         var copier = _services.GetRequiredService<DeepCopier>().GetCopier<Response>();
         var original = await direct.InvokeAndCopy(provider, contexts, copier);
         original.Dispose();

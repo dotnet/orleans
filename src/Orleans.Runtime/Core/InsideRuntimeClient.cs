@@ -18,6 +18,7 @@ using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
@@ -330,9 +331,9 @@ namespace Orleans.Runtime
                                 }
                                 else
                                 {
-                                    response = await ResponseCopyBoundary.InvokeAndCopy(invokable,
+                                    response = await invokable.InvokeAndCopy(
                                         this.responseCodecProvider, this.responseCopyContexts, this.responseCopier);
-                                    isCopied = invokable is not IResponseInvokable || response.Exception is null;
+                                    isCopied = response.Exception is null;
                                 }
 
                                 invokable.Dispose();
@@ -408,7 +409,7 @@ namespace Orleans.Runtime
                 if (!isCopied && !message.IsExpired)
                 {
                     ownedResponse = null;
-                    ownedResponse = ResponseCopyBoundary.CopyAndDispose(response, this._deepCopier);
+                    ownedResponse = OrleansGeneratedCodeHelper.CopyResponseAndDispose(response, this._deepCopier);
                 }
 
                 SendResponse(message, ownedResponse);

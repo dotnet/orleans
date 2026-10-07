@@ -13,7 +13,7 @@ namespace OrleansCodeGen.TestProject
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IHelloGrain), "5336307F")]
-    public sealed class Invokable_IHelloGrain_GrainReference_5336307F : global::Orleans.Runtime.TaskRequest<string>, global::Orleans.Serialization.Invocation.IResponseInvokable
+    public sealed class Invokable_IHelloGrain_GrainReference_5336307F : global::Orleans.Runtime.TaskRequest<string>, global::Orleans.Serialization.Invocation.IInvokable
     {
         public string arg0;
         global::TestProject.IHelloGrain _target;
@@ -62,7 +62,7 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.SayHello(arg0);
-        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
         {
             try
             {
@@ -70,6 +70,8 @@ namespace OrleansCodeGen.TestProject
                 if (!factory.IsSupported)
                 {
                     var original = await Invoke();
+                    if (original.Exception is not null)
+                        return original;
                     return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
                 }
 

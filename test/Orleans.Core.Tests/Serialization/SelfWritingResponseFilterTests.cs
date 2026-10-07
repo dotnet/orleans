@@ -236,7 +236,7 @@ public sealed class SelfWritingResponseFilterTests
     }
 
     private sealed class DirectInvocation(List<int> payload, Exception? failure = null)
-        : LegacyInvocation(new PayloadResponse(payload), payload), IResponseInvokable
+        : LegacyInvocation(new PayloadResponse(payload), payload), IInvokable
     {
         public int DirectCalls { get; private set; }
         public int CopyCalls { get; private set; }

@@ -2288,7 +2288,7 @@ public class DemoClass
             frameworkSymbol.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
                 .Select(static source => (source.HintName, Source: source.SourceText.ToString())));
         var source = ConcatenateGeneratedSources(managed);
-        Assert.Contains("IResponseInvokable", source);
+        Assert.Contains("IInvokable.InvokeAndCopy", source);
         Assert.Contains("IRawResponseWriter", source);
         Assert.Contains("AddRawResponseReader", source);
         Assert.DoesNotContain("#if NET5_0_OR_GREATER", source);
@@ -3563,7 +3563,7 @@ public class DemoClass
         Assert.Contains("ResponsePool.GetGenerated<", response);
         Assert.Contains("_factory = null", response);
         Assert.Contains("options.AddRawResponseReader<int>", response);
-        Assert.Contains("IResponseInvokable.InvokeAndCopy", proxy);
+        Assert.Contains("IInvokable.InvokeAndCopy", proxy);
         Assert.Contains("factory.RentCopied(value, contexts)", proxy);
         Assert.Contains("var original = await Invoke();", proxy);
         Assert.Contains("OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier)", proxy);
@@ -3601,7 +3601,7 @@ public class DemoClass
         var result = RunSourceGenerator(compilation);
         Assert.Empty(result.Diagnostics);
         var proxy = Assert.Single(result.GeneratedSources, static item => item.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal)).SourceText.ToString();
-        Assert.DoesNotContain("IResponseInvokable", proxy);
+        Assert.DoesNotContain("IInvokable.InvokeAndCopy", proxy);
     }
 
     private static GeneratorRunResult RunSourceGenerator(

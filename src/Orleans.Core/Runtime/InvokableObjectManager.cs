@@ -11,6 +11,7 @@ using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.GeneratedCodeHelpers;
 
 namespace Orleans
 {
@@ -396,10 +397,10 @@ namespace Orleans
                         }
                         else
                         {
-                            response = await ResponseCopyBoundary.InvokeAndCopy(request,
+                            response = await request.InvokeAndCopy(
                                 _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializers.ICodecProvider>(),
                                 _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(), _manager._responseCopier);
-                            isCopied = request is not IResponseInvokable || response.Exception is null;
+                            isCopied = response.Exception is null;
                         }
 
                         if (message.Direction != Message.Directions.OneWay)
@@ -484,7 +485,7 @@ namespace Orleans
                         try
                         {
                             response = null;
-                            response = ResponseCopyBoundary.CopyAndDispose(resultObject, _manager.deepCopier);
+                            response = OrleansGeneratedCodeHelper.CopyResponseAndDispose(resultObject, _manager.deepCopier);
                         }
                         catch (Exception exc2)
                         {

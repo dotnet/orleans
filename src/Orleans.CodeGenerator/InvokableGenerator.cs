@@ -161,10 +161,10 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         {
             var type = result.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var factory = $"global::{RpcResponseHolderGenerator.GetNamespace(_generationContext.Compilation)}.{responseName}Factory";
-            classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(ParseTypeName("global::Orleans.Serialization.Invocation.IResponseInvokable")));
+            classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(ParseTypeName("global::Orleans.Serialization.Invocation.IInvokable")));
             classDeclaration = classDeclaration.AddMembers(ParseMemberDeclaration($$"""
                 async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>
-                    global::Orleans.Serialization.Invocation.IResponseInvokable.InvokeAndCopy(
+                    global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(
                         global::Orleans.Serialization.Serializers.ICodecProvider provider,
                         global::Orleans.Serialization.Cloning.CopyContextPool contexts,
                         global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
@@ -175,6 +175,7 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                         if (!factory.IsSupported)
                         {
                             var original = await Invoke();
+                            if (original.Exception is not null) return original;
                             return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
                         }
                         {{type}} value = await InvokeInner();

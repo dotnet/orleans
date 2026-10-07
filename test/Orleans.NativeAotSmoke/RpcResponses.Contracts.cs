@@ -29,7 +29,7 @@ public static class RpcResponseContracts
         _ = proxy.Payload();
         using var request = ((RpcTupleProxyBase)proxy).Captured!;
         request.SetTarget(target);
-        using var response = await ((IResponseInvokable)request).InvokeAndCopy(provider, contexts,
+        using var response = await request.InvokeAndCopy(provider, contexts,
             new DeepCopier<Response>(provider.GetDeepCopier<Response>(), contexts));
         Ensure(response is IRawResponseWriter && !response.GetType().IsGenericType,
             "The actual generated invokable creates a non-generic self-writing holder.");
@@ -55,7 +55,7 @@ public static class RpcResponseContracts
         {
             using var request = invocation;
             request.SetTarget(target);
-            using var result = await ((IResponseInvokable)request).InvokeAndCopy(provider, contexts,
+            using var result = await request.InvokeAndCopy(provider, contexts,
                 new DeepCopier<Response>(provider.GetDeepCopier<Response>(), contexts));
             Ensure(result is IRawResponseWriter && Equals(expected, result.GetResult<T>()), "Generated primitive responses bind direct writers.");
             var output = new ArrayBufferWriter<byte>();

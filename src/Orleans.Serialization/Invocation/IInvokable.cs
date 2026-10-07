@@ -2,6 +2,9 @@ using System;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Serialization.Invocation
 {
@@ -26,6 +29,39 @@ namespace Orleans.Serialization.Invocation
         /// Invoke the object.
         /// </summary>
         ValueTask<Response> Invoke();
+
+        /// <summary>
+        /// Invokes the method and isolates its successful result before returning to incoming filters.
+        /// </summary>
+        /// <param name="codecProvider">The invocation's serialization provider.</param>
+        /// <param name="copyContextPool">The invocation's copy-context pool.</param>
+        /// <param name="responseCopier">The selected copier for response implementations.</param>
+        /// <returns>An owned response whose successful result is isolated.</returns>
+        /// <remarks>Exception envelopes retain the original exception for filters and are copied at delivery.</remarks>
+        async ValueTask<Response> InvokeAndCopy(
+            ICodecProvider codecProvider,
+            CopyContextPool copyContextPool,
+            DeepCopier<Response> responseCopier)
+        {
+            Response? response = await Invoke();
+            try
+            {
+                if (response.Exception is not null)
+                {
+                    var result = response;
+                    response = null;
+                    return result;
+                }
+
+                var original = response;
+                response = null;
+                return OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
+            }
+            finally
+            {
+                response?.Dispose();
+            }
+        }
 
         /// <summary>
         /// Gets the number of arguments.

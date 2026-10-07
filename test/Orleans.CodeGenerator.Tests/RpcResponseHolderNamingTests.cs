@@ -84,7 +84,7 @@ public sealed class RpcResponseHolderNamingTests
         var copier = services.GetRequiredService<DeepCopier>().GetCopier<Response>();
         var target = Activator.CreateInstance(assembly.GetType("TestProject.CollisionTarget")!);
         var requests = assembly.GetTypes()
-            .Where(static type => typeof(IResponseInvokable).IsAssignableFrom(type))
+            .Where(static type => !type.IsAbstract && typeof(IInvokable).IsAssignableFrom(type))
             .Select(static type => (IInvokable)Activator.CreateInstance(type)!)
             .OrderBy(static request => request.GetMethodName(), StringComparer.Ordinal)
             .ToArray();
@@ -93,8 +93,8 @@ public sealed class RpcResponseHolderNamingTests
         using var secondRequest = requests[1];
         firstRequest.SetTarget(new TargetHolder(target!));
         secondRequest.SetTarget(new TargetHolder(target!));
-        using var first = await ((IResponseInvokable)firstRequest).InvokeAndCopy(provider, contexts, copier);
-        using var second = await ((IResponseInvokable)secondRequest).InvokeAndCopy(provider, contexts, copier);
+        using var first = await firstRequest.InvokeAndCopy(provider, contexts, copier);
+        using var second = await secondRequest.InvokeAndCopy(provider, contexts, copier);
         Assert.IsAssignableFrom<IRawResponseWriter>(first);
         Assert.IsAssignableFrom<IRawResponseWriter>(second);
         Assert.NotEqual(first.GetType(), second.GetType());

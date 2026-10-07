@@ -37,6 +37,83 @@ namespace UnitTests.Serialization;
 public sealed class SelfWritingResponseOwnershipTests
 {
     [Theory]
+    [InlineData("Distinct")]
+    [InlineData("Same")]
+    [InlineData("Throw")]
+    public async Task DefaultInvokableContractCopiesAndTransfersOneOwner(string behavior)
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var provider = services.GetRequiredService<ICodecProvider>();
+        var contexts = services.GetRequiredService<CopyContextPool>();
+        var counts = new Counts { ReturnInput = behavior == "Same", ThrowCopy = behavior == "Throw" };
+        var payload = new Payload { Values = [17, 25, 42] };
+        var request = new LegacyRequest(payload, counts);
+        request.Bind(provider);
+        var copier = new DeepCopier<Response>(new CountingResponseCopier(counts, provider), contexts);
+
+        if (behavior == "Throw")
+        {
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await ((IInvokable)request).InvokeAndCopy(provider, contexts, copier));
+            Assert.Same(counts.CopyFailure, exception);
+            Assert.Equal(1, counts.Rents);
+            Assert.Equal(1, counts.Returns);
+            Assert.Null(request.ReturnedResponse!.Result);
+        }
+        else
+        {
+            var response = await ((IInvokable)request).InvokeAndCopy(provider, contexts, copier);
+            Assert.Equal(1, counts.ResponseCopies);
+            Assert.Equal(behavior == "Same" ? 0 : 1, counts.PayloadCopies);
+            Assert.Equal(behavior == "Same" ? 0 : 1, counts.Returns);
+            var result = Assert.IsType<Payload>(response.Result);
+            Assert.Equal(new[] { 17, 25, 42 }, result.Values);
+            if (behavior == "Same") Assert.Same(request.ReturnedResponse, response);
+            else
+            {
+                Assert.NotSame(request.ReturnedResponse, response);
+                Assert.NotSame(payload, result);
+                payload.Values.Clear();
+                Assert.Equal(new[] { 17, 25, 42 }, result.Values);
+            }
+            response.Dispose();
+            Assert.Equal(counts.Rents, counts.Returns);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task ExceptionEnvelopesCopyAtDeliveryAfterFilters(bool observer, bool direct, bool filtered)
+    {
+        var counts = new Counts();
+        var failure = new InvalidOperationException("original invocation exception");
+        var filter = filtered ? new CallbackFilter(async context =>
+        {
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(context.Invoke));
+            Assert.Same(failure, context.Response!.Exception);
+            Assert.Equal(0, counts.ExceptionCopies);
+            counts.FilterFinished = true;
+        }) : null;
+        await using var fixture = new SendFixture(counts, filter, recordExceptionCopies: true);
+        LegacyRequest request = direct ? new DirectExceptionRequest(failure, counts) : new ExceptionRequest(failure, counts);
+
+        using var response = await fixture.Invoke(request, observer);
+
+        Assert.Same(failure, response.Exception);
+        Assert.Equal(1, counts.ExceptionCopies);
+        Assert.Equal(filtered, counts.FilterFinished);
+        Assert.Equal(filtered, counts.ExceptionCopiedAfterFilter);
+        Assert.Equal(0, counts.PayloadCopies);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task RemoteCallback_ConsumesTypedOrVoidResponseExactlyOnce(bool voidCall)
@@ -162,7 +239,7 @@ public sealed class SelfWritingResponseOwnershipTests
                 && type.Name.StartsWith("Invokable_IConcurrentGrain_", StringComparison.Ordinal))
             .Select(static type => (IInvokable)Activator.CreateInstance(type)!)
             .Single(static request => request.GetMethodName() == nameof(IConcurrentGrain.ModifyReturnList_Test));
-        Assert.IsAssignableFrom<IResponseInvokable>(request);
+        Assert.IsAssignableFrom<IInvokable>(request);
         var filter = filtered ? new CallbackFilter(context => context.Invoke()) : null;
         await using var fixture = new SendFixture(counts, filter, target);
         using var response = await fixture.Invoke(request, observer);
@@ -626,6 +703,9 @@ public sealed class SelfWritingResponseOwnershipTests
         public int ResponseCopies;
         public int Rents;
         public int Returns;
+        public int ExceptionCopies;
+        public bool FilterFinished;
+        public bool ExceptionCopiedAfterFilter;
         public bool ThrowCopy;
         public bool ReturnInput;
         public Exception CopyFailure { get; } = new InvalidOperationException("payload copy failed");
@@ -712,7 +792,7 @@ public sealed class SelfWritingResponseOwnershipTests
         }
     }
 
-    private sealed class DirectRequest(Payload payload, Counts counts) : LegacyRequest(payload, counts), IResponseInvokable
+    private sealed class DirectRequest(Payload payload, Counts counts) : LegacyRequest(payload, counts), IInvokable
     {
         public override ValueTask<Response> Invoke() => throw new InvalidOperationException("The direct request uses InvokeAndCopy.");
 
@@ -722,6 +802,39 @@ public sealed class SelfWritingResponseOwnershipTests
             AfterInvocation?.Invoke();
             return ValueTask.FromResult(ReturnedResponse);
         }
+    }
+
+    private class ExceptionRequest(Exception failure, Counts counts) : LegacyRequest(new Payload(), counts)
+    {
+        protected Exception Failure { get; } = failure;
+        public override ValueTask<Response> Invoke() => ValueTask.FromResult(Response.FromException(Failure));
+    }
+
+    private sealed class DirectExceptionRequest(Exception failure, Counts counts) : ExceptionRequest(failure, counts), IInvokable
+    {
+        public override ValueTask<Response> Invoke() => throw new InvalidOperationException("Use the isolated invocation contract.");
+        public ValueTask<Response> InvokeAndCopy(ICodecProvider provider, CopyContextPool contexts, DeepCopier<Response> copier)
+            => ValueTask.FromResult(Response.FromException(Failure));
+    }
+
+    private sealed class ExceptionDeliveryCopier(Counts counts) : IDeepCopier<ExceptionResponse>
+    {
+        [return: NotNullIfNotNull(nameof(input))]
+        public ExceptionResponse? DeepCopy(ExceptionResponse? input, CopyContext context)
+        {
+            if (input is null) return null;
+            counts.ExceptionCopies++;
+            counts.ExceptionCopiedAfterFilter = counts.FilterFinished;
+            return input;
+        }
+    }
+
+    private sealed class UnusedExceptionCodec : IFieldCodec<ExceptionResponse>
+    {
+        public ExceptionResponse ReadValue<TInput>(ref Reader<TInput> reader, Orleans.Serialization.WireProtocol.Field field)
+            => throw new NotSupportedException("The exception delivery control exercises copying.");
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint delta, Type? expected, ExceptionResponse? value)
+            where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException("The exception delivery control exercises copying.");
     }
 
     private sealed class CountingResponseCopier(Counts counts, ICodecProvider provider) : IDeepCopier<Response>
@@ -809,13 +922,15 @@ public sealed class SelfWritingResponseOwnershipTests
         public Dictionary<string, object>? InitialContext { get; set; }
         public CodecProvider Provider => _services.GetRequiredService<CodecProvider>();
 
-        public SendFixture(Counts counts, IIncomingGrainCallFilter? filter, IAddressable? target = null)
+        public SendFixture(Counts counts, IIncomingGrainCallFilter? filter, IAddressable? target = null, bool recordExceptionCopies = false)
         {
             _counts = counts;
             _observer = target ?? new Observer();
             var services = new ServiceCollection();
             services.AddSerializer(builder => builder.Configure(options =>
             {
+                if (recordExceptionCopies)
+                    options.AddSerializer<ExceptionResponse>(_ => new UnusedExceptionCodec(), _ => new ExceptionDeliveryCopier(counts));
                 options.AddSerializer<Response>(_ => new UnusedResponseCodec(), provider => new CountingResponseCopier(counts, provider));
                 options.AddSerializer<CountedResponse>(_ => new UnusedHolderCodec(), provider => new CountingHolderCopier(counts, provider));
                 options.AddCopier(typeof(SendFailureCopier));

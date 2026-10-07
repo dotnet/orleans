@@ -14,18 +14,15 @@ namespace Orleans.Runtime
     /// <summary>
     /// Invokes a request on a grain.
     /// </summary>
-    internal sealed class GrainMethodInvoker : IIncomingGrainCallContext, IDisposable
+    internal sealed class GrainMethodInvoker : GrainCallInvoker, IIncomingGrainCallContext
     {
         private readonly Message message;
-        private readonly IInvokable request;
         private readonly List<IIncomingGrainCallFilter> filters;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private readonly DeepCopier<Response> responseCopier;
         private readonly IGrainContext grainContext;
         private readonly ICodecProvider codecProvider;
         private readonly CopyContextPool copyContexts;
-        private ResponseOwnership responses;
-        private int stage;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainMethodInvoker"/> class.
@@ -46,10 +43,9 @@ namespace Orleans.Runtime
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
             DeepCopier<Response> responseCopier,
             ICodecProvider codecProvider,
-            CopyContextPool copyContexts)
+            CopyContextPool copyContexts) : base(request)
         {
             this.message = message;
-            this.request = request;
             this.grainContext = grainContext;
             this.filters = filters;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
@@ -58,15 +54,11 @@ namespace Orleans.Runtime
             this.copyContexts = copyContexts;
         }
 
-        public IInvokable Request => request;
-
-        public object Grain => grainContext.GrainInstance!;
-
-        public MethodInfo InterfaceMethod => request.GetMethod();
+        public override object Grain => grainContext.GrainInstance!;
 
         public MethodInfo ImplementationMethod => GetMethodEntry().ImplementationMethod;
 
-        public object? Result
+        public override object? Result
         {
             get => Response switch
             {
@@ -76,117 +68,35 @@ namespace Orleans.Runtime
             set => Response = Response.FromResult(value);
         }
 
-        public Response? Response
-        {
-            get => responses.Value;
-            set => responses.Value = value;
-        }
-
-        internal Response TakeResponse() => responses.Take();
-
-        public void Dispose() => responses.Dispose();
-
-        public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
+        public override GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
 
         public IGrainContext TargetContext => grainContext;
 
-        public GrainId TargetId => grainContext.GrainId;
+        public override GrainId TargetId => grainContext.GrainId;
 
-        public GrainInterfaceType InterfaceType => message.InterfaceType;
+        public override GrainInterfaceType InterfaceType => message.InterfaceType;
 
-        public string InterfaceName => request.GetInterfaceName();
+        protected override int FilterCount => filters.Count + (Grain is IIncomingGrainCallFilter ? 1 : 0);
 
-        public string MethodName => request.GetMethodName();
+        protected override Task InvokeFilter(int index) => index < filters.Count
+            ? filters[index].Invoke(this)
+            : ((IIncomingGrainCallFilter)Grain).Invoke(this);
 
-        public async Task Invoke()
+        protected override string GetFilterName(int index) => index < filters.Count
+            ? filters[index].GetType().Name : Grain.GetType().Name;
+
+        protected override async Task InvokeInner()
         {
-            try
-            {
-                // Execute each stage in the pipeline. Each successive call to this method will invoke the next stage.
-                // Stages which are not implemented (eg, because the user has not specified an interceptor) are skipped.
-                var numFilters = filters.Count;
-                if (stage < numFilters)
-                {
-                    // Call each of the specified interceptors.
-                    var systemWideFilter = this.filters[stage];
-                    stage++;
-                    await systemWideFilter.Invoke(this);
-
-                    // If Response is null some filter did not continue the call chain
-                    if (this.Response is null)
-                    {
-                        ThrowBrokenCallFilterChain(systemWideFilter.GetType().Name);
-                    }
-
-                    return;
-                }
-
-                if (stage == numFilters)
-                {
-                    stage++;
-
-                    // Grain-level invoker, if present.
-                    if (this.Grain is IIncomingGrainCallFilter grainClassLevelFilter)
-                    {
-                        await grainClassLevelFilter.Invoke(this);
-
-                        // If Response is null some filter did not continue the call chain
-                        if (this.Response is null)
-                        {
-                            ThrowBrokenCallFilterChain(this.Grain.GetType().Name);
-                        }
-                        return;
-                    }
-                }
-
-                if (stage == numFilters + 1)
-                {
-                    // Finally call the root-level invoker.
-                    stage++;
-                    var response = request is IResponseInvokable direct
-                        ? await direct.InvokeAndCopy(codecProvider, copyContexts, responseCopier)
-                        : await request.Invoke();
-
-                    // Propagate exceptions to other filters.
-                    if (response.Exception is { } exception)
-                    {
-                        Response = response;
-                        ExceptionDispatchInfo.Capture(exception).Throw();
-                    }
-
-                    if (request is not IResponseInvokable)
-                        response = ResponseCopyBoundary.CopyAndDispose(response, this.responseCopier);
-
-                    Response = response;
-
-                    return;
-                }
-            }
-            finally
-            {
-                stage--;
-            }
-
-            // If this method has been called more than the expected number of times, that is invalid.
-            ThrowInvalidCall();
-        }
-
-        private static void ThrowInvalidCall()
-        {
-            throw new InvalidOperationException(
-                $"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() received an invalid call.");
-        }
-
-        private static void ThrowBrokenCallFilterChain(string filterName)
-        {
-            throw new InvalidOperationException($"{nameof(GrainMethodInvoker)}.{nameof(Invoke)}() invoked a broken filter: {filterName}.");
+            Response = await Request.InvokeAndCopy(codecProvider, copyContexts, responseCopier);
+            if (Response.Exception is { } exception)
+                ExceptionDispatchInfo.Capture(exception).Throw();
         }
 
 
         private (MethodInfo ImplementationMethod, MethodInfo InterfaceMethod) GetMethodEntry()
         {
-            var interfaceType = this.request.GetInterfaceType();
-            var implementationType = this.request.GetTarget()!.GetType();
+            var interfaceType = Request.GetInterfaceType();
+            var implementationType = Request.GetTarget()!.GetType();
 
             // Get or create the implementation map for this object.
             var implementationMap = interfaceToImplementationMapping.GetOrCreate(
@@ -194,7 +104,7 @@ namespace Orleans.Runtime
                 interfaceType);
 
             // Get the method info for the method being invoked.
-            var method = request.GetMethod();
+            var method = Request.GetMethod();
             if (method.IsConstructedGenericMethod)
             {
                 if (implementationMap.TryGetValue(method.GetGenericMethodDefinition(), out var entry))

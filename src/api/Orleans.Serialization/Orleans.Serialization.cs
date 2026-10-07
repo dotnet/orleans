@@ -3609,6 +3609,7 @@ namespace Orleans.Serialization.Invocation
         string GetMethodName();
         object? GetTarget();
         System.Threading.Tasks.ValueTask<Response> Invoke();
+        System.Threading.Tasks.ValueTask<Response> InvokeAndCopy(Serializers.ICodecProvider codecProvider, Cloning.CopyContextPool copyContextPool, DeepCopier<Response> responseCopier);
         void SetArgument(int index, object value);
         void SetTarget(ITargetHolder holder);
         bool TryCancel();
@@ -3640,11 +3641,6 @@ namespace Orleans.Serialization.Invocation
     {
         void Complete();
         void Complete(Response value);
-    }
-
-    public partial interface IResponseInvokable
-    {
-        System.Threading.Tasks.ValueTask<Response> InvokeAndCopy(Serializers.ICodecProvider codecProvider, Cloning.CopyContextPool copyContextPool, DeepCopier<Response> responseCopier);
     }
 
     public partial interface ITargetHolder
