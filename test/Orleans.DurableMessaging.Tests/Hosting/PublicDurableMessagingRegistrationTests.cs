@@ -305,6 +305,8 @@ public sealed class PublicDurableMessagingRegistrationTests
 
     private sealed class ConstructionTestStateManager : IJournaledStateManager
     {
+        public IList<IJournaledStateHook> Hooks { get; } = [];
+
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
         public void RegisterStateMachine(string name, IStateMachine state) { }
         public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? state)

@@ -5,6 +5,8 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <remarks>
 /// When both delegates for a phase are supplied, the synchronous delegate runs first.
+/// Synchronous delegates complete their work before returning. Asynchronous delegates await
+/// their I/O outcome before completing their returned value task.
 /// Custom <see cref="IJournaledStateHook"/> implementations can carry feature identity and state
 /// for inspection and deduplication in the owner's hook list.
 /// </remarks>

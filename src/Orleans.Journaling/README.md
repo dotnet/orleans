@@ -22,8 +22,13 @@ CancellationToken>` callbacks and asynchronous
 hook object can carry feature identity and operation-local state. Within each
 delegate adapter, the synchronous callback precedes the asynchronous callback.
 
-Hooks surround actual coalesced writes, snapshots, and deletion. Before callbacks
-establish prerequisites before synchronous capture or storage deletion. After
+Hooks surround actual coalesced writes, snapshots, and deletion. Ordinary before
+callbacks run in list order. An optional single `IJournaledStateCaptureHook` runs
+last, directly in the work loop before capture or deletion. Its prerequisite
+covers changes staged while ordinary callbacks awaited, and changes arriving
+during its own I/O. The same list supports inspecting and deduplicating this
+registration; multiple final capture hooks produce a prerequisite error before
+any callback or storage work. After
 callbacks run after storage acknowledgement and state acknowledgement or reset.
 Successful zero-byte writes also complete their callbacks. Prerequisites must cover
 changes which arrive during an asynchronous before callback; captured changes and

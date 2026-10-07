@@ -86,8 +86,14 @@ Custom hook objects can retain feature identity and operation-local prerequisite
 
 :::code source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="journal_operation_hooks" language="csharp":::
 
-The manager invokes hooks in registration order around actual coalesced append,
-snapshot, and delete operations. Before callbacks complete before synchronous
+The manager invokes ordinary before hooks in registration order around actual
+coalesced append, snapshot, and delete operations. An optional single
+<xref:Orleans.Journaling.IJournaledStateCaptureHook> runs last, directly in the work
+loop before capture or deletion. Its prerequisite covers changes arriving while
+earlier callbacks awaited and during its own I/O. Inspect and deduplicate this
+registration through the same list; multiple final capture hooks are rejected
+before callbacks or storage work begins. All after hooks retain list order.
+Before callbacks complete before synchronous
 state capture or storage deletion. Their prerequisites cover the changes entering
 that capture, including changes staged while asynchronous preparation awaited.
 After storage succeeds, the manager acknowledges captured state or resets deleted

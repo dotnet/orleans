@@ -45,15 +45,16 @@ public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler
     public bool CanHandle(IInboxHandlerContext context) =>
         context.Envelope.RouteKey == "notifications";
 
-    public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!context.Envelope.Data.TryGetBody<string>(out var message)
             || string.IsNullOrWhiteSpace(message))
         {
             throw new ArgumentException("A notification must contain a nonempty string.");
         }
 
-        IPreparedOutboxBatch? reply = null;
+        DurableEnvelope? reply = null;
         if (context.Envelope.ReplyTo is { } recipient)
         {
             var replyBuilder = context.CreateEnvelope()
@@ -64,19 +65,18 @@ public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler
                 replyBuilder.WithCorrelationKey(correlationKey);
             }
 
-            var envelope = replyBuilder.Build();
-            reply = await context.Outbox.PrepareSendAsync([envelope], cancellationToken);
+            reply = replyBuilder.Build();
         }
 
         var nextCount = checked(_count.Value + 1);
-        return () =>
+        return ValueTask.FromResult<Action>(() =>
         {
             _count.Value = nextCount;
-            if (reply is not null)
+            if (reply is { } envelope)
             {
-                context.Send(reply);
+                context.Send(envelope);
             }
-        };
+        });
     }
 }
 // </messaging_grain>
@@ -99,10 +99,8 @@ public sealed class NotificationSenderGrain(
             .To(receiver, "notifications")
             .WithBody(message)
             .Build();
-        using var batch = await outbox.PrepareSendAsync([envelope]);
-
         sentCount.Value = checked(sentCount.Value + 1);
-        outbox.Send(batch);
+        outbox.Send(envelope);
         await stateManager.WriteStateAsync();
     }
 }

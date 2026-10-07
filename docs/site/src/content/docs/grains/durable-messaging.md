@@ -29,7 +29,12 @@ for a follow-up message.
 
 Durable Messaging has the following boundaries:
 
-- Awaiting <xref:Orleans.DurableMessaging.IDurableOutbox.PrepareSendAsync*> copies and
+- Calling <xref:Orleans.DurableMessaging.IDurableOutbox.Send*> with an envelope
+  synchronously stages an outgoing intent alongside complete, safe-to-commit business
+  changes. Before the next journal capture, an outbox persistence hook confirms a
+  durable self-wakeup and stages its ownership handle. Ordinary persistence captures
+  the messages and ownership with the business effects.
+- Optionally awaiting <xref:Orleans.DurableMessaging.IDurableOutbox.PrepareSendAsync*> copies and
   validates the envelopes, reserves their identities, and confirms a durable self-wakeup
   before application state changes. The returned
   <xref:Orleans.DurableMessaging.IPreparedOutboxBatch> retains those prerequisites.
@@ -99,10 +104,13 @@ order. Selection keeps shared application state unchanged. Its context exposes e
 metadata and grain identity, and validates access to outgoing-message operations.
 
 <xref:Orleans.DurableMessaging.IInboxHandler.PrepareAsync*> performs fallible computation,
-I/O and envelope serialization using operation-local values. It awaits
-`context.Outbox.PrepareSendAsync` for outgoing envelopes, then returns a non-null
+I/O and envelope serialization using operation-local values, then returns a non-null
 synchronous action. The action applies the prepared business mutations and calls
-`context.Send(batch)` to stage the prepared output. Messaging validates the current message and ownership
+`context.Send(envelope)` to stage outgoing messages. The journal owner's pre-capture
+hook establishes their durable wakeup before persistence. A handler can explicitly
+await `context.Outbox.PrepareSendAsync` during preparation when it needs the wakeup
+prerequisite established earlier, then call `context.Send(batch)` from its action.
+Messaging validates the current message and ownership
 before invoking it, then stages inbox completion and deduplication before the activation
 turn yields. Earlier journal writes can complete while preparation awaits because the
 prepared attempt's effects are still local.
@@ -112,8 +120,8 @@ returned action applies the complete set of business changes synchronously, leav
 state ready for an atomic journal write. Orleans' single-threaded activation execution
 keeps these updates together until the action returns.
 
-The handler context admits batch preparation during its matching `PrepareAsync` call
-and outgoing sends while the returned action executes. Both context send paths share
+The handler context admits optional batch preparation during its matching `PrepareAsync` call
+and outgoing sends while the returned action executes. Envelope and batch sends share
 this attempt-scoped boundary. Preparation supports read-only outbox inspection and
 envelope construction. Every use validates the current attempt, phase, activation and
 batch lifetime; a contract violation retains its first cause and prevents completion.
@@ -137,14 +145,16 @@ Durable Messaging uses standard named journaled dictionaries and values. Journal
 supplies their capture, acknowledgement, replay and reset protocol. The outbox's
 existing journaled sequence state associates captured message identities and wake-up
 ownership with the storage acknowledgement, releasing exactly that cohort for dispatch.
-Feature preparation establishes durable wake-up ownership before staging. Application and messaging code
+The outbox's final <xref:Orleans.Journaling.IJournaledStateCaptureHook> establishes durable wake-up
+ownership before capture; explicit batch preparation can establish it before staging.
+Application and messaging code
 complete their preconditions before applying synchronous changes, so the registered
 <xref:Orleans.Journaling.IStateMachine> instances are ready for capture when the journal
 write begins. Independent writes can commit earlier valid state while another operation
 prepares local values.
 Mutations made during storage I/O remain pending for the next capture.
 
-A failure in an admitted write or delete fences the journal manager, faults its
+A storage failure in an admitted write or delete fences the journal manager, faults its
 operation waiters and requests grain deactivation. Messaging handles failed writes by completing
 the affected operations and releasing their owned resources. Activation shutdown drains
 messaging work; standalone owners coordinate component cleanup with manager disposal.
@@ -156,6 +166,16 @@ actual durable outcome. A failed append response can follow a successful storage
 commit: replay restores that committed envelope and exact ownership handle. A failed
 ownership-clear write follows the same boundary; fresh replay determines whether the
 previous owner remains responsible or cleanup was committed.
+
+A failed journal prerequisite hook reports
+<xref:Orleans.Journaling.JournaledStatePreCommitException>. Storage has not been
+attempted, and complete safe-to-commit changes remain pending for explicit persistence
+retry or owner retirement and fresh replay. An explicit persistence retry commits
+the already-staged changes; fresh-owner recovery determines subsequent handler work.
+A post-persistence hook failure reports
+<xref:Orleans.Journaling.JournaledStatePostCommitException>; the captured cohort is
+already acknowledged. Handle that post-persistence work using the committed feature
+state. See [Persistence operation hooks](journaling/runtime-behavior.md#persistence-operation-hooks).
 
 Cancellation of a caller's wait for
 <xref:Orleans.Journaling.IJournaledStateManager.WriteStateAsync*> leaves an already
@@ -222,8 +242,9 @@ optional reply, and stages the reply and notification count for the inbox's comp
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_grain" language="csharp":::
 
-An ordinary grain method awaits preparation before changing its sent count, stages the
-prepared batch, and persists both through the application-facing state manager:
+An ordinary grain method stages its sent count and outgoing envelope synchronously,
+then persists both through the application-facing state manager. The outbox hook
+confirms the wakeup before capture:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_send" language="csharp":::
 
