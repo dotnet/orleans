@@ -222,6 +222,7 @@ namespace Orleans.DurableMessaging
         System.Collections.Generic.IEnumerable<DurableEnvelope> Messages { get; }
 
         System.Threading.Tasks.ValueTask<IPreparedOutboxBatch> PrepareSendAsync(System.Collections.Generic.IReadOnlyList<DurableEnvelope> messages, System.Threading.CancellationToken cancellationToken = default);
+        void Send(DurableEnvelope envelope);
         void Send(IPreparedOutboxBatch batch);
         bool TryGetMessage(System.Guid messageId, out DurableEnvelope envelope);
     }
@@ -241,6 +242,7 @@ namespace Orleans.DurableMessaging
         IDurableOutbox Outbox { get; }
 
         DurableEnvelopeBuilder CreateEnvelope();
+        void Send(DurableEnvelope envelope);
         void Send(IPreparedOutboxBatch batch);
     }
 

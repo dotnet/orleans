@@ -5,6 +5,8 @@
     <Description>Durable messaging envelope, delivery, and handler-routing contracts for Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Messaging Inbox Outbox Durable</PackageTags>
     <IsPackable>false</IsPackable>
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>

@@ -18,9 +18,10 @@ namespace Orleans.DurableMessaging;
 /// messages are properly attributed and serialized without requiring handlers to manage infrastructure concerns.
 /// </para>
 /// <para>
-/// Build outbound envelopes in local variables and await <see cref="IDurableOutbox.PrepareSendAsync"/>
-/// through <see cref="Outbox"/>. Call <see cref="Send"/> from the synchronous action returned by
-/// <see cref="IInboxHandler.PrepareAsync"/> to stage the prepared batch alongside business changes.
+/// Build outbound envelopes in local variables and call <see cref="Send(DurableEnvelope)"/> from the
+/// synchronous action returned by <see cref="IInboxHandler.PrepareAsync"/> alongside business changes.
+/// The journal establishes the self-wakeup before capture. Optional <see cref="IDurableOutbox.PrepareSendAsync"/>
+/// establishes this prerequisite earlier and returns a batch to stage from the same action.
 /// </para>
 /// </remarks>
 /// <example>
@@ -132,8 +133,9 @@ public interface IInboxHandlerContext
     /// attributed and serialized without requiring handlers to manage these infrastructure concerns.
     /// </para>
     /// <para>
-    /// The builder and its completed envelope are local preparation values. Await
-    /// <see cref="IDurableOutbox.PrepareSendAsync"/> before applying business changes and staging the batch.
+    /// The builder and its completed envelope are local preparation values. Stage the envelope with
+    /// <see cref="Send(DurableEnvelope)"/> from the returned action, or optionally establish the wakeup earlier
+    /// using <see cref="IDurableOutbox.PrepareSendAsync"/> before staging its batch.
     /// </para>
     /// <para>
     /// The builder follows a fluent API pattern:
@@ -143,8 +145,8 @@ public interface IInboxHandlerContext
     /// <item><description>Call <c>.WithBody(value)</c> to serialize the message body</description></item>
     /// <item><description>Optionally call <c>.WithCorrelationKey()</c>, <c>.WithReplyTo()</c>, <c>.WithContextValue()</c></description></item>
     /// <item><description>Call <c>.Build()</c> to create the envelope</description></item>
-    /// <item><description>Await <see cref="IDurableOutbox.PrepareSendAsync"/> through <see cref="Outbox"/> to prepare the outgoing batch</description></item>
-    /// <item><description>Call <see cref="Send"/> with the batch from the returned apply action</description></item>
+    /// <item><description>Call <see cref="Send(DurableEnvelope)"/> with the envelope from the returned apply action</description></item>
+    /// <item><description>For an early wakeup prerequisite, optionally await <see cref="IDurableOutbox.PrepareSendAsync"/> and use <see cref="Send(IPreparedOutboxBatch)"/></description></item>
     /// </list>
     /// </remarks>
     /// <example>
@@ -208,12 +210,20 @@ public interface IInboxHandlerContext
     void Send(IPreparedOutboxBatch batch);
 
     /// <summary>
-    /// Gets the handler-scoped outbox for preparing batches and inspecting pending messages.
+    /// Stages an outgoing envelope from this attempt's synchronous apply action.
+    /// </summary>
+    /// <param name="envelope">The fully built outgoing envelope.</param>
+    /// <remarks>The journal establishes the self-wakeup before capture and dispatch follows acknowledgement.</remarks>
+    void Send(DurableEnvelope envelope) => Outbox.Send(envelope);
+
+    /// <summary>
+    /// Gets the handler-scoped outbox for sending envelopes, preparing optional batches, and inspecting pending messages.
     /// </summary>
     /// <remarks>
-    /// Acquire batches with <see cref="IDurableOutbox.PrepareSendAsync"/> during handler preparation.
-    /// Stage them from the matching apply action using <see cref="Send"/> or <see cref="IDurableOutbox.Send"/>.
-    /// Both paths enforce the same attempt ownership. The runtime owns attempt-end disposal and delivery.
+    /// Stage envelopes with <see cref="Send(DurableEnvelope)"/> from the matching apply action.
+    /// Optional batches acquired with <see cref="IDurableOutbox.PrepareSendAsync"/> during preparation are
+    /// staged with <see cref="Send(IPreparedOutboxBatch)"/>. Both paths enforce attempt ownership.
+    /// The runtime owns attempt-end batch disposal and delivery.
     /// </remarks>
     /// <example>
     /// <code>

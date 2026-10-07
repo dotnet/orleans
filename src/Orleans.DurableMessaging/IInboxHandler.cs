@@ -54,7 +54,7 @@ public interface IInboxHandler
     /// </para>
     /// <para>
     /// Selection is read-only. <see cref="IInboxHandlerContext.CreateEnvelope"/>,
-    /// <see cref="IInboxHandlerContext.Send"/>, and <see cref="IInboxHandlerContext.Outbox"/>
+    /// <see cref="IInboxHandlerContext.Send(DurableEnvelope)"/>, and <see cref="IInboxHandlerContext.Outbox"/>
     /// throw when called from this method. After selection, <see cref="PrepareAsync"/> prepares local
     /// values and returns the action which stages journaled effects and outgoing messages.
     /// </para>
@@ -90,14 +90,16 @@ public interface IInboxHandler
     /// <remarks>
     /// <para>
     /// Perform validation, asynchronous I/O, and other failure-prone work using operation-local values.
-    /// Build outbound envelopes and await <see cref="IDurableOutbox.PrepareSendAsync"/> through the context
-    /// outbox during this phase. Revalidate local results after asynchronous preparation. Apply shared
-    /// business mutations and call <see cref="IInboxHandlerContext.Send"/> with the batch from the returned action.
+    /// Build outbound envelopes during this phase. Revalidate local results after asynchronous preparation.
+    /// Apply shared business mutations and call <see cref="IInboxHandlerContext.Send(DurableEnvelope)"/>
+    /// from the returned action. The journal establishes a durable self-wakeup before capturing these changes.
+    /// Optionally await <see cref="IDurableOutbox.PrepareSendAsync"/> to establish that prerequisite earlier,
+    /// then stage the resulting batch from the action.
     /// </para>
     /// <para>
     /// Messaging awaits preparation and invokes the returned action once for that prepared attempt.
     /// Use a synchronous lambda or method group which applies already-prepared business mutations and
-    /// stages prepared batches. An attempt with no effects returns an empty synchronous action. The runtime
+    /// stages envelopes or prepared batches. An attempt with no effects returns an empty synchronous action. The runtime
     /// disposes batches acquired through the handler outbox when the attempt ends, including on failure;
     /// keep their lifetime open through the returned action. Staged ownership continues through persistence.
     /// </para>
