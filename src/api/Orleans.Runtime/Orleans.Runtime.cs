@@ -190,6 +190,8 @@ namespace Orleans.Configuration
 
         public CachingStrategyType CachingStrategy { get { throw null; } set { } }
 
+        public System.Func<Runtime.SiloAddress, int, uint[]> GetPartitionBoundaries { get { throw null; } set { } }
+
         [System.Obsolete("InitialCacheTTL is deprecated and will be removed in a future version.")]
         public System.TimeSpan InitialCacheTTL { get { throw null; } set { } }
 
@@ -200,6 +202,8 @@ namespace Orleans.Configuration
         public int PartitionsPerSilo { get { throw null; } set { } }
 
         public System.TimeSpan RangeLeaseDuration { get { throw null; } set { } }
+
+        public static uint[] GetLegacyPartitionBoundaries(Runtime.SiloAddress silo, int partitionCount) { throw null; }
 
         public enum CachingStrategyType
         {
