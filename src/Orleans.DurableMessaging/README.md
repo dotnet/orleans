@@ -10,7 +10,8 @@ This project supplies the durable messaging protocol and handler-routing contrac
 - `HierarchicalKey` provides escaped, slash-separated correlation keys with
   segment-aware parent, child, and ancestor comparisons.
 - `IDurableInbox`, `IDurableOutbox`, and `IDurableInboxExtension` define message
-  registration, inspection, enqueue, and delivery operations. `DeliveryResult` and
+  registration, inspection, enqueue, and delivery operations. `IDurableOutbox.Send(envelope)`
+  synchronously stages a fully built envelope alongside business mutations. `DeliveryResult` and
   `DeliveryStatus` describe delivery outcomes.
 - `IPreparedOutboxBatch` is an opaque, activation-local disposable handle returned
   by `IDurableOutbox.PrepareSendAsync`. `Send(batch)` synchronously stages its prepared
@@ -24,18 +25,24 @@ This project supplies the durable messaging protocol and handler-routing contrac
   and batch limits, including an outbox retry age shorter than the deduplication window.
 
 Handlers perform validation, asynchronous I/O, and envelope serialization using local
-values, then await `context.Outbox.PrepareSendAsync(messages, cancellationToken)`.
-Preparation copies and validates the envelope collection and confirms a viable durable
-self-wakeup before shared business or journaled mutations. An empty batch is a valid
-no-op and requires no new wakeup. Durable state determines the work for duplicate and
-orphan wakeups; wakeups defer while local preparation or persistence is unresolved.
+values. After revalidating prepared results, they return a non-null synchronous action
+which applies business changes and calls `context.Send(envelope)` or
+`context.Outbox.Send(envelope)`. Messaging invokes that action once for the prepared
+attempt and stages inbox completion in the same turn before ordinary journal persistence.
+Each applied effect is safe to commit with shared pending changes.
 
-After revalidating prepared results, handlers return a non-null synchronous action
-which applies business changes and calls `context.Send(batch)` or
-`context.Outbox.Send(batch)`. Messaging invokes that action once for the prepared attempt
-and stages inbox completion in the same turn before ordinary journal persistence.
-Each applied effect is safe to commit with shared pending changes. External dispatch
-starts after the corresponding captured intents are acknowledged.
+The runtime outbox supplies a final journal capture hook which establishes the durable
+self-wakeup after ordinary before callbacks and directly before capture. It covers
+messages staged during asynchronous prerequisite work. Captured messages and their
+owner are acknowledged together before dispatch becomes eligible. Prerequisite failure
+retains safe pending business state and messages for an explicit write retry or owner
+retirement; post-commit hook failure reports an already completed persistence operation.
+
+`PrepareSendAsync(messages, cancellationToken)` remains available when an application
+needs the wakeup established earlier, before business mutation. It copies and validates
+the envelope collection and returns an activation-local batch for synchronous staging.
+An empty batch is a valid no-op and requires no new wakeup. Durable state determines the
+work for duplicate and orphan wakeups; unresolved preparation or persistence defers them.
 
 The handler runtime tracks preparations from their start and owns resulting batches
 through attempt completion, including late results after cancellation or failure. Keep

@@ -61,11 +61,26 @@ public interface IDurableOutbox
     IEnumerable<DurableEnvelope> Messages { get; }
 
     /// <summary>
+    /// Synchronously stages an envelope alongside safe-to-commit business mutations.
+    /// </summary>
+    /// <param name="envelope">The fully built envelope to send.</param>
+    /// <remarks>
+    /// The journal's final capture hook establishes a durable self-wakeup after ordinary before hooks
+    /// and before capturing pending state, including messages staged while scheduling is awaited. An explicit write retry retains
+    /// pending business changes and messages after a scheduling failure. Dispatch starts after the
+    /// captured message and owner pair are acknowledged. Equivalent identities retain the original envelope.
+    /// Handlers call this method from their returned synchronous apply action.
+    /// Use <see cref="PrepareSendAsync"/> to establish the wakeup earlier, before business mutation.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The envelope conflicts with an existing identity, sender, or handler scope.</exception>
+    void Send(DurableEnvelope envelope);
+
+    /// <summary>
     /// Prepares outgoing messages and confirms a viable durable self-wakeup before staging.
     /// </summary>
     /// <param name="messages">The fully built envelopes to prepare.</param>
     /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
-    /// <returns>An activation-local batch which can be synchronously staged using <see cref="Send"/>.</returns>
+    /// <returns>An activation-local batch which can be synchronously staged using <see cref="Send(IPreparedOutboxBatch)"/>.</returns>
     /// <remarks>
     /// <para>
     /// Preparation copies the input collection and validates the envelopes before its first asynchronous wait.
