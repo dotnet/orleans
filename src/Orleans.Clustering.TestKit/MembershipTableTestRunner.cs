@@ -23,7 +23,13 @@ public sealed class MembershipTableTestRunner
     {
     }
 
-    internal MembershipTableTestRunner(
+    /// <summary>Creates a runner over initialized independent handles with a configurable concurrent-read row payload.</summary>
+    /// <param name="fixture">The initialized fixture which owns the provider handles.</param>
+    /// <param name="seed">The deterministic test-data seed.</param>
+    /// <param name="output">Receives conformance diagnostics.</param>
+    /// <param name="concurrencyRowCount">The number of rows used by concurrent-read scenarios.</param>
+    /// <param name="concurrencyRowPadding">The number of characters appended to each concurrent-read row's host name.</param>
+    public MembershipTableTestRunner(
         MembershipTableTestFixture fixture,
         int seed,
         Action<string>? output,

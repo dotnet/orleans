@@ -77,6 +77,8 @@ namespace Orleans.Clustering.TestKit
 
     public sealed partial class MembershipTableTestRunner
     {
+        public MembershipTableTestRunner(MembershipTableTestFixture fixture, int seed, System.Action<string>? output, int concurrencyRowCount, int concurrencyRowPadding) { }
+
         public MembershipTableTestRunner(MembershipTableTestFixture fixture, int seed = 0, System.Action<string>? output = null, int concurrencyRowCount = 128) { }
 
         public System.Threading.Tasks.Task CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(System.Threading.CancellationToken cancellationToken = default) { throw null; }
