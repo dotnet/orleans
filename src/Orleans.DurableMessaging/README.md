@@ -26,7 +26,10 @@ The protocol and runtime provide:
 - `IDurableInbox`, `IDurableOutbox`, and `IDurableInboxExtension` define message
   registration, inspection, enqueue, and delivery operations. `DeliveryResult` and
   `DeliveryStatus` describe delivery outcomes.
-- `IPreparedOutboxBatch` is an opaque, activation-local disposable handle returned
+- `IDurableOutbox.Send(envelope)` synchronously stages an outgoing envelope. A journal
+  before-operation hook establishes its durable self-wakeup before capture; dispatch
+  follows acknowledgement of the exact captured messages and physical owner pair.
+- `IPreparedOutboxBatch` is an optional opaque, activation-local disposable handle returned
   by `IDurableOutbox.PrepareSendAsync`. `Send(batch)` synchronously stages its prepared
   outgoing intents.
 - `IInboxHandler` and `IInboxHandler<TMessage>` define metadata selection and
@@ -38,18 +41,40 @@ The protocol and runtime provide:
   and batch limits, including an outbox retry age shorter than the deduplication window.
 
 Handlers perform validation, asynchronous I/O, and envelope serialization using local
-values, then await `context.Outbox.PrepareSendAsync(messages, cancellationToken)`.
-Preparation copies and validates the envelope collection and confirms a viable durable
-self-wakeup before shared business or journaled mutations. An empty batch is a valid
-no-op and requires no new wakeup. Durable state determines the work for duplicate and
-orphan wakeups; wakeups defer while local preparation or persistence is unresolved.
+values, then return a non-null synchronous action which applies business changes and
+calls `context.Send(envelope)` or `context.Outbox.Send(envelope)`. Messaging stages inbox
+completion in that same turn. Each applied effect is safe to commit with shared pending
+changes. Ordinary applications use `outbox.Send(envelope)` alongside business updates
+and await their usual journal write:
 
-After revalidating prepared results, handlers return a non-null synchronous action
-which applies business changes and calls `context.Send(batch)` or
-`context.Outbox.Send(batch)`. Messaging invokes that action once for the prepared attempt
-and stages inbox completion in the same turn before ordinary journal persistence.
-Each applied effect is safe to commit with shared pending changes. External dispatch
-starts after the corresponding captured intents are acknowledged.
+```csharp
+businessState.Value = nextValue;
+outbox.Send(envelope);
+await stateManager.WriteStateAsync(cancellationToken);
+```
+
+The outbox's journal hook confirms a viable durable self-wakeup before synchronous
+capture, including messages arriving while scheduling awaits. Scheduling uses the owned
+journal-operation and feature-shutdown lifetimes. Caller cancellation ends only the
+caller wait. A `JournaledStatePreCommitException` reports a failed prerequisite before
+capture: ordinary callers can restore the prerequisite and explicitly retry the write
+with their business changes and message intents still pending. Feature-owned operations
+retire their owner after a prerequisite failure and recover from the durable outcome.
+A `JournaledStatePostCommitException` reports failed post-persistence work after actual
+acknowledgement; business effects and messaging acknowledgements remain committed.
+
+External dispatch starts after the corresponding captured intents and owner pair are
+acknowledged. Messages staged during a storage await belong to a later capture. The
+hook shares actual scheduling with early preparation independently of the gate retained
+by feature-owned writes through acknowledgement. Owner retirement and subsequent sends preserve exact physical
+job identity and generation boundaries.
+
+For an early prerequisite, await `context.Outbox.PrepareSendAsync(messages, cancellationToken)`
+during handler preparation, then call `context.Send(batch)` from the returned action.
+Ordinary callers can likewise acquire a batch before business mutation. Preparation
+copies and validates the collection and confirms the wakeup before staging; empty
+batches are valid no-ops. Durable state determines work for duplicate and orphan wakeups,
+and wakeups defer while local preparation or persistence is unresolved.
 
 The handler runtime tracks preparations from their start and owns resulting batches
 through attempt completion, including late results after cancellation or failure. Keep
@@ -130,15 +155,15 @@ valid payloads. Empty-owner clearing shares the inbox admission gate with delive
 so direct interleaved delivery proceeds after the clear's durable outcome.
 
 The handler context's outbox permits preparation during that attempt's `PrepareAsync`
-call and sending its own batches during the returned action. Every call checks the
+call and sending envelopes or its own batches during the returned action. Every call checks the
 current attempt and phase before applying repeated-send semantics. A caught or replaced
 scope violation retains its original cause and prevents a successful completion commit.
 An action-time failure ends the inbox operation and requests a fresh activation.
 
-Preparation keeps business state, outgoing intents, and inbox completion unchanged.
+Optional early preparation keeps business state, outgoing intents, and inbox completion unchanged.
 Independent journal writes can persist previously staged changes while preparation
 awaits. The runtime revalidates inbox ownership before applying business effects,
-staging prepared output, and recording `(SenderId, MessageId)` deduplication in one
+staging output, and recording `(SenderId, MessageId)` deduplication in one
 synchronous turn. Scheduling failures during preparation follow the ordinary bounded
 retry/dead-letter policy; handlers can catch them and prepare a safe alternative outcome.
 Each started acquisition remains owned through its actual result. Attempt cleanup
@@ -202,7 +227,8 @@ over generic handler selection. Operational diagnostics expose retained dead let
 and stage their removal for the next journal write.
 
 The builder encodes the body and request context into an envelope buffer which the
-outbox reuses with the owning grain as sender. `PrepareSendAsync` snapshots and validates
+outbox reuses with the owning grain as sender. Synchronous `Send(envelope)` validates and
+stages one message for the next journal capture. Optional `PrepareSendAsync` snapshots and validates
 the complete batch, reserves its message identities, and confirms a durable self-wakeup.
 The returned activation-local batch retains those prerequisites. Preparation leaves
 journaled state and visible message depth unchanged. `Send(batch)` synchronously stages

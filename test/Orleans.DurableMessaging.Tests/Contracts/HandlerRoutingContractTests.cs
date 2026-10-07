@@ -636,6 +636,8 @@ public sealed class HandlerRoutingContractTests : IDisposable
             return new(Preparation.Task);
         }
 
+        public void Send(DurableEnvelope envelope) => throw new NotSupportedException();
+
         public void Send(IPreparedOutboxBatch batch)
         {
             if (SendFailure is { } failure)

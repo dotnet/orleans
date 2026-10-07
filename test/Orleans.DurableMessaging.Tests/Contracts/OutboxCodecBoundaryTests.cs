@@ -489,6 +489,361 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(0, fixture.Outbox.Count);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task SynchronousSend_RespectsPreparedIdentityReservationsAndOriginalEnvelope(bool preparedFirst) => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var envelope = fixture.CreateEnvelope();
+        if (!preparedFirst) fixture.Outbox.Send(envelope);
+        using var batch = await fixture.Outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken);
+        var conflict = envelope with { RouteKey = "conflicting-route" };
+        Assert.Throws<InvalidOperationException>(() => fixture.Outbox.Send(conflict));
+        fixture.Outbox.Send(envelope);
+        fixture.Outbox.Send(batch);
+        fixture.Outbox.Send(envelope);
+        Assert.Equal(envelope, Assert.Single(fixture.Messages).Value);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(1, fixture.Probe.Count(nameof(DurableEnvelope)));
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Messages);
+        fixture.Outbox.Send(envelope);
+        Assert.Empty(fixture.Messages);
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task SynchronousSend_SchedulesBeforeCaptureAndIncludesArrivalsDuringScheduling(bool snapshot) => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync(snapshot: snapshot, businessState: true);
+        using var scheduling = fixture.BlockSchedule();
+        using var storage = fixture.Storage.BlockWrite(fixture.JournalId);
+        var first = fixture.CreateEnvelope();
+        fixture.Business!.Value = 42;
+        fixture.Outbox.Send(first);
+        var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await scheduling.WaitAsync();
+        Assert.Equal(0, fixture.Probe.Captures);
+        Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        Assert.True((await fixture.CallbackAsync(scheduling.Job!)).IsInProgress);
+        var second = fixture.CreateEnvelope();
+        fixture.Outbox.Send(second);
+        fixture.Outbox.Send(first);
+        Assert.Equal(2, fixture.Outbox.Count);
+        scheduling.Release();
+        await storage.WaitUntilEnteredAsync();
+        Assert.Same(scheduling.Job, fixture.Job.Value);
+        Assert.True((await fixture.CallbackAsync(scheduling.Job!)).IsInProgress);
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Receiver.ReceivedCalls());
+        storage.Release();
+        await write;
+        await using (var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId, businessState: true))
+        {
+            Assert.Equal(42, recovered.Business!.Value);
+            Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), recovered.Messages.Keys.Order());
+            Assert.Equal(scheduling.Job!.Id, recovered.Job.Value!.Id);
+            Assert.Equal(scheduling.Job.ShardId, recovered.Job.Value.ShardId);
+        }
+        await fixture.DeliverAsync();
+        Assert.Equal(2, fixture.Receiver.ReceivedCalls().Count());
+        Assert.Empty(fixture.Messages);
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+    });
+
+    [Fact]
+    public Task SynchronousSend_ArrivalDuringLaterHookHasWakeupBeforeCapture() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Manager.Hooks.Add(new JournaledStateHook
+        {
+            BeforeOperationAsync = async (_, _) =>
+            {
+                entered.TrySetResult();
+                await release.Task;
+            }
+        });
+        var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            fixture.Outbox.Send(fixture.CreateEnvelope());
+        }
+        finally { release.TrySetResult(); }
+        await write;
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+        Assert.NotNull(fixture.Job.Value);
+        await using var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
+        Assert.Single(recovered.Messages);
+        Assert.Equal(fixture.Job.Value.Id, recovered.Job.Value!.Id);
+    });
+
+    [Fact]
+    public Task SynchronousSend_StorageAwaitArrivalRemainsPendingUntilItsOwnAck() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var first = fixture.CreateEnvelope();
+        fixture.Outbox.Send(first);
+        using var storage = fixture.Storage.BlockWrite(fixture.JournalId);
+        var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.WaitUntilEnteredAsync();
+        var later = fixture.CreateEnvelope();
+        fixture.Outbox.Send(later);
+        storage.Release();
+        await write;
+        using var removal = fixture.Storage.BlockWrite(fixture.JournalId);
+        var deliver = fixture.DeliverAsync();
+        await removal.WaitUntilEnteredAsync();
+        var delivery = Assert.Single(fixture.Receiver.ReceivedCalls());
+        Assert.Equal(first.MessageId, ((DurableEnvelope)delivery.GetArguments()[0]!).MessageId);
+        Assert.Equal(later.MessageId, Assert.Single(fixture.Messages).Key);
+        await using (var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId))
+        {
+            Assert.Equal(first.MessageId, Assert.Single(recovered.Messages).Key);
+        }
+        removal.Release();
+        await deliver;
+        await fixture.DeliverAsync();
+        Assert.Equal(2, fixture.Receiver.ReceivedCalls().Count());
+        Assert.Empty(fixture.Messages);
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+    });
+
+    [Fact]
+    public Task SynchronousSend_SchedulingFailureRetainsBusinessAndIntentForExplicitRetry() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync(businessState: true);
+        var failure = new IOException("Scheduling failed before journal capture.");
+        using var scheduling = fixture.BlockSchedule();
+        fixture.Business!.Value = 42;
+        var envelope = fixture.CreateEnvelope();
+        fixture.Outbox.Send(envelope);
+        var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await scheduling.WaitAsync();
+        scheduling.Fail(failure);
+        var error = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => write);
+        Assert.Same(failure, error.InnerException);
+        Assert.Equal(0, fixture.Probe.Captures);
+        Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        Assert.Equal(42, fixture.Business.Value);
+        Assert.Equal(envelope.MessageId, Assert.Single(fixture.Messages).Key);
+        Assert.Null(fixture.Job.Value);
+        await using (var uncommitted = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId, businessState: true))
+        {
+            Assert.Equal(0, uncommitted.Business!.Value);
+            Assert.Empty(uncommitted.Messages);
+        }
+        using var retry = fixture.BlockSchedule();
+        var retried = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await retry.WaitAsync();
+        Assert.Equal(0, fixture.Probe.Captures);
+        retry.Release();
+        await retried;
+        Assert.Equal(2, fixture.Jobs.ReceivedCalls().Count());
+        Assert.Equal(1, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        await using var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId, businessState: true);
+        Assert.Equal(42, recovered.Business!.Value);
+        Assert.Equal(envelope.MessageId, Assert.Single(recovered.Messages).Key);
+        Assert.Equal(retry.Job!.Id, recovered.Job.Value!.Id);
+    });
+
+    [Fact]
+    public Task SynchronousSend_CanceledCallerLeavesSchedulingAndAckOwnedByJournal() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        using var scheduling = fixture.BlockSchedule();
+        using var cancellation = new CancellationTokenSource();
+        fixture.Outbox.Send(fixture.CreateEnvelope());
+        var write = fixture.Manager.WriteStateAsync(cancellation.Token).AsTask();
+        await scheduling.WaitAsync();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
+        Assert.False(scheduling.Token.IsCancellationRequested);
+        Assert.Equal(0, fixture.Probe.Captures);
+        scheduling.Release();
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+        Assert.Equal(1, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Messages);
+    });
+
+    [Fact]
+    public Task SynchronousSend_OverlappingPreparationSharesOnePhysicalWakeup() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        using var scheduling = fixture.BlockSchedule();
+        var envelope = fixture.CreateEnvelope();
+        var prepared = fixture.Outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken).AsTask();
+        await scheduling.WaitAsync();
+        fixture.Outbox.Send(envelope);
+        var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        scheduling.Release();
+        using var batch = await prepared;
+        await write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        fixture.Outbox.Send(batch);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+        Assert.Equal(1, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        Assert.Equal(envelope.MessageId, Assert.Single(fixture.Messages).Key);
+        Assert.Same(scheduling.Job, fixture.Job.Value);
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task SynchronousSend_OwnerRetirementArrivalGetsItsOwnCapturedOwner(bool beforeCapture) => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        fixture.Outbox.Send(fixture.CreateEnvelope());
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await fixture.DeliverAsync();
+        var old = fixture.Job.Value!;
+        var next = fixture.CreateEnvelope();
+        if (beforeCapture)
+        {
+            fixture.Manager.Hooks.Insert(0, new JournaledStateHook { BeforeOperation = (_, _) => fixture.Outbox.Send(next) });
+        }
+        using var storage = fixture.Storage.BlockWrite(fixture.JournalId);
+        var retirement = fixture.PumpAsync(old).AsTask();
+        await storage.WaitUntilEnteredAsync();
+        if (!beforeCapture) fixture.Outbox.Send(next);
+        Assert.Empty(fixture.Receiver.ReceivedCalls().Skip(1));
+        storage.Release();
+        await retirement.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        if (beforeCapture) fixture.Manager.Hooks.RemoveAt(0);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(next.MessageId, Assert.Single(fixture.Messages).Key);
+        var replacement = fixture.Job.Value!;
+        Assert.NotEqual(old.Id, replacement.Id);
+        Assert.Equal(2, fixture.Jobs.ReceivedCalls().Count());
+        await using var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
+        Assert.Equal(next.MessageId, Assert.Single(recovered.Messages).Key);
+        Assert.Equal(replacement.Id, recovered.Job.Value!.Id);
+        Assert.Equal(replacement.ShardId, recovered.Job.Value.ShardId);
+        await recovered.DeliverAsync();
+        Assert.Empty(recovered.Messages);
+    });
+
+    [Fact]
+    public Task SynchronousSend_PostCommitFailurePreservesAcknowledgedOwnedDelivery() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        fixture.Outbox.Send(fixture.CreateEnvelope());
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var failure = new IOException("After hook failed after acknowledged delivery removal.");
+        var hook = new JournaledStateHook { AfterOperation = (_, _) => throw failure };
+        fixture.Manager.Hooks.Add(hook);
+        var error = await Assert.ThrowsAsync<JournaledStatePostCommitException>(() => fixture.DeliverAsync());
+        Assert.Same(failure, error.InnerException);
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(2, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        fixture.Manager.Hooks.Remove(hook);
+        fixture.Outbox.Send(fixture.CreateEnvelope());
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(2, fixture.Receiver.ReceivedCalls().Count());
+    });
+
+    [Fact]
+    public Task SynchronousSend_OwnedPreCommitFailureRetiresStagedOperationForFreshReplay() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var envelope = fixture.CreateEnvelope();
+        fixture.Outbox.Send(envelope);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var failure = new IOException("Blocked prerequisite on an owned delivery write.");
+        fixture.Manager.Hooks.Add(new JournaledStateHook { BeforeOperation = (_, _) => throw failure });
+        var error = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => fixture.DeliverAsync());
+        Assert.Same(failure, error.InnerException);
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(1, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        Assert.Same(error, Assert.Throws<JournaledStatePreCommitException>(() => fixture.Outbox.Send(fixture.CreateEnvelope())));
+        var deactivate = Assert.Single(fixture.Context.ReceivedCalls(), call => call.GetMethodInfo().Name == "Deactivate");
+        Assert.Same(error, Assert.IsType<DeactivationReason>(deactivate.GetArguments()[0]).Exception);
+        await using var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
+        Assert.Equal(envelope.MessageId, Assert.Single(recovered.Messages).Key);
+        await recovered.DeliverAsync();
+        Assert.Empty(recovered.Messages);
+    });
+
+    [Fact]
+    public Task SynchronousSend_StopDrainsSchedulingBeforeTerminalDeletion() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        using var scheduling = fixture.BlockSchedule();
+        fixture.Outbox.Send(fixture.CreateEnvelope());
+        var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await scheduling.WaitAsync();
+        var stop = ((ILifecycleObserver)fixture.Outbox).OnStop(CancellationToken.None);
+        Assert.True(scheduling.Token.IsCancellationRequested);
+        Assert.False(stop.IsCompleted);
+        scheduling.Release();
+        var error = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => write);
+        Assert.IsAssignableFrom<OperationCanceledException>(error.InnerException);
+        await stop;
+        Assert.Equal(0, fixture.Probe.Captures);
+        await fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Empty(fixture.Messages);
+        Assert.ThrowsAny<OperationCanceledException>(() => fixture.Outbox.Send(fixture.CreateEnvelope()));
+        await using var fresh = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
+        fresh.Outbox.Send(fresh.CreateEnvelope());
+        await fresh.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Single(fresh.Messages);
+    });
+
+    private static async Task OnOwnerAsync(Func<Task> action)
+    {
+        var scheduler = new ConcurrentExclusiveSchedulerPair(TaskScheduler.Default, maxConcurrencyLevel: 1);
+        try
+        {
+            await Task.Factory.StartNew(action, TestContext.Current.CancellationToken, TaskCreationOptions.None,
+                scheduler.ExclusiveScheduler).Unwrap().WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            scheduler.Complete();
+            await scheduler.Completion;
+        }
+    }
+
+    private sealed class ScheduleBarrier(ILocalDurableJobManager jobs) : IDisposable
+    {
+        private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _continue = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public DurableJob? Job { get; private set; }
+        public CancellationToken Token { get; private set; }
+        public void Arm() => jobs.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
+            .Returns(call => ScheduleAsync(call.ArgAt<ScheduleJobRequest>(0), call.ArgAt<CancellationToken>(1)));
+        private async Task<DurableJob> ScheduleAsync(ScheduleJobRequest request, CancellationToken token)
+        {
+            Token = token;
+            Job = new DurableJob
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                ShardId = "opaque-shard",
+                Name = request.JobName,
+                DueTime = request.DueTime,
+                TargetGrainId = request.Target,
+                Metadata = request.Metadata
+            };
+            _entered.TrySetResult();
+            await _continue.Task;
+            return Job;
+        }
+        public Task WaitAsync() => _entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        public void Release() => _continue.TrySetResult();
+        public void Fail(Exception failure) => _continue.TrySetException(failure);
+        public void Dispose() => Release();
+    }
+
     [GenerateSerializer]
     public sealed record Payload([property: Id(0)] byte[] Bytes);
 
@@ -497,6 +852,7 @@ public sealed class OutboxCodecBoundaryTests
         private readonly ConcurrentQueue<(string Type, string Phase)> _calls = new();
         public required SerializerSessionPool InnerSessions { get; init; }
         public string Phase { get; set; } = "before-admission";
+        public int Captures { get; set; }
         public string? FailureType { get; set; }
         public string? ReadFailureType { get; set; }
         public int ReadFailures { get; private set; }
@@ -549,6 +905,8 @@ public sealed class OutboxCodecBoundaryTests
         public ControlledJournalStorageProvider Storage { get; }
         public IJournaledStateManager Manager { get; }
         public IDurableOutbox Outbox { get; }
+        public IDurableValue<int>? Business { get; }
+        public IDurableInboxExtension Receiver { get; }
         public IDurableDictionary<Guid, DurableEnvelope> Messages { get; }
         public IDurableValue<DurableJob> Job { get; }
         public StateTrackingManager States { get; }
@@ -564,7 +922,7 @@ public sealed class OutboxCodecBoundaryTests
             }
         }
 
-        private CodecFixture(ControlledJournalStorageProvider? storage, JournalId? journalId, DeliveryResult delivery, int maxAttempts, int stateOrder, bool snapshot)
+        private CodecFixture(ControlledJournalStorageProvider? storage, JournalId? journalId, DeliveryResult delivery, int maxAttempts, int stateOrder, bool snapshot, bool businessState)
         {
             JournalId = journalId ?? new JournalId($"codec-boundary/{Guid.NewGuid():N}");
             Storage = storage ?? new ControlledJournalStorageProvider();
@@ -614,7 +972,7 @@ public sealed class OutboxCodecBoundaryTests
                 });
             });
             services.AddSingleton(jobs);
-            var inbox = Substitute.For<IDurableInboxExtension>();
+            var inbox = Receiver = Substitute.For<IDurableInboxExtension>();
             inbox.DeliverAsync(Arg.Any<DurableEnvelope>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(delivery));
             var grains = Substitute.For<IGrainFactory>();
             grains.GetGrain<IDurableInboxExtension>(Arg.Any<GrainId>()).Returns(inbox);
@@ -630,6 +988,7 @@ public sealed class OutboxCodecBoundaryTests
             Outbox = (IDurableOutbox)ActivatorUtilities.CreateInstance(dependencies, Implementation("DurableOutbox"),
                 dependencies.GetRequiredKeyedService<IDurableValueCommandCodec<long>>("orleans-binary"));
             States = _scope.ServiceProvider.GetRequiredService<StateTrackingManager>();
+            if (businessState) Business = dependencies.GetRequiredKeyedService<IDurableValue<int>>("business");
             States.RegisterStates(stateOrder);
             Messages = States.GetState<IDurableDictionary<Guid, DurableEnvelope>>("__orleans.durable-messaging.outbox");
             Job = States.GetState<IDurableValue<DurableJob>>("__orleans.durable-messaging.outbox-job-handle");
@@ -637,9 +996,9 @@ public sealed class OutboxCodecBoundaryTests
         }
 
         public static async Task<CodecFixture> CreateAsync(ControlledJournalStorageProvider? storage = null, JournalId? journalId = null,
-            DeliveryResult? delivery = null, int maxAttempts = 1, int stateOrder = 0, bool snapshot = false, bool initialize = true)
+            DeliveryResult? delivery = null, int maxAttempts = 1, int stateOrder = 0, bool snapshot = false, bool initialize = true, bool businessState = false)
         {
-            var result = new CodecFixture(storage, journalId, delivery ?? DeliveryResult.Accepted(), maxAttempts, stateOrder, snapshot);
+            var result = new CodecFixture(storage, journalId, delivery ?? DeliveryResult.Accepted(), maxAttempts, stateOrder, snapshot, businessState);
             if (initialize)
             {
                 await result.Manager.InitializeAsync(TestContext.Current.CancellationToken);
@@ -664,6 +1023,29 @@ public sealed class OutboxCodecBoundaryTests
                 _ => throw new ArgumentOutOfRangeException(nameof(name))
             };
             return _scope.ServiceProvider.GetRequiredKeyedService(contract, name);
+        }
+
+        public ScheduleBarrier BlockSchedule()
+        {
+            var result = new ScheduleBarrier(Jobs);
+            result.Arm();
+            return result;
+        }
+
+        public ValueTask<DurableJobRunResult> CallbackAsync(DurableJob job)
+        {
+            var context = Substitute.For<IJobRunContext>();
+            context.Job.Returns(job);
+            context.RunId.Returns("early-run");
+            context.DequeueCount.Returns(1);
+            return ((IDurableJobFeatureHandler)Outbox).ExecuteJobAsync(context, TestContext.Current.CancellationToken);
+        }
+
+        public ValueTask<DurableJobRunResult> PumpAsync(DurableJob job)
+        {
+            var generation = Outbox.GetType().GetField("_stateGeneration", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Outbox);
+            return (ValueTask<DurableJobRunResult>)Outbox.GetType().GetMethod("ExecuteJobCoreAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(Outbox, [job.Metadata!["orleans.messaging.ownership-id"], job, generation, TestContext.Current.CancellationToken, TestContext.Current.CancellationToken])!;
         }
 
         public async Task SeedOwnerlessJournalAsync(JournalId journal, DurableEnvelope envelope)
@@ -713,7 +1095,7 @@ public sealed class OutboxCodecBoundaryTests
                 {
                     await Manager.WriteStateAsync(CancellationToken.None);
                 }
-                catch (Exception exception)
+                catch (Exception exception) when (exception is not JournaledStatePreCommitException and not JournaledStatePostCommitException)
                 {
                     Outbox.GetType().GetMethod("FailPersistence", BindingFlags.Instance | BindingFlags.NonPublic)!
                         .CreateDelegate<Action<Exception>>(Outbox)(exception);
@@ -759,6 +1141,7 @@ public sealed class OutboxCodecBoundaryTests
     private sealed class StateTrackingManager(IJournaledStateManager inner, CodecProbe probe) : IJournaledStateManager
     {
         private readonly Dictionary<string, IStateMachine> _states = new(StringComparer.Ordinal);
+        public IList<IJournaledStateHook> Hooks => inner.Hooks;
         public Exception? Failure { get; private set; }
         public int StateCount => _states.Count;
         public void RegisterStateMachine(string name, IStateMachine state) => _states.Add(name, state);
@@ -790,8 +1173,8 @@ public sealed class OutboxCodecBoundaryTests
 
         private sealed class TrackedState(IStateMachine state, CodecProbe probe) : IStateMachine
         {
-            public void WritePendingEntries(JournalStreamWriter writer) { probe.Phase = "capture"; state.WritePendingEntries(writer); }
-            public void WriteSnapshot(JournalStreamWriter writer) { probe.Phase = "capture"; state.WriteSnapshot(writer); }
+            public void WritePendingEntries(JournalStreamWriter writer) { probe.Phase = "capture"; probe.Captures++; state.WritePendingEntries(writer); }
+            public void WriteSnapshot(JournalStreamWriter writer) { probe.Phase = "capture"; probe.Captures++; state.WriteSnapshot(writer); }
             public void OnWriteCompleted() => state.OnWriteCompleted();
             public void Reset(JournalStreamWriter writer) => state.Reset(writer);
             public void OnRecoveryCompleted() => state.OnRecoveryCompleted();

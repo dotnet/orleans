@@ -2815,6 +2815,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             _eagerCapture = eagerCapture;
         }
 
+        public IList<IJournaledStateHook> Hooks { get; } = [];
         public TestStorage Storage { get; private set; } = null!;
         public int RegistrationCount => _states.Count;
         public int WriteCount { get; private set; }
@@ -2867,6 +2868,14 @@ public sealed class DurableOutboxDeliveryBatchTests
             _failure?.Throw();
             try
             {
+                foreach (var hook in Hooks) await hook.BeforeOperationAsync(JournaledStateOperation.Write, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                throw new JournaledStatePreCommitException(JournaledStateOperation.Write, exception);
+            }
+            try
+            {
                 WriteCount++;
                 uint id = 1;
                 foreach (var state in _states.Values) state.WritePendingEntries(_writer.CreateJournalStreamWriter(new(id++)));
@@ -2900,6 +2909,13 @@ public sealed class DurableOutboxDeliveryBatchTests
                 Fail(exception);
                 throw;
             }
+            List<Exception>? failures = null;
+            foreach (var hook in Hooks)
+            {
+                try { await hook.AfterOperationAsync(JournaledStateOperation.Write, CancellationToken.None); }
+                catch (Exception exception) { (failures ??= []).Add(exception); }
+            }
+            if (failures is not null) throw new JournaledStatePostCommitException(JournaledStateOperation.Write, new AggregateException(failures));
         }
 
         public void Fail(Exception exception)

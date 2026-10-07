@@ -61,8 +61,8 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
 
     /// <inheritdoc />
     /// <remarks>
-    /// Prepare outgoing batches through this handler-scoped outbox, then stage them through
-    /// <see cref="Send"/> or the outbox from the matching apply action.
+    /// Stage envelopes or optional prepared batches through this handler-scoped outbox
+    /// from the matching apply action.
     /// </remarks>
     public IDurableOutbox Outbox { get; }
 
@@ -141,4 +141,7 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     {
         Outbox.Send(batch);
     }
+
+    /// <inheritdoc/>
+    public void Send(DurableEnvelope envelope) => Outbox.Send(envelope);
 }

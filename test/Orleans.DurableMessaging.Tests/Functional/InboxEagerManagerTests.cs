@@ -139,6 +139,7 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
         private readonly Dictionary<IStateMachine, uint> _ids = [];
         private IEnumerable<IStateMachine> States => reverseStateOrder ? _states.Values.Reverse() : _states.Values;
         private System.Runtime.ExceptionServices.ExceptionDispatchInfo? _failure;
+        public IList<IJournaledStateHook> Hooks { get; } = [];
         public Action? BeforeCapture { get; set; }
         public int Writes { get; private set; }
         public int Requests { get; private set; }

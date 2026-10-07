@@ -254,8 +254,38 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         Assert.Equal(first.Output.MessageId, Assert.Single(Fixture.GetStagedOutput(receiver)).MessageId);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SynchronousEnvelopeSend_PreparationRejectionRetainsFirstError(bool throughOutbox)
+    {
+        var receiver = NewGrain();
+        await receiver.GetSnapshotAsync();
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
+        var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
+        var effects = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEffect>>("test-effects");
+        using var handler = new SendingHandler(throughOutbox, true, true, effects, synchronous: true);
+        await OnTurnAsync(context, () => context.ActivationServices.GetRequiredService<IDurableInbox>().RegisterHandler("guarded/send", handler));
+        using var envelope = CreateEnvelope(receiver, NewMessage(311, "sync-prepare"), "guarded/send");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
+        await handler.Prepared.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        handler.BeginSend.TrySetResult();
+        await handler.SendAttempted.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var error = Assert.IsType<InvalidOperationException>(handler.Rejection);
+        Assert.Contains("synchronous apply action", error.Message, StringComparison.Ordinal);
+        Assert.Empty(outbox);
+        Assert.Empty(outbox.PreparedBatches);
+        Assert.Equal(0, outbox.SendCalls);
+        handler.FinishPreparation.TrySetResult();
+        Assert.Same(error, await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        Assert.Equal(0, handler.Applied);
+        Assert.Empty(effects);
+        Assert.Empty(outbox);
+    }
+
     private sealed class SendingHandler(bool throughOutbox, bool sendDuringPreparation, bool returnAction,
-        IDurableDictionary<Guid, DurableEffect> effects) : IInboxHandler, IDisposable
+        IDurableDictionary<Guid, DurableEffect> effects, bool synchronous = false) : IInboxHandler, IDisposable
     {
         public TaskCompletionSource Prepared { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource BeginSend { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -275,7 +305,7 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
             Context = context;
             _outbox = context.Outbox;
             Output = context.CreateEnvelope().To(context.GrainId, "output").WithBody(42).Build();
-            Batch = await context.Outbox.PrepareSendAsync([Output], cancellationToken);
+            if (!synchronous) Batch = await context.Outbox.PrepareSendAsync([Output], cancellationToken);
             Prepared.TrySetResult();
             await BeginSend.Task.WaitAsync(cancellationToken);
             if (sendDuringPreparation)
@@ -297,6 +327,12 @@ public sealed class InboxHandlerSendBoundaryTests : DurableMessagingBehaviorTest
         }
         public void Send(IPreparedOutboxBatch batch)
         {
+            if (synchronous)
+            {
+                if (throughOutbox) _outbox!.Send(Output);
+                else Context!.Send(Output);
+                return;
+            }
             if (throughOutbox) _outbox!.Send(batch);
             else Context!.Send(batch);
         }

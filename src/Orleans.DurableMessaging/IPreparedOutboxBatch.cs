@@ -8,7 +8,7 @@ namespace Orleans.DurableMessaging;
 /// <remarks>
 /// <para>
 /// <see cref="IDurableOutbox.PrepareSendAsync"/> creates a batch bound to its owning outbox and activation.
-/// Retain the original envelopes for message metadata. Use the batch with <see cref="IDurableOutbox.Send"/>
+/// Retain the original envelopes for message metadata. Use the batch with <see cref="IDurableOutbox.Send(IPreparedOutboxBatch)"/>
 /// after preparation completes and before its owning scope ends.
 /// </para>
 /// <para>

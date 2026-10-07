@@ -375,6 +375,11 @@ internal sealed partial class DurableInboxExtension :
             {
                 await _stateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
             }
+            catch (JournaledStatePostCommitException)
+            {
+                AcknowledgeWrite(operation);
+                throw;
+            }
             catch (Exception exception)
             {
                 LatchFailure(exception);
@@ -382,8 +387,8 @@ internal sealed partial class DurableInboxExtension :
             }
             AcknowledgeWrite(operation);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException
-            || _failure is not null || !_shutdownToken.IsCancellationRequested)
+        catch (Exception exception) when (exception is not JournaledStatePostCommitException
+            && (exception is not OperationCanceledException || _failure is not null || !_shutdownToken.IsCancellationRequested))
         {
             LatchFailure(exception);
             try
@@ -890,6 +895,21 @@ internal sealed partial class DurableInboxExtension :
                         "Inbox handlers must consume every failed batch preparation before returning their synchronous apply action.",
                         failure));
                 }
+            }
+        }
+
+        public void Send(DurableEnvelope envelope)
+        {
+            ValidateScope(HandlerPhase.Applying,
+                "Handler messages can be sent only from that attempt's synchronous apply action.");
+            try
+            {
+                Owner._outbox.Send(envelope);
+            }
+            catch (Exception exception)
+            {
+                RejectOperation(exception);
+                throw;
             }
         }
 
