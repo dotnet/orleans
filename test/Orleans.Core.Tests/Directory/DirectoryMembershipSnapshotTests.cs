@@ -126,13 +126,13 @@ public sealed class DirectoryMembershipSnapshotTests
     public void LegacyPartitionBoundariesPreserveCachedHashOrder()
     {
         var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11112), 1);
-        uint[] generated = [300, 100, 200];
+        uint[] generated = [uint.MaxValue, 100, 0x80000000, 200];
         member.InternalSetUniformHashCodes(generated);
 
         var boundaries = GrainDirectoryOptions.GetLegacyPartitionBoundaries(member, generated.Length);
 
-        Assert.Equal([100u, 200u, 300u], boundaries);
-        Assert.Equal([300u, 100u, 200u], member.GetUniformHashCodes(generated.Length));
+        Assert.Equal([100u, 200u, 0x80000000u, uint.MaxValue], boundaries);
+        Assert.Equal([uint.MaxValue, 100u, 0x80000000u, 200u], member.GetUniformHashCodes(generated.Length));
         Assert.NotSame(generated, boundaries);
     }
 
