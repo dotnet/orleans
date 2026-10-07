@@ -290,6 +290,39 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 "The journaled state operation was queued before deletion reset its state.");
                         }
 
+                        hookOperation = workItem switch
+                        {
+                            AppendJournalWorkItem or WriteSnapshotWorkItem =>
+                                workItem is WriteSnapshotWorkItem || _migrationSnapshotRequired || _storage.IsCompactionRequested
+                                    ? JournaledStateOperation.Snapshot : JournaledStateOperation.Write,
+                            DeleteStateWorkItem => JournaledStateOperation.Delete,
+                            _ => null
+                        };
+                        if (hookOperation is { } operation && _hooks is { Count: > 0 })
+                        {
+                            beforeHookRunning = true;
+                            var captureHook = GetCaptureHook();
+                            if (captureHook is null || _hooks.Count > 1)
+                            {
+                                await InvokeBeforeHooksAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
+                            }
+                            if (captureHook is not null)
+                            {
+                                var previous = CurrentHookOwner.Value;
+                                CurrentHookOwner.Value = this;
+                                try
+                                {
+                                    await captureHook.BeforeOperationAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+                                finally
+                                {
+                                    CurrentHookOwner.Value = previous;
+                                }
+                            }
+                            _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                            beforeHookRunning = false;
+                        }
+
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         switch (workItem)
@@ -299,16 +332,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 {
                                     // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
                                     //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
-                                    var isSnapshot = workItem is WriteSnapshotWorkItem
-                                        || _migrationSnapshotRequired
-                                        || _storage.IsCompactionRequested;
-                                    hookOperation = isSnapshot ? JournaledStateOperation.Snapshot : JournaledStateOperation.Write;
-                                    if (_hooks is { Count: > 0 })
-                                    {
-                                        beforeHookRunning = true;
-                                        await InvokeBeforeHooksAsync(hookOperation.Value, _shutdownCancellation.Token).ConfigureAwait(true);
-                                        beforeHookRunning = false;
-                                    }
+                                    var isSnapshot = hookOperation == JournaledStateOperation.Snapshot;
                                     var operationLabel = isSnapshot
                                         ? JournalingInstruments.OperationSnapshot
                                         : JournalingInstruments.OperationAppend;
@@ -498,13 +522,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                             case DeleteStateWorkItem:
                                 {
-                                    hookOperation = JournaledStateOperation.Delete;
-                                    if (_hooks is { Count: > 0 })
-                                    {
-                                        beforeHookRunning = true;
-                                        await InvokeBeforeHooksAsync(hookOperation.Value, _shutdownCancellation.Token).ConfigureAwait(true);
-                                        beforeHookRunning = false;
-                                    }
                                     // Clear storage.
                                     await DeleteStorageAsync(_shutdownCancellation.Token).ConfigureAwait(true);
 
@@ -642,6 +659,23 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
     }
 
+    private IJournaledStateCaptureHook? GetCaptureHook()
+    {
+        IJournaledStateCaptureHook? result = null;
+        foreach (var hook in _hooks!)
+        {
+            if (hook is IJournaledStateCaptureHook captureHook)
+            {
+                if (result is not null)
+                {
+                    throw new InvalidOperationException("A journal owner supports one final capture prerequisite hook. Inspect and deduplicate the hook list before registration.");
+                }
+                result = captureHook;
+            }
+        }
+        return result;
+    }
+
     private async ValueTask InvokeBeforeHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
     {
         var previous = CurrentHookOwner.Value;
@@ -650,6 +684,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         {
             foreach (var hook in _hooks!)
             {
+                if (hook is IJournaledStateCaptureHook)
+                {
+                    continue;
+                }
                 cancellationToken.ThrowIfCancellationRequested();
                 await hook.BeforeOperationAsync(operation, cancellationToken).ConfigureAwait(true);
             }

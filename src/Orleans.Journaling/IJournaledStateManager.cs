@@ -17,7 +17,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// Inspect, add, remove, and deduplicate hooks on the owner's logical execution context while
-    /// no persistence operation is running. Hooks execute in list order. Registration is independent
+    /// no persistence operation is running. Ordinary before hooks and all after hooks execute in list
+    /// order. The optional single <see cref="IJournaledStateCaptureHook"/> supplies the final prerequisite.
+    /// Registration is independent
     /// of state-machine registration and persists through recovery and deletion.
     /// </remarks>
     IList<IJournaledStateHook> Hooks { get; }

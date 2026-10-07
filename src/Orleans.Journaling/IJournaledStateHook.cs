@@ -19,7 +19,8 @@ public enum JournaledStateOperation
 /// Participates in the prerequisites and completion of actual journal operations.
 /// </summary>
 /// <remarks>
-/// Hooks run in registration order on the owner's logical execution context, outside its lock.
+/// Ordinary before hooks run in registration order on the owner's logical execution context, outside its lock.
+/// An optional <see cref="IJournaledStateCaptureHook"/> runs last immediately before capture or deletion.
 /// Before hooks finish before synchronous capture begins. Their prerequisites must remain valid for
 /// changes staged during asynchronous preparation. After hooks run after storage acknowledgement and
 /// state acknowledgement or reset, including successful writes which produce no storage bytes.

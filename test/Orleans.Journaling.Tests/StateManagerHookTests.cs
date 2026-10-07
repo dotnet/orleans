@@ -484,6 +484,168 @@ public partial class StateManagerTests
         Assert.Single(storage.Appends);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Hooks_FinalPrerequisiteCoversChangesArrivingDuringLaterOrdinaryHook(bool snapshot)
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = snapshot };
+        var sut = CreateTestSystem(storage);
+        await using var manager = sut.Manager;
+        var state = new DurableDictionary<string, int>("state", manager, CreateDictionaryCodec<string, int>());
+        List<string> events = [];
+        manager.RegisterStateMachine("ack", new HookAcknowledgementState(events));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.Hooks.Add(new CaptureTestHook(
+            (_, token) =>
+            {
+                Assert.True(token.CanBeCanceled);
+                Assert.Equal(3, state["late"]);
+                state["owner"] = 2;
+                events.Add("capture-prerequisite");
+                return default;
+            },
+            (_, _) => events.Add("capture-after")));
+        manager.Hooks.Add(new JournaledStateHook
+        {
+            BeforeOperationAsync = async (_, token) =>
+            {
+                events.Add("ordinary-before");
+                entered.TrySetResult();
+                await release.Task.WaitAsync(token);
+                events.Add("ordinary-complete");
+            },
+            AfterOperation = (_, _) => events.Add("ordinary-after")
+        });
+        state["business"] = 1;
+        var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        try
+        {
+            Assert.Equal(new[] { "ordinary-before" }, events);
+            Assert.Empty(storage.Appends);
+            Assert.Empty(storage.Replaces);
+            state["late"] = 3;
+            release.TrySetResult();
+            await write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.Equal(new[] { "ordinary-before", "ordinary-complete", "capture-prerequisite", "ack", "capture-after", "ordinary-after" }, events);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+        var replay = CreateTestSystem(storage);
+        await using var recoveredManager = replay.Manager;
+        var recovered = new DurableDictionary<string, int>("state", recoveredManager, CreateDictionaryCodec<string, int>());
+        await replay.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        Assert.Equal(3, recovered.Count);
+        Assert.Equal(1, recovered["business"]);
+        Assert.Equal(2, recovered["owner"]);
+        Assert.Equal(3, recovered["late"]);
+    }
+
+    [Fact]
+    public async Task Hooks_DuplicateCapturePrerequisitesFailBeforeOrdinaryCallbacks()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage);
+        await using var manager = sut.Manager;
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var ordinary = 0;
+        manager.Hooks.Add(new JournaledStateHook { BeforeOperation = (_, _) => ordinary++ });
+        manager.Hooks.Add(new CaptureTestHook((_, _) => default));
+        var duplicate = new CaptureTestHook((_, _) => default);
+        manager.Hooks.Add(duplicate);
+
+        var failure = await Assert.ThrowsAsync<JournaledStatePreCommitException>(
+            () => manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Contains("one final capture", Assert.IsType<InvalidOperationException>(failure.InnerException).Message, StringComparison.Ordinal);
+        Assert.Equal(0, ordinary);
+        Assert.Empty(storage.Appends);
+        manager.Hooks.Remove(duplicate);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, ordinary);
+    }
+
+    [Fact]
+    public async Task Hooks_FinalPrerequisiteRejectsSameOwnerReentry()
+    {
+        var sut = CreateTestSystem();
+        await using var manager = sut.Manager;
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        manager.Hooks.Add(new CaptureTestHook((_, token) => manager.DeleteStateAsync(token)));
+
+        var failure = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() =>
+            manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
+                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        Assert.Contains("same journal owner", Assert.IsType<InvalidOperationException>(failure.InnerException).Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Hooks_FinalPrerequisiteRetainsOwnedCancellationAfterCallerLeaves()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage);
+        await using var manager = sut.Manager;
+        var state = new DurableDictionary<string, int>("state", manager, CreateDictionaryCodec<string, int>());
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var acknowledged = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationToken owned = default;
+        manager.Hooks.Add(new CaptureTestHook(
+            async (_, token) =>
+            {
+                owned = token;
+                entered.TrySetResult();
+                await release.Task.WaitAsync(token);
+                state["owner"] = 2;
+            },
+            (_, token) =>
+            {
+                Assert.Equal(owned, token);
+                Assert.False(token.IsCancellationRequested);
+                Assert.Single(storage.Appends);
+                acknowledged.TrySetResult();
+            }));
+        using var caller = new CancellationTokenSource();
+        state["business"] = 1;
+        var write = manager.WriteStateAsync(caller.Token).AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        try
+        {
+            caller.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
+            Assert.False(owned.IsCancellationRequested);
+            Assert.Empty(storage.Appends);
+            release.TrySetResult();
+            await acknowledged.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.Equal(2, state["owner"]);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
+    private sealed class CaptureTestHook(
+        Func<JournaledStateOperation, CancellationToken, ValueTask> before,
+        Action<JournaledStateOperation, CancellationToken>? after = null) : IJournaledStateCaptureHook
+    {
+        public ValueTask BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken) =>
+            before(operation, cancellationToken);
+
+        public ValueTask AfterOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+        {
+            after?.Invoke(operation, cancellationToken);
+            return default;
+        }
+    }
+
     private sealed class HookAcknowledgementState(List<string> events) : IStateMachine
     {
         public void ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
