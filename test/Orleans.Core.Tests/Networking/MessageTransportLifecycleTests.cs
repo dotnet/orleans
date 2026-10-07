@@ -667,6 +667,85 @@ public class MessageTransportLifecycleTests
         await connection.CloseAsync(null);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Message_TerminalDisposeOrReplacement_ReleasesResponseOnce(bool replace)
+    {
+        var response = new TrackedRawResponse("owned payload");
+        var message = new Message { Direction = Message.Directions.Response, BodyObject = response };
+        message.BodyObject = response;
+        Assert.Equal(0, response.DisposeCount);
+
+        if (replace) message.BodyObject = Response.FromException(new IOException("replacement"));
+        else message.Dispose();
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        message.Dispose();
+        message.Dispose();
+        Assert.Null(message._bodyObject);
+        Assert.Equal(1, response.DisposeCount);
+    }
+
+    [Fact]
+    public async Task MessageWriteRequest_FailedWriteThenTerminalDrop_ReleasesRetainedResponse()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CapturingTransport();
+        var connection = new ResponseSendConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        var response = new TrackedRawResponse("failed write");
+        var message = new Message { Direction = Message.Directions.Response, BodyObject = response };
+        var request = shared.GetSendMessageHandler(connection);
+        request.WriteMessage(message);
+
+        request.SetException(new IOException("reroute"));
+        var retry = await connection.Retried.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Same(response, retry.Message._bodyObject);
+        Assert.Equal(0, response.DisposeCount);
+        retry.Message.Dispose();
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        Assert.Null(message._bodyObject);
+        await connection.CloseAsync(null);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Connection_SerializationFailure_ReleasesReplacedOrDroppedResponse(bool exhaustedRetries)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CapturingTransport();
+        var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connection = new ResponseSendConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter,
+            message =>
+            {
+                Assert.IsType<ExceptionResponse>(message._bodyObject);
+                sent.TrySetResult();
+            });
+        var response = new TrackedRawResponse("bad serialization") { FailWriting = true };
+        var message = new Message
+        {
+            Direction = Message.Directions.Response,
+            BodyObject = response,
+            RetryCount = (short)(exhaustedRetries ? MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES : 0),
+        };
+
+        connection.Send(message);
+        if (!exhaustedRetries) await sent.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await response.Disposed.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await connection.CloseAsync(null);
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        Assert.Null(message._bodyObject);
+        Assert.Equal(exhaustedRetries ? MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES : 1, message.RetryCount);
+    }
+
     [Fact]
     public void MessageWriteRequest_LargeMessageState_TracksFramesAndAdaptsPageSize()
     {
@@ -1120,7 +1199,9 @@ public class MessageTransportLifecycleTests
 
     private sealed class TrackedRawResponse(string payload) : Response, IRawResponseWriter
     {
+        private readonly TaskCompletionSource _disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int DisposeCount { get; private set; }
+        public Task Disposed => _disposed.Task;
         public bool FailWriting { get; set; }
         public override object? Result { get; set; } = payload;
         public override Exception? Exception { get; set; }
@@ -1130,6 +1211,7 @@ public class MessageTransportLifecycleTests
         {
             DisposeCount++;
             Result = null;
+            _disposed.TrySetResult();
         }
 
         public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte>

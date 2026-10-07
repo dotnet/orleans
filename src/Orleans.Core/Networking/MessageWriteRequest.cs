@@ -4,7 +4,6 @@ using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
-using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime.Messaging;
 
@@ -88,13 +87,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         {
             foreach (var (message, _, _) in _messages)
             {
-                if (message._bodyObject is Response response)
-                {
-                    message._bodyObject = null;
-                    response.Dispose();
-                }
-
-                message.ReleaseBodyBuffer();
+                message.ReleaseBody();
             }
 
             Reset();

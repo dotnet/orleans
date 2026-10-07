@@ -1051,9 +1051,8 @@ public sealed class SelfWritingResponseOwnershipTests
             using var received = SelfWritingResponseMessageTests.ReadFrame(_serializer, frame);
             Assert.Equal(message.Direction, received.Direction);
             Assert.Equal(message.Id, received.Id);
-            using var result = Assert.IsAssignableFrom<Response>(received.BodyObject);
+            using var result = Assert.IsAssignableFrom<Response>(received.TakeBodyObject());
             Assert.Equal(Assert.IsType<Payload>(response.Result).Values, Assert.IsType<Payload>(result.Result).Values);
-            received.BodyObject = null;
             return Task.CompletedTask;
         }
 
