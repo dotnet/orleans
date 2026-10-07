@@ -203,8 +203,6 @@ namespace Orleans.Configuration
 
         public System.TimeSpan RangeLeaseDuration { get { throw null; } set { } }
 
-        public static uint[] GetLegacyPartitionBoundaries(Runtime.SiloAddress silo, int partitionCount) { throw null; }
-
         public enum CachingStrategyType
         {
             None = 0,

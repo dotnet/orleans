@@ -1,8 +1,12 @@
 using System.Collections.Immutable;
+using Documentation.Deployment;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Runtime.GrainDirectory;
 using CsCheck;
 using UnitTests.Directory;
@@ -133,7 +137,8 @@ public sealed class DirectoryMembershipSnapshotTests
         uint[] generated = [uint.MaxValue, 100, 0x80000000, 200];
         member.InternalSetUniformHashCodes(generated);
 
-        var boundaries = GrainDirectoryOptions.GetLegacyPartitionBoundaries(member, generated.Length);
+        var options = GetDocumentedLegacyOptions();
+        var boundaries = options.GetPartitionBoundaries(member, generated.Length);
 
         Assert.Equal([100u, 200u, 0x80000000u, uint.MaxValue], boundaries);
         Assert.Equal([uint.MaxValue, 100u, 0x80000000u, 200u], member.GetUniformHashCodes(generated.Length));
@@ -151,11 +156,8 @@ public sealed class DirectoryMembershipSnapshotTests
         var membership = new ClusterMembershipSnapshot(
             members.ToImmutableDictionary(member => member, member => new ClusterMember(member, SiloStatus.Active, member.ToString())),
             new(1));
-        var options = new GrainDirectoryOptions
-        {
-            PartitionsPerSilo = partitionCount,
-            GetPartitionBoundaries = GrainDirectoryOptions.GetLegacyPartitionBoundaries
-        };
+        var options = GetDocumentedLegacyOptions();
+        Assert.Equal(partitionCount, options.PartitionsPerSilo);
         var snapshot = new DirectoryMembershipSnapshot(membership, null!, options.PartitionsPerSilo, options.GetPartitionBoundaries);
         var legacyHashes = members.Select(member => member.GetUniformHashCodes(partitionCount).Order().ToArray()).ToArray();
 
@@ -208,6 +210,16 @@ public sealed class DirectoryMembershipSnapshotTests
     {
         Assert.Throws<ArgumentNullException>(() =>
             new DirectoryMembershipService(null!, null!, null!, 3, null!));
+    }
+
+    private static GrainDirectoryOptions GetDocumentedLegacyOptions()
+    {
+        var services = new ServiceCollection();
+        var siloBuilder = Substitute.For<ISiloBuilder>();
+        siloBuilder.Services.Returns(services);
+        DirectoryPartitioningSnippet.Configure(siloBuilder);
+        using var serviceProvider = services.BuildServiceProvider();
+        return serviceProvider.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value;
     }
 
     [Theory]

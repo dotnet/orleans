@@ -1,4 +1,5 @@
 #nullable enable
+using Documentation.Deployment;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -49,13 +50,18 @@ public sealed class GrainDirectoryOptionsTests
         var builder = new InProcessTestClusterBuilder(1);
         builder.ConfigureSilo((_, siloBuilder) =>
         {
-            siloBuilder.Configure<GrainDirectoryOptions>(options =>
+            if (useLegacyMapping)
             {
-                options.PartitionsPerSilo = useLegacyMapping ? 30 : 3;
-                options.GetPartitionBoundaries = useLegacyMapping
-                    ? GrainDirectoryOptions.GetLegacyPartitionBoundaries
-                    : static (_, _) => [300, 100, 200];
-            });
+                DirectoryPartitioningSnippet.Configure(siloBuilder);
+            }
+            else
+            {
+                siloBuilder.Configure<GrainDirectoryOptions>(options =>
+                {
+                    options.PartitionsPerSilo = 3;
+                    options.GetPartitionBoundaries = static (_, _) => [300, 100, 200];
+                });
+            }
 #pragma warning disable ORLEANSEXP003
             siloBuilder.AddDistributedGrainDirectory();
 #pragma warning restore ORLEANSEXP003

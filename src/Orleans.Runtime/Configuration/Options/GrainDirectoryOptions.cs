@@ -75,31 +75,10 @@ public class GrainDirectoryOptions
     /// and refresh calls throw <see cref="OrleansConfigurationException"/>. Correct the configuration and restart the affected silos.
     /// By default, a single partition uses <see cref="SiloAddress.GetConsistentHashCode()"/>, and multiple partitions use
     /// <see cref="SiloAddress.GetUniformHashCodes(int)"/> in hash-generation order.
-    /// To retain the mapping used by Orleans 10.1 distributed-directory clusters, configure
-    /// <see cref="PartitionsPerSilo"/> to 30 and set this property to <see cref="GetLegacyPartitionBoundaries"/>.
+    /// Applications which reorder the array returned by <see cref="SiloAddress.GetUniformHashCodes(int)"/>
+    /// must copy it first to preserve the silo's cached hash order.
     /// </remarks>
     public Func<SiloAddress, int, uint[]> GetPartitionBoundaries { get; set; } = DirectoryMembershipSnapshot.DefaultGetRingBoundaries;
-
-    /// <summary>
-    /// Returns directory partition boundaries in ascending unsigned hash order, matching the Orleans 10.1 distributed directory.
-    /// </summary>
-    /// <param name="silo">The silo whose partition boundaries are requested.</param>
-    /// <param name="partitionCount">The number of partition boundaries to return.</param>
-    /// <returns>A new array of uniform hash codes sorted by their unsigned values.</returns>
-    /// <remarks>
-    /// Use this function with <see cref="PartitionsPerSilo"/> set to 30 when upgrading an Orleans 10.1 distributed-directory cluster.
-    /// Retain this mapping after the upgrade so that subsequent rolling upgrades preserve partition identities.
-    /// </remarks>
-    /// <exception cref="ArgumentNullException"><paramref name="silo"/> is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="partitionCount"/> is less than one.</exception>
-    public static uint[] GetLegacyPartitionBoundaries(SiloAddress silo, int partitionCount)
-    {
-        ArgumentNullException.ThrowIfNull(silo);
-        ArgumentOutOfRangeException.ThrowIfLessThan(partitionCount, 1);
-        var boundaries = (uint[])silo.GetUniformHashCodes(partitionCount).Clone();
-        Array.Sort(boundaries);
-        return boundaries;
-    }
 
     /// <summary>
     /// Gets or sets the initial (minimum) time, in seconds, to keep a cache entry before revalidating.

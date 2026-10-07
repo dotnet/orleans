@@ -13,4 +13,8 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)docs\site\src\content\docs\snippets\compiled\Deployment\DirectoryPartitioningSnippet.cs" Link="GrainDirectory\DirectoryPartitioningSnippet.cs" />
+  </ItemGroup>
 </Project>
