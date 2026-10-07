@@ -345,6 +345,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             return;
         }
 
+        ValidateReady();
         // Owned writes can retain _gate through ACK. Share scheduling, not that gate, with preparation.
         StartPreparation();
         try

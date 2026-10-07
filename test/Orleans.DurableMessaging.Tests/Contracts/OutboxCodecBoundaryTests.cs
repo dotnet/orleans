@@ -775,6 +775,36 @@ public sealed class OutboxCodecBoundaryTests
     });
 
     [Fact]
+    public Task SynchronousSend_StopBeforeQueuedHookPreventsNewScheduling() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Manager.Hooks.Insert(0, new JournaledStateHook
+        {
+            BeforeOperationAsync = async (_, _) =>
+            {
+                entered.TrySetResult();
+                await release.Task;
+            }
+        });
+        fixture.Outbox.Send(fixture.CreateEnvelope());
+        var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            await ((ILifecycleObserver)fixture.Outbox).OnStop(CancellationToken.None);
+        }
+        finally { release.TrySetResult(); }
+        var error = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => write);
+        Assert.IsAssignableFrom<OperationCanceledException>(error.InnerException);
+        Assert.Empty(fixture.Jobs.ReceivedCalls());
+        Assert.Equal(0, fixture.Probe.Captures);
+        await fixture.Manager.DeleteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Empty(fixture.Messages);
+    });
+
+    [Fact]
     public Task SynchronousSend_StopDrainsSchedulingBeforeTerminalDeletion() => OnOwnerAsync(async () =>
     {
         await using var fixture = await CodecFixture.CreateAsync();
