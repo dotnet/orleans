@@ -11,6 +11,7 @@ namespace Orleans.Journaling;
 internal partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
+    private static readonly AsyncLocal<JournaledStateManager?> CurrentHookOwner = new();
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -33,6 +34,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private Exception? _failure;
     private bool _migrationSnapshotRequired;
     private int _disposed;
+    private List<IJournaledStateHook>? _hooks;
+
+    public IList<IJournaledStateHook> Hooks => _hooks ??= [];
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
         : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)), grainContext)
@@ -155,6 +159,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
     {
+        ThrowIfHookReentry();
         cancellationToken.ThrowIfCancellationRequested();
         Task task;
         bool didEnqueue;
@@ -273,6 +278,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         storageActivity.SetTag(ActivityTagKeys.JournalStorageOperation, queueOperation);
                     }
 
+                    JournaledStateOperation? hookOperation = null;
+                    var beforeHookRunning = false;
+                    var afterHookRunning = false;
                     try
                     {
                         if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem
@@ -280,6 +288,39 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         {
                             throw new InvalidOperationException(
                                 "The journaled state operation was queued before deletion reset its state.");
+                        }
+
+                        hookOperation = workItem switch
+                        {
+                            AppendJournalWorkItem or WriteSnapshotWorkItem =>
+                                workItem is WriteSnapshotWorkItem || _migrationSnapshotRequired || _storage.IsCompactionRequested
+                                    ? JournaledStateOperation.Snapshot : JournaledStateOperation.Write,
+                            DeleteStateWorkItem => JournaledStateOperation.Delete,
+                            _ => null
+                        };
+                        if (hookOperation is { } operation && _hooks is { Count: > 0 })
+                        {
+                            beforeHookRunning = true;
+                            var captureHook = GetCaptureHook();
+                            if (captureHook is null || _hooks.Count > 1)
+                            {
+                                await InvokeBeforeHooksAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
+                            }
+                            if (captureHook is not null)
+                            {
+                                var previous = CurrentHookOwner.Value;
+                                CurrentHookOwner.Value = this;
+                                try
+                                {
+                                    await captureHook.BeforeOperationAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+                                finally
+                                {
+                                    CurrentHookOwner.Value = previous;
+                                }
+                            }
+                            _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                            beforeHookRunning = false;
                         }
 
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
@@ -291,9 +332,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 {
                                     // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
                                     //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
-                                    var isSnapshot = workItem is WriteSnapshotWorkItem
-                                        || _migrationSnapshotRequired
-                                        || _storage.IsCompactionRequested;
+                                    var isSnapshot = hookOperation == JournaledStateOperation.Snapshot;
                                     var operationLabel = isSnapshot
                                         ? JournalingInstruments.OperationSnapshot
                                         : JournalingInstruments.OperationAppend;
@@ -540,6 +579,13 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 }
                         }
 
+                        if (hookOperation is { } completedOperation && _hooks is { Count: > 0 })
+                        {
+                            afterHookRunning = true;
+                            await InvokeAfterHooksAsync(completedOperation, _shutdownCancellation.Token).ConfigureAwait(true);
+                            afterHookRunning = false;
+                        }
+
                         if (recordQueueDuration && queueOperation is not null)
                         {
                             _shared.Instruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: true);
@@ -547,6 +593,23 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                         storageActivity?.SetStatus(ActivityStatusCode.Ok);
                         workItem.SetResult();
+                    }
+                    catch (Exception exception) when (beforeHookRunning || afterHookRunning)
+                    {
+                        if (beforeHookRunning && exception is OperationCanceledException && _shutdownCancellation.IsCancellationRequested)
+                        {
+                            workItem.TrySetCanceled(_shutdownCancellation.Token);
+                            continue;
+                        }
+                        LogOperationHookFailed(_shared.Logger, exception, hookOperation!.Value, afterHookRunning);
+                        storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal operation hook failed.");
+                        if (recordQueueDuration && queueOperation is not null)
+                        {
+                            _shared.Instruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: afterHookRunning);
+                        }
+                        workItem.SetException(afterHookRunning
+                            ? new JournaledStatePostCommitException(hookOperation.Value, exception)
+                            : new JournaledStatePreCommitException(hookOperation.Value, exception));
                     }
                     catch (Exception exception)
                     {
@@ -593,6 +656,87 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 Fence(exception);
                 return;
             }
+        }
+    }
+
+    private IJournaledStateCaptureHook? GetCaptureHook()
+    {
+        IJournaledStateCaptureHook? result = null;
+        foreach (var hook in _hooks!)
+        {
+            if (hook is IJournaledStateCaptureHook captureHook)
+            {
+                if (result is not null)
+                {
+                    throw new InvalidOperationException("A journal owner supports one final capture prerequisite hook. Inspect and deduplicate the hook list before registration.");
+                }
+                result = captureHook;
+            }
+        }
+        return result;
+    }
+
+    private async ValueTask InvokeBeforeHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+    {
+        var previous = CurrentHookOwner.Value;
+        CurrentHookOwner.Value = this;
+        try
+        {
+            foreach (var hook in _hooks!)
+            {
+                if (hook is IJournaledStateCaptureHook)
+                {
+                    continue;
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+                await hook.BeforeOperationAsync(operation, cancellationToken).ConfigureAwait(true);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        finally
+        {
+            CurrentHookOwner.Value = previous;
+        }
+    }
+
+    private async ValueTask InvokeAfterHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+    {
+        var previous = CurrentHookOwner.Value;
+        CurrentHookOwner.Value = this;
+        List<Exception>? failures = null;
+        try
+        {
+            foreach (var hook in _hooks!)
+            {
+                try
+                {
+                    await hook.AfterOperationAsync(operation, cancellationToken).ConfigureAwait(true);
+                }
+                catch (Exception exception)
+                {
+                    (failures ??= []).Add(exception);
+                }
+            }
+        }
+        finally
+        {
+            CurrentHookOwner.Value = previous;
+        }
+        if (failures is { Count: 1 })
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        }
+        if (failures is not null)
+        {
+            throw new AggregateException(failures);
+        }
+    }
+
+    private void ThrowIfHookReentry()
+    {
+        if (ReferenceEquals(CurrentHookOwner.Value, this))
+        {
+            throw new InvalidOperationException("Journal operation hooks cannot enqueue another operation on the same journal owner.");
         }
     }
 
@@ -699,6 +843,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask DeleteStateAsync(CancellationToken cancellationToken = default)
     {
+        ThrowIfHookReentry();
         cancellationToken.ThrowIfCancellationRequested();
         Task task;
         bool didEnqueue;
@@ -886,6 +1031,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
     {
+        ThrowIfHookReentry();
         cancellationToken.ThrowIfCancellationRequested();
 
         Task pendingWrite;
@@ -1062,9 +1208,22 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     private async Task StopAsync(CancellationToken cancellationToken)
     {
+        ThrowIfHookReentry();
+        AggregateException? cancellationFailure = null;
         lock (_lock)
         {
-            _shutdownCancellation.Cancel();
+            try
+            {
+                _shutdownCancellation.Cancel();
+            }
+            catch (AggregateException exception)
+            {
+                cancellationFailure = exception;
+            }
+        }
+        if (cancellationFailure is not null)
+        {
+            LogShutdownCancellationFailed(_shared.Logger, cancellationFailure);
         }
 
         _workSignal.Signal();
@@ -1078,6 +1237,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         finally
         {
             CancelQueuedWorkItems(_shutdownCancellation.Token);
+        }
+        if (cancellationFailure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cancellationFailure).Throw();
         }
     }
 
@@ -1099,6 +1262,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask DisposeAsync()
     {
+        ThrowIfHookReentry();
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
@@ -1346,6 +1510,16 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         void IStateMachine.Reset(JournalStreamWriter writer) => _preservedEntries.Clear();
         void IStateMachine.WritePendingEntries(JournalStreamWriter writer) { }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal {Operation} hook failed. Persistence completed: {Committed}.")]
+    private static partial void LogOperationHookFailed(ILogger logger, Exception exception, JournaledStateOperation operation, bool committed);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal shutdown cancellation callback failed; owned operations are drained before resources are released.")]
+    private static partial void LogShutdownCancellationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Error,
