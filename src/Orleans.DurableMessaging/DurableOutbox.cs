@@ -22,7 +22,7 @@ namespace Orleans.DurableMessaging;
 /// Prepares and stages outbound messages using owner-bound durable collections.
 /// The sequence state associates message cohorts with journal acknowledgement.
 /// </summary>
-internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeatureHandler, ILifecycleObserver, IJournaledStateHook
+internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeatureHandler, ILifecycleObserver, IJournaledStateCaptureHook
 {
     internal const string JobName = "orleans.messaging.outbox-flush";
     public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);

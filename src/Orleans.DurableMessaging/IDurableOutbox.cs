@@ -65,8 +65,8 @@ public interface IDurableOutbox
     /// </summary>
     /// <param name="envelope">The fully built envelope to send.</param>
     /// <remarks>
-    /// The journal's before-operation hook establishes a durable self-wakeup before capturing pending
-    /// state, including messages staged while scheduling is awaited. An explicit write retry retains
+    /// The journal's final capture hook establishes a durable self-wakeup after ordinary before hooks
+    /// and before capturing pending state, including messages staged while scheduling is awaited. An explicit write retry retains
     /// pending business changes and messages after a scheduling failure. Dispatch starts after the
     /// captured message and owner pair are acknowledged. Equivalent identities retain the original envelope.
     /// Handlers call this method from their returned synchronous apply action.

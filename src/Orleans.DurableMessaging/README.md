@@ -26,8 +26,8 @@ The protocol and runtime provide:
 - `IDurableInbox`, `IDurableOutbox`, and `IDurableInboxExtension` define message
   registration, inspection, enqueue, and delivery operations. `DeliveryResult` and
   `DeliveryStatus` describe delivery outcomes.
-- `IDurableOutbox.Send(envelope)` synchronously stages an outgoing envelope. A journal
-  before-operation hook establishes its durable self-wakeup before capture; dispatch
+- `IDurableOutbox.Send(envelope)` synchronously stages an outgoing envelope. The final journal
+  capture hook establishes its durable self-wakeup before capture; dispatch
   follows acknowledgement of the exact captured messages and physical owner pair.
 - `IPreparedOutboxBatch` is an optional opaque, activation-local disposable handle returned
   by `IDurableOutbox.PrepareSendAsync`. `Send(batch)` synchronously stages its prepared
@@ -53,8 +53,10 @@ outbox.Send(envelope);
 await stateManager.WriteStateAsync(cancellationToken);
 ```
 
-The outbox's journal hook confirms a viable durable self-wakeup before synchronous
-capture, including messages arriving while scheduling awaits. Scheduling uses the owned
+The outbox registers the owner's single `IJournaledStateCaptureHook`. Ordinary before
+callbacks run first; the work loop then directly awaits this final prerequisite and
+synchronously captures state. The outbox confirms a viable durable self-wakeup for
+all staged intents, including messages arriving during ordinary hooks or its own scheduling. Scheduling uses the owned
 journal-operation and feature-shutdown lifetimes. Caller cancellation ends only the
 caller wait. A `JournaledStatePreCommitException` reports a failed prerequisite before
 capture: ordinary callers can restore the prerequisite and explicitly retry the write
