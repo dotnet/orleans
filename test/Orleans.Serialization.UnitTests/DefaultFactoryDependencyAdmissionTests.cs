@@ -196,6 +196,61 @@ public sealed class DefaultFactoryDependencyAdmissionTests
         Assert.Same(dependency, OrleansGeneratedCodeHelper.GetService<Dependency>(null!, provider));
     }
 
+    [Fact]
+    public void PublishedDefaultService_AdmissionDoesNotAllocate()
+    {
+        var dependency = new Dependency();
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+        {
+            options.AddDefaultSerializerService<Dependency, Dependency>(_ => dependency);
+        })).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        for (var i = 0; i < 100; i++)
+        {
+            _ = OrleansGeneratedCodeHelper.GetService<Dependency>(null!, provider);
+        }
+
+        Dependency? actual = null;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1_000; i++)
+        {
+            actual = OrleansGeneratedCodeHelper.GetService<Dependency>(null!, provider);
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Same(dependency, actual);
+        Assert.Equal(0, allocated);
+        Assert.False(provider.IsConstructionPending);
+    }
+
+    [Fact]
+    public void DefaultAdmission_VisitedTypesAreClearedBetweenProviders()
+    {
+        var dependency = new Dependency();
+        var admitted = new State();
+        using (var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+        {
+            options.AddSerializerService<Dependency>(_ => dependency);
+            RegisterDefaults(options, admitted);
+        })).BuildServiceProvider())
+        {
+            var provider = services.GetRequiredService<CodecProvider>();
+            Assert.Same(dependency, Assert.IsType<DependentCodec>(provider.GetCodec<Target>()).Dependency);
+            Assert.Equal(1, admitted.FactoryCalls);
+        }
+
+        var declined = new State();
+        using var otherServices = new ServiceCollection()
+            .AddSingleton(dependency)
+            .AddSerializer(builder => builder.Configure(options => RegisterDefaults(options, declined)))
+            .BuildServiceProvider();
+        var otherProvider = otherServices.GetRequiredService<CodecProvider>();
+
+        Assert.Same(dependency, Assert.IsType<DependentCodec>(otherProvider.GetCodec<Target>()).Dependency);
+        Assert.Equal(0, declined.FactoryCalls);
+        Assert.False(otherProvider.IsConstructionPending);
+    }
+
     private static void RegisterDefaults(TypeManifestOptions options, State state)
     {
         options.AddSerializer(typeof(DependentCodec));
