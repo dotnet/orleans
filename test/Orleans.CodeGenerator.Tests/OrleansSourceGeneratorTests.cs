@@ -3678,6 +3678,15 @@ public class DemoClass
             .OfType<ClassDeclarationSyntax>().Where(static type => type.BaseList?.ToString().Contains("IRawResponseWriter", StringComparison.Ordinal) == true).ToArray();
         var holder = Assert.Single(holders);
         Assert.Null(holder.TypeParameterList);
+        var factory = CSharpSyntaxTree.ParseText(response, cancellationToken: TestContext.Current.CancellationToken)
+            .GetCompilationUnitRoot(TestContext.Current.CancellationToken).DescendantNodes()
+            .OfType<ClassDeclarationSyntax>().Single(static type => type.Identifier.ValueText.EndsWith("Factory", StringComparison.Ordinal));
+        var resolver = Assert.Single(factory.Members.OfType<MethodDeclarationSyntax>(),
+            static method => method.Identifier.ValueText == "Resolve");
+        Assert.IsType<ReturnStatementSyntax>(Assert.Single(resolver.Body!.Statements));
+        var constructor = Assert.Single(factory.Members.OfType<ConstructorDeclarationSyntax>());
+        Assert.Equal(4, constructor.DescendantNodes().OfType<InvocationExpressionSyntax>().Count(
+            static invocation => invocation.Expression is MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "provider" } }));
         var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
             .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
                 options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)));

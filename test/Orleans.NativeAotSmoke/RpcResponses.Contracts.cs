@@ -6,6 +6,8 @@ using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Configuration;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
@@ -14,6 +16,37 @@ namespace Orleans.NativeAotSmoke;
 
 public static class RpcResponseContracts
 {
+    public static void GeneratedFactoryPublication()
+    {
+        IRawResponseReader? unpublished = null;
+        var failure = new InvalidOperationException("response construction failed");
+        using var services = CreateServices(options => options.AddSerializerService<PublicationRoot>(provider =>
+        {
+            Ensure(((CodecProvider)provider).TryGetRawResponseReader(typeof(int), out unpublished),
+                "A response factory resolves inside the construction graph.");
+            throw failure;
+        }));
+        var provider = services.GetRequiredService<CodecProvider>();
+        try
+        {
+            OrleansGeneratedCodeHelper.GetService<PublicationRoot>(null!, provider);
+            throw new InvalidOperationException("The construction failure must propagate.");
+        }
+        catch (InvalidOperationException exception) when (ReferenceEquals(exception, failure))
+        {
+        }
+        Ensure(unpublished is not null, "The failed graph constructed its response factory.");
+        Ensure(provider.TryGetRawResponseReader(typeof(int), out var published), "A response factory resolves after rollback.");
+        Ensure(!ReferenceEquals(unpublished, published), "A failed graph must not publish its response factory.");
+        Ensure(provider.TryGetRawResponseReader(typeof(int), out var repeated)
+            && ReferenceEquals(published, repeated), "Successful construction publishes a canonical provider-owned response factory.");
+        using var other = CreateServices();
+        Ensure(other.GetRequiredService<CodecProvider>().TryGetRawResponseReader(typeof(int), out var isolated)
+            && !ReferenceEquals(published, isolated), "Response factories retain their provider isolation.");
+    }
+
+    private sealed class PublicationRoot;
+
     public static async System.Threading.Tasks.Task GeneratedInvokablesWriteCopiedResponses()
     {
 #if NATIVE_AOT_SMOKE
@@ -292,13 +325,15 @@ public static class RpcResponseContracts
     }
 #endif
 
-    private static ServiceProvider CreateServices()
+    private static ServiceProvider CreateServices(Action<TypeManifestOptions>? configure = null)
     {
 #if NATIVE_AOT_SMOKE
-        return new ServiceCollection().AddSerializerContext(new global::OrleansCodeGen.OrleansNativeAotSmoke.RpcResponseFactories()).BuildServiceProvider();
+        var collection = new ServiceCollection().AddSerializerContext(new global::OrleansCodeGen.OrleansNativeAotSmoke.RpcResponseFactories());
 #else
-        return new ServiceCollection().AddSerializer(builder => builder.AddAssembly(typeof(IRpcResponses).Assembly)).BuildServiceProvider();
+        var collection = new ServiceCollection().AddSerializer(builder => builder.AddAssembly(typeof(IRpcResponses).Assembly));
 #endif
+        if (configure is not null) collection.Configure(configure);
+        return collection.BuildServiceProvider();
     }
 
     private static Response Copy(ServiceProvider services, Response response)

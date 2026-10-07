@@ -141,10 +141,6 @@ internal static class RpcResponseHolderGenerator
                 public override bool IsSupported { get; }
                 internal static {{factory}} Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
                 {
-                    provider.GetCodec<{{type}}>();
-                    provider.GetDeepCopier<{{type}}>();
-                    provider.GetCodec<global::Orleans.Serialization.Invocation.Response<{{type}}>>();
-                    provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<{{type}}>>();
                     return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<{{factory}}>(null, provider);
                 }
                 public {{factory}}(global::Orleans.Serialization.Serializers.ICodecProvider provider)

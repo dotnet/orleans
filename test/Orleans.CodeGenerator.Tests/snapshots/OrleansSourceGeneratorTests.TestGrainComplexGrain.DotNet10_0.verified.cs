@@ -587,10 +587,6 @@ namespace OrleansCodeGen.TestProject
 
         internal static RpcResponse_FC7DD5BDFactory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
         {
-            provider.GetCodec<global::TestProject.ComplexData>();
-            provider.GetDeepCopier<global::TestProject.ComplexData>();
-            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::TestProject.ComplexData>>();
-            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::TestProject.ComplexData>>();
             return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_FC7DD5BDFactory>(null, provider);
         }
 

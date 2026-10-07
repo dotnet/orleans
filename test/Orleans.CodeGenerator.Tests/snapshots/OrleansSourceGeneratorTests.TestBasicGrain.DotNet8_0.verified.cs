@@ -388,10 +388,6 @@ namespace OrleansCodeGen.TestProject
 
         internal static RpcResponse_9146C7E3Factory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
         {
-            provider.GetCodec<string>();
-            provider.GetDeepCopier<string>();
-            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<string>>();
-            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<string>>();
             return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_9146C7E3Factory>(null, provider);
         }
 

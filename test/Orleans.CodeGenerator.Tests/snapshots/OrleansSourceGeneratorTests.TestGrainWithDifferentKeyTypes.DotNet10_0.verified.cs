@@ -1008,10 +1008,6 @@ namespace OrleansCodeGen.TestProject
 
         internal static RpcResponse_5C3A711CFactory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
         {
-            provider.GetCodec<global::System.Guid>();
-            provider.GetDeepCopier<global::System.Guid>();
-            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::System.Guid>>();
-            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::System.Guid>>();
             return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_5C3A711CFactory>(null, provider);
         }
 
@@ -1141,10 +1137,6 @@ namespace OrleansCodeGen.TestProject
 
         internal static RpcResponse_6A3EE8F4Factory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
         {
-            provider.GetCodec<global::System.Tuple<global::System.Guid, string>>();
-            provider.GetDeepCopier<global::System.Tuple<global::System.Guid, string>>();
-            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<global::System.Guid, string>>>();
-            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<global::System.Guid, string>>>();
             return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_6A3EE8F4Factory>(null, provider);
         }
 
@@ -1282,10 +1274,6 @@ namespace OrleansCodeGen.TestProject
 
         internal static RpcResponse_AFB713E4Factory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
         {
-            provider.GetCodec<global::System.Tuple<long, string>>();
-            provider.GetDeepCopier<global::System.Tuple<long, string>>();
-            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<long, string>>>();
-            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::System.Tuple<long, string>>>();
             return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_AFB713E4Factory>(null, provider);
         }
 
@@ -1429,10 +1417,6 @@ namespace OrleansCodeGen.TestProject
 
         internal static RpcResponse_9146C7E3Factory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
         {
-            provider.GetCodec<string>();
-            provider.GetDeepCopier<string>();
-            provider.GetCodec<global::Orleans.Serialization.Invocation.Response<string>>();
-            provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<string>>();
             return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_9146C7E3Factory>(null, provider);
         }
 

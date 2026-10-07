@@ -102,6 +102,10 @@ public sealed class RpcResponseTests : IDisposable
         => NativeAotSmoke.RpcResponseContracts.PrimitiveResponses();
 
     [Fact]
+    public void GeneratedResponseFactoriesPreserveNativePublicationContracts()
+        => NativeAotSmoke.RpcResponseContracts.GeneratedFactoryPublication();
+
+    [Fact]
     public void GeneratedResponseFactoriesPreserveReferencePayloadCycles()
         => NativeAotSmoke.RpcResponseContracts.ReferenceResponsePreservesCycles();
 
@@ -594,6 +598,177 @@ public sealed class RpcResponseTests : IDisposable
             .Select(static type => (IInvokable)Activator.CreateInstance(type)!);
         var result = invokables.Single(invokable => invokable.GetMethodName() == methodName);
         return result;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GeneratedResponseFactoryResolvesDependenciesOnlyDuringConstruction(bool readerFirst)
+    {
+        var options = _services.GetRequiredService<Microsoft.Extensions.Options.IOptions<TypeManifestOptions>>().Value;
+        var resultCodec = options.CodecFactories[typeof(int)];
+        var resultCopier = options.CopierFactories[typeof(int)];
+        var responseCodec = options.CodecFactories[typeof(Response<int>)];
+        var responseCopier = options.CopierFactories[typeof(Response<int>)];
+        var codecCalls = 0;
+        var copierCalls = 0;
+        var responseCodecCalls = 0;
+        var responseCopierCalls = 0;
+        options.CodecFactories[typeof(int)] = resultCodec with
+        {
+            Factory = provider => { codecCalls++; return resultCodec.Factory(provider); }
+        };
+        options.CopierFactories[typeof(int)] = resultCopier with
+        {
+            Factory = provider => { copierCalls++; return resultCopier.Factory(provider); }
+        };
+        options.CodecFactories[typeof(Response<int>)] = responseCodec with
+        {
+            Factory = provider => { responseCodecCalls++; return responseCodec.Factory(provider); }
+        };
+        options.CopierFactories[typeof(Response<int>)] = responseCopier with
+        {
+            Factory = provider => { responseCopierCalls++; return responseCopier.Factory(provider); }
+        };
+
+        var provider = _services.GetRequiredService<CodecProvider>();
+        var contexts = _services.GetRequiredService<CopyContextPool>();
+        var copier = _services.GetRequiredService<DeepCopier>().GetCopier<Response>();
+        if (readerFirst) Assert.True(provider.TryGetRawResponseReader(typeof(int), out _));
+        using var invokable = CreateInvokable("Integer");
+        invokable.SetTarget(new TargetHolder(new RpcResponseTarget()));
+        using var response = await invokable.InvokeAndCopy(provider, contexts, copier);
+        Assert.IsAssignableFrom<IRawResponseWriter>(response);
+        Assert.Equal(42, response.GetResult<int>());
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var reader));
+        for (var i = 0; i < 100; i++) provider.TryGetRawResponseReader(typeof(int), out _);
+
+        IRawResponseReader? actual = null;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1_000; i++) provider.TryGetRawResponseReader(typeof(int), out actual);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.Same(reader, actual);
+        Assert.Equal(1, codecCalls);
+        Assert.Equal(1, copierCalls);
+        Assert.Equal(1, responseCodecCalls);
+        Assert.Equal(1, responseCopierCalls);
+        Assert.Equal(0, allocated);
+        Assert.False(provider.IsConstructionPending);
+    }
+
+    [Fact]
+    public void GeneratedResponseFactoryInitializesBeforeBeginningItsGraphAndRetriesInitializationFailure()
+    {
+        var initializationCalls = 0;
+        var failure = new InvalidOperationException("serializer initialization failed");
+        using var services = new ServiceCollection().AddSerializer()
+            .AddSingleton<IGeneralizedCodec>(services =>
+            {
+                initializationCalls++;
+                Assert.False(services.GetRequiredService<CodecProvider>().IsConstructionPending);
+                if (initializationCalls == 1) throw failure;
+                return new InitializationCodec();
+            }).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(
+            () => provider.TryGetRawResponseReader(typeof(int), out _)));
+        Assert.False(provider.IsConstructionPending);
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var reader));
+        Assert.Equal(2, initializationCalls);
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var repeated));
+        Assert.Same(reader, repeated);
+        Assert.Equal(2, initializationCalls);
+    }
+
+    [Fact]
+    public void GeneratedResponseFactoryRollsBackWithItsConstructionGraph()
+    {
+        IRawResponseReader? unpublished = null;
+        var failure = new InvalidOperationException("response graph failed");
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+            options.AddSerializerService<ResponseFactoryRoot>(provider =>
+            {
+                Assert.True(((CodecProvider)provider).TryGetRawResponseReader(typeof(int), out unpublished));
+                throw failure;
+            }))).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(
+            () => OrleansGeneratedCodeHelper.GetService<ResponseFactoryRoot>(null!, provider)));
+        Assert.NotNull(unpublished);
+        Assert.False(provider.IsConstructionPending);
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var published));
+        Assert.NotSame(unpublished, published);
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var repeated));
+        Assert.Same(published, repeated);
+    }
+
+    [Fact]
+    public void PublishedGeneratedResponseFactoryPropagatesPendingGraphFailure()
+    {
+        var failure = new InvalidOperationException("response graph already faulted");
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+        {
+            options.AddSerializerService<FailedResponseFactoryRoot>(_ => throw failure);
+            options.AddSerializerService<ResponseFactoryRoot>(provider =>
+            {
+                Assert.Same(failure, Assert.Throws<InvalidOperationException>(() =>
+                    OrleansGeneratedCodeHelper.GetService<FailedResponseFactoryRoot>(null!, provider)));
+                ((CodecProvider)provider).TryGetRawResponseReader(typeof(int), out _);
+                return new ResponseFactoryRoot();
+            });
+        })).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var published));
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(
+            () => OrleansGeneratedCodeHelper.GetService<ResponseFactoryRoot>(null!, provider)));
+        Assert.False(provider.IsConstructionPending);
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var repeated));
+        Assert.Same(published, repeated);
+    }
+
+    [Fact]
+    public async Task GeneratedResponseFactoryKeepsProviderSpecificOverridesWhenInvokableIsReused()
+    {
+        var payloadCopier = new TransformingIntCopier();
+        using var overridden = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+            options.AddSerializer<int>(static _ => new Int32Codec(), _ => payloadCopier))).BuildServiceProvider();
+        using var invokable = CreateInvokable("Integer");
+        invokable.SetTarget(new TargetHolder(new RpcResponseTarget()));
+        var provider = _services.GetRequiredService<CodecProvider>();
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var originalReader));
+
+        for (var i = 0; i < 6; i++)
+        {
+            var selected = i % 2 == 0 ? _services : overridden;
+            var selectedProvider = selected.GetRequiredService<CodecProvider>();
+            using var response = await invokable.InvokeAndCopy(
+                selectedProvider, selected.GetRequiredService<CopyContextPool>(),
+                selected.GetRequiredService<DeepCopier>().GetCopier<Response>());
+            Assert.Null(response.Exception);
+            Assert.Equal(i % 2 == 0 ? 42 : 43, response.GetResult<int>());
+            Assert.Equal(i % 2 == 0, response is IRawResponseWriter);
+        }
+
+        Assert.Equal(3, payloadCopier.Copies);
+        Assert.False(overridden.GetRequiredService<CodecProvider>().TryGetRawResponseReader(typeof(int), out _));
+        Assert.True(provider.TryGetRawResponseReader(typeof(int), out var repeated));
+        Assert.Same(originalReader, repeated);
+    }
+
+    private sealed class ResponseFactoryRoot;
+    private sealed class FailedResponseFactoryRoot;
+
+    private sealed class InitializationCodec : IGeneralizedCodec
+    {
+        public bool IsSupportedType(Type type) => false;
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta,
+            [System.Diagnostics.CodeAnalysis.AllowNull] Type expectedType, object? value)
+            where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
+        public object? ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
     }
 
     [Theory]
