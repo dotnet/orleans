@@ -79,6 +79,10 @@ Named directories can also be configured under `Orleans:GrainDirectory:{name}` w
 
 The experimental directory defaults to one partition per silo (<xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> = `1`). Change this only after testing with the expected cluster size and workload.
 
+<xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> configures the function which assigns starting hash boundaries to numbered partitions. The default uses the silo's consistent hash for a single partition and uniform hashes in generation order for multiple partitions. A custom function returns exactly the configured number of boundaries, with each array index identifying a partition. Keep each partition's starting boundary stable throughout the silo's membership and use equivalent functions on every silo. Orleans reads the returned array without modifying it.
+
+The partition count and boundary function are captured when the directory is created. Keep both consistent across the cluster, including during rollout and rollback. See [Distributed-directory upgrade compatibility](../deployment/upgrades.md#distributed-directory-upgrade-compatibility) for retaining the mapping used by an existing cluster.
+
 Evaluate it when stronger coordination during membership changes is worth adopting an experimental feature. Keep a rollout and rollback plan, and don't describe it as a drop-in production default.
 
 ## Operational guidance

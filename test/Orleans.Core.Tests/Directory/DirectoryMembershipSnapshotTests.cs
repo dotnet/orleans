@@ -107,6 +107,105 @@ public sealed class DirectoryMembershipSnapshotTests
         Assert.Equal(RingRange.Empty, DirectoryMembershipSnapshot.Default.GetRange(member, 2));
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(30)]
+    public void DefaultPartitionBoundariesPreserveCurrentMapping(int partitionCount)
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11111), 1);
+        var options = new GrainDirectoryOptions();
+        var expected = partitionCount == 1
+            ? [unchecked((uint)member.GetConsistentHashCode())]
+            : member.GetUniformHashCodes(partitionCount);
+
+        Assert.Equal(expected, options.GetPartitionBoundaries(member, partitionCount));
+    }
+
+    [Fact]
+    public void LegacyPartitionBoundariesPreserveCachedHashOrder()
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11112), 1);
+        uint[] generated = [300, 100, 200];
+        member.InternalSetUniformHashCodes(generated);
+
+        var boundaries = GrainDirectoryOptions.GetLegacyPartitionBoundaries(member, generated.Length);
+
+        Assert.Equal([100u, 200u, 300u], boundaries);
+        Assert.Equal([300u, 100u, 200u], member.GetUniformHashCodes(generated.Length));
+        Assert.NotSame(generated, boundaries);
+    }
+
+    [Fact]
+    public void LegacyPartitionBoundariesMatchOrleans10_1PartitionRanges()
+    {
+        const int partitionCount = 30;
+        var members = Enumerable.Range(0, 3)
+            .Select(index => SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11120 + index), 1))
+            .Order()
+            .ToArray();
+        var membership = new ClusterMembershipSnapshot(
+            members.ToImmutableDictionary(member => member, member => new ClusterMember(member, SiloStatus.Active, member.ToString())),
+            new(1));
+        var options = new GrainDirectoryOptions
+        {
+            PartitionsPerSilo = partitionCount,
+            GetPartitionBoundaries = GrainDirectoryOptions.GetLegacyPartitionBoundaries
+        };
+        var snapshot = new DirectoryMembershipSnapshot(membership, null!, options.PartitionsPerSilo, options.GetPartitionBoundaries);
+        var legacyHashes = members.Select(member => member.GetUniformHashCodes(partitionCount).Order().ToArray()).ToArray();
+
+        Assert.Equal(members, snapshot.Members);
+        Assert.Equal(members.Length * partitionCount, snapshot.RangeOwners.Count);
+        for (var memberIndex = 0; memberIndex < members.Length; memberIndex++)
+        {
+            for (var partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++)
+            {
+                var expectedRange = GetExpectedRange(legacyHashes, memberIndex, partitionIndex);
+                Assert.Equal(expectedRange, snapshot.GetRange(members[memberIndex], partitionIndex));
+                Assert.True(snapshot.TryGetOwner(expectedRange.End, out var owner, out _));
+                Assert.Equal(members[memberIndex], owner);
+                Assert.Contains((expectedRange, memberIndex, partitionIndex), snapshot.RangeOwners);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(4)]
+    public void PartitionBoundariesRejectIncorrectCount(int returnedCount)
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11113), 1);
+        var membership = new ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(member, new ClusterMember(member, SiloStatus.Active, "Silo")),
+            new(1));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            new DirectoryMembershipSnapshot(membership, null!, 3, (_, _) => new uint[returnedCount]));
+
+        Assert.Contains("exactly 3 boundaries", exception.Message);
+        Assert.Contains(member.ToString(), exception.Message);
+    }
+
+    [Fact]
+    public void PartitionBoundariesRejectNullResult()
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11114), 1);
+        var membership = new ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(member, new ClusterMember(member, SiloStatus.Active, "Silo")),
+            new(1));
+
+        Assert.Throws<InvalidOperationException>(() => new DirectoryMembershipSnapshot(membership, null!, 3, (_, _) => null!));
+    }
+
+    [Fact]
+    public void PartitionBoundariesRejectNullFunction()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new DirectoryMembershipService(null!, null!, null!, 3, null!));
+    }
+
     private static RingRange GetExpectedRange(uint[][] hashesByMember, int memberIndex, int partitionIndex)
     {
         var boundaries = new List<(uint Hash, int MemberIndex, int PartitionIndex)>();

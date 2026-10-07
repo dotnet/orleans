@@ -34,6 +34,7 @@ internal sealed class DirectoryMembershipSnapshot
     internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, int partitionCount, Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(partitionCount, 1);
+        ArgumentNullException.ThrowIfNull(getRingBoundaries);
         PartitionCount = partitionCount;
 
         var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
@@ -53,7 +54,11 @@ internal sealed class DirectoryMembershipSnapshot
         {
             var activeMember = sortedActiveMembers[memberIndex];
             var hashCodes = getRingBoundaries(activeMember, partitionCount);
-            Debug.Assert(hashCodes.Length == partitionCount);
+            if (hashCodes is null || hashCodes.Length != partitionCount)
+            {
+                throw new InvalidOperationException(
+                    $"The grain directory partition boundary function must return exactly {partitionCount} boundaries for silo '{activeMember}'.");
+            }
             var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(partitionCount);
             for (var partitionIndex = 0; partitionIndex < hashCodes.Length; partitionIndex++)
             {

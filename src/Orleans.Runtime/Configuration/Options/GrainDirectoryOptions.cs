@@ -1,3 +1,4 @@
+using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 
 namespace Orleans.Configuration;
@@ -52,6 +53,7 @@ public class GrainDirectoryOptions
     /// </summary>
     /// <remarks>
     /// This option only applies when using the <see cref="DistributedGrainDirectory"/>.
+    /// All silos must use the same partition count and <see cref="GetPartitionBoundaries"/> mapping throughout a rolling upgrade.
     /// </remarks>
     public int PartitionsPerSilo { get; set; } = DEFAULT_PARTITIONS_PER_SILO;
 
@@ -59,6 +61,43 @@ public class GrainDirectoryOptions
     /// The default value for <see cref="PartitionsPerSilo"/>.
     /// </summary>
     public const int DEFAULT_PARTITIONS_PER_SILO = 1;
+
+    /// <summary>
+    /// Gets or sets the function which returns directory partition boundaries for a silo and partition count.
+    /// Each array index identifies a partition and its value is that partition's exclusive starting boundary.
+    /// </summary>
+    /// <remarks>
+    /// The function must return exactly the requested number of boundaries and produce the same mapping on every silo.
+    /// Each partition's starting boundary must remain stable throughout the silo's membership.
+    /// Orleans treats the returned array as read-only.
+    /// The function is captured when the distributed directory is created and can be invoked concurrently on different silos.
+    /// By default, a single partition uses <see cref="SiloAddress.GetConsistentHashCode"/>, and multiple partitions use
+    /// <see cref="SiloAddress.GetUniformHashCodes"/> in hash-generation order.
+    /// To retain the mapping used by Orleans 10.1 distributed-directory clusters, configure
+    /// <see cref="PartitionsPerSilo"/> to 30 and set this property to <see cref="GetLegacyPartitionBoundaries"/>.
+    /// </remarks>
+    public Func<SiloAddress, int, uint[]> GetPartitionBoundaries { get; set; } = DirectoryMembershipSnapshot.DefaultGetRingBoundaries;
+
+    /// <summary>
+    /// Returns directory partition boundaries in ascending unsigned hash order, matching the Orleans 10.1 distributed directory.
+    /// </summary>
+    /// <param name="silo">The silo whose partition boundaries are requested.</param>
+    /// <param name="partitionCount">The number of partition boundaries to return.</param>
+    /// <returns>A new array of uniform hash codes sorted by their unsigned values.</returns>
+    /// <remarks>
+    /// Use this function with <see cref="PartitionsPerSilo"/> set to 30 when upgrading an Orleans 10.1 distributed-directory cluster.
+    /// Retain this mapping after the upgrade so that subsequent rolling upgrades preserve partition identities.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="silo"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="partitionCount"/> is less than one.</exception>
+    public static uint[] GetLegacyPartitionBoundaries(SiloAddress silo, int partitionCount)
+    {
+        ArgumentNullException.ThrowIfNull(silo);
+        ArgumentOutOfRangeException.ThrowIfLessThan(partitionCount, 1);
+        var boundaries = (uint[])silo.GetUniformHashCodes(partitionCount).Clone();
+        Array.Sort(boundaries);
+        return boundaries;
+    }
 
     /// <summary>
     /// Gets or sets the initial (minimum) time, in seconds, to keep a cache entry before revalidating.
