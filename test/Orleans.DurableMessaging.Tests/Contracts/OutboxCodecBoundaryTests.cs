@@ -585,6 +585,41 @@ public sealed class OutboxCodecBoundaryTests
     });
 
     [Fact]
+    public Task SynchronousSend_EmptyFinalHookAndCaptureShareOneTurn() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var envelope = fixture.CreateEnvelope();
+        Task? staged = null;
+        var hook = Assert.IsAssignableFrom<IJournaledStateCaptureHook>(Assert.Single(fixture.Manager.Hooks));
+        fixture.Manager.Hooks[0] = new CaptureBoundaryHook(hook, () =>
+        {
+            staged ??= Task.Factory.StartNew(() => fixture.Outbox.Send(envelope), TestContext.Current.CancellationToken,
+                TaskCreationOptions.None, TaskScheduler.Current);
+        });
+        fixture.Manager.Hooks.Add(new JournaledStateHook { BeforeOperationAsync = async (_, _) => await Task.Yield() });
+        using var storage = fixture.Storage.BlockWrite(fixture.JournalId);
+        var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.WaitUntilEnteredAsync();
+        await Assert.IsAssignableFrom<Task>(staged);
+        Assert.Equal(envelope.MessageId, Assert.Single(fixture.Messages).Key);
+        Assert.Empty(fixture.Jobs.ReceivedCalls());
+        storage.Release();
+        await write;
+        await using (var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId))
+        {
+            Assert.Empty(recovered.Messages);
+            Assert.Null(recovered.Job.Value);
+        }
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Receiver.ReceivedCalls());
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+        await fixture.DeliverAsync();
+        Assert.Equal(envelope.MessageId, ((DurableEnvelope)Assert.Single(fixture.Receiver.ReceivedCalls()).GetArguments()[0]!).MessageId);
+        Assert.Empty(fixture.Messages);
+    }, preventInlining: true);
+
+    [Fact]
     public Task SynchronousSend_StorageAwaitArrivalRemainsPendingUntilItsOwnAck() => OnOwnerAsync(async () =>
     {
         await using var fixture = await CodecFixture.CreateAsync();
@@ -829,19 +864,37 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Single(fresh.Messages);
     });
 
-    private static async Task OnOwnerAsync(Func<Task> action)
+    private static async Task OnOwnerAsync(Func<Task> action, bool preventInlining = false)
     {
         var scheduler = new ConcurrentExclusiveSchedulerPair(TaskScheduler.Default, maxConcurrencyLevel: 1);
         try
         {
             await Task.Factory.StartNew(action, TestContext.Current.CancellationToken, TaskCreationOptions.None,
-                scheduler.ExclusiveScheduler).Unwrap().WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+                preventInlining ? new NonInliningScheduler(scheduler.ExclusiveScheduler) : scheduler.ExclusiveScheduler)
+                .Unwrap().WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         }
         finally
         {
             scheduler.Complete();
             await scheduler.Completion;
         }
+    }
+
+    private sealed class CaptureBoundaryHook(IJournaledStateHook inner, Action afterPrerequisite) : IJournaledStateCaptureHook
+    {
+        public async ValueTask BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+        {
+            await inner.BeforeOperationAsync(operation, cancellationToken);
+            afterPrerequisite();
+        }
+    }
+
+    private sealed class NonInliningScheduler(TaskScheduler scheduler) : TaskScheduler
+    {
+        protected override void QueueTask(Task task) => Task.Factory.StartNew(() => TryExecuteTask(task),
+            CancellationToken.None, TaskCreationOptions.None, scheduler);
+        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => false;
+        protected override IEnumerable<Task> GetScheduledTasks() => [];
     }
 
     private sealed class ScheduleBarrier(ILocalDurableJobManager jobs) : IDisposable
