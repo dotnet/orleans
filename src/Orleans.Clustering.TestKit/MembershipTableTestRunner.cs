@@ -12,20 +12,33 @@ public sealed class MembershipTableTestRunner
     private readonly int _seed;
     private readonly Action<string>? _output;
     private readonly int _concurrencyRowCount;
+    private readonly int _concurrencyRowPadding;
     private IMembershipTable A => _fixture.First;
     private IMembershipTable B => _fixture.Second;
     private IMembershipTable Other => _fixture.OtherCluster;
 
     /// <summary>Creates a runner over initialized independent handles. Row count controls workload, never guarantees.</summary>
     public MembershipTableTestRunner(MembershipTableTestFixture fixture, int seed = 0, Action<string>? output = null, int concurrencyRowCount = 128)
+        : this(fixture, seed, output, concurrencyRowCount, concurrencyRowPadding: 0)
+    {
+    }
+
+    internal MembershipTableTestRunner(
+        MembershipTableTestFixture fixture,
+        int seed,
+        Action<string>? output,
+        int concurrencyRowCount,
+        int concurrencyRowPadding)
     {
         _fixture = fixture ?? throw new ArgumentNullException(nameof(fixture));
         if (fixture.First is null || fixture.Second is null || fixture.OtherCluster is null)
             throw new ArgumentException("Initialize the fixture before constructing its runner.", nameof(fixture));
         if (concurrencyRowCount is < 3 or > 10000) throw new ArgumentOutOfRangeException(nameof(concurrencyRowCount));
+        if (concurrencyRowPadding is < 0 or > 256 * 1024) throw new ArgumentOutOfRangeException(nameof(concurrencyRowPadding));
         _seed = seed;
         _output = output;
         _concurrencyRowCount = concurrencyRowCount;
+        _concurrencyRowPadding = concurrencyRowPadding;
     }
 
     /// <summary>G01: insertion and its version are one exact +1 commit, preserving the sentinel.</summary>
@@ -687,9 +700,14 @@ public sealed class MembershipTableTestRunner
         var current = ClusteringMembershipSnapshot.Capture(await A.ReadAllAsync(ct));
         Check(current.Rows.Count == 0, "concurrent-read setup requires an empty cluster");
         var expectedRows = current.Rows.ToBuilder();
+        // Each insert needs the new opaque table ETag, so setup performs a growing full read after every row.
         for (var i = 1; i <= _concurrencyRowCount; i++)
         {
             var input = Entry(i);
+            if (_concurrencyRowPadding > 0)
+            {
+                input.HostName += new string('x', _concurrencyRowPadding);
+            }
             var expectedEntry = MembershipEntrySnapshot.Capture(input);
             var writer = i % 2 == 0 ? B : A;
             var reader = i % 2 == 0 ? A : B;

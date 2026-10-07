@@ -23,6 +23,7 @@
     <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
     <InternalsVisibleTo Include="Orleans.Clustering.TestKit.Tests" />
     <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
