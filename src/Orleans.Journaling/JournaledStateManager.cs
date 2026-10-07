@@ -579,6 +579,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     }
                     catch (Exception exception) when (beforeHookRunning || afterHookRunning)
                     {
+                        if (beforeHookRunning && exception is OperationCanceledException && _shutdownCancellation.IsCancellationRequested)
+                        {
+                            workItem.TrySetCanceled(_shutdownCancellation.Token);
+                            continue;
+                        }
                         LogOperationHookFailed(_shared.Logger, exception, hookOperation!.Value, afterHookRunning);
                         storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal operation hook failed.");
                         if (recordQueueDuration && queueOperation is not null)
@@ -587,9 +592,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         }
                         workItem.SetException(afterHookRunning
                             ? new JournaledStatePostCommitException(hookOperation.Value, exception)
-                            : exception is OperationCanceledException && _shutdownCancellation.IsCancellationRequested
-                                ? exception
-                                : new JournaledStatePreCommitException(hookOperation.Value, exception));
+                            : new JournaledStatePreCommitException(hookOperation.Value, exception));
                     }
                     catch (Exception exception)
                     {
@@ -1168,9 +1171,21 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private async Task StopAsync(CancellationToken cancellationToken)
     {
         ThrowIfHookReentry();
+        AggregateException? cancellationFailure = null;
         lock (_lock)
         {
-            _shutdownCancellation.Cancel();
+            try
+            {
+                _shutdownCancellation.Cancel();
+            }
+            catch (AggregateException exception)
+            {
+                cancellationFailure = exception;
+            }
+        }
+        if (cancellationFailure is not null)
+        {
+            LogShutdownCancellationFailed(_shared.Logger, cancellationFailure);
         }
 
         _workSignal.Signal();
@@ -1184,6 +1199,10 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         finally
         {
             CancelQueuedWorkItems(_shutdownCancellation.Token);
+        }
+        if (cancellationFailure is not null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cancellationFailure).Throw();
         }
     }
 
@@ -1458,6 +1477,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Level = LogLevel.Error,
         Message = "Journal {Operation} hook failed. Persistence completed: {Committed}.")]
     private static partial void LogOperationHookFailed(ILogger logger, Exception exception, JournaledStateOperation operation, bool committed);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal shutdown cancellation callback failed; owned operations are drained before resources are released.")]
+    private static partial void LogShutdownCancellationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Error,

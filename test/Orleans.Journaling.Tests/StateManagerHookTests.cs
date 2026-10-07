@@ -207,6 +207,68 @@ public partial class StateManagerTests
         await sut.Manager.DisposeAsync();
     }
 
+    [Fact]
+    public async Task Hooks_ShutdownCallbackFailureStillDrainsOwnedPreparation()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage);
+        var manager = sut.Manager;
+        var state = new DurableDictionary<string, int>("state", manager, CreateDictionaryCodec<string, int>());
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var drained = false;
+        var failure = new IOException("Cancellation callback failed.");
+        manager.Hooks.Add(new JournaledStateHook
+        {
+            BeforeOperationAsync = async (_, token) =>
+            {
+                using var registration = token.Register(() => throw failure);
+                entered.TrySetResult();
+                await release.Task;
+                drained = true;
+            }
+        });
+        state["business"] = 1;
+        var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        try
+        {
+            var shutdown = manager.DisposeAsync().AsTask();
+            Assert.False(shutdown.IsCompleted);
+            Assert.False(drained);
+            Assert.Empty(storage.Appends);
+            release.TrySetResult();
+            var caught = await Assert.ThrowsAsync<AggregateException>(() =>
+                shutdown.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+            Assert.Same(failure, Assert.Single(caught.InnerExceptions));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => write);
+            Assert.True(drained);
+            Assert.Empty(storage.Appends);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task Hooks_ReentrantDisposalPreservesOwnerForExplicitRetry()
+    {
+        var sut = CreateTestSystem();
+        await using var manager = sut.Manager;
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        manager.Hooks.Add(new JournaledStateHook
+        {
+            BeforeOperationAsync = async (_, _) => await manager.DisposeAsync()
+        });
+        var caught = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() =>
+            manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.Contains("same journal owner", Assert.IsType<InvalidOperationException>(caught.InnerException).Message, StringComparison.Ordinal);
+        manager.Hooks.Clear();
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
