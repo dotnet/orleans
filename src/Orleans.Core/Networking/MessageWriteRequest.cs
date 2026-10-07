@@ -96,7 +96,15 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
     public override void SetException(Exception error)
     {
-        LogErrorSendingMessages(_shared.ConnectionTrace, error, _messages);
+        if (error is ConnectionClosedException)
+        {
+            LogInformationConnectionClosedWhileSendingMessages(_shared.ConnectionTrace, error, _messages);
+        }
+        else
+        {
+            LogErrorSendingMessages(_shared.ConnectionTrace, error, _messages);
+        }
+
         var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
         foreach (var (message, _, _) in _messages)
         {
@@ -135,4 +143,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error sending messages {Messages}")]
     private static partial void LogErrorSendingMessages(ILogger logger, Exception error, object messages);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Connection closed while sending messages {Messages}; rerouting")]
+    private static partial void LogInformationConnectionClosedWhileSendingMessages(ILogger logger, Exception error, object messages);
 }
