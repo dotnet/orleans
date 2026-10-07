@@ -783,9 +783,17 @@ namespace Orleans.Serialization.Serializers
                 return true;
             }
 
-            result = ConstructService(type, () => factory(this));
+            if ((_initialized || IsInitializationLockHeld) && TryGetCached(_serializerServices, type, out result))
+            {
+                return true;
+            }
+
+            result = ConstructRegisteredService(type, factory);
             return true;
         }
+
+        private object ConstructRegisteredService(Type type, Func<ICodecProvider, object> factory)
+            => ConstructService(type, () => factory(this));
 
         private object ConstructService(Type type, Func<object> create, bool beginGraph = true)
         {
