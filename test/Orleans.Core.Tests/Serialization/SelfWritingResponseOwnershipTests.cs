@@ -36,6 +36,83 @@ namespace UnitTests.Serialization;
 [TestCategory("BVT"), TestCategory("Serialization")]
 public sealed class SelfWritingResponseOwnershipTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RemoteCallback_ConsumesTypedOrVoidResponseExactlyOnce(bool voidCall)
+    {
+        var counts = new Counts();
+        await using var fixture = new CallbackFixture(counts, []);
+        var request = new LegacyRequest(new Payload(), counts);
+
+        if (voidCall) await fixture.Runtime.InvokeMethodAsync(fixture.Reference, request, InvokeMethodOptions.None);
+        else
+        {
+            var result = await fixture.Runtime.InvokeMethodAsync<Payload>(fixture.Reference, request, InvokeMethodOptions.None);
+            Assert.Equal(new[] { 17, 25, 42 }, result!.Values);
+        }
+
+        Assert.Equal(1, counts.Rents);
+        Assert.Equal(1, counts.Returns);
+        Assert.Null(fixture.ReceivedResponse!.Result);
+        Assert.False(fixture.ReceivedResponse.HasBinding);
+        Assert.Null(fixture.ReceivedMessage!._bodyObject);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task OutgoingFilter_RetainsSelectedAndSupersededResponsesUntilConsumption(bool voidCall, bool restore, bool fail)
+    {
+        var counts = new Counts();
+        var failure = new InvalidOperationException("outgoing filter failed");
+        CallbackFixture fixture = null!;
+        var filter = new OutgoingCallbackFilter(async context =>
+        {
+            await context.Invoke();
+            var original = Assert.IsType<CountedResponse>(context.Response);
+            Assert.Equal(new[] { 17, 25, 42 }, Assert.IsType<Payload>(context.Result).Values);
+            Assert.Equal(0, counts.Returns);
+            context.Response = CountedResponse.Rent(new Payload { Values = [47, 59] }, counts, fixture.Codec);
+            if (restore) context.Response = original;
+            Assert.Equal(0, counts.Returns);
+            Assert.Equal(new[] { 17, 25, 42 }, Assert.IsType<Payload>(original.Result).Values);
+            if (fail) throw failure;
+        });
+        await using var ownedFixture = fixture = new CallbackFixture(counts, [filter]);
+        var request = new LegacyRequest(new Payload(), counts);
+
+        async Task Invoke()
+        {
+            if (voidCall) await fixture.Runtime.InvokeMethodAsync(fixture.Reference, request, InvokeMethodOptions.None);
+            else
+            {
+                var result = await fixture.Runtime.InvokeMethodAsync<Payload>(fixture.Reference, request, InvokeMethodOptions.None);
+                Assert.Equal(restore ? new[] { 17, 25, 42 } : new[] { 47, 59 }, result!.Values);
+            }
+        }
+
+        if (fail) Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(Invoke));
+        else await Invoke();
+
+        Assert.Equal(2, counts.Rents);
+        Assert.Equal(2, counts.Returns);
+        Assert.Null(fixture.ReceivedResponse!.Result);
+        Assert.False(fixture.ReceivedResponse.HasBinding);
+        Assert.Null(fixture.ReceivedMessage!._bodyObject);
+        var first = ResponsePool.GetGenerated<CountedResponse>();
+        var second = ResponsePool.GetGenerated<CountedResponse>();
+        Assert.NotSame(first, second);
+        ResponsePool.ReturnGenerated(first);
+        ResponsePool.ReturnGenerated(second);
+    }
+
     [Fact]
     public void MigrationArgumentCodec_RetainsOrdinaryHostDependencyResolution()
     {
@@ -571,6 +648,7 @@ public sealed class SelfWritingResponseOwnershipTests
         private Payload _value = null!;
 
         public CountedResponse() { }
+        public bool HasBinding => _counts is not null || _codec is not null;
 
         public static CountedResponse Rent(Payload value, Counts counts, IFieldCodec<Payload> codec)
         {
@@ -891,6 +969,71 @@ public sealed class SelfWritingResponseOwnershipTests
             _serializer.Dispose();
             await _services.DisposeAsync();
             GC.KeepAlive(_observer);
+        }
+    }
+
+    private sealed class OutgoingCallbackFilter(Func<IOutgoingGrainCallContext, Task> callback) : IOutgoingGrainCallFilter
+    {
+        public Task Invoke(IOutgoingGrainCallContext context) => callback(context);
+    }
+
+    private sealed class CallbackFixture : IAsyncDisposable
+    {
+        private readonly ServiceProvider _services;
+        private readonly MessageSerializer _serializer;
+        public GrainReferenceRuntime Runtime { get; }
+        public GrainReference Reference { get; }
+        public IFieldCodec<Payload> Codec { get; }
+        public CountedResponse? ReceivedResponse { get; private set; }
+        public Message? ReceivedMessage { get; private set; }
+
+        public CallbackFixture(Counts counts, IOutgoingGrainCallFilter[] filters)
+        {
+            var services = new ServiceCollection().AddMetrics();
+            services.AddSerializer(builder => builder.Configure(options =>
+                options.AddRawResponseReader<Payload>(provider => new OwnedRawReader(provider.GetCodec<Payload>(), counts))));
+            _services = services.BuildServiceProvider();
+            Codec = _services.GetRequiredService<ICodecProvider>().GetCodec<Payload>();
+            _serializer = new MessageSerializer(_services.GetRequiredService<SerializerSessionPool>(), new SiloMessagingOptions());
+            var runtimeClient = Substitute.For<IRuntimeClient>();
+            Runtime = new GrainReferenceRuntime(runtimeClient, null!, filters, null!, null!);
+            var grainId = GrainId.Create("callback-ownership", "target");
+            var referenceProvider = new UntypedReferenceProvider(_services, Runtime);
+            Assert.True(referenceProvider.TryGet(grainId.Type, GrainInterfaceType.Create("callback-ownership"), out var activator));
+            Reference = activator.CreateReference(grainId);
+            var instruments = new ApplicationRequestInstruments(new OrleansInstruments(_services.GetRequiredService<IMeterFactory>()));
+            runtimeClient.When(client => client.SendRequest(
+                Arg.Any<GrainReference>(), Arg.Any<IInvokable>(), Arg.Any<IResponseCompletionSource>(), Arg.Any<InvokeMethodOptions>()))
+                .Do(call =>
+                {
+                    using var sender = Response.FromResult(new Payload { Values = [17, 25, 42] });
+                    var frame = SelfWritingResponseMessageTests.WriteFrame(_serializer,
+                        new Message { Direction = Message.Directions.Response, BodyObject = sender });
+                    ReceivedMessage = SelfWritingResponseMessageTests.ReadFrame(_serializer, frame);
+                    ReceivedResponse = Assert.IsType<CountedResponse>(ReceivedMessage.BodyObject);
+                    var shared = new SharedCallbackData(_ => { }, NullLogger<CallbackData>.Instance,
+                        TimeProvider.System, TimeSpan.FromMinutes(1), false, false, null);
+                    var callback = new CallbackData(shared, call.Arg<IResponseCompletionSource>(),
+                        new Message { BodyObject = call.Arg<IInvokable>() }, instruments);
+                    callback.DoCallback(ReceivedMessage);
+                });
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _serializer.Dispose();
+            await _services.DisposeAsync();
+        }
+    }
+
+    private sealed class OwnedRawReader(IFieldCodec<Payload> codec, Counts counts) : IRawResponseReader
+    {
+        private readonly PooledResponseCodec<Payload, IFieldCodec<Payload>> _codec = new(codec);
+        public bool IsSupported => true;
+        public Response ReadRaw<TInput>(ref Reader<TInput> reader, scoped ref Orleans.Serialization.WireProtocol.Field field)
+        {
+            using var decoded = (Response<Payload>)_codec.ReadRaw(ref reader, ref field);
+            return CountedResponse.Rent(decoded.TypedResult!, counts, codec);
         }
     }
 

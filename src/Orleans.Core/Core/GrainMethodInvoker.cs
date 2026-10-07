@@ -24,8 +24,7 @@ namespace Orleans.Runtime
         private readonly IGrainContext grainContext;
         private readonly ICodecProvider codecProvider;
         private readonly CopyContextPool copyContexts;
-        private Response? response;
-        private List<Response>? otherOwnedResponses;
+        private ResponseOwnership responses;
         private int stage;
 
         /// <summary>
@@ -79,50 +78,13 @@ namespace Orleans.Runtime
 
         public Response? Response
         {
-            get => response;
-            set
-            {
-                if (ReferenceEquals(response, value)) return;
-                if (response is { } previous)
-                {
-                    (otherOwnedResponses ??= []).Add(previous);
-                }
-
-                if (value is not null && otherOwnedResponses is { } others)
-                {
-                    for (var i = others.Count - 1; i >= 0; i--)
-                    {
-                        if (ReferenceEquals(value, others[i])) others.RemoveAt(i);
-                    }
-                }
-
-                response = value;
-            }
+            get => responses.Value;
+            set => responses.Value = value;
         }
 
-        internal Response TakeResponse()
-        {
-            var result = response!;
-            response = null;
-            return result;
-        }
+        internal Response TakeResponse() => responses.Take();
 
-        public void Dispose()
-        {
-            var current = response;
-            response = null;
-            var others = otherOwnedResponses;
-            otherOwnedResponses = null;
-            try
-            {
-                current?.Dispose();
-            }
-            finally
-            {
-                if (others is not null)
-                    foreach (var entry in others) entry.Dispose();
-            }
-        }
+        public void Dispose() => responses.Dispose();
 
         public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
 

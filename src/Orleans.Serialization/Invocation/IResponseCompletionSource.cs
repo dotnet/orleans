@@ -6,9 +6,13 @@ namespace Orleans.Serialization.Invocation
     public interface IResponseCompletionSource
     {
         /// <summary>
-        /// Sets the result.
+        /// Completes the promise and takes ownership of the response envelope.
         /// </summary>
-        /// <param name="value">The result value.</param>
+        /// <param name="value">The response whose ownership is transferred to this instance.</param>
+        /// <remarks>
+        /// Typed completion extracts the payload and disposes the envelope. Untyped completion transfers a successful
+        /// envelope to its result consumer, which disposes it after use.
+        /// </remarks>
         void Complete(Response value);
 
         /// <summary>

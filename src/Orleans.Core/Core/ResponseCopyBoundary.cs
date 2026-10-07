@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
@@ -27,4 +28,53 @@ internal static class ResponseCopyBoundary
 
     internal static Response CopyAndDispose(Response response, DeepCopier copier)
         => OrleansGeneratedCodeHelper.CopyResponseAndDispose(response, copier);
+}
+
+internal struct ResponseOwnership : IDisposable
+{
+    private Response? _current;
+    private List<Response>? _others;
+
+    internal Response? Value
+    {
+        readonly get => _current;
+        set
+        {
+            if (ReferenceEquals(_current, value)) return;
+            if (_current is { } previous) (_others ??= []).Add(previous);
+            if (value is not null && _others is { } others)
+            {
+                for (var i = others.Count - 1; i >= 0; i--)
+                {
+                    if (ReferenceEquals(value, others[i])) others.RemoveAt(i);
+                }
+            }
+
+            _current = value;
+        }
+    }
+
+    internal Response Take()
+    {
+        var result = _current!;
+        _current = null;
+        return result;
+    }
+
+    public void Dispose()
+    {
+        var current = _current;
+        _current = null;
+        var others = _others;
+        _others = null;
+        try
+        {
+            current?.Dispose();
+        }
+        finally
+        {
+            if (others is not null)
+                foreach (var response in others) response.Dispose();
+        }
+    }
 }

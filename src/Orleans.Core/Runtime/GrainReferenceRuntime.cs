@@ -86,7 +86,7 @@ namespace Orleans.Runtime
         private async ValueTask<TResult?> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
-            var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
+            using var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
             await invoker.Invoke();
             return invoker.TypedResult;
         }
@@ -94,7 +94,7 @@ namespace Orleans.Runtime
         private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
-            var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
+            using var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
             await invoker.Invoke();
         }
 

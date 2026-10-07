@@ -240,6 +240,7 @@ namespace Orleans.Runtime
             try
             {
                 var body = message.BodyObject;
+                message._bodyObject = null;
                 if (body is Response response)
                 {
                     context.Complete(response);

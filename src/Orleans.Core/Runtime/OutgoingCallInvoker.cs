@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Invokes a request on a grain reference.
     /// </summary>
-    internal sealed class OutgoingCallInvoker<TResult> : IOutgoingGrainCallContext
+    internal sealed class OutgoingCallInvoker<TResult> : IOutgoingGrainCallContext, IDisposable
     {
         private readonly IInvokable request;
         private readonly InvokeMethodOptions options;
@@ -18,6 +18,7 @@ namespace Orleans.Runtime
         private readonly int stages;
         private readonly GrainReference grainReference;
         private readonly IOutgoingGrainCallFilter? requestFilter;
+        private ResponseOwnership responses;
         private int stage;
 
         /// <summary>
@@ -58,7 +59,9 @@ namespace Orleans.Runtime
 
         public object? Result { get => TypedResult; set => TypedResult = (TResult?)value; }
 
-        public Response? Response { get; set; }
+        public Response? Response { get => responses.Value; set => responses.Value = value; }
+
+        public void Dispose() => responses.Dispose();
 
         public TResult? TypedResult { get => Response!.GetResult<TResult>(); set => Response = Response.FromResult(value); }
 
