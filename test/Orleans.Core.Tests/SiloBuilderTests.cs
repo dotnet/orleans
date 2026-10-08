@@ -1,6 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using NSubstitute;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
@@ -8,7 +11,9 @@ using Orleans.Configuration.Validators;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
+using Orleans.Runtime.MembershipService;
 using Orleans.Statistics;
+using Orleans.TestingHost;
 using UnitTests.Grains;
 using Xunit;
 
@@ -295,6 +300,75 @@ namespace NonSilo.Tests
                 .BuildServiceProvider();
 
             new SiloClusteringValidator(services).ValidateConfiguration();
+        }
+
+        [Fact]
+        public async Task SiloBuilder_InfiniteTableRefreshTimeoutStartsAndStopsWithoutFatalErrors()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var refreshWait = new TaskCompletionSource<(TimeSpan? Delay, Task<bool> Tick)>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var fatalErrorHandler = Substitute.For<IFatalErrorHandler>();
+            fatalErrorHandler.IsUnexpected(Arg.Any<Exception>()).Returns(true);
+            using var portAllocator = new TestClusterPortAllocator();
+            var (siloPort, gatewayPort) = portAllocator.AllocateConsecutivePortPairs(1);
+            using var host = new HostBuilder()
+                .UseOrleans(siloBuilder => siloBuilder
+                    .UseLocalhostClustering(siloPort, gatewayPort)
+                    .Configure<ClusterMembershipOptions>(options => options.TableRefreshTimeout = Timeout.InfiniteTimeSpan)
+                    .ConfigureServices(services =>
+                    {
+                        services.AddSingleton(fatalErrorHandler);
+                        services.AddSingleton<IAsyncTimerFactory>(serviceProvider =>
+                        {
+                            var timerFactory = new AsyncTimerFactory(serviceProvider.GetRequiredService<ILoggerFactory>());
+                            var observedFactory = Substitute.For<IAsyncTimerFactory>();
+                            observedFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<TimeProvider>())
+                                .Returns(call =>
+                                {
+                                    var name = call.ArgAt<string>(1);
+                                    var timer = timerFactory.Create(call.ArgAt<TimeSpan>(0), name, call.ArgAt<TimeProvider>(2));
+                                    return name == "PeriodicallyRefreshMembershipTable"
+                                        ? new ObservedMembershipRefreshTimer(timer, refreshWait)
+                                        : timer;
+                                });
+                            return observedFactory;
+                        });
+                    }))
+                .Build();
+
+            try
+            {
+                await host.StartAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+                var (delay, tick) = await refreshWait.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+                Assert.Equal(Timeout.InfiniteTimeSpan, delay);
+                Assert.False(tick.IsCompleted);
+                Assert.Equal(SiloStatus.Active, host.Services.GetRequiredService<IMembershipManager>().LocalSiloStatus);
+            }
+            finally
+            {
+                await host.StopAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+            }
+
+            var stoppedRefresh = await refreshWait.Task;
+            Assert.False(await stoppedRefresh.Tick.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+            fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default!, default!, default!);
+        }
+
+        private sealed class ObservedMembershipRefreshTimer(
+            IAsyncTimer timer,
+            TaskCompletionSource<(TimeSpan? Delay, Task<bool> Tick)> refreshWait) : IAsyncTimer
+        {
+            public Task<bool> NextTick(TimeSpan? overrideDelay = default)
+            {
+                var tick = timer.NextTick(overrideDelay);
+                refreshWait.TrySetResult((overrideDelay, tick));
+                return tick;
+            }
+
+            public bool CheckHealth(DateTime lastCheckTime, [NotNullWhen(false)] out string? reason) => timer.CheckHealth(lastCheckTime, out reason);
+
+            public void Dispose() => timer.Dispose();
         }
 
         /// <summary>
