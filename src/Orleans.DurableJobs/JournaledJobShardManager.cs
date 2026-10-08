@@ -41,7 +41,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
     private readonly JournaledStateManagerOptions _journaledStateManagerOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ConcurrentDictionary<string, JournaledJobShard> _jobShardCache = new();
-    private readonly ConcurrentDictionary<string, Lazy<Task<JournaledJobShard>>> _openingShards = new();
+    private readonly ConcurrentDictionary<string, ShardOpen> _openingShards = new();
     // Sticky positive cache for IsShardOwnedByLocalSiloAsync. Entries are added once a shard is
     // confirmed to be owned by this silo, and removed only when ownership is released locally
     // (via UnregisterShardAsync). Each recovered instance commits a journal-content fence before
@@ -501,22 +501,42 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
 
     private async ValueTask<JournaledJobShard> GetOrOpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken, bool isNew = false)
     {
-        if (_jobShardCache.TryGetValue(descriptor.ShardId.Value, out var existing))
+        while (true)
         {
-            return existing;
-        }
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_jobShardCache.TryGetValue(descriptor.ShardId.Value, out var existing))
+            {
+                return existing;
+            }
 
-        var candidate = new Lazy<Task<JournaledJobShard>>(() => OpenAndCacheShardAsync(descriptor, cancellationToken, isNew));
-        var opening = _openingShards.GetOrAdd(descriptor.ShardId.Value, candidate);
-        var task = opening.Value;
-        const string joinedEvent = "Orleans.DurableJobs.ShardOpenJoined";
-        if (!ReferenceEquals(opening, candidate) && _diagnostics.IsEnabled(joinedEvent))
-        {
-            _diagnostics.Write(joinedEvent, descriptor.StorageId.Value);
-        }
+            var candidate = new ShardOpen(
+                cancellationToken,
+                new Lazy<Task<JournaledJobShard>>(() => OpenAndCacheShardAsync(descriptor, cancellationToken, isNew)));
+            var opening = _openingShards.GetOrAdd(descriptor.ShardId.Value, candidate);
+            var task = opening.Task.Value;
+            const string joinedEvent = "Orleans.DurableJobs.ShardOpenJoined";
+            if (!ReferenceEquals(opening, candidate) && _diagnostics.IsEnabled(joinedEvent))
+            {
+                _diagnostics.Write(joinedEvent, descriptor.StorageId.Value);
+            }
 
-        return await task.WaitAsync(cancellationToken);
+            try
+            {
+                return await task.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
+                && opening.InitiatingCancellation.IsCancellationRequested && task.IsCanceled)
+            {
+                const string retryEvent = "Orleans.DurableJobs.ShardOpenRetryAfterCancellation";
+                if (_diagnostics.IsEnabled(retryEvent))
+                {
+                    _diagnostics.Write(retryEvent, descriptor.StorageId.Value);
+                }
+            }
+        }
     }
+
+    private sealed record ShardOpen(CancellationToken InitiatingCancellation, Lazy<Task<JournaledJobShard>> Task);
 
     private async Task<JournaledJobShard> OpenAndCacheShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken, bool isNew)
     {
@@ -541,10 +561,13 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
     {
         var codec = CreateOperationCodec();
         var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec, _timeProvider);
+        var fence = new JournaledJobShardOwnershipFence(
+            _serviceProvider.GetRequiredKeyedService<IDurableValueCommandCodec<string>>(_journaledStateManagerOptions.JournalFormatKey));
         var manager = descriptor.Provider.Factory.CreateStandalone(descriptor.StorageId);
         try
         {
             manager.RegisterStateMachine(JournaledJobShardState.StateName, state);
+            manager.RegisterStateMachine(JournaledJobShardOwnershipFence.StateName, fence);
             await manager.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
             if (!isNew)
@@ -553,7 +576,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
 
                 // A nonempty content commit fences earlier replay instances, including writes which
                 // passed their ownership check before takeover. Metadata-only updates can still retry.
-                state.WriteSnapshot();
+                fence.Write(SiloAddress.ToParsableString());
                 await manager.WriteStateAsync(cancellationToken).ConfigureAwait(false);
             }
 

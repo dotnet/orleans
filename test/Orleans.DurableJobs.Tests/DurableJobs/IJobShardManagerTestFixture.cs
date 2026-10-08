@@ -33,6 +33,8 @@ public interface IJobShardManagerTestScope : IAsyncDisposable
     JobShardManager CreateManager(TestSilo silo, DurableJobsOptions? options = null, Func<IJournalStorageProvider, IJournalStorageProvider>? decorateStorage = null);
 
     void SetSiloStatus(TestSilo silo, SiloStatus status);
+
+    long GetSnapshotByteCount(IReadOnlyList<DurableJob> jobs);
 }
 
 public sealed record TestSilo(SiloAddress SiloAddress);
@@ -107,6 +109,21 @@ public class JournaledJobShardManagerTestScope : IJobShardManagerTestScope
             _services.GetRequiredService<IOptions<JournaledStateManagerOptions>>());
 
     public void SetSiloStatus(TestSilo silo, SiloStatus status) => _membership.SetSiloStatus(silo.SiloAddress, status);
+
+    public long GetSnapshotByteCount(IReadOnlyList<DurableJob> jobs)
+    {
+        var key = _services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey;
+        var codec = _services.GetRequiredKeyedService<IDurableValueCommandCodec<DurableJobShardJournalRecord>>(key);
+        using var writer = _services.GetRequiredKeyedService<IJournalFormat>(key).CreateWriter();
+        codec.WriteSet(
+            DurableJobShardJournalRecord.ForSnapshot(new()
+            {
+                Jobs = jobs.Select(job => new DurableJobShardSnapshotEntry { Job = job, DequeueCount = 0 }).ToList()
+            }),
+            writer.CreateJournalStreamWriter(new JournalStreamId(8)));
+        using var buffer = writer.GetBuffer();
+        return buffer.Length;
+    }
 
     public virtual ValueTask DisposeAsync()
     {
