@@ -150,6 +150,8 @@ internal sealed class JournaledJobShardState : IStateMachine, IDurableValueComma
         return new() { Jobs = jobs };
     }
 
+    internal void WriteSnapshot() => Write(DurableJobShardJournalRecord.ForSnapshot(CaptureSnapshot()));
+
     internal void Apply(DurableJobShardJournalRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -14,11 +15,13 @@ using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace Orleans.DurableJobs;
 
 internal sealed partial class JournaledJobShardManager : JobShardManager
 {
+    private static readonly DiagnosticListener _diagnostics = new("Orleans.DurableJobs.ShardManager");
     private const string OwnerProperty = "DurableJobsOwner";
     private const string MembershipVersionProperty = "DurableJobsMembershipVersion";
     private const string MinDueTimeProperty = "DurableJobsMinDueTime";
@@ -38,10 +41,11 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
     private readonly JournaledStateManagerOptions _journaledStateManagerOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ConcurrentDictionary<string, JournaledJobShard> _jobShardCache = new();
+    private readonly ConcurrentDictionary<string, Lazy<Task<JournaledJobShard>>> _openingShards = new();
     // Sticky positive cache for IsShardOwnedByLocalSiloAsync. Entries are added once a shard is
     // confirmed to be owned by this silo, and removed only when ownership is released locally
-    // (via UnregisterShardAsync). Mis-cache from split-brain is bounded by storage-layer ETag
-    // conflicts triggering InconsistentStateException → the journaling layer's recovery path.
+    // (via UnregisterShardAsync). Each recovered instance commits a journal-content fence before
+    // publication, so a takeover invalidates prior instances' conditional storage mutations.
     private readonly ConcurrentDictionary<string, bool> _ownedShards = new(StringComparer.Ordinal);
     public JournaledJobShardManager(
         ILocalSiloDetails localSiloDetails,
@@ -265,14 +269,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
             return default;
         }
 
-        if (_jobShardCache.TryAdd(claimedShard.Id, claimedShard))
-        {
-            return (claimedShard, true);
-        }
-
-        // Unregister can still own the previous instance after releasing storage ownership.
-        await claimedShard.DisposeAsync();
-        return (null, true);
+        return (claimedShard, true);
     }
 
     public override async Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
@@ -295,7 +292,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
                 throw new InvalidOperationException($"Created DurableJobs shard '{shardId}' without readable journal storage properties.");
             }
 
-            return await GetOrOpenShardAsync(descriptor, cancellationToken);
+            return await GetOrOpenShardAsync(descriptor, cancellationToken, isNew: true);
         }
     }
 
@@ -438,6 +435,12 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
 
     private async ValueTask<JournaledJobShard?> TryClaimShardAsync(ShardCatalogProperties descriptor, bool isAdopted, CancellationToken cancellationToken)
     {
+        // Unregister retains the canonical instance while releasing ownership.
+        if (_jobShardCache.ContainsKey(descriptor.ShardId.Value))
+        {
+            return null;
+        }
+
         var adoptedCount = descriptor.AdoptedCount;
         var set = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -478,7 +481,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
         var updatedDescriptor = ShardCatalogProperties.From(descriptor.Provider, descriptor.StorageId, updatedMetadata);
         return updatedDescriptor is null || updatedDescriptor.Owner is null || !updatedDescriptor.Owner.Equals(SiloAddress)
             ? null
-            : await OpenShardAsync(updatedDescriptor, cancellationToken);
+            : await GetOrOpenShardAsync(updatedDescriptor, cancellationToken);
     }
 
     private async Task TryMarkShardPoisonedAsync(ShardCatalogProperties descriptor, int adoptedCount, CancellationToken cancellationToken)
@@ -496,24 +499,45 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
             cancellationToken);
     }
 
-    private async ValueTask<JournaledJobShard> GetOrOpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken)
+    private async ValueTask<JournaledJobShard> GetOrOpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken, bool isNew = false)
     {
         if (_jobShardCache.TryGetValue(descriptor.ShardId.Value, out var existing))
         {
             return existing;
         }
 
-        var shard = await OpenShardAsync(descriptor, cancellationToken);
-        if (_jobShardCache.TryAdd(shard.Id, shard))
+        var candidate = new Lazy<Task<JournaledJobShard>>(() => OpenAndCacheShardAsync(descriptor, cancellationToken, isNew));
+        var opening = _openingShards.GetOrAdd(descriptor.ShardId.Value, candidate);
+        var task = opening.Value;
+        const string joinedEvent = "Orleans.DurableJobs.ShardOpenJoined";
+        if (!ReferenceEquals(opening, candidate) && _diagnostics.IsEnabled(joinedEvent))
         {
-            return shard;
+            _diagnostics.Write(joinedEvent, descriptor.StorageId.Value);
         }
 
-        await shard.DisposeAsync();
-        return _jobShardCache[descriptor.ShardId.Value];
+        return await task.WaitAsync(cancellationToken);
     }
 
-    private async ValueTask<JournaledJobShard> OpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken)
+    private async Task<JournaledJobShard> OpenAndCacheShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken, bool isNew)
+    {
+        try
+        {
+            if (_jobShardCache.TryGetValue(descriptor.ShardId.Value, out var existing))
+            {
+                return existing;
+            }
+
+            var shard = await OpenShardAsync(descriptor, cancellationToken, isNew);
+            _jobShardCache[shard.Id] = shard;
+            return shard;
+        }
+        finally
+        {
+            _openingShards.TryRemove(descriptor.ShardId.Value, out _);
+        }
+    }
+
+    private async ValueTask<JournaledJobShard> OpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken, bool isNew)
     {
         var codec = CreateOperationCodec();
         var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec, _timeProvider);
@@ -522,6 +546,18 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
         {
             manager.RegisterStateMachine(JournaledJobShardState.StateName, state);
             await manager.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+            if (!isNew)
+            {
+                descriptor = await RequireLocalOwnershipAsync(descriptor, cancellationToken).ConfigureAwait(false);
+
+                // A nonempty content commit fences earlier replay instances, including writes which
+                // passed their ownership check before takeover. Metadata-only updates can still retry.
+                state.WriteSnapshot();
+                await manager.WriteStateAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            descriptor = await RequireLocalOwnershipAsync(descriptor, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -549,6 +585,17 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
             _timeProvider,
             _options.ShardBatchLingerDelay,
             _durableJobsInstruments);
+    }
+
+    private async ValueTask<ShardCatalogProperties> RequireLocalOwnershipAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken)
+    {
+        var current = await GetDescriptorAsync(descriptor.Provider, descriptor.StorageId, cancellationToken);
+        if (current is not { Poisoned: false, Owner: { } owner } || !owner.Equals(SiloAddress))
+        {
+            throw new InconsistentStateException($"DurableJobs shard '{descriptor.ShardId}' ownership changed while opening its journal.");
+        }
+
+        return current;
     }
 
     private IDurableValueCommandCodec<DurableJobShardJournalRecord> CreateOperationCodec()

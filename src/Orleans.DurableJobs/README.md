@@ -231,6 +231,16 @@ Assigned shards are delivered as they are opened, allowing execution to proceed 
 candidates are evaluated. The claim budget limits new claims;
 locally owned shards remain eligible after that budget is exhausted.
 
+Recovering a shard replays its jobs, verifies local ownership, and durably appends a
+snapshot before publishing the instance. This content commit establishes the
+new writer's storage concurrency boundary: earlier owners' pending writes fail
+against the changed journal, and the new owner progresses from the recovered
+state. Ownership is verified again after the commit to detect a superseding
+claim during opening. Concurrent local opens share one recovery and use the
+same canonical instance. Newly created journals start with their first writer.
+Persistent journal providers enforce conditional content mutations; ordinary metadata annotations and
+same-owner closure retain their metadata-only retry behavior.
+
 Catalog providers apply raw-prefix and range constraints using their storage capabilities.
 The timestamp representation also supports narrower day/hour prefixes and inclusive `MinId`
 and `MaxId` intervals for callers selecting a specific time window. Recovery starts at the
