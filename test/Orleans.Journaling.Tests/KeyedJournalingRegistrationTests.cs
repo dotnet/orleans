@@ -26,6 +26,53 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 {
     private const string CustomFormatKey = "custom-test-format";
 
+    [Fact]
+    public async Task VolatileProviders_UseIndependentNamedSnapshotThresholds()
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage(options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 2;
+            options.MaxBytesBeforeSnapshot = 100;
+        });
+        builder.AddVolatileJournalStorage("small-bytes", options =>
+        {
+            options.MaxAppendsBeforeSnapshot = 100;
+            options.MaxBytesBeforeSnapshot = 3;
+        });
+        await using var services = builder.Services.BuildServiceProvider();
+        var defaults = services.GetRequiredService<IJournalStorageProvider>().CreateStorage(new("threshold"));
+        var named = services.GetRequiredKeyedService<IJournalStorageProvider>("small-bytes").CreateStorage(new("threshold"));
+        var token = TestContext.Current.CancellationToken;
+        await defaults.AppendAsync(new System.Buffers.ReadOnlySequence<byte>([1]), token);
+        await named.AppendAsync(new System.Buffers.ReadOnlySequence<byte>([1, 2]), token);
+        Assert.False(defaults.IsCompactionRequested);
+        Assert.False(named.IsCompactionRequested);
+        await defaults.AppendAsync(new System.Buffers.ReadOnlySequence<byte>([2]), token);
+        Assert.True(defaults.IsCompactionRequested);
+        Assert.False(named.IsCompactionRequested);
+        await named.AppendAsync(new System.Buffers.ReadOnlySequence<byte>([3]), token);
+        Assert.True(named.IsCompactionRequested);
+        await defaults.ReplaceAsync(new System.Buffers.ReadOnlySequence<byte>([4]), token);
+        Assert.False(defaults.IsCompactionRequested);
+        Assert.True(named.IsCompactionRequested);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    public void VolatileProviders_InvalidNamedSnapshotThresholdsFailResolution(int appends, long bytes)
+    {
+        var builder = CreateNamedProviderBuilder();
+        builder.AddVolatileJournalStorage("invalid", options =>
+        {
+            options.MaxAppendsBeforeSnapshot = appends;
+            options.MaxBytesBeforeSnapshot = bytes;
+        });
+        using var services = builder.Services.BuildServiceProvider();
+        Assert.Throws<OptionsValidationException>(() => services.GetRequiredKeyedService<IJournalStorageProvider>("invalid"));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
