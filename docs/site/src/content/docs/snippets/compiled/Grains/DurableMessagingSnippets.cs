@@ -45,7 +45,7 @@ public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler
     public bool CanHandle(IInboxHandlerContext context) =>
         context.Envelope.RouteKey == "notifications";
 
-    public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!context.Envelope.Data.TryGetBody<string>(out var message)
@@ -69,14 +69,14 @@ public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler
         }
 
         var nextCount = checked(_count.Value + 1);
-        return ValueTask.FromResult<Action>(() =>
+        cancellationToken.ThrowIfCancellationRequested();
+        _count.Value = nextCount;
+        if (reply is { } envelope)
         {
-            _count.Value = nextCount;
-            if (reply is { } envelope)
-            {
-                context.Send(envelope);
-            }
-        });
+            context.Send(envelope);
+        }
+        context.Complete();
+        return ValueTask.CompletedTask;
     }
 }
 // </messaging_grain>

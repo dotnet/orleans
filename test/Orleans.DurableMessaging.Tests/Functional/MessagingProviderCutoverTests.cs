@@ -766,11 +766,14 @@ public sealed class MessagingProviderCutoverTests
     private sealed class RecordHandler(IDurableDictionary<Guid, int> effects) : IInboxHandler
     {
         public bool CanHandle(IInboxHandlerContext context) => true;
-        public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var id = context.Envelope.MessageId;
             var nextCount = effects.TryGetValue(id, out var count) ? count + 1 : 1;
-            return new(() => effects[id] = nextCount);
+            effects[id] = nextCount;
+            context.Complete();
+            return ValueTask.CompletedTask;
         }
     }
 

@@ -85,7 +85,7 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
 
     public bool CanHandle(IInboxHandlerContext context) => true;
 
-    public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         Assert.True(context.Envelope.Data.TryGetBody<DurableTestMessage>(out var body));
         var message = Assert.IsType<DurableTestMessage>(body);
@@ -96,15 +96,15 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
             outgoing = await context.Outbox.PrepareSendAsync([envelope], cancellationToken);
         }
 
-        return () =>
+        cancellationToken.ThrowIfCancellationRequested();
+        _effects.TryGetValue(message.LogicalId, out var prior);
+        var effect = new DurableEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
+        _effects[message.LogicalId] = effect;
+        if (outgoing is { } batch)
         {
-            _effects.TryGetValue(message.LogicalId, out var prior);
-            _effects[message.LogicalId] = new DurableEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
-            if (outgoing is { } batch)
-            {
-                context.Send(batch);
-            }
-        };
+            context.Send(batch);
+        }
+        context.Complete();
     }
 
     private NamedFactoryMessagingSnapshot CreateSnapshot() =>

@@ -50,10 +50,12 @@ Durable Messaging has the following boundaries:
   staged, or durable. Every call validates activation, scope, and lifetime first.
   Reusing an ID with different routing, correlation, body, or request-context content
   throws before intent admission.
-- Handlers prepare local values asynchronously and return a synchronous action.
-  Expected preparation failures produce retry or dead-letter accounting. Messaging
-  invokes the action once for that prepared attempt and stages outgoing intents, inbox
-  completion and deduplication in the same uninterrupted activation turn.
+- Handlers use <xref:Orleans.DurableMessaging.IInboxHandler.HandleAsync*> for
+  asynchronous local preparation followed by complete shared updates and
+  <xref:Orleans.DurableMessaging.IInboxHandlerContext.Complete*>. From the first
+  shared-state mutation through completion of the handler method, the handler
+  performs its work without awaiting. Completion stages inbox removal and
+  deduplication in that same uninterrupted turn as business changes and outgoing intents.
 - Journal capture observes the combined, safe-to-commit staged effects. The manager
   persists them atomically, then acknowledges each state's captured changes.
 - The owning grain or standalone host keeps messaging operations quiescent through
@@ -103,39 +105,49 @@ Exact registration preserves handler identity; generic predicates run in registr
 order. Selection keeps shared application state unchanged. Its context exposes envelope
 metadata and grain identity, and validates access to outgoing-message operations.
 
-<xref:Orleans.DurableMessaging.IInboxHandler.PrepareAsync*> performs fallible computation,
-I/O and envelope serialization using operation-local values, then returns a non-null
-synchronous action. The action applies the prepared business mutations and calls
-`context.Send(envelope)` to stage outgoing messages. The journal owner's pre-capture
-hook establishes their durable wakeup before persistence. A handler can explicitly
-await `context.Outbox.PrepareSendAsync` during preparation when it needs the wakeup
-prerequisite established earlier, then call `context.Send(batch)` from its action.
-Messaging validates the current message and ownership
-before invoking it, then stages inbox completion and deduplication before the activation
-turn yields. Earlier journal writes can complete while preparation awaits because the
-prepared attempt's effects are still local.
+<xref:Orleans.DurableMessaging.IInboxHandler.HandleAsync*> returns a
+<xref:System.Threading.Tasks.ValueTask>. Perform fallible computation, asynchronous
+I/O, validation and envelope serialization using operation-local values. Recheck
+relevant preconditions and observe cancellation before the first shared mutation.
+Then apply the complete business update, stage outgoing messages using
+`context.Send(envelope)`, and call <xref:Orleans.DurableMessaging.IInboxHandlerContext.Complete*>.
+From the first shared-state mutation until the handler method completes, perform
+these operations without an intervening await, including after `Complete()`.
+This is the handler's coding contract; ordinary journaled collections remain the
+application's state interfaces. Handler continuations use the owning activation's
+logical execution context when accessing shared state.
 
-Complete fallible application work and check preconditions during preparation. The
-returned action applies the complete set of business changes synchronously, leaving
-state ready for an atomic journal write. Orleans' single-threaded activation execution
-keeps these updates together until the action returns.
+`Complete()` synchronously removes the current pending inbox message and stages
+its completion/deduplication record. That record can be captured with the already
+staged business changes and outgoing messages even if an earlier queued journal
+writer runs before the inbox observes the method's return. After handling, the
+runtime owns ordinary journal persistence and actual acknowledgement. Storage
+acknowledgement establishes durability and releases the captured outgoing cohort
+for dispatch.
 
-The handler context admits optional batch preparation during its matching `PrepareAsync` call
-and outgoing sends while the returned action executes. Envelope and batch sends share
-this attempt-scoped boundary. Preparation supports read-only outbox inspection and
-envelope construction. Every use validates the current attempt, phase, activation and
-batch lifetime; a contract violation retains its first cause and prevents completion.
+The journal owner's final capture hook establishes a durable wakeup for outgoing
+intents. A handler can optionally await `context.Outbox.PrepareSendAsync` before
+its first shared mutation when it needs the wakeup prerequisite established earlier,
+then stage its batch synchronously. Handle or propagate preparation errors before
+applying shared updates. Earlier journal writes can complete while preparation
+awaits because the proposed business effects are still local.
 
-Handlers consume preparation results and handle or propagate their failures before
-returning an action. Retrieving a failed result counts as consumption when it throws.
-The runtime rejects unfinished acquisitions and completed failed or canceled results
-which remain unconsumed. It owns started acquisitions and their late results independently
-of caller consumption. Converting a returned value task with `AsTask()` transfers result
-retrieval to the task adapter; application code then awaits or handles that caller-owned
-task before returning the action.
+Every successful handler calls `Complete()`, including handlers which produce no
+business or outgoing-message changes. A successful return which omits completion
+reports a handler contract error and retires the owner. Context operations retain
+their actual attempt, activation and resource lifetimes. Completion ends outgoing
+staging for that attempt; metadata remains available for inspection.
 
-The handler facade retains prepared batches through the attempt's actual persistence
-outcome and disposes unused or late results. Ordinary application methods await every
+An expected failure before completion follows preparation retry/dead-letter policy
+under the coding contract. A handler error after completion is reported after
+owned persistence and cleanup; its already-staged completion and output are
+preserved, so the runtime completes the logical operation rather than reapplying
+its business effects. Actual storage failures retain terminal handling and their
+original outcome.
+
+The handler facade retains started acquisition tasks and prepared batches through
+their actual outcome and the attempt's persistence lifetime, disposing unused or
+late results during retirement. Ordinary application methods await every
 preparation and dispose each successful batch after their synchronous mutation/staging
 and journal-write scope. Disposing an unstaged batch releases its reservation; disposing
 a staged batch preserves its cohort's ownership through acknowledgement. An empty batch
@@ -191,13 +203,15 @@ the owner. A fresh owner handles subsequent messages. Durable attempts and timer
 turns retain their own cancellation lifetimes: an outgoing remote batch keeps its
 durable attempt token across timer turns.
 
-Cancellation of a durable-job or timer attempt during handler preparation leaves
+Cancellation observed before the handler's first shared mutation leaves
 the committed inbox message and physical owner available for a replacement attempt
 on the same activation. Retirement drains started preparations and releases their
-batches before completing the canceled attempt. The runtime rechecks cancellation
-before applying handler effects. Once synchronous staging begins, partial-application
-failures retain terminal handling; an admitted journal write and its resources stay
-owned through the actual storage outcome, independently of attempt cancellation.
+batches before completing the canceled attempt. The handler observes cancellation
+before its final update. Once it begins that update, it completes the business changes,
+outgoing staging, completion and method return without awaiting. Attempt cancellation
+which arrives during this uninterrupted block leaves completion and the subsequent
+owned write intact. The write and its resources stay owned through the actual storage
+outcome.
 
 ## Backpressure, retries, and dead letters
 
@@ -245,8 +259,9 @@ Grains deriving from <xref:Orleans.Journaling.DurableGrain> receive the same set
 automatically. The capability enables ordinary grains to use their application's
 inheritance model with scoped inbox and outbox services.
 
-The following grain selects messaging through its application interface, prepares an
-optional reply, and stages the reply and notification count for the inbox's completion write:
+The following grain selects messaging through its application interface, constructs
+an optional reply, then updates its notification count, sends the reply and completes
+handling before returning. The inbox owns their journal write:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_grain" language="csharp":::
 
