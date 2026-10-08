@@ -242,7 +242,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public async Task DestinationProxyCache_ReusesHotDestinationAndBoundsRetainedKeys()
+    public async Task RemoteDelivery_ResolvesEachDestinationThroughGrainFactory()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false, batchSize: 128);
         await fixture.SendAsync(fixture.Envelope);
@@ -251,18 +251,16 @@ public sealed class DurableOutboxDeliveryBatchTests
         await fixture.SendAsync(fixture.CreateEnvelope(Guid.NewGuid()));
         await fixture.CommitAsync();
         await fixture.DeliverAsync();
-        Assert.Equal(1, fixture.ProxyAcquisitionCount);
+        Assert.Equal(2, fixture.ProxyAcquisitionCount);
         for (var index = 0; index < 65; index++)
         {
-            await fixture.SendAsync(fixture.CreateEnvelope(Guid.NewGuid()) with { ReceiverId = GrainId.Create("cache", index.ToString()) });
+            await fixture.SendAsync(fixture.CreateEnvelope(Guid.NewGuid()) with { ReceiverId = GrainId.Create("destination", index.ToString()) });
         }
         await fixture.CommitAsync();
         await fixture.DeliverAsync();
         Assert.Empty(fixture.Messages);
-        Assert.Equal(66, fixture.ProxyAcquisitionCount);
-        var destinations = Assert.IsAssignableFrom<IDictionary>(fixture.LocalField("_destinations"));
-        Assert.Equal(64, destinations.Count);
-        Assert.False(destinations.Contains(fixture.ReceiverId));
+        Assert.Equal(67, fixture.ProxyAcquisitionCount);
+        Assert.Equal(67, fixture.DeliveryCount);
     }
 
     [Fact]
@@ -1133,7 +1131,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     }
 
     [Fact]
-    public async Task CanceledRunningPump_ReleasesLogicalOwnershipForDuplicateCallback()
+    public async Task CanceledRunningPump_ReleasesLogicalOwnershipForLocalRetryAndDuplicateCallback()
     {
         const string ownershipId = "owner:1";
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1157,8 +1155,17 @@ public sealed class DurableOutboxDeliveryBatchTests
             cancellation.Token)).IsInProgress);
         var running = fixture.RunRegisteredTimerAsync(TestContext.Current.CancellationToken);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var localRetryArmed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.ArmObserved = () =>
+        {
+            if (fixture.ArmedTimerNames[^1] == "LocalPumpTimerState")
+            {
+                localRetryArmed.TrySetResult();
+            }
+        };
         cancellation.Cancel();
         await running;
+        await localRetryArmed.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         Assert.True((await fixture.ExecuteJobAsync(
             ownershipId,
@@ -1166,8 +1173,9 @@ public sealed class DurableOutboxDeliveryBatchTests
             "run-2",
             TestContext.Current.CancellationToken)).IsInProgress);
         Assert.Equal(
-            1,
+            2,
             timerRegistry.ReceivedCalls().Count(static call => call.GetMethodInfo().Name == "RegisterGrainTimer"));
+        Assert.Equal(["PumpTimerState", "LocalPumpTimerState"], fixture.ArmedTimerNames);
     }
 
     [Fact]

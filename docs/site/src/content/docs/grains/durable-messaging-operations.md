@@ -162,18 +162,18 @@ throughput alongside steady-state handling.
 Track allocation rate and retained memory separately. A processing-rate budget
 expressed as bytes per acknowledged message describes how much garbage the
 workload produces. Live-memory capacity also includes retained business outcomes,
-transport identities, pending deliveries, cached references, and storage buffers.
+transport identities, pending deliveries, serialization metadata, and storage buffers.
 
 | Budget | Measurement |
 | --- | --- |
 | Processing allocations | Managed bytes allocated across the process divided by actually acknowledged messages, after warm-up. |
 | Pending work | Inbox/outbox depth, active preparation and delivery counts, and serialized payload bytes. |
 | Retained data | Processed identities and operation ledgers over their configured retention, plus append history and snapshots. |
-| Supporting memory | Reference-cache cardinality, reusable pump state, buffer capacity, and outstanding reader/operation ownership. |
+| Supporting memory | Serialization-metadata cardinality, reusable pump state, buffer capacity, and outstanding reader/operation ownership. |
 | Persistence and recovery work | Journal appends/snapshots and durable job scheduling, retries, and retirement per completed workflow. |
 
-Measure a sequential chain for latency and a many-destination workload for cache
-and pending-work capacity. Include cancellation, shutdown, and snapshot
+Measure a sequential chain for latency and a many-destination workload for
+pending-work capacity. Include cancellation, shutdown, and snapshot
 replacement while work or readers remain active. The ownership protocol keeps
 their resources live until the actual operation or read finishes; capacity
 planning includes that overlapping lifetime.

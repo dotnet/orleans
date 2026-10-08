@@ -58,11 +58,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly SemaphoreSlim _deliveryGate = new(1, 1);
     private readonly CancellationTokenSource _shutdown = new();
-    // Activation-local FIFO: bound both retained proxies and destination keys.
-    private const int DestinationCacheCapacity = 64;
-    private readonly Dictionary<GrainId, IDurableInboxExtension> _destinations = [];
-    private readonly Queue<GrainId> _destinationOrder = new(DestinationCacheCapacity);
-
     private readonly Dictionary<Guid, PendingMessage> _pendingMessages = [];
     private int _unacknowledgedMessageCount;
     private PendingMessage[] _capturedMessages = [];
@@ -989,22 +984,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
-    private IDurableInboxExtension GetDestination(GrainId destination)
-    {
-        if (_destinations.TryGetValue(destination, out var proxy))
-        {
-            return proxy;
-        }
-        proxy = _grainFactory.GetGrain<IDurableInboxExtension>(destination);
-        if (_destinations.Count == DestinationCacheCapacity)
-        {
-            _destinations.Remove(_destinationOrder.Dequeue());
-        }
-        _destinations.Add(destination, proxy);
-        _destinationOrder.Enqueue(destination);
-        return proxy;
-    }
-
     private async Task<DeliveryOutcome> DeliverAsync(DeliveryCandidate candidate, CancellationToken cancellationToken)
     {
         if (candidate.State?.EnqueuedAt is { } enqueuedAt
@@ -1018,7 +997,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             var envelope = candidate.Envelope;
             var target = envelope.ReceiverId == _grainContext.GrainId
                 ? _grainContext.GetGrainExtension<IDurableInboxExtension>()
-                : GetDestination(envelope.ReceiverId);
+                : _grainFactory.GetGrain<IDurableInboxExtension>(envelope.ReceiverId);
             var result = await target.DeliverAsync(envelope, cancellationToken).ConfigureAwait(true);
             return new(candidate, result, null, Stopwatch.GetElapsedTime(start), Expired: false);
         }
