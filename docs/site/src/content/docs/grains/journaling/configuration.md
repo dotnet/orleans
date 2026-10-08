@@ -204,11 +204,24 @@ writes copy into provider-owned pages; the built-in journal manager can share
 its owned pages through the storage implementation's explicit retained-buffer
 capability.
 
-The Arc page cache retains at most **4 MiB** and caches individual pages up to
-**1 MiB**. A drained inactive manager writer and a borrowed-write tail retain at
-most one **16 KiB** page. These cache limits are separate from live stored data,
-reader-pinned retired snapshots, and the BCL array pool. Capacity planning includes
-the complete retained journal and overlapping readers as well as cached buffers.
+The existing process-wide Arc buffer pool retains up to **4 MiB** of free pages
+by default and caches individual pages up to **1 MiB**. Set
+<xref:Orleans.Serialization.Buffers.ArcBufferWriter.MaxRetainedPoolBytes> during
+process startup to choose the aggregate free-page budget:
+
+:::code language="csharp" source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="arc_buffer_pool_budget":::
+
+The setting applies to every Arc buffer writer in the process, including writers
+used by volatile storage and serialization. It accepts zero to release cached
+pages and disable free-page retention; negative values raise an argument error.
+Lowering the budget releases excess free pages immediately. Rented pages, stored
+journal data, and reader-pinned snapshots keep their reference-counted ownership
+until their owners release them. Large arrays also participate in the BCL array
+pool's independent retention policy.
+
+A drained inactive manager writer and a borrowed-write tail retain at most one
+**16 KiB** page. Capacity planning includes the complete retained journal and
+overlapping readers as well as free pooled buffers.
 Closing an individual manager or storage handle preserves shared history;
 replacement, deletion, or the shared store's end of lifetime releases its pages.
 

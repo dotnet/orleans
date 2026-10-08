@@ -4,6 +4,7 @@ using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Metadata;
 using Orleans.Runtime;
+using Orleans.Serialization.Buffers;
 
 #pragma warning disable ORLEANSEXP005
 
@@ -20,6 +21,14 @@ internal static class VolatileJournalConfiguration
         });
 }
 // </volatile_journal_thresholds>
+
+// <arc_buffer_pool_budget>
+internal static class JournalBufferConfiguration
+{
+    internal static void ConfigureProcess() =>
+        ArcBufferWriter.MaxRetainedPoolBytes = 8 * 1024 * 1024;
+}
+// </arc_buffer_pool_budget>
 
 // <journal_operation_hooks>
 internal static class JournalHookRegistration
