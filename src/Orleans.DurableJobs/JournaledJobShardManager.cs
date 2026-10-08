@@ -302,6 +302,14 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
 
         try
         {
+            if (!_jobShardCache.TryGetValue(shard.Id, out var canonical) || !ReferenceEquals(canonical, journaledShard))
+            {
+                throw new InvalidOperationException($"Cannot unregister DurableJobs shard '{shard.Id}' because it is not the current local instance.");
+            }
+
+            // The queue barrier drains accepted mutations; stale references reject new mutations.
+            await journaledShard.RetireAsync(cancellationToken);
+
             var descriptor = await GetDescriptorAsync(journaledShard.Provider, journaledShard.StorageId, cancellationToken)
                 ?? throw new InvalidOperationException($"Cannot unregister DurableJobs shard '{shard.Id}' because its catalog properties were not found.");
 
@@ -337,9 +345,18 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
         }
         finally
         {
-            _jobShardCache.TryRemove(shard.Id, out _);
-            _ownedShards.TryRemove(shard.Id, out _);
-            await journaledShard.DisposeAsync();
+            try
+            {
+                await journaledShard.DisposeAsync();
+            }
+            finally
+            {
+                var entry = new KeyValuePair<string, JournaledJobShard>(shard.Id, journaledShard);
+                if (((ICollection<KeyValuePair<string, JournaledJobShard>>)_jobShardCache).Remove(entry))
+                {
+                    _ownedShards.TryRemove(shard.Id, out _);
+                }
+            }
         }
     }
 

@@ -25,6 +25,7 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly SingleWaiterAutoResetEvent _pendingOperationSignal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly Task _operationProcessor;
+    private bool _retiring;
     private int _disposed;
 
     /// <summary>
@@ -126,6 +127,35 @@ internal sealed class JournaledJobShard : IJobShard
         {
             EnqueueOperation(operation);
             await operation.Task.ConfigureAwait(false);
+        }
+        finally
+        {
+            operation.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Closes mutation admission and drains accepted operations before ownership cleanup.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the completion barrier.</param>
+    internal async Task RetireAsync(CancellationToken cancellationToken)
+    {
+        var operation = new MarkAsCompleteOperation(cancellationToken);
+        try
+        {
+            lock (_pendingOperationsLock)
+            {
+                ThrowIfDisposed();
+                _retiring = true;
+                _pendingOperations.Enqueue(operation);
+                _pendingOperationSignal.Signal();
+            }
+
+            await operation.Task.ConfigureAwait(false);
+            if (!_state.IsAddingCompleted)
+            {
+                throw new InvalidOperationException($"Cannot retire DurableJobs shard '{Id}' because closing it failed.");
+            }
         }
         finally
         {
@@ -287,6 +317,7 @@ internal sealed class JournaledJobShard : IJobShard
         lock (_pendingOperationsLock)
         {
             ThrowIfDisposed();
+            ObjectDisposedException.ThrowIf(_retiring && operation is not DeleteStateOperation, this);
             _pendingOperations.Enqueue(operation);
             _pendingOperationSignal.Signal();
         }
