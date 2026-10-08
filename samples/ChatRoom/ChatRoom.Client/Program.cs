@@ -1,5 +1,4 @@
-﻿using System.Reflection;
-using ChatRoom;
+﻿using ChatRoom;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Spectre.Console;
@@ -99,11 +98,7 @@ static Task StopAsync(IHost host) =>
 static void PrintUsage()
 {
     AnsiConsole.WriteLine();
-    using var logoStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("ChatRoom.Client.logo.png");
-    var logo = new CanvasImage(logoStream!)
-    {
-        MaxWidth = 25
-    };
+    var logo = new PreRenderedLogo();
 
     var table = new Table()
     {
@@ -141,6 +136,7 @@ static void PrintUsage()
         .AddEmptyRow()
         .AddEmptyRow()
         .AddRow(markup);
+
     table.AddRow(logo, rightTable);
 
     AnsiConsole.Write(table);
