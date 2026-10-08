@@ -646,8 +646,19 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
 
         var workItem = new AsyncClosureWorkItem(() => RunShardWithCleanupAsync(shard), this);
-        if (!_runningShards.TryAdd(shardId, new RunningShard(shard, workItem.Task)))
+        var running = new RunningShard(shard, workItem.Task);
+        if (!_runningShards.TryAdd(shardId, running))
         {
+            return;
+        }
+
+        // A previous runner can finish retirement between the lifetime check and registration.
+        if (IsRetiredShard(shard))
+        {
+            var entry = new KeyValuePair<string, RunningShard>(shardId, running);
+            ((ICollection<KeyValuePair<string, RunningShard>>)_runningShards).Remove(entry);
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
             return;
         }
 

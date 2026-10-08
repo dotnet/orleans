@@ -1490,6 +1490,61 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task Activation_RetirementAfterInitialCheckRejectsDisposedShardAndPreservesReplacement()
+    {
+        var token = TestContext.Current.CancellationToken;
+        using var time = new ActivationGatedTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var storage = new VolatileJournalStorageProvider();
+        await using var services = CreateJournaledServices(storage, time);
+        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var membership = new TestClusterMembershipService();
+        membership.SetSiloStatus(owner, SiloStatus.Active);
+        var shardManager = CreateJournaledShardManager(owner, services, membership, options);
+        var now = time.GetUtcNow();
+        await using var original = await shardManager.CreateShardAsync(now, now.Add(options.ShardDuration), new Dictionary<string, string>(), token);
+        var job = await original.TryScheduleJobAsync(CreateScheduleRequest(now.AddSeconds(30)), token);
+        Assert.NotNull(job);
+        var logger = new RecordingLogger<LocalDurableJobManager>();
+        var manager = CreateManager(shardManager, time, options, logger: logger);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        accessor.AddWritableShard(now, original);
+        time.GateNextRead();
+        var activation = Task.Run(() => accessor.TryActivateShard(original), token);
+        try
+        {
+            await time.ActivationTimeRead.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.False(accessor.TryGetRunningShardTask(original.Id, out _));
+            await shardManager.UnregisterShardAsync(original, token);
+            accessor.TryActivateShard(original);
+            AssertSchedulingCacheEmpty(accessor);
+            var replacement = Assert.Single(await shardManager.AssignJobShardsAsync(now, 1, token));
+            Assert.NotSame(original, replacement);
+            accessor.AddWritableShard(now, replacement);
+            time.ResumeActivation.Set();
+            await activation.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.DoesNotContain(logger.Entries, entry => entry.EventId.Name == "LogStartingShard");
+            Assert.False(accessor.TryGetRunningShardTask(original.Id, out _));
+            Assert.True(accessor.TryGetCachedShard(original.Id, out var cached));
+            Assert.Same(replacement, cached);
+            Assert.True(accessor.TryGetWritableShard(now, out var writable));
+            Assert.Same(replacement, writable);
+            Assert.Equal(1, await replacement.GetJobCountAsync());
+            Assert.True(await manager.CancelAsync(job, token));
+        }
+        finally
+        {
+            time.ResumeActivation.Set();
+            await activation.WaitAsync(TimeSpan.FromSeconds(5), token);
+            await CreateLifecycleObserver(manager).OnStop(token).WaitAsync(TimeSpan.FromSeconds(5), token);
+        }
+
+        AssertSchedulingCacheEmpty(accessor);
+        Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.Null(await storage.CreateStorage(JobShardId.Parse(original.Id).ToJournalId()).GetMetadataAsync(token));
+    }
+
+    [Fact]
     public async Task FaultedRunner_WithFencedJournalPreservesPersistedJobsAndLogsCleanupFailure()
     {
         var token = TestContext.Current.CancellationToken;
@@ -4216,6 +4271,34 @@ public class LocalDurableJobManagerTests
                 return inner.DeleteAsync(cancellationToken);
             }
         }
+    }
+
+    private sealed class ActivationGatedTimeProvider(DateTimeOffset start) : FakeTimeProvider(start), IDisposable
+    {
+        private int _gateNextRead;
+
+        public TaskCompletionSource ActivationTimeRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ManualResetEventSlim ResumeActivation { get; } = new();
+
+        public void GateNextRead() => Volatile.Write(ref _gateNextRead, 1);
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            var now = base.GetUtcNow();
+            if (Interlocked.Exchange(ref _gateNextRead, 0) != 0)
+            {
+                ActivationTimeRead.SetResult();
+                if (!ResumeActivation.Wait(TimeSpan.FromSeconds(5)))
+                {
+                    throw new TimeoutException("Shard activation was not resumed after the readiness clock read.");
+                }
+            }
+
+            return now;
+        }
+
+        public void Dispose() => ResumeActivation.Dispose();
     }
 
     private sealed class TimerTrackingFakeTimeProvider(DateTimeOffset start) : FakeTimeProvider(start)
