@@ -7,6 +7,7 @@ using Benchmarks.Ping;
 using Benchmarks.Placement;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using Benchmarks.DurableMessaging;
 
 namespace Benchmarks;
 
@@ -364,6 +365,14 @@ internal class Program
         ["Journaling.Azure.Bdn"] = args =>
         {
             var summaries = BenchmarkSwitcher.FromTypes([typeof(AzureJournalBenchmarks)]).Run(args).ToArray();
+            if (summaries.Length == 0 || summaries.Any(summary => summary.HasCriticalValidationErrors || summary.Reports.Any(report => !report.Success)))
+            {
+                Environment.ExitCode = 1;
+            }
+        },
+        ["DurableMessaging.Sequential"] = args =>
+        {
+            var summaries = BenchmarkSwitcher.FromTypes([typeof(SequentialMessagingBenchmark)]).Run(args).ToArray();
             if (summaries.Length == 0 || summaries.Any(summary => summary.HasCriticalValidationErrors || summary.Reports.Any(report => !report.Success)))
             {
                 Environment.ExitCode = 1;
