@@ -366,17 +366,17 @@ public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehavi
         public DurableEnvelope Output { get; private set; }
         public int Applied { get; private set; }
         public bool CanHandle(IInboxHandlerContext context) => context.Envelope.RouteKey == BootstrapState.Route;
-        public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             Context = context;
             Output = context.CreateEnvelope().To(BootstrapState.OutputTarget, "output").WithBody(42).Build();
-            return ValueTask.FromResult<Action>(() =>
-            {
-                Applied++;
-                observation.Value!.Value = 42;
-                if (throughOutbox) context.Outbox.Send(Output);
-                else context.Send(Output);
-            });
+            Applied++;
+            observation.Value!.Value = 42;
+            if (throughOutbox) context.Outbox.Send(Output);
+            else context.Send(Output);
+            context.Complete();
+            return ValueTask.CompletedTask;
         }
     }
 

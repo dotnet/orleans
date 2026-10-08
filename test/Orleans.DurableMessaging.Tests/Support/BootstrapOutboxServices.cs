@@ -123,18 +123,17 @@ public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurabl
     }
 
     public bool CanHandle(IInboxHandlerContext context) => context.Envelope.RouteKey == "output";
-    public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!context.Envelope.Data.TryGetBody<int>(out var value))
         {
             throw new InvalidOperationException("The bootstrap output must contain an integer.");
         }
-        return ValueTask.FromResult<Action>(() =>
-        {
-            _values.Add(context.Envelope.MessageId, value);
-            _pending.Add((context.Envelope.SenderId, context.Envelope.MessageId, value));
-        });
+        _values.Add(context.Envelope.MessageId, value);
+        _pending.Add((context.Envelope.SenderId, context.Envelope.MessageId, value));
+        context.Complete();
+        return ValueTask.CompletedTask;
     }
 
     public Task<int> GetMessageCountAsync() => Task.FromResult(_values.Count);

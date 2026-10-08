@@ -109,7 +109,11 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public bool CanHandle(IInboxHandlerContext context) => context.Envelope.RouteKey == Route;
     public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        if (HandlerOverride is { } handler) return await handler.PrepareAsync(context, cancellationToken);
+        if (HandlerOverride is { } handler)
+        {
+            await handler.HandleAsync(context, cancellationToken);
+            return;
+        }
         if (_handlers.TryGet(context.GrainId, Route, out var barrier))
         {
             barrier.Entered.TrySetResult();
