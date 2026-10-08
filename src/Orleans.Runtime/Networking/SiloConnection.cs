@@ -268,6 +268,12 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
+            if (global::Orleans.Runtime.Messaging.MessageCenter.IsForwardedClientRequestUpdate(msg))
+            {
+                this.messageCenter.SendForwardingUpdate(msg);
+                return;
+            }
+
             if (msg.IsPing())
             {
                 LogWarningFailedPingMessage(this.Log, msg);
@@ -278,15 +284,31 @@ namespace Orleans.Runtime.Messaging
             {
                 LogDebugSiloRejectingMessage(this.Log, this.LocalSiloAddress, msg, reason);
 
+                var rejectionReason = $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}";
+                var exception = new SiloUnavailableException();
+                if (global::Orleans.Runtime.Messaging.MessageCenter.IsForwardedClientRequest(msg, this.LocalSiloAddress))
+                {
+                    this.messageCenter.RejectForwardedClientRequest(msg, rejectionReason, exception);
+                    return;
+                }
+
                 // Done retrying, send back an error instead
                 this.messageCenter.SendRejection(
                     msg,
                     Message.RejectionTypes.Transient,
-                    $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}",
-                    new SiloUnavailableException());
+                    rejectionReason,
+                    exception);
             }
             else
             {
+                if (msg.Direction == Message.Directions.Response
+                    && msg.TargetGrain.IsClient()
+                    && msg.TargetSilo is { } unavailableGateway)
+                {
+                    _ = this.messageCenter.ReaddressResponse(msg, unavailableGateway);
+                    return;
+                }
+
                 this.MessagingTrace.OnSiloDropSendingMessage(this.LocalSiloAddress, msg, reason);
                 msg.Dispose();
             }
@@ -294,6 +316,12 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RetryMessage(Message msg, Exception? ex = null)
         {
+            if (global::Orleans.Runtime.Messaging.MessageCenter.IsForwardedClientRequestUpdate(msg))
+            {
+                this.messageCenter.SendForwardingUpdate(msg);
+                return;
+            }
+
             if (msg.IsPing())
             {
                 LogWarningRetryingPingMessage(this.Log, msg);
@@ -302,7 +330,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 ++msg.RetryCount;
-                this.messageCenter.SendMessage(msg);
+                this.messageCenter.SendMessage(msg, msg.GatewayRequestRetry);
             }
             else
             {
