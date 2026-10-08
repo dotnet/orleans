@@ -166,7 +166,7 @@ logs.
 ## Measure sequential throughput
 
 The repository's `DurableMessaging.Sequential` benchmark measures a single chain
-through 2, 4, or 8 interacting grains on one silo. It performs 128 sequential
+through 2, 4, or 8 interacting grains on one silo. It performs 1,024 sequential
 durable deliveries per invocation and awaits actual journal acknowledgement of every
 handler step. Normal inbox/outbox pumps and real time drive progress.
 
@@ -185,3 +185,9 @@ bound retained history. Its volatile journal and in-memory jobs isolate local
 framework overhead. Use the deployment's persistent providers, cross-silo placement,
 and independent concurrent chains for production capacity measurements. Record
 hardware, runtime, commit, provider, and benchmark preset with every comparison.
+
+Use `--memory` to report managed bytes allocated per acknowledged message across
+the process. Compare the same grain count, chain length, and storage thresholds.
+Volatile storage defaults to 100 appends or 1 MiB between snapshots; see
+[Development storage](journaling/configuration.md#development-storage) for both
+limits and their memory/replay tradeoff.

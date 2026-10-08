@@ -36,6 +36,7 @@ internal sealed partial class DurableInboxExtension :
     public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
 
     private readonly IGrainContext _grainContext;
+    private readonly string _grainType;
     private readonly ITimerRegistry _timerRegistry;
     private readonly IJournaledStateManager _stateManager;
     private readonly SerializerSessionPool _sessionPool;
@@ -147,6 +148,7 @@ internal sealed partial class DurableInboxExtension :
         ArgumentNullException.ThrowIfNull(options);
         _shutdownToken = _shutdownCts.Token;
         _grainContext = grainContext;
+        _grainType = grainContext.GrainId.Type.ToString();
         _timerRegistry = timerRegistry;
         _stateManager = stateManager;
         _sessionPool = sessionPool;
@@ -241,7 +243,7 @@ internal sealed partial class DurableInboxExtension :
             if (_processed.TryGetValue(key, out var processedAt)
                 && !DurableMessagingTime.IsExpired(_timeProvider.GetUtcNow(), processedAt, _deduplicationWindow))
             {
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "duplicate");
+                _instruments.OnInboxMessageReceived(_grainType, "duplicate");
                 return DeliveryResult.Duplicate();
             }
 
@@ -249,19 +251,19 @@ internal sealed partial class DurableInboxExtension :
             {
                 await EnsureJobScheduledUnderGateAsync(CancellationToken.None).ConfigureAwait(true);
                 ScheduleLocalDrain();
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "duplicate");
+                _instruments.OnInboxMessageReceived(_grainType, "duplicate");
                 return DeliveryResult.Duplicate();
             }
 
             if (_inboxDict.Count >= _maxCapacity)
             {
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "backpressured");
+                _instruments.OnInboxMessageReceived(_grainType, "backpressured");
                 return DeliveryResult.Backpressured();
             }
 
             if (!TryFindHandlerWithinMutationBoundary(new InboxHandlerSelectionContext(envelope, _grainContext.GrainId), out _))
             {
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "route_not_found");
+                _instruments.OnInboxMessageReceived(_grainType, "route_not_found");
                 return DeliveryResult.RouteNotFound(envelope.RouteKey);
             }
 
@@ -279,7 +281,7 @@ internal sealed partial class DurableInboxExtension :
                 await SubmitAsync(operation).ConfigureAwait(true);
                 ValidateReady();
                 ScheduleLocalDrain();
-                _instruments.OnInboxMessageReceived(_grainContext.GrainId.Type.ToString(), "accepted");
+                _instruments.OnInboxMessageReceived(_grainType, "accepted");
                 LogMessageAccepted(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
                 return DeliveryResult.Accepted();
             }
@@ -1205,14 +1207,24 @@ internal sealed partial class DurableInboxExtension :
         }
 
         var now = _timeProvider.GetUtcNow();
-        var pending = _inboxDict.Where(pair => !_provisionalAcceptances.Contains(pair.Key)
+        var pending = new List<DurableEnvelope>(Math.Min(_inboxDict.Count, _batchSize));
+        foreach (var pair in _inboxDict)
+        {
+            if (!_provisionalAcceptances.Contains(pair.Key)
                 && (!_messageStates.TryGetValue(pair.Key, out var state) || state.NextAttemptAt is null || state.NextAttemptAt <= now))
-            .Take(_batchSize).Select(static pair => pair.Value).ToList();
+            {
+                pending.Add(pair.Value);
+                if (pending.Count == _batchSize)
+                {
+                    break;
+                }
+            }
+        }
         foreach (var envelope in pending)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ValidateOwner(owner);
-            var stopwatch = Stopwatch.StartNew();
+            var start = Stopwatch.GetTimestamp();
             var operation = new HandlerWrite(owner, envelope, cancellationToken);
             await SubmitAsync(operation).ConfigureAwait(true);
             if (operation.Skipped)
@@ -1220,8 +1232,8 @@ internal sealed partial class DurableInboxExtension :
                 cancellationToken.ThrowIfCancellationRequested();
             }
             var status = operation.Error is null ? "success" : operation.DeadLetter ? "dead_lettered" : "retry";
-            _instruments.OnInboxMessageProcessed(_grainContext.GrainId.Type.ToString(), status);
-            _instruments.OnInboxProcessingDuration(stopwatch.Elapsed, _grainContext.GrainId.Type.ToString());
+            _instruments.OnInboxMessageProcessed(_grainType, status);
+            _instruments.OnInboxProcessingDuration(Stopwatch.GetElapsedTime(start), _grainType);
         }
 
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
@@ -1264,8 +1276,19 @@ internal sealed partial class DurableInboxExtension :
     private DateTimeOffset GetNextAttemptAt()
     {
         var now = _timeProvider.GetUtcNow();
-        var attempts = _inboxDict.Keys.Select(key => _messageStates.TryGetValue(key, out var state) ? state.NextAttemptAt : null).ToList();
-        return attempts.Any(value => value is null || value <= now) ? now : attempts.Min()!.Value;
+        var next = DateTimeOffset.MaxValue;
+        foreach (var key in _inboxDict.Keys)
+        {
+            if (!_messageStates.TryGetValue(key, out var state) || state.NextAttemptAt is not { } at || at <= now)
+            {
+                return now;
+            }
+            if (at < next)
+            {
+                next = at;
+            }
+        }
+        return next;
     }
 
     private DateTimeOffset? GetNextProcessedMaintenance()

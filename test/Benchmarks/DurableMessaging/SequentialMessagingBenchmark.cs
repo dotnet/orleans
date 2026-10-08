@@ -15,7 +15,7 @@ namespace Benchmarks.DurableMessaging;
 [BenchmarkCategory("DurableMessaging")]
 public class SequentialMessagingBenchmark
 {
-    private const int MessagesPerInvocation = 128;
+    private const int MessagesPerInvocation = 1024;
     private InProcessTestCluster? _cluster;
     private CommittedHopProbe _probe = null!;
     private ISequentialMessagingGrain[] _grains = [];
@@ -55,7 +55,7 @@ public class SequentialMessagingBenchmark
         await RunChainAsync();
     }
 
-    /// <summary>Completes 128 sequential deliveries, normalized to one acknowledged message.</summary>
+    /// <summary>Completes 1,024 sequential deliveries, normalized to one acknowledged message.</summary>
     /// <returns>The exact number of committed handler steps.</returns>
     [Benchmark(OperationsPerInvoke = MessagesPerInvocation)]
     public Task<int> SequentialRing() => RunChainAsync();

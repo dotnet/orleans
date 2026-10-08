@@ -107,6 +107,15 @@ and drain execution. Pump callbacks execute as non-interleaving grain timer turn
 keeping infrastructure writes and handler effects within their owning journal
 boundaries.
 
+Acknowledged outbox cohorts and completed remote delivery batches wake a local
+pump immediately. Zero-due timer turns enter the normal activation message queue,
+with the same non-interleaving and keep-alive policy. Local drains share the exact
+physical ownership handle with job-driven drains and leave empty-owner retirement
+to the durable job. Pending remote deliveries release the pump turn; their actual
+completion schedules collection of the retained outcomes. This keeps reciprocal
+senders responsive while Durable Jobs owns recovery, scheduled retries, and
+ownership retirement.
+
 ## Handler preparation and terminal recovery
 
 <xref:Orleans.DurableMessaging.IInboxHandler.CanHandle*> is a pure metadata predicate.

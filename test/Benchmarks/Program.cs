@@ -387,6 +387,11 @@ internal class Program
     // requires benchmark name or 'All' word as first parameter
     public static void Main(string[] args)
     {
+        if (args is ["--ignore-exit-code", "8", var command, ..]
+            && (_benchmarks.ContainsKey(command) || command.Equals("all", StringComparison.OrdinalIgnoreCase)))
+        {
+            args = args[2..];
+        }
         if (args.Length == 0 || (!args[0].Equals("all", StringComparison.OrdinalIgnoreCase) && !_benchmarks.ContainsKey(args[0])))
         {
             Environment.ExitCode = (args.Any(arg => arg is "-automated" or "@@")

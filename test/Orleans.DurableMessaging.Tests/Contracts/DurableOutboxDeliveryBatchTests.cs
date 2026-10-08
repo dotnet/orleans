@@ -26,6 +26,65 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 public sealed class DurableOutboxDeliveryBatchTests
 {
     [Fact]
+    public async Task LocalPump_AcknowledgementWakesOnceAndRetainsPhysicalRecoveryOwner()
+    {
+        using var fixture = new OutboxFixture(hasDurableMessage: false);
+        await fixture.SendAsync(fixture.Envelope);
+        Assert.Empty(fixture.RegisteredTimerNames);
+        Assert.Equal(0, fixture.DeliveryCount);
+        await fixture.CommitAsync();
+        var job = fixture.Job.Value;
+        var id = fixture.JobId.Value;
+        Assert.Equal(["LocalPumpTimerState"], fixture.RegisteredTimerNames);
+        await fixture.CommitAsync();
+        Assert.Equal(["LocalPumpTimerState"], fixture.RegisteredTimerNames);
+        await fixture.RunRegisteredTimerAtAsync(0);
+        Assert.Equal(1, fixture.DeliveryCount);
+        Assert.Empty(fixture.Messages);
+        Assert.Same(job, fixture.Job.Value);
+        Assert.Equal(id, fixture.JobId.Value);
+
+        Assert.True((await fixture.ExecuteJobAsync(job!, "recovery-retirement", TestContext.Current.CancellationToken)).IsInProgress);
+        await fixture.RunRegisteredTimerAtAsync(1);
+        Assert.Null(fixture.Job.Value);
+        Assert.Null(fixture.JobId.Value);
+        Assert.Equal(id, fixture.CompletedJobId.Value);
+    }
+
+    [Theory]
+    [InlineData(DeliveryStatus.Accepted)]
+    [InlineData(DeliveryStatus.Backpressured)]
+    public async Task LocalPump_RemoteCompletionWakesWithoutJobPollingAndKeepsActualOutcome(DeliveryStatus status)
+    {
+        var release = new TaskCompletionSource<DeliveryResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var fixture = new OutboxFixture(_ => new(release.Task), hasDurableMessage: false);
+        await fixture.SendAsync(fixture.Envelope);
+        await fixture.CommitAsync();
+        await fixture.RunRegisteredTimerAtAsync(0);
+        Assert.Equal(1, fixture.DeliveryCount);
+        Assert.Single(fixture.Messages);
+        Assert.Equal(["LocalPumpTimerState"], fixture.RegisteredTimerNames);
+        var queued = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.TimerRegistry.WhenForAnyArgs(registry => registry.RegisterGrainTimer(
+            default!, default(Func<Arg.AnyType, CancellationToken, Task>)!, default!, default)).Do(_ => queued.TrySetResult());
+        release.SetResult(status == DeliveryStatus.Accepted ? DeliveryResult.Accepted() : DeliveryResult.Backpressured());
+        await queued.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal(["LocalPumpTimerState", "LocalPumpTimerState"], fixture.RegisteredTimerNames);
+        await fixture.RunRegisteredTimerAtAsync(1);
+        Assert.Equal(1, fixture.DeliveryCount);
+        if (status == DeliveryStatus.Accepted)
+        {
+            Assert.Empty(fixture.Messages);
+        }
+        else
+        {
+            Assert.Single(fixture.Messages);
+            Assert.Equal(1, fixture.MessageStates.GetProperty<int>(fixture.MessageId, "AttemptCount"));
+            Assert.Equal(2, fixture.RegisteredTimerNames.Length);
+        }
+    }
+
+    [Fact]
     public async Task RecoveryAndLifecycleStart_CoalesceMissingOwnerRepair()
     {
         var timerRegistry = Substitute.For<ITimerRegistry>();
@@ -45,9 +104,9 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.NotNull(fixture.JobId.Value);
         Assert.Equal(1, jobManager.AttemptCount);
         Assert.Equal(1, fixture.Manager.WriteCount);
-        Assert.Single(
-            timerRegistry.ReceivedCalls(),
-            static call => call.GetMethodInfo().Name == "RegisterGrainTimer");
+        Assert.Equal(
+            ["EnsureJobTimerState", "LocalPumpTimerState"],
+            fixture.RegisteredTimerNames);
     }
 
     [Fact]
@@ -482,9 +541,9 @@ public sealed class DurableOutboxDeliveryBatchTests
         {
             releaseLoopback.TrySetResult();
             releaseRemote.TrySetResult();
-            await turn.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         }
-        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => fixture.ExecuteJobAsync("owner:1").AsTask());
+        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => turn.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
         Assert.Equal(loopbackToken, failure.CancellationToken);
         var cancellationErrors = fixture.LoggedExceptions.OfType<AggregateException>().ToArray();
         if (callbackThrows) Assert.Same(callbackFailure, Assert.Single(Assert.Single(cancellationErrors).Flatten().InnerExceptions));
@@ -933,9 +992,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         await fixture.StartAsync();
         await fixture.RunRegisteredTimerAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(
-            1,
-            timerRegistry.ReceivedCalls().Count(static call => call.GetMethodInfo().Name == "RegisterGrainTimer"));
+        Assert.Equal(["EnsureJobTimerState", "LocalPumpTimerState"], fixture.RegisteredTimerNames);
     }
 
     [Fact]
@@ -1421,7 +1478,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(1, fixture.JobSequence.Value);
         Assert.Equal(1, fixture.Manager.CaptureCount);
         Assert.Equal(0, fixture.PendingMessageCount);
-        await fixture.RunRegisteredTimerAsync(TestContext.Current.CancellationToken);
+        await fixture.RunRegisteredTimerAtAsync(0);
         Assert.Equal(1, fixture.Manager.CaptureCount);
         using var recovered = fixture.Recreate();
         Assert.Equal(2, recovered.Messages.Count);
@@ -2477,6 +2534,10 @@ public sealed class DurableOutboxDeliveryBatchTests
             var call = TimerRegistry.ReceivedCalls().Where(static call => call.GetMethodInfo().Name == "RegisterGrainTimer").ElementAt(index);
             return RunTimerAsync(call, TestContext.Current.CancellationToken);
         }
+
+        public string[] RegisteredTimerNames => TimerRegistry.ReceivedCalls()
+            .Where(static call => call.GetMethodInfo().Name == "RegisterGrainTimer")
+            .Select(static call => call.GetArguments()[2]!.GetType().Name).ToArray();
 
         public Task StopAsync() => ((ILifecycleObserver)_outbox).OnStop(TestContext.Current.CancellationToken);
         public OutboxFixture Recreate() => new(storage: Manager.Storage, envelope: Envelope);

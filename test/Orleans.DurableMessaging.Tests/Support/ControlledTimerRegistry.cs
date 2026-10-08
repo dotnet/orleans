@@ -21,7 +21,8 @@ public sealed class OutboxPumpTimerProbe
 
     internal Task WaitIfBlockedAsync(object? state, CancellationToken cancellationToken)
     {
-        if (state?.GetType().FullName != "Orleans.DurableMessaging.DurableOutbox+PumpTimerState")
+        if (state?.GetType().FullName is not ("Orleans.DurableMessaging.DurableOutbox+PumpTimerState"
+            or "Orleans.DurableMessaging.DurableOutbox+LocalPumpTimerState"))
         {
             return Task.CompletedTask;
         }

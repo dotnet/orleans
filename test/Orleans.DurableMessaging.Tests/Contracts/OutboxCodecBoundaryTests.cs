@@ -1128,7 +1128,7 @@ public sealed class OutboxCodecBoundaryTests
         {
             var generation = Outbox.GetType().GetField("_stateGeneration", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Outbox);
             return (ValueTask<DurableJobRunResult>)Outbox.GetType().GetMethod("ExecuteJobCoreAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(Outbox, [job.Metadata!["orleans.messaging.ownership-id"], job, generation, TestContext.Current.CancellationToken, TestContext.Current.CancellationToken])!;
+                .Invoke(Outbox, [job.Metadata!["orleans.messaging.ownership-id"], job, generation, TestContext.Current.CancellationToken, TestContext.Current.CancellationToken, true])!;
         }
 
         public async Task SeedOwnerlessJournalAsync(JournalId journal, DurableEnvelope envelope)
