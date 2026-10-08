@@ -14,7 +14,7 @@ namespace Orleans.DurableMessaging
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        [Id(2)]
+        [Id(1)]
         public string? Message { get { throw null; } init { } }
 
         [Id(0)]
@@ -37,7 +37,7 @@ namespace Orleans.DurableMessaging
         Duplicate = 1,
         Backpressured = 2,
         HandlerNotFound = 3,
-        DeadLettered = 6
+        DeadLettered = 4
     }
 
     public sealed partial class DurableDeadLetter
@@ -60,7 +60,7 @@ namespace Orleans.DurableMessaging
         [Id(0)]
         public required System.Guid MessageId { get { throw null; } init { } }
 
-        [Id(8)]
+        [Id(3)]
         public required Serialization.Buffers.ImmutableBuffer Payload { get { throw null; } init { } }
 
         [Id(2)]
@@ -72,7 +72,7 @@ namespace Orleans.DurableMessaging
 
     [GenerateSerializer]
     [Immutable]
-    [Alias("Orleans.HierarchicalKey")]
+    [Alias("Orleans.DurableMessaging.HierarchicalKey")]
     public sealed partial class HierarchicalKey : System.ISpanFormattable, System.IFormattable, System.IEquatable<HierarchicalKey>, System.IParsable<HierarchicalKey>, System.ISpanParsable<HierarchicalKey>
     {
         internal HierarchicalKey() { }

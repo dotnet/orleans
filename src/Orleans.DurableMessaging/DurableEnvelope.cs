@@ -40,6 +40,6 @@ public readonly struct DurableEnvelope
     /// Empty payloads are valid. Application decoding takes place during handler preparation,
     /// before shared mutations. Create the payload locally before staging the envelope.
     /// </remarks>
-    [Id(8)]
+    [Id(3)]
     public required ImmutableBuffer Payload { get; init; }
 }

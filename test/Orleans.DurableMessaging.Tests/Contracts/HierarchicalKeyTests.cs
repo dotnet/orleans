@@ -13,11 +13,11 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 public class HierarchicalKeyTests
 {
     [Fact]
-    public void SerializationContract_PreservesDraftTypeAlias()
+    public void SerializationContract_IdentifiesCurrentType()
     {
         var alias = Assert.Single(typeof(HierarchicalKey).GetCustomAttributes(inherit: false).OfType<AliasAttribute>());
 
-        Assert.Equal("Orleans.HierarchicalKey", alias.Alias);
+        Assert.Equal("Orleans.DurableMessaging.HierarchicalKey", alias.Alias);
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public class HierarchicalKeyTests
     [Fact]
     public void Create_WithNullString_ThrowsArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create(null!));
+        Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create((string)null!));
     }
 
     [Fact]
@@ -746,7 +746,7 @@ public class HierarchicalKeyTests
     [Fact]
     public void CreateWithNullParent_CreatesKeyWithoutParent()
     {
-        var key = HierarchicalKey.Create(null, "bar");
+        var key = HierarchicalKey.Create((HierarchicalKey?)null, "bar");
         Assert.Equal("bar", key.ToString());
     }
 }

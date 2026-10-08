@@ -39,14 +39,6 @@ A receiver without a registered handler returns
 `No inbox handler is registered.`. An unknown application kind instead fails during
 application decoding/dispatch and follows handler retry/dead-letter policy.
 
-> [!WARNING]
-> This prerelease introduces an envelope format with opaque `Payload` at `Id(8)`;
-> retired legacy field IDs 3 through 7 remain reserved. Migrate persisted legacy
-> envelopes and journal replay history before switching. A drain-based migration
-> also requires an acknowledged compatible snapshot to replace earlier append
-> records. Include retained dead letters needed for replay. See
-> [Prerelease envelope migration](durable-messaging-operations.md#migrate-legacy-prerelease-envelopes).
-
 ### Encode ordinary application values
 
 Use <xref:Orleans.Serialization.Serializer> or

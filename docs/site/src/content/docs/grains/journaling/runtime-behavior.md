@@ -25,6 +25,8 @@ During <xref:Orleans.Runtime.GrainLifecycleStage.SetupState>, the manager:
 1. Resets and replays each registered durable state.
 1. Completes activation setup after replay finishes.
 
+Nonempty journals require stored format metadata. A missing format key fails recovery and leaves the journal unchanged. New empty journals use the configured write format.
+
 <xref:Orleans.Grain.OnActivateAsync*> and requests observe recovered durable state after setup succeeds, whether the grain derives directly from <xref:Orleans.Grain>, from an application-owned base, or from <xref:Orleans.Journaling.DurableGrain>. A storage read, format, codec, or malformed-data failure fails activation and preserves the stored journal for diagnosis and recovery.
 
 Provider registration makes Journaling services available. Per-grain journal I/O begins only for activations which resolve the manager, directly or through durable-state dependencies. Grains which use other persistence models keep their existing activation behavior.

@@ -106,7 +106,7 @@ public sealed class DurableEnvelopeContractTests
     }
 
     [Fact]
-    public void OpaqueContracts_ExposeExactPublicSurfaceAndReservedIds()
+    public void OpaqueContracts_ExposeExactPublicSurfaceAndContiguousIds()
     {
         Assert.True(typeof(DurableEnvelope).IsPublic);
         Assert.True(typeof(DurableEnvelope).IsValueType);
@@ -119,7 +119,7 @@ public sealed class DurableEnvelopeContractTests
             Property("SenderId", typeof(GrainId), true),
             Property("ReceiverId", typeof(GrainId), true),
             Property("Payload", typeof(ImmutableBuffer), true));
-        AssertIds(typeof(DurableEnvelope), ("MessageId", 0u), ("SenderId", 1u), ("ReceiverId", 2u), ("Payload", 8u));
+        AssertIds(typeof(DurableEnvelope), ("MessageId", 0u), ("SenderId", 1u), ("ReceiverId", 2u), ("Payload", 3u));
         foreach (var property in typeof(DurableEnvelope).GetProperties())
         {
             Assert.Single(property.GetCustomAttributes<RequiredMemberAttribute>());
@@ -143,9 +143,9 @@ public sealed class DurableEnvelopeContractTests
         Assert.True(Assert.Single(typeof(IDurableInbox).GetMethod("TryGetMessage")!.GetParameters(), p => p.ParameterType.IsByRef).IsOut);
         Assert.True(Assert.Single(typeof(IDurableOutbox).GetMethod("TryGetMessage")!.GetParameters(), p => p.ParameterType.IsByRef).IsOut);
 
-        Assert.Equal(new[] { "Accepted:0", "Backpressured:2", "DeadLettered:6", "Duplicate:1", "HandlerNotFound:3" },
+        Assert.Equal(new[] { "Accepted:0", "Backpressured:2", "DeadLettered:4", "Duplicate:1", "HandlerNotFound:3" },
             Enum.GetNames<DeliveryStatus>().Select(name => $"{name}:{(int)Enum.Parse<DeliveryStatus>(name)}").Order(StringComparer.Ordinal));
-        AssertIds(typeof(DeliveryResult), ("Status", 0u), ("Message", 2u));
+        AssertIds(typeof(DeliveryResult), ("Status", 0u), ("Message", 1u));
         AssertSurface(typeof(DeliveryResult), Property("Status", typeof(DeliveryStatus), true), Property("Message", typeof(string), true),
             StaticMethod("Accepted", typeof(DeliveryResult)), StaticMethod("Duplicate", typeof(DeliveryResult)),
             StaticMethod("Backpressured", typeof(DeliveryResult)), StaticMethod("HandlerNotFound", typeof(DeliveryResult)),
@@ -163,17 +163,6 @@ public sealed class DurableEnvelopeContractTests
             Method("AsReadOnlySequence", typeof(ReadOnlySequence<byte>)),
             StaticMethod("Create", typeof(ImmutableBuffer), typeof(Action<IBufferWriter<byte>>)));
 
-        string[] removed =
-        [
-            "DurableEnvelopeBuilder", "DurableEnvelopeData", "IInboxHandler`1",
-            "RouteKeyHandler", "RoutePrefixHandler", "CorrelationHandler", "IPreparedOutboxBatch"
-        ];
-        var exported = typeof(DurableEnvelope).Assembly.GetExportedTypes();
-        foreach (var name in removed)
-        {
-            Assert.DoesNotContain(exported, type => type.FullName == $"Orleans.DurableMessaging.{name}"
-                || (type.Namespace == "Orleans.DurableMessaging" && type.Name.StartsWith(name + "`", StringComparison.Ordinal)));
-        }
     }
 
     private static void AssertIds(Type type, params (string Name, uint Id)[] expected)

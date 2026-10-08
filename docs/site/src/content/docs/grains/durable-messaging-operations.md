@@ -190,31 +190,9 @@ runs with the same payload, chain length, providers, and retention settings.
 Use untraced runs for latency comparisons and keep trace collection overhead
 separate from the benchmark result.
 
-## Deploy compatible message contracts
+## Evolve application payload records
 
-### Migrate legacy prerelease envelopes
-
-The new prerelease envelope format carries its opaque `Payload` at serialization
-`Id(8)`. Transport identities retain IDs 0, 1, and 2. Retired legacy envelope fields
-at IDs 3 through 7 remain reserved and must not be reused.
-
-**Migrate legacy prerelease envelopes and their journal replay history before
-switching to the new core.** Quiesce producers and use the legacy reader to drain
-pending inbox/outbox work and reconcile retained dead letters and authorized
-replays. Earlier append records still contain legacy envelopes even after current
-queues become empty. Complete a storage compaction which acknowledges a snapshot
-containing only compatible live state, or explicitly rewrite that history and
-remaining envelopes into the new format. Preserve business state and processed
-identities throughout the migration.
-
-This is a coordinated format transition: validate fresh recovery of the resulting
-journals with the new reader before activating the new deployment and admitting
-producers. Validation includes pending envelopes, processed identities, retained
-dead letters, and application state.
-
-### Evolve application payload records
-
-Within the new envelope format, keep application message-kind and serialization
+Keep application message-kind and serialization
 identifiers stable. Typed payload records use `GenerateSerializer` and stable `Id`
 members; preserve readers for previously encoded application records. Explicitly
 version business semantics and application message kinds when an incompatible

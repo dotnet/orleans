@@ -28,5 +28,5 @@ public enum DeliveryStatus
     /// <summary>
     /// The message was moved to the receiver's dead-letter store.
     /// </summary>
-    DeadLettered = 6
+    DeadLettered = 4
 }

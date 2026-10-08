@@ -37,8 +37,8 @@ public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehavi
     [InlineData(typeof(ApplicationBootstrapGrain))]
     [InlineData(typeof(InterfaceBootstrapGrain))]
     [InlineData(typeof(GenericBootstrapGrain<int>))]
-    [InlineData(typeof(LegacyBootstrapGrain))]
-    [InlineData(typeof(LegacyMarkedBootstrapGrain))]
+    [InlineData(typeof(DurableBootstrapGrain))]
+    [InlineData(typeof(MarkedDurableBootstrapGrain))]
     public async Task SelectedComposition_BindsOnceAndReplaysFreshScopedState(Type grainClass)
     {
         var grain = CreateGrain(grainClass);

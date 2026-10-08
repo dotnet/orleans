@@ -207,7 +207,7 @@ public sealed class HandlerRoutingContractTests
     }
 
     [Fact]
-    public void HandlerNotFound_PreservesWireValueAndFixedDiagnostic()
+    public void HandlerNotFound_RoundTripsStatusAndDiagnostic()
     {
         var result = DeliveryResult.HandlerNotFound();
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
@@ -215,7 +215,7 @@ public sealed class HandlerRoutingContractTests
 
         var decoded = serializer.Deserialize(serializer.SerializeToArray(result));
 
-        Assert.Equal(3, (int)result.Status);
+        Assert.Equal(DeliveryStatus.HandlerNotFound, result.Status);
         Assert.Equal(DeliveryStatus.HandlerNotFound, decoded.Status);
         Assert.Equal("No inbox handler is registered.", result.Message);
         Assert.Equal("No inbox handler is registered.", decoded.Message);

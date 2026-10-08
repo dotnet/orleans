@@ -150,7 +150,7 @@ Serializer naming policies affect application payload values. Journal command na
 
 ## Migrate a journal format
 
-Providers expose the persisted format key as <xref:Orleans.Journaling.IJournalMetadata.FormatKey> and <xref:Orleans.Journaling.JournalMetadata.FormatKey>. Recovery selects the stored reader independently of the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata. <xref:Orleans.Journaling.Json.JsonLinesJournalFormat.JournalFormatKey> supplies the JSON Lines format key.
+Providers expose the persisted format key as <xref:Orleans.Journaling.IJournalMetadata.FormatKey> and <xref:Orleans.Journaling.JournalMetadata.FormatKey>. Recovery selects the stored reader independently of the configured write format. Nonempty journals require a stored format key; recovery fails explicitly when it is absent. New empty journals use the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata. <xref:Orleans.Journaling.Json.JsonLinesJournalFormat.JournalFormatKey> supplies the JSON Lines format key.
 
 Use this deployment sequence:
 

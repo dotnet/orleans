@@ -170,10 +170,10 @@ public sealed class ApplicationBootstrapGrain(BootstrapState state) : Applicatio
 public sealed class InterfaceBootstrapGrain(BootstrapState state) : BootstrapGrainBase(state), IMarkedBootstrapTestGrain;
 public sealed class GenericBootstrapGrain<T>(BootstrapState state) : BootstrapGrainBase(state), IGenericBootstrapTestGrain<T>, IDurableMessagingGrain;
 
-public class LegacyBootstrapGrain : DurableGrain, IBootstrapTestGrain, IDisposable
+public class DurableBootstrapGrain : DurableGrain, IBootstrapTestGrain, IDisposable
 {
     private readonly BootstrapState _state;
-    public LegacyBootstrapGrain(BootstrapState state)
+    public DurableBootstrapGrain(BootstrapState state)
     {
         _state = state;
         state.Observation.Constructed(this);
@@ -188,7 +188,7 @@ public class LegacyBootstrapGrain : DurableGrain, IBootstrapTestGrain, IDisposab
     public void Dispose() => _state.Observation.GrainDisposals++;
 }
 
-public sealed class LegacyMarkedBootstrapGrain(BootstrapState state) : LegacyBootstrapGrain(state), IDurableMessagingGrain;
+public sealed class MarkedDurableBootstrapGrain(BootstrapState state) : DurableBootstrapGrain(state), IDurableMessagingGrain;
 
 public interface IBootstrapControlGrain : IGrainWithGuidKey { Task PingAsync(); }
 public interface IInterleavingBootstrapControlGrain : IBootstrapControlGrain

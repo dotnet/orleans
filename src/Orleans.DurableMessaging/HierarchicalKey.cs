@@ -14,7 +14,7 @@ namespace Orleans.DurableMessaging;
 /// Segments can be escaped to allow literal slash characters.
 /// </remarks>
 [GenerateSerializer, Immutable]
-[Alias("Orleans.HierarchicalKey")]
+[Alias("Orleans.DurableMessaging.HierarchicalKey")]
 public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
 {
     /// <summary>
@@ -50,7 +50,6 @@ public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalK
     /// <param name="value">The string value representing the key.</param>
     /// <returns>A new hierarchical key.</returns>
     /// <exception cref="ArgumentException">Thrown when the value contains empty segments.</exception>
-    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
     public static HierarchicalKey Create(string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(value);
@@ -94,7 +93,6 @@ public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalK
     /// <param name="parent">The parent key.</param>
     /// <param name="value">The value for the child key.</param>
     /// <returns>A new hierarchical key.</returns>
-    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
     public static HierarchicalKey Create(HierarchicalKey? parent, string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(value);

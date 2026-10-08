@@ -971,9 +971,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             return;
         }
 
-        var journalFormatKey = metadata?.FormatKey is { } storedFormatKey
-            ? JournalFormatServices.ValidateJournalFormatKey(storedFormatKey)
-            : _shared.JournalFormatKey;
+        if (metadata?.FormatKey is not { } storedFormatKey)
+        {
+            throw new InvalidDataException("Nonempty journal data requires stored journal format metadata.");
+        }
+
+        var journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(storedFormatKey);
         try
         {
             if (!string.Equals(journalFormatKey, _shared.JournalFormatKey, StringComparison.Ordinal))

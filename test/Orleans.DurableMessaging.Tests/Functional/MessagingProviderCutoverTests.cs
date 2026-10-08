@@ -506,7 +506,7 @@ public sealed class MessagingProviderCutoverTests
                 options.DeduplicationWindow = TimeSpan.FromHours(1);
                 options.MaxOutboxRetryAge = TimeSpan.FromMinutes(5);
                 options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(1);
-                // Cutover's immediate provider drain explicitly selects the supported legacy policy.
+                // Retire idle owners immediately so the provider drain completes.
                 options.OutboxIdleRetirementGracePeriod = TimeSpan.Zero;
             });
             services.AddSingleton<ILocalDurableJobManager>(Jobs);

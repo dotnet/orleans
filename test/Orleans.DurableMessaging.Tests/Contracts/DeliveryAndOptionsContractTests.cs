@@ -115,7 +115,7 @@ public sealed class DeliveryAndOptionsContractTests
     }
 
     [Fact]
-    public void DeliveryStatus_AllValues_HaveStableDistinctValues()
+    public void DeliveryStatus_AllValues_HaveContiguousDistinctValues()
     {
         Assert.Equal(
             [
@@ -126,7 +126,7 @@ public sealed class DeliveryAndOptionsContractTests
                 DeliveryStatus.DeadLettered
             ],
             Enum.GetValues<DeliveryStatus>());
-        Assert.Equal([0, 1, 2, 3, 6], Enum.GetValues<DeliveryStatus>().Select(static value => (int)value));
+        Assert.Equal([0, 1, 2, 3, 4], Enum.GetValues<DeliveryStatus>().Select(static value => (int)value));
     }
 
     [Fact]

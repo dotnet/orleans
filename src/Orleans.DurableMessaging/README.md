@@ -52,21 +52,6 @@ The protocol and runtime provide:
 - `DurableInboxOptions` supplies defaults and validates capacity, retry, retention,
   and batch limits, including an outbox retry age shorter than the deduplication window.
 
-## Prerelease envelope migration
-
-The new prerelease envelope format places opaque `Payload` at serialization `Id(8)`.
-Identity fields retain IDs 0, 1, and 2; retired legacy fields at IDs 3 through 7 remain
-reserved and must not be reused.
-
-**Migrate legacy prerelease envelopes and their journal replay history before
-switching to the new core.** Quiesce producers, drain pending work using the legacy
-reader, and reconcile retained dead letters required for replay. Earlier append
-records still contain legacy envelopes after current queues become empty. Complete
-an acknowledged compatible snapshot which replaces that history, or explicitly
-migrate the history and remaining envelopes. Preserve business state and processed
-identities. Coordinate the format transition and validate fresh recovery with the
-new reader before activating the new deployment and admitting producers.
-
 ## Handler and persistence boundaries
 
 Handlers perform asynchronous I/O, validation, envelope construction, and cancellation
