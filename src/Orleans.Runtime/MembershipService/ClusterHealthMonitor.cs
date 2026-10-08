@@ -115,10 +115,6 @@ namespace Orleans.Runtime.MembershipService
 
                             tableSnapshot = updates.Current;
                         }
-                        else if (this.membershipManager.LocalSiloStatus != SiloStatus.Joining)
-                        {
-                            continue;
-                        }
 
                         var utcNow = this.timeProvider.GetUtcNow().UtcDateTime;
                         var newMonitoredSilos = this.UpdateMonitoredSilos(tableSnapshot, this.monitoredSilos, utcNow);
