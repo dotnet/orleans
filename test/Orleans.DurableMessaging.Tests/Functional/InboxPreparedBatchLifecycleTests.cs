@@ -1,5 +1,3 @@
-using System.Reflection;
-using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Tests.Support;
@@ -508,12 +506,22 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
     [InlineData(true)]
     public async Task AttemptCancellation_BeforeCompleteDrainsLateAcquisitionAndKeepsOwner(bool providerFails)
     {
+        using var lifecycle = new DiagnosticEventCollector(GrainLifecycleEvents.ListenerName);
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var retry = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = 0;
         handler.Body = async (self, token) =>
         {
+            if (++attempts > 1)
+            {
+                await retry.Task.WaitAsync(token);
+                self.Mutate();
+                self.Context.Complete();
+                return;
+            }
             using var registration = token.Register(() => canceled.TrySetResult());
             _ = self.Context.Outbox.PrepareSendAsync([self.Output], token);
             await canceled.Task;
@@ -538,9 +546,26 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         Assert.Empty(rig.Processed);
         Assert.Empty(rig.Effects);
         AssertDisposed(rig.Outbox, providerFails ? 0 : 1);
-        await AssertHealthyAsync(rig);
-        handler.Body = static (self, _) => { self.Mutate(); self.Context.Complete(); return default; };
-        Assert.Same(DurableJobRunResult.Completed, await RunPumpAsync(rig));
+        try
+        {
+            await AssertHealthyAsync(rig);
+        }
+        catch (OperationCanceledException error)
+        {
+            var deactivations = lifecycle.Events.Select(item => item.Payload).OfType<GrainLifecycleEvents.Deactivating>()
+                .Where(item => ReferenceEquals(item.GrainContext, rig.Context))
+                .Select(item => item.Reason.ToString());
+            throw new InvalidOperationException(
+                $"Healthy write canceled after attempt retirement. Grain={rig.Receiver.GetGrainId()}, " +
+                $"context={rig.Context}, deactivated={rig.Context.Deactivated.IsCompleted}, " +
+                $"handlerFailureCompleted={rig.Grain.DeactivationFailure.Task.IsCompleted}, " +
+                $"retirementCompleted={finished.IsCompleted}, providerCompleted={acquisition.Operation!.Completed.IsCompleted}, " +
+                $"deactivationReasons=[{string.Join(" | ", deactivations)}].",
+                error);
+        }
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        retry.TrySetResult();
+        await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         AssertSuccess(rig, input.Value, outputCount: 0);
         Assert.Same(rig.Context, Fixture.GetGrainContext(rig.Receiver));
     }
@@ -560,9 +585,18 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var retry = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = 0;
         OperationCanceledException? expected = null;
-        handler.Body = async (_, token) =>
+        handler.Body = async (self, token) =>
         {
+            if (++attempts > 1)
+            {
+                await retry.Task.WaitAsync(token);
+                self.Mutate();
+                self.Context.Complete();
+                return;
+            }
             entered.TrySetResult();
             try
             {
@@ -604,10 +638,37 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         Assert.Equal(snapshot.InboxJobId, rig.Grain.GetSnapshotForTest().InboxJobId);
         Assert.Same(snapshot.InboxJob, rig.Grain.GetSnapshotForTest().InboxJob);
         await AssertHealthyAsync(rig);
-        handler.Body = static (self, _) => { self.Mutate(); self.Context.Complete(); return default; };
-        Assert.Same(DurableJobRunResult.Completed, await RunPumpAsync(rig));
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        retry.TrySetResult();
+        await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         AssertSuccess(rig, input.Value, outputCount: 0);
         Assert.Same(rig.Context, Fixture.GetGrainContext(rig.Receiver));
+    }
+
+    [Fact]
+    public async Task CanceledJobCallback_LeavesActiveHandlerAndCommittedInboxUndisturbed()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        using var input = await DeliverAsync(rig);
+        var snapshot = rig.Grain.GetSnapshotForTest();
+        var writes = Writes(rig);
+        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
+        var feature = (IDurableJobFeatureHandler)rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
+        var canceled = new CancellationToken(canceled: true);
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => OnTurnAsync(rig.Context, async () =>
+            await feature.ExecuteJobAsync(new JobContext(job), canceled)));
+        Assert.Equal(canceled, error.CancellationToken);
+        Assert.Equal(writes, Writes(rig));
+        Assert.Single(rig.Inbox);
+        Assert.Empty(rig.Effects);
+        Assert.Empty(rig.Processed);
+        Assert.Equal(snapshot.InboxJobId, rig.Grain.GetSnapshotForTest().InboxJobId);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+        AssertSuccess(rig, input.Value, outputCount: 0);
     }
 
     [Theory]
@@ -851,21 +912,6 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, timer),
             TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
-    private async Task<DurableJobRunResult> RunPumpAsync(Rig rig)
-    {
-        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
-        var run = new JobContext(job);
-        var feature = (IDurableJobFeatureHandler)rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
-        await OnTurnAsync(rig.Context, async () => Assert.True(
-            (await feature.ExecuteJobAsync(run, TestContext.Current.CancellationToken)).IsInProgress));
-        var timer = GetTimer(events, rig);
-        await TimerStoppedAsync(events, timer);
-        DurableJobRunResult result = null!;
-        await OnTurnAsync(rig.Context, async () => result = await feature.ExecuteJobAsync(run, TestContext.Current.CancellationToken));
-        return result;
-    }
-
     private static Task OnTurnAsync(IGrainContext context, Action action) =>
         OnTurnAsync(context, () => { action(); return Task.CompletedTask; });
     private static Task OnTurnAsync(IGrainContext context, Func<Task> action)
@@ -914,8 +960,12 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             await Release.Task.WaitAsync(cancellationToken);
             await Body(this, cancellationToken);
         }
-        public void Mutate() => effects[Context.Envelope.MessageId] =
-            new DurableEffect(Context.Envelope.MessageId, 1, 501, "async-handler");
+        public void Mutate()
+        {
+            effects.TryGetValue(Context.Envelope.MessageId, out var previous);
+            effects[Context.Envelope.MessageId] =
+                new DurableEffect(Context.Envelope.MessageId, (previous?.Count ?? 0) + 1, 501, "async-handler");
+        }
         public void Dispose() => Release.TrySetResult();
     }
     private sealed class JobContext(DurableJob job) : IJobRunContext
