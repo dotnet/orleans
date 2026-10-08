@@ -9,8 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="logo.br" />
-    <EmbeddedResource Include="logo.br" />
+    <None Remove="logo.markup.gz" />
+    <EmbeddedResource Include="logo.markup.gz" />
   </ItemGroup>
 
   <ItemGroup>

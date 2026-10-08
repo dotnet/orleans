@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Text.Json;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 
@@ -12,9 +11,10 @@ internal sealed class PreRenderedLogo : Renderable
 
     public PreRenderedLogo()
     {
-        using var stream = typeof(PreRenderedLogo).Assembly.GetManifestResourceStream("ChatRoom.Client.logo.br");
-        using var compressed = new BrotliStream(stream!, CompressionMode.Decompress);
-        _markup = JsonSerializer.Deserialize<string[]>(compressed)!;
+        using var stream = typeof(PreRenderedLogo).Assembly.GetManifestResourceStream("ChatRoom.Client.logo.markup.gz");
+        using var compressed = new GZipStream(stream!, CompressionMode.Decompress);
+        using var reader = new StreamReader(compressed);
+        _markup = reader.ReadToEnd().Split('\f');
     }
 
     protected override Measurement Measure(RenderOptions options, int maxWidth)

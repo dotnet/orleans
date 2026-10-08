@@ -56,3 +56,64 @@ dotnet run --project .\ChatRoom.Client\
 ```
 
 The clients display a pre-rendered logo, text headings, and command instructions using Spectre.Console.
+
+## Regenerating the terminal logo
+
+`ChatRoom.Client\logo.png` is the source artwork. `logo.markup.gz` contains gzip-compressed UTF-8 Spectre.Console markup for widths of 1-25 pixels, separated by form feeds (`\f`). These sizes preserve the logo's appearance in narrow terminals.
+
+To regenerate it after changing the PNG, save the following as `RenderLogo.cs` in a temporary directory and run it with the .NET 10 SDK:
+
+```PowerShell
+dotnet run <path-to-RenderLogo.cs> -- .\ChatRoom.Client\logo.png .\ChatRoom.Client\logo.markup.gz
+```
+
+This one-off converter uses the original ImageSharp renderer, whose license terms apply. The client uses Spectre.Console and built-in .NET gzip decompression.
+
+```csharp
+#:package Spectre.Console.ImageSharp@0.54.0
+#:package SixLabors.ImageSharp@4.1.2
+
+using System.IO.Compression;
+using System.Text;
+using Spectre.Console;
+using Spectre.Console.Rendering;
+
+var image = new CanvasImage(args[0]) { MaxWidth = 25 };
+var options = new RenderOptions(AnsiConsole.Profile.Capabilities, new Size(50, 25));
+using var file = File.Create(args[1]);
+using var gzip = new GZipStream(file, CompressionLevel.SmallestSize);
+using var writer = new StreamWriter(gzip);
+
+for (var width = 1; width <= 25; width++)
+{
+    if (width > 1)
+    {
+        writer.Write('\f');
+    }
+
+    var markup = new StringBuilder();
+    string? previousStyle = null;
+    foreach (var segment in ((IRenderable)image).Render(options, width * 2))
+    {
+        var style = segment.IsLineBreak ? null : segment.Style.ToMarkup().Replace("default on ", "on ");
+        if (style != previousStyle)
+        {
+            if (!string.IsNullOrEmpty(previousStyle))
+            {
+                markup.Append("[/]");
+            }
+
+            if (!string.IsNullOrEmpty(style))
+            {
+                markup.Append('[').Append(style).Append(']');
+            }
+
+            previousStyle = style;
+        }
+
+        markup.Append(segment.IsLineBreak ? "\n" : Markup.Escape(segment.Text));
+    }
+
+    writer.Write(markup.ToString().TrimEnd('\n'));
+}
+```
