@@ -579,6 +579,11 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 {
                     LogErrorProcessingMembershipUpdates(exception);
                 }
+
+                if (exception is OrleansConfigurationException)
+                {
+                    break;
+                }
             }
         }
 

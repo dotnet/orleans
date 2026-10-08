@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- GetUniformHashCodes returns cached ImmutableArray<uint> storage instead of a mutable uint[] array. -->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Runtime.SiloAddress.GetUniformHashCodes(System.Int32)</Target>
+    <Left>lib/net10.0/Orleans.Core.Abstractions.dll</Left>
+    <Right>lib/net10.0/Orleans.Core.Abstractions.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Orleans.Runtime.SiloAddress.GetUniformHashCodes(System.Int32)</Target>
+    <Left>lib/net8.0/Orleans.Core.Abstractions.dll</Left>
+    <Right>lib/net8.0/Orleans.Core.Abstractions.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>
