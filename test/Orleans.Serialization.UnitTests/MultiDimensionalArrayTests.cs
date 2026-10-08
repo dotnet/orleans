@@ -1,7 +1,14 @@
 using System;
+using System.Buffers;
+using System.IO.Pipelines;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Session;
+using Orleans.Serialization.WireProtocol;
 using Xunit;
 
 namespace Orleans.Serialization.UnitTests;
@@ -15,12 +22,14 @@ public sealed class MultiDimensionalArrayTests : IDisposable
     private readonly ServiceProvider _serviceProvider;
     private readonly DeepCopier _deepCopier;
     private readonly Serializer _serializer;
+    private readonly ObjectSerializer _objectSerializer;
 
     public MultiDimensionalArrayTests()
     {
         _serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
         _deepCopier = _serviceProvider.GetRequiredService<DeepCopier>();
         _serializer = _serviceProvider.GetRequiredService<Serializer>();
+        _objectSerializer = _serviceProvider.GetRequiredService<ObjectSerializer>();
     }
 
     [Fact]
@@ -184,6 +193,124 @@ public sealed class MultiDimensionalArrayTests : IDisposable
         Assert.Same(first, second);
     }
 
+    [Theory]
+    [InlineData(0, 2)]
+    [InlineData(2, 0)]
+    [InlineData(0, 0)]
+    [InlineData(0, 2, 3)]
+    [InlineData(2, 0, 3)]
+    [InlineData(2, 3, 0)]
+    [InlineData(2, 0, 0)]
+    [InlineData(0, 2, 3, 4)]
+    [InlineData(2, 0, 3, 4)]
+    [InlineData(2, 3, 0, 4)]
+    [InlineData(2, 3, 4, 0)]
+    [InlineData(1024, 1024, 0)]
+    public void RoundTrip_EmptyArrays_PreservesDimensionsAndAliases(params int[] lengths)
+    {
+        var array = Array.CreateInstance(typeof(int), lengths);
+        var original = new object[] { array, array, 42 };
+
+        var result = _serializer.Deserialize<object[]>(_serializer.SerializeToArray(original))!;
+
+        Assert.Equal(3, result.Length);
+        var restored = Assert.IsAssignableFrom<Array>(result[0]);
+        Assert.Equal(array.GetType(), restored.GetType());
+        Assert.NotSame(array, restored);
+        Assert.Empty(restored);
+        Assert.Equal(lengths.Length, restored.Rank);
+        for (var dimension = 0; dimension < lengths.Length; dimension++)
+        {
+            Assert.Equal(lengths[dimension], restored.GetLength(dimension));
+            Assert.Equal(0, restored.GetLowerBound(dimension));
+        }
+
+        Assert.Same(restored, result[1]);
+        Assert.Equal(42, Assert.IsType<int>(result[2]));
+    }
+
+    // Captured from the unmodified writer on main c7056b3ab620e5d3144ea72b12d572dc398c988d.
+    [Theory]
+    [InlineData(2, 0, "2020000501090001E0E0")]
+    [InlineData(0, 2, "2020000501010009E0E0")]
+    [InlineData(1, 2, "2020000501050009E0012D0057E0")]
+    public void Deserialize_LegacyRankTwoPayload_PreservesShapeElementsAndWriterBytes(int rows, int columns, string hex)
+    {
+        var original = new int[rows, columns];
+        if (original.Length > 0)
+        {
+            original[0, 0] = 11;
+            original[0, 1] = -22;
+        }
+
+        var payload = Convert.FromHexString(hex);
+        var result = _serializer.Deserialize<int[,]>(payload)!;
+
+        Assert.Equal(rows, result.GetLength(0));
+        Assert.Equal(columns, result.GetLength(1));
+        Assert.Equal(original, result);
+        Assert.Equal(payload, _serializer.SerializeToArray(original));
+    }
+
+    [Theory]
+    [InlineData(2, 2)]
+    [InlineData(int.MaxValue, int.MaxValue)]
+    [InlineData(65536, 65536)]
+    [InlineData(int.MaxValue, int.MaxValue, int.MaxValue)]
+    public void Deserialize_NonEmptyDimensionsExceedInput_ThrowsBeforeAllocation(params int[] lengths)
+    {
+        var payload = CreateArrayPayload(lengths);
+        var arrayType = typeof(int).MakeArrayType(lengths.Length);
+
+        var exception = Assert.Throws<IndexOutOfRangeException>(() => _objectSerializer.Deserialize(payload, arrayType));
+
+        Assert.Equal(
+            $"Declared dimensions [{string.Join(", ", lengths)}] require more elements than the remaining length of the input, 1.",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task Deserialize_DimensionProductOverflow_ThrowsBeforeAllocation()
+    {
+        var lengths = new[] { int.MaxValue, int.MaxValue, int.MaxValue };
+        var pipe = new Pipe();
+        await pipe.Writer.WriteAsync(CreateArrayPayload(lengths), TestContext.Current.CancellationToken);
+        await pipe.Writer.CompleteAsync();
+        using var stream = pipe.Reader.AsStream();
+
+        var exception = Assert.Throws<IndexOutOfRangeException>(() => _serializer.Deserialize<int[,,]>(stream));
+
+        Assert.Equal(
+            $"Declared dimensions [{string.Join(", ", lengths)}] require more elements than the remaining length of the input, {long.MaxValue}.",
+            exception.Message);
+    }
+
+    [Theory]
+    [InlineData(-1, 2)]
+    [InlineData(-1, 0)]
+    [InlineData(0, -1)]
+    [InlineData(2, -1, 0)]
+    [InlineData(2, 0, -1)]
+    public void Deserialize_EmptyArrayWithNegativeDimension_Throws(params int[] lengths)
+    {
+        var payload = CreateArrayPayload(lengths);
+        var arrayType = typeof(int).MakeArrayType(lengths.Length);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => _objectSerializer.Deserialize(payload, arrayType));
+    }
+
+    [Theory]
+    [InlineData(0, 2)]
+    [InlineData(2, 0)]
+    [InlineData(2, 3, 0)]
+    public void Deserialize_EmptyArrayWithElement_Throws(params int[] lengths)
+    {
+        var payload = CreateArrayPayload(lengths, [42]);
+        var arrayType = typeof(int).MakeArrayType(lengths.Length);
+
+        Assert.Throws<IndexOutOfRangeException>(() => _objectSerializer.Deserialize(payload, arrayType));
+    }
+
     [Fact]
     public void RoundTrip_RankThreeReferenceArray_PreservesAliasesAndCopyIndependence()
     {
@@ -340,6 +467,27 @@ public sealed class MultiDimensionalArrayTests : IDisposable
     public void Dispose() => _serviceProvider.Dispose();
 
     private Array Copy(Array original) => Assert.IsAssignableFrom<Array>(_deepCopier.Copy((object)original));
+
+    private byte[] CreateArrayPayload(int[] lengths, int[]? elements = null)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        using var session = _serviceProvider.GetRequiredService<SerializerSessionPool>().GetSession();
+        var writer = Writer.Create(buffer, session);
+        var arrayType = typeof(int).MakeArrayType(lengths.Length);
+        ReferenceCodec.MarkValueField(session);
+        writer.WriteFieldHeader(0, arrayType, arrayType, WireType.TagDelimited);
+        _serviceProvider.GetRequiredService<CodecProvider>().GetCodec<int[]>().WriteField(ref writer, 0, typeof(int[]), lengths);
+        uint fieldIdDelta = 1;
+        foreach (var element in elements ?? [])
+        {
+            Int32Codec.WriteField(ref writer, fieldIdDelta, element);
+            fieldIdDelta = 0;
+        }
+
+        writer.WriteEndObject();
+        writer.Commit();
+        return buffer.WrittenSpan.ToArray();
+    }
 
     [GenerateSerializer]
     public sealed class MixedRankValue
