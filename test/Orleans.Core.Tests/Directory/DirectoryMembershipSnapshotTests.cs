@@ -171,15 +171,13 @@ public sealed class DirectoryMembershipSnapshotTests
     public void LegacyPartitionBoundariesPreserveCachedHashOrder()
     {
         var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11112), 1);
-        ImmutableArray<uint> generated = [uint.MaxValue, 100, 0x80000000, 200];
-        member.InternalSetUniformHashCodes(generated);
+        var generated = member.GetUniformHashCodes(30);
 
         var options = GetDocumentedLegacyOptions();
         var boundaries = options.GetPartitionBoundaries(member, generated.Length);
 
-        Assert.Equal([100u, 200u, 0x80000000u, uint.MaxValue], boundaries);
-        Assert.Equal([uint.MaxValue, 100u, 0x80000000u, 200u], member.GetUniformHashCodes(generated.Length));
-        Assert.False(generated.Equals(boundaries));
+        Assert.Equal(generated.Order(), boundaries);
+        Assert.True(generated.Equals(member.GetUniformHashCodes(generated.Length)));
     }
 
     [Fact]

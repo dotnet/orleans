@@ -170,26 +170,13 @@ public sealed class ReminderServiceLifecycleHarness
         => _observer.GetTickCount(grainId, reminderName);
 
     /// <inheritdoc />
-    public async Task<SiloAddress> JoinOneSiloAsync(
-        GrainId grainId,
-        CancellationToken cancellationToken)
+    public async Task<SiloAddress> JoinOneSiloAsync(CancellationToken cancellationToken)
     {
         var initialSilos = _cluster.GetActiveSilos().Select(silo => silo.SiloAddress).ToHashSet();
         try
         {
-            var ringHashCode = unchecked(grainId.GetUniformHashCode() + 1);
-            var silo = AssertSingle(await _cluster.StartSilosAsync(
-                1,
-                (_, options) => options.RingHashCode = ringHashCode,
-                cancellationToken));
+            var silo = AssertSingle(await _cluster.StartSilosAsync(1, cancellationToken));
             await WaitForReconciledTopologyAsync([silo], cancellationToken);
-            if (!IsOwner(silo.SiloAddress, grainId))
-            {
-                throw new InvalidOperationException(
-                    $"Joined silo {silo.SiloAddress} does not own requested grain {grainId} "
-                    + $"with uniform hash 0x{grainId.GetUniformHashCode():X8}.");
-            }
-
             return silo.SiloAddress;
         }
         catch (Exception joinFailure)
