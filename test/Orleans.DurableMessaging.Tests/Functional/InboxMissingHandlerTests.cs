@@ -303,6 +303,26 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
             {
                 _capturing = false;
             }
+            if (result.IsInProgress && _timer is null)
+            {
+                // Bind only this exact requested payload, never an unrelated coalesced turn.
+                var state = feature.GetType().GetField("_pumpTimer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(feature);
+                if (state is not null)
+                {
+                    var pending = state.GetType().BaseType!.GetField("_pending", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(state);
+                    if (pending is not null)
+                    {
+                        var execution = pending.GetType().GetProperty("Execution")!.GetValue(pending)!;
+                        var key = execution.GetType().GetProperty("Key")!.GetValue(execution)!;
+                        if (Equals(run.RunId, key.GetType().GetProperty("RunId")!.GetValue(key))
+                            && Equals(run.Job.Id, key.GetType().GetProperty("JobId")!.GetValue(key)))
+                        {
+                            _timer = Assert.IsAssignableFrom<IGrainTimer>(state.GetType().BaseType!
+                                .GetField("_timer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(state));
+                        }
+                    }
+                }
+            }
             if (!result.IsInProgress)
             {
                 Result.TrySetResult(result);

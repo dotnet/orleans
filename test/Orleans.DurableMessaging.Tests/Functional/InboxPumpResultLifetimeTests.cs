@@ -188,7 +188,8 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
             Assert.Equal(DurableJobRunStatus.InProgress,
                 feature.ExecuteJobAsync(retryRun, TestContext.Current.CancellationToken).GetAwaiter().GetResult().Status);
         });
-        Assert.Equal(2, entries.Count);
+        var queuedRetry = Assert.Single(entries.Keys.Cast<object>());
+        Assert.Equal(retryRun.RunId, queuedRetry.GetType().GetProperty("RunId")!.GetValue(queuedRetry));
         hold.Release();
         await turn;
         await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(), static snapshot => snapshot.InboxJobId is null);

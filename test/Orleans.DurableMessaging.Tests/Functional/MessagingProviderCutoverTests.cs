@@ -480,6 +480,8 @@ public sealed class MessagingProviderCutoverTests
                 options.DeduplicationWindow = TimeSpan.FromHours(1);
                 options.MaxOutboxRetryAge = TimeSpan.FromMinutes(5);
                 options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(1);
+                // Cutover's immediate provider drain explicitly selects the supported legacy policy.
+                options.OutboxIdleRetirementGracePeriod = TimeSpan.Zero;
             });
             services.AddSingleton<ILocalDurableJobManager>(Jobs);
             services.AddSingleton(_grainFactory);
@@ -818,23 +820,47 @@ public sealed class MessagingProviderCutoverTests
         {
             var timer = Substitute.For<IGrainTimer>();
             var disposed = false;
+            var queued = false;
+            var firing = false;
+            var due = DateTimeOffset.MaxValue;
             timer.When(value => value.Dispose()).Do(_ => disposed = true);
-            var due = options.DueTime == Timeout.InfiniteTimeSpan ? DateTimeOffset.MaxValue : clock.GetUtcNow() + options.DueTime;
-            timer.When(value => value.Change(Arg.Any<TimeSpan>(), Arg.Any<TimeSpan>())).Do(call =>
-                due = call.ArgAt<TimeSpan>(0) == Timeout.InfiniteTimeSpan ? DateTimeOffset.MaxValue : clock.GetUtcNow() + call.ArgAt<TimeSpan>(0));
-            _callbacks.Enqueue(RunAsync);
+            timer.When(value => value.Change(Arg.Any<TimeSpan>(), Arg.Any<TimeSpan>())).Do(call => Arm(call.ArgAt<TimeSpan>(0)));
+            Arm(options.DueTime);
             return timer;
 
-            Task RunAsync()
+            void Arm(TimeSpan delay)
             {
-                if (disposed) return Task.CompletedTask;
+                if (disposed) return;
+                due = delay == Timeout.InfiniteTimeSpan ? DateTimeOffset.MaxValue : clock.GetUtcNow() + delay;
+                if (!queued && !firing && due != DateTimeOffset.MaxValue)
+                {
+                    queued = true;
+                    _callbacks.Enqueue(RunAsync);
+                }
+            }
+
+            async Task RunAsync()
+            {
+                queued = false;
+                if (disposed || due == DateTimeOffset.MaxValue) return;
                 if (due > clock.GetUtcNow())
                 {
+                    queued = true;
                     _callbacks.Enqueue(RunAsync);
-                    return Task.CompletedTask;
+                    return;
                 }
-
-                return callback(state, Token);
+                due = DateTimeOffset.MaxValue;
+                firing = true;
+                try { await callback(state, Token); }
+                finally
+                {
+                    firing = false;
+                    if (!disposed && !queued && due != DateTimeOffset.MaxValue)
+                    {
+                        queued = true;
+                        _callbacks.Enqueue(RunAsync);
+                    }
+                }
             }
         }
 

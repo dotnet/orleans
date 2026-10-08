@@ -733,7 +733,7 @@ public sealed class OutboxCodecBoundaryTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public Task SynchronousSend_OwnerRetirementArrivalGetsItsOwnCapturedOwner(bool beforeCapture) => OnOwnerAsync(async () =>
+    public Task SynchronousSend_OwnerRetirementArrivalRetainsPreCaptureOwnerOrPreparesPostCaptureOwner(bool beforeCapture) => OnOwnerAsync(async () =>
     {
         await using var fixture = await CodecFixture.CreateAsync();
         fixture.Outbox.Send(fixture.CreateEnvelope());
@@ -756,8 +756,16 @@ public sealed class OutboxCodecBoundaryTests
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(next.MessageId, Assert.Single(fixture.Messages).Key);
         var replacement = fixture.Job.Value!;
-        Assert.NotEqual(old.Id, replacement.Id);
-        Assert.Equal(2, fixture.Jobs.ReceivedCalls().Count());
+        if (beforeCapture)
+        {
+            Assert.Same(old, replacement);
+            Assert.Single(fixture.Jobs.ReceivedCalls());
+        }
+        else
+        {
+            Assert.NotEqual(old.Id, replacement.Id);
+            Assert.Equal(2, fixture.Jobs.ReceivedCalls().Count());
+        }
         await using var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
         Assert.Equal(next.MessageId, Assert.Single(recovered.Messages).Key);
         Assert.Equal(replacement.Id, recovered.Job.Value!.Id);
@@ -1063,7 +1071,12 @@ public sealed class OutboxCodecBoundaryTests
             services.AddSingleton(Implementation("DurableMessagingInstruments"), Implementation("DurableMessagingInstruments")
                 .GetMethod("CreateForDirectConstruction", BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, null)!);
             services.AddScoped(Implementation("DurableMessagingPumpResults"), _ => Activator.CreateInstance(Implementation("DurableMessagingPumpResults"), nonPublic: true)!);
-            services.Configure<DurableInboxOptions>(options => options.MaxDeliveryAttempts = maxAttempts);
+            services.Configure<DurableInboxOptions>(options =>
+            {
+                options.MaxDeliveryAttempts = maxAttempts;
+                // These capture/retirement boundaries deliberately exercise the zero-grace policy.
+                options.OutboxIdleRetirementGracePeriod = TimeSpan.Zero;
+            });
             _services = services.BuildServiceProvider();
             _scope = _services.CreateAsyncScope();
             Manager = _scope.ServiceProvider.GetRequiredService<IJournaledStateManager>();

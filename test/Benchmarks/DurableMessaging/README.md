@@ -24,6 +24,12 @@ pump turns immediately. Durable Jobs supplies recovery, retry deadlines, and
 empty-owner retirement. The benchmark uses volatile storage's default snapshot
 limits: **100 appends or 1 MiB**, whichever is reached first.
 
+The outbox retains an idle recovery handle for the default 100 ms grace, amortizing
+job-provider work over a burst. Local delivery wakes remain immediate. Activation
+pumps reuse timer/state infrastructure, one-message delivery uses scalar
+accounting, and built-in volatile storage retains independently pinned journal
+pages. Record the grace and storage settings when comparing earlier builds.
+
 Iteration setup recreates the cluster and warms one complete chain. Each iteration
 contains one measured invocation, keeping journal and deduplication history bounded
 and comparable. The benchmark uses real time and normal pumps. BDN controls

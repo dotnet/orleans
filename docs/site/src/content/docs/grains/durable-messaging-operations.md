@@ -48,6 +48,7 @@ inbox and outbox behavior through `AddDurableMessaging`.
 | `MaxRetainedDeadLetters` | 1,000 | Bounds each endpoint's retained dead-letter count. |
 | `InboxBatchSize` | 32 | Bounds handler work admitted by a pump attempt. |
 | `OutboxBatchSize` | 32 | Bounds outgoing work admitted by a pump attempt. |
+| `OutboxIdleRetirementGracePeriod` | 100 milliseconds | Retains an empty outbox's acknowledged recovery job across short bursts. Zero selects immediate retirement. |
 
 Size retention across the entire producer fleet. Include outage duration and operator
 replay policy in your business-ledger retention. Keep long-term outcomes separately
@@ -57,6 +58,17 @@ Use bounded business ingress when the outbox's depth grows. Inbox capacity suppl
 receiver backpressure, while sender admission belongs to the application. Establish
 per-tenant payload and submission limits; bytes and serialization cost matter as well
 as message count.
+
+The outbox's idle grace amortizes recovery-job scheduling across short bursts.
+Acknowledged outgoing work and completed remote deliveries request an immediate
+local pump turn. Recovered committed work also requests a local turn as soon as
+the activation is ready. The grace applies to retirement of an empty owner,
+while delivery and retry deadlines keep their own schedules.
+
+An idle durable job requests execution at its idle-start time plus the grace.
+Provider polling and activation latency also contribute to recovery timing.
+Choose the grace alongside the deployment's recovery budget and job-provider
+transaction rate. The supported range is zero through 4,294,967,294 milliseconds.
 
 ## Interpret delivery and completion
 
@@ -144,6 +156,32 @@ Capacity includes pending envelopes, opaque serialized bodies, processed transpo
 records, business-ledger outcomes, and retained dead letters. Snapshot and storage
 costs depend on these retained sets. Measure activation replay time and storage
 throughput alongside steady-state handling.
+
+### Budget allocations and owned memory
+
+Track allocation rate and retained memory separately. A processing-rate budget
+expressed as bytes per acknowledged message describes how much garbage the
+workload produces. Live-memory capacity also includes retained business outcomes,
+transport identities, pending deliveries, cached references, and storage buffers.
+
+| Budget | Measurement |
+| --- | --- |
+| Processing allocations | Managed bytes allocated across the process divided by actually acknowledged messages, after warm-up. |
+| Pending work | Inbox/outbox depth, active preparation and delivery counts, and serialized payload bytes. |
+| Retained data | Processed identities and operation ledgers over their configured retention, plus append history and snapshots. |
+| Supporting memory | Reference-cache cardinality, reusable pump state, buffer capacity, and outstanding reader/operation ownership. |
+| Persistence and recovery work | Journal appends/snapshots and durable job scheduling, retries, and retirement per completed workflow. |
+
+Measure a sequential chain for latency and a many-destination workload for cache
+and pending-work capacity. Include cancellation, shutdown, and snapshot
+replacement while work or readers remain active. The ownership protocol keeps
+their resources live until the actual operation or read finishes; capacity
+planning includes that overlapping lifetime.
+
+Allocation-stack traces attribute costs to their producing paths. Compare warmed
+runs with the same payload, chain length, providers, and retention settings.
+Use untraced runs for latency comparisons and keep trace collection overhead
+separate from the benchmark result.
 
 ## Deploy compatible message contracts
 

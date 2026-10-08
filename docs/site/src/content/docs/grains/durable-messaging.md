@@ -110,11 +110,21 @@ boundaries.
 Acknowledged outbox cohorts and completed remote delivery batches wake a local
 pump immediately. Zero-due timer turns enter the normal activation message queue,
 with the same non-interleaving and keep-alive policy. Local drains share the exact
-physical ownership handle with job-driven drains and leave empty-owner retirement
-to the durable job. Pending remote deliveries release the pump turn; their actual
+physical ownership handle with job-driven drains. Activation-owned timer instances
+coalesce ready work into non-interleaving turns; each logical arm keeps its
+physical-owner, generation, and cancellation identity. Pending remote deliveries
+release the pump turn; their actual
 completion schedules collection of the retained outcomes. This keeps reciprocal
 senders responsive while Durable Jobs owns recovery, scheduled retries, and
 ownership retirement.
+
+An empty outbox retains its acknowledged recovery handle for the configured idle
+grace, allowing a new burst to reuse that handle. Eligible delivery accounting and
+owner retirement share one acknowledged journal write. Work arriving during
+prerequisite hooks or capture retains a valid wakeup and its own acknowledgement
+boundary. The default grace is 100 milliseconds; zero selects immediate retirement.
+See [Capacity, retries, and retention](durable-messaging-operations.md#capacity-retries-and-retention)
+for scheduling and recovery-budget guidance.
 
 ## Handler preparation and terminal recovery
 

@@ -16,6 +16,84 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 [TestArea("DurableMessaging")]
 public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorTestBase
 {
+    [Fact]
+    public async Task LateAcknowledgedAcceptance_ImmediatelyRearmsSameLocalTimerWithoutClockAdvance()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        handler.Body = (self, _) =>
+        {
+            Assert.Null(RequestContext.Get("reusable-turn-parent"));
+            self.Mutate();
+            self.Context.Complete();
+            return default;
+        };
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        RequestContext.Set("reusable-turn-parent", "first-call-chain");
+        EnvelopeLease first;
+        try { first = await DeliverAsync(rig); }
+        finally { RequestContext.Remove("reusable-turn-parent"); }
+        using var firstLease = first;
+        var timer = GetTimer(events, rig);
+        using var second = CreateEnvelope(rig.Receiver, NewMessage(502, "late-local"), "async/handler");
+        Task<DeliveryResult> accepted = null!;
+        // The pump is deliberately non-interleaving. Inject the owned late admission on its
+        // scheduler, as capture/hook tests do, rather than waiting on a blocked ordinary RPC.
+        await OnTurnAsync(rig.Context, () =>
+        {
+            RequestContext.Set("reusable-turn-parent", "second-call-chain");
+            try
+            {
+                var extension = (IDurableInboxExtension)rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
+                accepted = extension.DeliverAsync(second.Value).AsTask();
+            }
+            finally { RequestContext.Remove("reusable-turn-parent"); }
+        });
+        Assert.Equal(DeliveryStatus.Accepted, (await accepted).Status);
+        Assert.Equal(2, rig.Inbox.Count);
+        var drained = events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
+            item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, timer)
+                && rig.Inbox.Count == 0 && rig.Effects.Count == 2,
+            TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        handler.Release.TrySetResult();
+        await drained;
+        Assert.Equal(2, rig.Effects.Count);
+        Assert.Equal(2, rig.Processed.Count);
+        Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
+            created => ReferenceEquals(created.GrainContext, rig.Context));
+        Assert.Equal(2, events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.TickStop>()
+            .Count(stopped => ReferenceEquals(stopped.Timer, timer)));
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+    }
+
+    [Fact]
+    public async Task HandlerWithoutOutput_AllocatesNoAcquisitionListsOrFinishedSourceUntilObserved()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        using var input = await DeliverAsync(rig);
+        object operation = null!;
+        object execution = null!;
+        await OnTurnAsync(rig.Context, () =>
+        {
+            var extension = rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
+            var pending = CancellationCleanupProbe.Field<System.Collections.IList>(extension, "_pendingWrites");
+            operation = Assert.Single(pending.Cast<object>(), item => item.GetType().Name == "HandlerWrite");
+            execution = operation.GetType().GetProperty("Execution")!.GetValue(operation)!;
+            Assert.Null(operation.GetType().BaseType!.GetField("_finished", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(operation));
+            Assert.Null(execution.GetType().GetField("_preparations", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(execution));
+            Assert.Null(execution.GetType().GetField("_batches", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(execution));
+        });
+        var finished = await FinishedAsync(rig);
+        Assert.False(finished.IsCompleted);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+        AssertSuccess(rig, input.Value, outputCount: 0);
+        Assert.Null(execution.GetType().GetField("_preparations", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(execution));
+        Assert.Null(execution.GetType().GetField("_batches", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(execution));
+        Assert.True((bool)operation.GetType().BaseType!.GetField("_retired", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!.GetValue(operation)!);
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]

@@ -333,6 +333,8 @@ namespace Orleans.DurableMessaging.Configuration
 
         public int OutboxBatchSize { get { throw null; } set { } }
 
+        public System.TimeSpan OutboxIdleRetirementGracePeriod { get { throw null; } set { } }
+
         public void Validate() { }
     }
 }

@@ -145,6 +145,7 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal(1000, options.MaxRetainedDeadLetters);
         Assert.Equal(32, options.InboxBatchSize);
         Assert.Equal(32, options.OutboxBatchSize);
+        Assert.Equal(TimeSpan.FromMilliseconds(100), options.OutboxIdleRetirementGracePeriod);
     }
 
     [Fact]
@@ -163,6 +164,8 @@ public sealed class DeliveryAndOptionsContractTests
             (nameof(DurableInboxOptions.MaxRetainedDeadLetters), options => options.MaxRetainedDeadLetters = 0),
             (nameof(DurableInboxOptions.InboxBatchSize), options => options.InboxBatchSize = 0),
             (nameof(DurableInboxOptions.OutboxBatchSize), options => options.OutboxBatchSize = 0),
+            (nameof(DurableInboxOptions.OutboxIdleRetirementGracePeriod), options => options.OutboxIdleRetirementGracePeriod = TimeSpan.FromTicks(-1)),
+            (nameof(DurableInboxOptions.OutboxIdleRetirementGracePeriod), options => options.OutboxIdleRetirementGracePeriod = TimeSpan.MaxValue),
         };
 
         foreach (var (parameter, mutate) in invalidCases)
@@ -172,6 +175,15 @@ public sealed class DeliveryAndOptionsContractTests
             var exception = Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
             Assert.Equal(parameter, exception.ParamName);
         }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(100)]
+    [InlineData(4294967294)]
+    public void Validate_OutboxIdleGrace_SupportsImmediateAndMaximumTimerBoundary(long milliseconds)
+    {
+        new DurableInboxOptions { OutboxIdleRetirementGracePeriod = TimeSpan.FromMilliseconds(milliseconds) }.Validate();
     }
 
     [Fact]
