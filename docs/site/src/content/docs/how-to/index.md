@@ -37,6 +37,8 @@ If you are learning Orleans from an empty directory, start with the [tutorials a
 
 - [Persist grain state](../grains/grain-persistence/index.md)
 - [Configure experimental Journaling](../grains/journaling/configuration.md)
+- [Implement durable messaging workflows](../grains/durable-messaging-recipes.md)
+- [Operate durable messaging](../grains/durable-messaging-operations.md)
 - [Schedule activation-scoped work with grain timers](../grains/timers.md)
 - [Schedule durable work with reminders](../grains/reminders.md)
 - [Implement long-running reminders](long-running-reminders.md)

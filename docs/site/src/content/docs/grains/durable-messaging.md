@@ -1,7 +1,7 @@
 ---
 title: Durable messaging
 description: Understand the durable inbox and outbox guarantees, recovery model, and operating limits.
-ms.date: 09/21/2026
+ms.date: 10/08/2026
 ms.topic: conceptual
 ---
 
@@ -10,6 +10,15 @@ ms.topic: conceptual
 The `Microsoft.Orleans.DurableMessaging` package provides a grain-scoped inbox and
 outbox built on Orleans Journaling and Durable Jobs. It preserves application
 message effects and outgoing messages across activation loss.
+
+Use this page for the routing, commit, execution, and recovery model. Continue with:
+
+- [Idempotency and hierarchical operation keys](durable-messaging-idempotency.md)
+  for transport identities, durable business-outcome ledgers, and external effects.
+- [Practical recipes](durable-messaging-recipes.md) for inventory reservation,
+  payment-provider reconciliation, out-of-order projections, and notification fan-out.
+- [Operations and throughput](durable-messaging-operations.md) for configuration,
+  diagnostics, dead-letter replay, upgrades, and sequential messaging benchmarks.
 
 ## Message and routing model
 

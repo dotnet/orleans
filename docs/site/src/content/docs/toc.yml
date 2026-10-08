@@ -115,7 +115,15 @@ items:
           - name: Samples
             href: grains/journaling/samples.md
       - name: Durable messaging
-        href: grains/durable-messaging.md
+        items:
+          - name: Runtime model and guarantees
+            href: grains/durable-messaging.md
+          - name: Idempotency and hierarchical keys
+            href: grains/durable-messaging-idempotency.md
+          - name: Practical recipes
+            href: grains/durable-messaging-recipes.md
+          - name: Operations and throughput
+            href: grains/durable-messaging-operations.md
       - name: Transactions
         href: grains/transactions.md
   - name: Serialization and code generation
