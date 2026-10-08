@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -11,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Orleans.DurableJobs.Diagnostics;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Providers;
@@ -21,7 +21,6 @@ namespace Orleans.DurableJobs;
 
 internal sealed partial class JournaledJobShardManager : JobShardManager
 {
-    private static readonly DiagnosticListener _diagnostics = new("Orleans.DurableJobs.ShardManager");
     private const string OwnerProperty = "DurableJobsOwner";
     private const string MembershipVersionProperty = "DurableJobsMembershipVersion";
     private const string MinDueTimeProperty = "DurableJobsMinDueTime";
@@ -514,10 +513,9 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
                 new Lazy<Task<JournaledJobShard>>(() => OpenAndCacheShardAsync(descriptor, cancellationToken, isNew)));
             var opening = _openingShards.GetOrAdd(descriptor.ShardId.Value, candidate);
             var task = opening.Task.Value;
-            const string joinedEvent = "Orleans.DurableJobs.ShardOpenJoined";
-            if (!ReferenceEquals(opening, candidate) && _diagnostics.IsEnabled(joinedEvent))
+            if (!ReferenceEquals(opening, candidate))
             {
-                _diagnostics.Write(joinedEvent, descriptor.StorageId.Value);
+                DurableJobsEvents.EmitShardOpenJoined(SiloAddress, descriptor.StorageId);
             }
 
             try
@@ -527,11 +525,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
                 && opening.InitiatingCancellation.IsCancellationRequested && task.IsCanceled)
             {
-                const string retryEvent = "Orleans.DurableJobs.ShardOpenRetryAfterCancellation";
-                if (_diagnostics.IsEnabled(retryEvent))
-                {
-                    _diagnostics.Write(retryEvent, descriptor.StorageId.Value);
-                }
+                DurableJobsEvents.EmitShardOpenRetryAfterCancellation(SiloAddress, descriptor.StorageId);
             }
         }
     }

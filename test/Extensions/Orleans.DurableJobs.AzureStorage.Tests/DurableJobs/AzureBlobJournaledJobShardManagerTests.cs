@@ -7,6 +7,7 @@ using Azure.Storage.Blobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.DurableJobs;
+using Orleans.DurableJobs.Diagnostics;
 using Orleans.DurableJobs.Tests;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -349,7 +350,7 @@ public sealed class AzureBlobJournaledJobShardManagerTests(AzureBlobJournaledJob
         var now = scope.Now;
         var gate = storage!.GateNextRead();
         var creation = manager.CreateShardAsync(now.AddMinutes(-1), now.AddMinutes(5), new Dictionary<string, string>(), token);
-        using var events = new DiagnosticEventCollector("Orleans.DurableJobs");
+        using var events = new DiagnosticEventCollector(DurableJobsEvents.ListenerName);
         Task<List<IJobShard>>? discovery = null;
         IJobShard? shard = null;
         try
@@ -357,8 +358,9 @@ public sealed class AzureBlobJournaledJobShardManagerTests(AzureBlobJournaledJob
             await gate.Entered.Task.WaitAsync(token);
             var readsBeforeDiscovery = storage.ReadCount;
             var joined = events.WaitForEventAsync(
-                "Orleans.DurableJobs.ShardOpenJoined",
-                item => Equals(item.Payload, storage.CreatedJournalId.Value),
+                nameof(DurableJobsEvents.ShardOpenJoined),
+                item => item.Payload is DurableJobsEvents.ShardOpenJoined payload
+                    && payload.JournalId == storage.CreatedJournalId && payload.SiloAddress.Equals(scope.ActiveSilo.SiloAddress),
                 TimeSpan.FromSeconds(5),
                 token);
             discovery = manager.AssignJobShardsAsync(now.AddMinutes(5), 0, token);
@@ -401,15 +403,16 @@ public sealed class AzureBlobJournaledJobShardManagerTests(AzureBlobJournaledJob
         scope.SetSiloStatus(scope.FormerOwnerSilo, SiloStatus.Dead);
         var gate = storage!.GateNextAppend();
         var firstClaim = nextOwner.AssignJobShardsAsync(now.AddMinutes(5), 1, token);
-        using var events = new DiagnosticEventCollector("Orleans.DurableJobs");
+        using var events = new DiagnosticEventCollector(DurableJobsEvents.ListenerName);
         IJobShard? adopted = null;
         try
         {
             await gate.Entered.Task.WaitAsync(token);
             var appendsBeforeDiscovery = storage.AppendCount;
             var joined = events.WaitForEventAsync(
-                "Orleans.DurableJobs.ShardOpenJoined",
-                item => Equals(item.Payload, storage.CreatedJournalId.Value),
+                nameof(DurableJobsEvents.ShardOpenJoined),
+                item => item.Payload is DurableJobsEvents.ShardOpenJoined payload
+                    && payload.JournalId == storage.CreatedJournalId && payload.SiloAddress.Equals(scope.SecondActiveSilo.SiloAddress),
                 TimeSpan.FromSeconds(5),
                 token);
             var concurrentDiscovery = nextOwner.AssignJobShardsAsync(now.AddMinutes(5), 0, token);
@@ -446,23 +449,31 @@ public sealed class AzureBlobJournaledJobShardManagerTests(AzureBlobJournaledJob
         var manager = scope.CreateManager(scope.ActiveSilo);
         var now = scope.Now;
         var gate = storage!.GateNextRead();
-        using var events = new DiagnosticEventCollector("Orleans.DurableJobs");
+        using var events = new DiagnosticEventCollector(DurableJobsEvents.ListenerName);
         var creation = manager.CreateShardAsync(now.AddMinutes(-1), now.AddMinutes(5), new Dictionary<string, string>(), initiating.Token);
         IJobShard? shard = null;
         try
         {
             await gate.Entered.Task.WaitAsync(token);
             var joined = events.WaitForEventAsync(
-                "Orleans.DurableJobs.ShardOpenJoined",
-                item => Equals(item.Payload, storage.CreatedJournalId.Value),
+                nameof(DurableJobsEvents.ShardOpenJoined),
+                item => item.Payload is DurableJobsEvents.ShardOpenJoined payload
+                    && payload.JournalId == storage.CreatedJournalId && payload.SiloAddress.Equals(scope.ActiveSilo.SiloAddress),
                 TimeSpan.FromSeconds(5),
                 token);
             var discovery = manager.AssignJobShardsAsync(now.AddMinutes(5), 0, token);
             await joined;
+            var retried = events.WaitForEventAsync(
+                nameof(DurableJobsEvents.ShardOpenRetryAfterCancellation),
+                item => item.Payload is DurableJobsEvents.ShardOpenRetryAfterCancellation payload
+                    && payload.JournalId == storage.CreatedJournalId && payload.SiloAddress.Equals(scope.ActiveSilo.SiloAddress),
+                TimeSpan.FromSeconds(5),
+                token);
             initiating.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => creation.WaitAsync(token));
             Assert.False(token.IsCancellationRequested);
             shard = Assert.Single(await discovery.WaitAsync(token));
+            await retried;
             Assert.Equal(2, storage.ReadCount);
             Assert.Same(shard, Assert.Single(await manager.AssignJobShardsAsync(now.AddMinutes(5), 0, token)));
             var job = await shard.TryScheduleJobAsync(CreateRequest(now, "active-joiner"), token);
