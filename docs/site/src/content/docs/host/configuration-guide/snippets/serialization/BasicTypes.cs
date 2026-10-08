@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 
 namespace Orleans.Docs.Snippets.Serialization;
@@ -56,6 +57,22 @@ public record MyRecord(string A, string B)
     public required string C { get; init; }
 }
 // </record_primary_constructor>
+
+// <record_struct_metadata_constructor>
+[GenerateSerializer(IncludePrimaryConstructorParameters = true)]
+[method: ActivatorUtilitiesConstructor]
+public readonly record struct BinaryRecord(byte[] Value)
+{
+    [NonSerialized]
+    private readonly byte[] _storage = Value;
+
+    public byte[] Value
+    {
+        get => _storage;
+        init => _storage = value;
+    }
+}
+// </record_struct_metadata_constructor>
 
 // <best_practices_id_overlap>
 [GenerateSerializer]
