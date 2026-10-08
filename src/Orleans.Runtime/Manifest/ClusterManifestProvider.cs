@@ -94,11 +94,13 @@ namespace Orleans.Runtime.Metadata
         internal ManifestUpdateAttemptDiagnostics? LastAttemptDiagnostics => Volatile.Read(ref _lastAttemptDiagnostics);
 
         /// <summary>
-        /// Gets a single, internally-consistent snapshot of the published manifest and the diagnostics for the
-        /// most recent attempt to update it. The diagnostics are captured before the manifest, so a concurrent
-        /// publication or new attempt can only make the returned manifest newer than (never older than, or
-        /// contradictory with) the returned diagnostics - e.g. a silo the diagnostics still list as pending
-        /// cannot already be missing from the returned manifest.
+        /// Gets a best-effort, paired snapshot of the published manifest and the diagnostics for the most
+        /// recent attempt to update it, for use in diagnostic messages. The diagnostics are captured before
+        /// the manifest, so the common case - reading the pair while no attempt is concluding - cannot pair a
+        /// newer manifest with older (already-superseded) diagnostics. This ordering does not, however,
+        /// guarantee full atomicity with attempt completion or peer-repair publication: a silo can still be
+        /// reported as both pending (in the diagnostics) and already published (in the manifest) if a fetch
+        /// completes, or peer repair publishes a partial manifest, between the two reads.
         /// </summary>
         internal (ClusterManifest Manifest, ManifestUpdateAttemptDiagnostics? Diagnostics) GetManifestAndDiagnosticsSnapshot()
         {

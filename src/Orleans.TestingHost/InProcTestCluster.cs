@@ -474,10 +474,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         {
             var expectedSiloSet = activeSilos.Select(static silo => silo.SiloAddress).ToHashSet();
 
-            // Take one snapshot per observer so the observed manifest and its diagnostics describe states that
-            // could actually have coexisted (diagnostics are captured no later than the manifest, so a race with
-            // a concurrent publish or new attempt can only make the manifest newer, never contradict the
-            // diagnostics), rather than being read from two separate, independently-progressing LINQ pipelines.
+            // Take one snapshot per observer, pairing each manifest with the diagnostics captured just before it,
+            // rather than reading them from two separate, independently-progressing LINQ pipelines. This narrows
+            // (but does not eliminate) the window in which a fetch completion or peer-repair publication between
+            // the two reads could still pair a pending-looking diagnostic with an already-published silo; see
+            // GetManifestAndDiagnosticsSnapshot for details.
             var snapshots = activeSilos.Select((silo, index) =>
             {
                 var (manifest, diagnostics) = manifestProviders[index].GetManifestAndDiagnosticsSnapshot();
@@ -524,7 +525,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             ? $", last fetch failure for {failedSilo} at {diagnostics.LastFailureAt:O}: {diagnostics.LastFailureMessage}"
             : string.Empty;
         return $"{observer}: membership v{diagnostics.MembershipVersion}, published v{manifest.Version}, "
-            + $"pending=[{pending}], attempt started {elapsed.TotalSeconds:F1}s ago{failure}";
+            + $"pending=[{pending}], attempt started {elapsed.TotalSeconds.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)}s ago{failure}";
     }
 
     /// <summary>
