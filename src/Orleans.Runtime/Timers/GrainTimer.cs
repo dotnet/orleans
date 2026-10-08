@@ -15,7 +15,7 @@ internal abstract partial class GrainTimer : IGrainTimer
     protected static readonly TimerCallback TimerCallback = (state) => ((GrainTimer)state!).ScheduleTickOnActivation();
     protected static readonly MethodInfo InvokableMethodInfo = typeof(IGrainTimerInvoker).GetMethod(nameof(IGrainTimerInvoker.InvokeCallbackAsync), BindingFlags.Instance | BindingFlags.Public)!;
     private readonly CancellationTokenSource _cts = new();
-    private readonly ITimer _timer;
+    private ITimer? _timer;
     private readonly IGrainContext _grainContext;
     private readonly TimerRegistry _shared;
     private readonly bool _interleave;
@@ -38,16 +38,48 @@ internal abstract partial class GrainTimer : IGrainTimer
         _dueTime = Timeout.InfiniteTimeSpan;
         _period = Timeout.InfiniteTimeSpan;
         _invoker = new(this);
-
-        // Avoid capturing async locals.
-        using (new ExecutionContextSuppressor())
-        {
-            _timer = shared.TimeProvider.CreateTimer(TimerCallback, this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        }
-
     }
 
     protected IGrainContext GrainContext => _grainContext;
+
+    internal void Start(TimeSpan dueTime, TimeSpan period)
+    {
+        ValidateArguments(dueTime, period);
+        _dueTime = dueTime;
+        _period = period;
+        if (dueTime == TimeSpan.Zero)
+        {
+            // Admission still uses the ordinary activation message queue and its interleaving policy.
+            if (!_cts.IsCancellationRequested)
+            {
+                ScheduleTickOnActivation();
+            }
+        }
+        else
+        {
+            ChangeTimer(dueTime);
+        }
+    }
+
+    private void ChangeTimer(TimeSpan dueTime)
+    {
+        lock (_cts)
+        {
+            if (_cts.IsCancellationRequested || dueTime == Timeout.InfiniteTimeSpan && _timer is null)
+            {
+                return;
+            }
+
+            if (_timer is null)
+            {
+                using (new ExecutionContextSuppressor())
+                {
+                    _timer = _shared.TimeProvider.CreateTimer(TimerCallback, this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                }
+            }
+            _timer.Change(dueTime, Timeout.InfiniteTimeSpan);
+        }
+    }
 
     private ILogger Logger => _shared.TimerLogger;
 
@@ -70,8 +102,10 @@ internal abstract partial class GrainTimer : IGrainTimer
             // Indicate that the timer is firing so that the effect of the next change call is deferred until after the tick completes.
             _firing = true;
 
-            // Note: this does not execute on the activation's execution context.
+            // Tick admission can run on either the timer thread or the activation context.
             var msg = _shared.MessageFactory.CreateMessage(body: _invoker, options: InvokeMethodOptions.OneWay);
+            // Timer requests start a new call chain, including ticks queued immediately during registration.
+            msg.RequestContextData = null;
             msg.SetInfiniteTimeToLive();
             msg.SendingGrain = _grainContext.GrainId;
             msg.TargetGrain = _grainContext.GrainId;
@@ -150,12 +184,12 @@ internal abstract partial class GrainTimer : IGrainTimer
             if (!_changed)
             {
                 // If the timer was not modified during the tick, schedule the next tick based on the period.
-                _timer.Change(_period, Timeout.InfiniteTimeSpan);
+                ChangeTimer(_period);
             }
             else
             {
                 // If the timer was modified during the tick, schedule the next tick based on the new due time.
-                _timer.Change(_dueTime, Timeout.InfiniteTimeSpan);
+                ChangeTimer(_dueTime);
             }
         }
         catch (ObjectDisposedException)
@@ -213,7 +247,7 @@ internal abstract partial class GrainTimer : IGrainTimer
             {
                 // This method resets the timer, so the next tick will be scheduled at the new due time and subsequent
                 // ticks will be scheduled after the specified period.
-                _timer.Change(dueTime, Timeout.InfiniteTimeSpan);
+                ChangeTimer(dueTime);
             }
             catch (ObjectDisposedException)
             {
@@ -247,7 +281,11 @@ internal abstract partial class GrainTimer : IGrainTimer
             LogErrorCancellingCallback(Logger, exception);
         }
 
-        _timer.Dispose();
+        lock (_cts)
+        {
+            _timer?.Dispose();
+            _timer = null;
+        }
 
         GrainTimerEvents.EmitDisposed(GrainContext, this);
 
