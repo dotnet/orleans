@@ -634,9 +634,6 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         using var localEvents = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         using var input = await DeliverAsync(rig);
         var localTimer = GetTimer(localEvents, rig);
-        await OnTurnAsync(rig.Context, localTimer.Dispose);
-        await TimerStoppedAsync(localEvents, localTimer);
-        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var retry = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -663,16 +660,18 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             }
             catch (OperationCanceledException error) { expected = error; throw; }
         };
-        handler.Release.TrySetResult();
         var snapshot = rig.Grain.GetSnapshotForTest();
         var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
         var run = new JobContext(job);
         var feature = (IDurableJobFeatureHandler)rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
         using var jobEvents = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         using var cancellation = new CancellationTokenSource();
-        await OnTurnAsync(rig.Context, async () => Assert.True(
-            (await feature.ExecuteJobAsync(run, cancellation.Token)).IsInProgress));
-        var timer = GetTimer(jobEvents, rig);
+        var start = new StartAtTimerStop(rig, localTimer, feature, run, cancellation.Token, jobEvents);
+        using var subscription = GrainTimerEvents.AllEvents.Subscribe(start);
+        await OnTurnAsync(rig.Context, localTimer.Dispose);
+        var timer = await WaitAsync(start.Started.Task);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+        handler.Release.TrySetResult();
         try
         {
             await WaitAsync(entered.Task);
@@ -1028,5 +1027,36 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         public DurableJob Job { get; } = job;
         public string RunId { get; } = Guid.NewGuid().ToString("N");
         public int DequeueCount => 1;
+    }
+
+    private sealed class StartAtTimerStop(Rig rig, IGrainTimer preceding, IDurableJobFeatureHandler feature,
+        JobContext run, CancellationToken cancellationToken, DiagnosticEventCollector events)
+        : IObserver<GrainTimerEvents.TimerEvent>
+    {
+        private bool _started;
+        public TaskCompletionSource<IGrainTimer> Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void OnNext(GrainTimerEvents.TimerEvent value)
+        {
+            if (_started || value is not GrainTimerEvents.TickStop stopped
+                || !ReferenceEquals(stopped.Timer, preceding))
+            {
+                return;
+            }
+            _started = true;
+            try
+            {
+                Assert.Same(rig.Context, ReceiverTestServices.CurrentGrainContext);
+                var result = feature.ExecuteJobAsync(run, cancellationToken);
+                Assert.True(result.IsCompletedSuccessfully);
+                Assert.True(result.GetAwaiter().GetResult().IsInProgress);
+                Started.SetResult(GetTimer(events, rig));
+            }
+            catch (Exception error)
+            {
+                Started.SetException(error);
+            }
+        }
+        public void OnCompleted() { }
+        public void OnError(Exception error) => Started.TrySetException(error);
     }
 }
