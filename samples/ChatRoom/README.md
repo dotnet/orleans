@@ -12,7 +12,7 @@ description: "An Orleans sample chat room app."
 
 # Orleans Chat Room sample
 
-![An example chat session from an earlier version of the client](screenshot.png)
+![A screenshot of the chat client](screenshot.png)
 
 This sample uses [Orleans Streaming](https://learn.microsoft.com/dotnet/orleans/streaming) to build a basic chat application. In this application, each client can:
 
@@ -55,4 +55,4 @@ Then, once the server has started, open one or more terminal windows and execute
 dotnet run --project .\ChatRoom.Client\
 ```
 
-The clients display text headings and command instructions using Spectre.Console.
+The clients display a pre-rendered logo, text headings, and command instructions using Spectre.Console.

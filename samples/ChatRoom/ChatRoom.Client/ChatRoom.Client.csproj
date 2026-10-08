@@ -9,6 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="logo.br" />
+    <EmbeddedResource Include="logo.br" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="Spectre.Console" />
   </ItemGroup>

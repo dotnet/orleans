@@ -98,6 +98,14 @@ static Task StopAsync(IHost host) =>
 static void PrintUsage()
 {
     AnsiConsole.WriteLine();
+    var logo = new PreRenderedLogo();
+
+    var table = new Table()
+    {
+        Border = TableBorder.None,
+        Expand = true,
+    }.HideHeaders();
+    table.AddColumn(new TableColumn("One"));
 
     var header = new FigletText("Orleans")
     {
@@ -116,16 +124,21 @@ static void PrintUsage()
        + "[bold fuchsia]/m[/] to query [underline green]members[/] in the channel\n"
        + "[bold fuchsia]/exit[/] to exit\n"
        + "[bold aqua]<message>[/] to send a [underline green]message[/]\n");
-    var table = new Table()
+    table.AddColumn(new TableColumn("Two"));
+
+    var rightTable = new Table()
         .HideHeaders()
         .Border(TableBorder.None)
         .AddColumn(new TableColumn("Content"));
 
-    table.AddRow(header)
+    rightTable.AddRow(header)
         .AddRow(header2)
         .AddEmptyRow()
         .AddEmptyRow()
         .AddRow(markup);
+
+    table.AddRow(logo, rightTable);
+
     AnsiConsole.Write(table);
     AnsiConsole.WriteLine();
 }
