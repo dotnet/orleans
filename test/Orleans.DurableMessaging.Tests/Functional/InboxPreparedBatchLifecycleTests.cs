@@ -616,8 +616,9 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
                 $"deactivationReasons=[{string.Join(" | ", deactivations)}].",
                 error);
         }
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        var duplicate = DeliverAsync(rig.Receiver, input.Value);
         retry.TrySetResult();
+        Assert.Equal(DeliveryStatus.Duplicate, (await duplicate).Status);
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         AssertSuccess(rig, input.Value, outputCount: 0);
         Assert.Same(rig.Context, Fixture.GetGrainContext(rig.Receiver));
@@ -691,8 +692,9 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         Assert.Equal(snapshot.InboxJobId, rig.Grain.GetSnapshotForTest().InboxJobId);
         Assert.Same(snapshot.InboxJob, rig.Grain.GetSnapshotForTest().InboxJob);
         await AssertHealthyAsync(rig);
-        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        var duplicate = DeliverAsync(rig.Receiver, input.Value);
         retry.TrySetResult();
+        Assert.Equal(DeliveryStatus.Duplicate, (await duplicate).Status);
         await Fixture.WaitForEffectCountAsync(rig.Receiver, 1);
         AssertSuccess(rig, input.Value, outputCount: 0);
         Assert.Same(rig.Context, Fixture.GetGrainContext(rig.Receiver));
