@@ -49,11 +49,13 @@ Compare the snapshot version with the required <xref:Orleans.Runtime.MembershipV
 
 A starting silo writes its row, becomes `Joining`, and validates two-way connectivity with active members before becoming `Active`. This prevents a partitioned process from silently joining one side of a cluster.
 
-The periodic `IAmAlive` value is not the peer heartbeat. It is a timestamp written to the membership row for diagnostics and startup disaster recovery. A sufficiently stale active row can be ignored during the joining connectivity check, allowing a cluster to recover after all processes were lost without cleanly declaring each other dead.
+`IAmAliveTime` is a membership-row liveness timestamp used for diagnostics and startup disaster recovery. A joining silo monitors suspected and stale peers and reevaluates monitoring candidates at the <xref:Orleans.Configuration.ClusterMembershipOptions.TableRefreshTimeout?displayProperty=nameWithType> interval. It compares the latest snapshot's timestamps with current time, so a peer whose timestamp becomes stale during startup enters monitoring even when the membership view remains unchanged.
+
+Those monitors apply the usual failed-probe threshold, connection-liveness checks, and death-vote protocol. Initial connectivity validation retries for up to <xref:Orleans.Configuration.ClusterMembershipOptions.MaxJoinAttemptTime?displayProperty=nameWithType>, completing when each active peer responds or membership records its departure. This allows a replacement silo to recover after an ungraceful process exit and become `Active` through the normal membership protocol.
 
 ## Failure detection and death votes <a name="the-membership-protocol"></a>
 
-Active silos monitor peers selected from the membership view. `ClusterHealthMonitor` sends probes over silo-to-silo messaging, tracks consecutive failures, and can use indirect probes to distinguish a failed target from an unhealthy observer. A failed monitor writes a timestamped vote into the target's membership row.
+Active silos monitor hash-ring-selected peers plus suspected and stale peers. Joining and active silos reevaluate that selection on membership updates and at the `TableRefreshTimeout` interval, preserving existing monitors and their probe counters. `ClusterHealthMonitor` sends probes over silo-to-silo messaging, tracks consecutive failures, and can use indirect probes to distinguish a failed target from an unhealthy observer. A failed monitor writes a timestamped vote into the target's membership row.
 
 Each observer maintains a [Phi Accrual failure detector](https://paperhub.s3.amazonaws.com/f516fdfa940caa08c679d3946b273128.pdf) for each peer. The detector models successful direct-probe round-trip times and estimates the timeout at which the probability of a later response is sufficiently low. The timeout starts at <xref:Orleans.Configuration.ClusterMembershipOptions.ProbeTimeout?displayProperty=nameWithType> and adapts after enough observations. Failures are excluded because they only show that the response exceeded the current timeout, while indirect results are excluded because they measure a different observer's network path.
 
