@@ -90,6 +90,34 @@ public sealed class DurableEnvelopeContractTests : IDisposable
 
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void EnvelopeBuilder_NullTypedCorrelationKey_RejectsWithoutChangingMetadata(bool hasCorrelationKey)
+    {
+        var sender = GrainId.Create("sender", "correlation-validation");
+        var receiver = GrainId.Create("receiver", "correlation-validation");
+        var builder = new DurableEnvelopeBuilder(_sessions, sender)
+            .To(receiver, "correlation/validate")
+            .WithBody("payload");
+        var correlationKey = hasCorrelationKey ? HierarchicalKey.Create("orders/2026/42") : null;
+        if (correlationKey is not null)
+        {
+            builder.WithCorrelationKey(correlationKey);
+        }
+
+        var exception = Assert.Throws<ArgumentNullException>(() => builder.WithCorrelationKey((HierarchicalKey)null!));
+
+        Assert.Equal("correlationKey", exception.ParamName);
+        var envelope = builder.Build();
+        Assert.Equal(correlationKey, envelope.CorrelationKey);
+        Assert.Equal(sender, envelope.SenderId);
+        Assert.Equal(receiver, envelope.ReceiverId);
+        Assert.Equal("correlation/validate", envelope.RouteKey);
+        Assert.True(envelope.Data.TryGetBody<string>(out var body));
+        Assert.Equal("payload", body);
+    }
+
     [Fact]
     public void EnvelopeBuilder_MissingRequiredField_ThrowsWithoutProducingEnvelope()
     {

@@ -147,6 +147,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     /// </summary>
     /// <param name="correlationKey">The correlation key (e.g., "transfer-123/debit").</param>
     /// <returns>This builder for chaining.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="correlationKey"/> is null.</exception>
     /// <example>
     /// <code>
     /// // Parent request
@@ -160,6 +161,7 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     public DurableEnvelopeBuilder WithCorrelationKey(HierarchicalKey correlationKey)
     {
         ThrowIfBuilt();
+        ArgumentNullException.ThrowIfNull(correlationKey);
         _correlationKey = correlationKey;
         return this;
     }
