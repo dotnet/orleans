@@ -1,3 +1,4 @@
+using System;
 using Orleans.Runtime;
 using Orleans.Serialization.Session;
 
@@ -20,6 +21,7 @@ namespace Orleans.DurableMessaging;
 internal sealed class InboxHandlerContext : IInboxHandlerContext
 {
     private readonly SerializerSessionPool _sessionPool;
+    private readonly Action _complete;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="InboxHandlerContext"/> class.
@@ -28,6 +30,8 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     /// <param name="grainId">The current grain's identity.</param>
     /// <param name="outbox">The outbox for sending messages.</param>
     /// <param name="sessionPool">The serializer session pool for creating envelope builders.</param>
+    /// <param name="complete">The required runtime callback which stages this attempt's logical completion.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="complete"/> is null.</exception>
     /// <remarks>
     /// This constructor is typically called by the inbox processing pump. The parameters are captured
     /// and exposed via the <see cref="IInboxHandlerContext"/> interface properties.
@@ -36,12 +40,15 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
         DurableEnvelope envelope,
         GrainId grainId,
         IDurableOutbox outbox,
-        SerializerSessionPool sessionPool)
+        SerializerSessionPool sessionPool,
+        Action complete)
     {
+        ArgumentNullException.ThrowIfNull(complete);
         Envelope = envelope;
         GrainId = grainId;
         Outbox = outbox;
         _sessionPool = sessionPool;
+        _complete = complete;
     }
 
     /// <inheritdoc />
@@ -62,7 +69,7 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     /// <inheritdoc />
     /// <remarks>
     /// Stage envelopes or optional prepared batches through this handler-scoped outbox
-    /// from the matching apply action.
+    /// in the matching handler's synchronous final block before completion.
     /// </remarks>
     public IDurableOutbox Outbox { get; }
 
@@ -102,7 +109,9 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     ///     .Build();
     ///
     /// var batch = await context.Outbox.PrepareSendAsync([envelope, notification, audit], ct);
-    /// return () => context.Send(batch);
+    /// ct.ThrowIfCancellationRequested();
+    /// context.Send(batch);
+    /// context.Complete();
     /// </code>
     /// </example>
     public DurableEnvelopeBuilder CreateEnvelope()
@@ -117,7 +126,7 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     /// <inheritdoc />
     /// <example>
     /// <code>
-    /// public async ValueTask&lt;Action&gt; PrepareAsync(OrderRequest request, IInboxHandlerContext context, CancellationToken ct)
+    /// public async ValueTask HandleAsync(OrderRequest request, IInboxHandlerContext context, CancellationToken ct)
     /// {
     ///     var result = await PrepareOrderAsync(request, ct);
     ///
@@ -133,7 +142,9 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
     ///         .Build();
     ///
     ///     var batch = await context.Outbox.PrepareSendAsync([confirmation, fulfillment], ct);
-    ///     return () => context.Send(batch);
+    ///     ct.ThrowIfCancellationRequested();
+    ///     context.Send(batch);
+    ///     context.Complete();
     /// }
     /// </code>
     /// </example>
@@ -144,4 +155,7 @@ internal sealed class InboxHandlerContext : IInboxHandlerContext
 
     /// <inheritdoc/>
     public void Send(DurableEnvelope envelope) => Outbox.Send(envelope);
+
+    /// <inheritdoc/>
+    public void Complete() => _complete();
 }

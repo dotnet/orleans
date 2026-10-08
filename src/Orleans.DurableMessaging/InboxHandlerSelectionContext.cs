@@ -19,4 +19,7 @@ internal sealed class InboxHandlerSelectionContext(
 
     public void Send(IPreparedOutboxBatch batch) =>
         throw new InvalidOperationException("Handler selection is read-only and cannot send outbound messages.");
+
+    public void Complete() =>
+        throw new InvalidOperationException("Handler selection is read-only and cannot complete an inbox message.");
 }

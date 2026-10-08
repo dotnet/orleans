@@ -37,7 +37,9 @@ namespace Orleans.DurableMessaging;
 ///     .Build();
 ///
 /// var batch = await context.Outbox.PrepareSendAsync([envelope], ct);
-/// return () => context.Send(batch);
+/// ct.ThrowIfCancellationRequested();
+/// context.Send(batch);
+/// context.Complete();
 /// </code>
 /// </example>
 public interface IDurableOutbox
@@ -69,7 +71,7 @@ public interface IDurableOutbox
     /// and before capturing pending state, including messages staged while scheduling is awaited. An explicit write retry retains
     /// pending business changes and messages after a scheduling failure. Dispatch starts after the
     /// captured message and owner pair are acknowledged. Equivalent identities retain the original envelope.
-    /// Handlers call this method from their returned synchronous apply action.
+    /// Handlers call this method before Complete in their synchronous final block and return without awaits.
     /// Use <see cref="PrepareSendAsync"/> to establish the wakeup earlier, before business mutation.
     /// </remarks>
     /// <exception cref="InvalidOperationException">The envelope conflicts with an existing identity, sender, or handler scope.</exception>
@@ -95,22 +97,18 @@ public interface IDurableOutbox
     /// </para>
     /// <para>
     /// Inbox handlers acquire batches through <see cref="IInboxHandlerContext.Outbox"/> during
-    /// <see cref="IInboxHandler.PrepareAsync"/>. The runtime tracks preparations from their start and owns
+    /// <see cref="IInboxHandler.HandleAsync"/>. The runtime tracks preparations from their start and owns
     /// resulting batches through attempt completion, including late results after cancellation or failure.
-    /// Retain a batch for the returned action. Ordinary callers must await every preparation operation and
-    /// dispose each successfully returned batch, keeping its scope through staging and the journal write.
+    /// Retain a batch through the synchronous final block and call <see cref="IInboxHandlerContext.Complete"/>.
+    /// Sending and further preparation are rejected after handler completion or retirement. Ordinary callers
+    /// must await every preparation operation and dispose each successfully returned batch, keeping its scope
+    /// through staging and the journal write.
     /// </para>
     /// <para>
-    /// Handler preparation consumes each returned completion and handles or propagates failures before
-    /// returning its action. Retrieving a failed result counts as consumption even when retrieval throws;
-    /// status inspection leaves the result unconsumed. The runtime rejects unfinished acquisitions and
-    /// failed or canceled completions which remain unconsumed.
-    /// </para>
-    /// <para>
-    /// Task conversion, such as <c>AsTask()</c>, retrieves the <see cref="ValueTask{TResult}"/> result on behalf
-    /// of the resulting task. That task belongs to the caller, which awaits or handles its outcome before
-    /// returning the action. Runtime consumption tracking applies to the returned value task; handling
-    /// the converted task's outcome remains the caller's responsibility.
+    /// Await and handle preparation results before the first shared mutation in
+    /// <see cref="IInboxHandler.HandleAsync"/>. The runtime retains actual acquisition tasks and batches
+    /// through their outcomes and retirement. Application code handles the outcome of any task it creates
+    /// using <c>AsTask()</c>; the handler's final updates, completion, and method return execute without awaits.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="messages"/> is null.</exception>
@@ -133,7 +131,7 @@ public interface IDurableOutbox
     /// <para>
     /// Repeatedly sending the same live, already-staged batch has no additional effect within a valid
     /// current scope. Every call requires the batch's owning activation and scope. Handler calls require
-    /// the matching returned action, via its context or outbox. Outside-scope, stale, wrong-attempt,
+    /// the matching active attempt before Complete, via its context or outbox. Outside-scope, stale, wrong-attempt,
     /// disposed, or foreign handles are rejected before any mutation.
     /// </para>
     /// <para>

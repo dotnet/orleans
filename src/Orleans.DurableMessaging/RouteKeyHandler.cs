@@ -11,8 +11,8 @@ namespace Orleans.DurableMessaging;
 /// <para>
 /// <see cref="RouteKeyHandler"/> simplifies implementing handlers that only respond to messages
 /// with a specific <see cref="DurableEnvelope.RouteKey"/>. Derived classes override
-/// <see cref="PrepareAsync(IInboxHandlerContext, CancellationToken)"/> to implement
-/// asynchronous preparation and return the synchronous apply action.
+/// <see cref="HandleAsync(IInboxHandlerContext, CancellationToken)"/> to implement
+/// local asynchronous preparation followed by synchronous updates and completion.
 /// </para>
 /// <para>
 /// For prefix-based routing (e.g., "orders/" matches "orders/create" and "orders/update"), derive
@@ -26,7 +26,7 @@ namespace Orleans.DurableMessaging;
 /// </remarks>
 /// <example>
 /// <code>
-/// protected override async ValueTask&lt;Action&gt; PrepareAsync(
+/// protected override async ValueTask HandleAsync(
 ///     IInboxHandlerContext context, CancellationToken ct)
 /// {
 ///     if (!context.Envelope.Data.TryGetBody&lt;OrderRequest&gt;(out var request))
@@ -35,7 +35,9 @@ namespace Orleans.DurableMessaging;
 ///     }
 ///
 ///     var prepared = await PrepareOrderAsync(request, ct);
-///     return () =&gt; ApplyOrder(prepared);
+///     ct.ThrowIfCancellationRequested();
+///     ApplyOrder(prepared);
+///     context.Complete();
 /// }
 /// </code>
 /// </example>
@@ -79,28 +81,28 @@ public abstract class RouteKeyHandler : IInboxHandler
     }
 
     /// <summary>
-    /// Prepares a message that matches the configured route key.
+    /// Handles a message that matches the configured route key.
     /// </summary>
     /// <param name="context">Handler context containing the envelope and methods for sending messages.</param>
-    /// <param name="cancellationToken">The cancellation token for preparation.</param>
-    /// <returns>A task whose result is a non-null synchronous action applying the prepared effects.</returns>
+    /// <param name="cancellationToken">The cancellation token to check before the first shared mutation.</param>
+    /// <returns>A completion representing the handler method outcome.</returns>
     /// <remarks>
     /// <para>
     /// This method is only called when <see cref="CanHandle"/> returns <c>true</c>, meaning the
     /// envelope's route key matches the configured route key.
     /// </para>
     /// <para>
-    /// Follow the preparation and synchronous application requirements of <see cref="IInboxHandler.PrepareAsync"/>.
-    /// The interface implementation forwards the returned action to Messaging for invocation.
+    /// Follow the local preparation and synchronous final-block requirements of <see cref="IInboxHandler.HandleAsync"/>.
+    /// The interface implementation forwards the method outcome. The handler calls <see cref="IInboxHandlerContext.Complete"/>.
     /// </para>
     /// </remarks>
-    protected abstract ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
+    protected abstract ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Explicit interface implementation that delegates to the protected <see cref="PrepareAsync"/> method.
+    /// Explicit interface implementation that delegates to the protected <see cref="HandleAsync"/> method.
     /// </summary>
-    ValueTask<Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        return PrepareAsync(context, cancellationToken);
+        return HandleAsync(context, cancellationToken);
     }
 }
