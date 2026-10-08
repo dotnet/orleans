@@ -153,6 +153,22 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<Guid, DurableEnvelo
         }
     }
 
+    public void Send(DurableEnvelope envelope)
+    {
+        SendCalls++;
+        ThrowIfStopped();
+        ValidateMessages([envelope]);
+        if (NextSendFailure is { } failure)
+        {
+            NextSendFailure = null;
+            throw failure;
+        }
+        if (!StoredMessages.ContainsKey(envelope.MessageId))
+        {
+            StoredMessages.Add(envelope.MessageId, envelope);
+        }
+    }
+
     public void Send(IPreparedOutboxBatch batch)
     {
         SendCalls++;

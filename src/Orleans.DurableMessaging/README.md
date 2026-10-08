@@ -123,10 +123,16 @@ valid payloads. Empty-owner clearing shares the inbox admission gate with delive
 so direct interleaved delivery proceeds after the clear's durable outcome.
 
 The handler context's outbox permits preparation during that attempt's `PrepareAsync`
-call and sending its own batches during the returned action. Every call checks the
+call and staging envelopes or its own batches during the returned action. Every call checks the
 current attempt and phase before applying repeated-send semantics. A caught or replaced
 scope violation retains its original cause and prevents a successful completion commit.
 An action-time failure ends the inbox operation and requests a fresh activation.
+
+A `JournaledStatePostCommitException` reports failed hook work after storage
+acknowledgement. The inbox acknowledges the completed operation's immutable acceptance,
+ownership repair, or owner-clear facts before surfacing that exception. It remains
+available for subsequent work. A prerequisite failure after staging retires inbox
+processing and recovers the durable outcome through a fresh activation.
 
 Preparation keeps business state, outgoing intents, and inbox completion unchanged.
 Independent journal writes can persist previously staged changes while preparation
