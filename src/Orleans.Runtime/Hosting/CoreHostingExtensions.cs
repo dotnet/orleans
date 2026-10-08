@@ -164,12 +164,16 @@ namespace Orleans.Hosting
 
             // Distributed Grain Directory
             services.AddOptions<GrainDirectoryOptions>();
-            services.TryAddSingleton(static sp => new DirectoryMembershipService(
-                sp.GetRequiredService<ClusterMembershipService>(),
-                sp.GetRequiredService<IInternalGrainFactory>(),
-                sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
-                sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.PartitionsPerSilo,
-                DirectoryMembershipSnapshot.DefaultGetRingBoundaries));
+            services.TryAddSingleton(static sp =>
+            {
+                var options = sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value;
+                return new DirectoryMembershipService(
+                    sp.GetRequiredService<ClusterMembershipService>(),
+                    sp.GetRequiredService<IInternalGrainFactory>(),
+                    sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
+                    options.PartitionsPerSilo,
+                    options.GetPartitionBoundaries);
+            });
             if (!services.Contains(DirectoryDescriptor))
             {
                 services.Add(DirectoryDescriptor);

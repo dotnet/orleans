@@ -23,9 +23,6 @@ public sealed class InProcessTestSiloSpecificOptions
     /// <value>The name of the silo.</value>
     public string SiloName { get; set; } = null!;
 
-    // In-process tests can place this silo at a specific ring point before the host starts.
-    internal uint? RingHashCode { get; set; }
-
     /// <summary>
     /// Creates an instance of the <see cref="TestSiloSpecificOptions"/> class.
     /// </summary>
