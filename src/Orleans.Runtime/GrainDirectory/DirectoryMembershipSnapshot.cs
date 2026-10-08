@@ -16,7 +16,7 @@ internal sealed class DirectoryMembershipSnapshot
     /// <summary>
     /// The default hash function for directory ring boundaries, matching the <see cref="LocalGrainDirectory"/> partitioning scheme.
     /// </summary>
-    internal static readonly Func<SiloAddress, int, uint[]> DefaultGetRingBoundaries = static (silo, count) =>
+    internal static readonly Func<SiloAddress, int, ImmutableArray<uint>> DefaultGetRingBoundaries = static (silo, count) =>
     {
         if (count == 1)
         {
@@ -31,7 +31,7 @@ internal sealed class DirectoryMembershipSnapshot
     private readonly ImmutableArray<ImmutableArray<IGrainDirectoryPartition>> _partitionsByMember;
     private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
 
-    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, int partitionCount, Func<SiloAddress, int, uint[]> getRingBoundaries)
+    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, int partitionCount, Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(partitionCount, 1);
         ArgumentNullException.ThrowIfNull(getRingBoundaries);
@@ -54,7 +54,7 @@ internal sealed class DirectoryMembershipSnapshot
         {
             var activeMember = sortedActiveMembers[memberIndex];
             var hashCodes = getRingBoundaries(activeMember, partitionCount);
-            if (hashCodes is null || hashCodes.Length != partitionCount)
+            if (hashCodes.IsDefault || hashCodes.Length != partitionCount)
             {
                 throw new InvalidOperationException(
                     $"The grain directory partition boundary function must return exactly {partitionCount} boundaries for silo '{activeMember}'.");

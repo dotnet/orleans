@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -19,7 +20,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
     private readonly Task _runTask;
     private readonly AsyncEnumerable<DirectoryMembershipSnapshot> _viewUpdates;
     private readonly int _partitionsPerSilo;
-    private readonly Func<SiloAddress, int, uint[]> _getRingBoundaries;
+    private readonly Func<SiloAddress, int, ImmutableArray<uint>> _getRingBoundaries;
     private DirectoryMembershipSnapshot _currentView = DirectoryMembershipSnapshot.Default;
 
     public DirectoryMembershipSnapshot CurrentView
@@ -78,7 +79,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         IInternalGrainFactory grainFactory,
         ILogger<DirectoryMembershipService> logger,
         int partitionsPerSilo,
-        Func<SiloAddress, int, uint[]> getRingBoundaries)
+        Func<SiloAddress, int, ImmutableArray<uint>> getRingBoundaries)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1);
         ArgumentNullException.ThrowIfNull(getRingBoundaries);

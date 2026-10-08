@@ -1,4 +1,4 @@
-using System;
+using System.Collections.Immutable;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
@@ -13,11 +13,7 @@ internal static class DirectoryPartitioningSnippet
         {
             options.PartitionsPerSilo = 30;
             options.GetPartitionBoundaries = static (silo, partitionCount) =>
-            {
-                var boundaries = (uint[])silo.GetUniformHashCodes(partitionCount).Clone();
-                Array.Sort(boundaries);
-                return boundaries;
-            };
+                silo.GetUniformHashCodes(partitionCount).Sort();
         });
         // </legacy_directory_partitions>
     }

@@ -47,17 +47,21 @@ Replace a bounded number of silos at a time. Pause when error rate, latency, mem
 
 Orleans grain versioning can route calls among compatible grain implementations, but it doesn't make arbitrary application or storage changes compatible. See [Deploy new versions of grains](../grains/grain-versioning/deploying-new-versions-of-grains.md) and [Backward compatibility guidelines](../grains/grain-versioning/backward-compatibility-guidelines.md).
 
+### Uniform silo hash API compatibility
+
+<xref:Orleans.Runtime.SiloAddress.GetUniformHashCodes*> returns an <xref:System.Collections.Immutable.ImmutableArray`1> which shares the silo's cached hash storage. Rebuild callers compiled against the earlier `uint[]` return type. Use `ToArray()` when a mutable buffer is needed, or `Sort()` to obtain a sorted immutable result while preserving the cached values.
+
 ### Distributed-directory upgrade compatibility
 
 Rolling upgrades using the experimental [distributed grain directory](../host/grain-directory.md#strongly-consistent-in-cluster-directory) preserve both the partition count and the mapping from hash boundaries to partition numbers. Directory requests and ownership-transfer snapshots address those numbered partitions, so all silos must agree on their ranges.
 
 Orleans 10.1 used 30 partitions per silo and assigned partition numbers after sorting each silo's uniform hashes by unsigned value. Orleans 10.2 changed the default count to one and assigned multiple partitions in hash-generation order.
 
-When upgrading a distributed-directory cluster running Orleans 10.1, configure newer silos with <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> set to `30` and provide an application-defined <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> delegate which sorts a copy of each silo's uniform hashes:
+When upgrading a distributed-directory cluster running Orleans 10.1, configure newer silos with <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> set to `30` and provide an application-defined <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> delegate which returns each silo's uniform hashes in sorted order:
 
 :::code language="csharp" source="../snippets/compiled/Deployment/DirectoryPartitioningSnippet.cs" id="legacy_directory_partitions":::
 
-The copy preserves the silo's cached hash order, while sorting preserves the existing partition identities. Retain this configuration after the upgrade and throughout rollback.
+Sorting the immutable hash array preserves the silo's cached hash order and produces the existing partition identities. Retain this configuration after the upgrade and throughout rollback.
 
 Clusters already using the Orleans 10.2-and-later generated-order mapping retain the default boundary function and their existing partition count. Qualify upgrades and rollback under sustained traffic, checking directory registration preservation and activation uniqueness. Changing an established cluster's partition count or boundary mapping requires a coordinated full-cluster restart or a blue-green cutover with controlled grain-state ownership.
 

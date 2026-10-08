@@ -1021,8 +1021,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                     {
                         var uniformHashCodes = siloAddress
                             .GetUniformHashCodes(ringOptions.NumVirtualBucketsConsistentRing)
-                            .ToArray();
-                        uniformHashCodes[0] = ringHashCode;
+                            .SetItem(0, ringHashCode);
                         siloAddress.InternalSetUniformHashCodes(uniformHashCodes);
                     }
                 }

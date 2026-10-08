@@ -49,7 +49,7 @@ public sealed class DirectoryMembershipSnapshotTests
                 {
                     var i = 0;
                     return new DirectoryMembershipSnapshotTestCase(
-                        new DirectoryMembershipSnapshot(snapshot, null!, partitionCount, (_, _) => hashes[i++]),
+                        new DirectoryMembershipSnapshot(snapshot, null!, partitionCount, (_, _) => hashes[i++].ToImmutableArray()),
                         hashes);
                 }));
         });
@@ -130,11 +130,48 @@ public sealed class DirectoryMembershipSnapshotTests
         Assert.Equal(expected, options.GetPartitionBoundaries(member, partitionCount));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(30)]
+    public void UniformHashCodesAreImmutableAndReuseCachedStorage(int count)
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11200 + count), 1);
+        var hashes = member.GetUniformHashCodes(count);
+
+        Assert.False(hashes.IsDefault);
+        Assert.Equal(count, hashes.Length);
+        Assert.True(hashes.Equals(member.GetUniformHashCodes(count)));
+        Assert.True(((ICollection<uint>)hashes).IsReadOnly);
+        if (count > 0)
+        {
+            var originalHash = hashes[0];
+            var copy = hashes.ToArray();
+            copy[0] ^= uint.MaxValue;
+
+            Assert.Throws<NotSupportedException>(() => ((IList<uint>)hashes)[0] = 0);
+            Assert.Equal(originalHash, member.GetUniformHashCodes(count)[0]);
+        }
+    }
+
+    [Fact]
+    public void UniformHashCodesRemainStableWhenCacheCountChanges()
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11231), 1);
+        var hashes = member.GetUniformHashCodes(30);
+        var expected = hashes.ToArray();
+
+        Assert.Single(member.GetUniformHashCodes(1));
+
+        Assert.Equal(expected, hashes);
+        Assert.Equal(expected, member.GetUniformHashCodes(30));
+    }
+
     [Fact]
     public void LegacyPartitionBoundariesPreserveCachedHashOrder()
     {
         var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11112), 1);
-        uint[] generated = [uint.MaxValue, 100, 0x80000000, 200];
+        ImmutableArray<uint> generated = [uint.MaxValue, 100, 0x80000000, 200];
         member.InternalSetUniformHashCodes(generated);
 
         var options = GetDocumentedLegacyOptions();
@@ -142,7 +179,7 @@ public sealed class DirectoryMembershipSnapshotTests
 
         Assert.Equal([100u, 200u, 0x80000000u, uint.MaxValue], boundaries);
         Assert.Equal([uint.MaxValue, 100u, 0x80000000u, 200u], member.GetUniformHashCodes(generated.Length));
-        Assert.NotSame(generated, boundaries);
+        Assert.False(generated.Equals(boundaries));
     }
 
     [Fact]
@@ -188,21 +225,21 @@ public sealed class DirectoryMembershipSnapshotTests
             new(1));
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            new DirectoryMembershipSnapshot(membership, null!, 3, (_, _) => new uint[returnedCount]));
+            new DirectoryMembershipSnapshot(membership, null!, 3, (_, _) => new uint[returnedCount].ToImmutableArray()));
 
         Assert.Contains("exactly 3 boundaries", exception.Message);
         Assert.Contains(member.ToString(), exception.Message);
     }
 
     [Fact]
-    public void PartitionBoundariesRejectNullResult()
+    public void PartitionBoundariesRejectDefaultResult()
     {
         var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11114), 1);
         var membership = new ClusterMembershipSnapshot(
             ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(member, new ClusterMember(member, SiloStatus.Active, "Silo")),
             new(1));
 
-        Assert.Throws<InvalidOperationException>(() => new DirectoryMembershipSnapshot(membership, null!, 3, (_, _) => null!));
+        Assert.Throws<InvalidOperationException>(() => new DirectoryMembershipSnapshot(membership, null!, 3, (_, _) => default));
     }
 
     [Fact]
@@ -261,7 +298,7 @@ public sealed class DirectoryMembershipSnapshotTests
                     throw callbackFailure;
                 }
 
-                return returnedCount == -1 ? null! : new uint[returnedCount];
+                return returnedCount == -1 ? default : new uint[returnedCount].ToImmutableArray();
             });
         var initialView = await directoryMembership.RefreshViewAsync(membership.CurrentVersion, timeout.Token);
         Assert.Equal(membership.CurrentVersion, initialView.Version);

@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Buffers.Text;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -35,7 +36,7 @@ namespace Orleans.Runtime
         private bool hashCodeSet;
 
         [NonSerialized]
-        private uint[]? uniformHashCache;
+        private ImmutableArray<uint> uniformHashCache;
 
         /// <summary>
         /// Gets the endpoint.
@@ -453,24 +454,27 @@ namespace Orleans.Runtime
             this.hashCodeSet = true;
         }
 
-        internal void InternalSetUniformHashCodes(uint[] hashCodes)
+        internal void InternalSetUniformHashCodes(ImmutableArray<uint> hashCodes)
         {
             uniformHashCache = hashCodes;
         }
 
         /// <summary>
-        /// Returns a collection of uniform hash codes variants for this instance.
+        /// Returns an immutable collection of uniform hash code variants for this instance.
         /// </summary>
         /// <param name="numHashes">The number of hash codes to return.</param>
-        /// <returns>A collection of uniform hash codes variants for this instance.</returns>
-        public uint[] GetUniformHashCodes(int numHashes)
+        /// <returns>An immutable collection of uniform hash code variants for this instance.</returns>
+        /// <remarks>
+        /// Results are cached and share their backing storage across calls requesting the same number of hashes.
+        /// </remarks>
+        public ImmutableArray<uint> GetUniformHashCodes(int numHashes)
         {
             var cache = uniformHashCache;
-            if (cache is not null && cache.Length == numHashes) return cache;
+            if (!cache.IsDefault && cache.Length == numHashes) return cache;
             return uniformHashCache = GetUniformHashCodesImpl(numHashes);
         }
 
-        private uint[] GetUniformHashCodesImpl(int numHashes)
+        private ImmutableArray<uint> GetUniformHashCodesImpl(int numHashes)
         {
             Span<byte> bytes = stackalloc byte[16 + sizeof(int) + sizeof(int) + sizeof(int)]; // ip + port + generation + extraBit
 
@@ -503,7 +507,7 @@ namespace Orleans.Runtime
                 hashes[extraBit] = StableHash.ComputeHash(bytes);
             }
 
-            return hashes;
+            return ImmutableCollectionsMarshal.AsImmutableArray(hashes);
         }
 
         /// <summary>

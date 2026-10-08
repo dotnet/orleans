@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
 
@@ -67,18 +68,16 @@ public class GrainDirectoryOptions
     /// Each array index identifies a partition and its value is that partition's exclusive starting boundary.
     /// </summary>
     /// <remarks>
-    /// The function must return exactly the requested number of boundaries and produce the same mapping on every silo.
+    /// The function must return an initialized immutable array containing exactly the requested number of boundaries
+    /// and produce the same mapping on every silo.
     /// Each partition's starting boundary must remain stable throughout the silo's membership.
-    /// Orleans treats the returned array as read-only.
     /// The function is captured when the distributed directory is created and can be invoked concurrently on different silos.
     /// If the function throws or returns an invalid result, directory membership processing stops and membership reads
     /// and refresh calls throw <see cref="OrleansConfigurationException"/>. Correct the configuration and restart the affected silos.
     /// By default, a single partition uses <see cref="SiloAddress.GetConsistentHashCode()"/>, and multiple partitions use
     /// <see cref="SiloAddress.GetUniformHashCodes(int)"/> in hash-generation order.
-    /// Applications which reorder the array returned by <see cref="SiloAddress.GetUniformHashCodes(int)"/>
-    /// must copy it first to preserve the silo's cached hash order.
     /// </remarks>
-    public Func<SiloAddress, int, uint[]> GetPartitionBoundaries { get; set; } = DirectoryMembershipSnapshot.DefaultGetRingBoundaries;
+    public Func<SiloAddress, int, ImmutableArray<uint>> GetPartitionBoundaries { get; set; } = DirectoryMembershipSnapshot.DefaultGetRingBoundaries;
 
     /// <summary>
     /// Gets or sets the initial (minimum) time, in seconds, to keep a cache entry before revalidating.
