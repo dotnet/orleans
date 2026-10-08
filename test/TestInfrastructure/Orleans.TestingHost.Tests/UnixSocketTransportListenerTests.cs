@@ -11,6 +11,33 @@ namespace Orleans.TestingHost.Tests;
 public class UnixSocketTransportListenerTests
 {
     [Fact]
+    public async Task PreCanceledBindPreservesUnboundState()
+    {
+        if (!Socket.OSSupportsUnixDomainSockets)
+        {
+            throw Xunit.Sdk.SkipException.ForSkip("Unix domain sockets are not supported.");
+        }
+
+        var path = Path.Combine(Path.GetTempPath(), $"orleans-{Guid.NewGuid():N}.sock");
+        var options = new StaticOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions>(
+            "test",
+            new UnixDomainSocketMessageTransportListenerOptions { Path = path });
+        await using var listener = new UnixDomainSocketMessageTransportListener("test", options, NullLoggerFactory.Instance);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => listener.BindAsync(cancellation.Token).AsTask());
+
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.False(File.Exists(path));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => listener.AcceptAsync(TestContext.Current.CancellationToken).AsTask());
+        await listener.BindAsync(TestContext.Current.CancellationToken);
+        Assert.True(File.Exists(path));
+    }
+
+    [Fact]
     public async Task DisposeRemovesSocketFileAndIsIdempotent()
     {
         if (!Socket.OSSupportsUnixDomainSockets)

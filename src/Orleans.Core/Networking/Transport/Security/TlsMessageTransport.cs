@@ -103,13 +103,13 @@ internal abstract partial class TlsMessageTransport : StreamMessageTransport
     }
 
     /// <inheritdoc/>
-    protected override async Task RunAsyncCore()
+    protected override async Task RunAsyncCore(CancellationToken cancellationToken)
     {
-        await AuthenticateAsync().ConfigureAwait(false);
-        await base.RunAsyncCore().ConfigureAwait(false);
+        await AuthenticateAsync(cancellationToken).ConfigureAwait(false);
+        await base.RunAsyncCore(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task AuthenticateAsync()
+    private async Task AuthenticateAsync(CancellationToken cancellationToken)
     {
         bool certificateRequired;
 
@@ -122,7 +122,7 @@ internal abstract partial class TlsMessageTransport : StreamMessageTransport
             certificateRequired = true;
         }
 
-        using (var cancellationTokenSource = _options.CreateHandshakeCancellationTokenSource())
+        using (var cancellationTokenSource = _options.CreateHandshakeCancellationTokenSource(cancellationToken, _innerTransport.Closed))
         {
             try
             {
@@ -131,16 +131,24 @@ internal abstract partial class TlsMessageTransport : StreamMessageTransport
             }
             catch (OperationCanceledException ex)
             {
-                LogAuthenticationTimedOut(_logger, ex);
+                if (cancellationToken.IsCancellationRequested || _innerTransport.Closed.IsCancellationRequested)
+                {
+                    LogAuthenticationCanceled(_logger, ex);
+                }
+                else
+                {
+                    LogAuthenticationTimedOut(_logger, ex);
+                }
+
                 await _sslStream.DisposeAsync().ConfigureAwait(false);
-                await _innerTransport.CloseAsync(ex).ConfigureAwait(false);
+                await _innerTransport.CloseAsync(ex, CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
             catch (Exception ex)
             {
                 LogAuthenticationFailed(_logger, ex);
                 await _sslStream.DisposeAsync().ConfigureAwait(false);
-                await _innerTransport.CloseAsync(ex).ConfigureAwait(false);
+                await _innerTransport.CloseAsync(ex, CancellationToken.None).ConfigureAwait(false);
                 throw;
             }
         }
@@ -226,6 +234,9 @@ internal abstract partial class TlsMessageTransport : StreamMessageTransport
 
     [LoggerMessage(2, LogLevel.Warning, "Authentication timed out")]
     private static partial void LogAuthenticationTimedOut(ILogger logger, Exception exception);
+
+    [LoggerMessage(3, LogLevel.Debug, "Authentication canceled")]
+    private static partial void LogAuthenticationCanceled(ILogger logger, Exception exception);
 
     [LoggerMessage(1, LogLevel.Warning, "Authentication failed")]
     private static partial void LogAuthenticationFailed(ILogger logger, Exception exception);

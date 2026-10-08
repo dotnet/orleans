@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -111,7 +112,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override async Task RunAsyncCore()
+        protected override async Task RunAsyncCore(CancellationToken cancellationToken)
         {
             var preamble = await connectionPreambleHelper.Read(this.Context);
 
@@ -135,10 +136,11 @@ namespace Orleans.Runtime.Messaging
                 throw new InvalidOperationException($@"Unexpected cluster id ""{preamble.ClusterId}"", expected ""{this.myClusterId}""");
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 this.gateway.RecordOpenedConnection(this, clientId);
-                await base.RunAsyncCore();
+                await base.RunAsyncCore(cancellationToken);
             }
             finally
             {

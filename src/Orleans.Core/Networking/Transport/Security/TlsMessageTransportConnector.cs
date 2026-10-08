@@ -32,7 +32,7 @@ internal sealed partial class TlsMessageTransportConnector(
         {
             var tlsOptions = _tlsOptions.CurrentValue;
             var transport = new ClientTlsMessageTransport(innerTransport, tlsOptions, _logger);
-            transport.Start();
+            transport.Start(cancellationToken);
             return transport;
         }
         catch

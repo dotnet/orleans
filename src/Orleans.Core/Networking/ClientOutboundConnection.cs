@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -56,7 +57,7 @@ namespace Orleans.Runtime.Messaging
             this.messageCenter.DispatchLocalMessage(message);
         }
 
-        protected override async Task RunAsyncCore()
+        protected override async Task RunAsyncCore(CancellationToken cancellationToken)
         {
             Exception? error = default;
             try
@@ -86,7 +87,7 @@ namespace Orleans.Runtime.Messaging
                     throw new InvalidOperationException($@"Unexpected cluster id ""{preamble.ClusterId}"", expected ""{myClusterId}""");
                 }
 
-                await base.RunAsyncCore();
+                await base.RunAsyncCore(cancellationToken);
             }
             catch (Exception exception) when ((error = exception) is null)
             {

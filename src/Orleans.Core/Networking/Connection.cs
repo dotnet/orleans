@@ -79,8 +79,9 @@ namespace Orleans.Runtime.Messaging
         /// <summary>
         /// Start processing this connection.
         /// </summary>
+        /// <param name="cancellationToken">The cancellation token for connection initialization.</param>
         /// <returns>A <see cref="Task"/> which completes when the connection terminates and has completed processing.</returns>
-        public async Task RunAsync()
+        public async Task RunAsync(CancellationToken cancellationToken = default)
         {
             var run = Interlocked.CompareExchange(ref _runState, 1, 0) == 0;
             Exception? error = default;
@@ -88,9 +89,10 @@ namespace Orleans.Runtime.Messaging
             {
                 if (run)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     NetworkingMetrics.OnOpenedSocket(ConnectionDirection);
                     _openedSocket = true;
-                    await RunAsyncCore();
+                    await RunAsyncCore(cancellationToken);
                 }
             }
             catch (Exception exception)
@@ -108,8 +110,9 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected virtual Task RunAsyncCore()
+        protected virtual Task RunAsyncCore(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             using (new ExecutionContextSuppressor())
             {
                 _processIncomingTask = ProcessIncoming();

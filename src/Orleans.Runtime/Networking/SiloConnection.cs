@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -179,13 +180,20 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override async Task RunAsyncCore()
+        protected override async Task RunAsyncCore(CancellationToken cancellationToken)
         {
             Exception? error = default;
             try
             {
                 await Task.WhenAll(ReadPreamble(), WritePreamble());
-                await base.RunAsyncCore();
+                cancellationToken.ThrowIfCancellationRequested();
+                if (this.RemoteSiloAddress is not null)
+                {
+                    // Publish after the local preamble so message writes preserve protocol ordering.
+                    this.connectionManager.OnConnected(this.RemoteSiloAddress, this);
+                }
+
+                await base.RunAsyncCore(cancellationToken);
             }
             catch (Exception exception) when ((error = exception) is null)
             {
@@ -229,7 +237,6 @@ namespace Orleans.Runtime.Messaging
                 if (preamble.SiloAddress is not null)
                 {
                     this.RemoteSiloAddress = preamble.SiloAddress;
-                    this.connectionManager.OnConnected(preamble.SiloAddress, this);
                 }
             }
         }

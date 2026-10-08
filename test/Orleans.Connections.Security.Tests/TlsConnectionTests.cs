@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -260,15 +261,34 @@ namespace Orleans.Connections.Security.Tests
         /// - Data integrity is maintained (echo test)
         /// </summary>
         [Theory]
-        [InlineData(null, RemoteCertificateMode.AllowCertificate)]
-        [InlineData(null, RemoteCertificateMode.NoCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate)]
-        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate)]
-        public async Task TlsEndToEnd(string[]? oids, RemoteCertificateMode certificateMode)
+        [InlineData(null, RemoteCertificateMode.AllowCertificate, ConnectionTransportType.InMemory)]
+        [InlineData(null, RemoteCertificateMode.NoCertificate, ConnectionTransportType.InMemory)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, ConnectionTransportType.InMemory)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, ConnectionTransportType.InMemory)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, ConnectionTransportType.InMemory)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, ConnectionTransportType.InMemory)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate, ConnectionTransportType.InMemory)]
+        [InlineData(null, RemoteCertificateMode.AllowCertificate, ConnectionTransportType.TcpSocket)]
+        [InlineData(null, RemoteCertificateMode.NoCertificate, ConnectionTransportType.TcpSocket)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, ConnectionTransportType.TcpSocket)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, ConnectionTransportType.TcpSocket)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, ConnectionTransportType.TcpSocket)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, ConnectionTransportType.TcpSocket)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate, ConnectionTransportType.TcpSocket)]
+        [InlineData(null, RemoteCertificateMode.AllowCertificate, ConnectionTransportType.UnixSocket)]
+        [InlineData(null, RemoteCertificateMode.NoCertificate, ConnectionTransportType.UnixSocket)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, ConnectionTransportType.UnixSocket)]
+        [InlineData(new[] { TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, ConnectionTransportType.UnixSocket)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.NoCertificate, ConnectionTransportType.UnixSocket)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.AllowCertificate, ConnectionTransportType.UnixSocket)]
+        [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate, ConnectionTransportType.UnixSocket)]
+        public async Task TlsEndToEnd(string[]? oids, RemoteCertificateMode certificateMode, ConnectionTransportType connectionTransport)
         {
+            if (connectionTransport == ConnectionTransportType.UnixSocket && !Socket.OSSupportsUnixDomainSockets)
+            {
+                throw Xunit.Sdk.SkipException.ForSkip("Unix domain sockets are not supported.");
+            }
+
             var cancellationToken = TestContext.Current.CancellationToken;
             TestCluster? testCluster = default;
             try
@@ -276,6 +296,7 @@ namespace Orleans.Connections.Security.Tests
                 var builder = new TestClusterBuilder()
                     .AddSiloBuilderConfigurator<TlsServerConfigurator>()
                     .AddClientBuilderConfigurator<TlsClientConfigurator>();
+                builder.Options.ConnectionTransport = connectionTransport;
 
                 // Create a self-signed certificate with specified OIDs
                 var certificate = TestCertificateHelper.CreateSelfSignedCertificate(

@@ -260,9 +260,10 @@ namespace Orleans.Runtime.Messaging
                 ConnectionEvents.EmitConnected(address);
                 LogInformationConnectedToEndpoint(this.logger, address);
 
-                connectionTask = this.StartConnection(address, connection);
+                connectionTask = this.StartConnection(address, connection, openConnectionCancellation.Token);
 
                 await connection.Initialized.WaitAsync(openConnectionCancellation.Token);
+                openConnectionCancellation.Token.ThrowIfCancellationRequested();
                 this.OnConnected(address, connection, entry);
 
                 return connection;
@@ -444,27 +445,27 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private Task StartConnection(SiloAddress address, Connection connection)
+        private Task StartConnection(SiloAddress address, Connection connection, CancellationToken cancellationToken)
         {
             var started = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
             var completion = started.Task.Unwrap();
             this.connectionTasks[connection] = completion;
             ThreadPool.UnsafeQueueUserWorkItem(state =>
             {
-                var (manager, address, connection, started) = state;
-                started.SetResult(manager.RunConnectionAsync(address, connection));
-            }, (this, address, connection, started), preferLocal: false);
+                var (manager, address, connection, started, cancellationToken) = state;
+                started.SetResult(manager.RunConnectionAsync(address, connection, cancellationToken));
+            }, (this, address, connection, started, cancellationToken), preferLocal: false);
             return completion;
         }
 
-        private async Task RunConnectionAsync(SiloAddress address, Connection connection)
+        private async Task RunConnectionAsync(SiloAddress address, Connection connection, CancellationToken cancellationToken)
         {
             Exception? error = default;
             try
             {
                 using (this.BeginConnectionScope(connection))
                 {
-                    await connection.RunAsync();
+                    await connection.RunAsync(cancellationToken);
                 }
             }
             catch (Exception exception)

@@ -38,6 +38,93 @@ public class ConnectionManagerTests
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
 
     [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    public async Task SiloConnection_PublishesAfterBothPreamblesComplete(bool outbound, bool failWrite, bool cancelEstablishment)
+    {
+        await using var rig = new TestRig();
+        using var preamble = new ArcBufferWriter();
+        var serializerTransport = Substitute.For<MessageTransport>();
+        serializerTransport.EnqueueWrite(Arg.Any<WriteRequest>()).Returns(call =>
+        {
+            var request = call.Arg<WriteRequest>();
+            using var bytes = request.Buffers.ConsumeSlice(request.Buffers.Length);
+            foreach (var segment in bytes.MemorySegments)
+            {
+                preamble.Write(segment.Span);
+            }
+
+            request.SetResult();
+            return true;
+        });
+        await rig.PreambleHelper.Write(serializerTransport, new ConnectionPreamble
+        {
+            NodeIdentity = Constants.SiloDirectConnectionId,
+            SiloAddress = rig.Address,
+            ClusterId = "test-cluster"
+        });
+        PreambleTransport transport = null!;
+        var (connection, _) = rig.CreateSiloConnection(
+            outbound: outbound,
+            wrapTransport: inner => transport = new PreambleTransport(
+                inner, preamble, () => rig.Manager.TryGetConnection(rig.Address, out _)));
+
+        using var cancellation = new CancellationTokenSource();
+        var running = connection.RunAsync(cancellation.Token);
+        try
+        {
+            Assert.NotNull(transport.PendingWrite);
+            Assert.False(transport.PublishedBeforeWrite);
+            Assert.Equal(rig.Address, connection.RemoteSiloAddress);
+            Assert.False(connection.Initialized.IsCompleted);
+            Assert.False(rig.Manager.TryGetConnection(rig.Address, out _));
+            Assert.Equal(0, rig.Manager.ConnectionCount);
+
+            if (cancelEstablishment)
+            {
+                cancellation.Cancel();
+                transport.CompleteWrite();
+                var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => connection.Initialized.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
+                Assert.Equal(cancellation.Token, error.CancellationToken);
+                await running.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+                Assert.False(rig.Manager.TryGetConnection(rig.Address, out _));
+                Assert.Equal(0, rig.Manager.ConnectionCount);
+            }
+            else if (failWrite)
+            {
+                var error = new ConnectionClosedException("Preamble write failed.");
+                transport.CompleteWrite(error);
+                var actual = await Assert.ThrowsAsync<ConnectionClosedException>(
+                    () => connection.Initialized.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
+                Assert.Same(error, actual);
+                await running.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+                Assert.False(rig.Manager.TryGetConnection(rig.Address, out _));
+                Assert.Equal(0, rig.Manager.ConnectionCount);
+            }
+            else
+            {
+                transport.CompleteWrite();
+                await connection.Initialized.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+
+                Assert.True(rig.Manager.TryGetConnection(rig.Address, out var published));
+                Assert.Same(connection, published);
+                Assert.Equal(1, rig.Manager.ConnectionCount);
+            }
+        }
+        finally
+        {
+            transport.CompleteWrite();
+            await connection.CloseAsync(exception: null).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            await running.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Theory]
     [InlineData((int)Message.Directions.Request)]
     [InlineData((int)Message.Directions.Response)]
     [InlineData((int)Message.Directions.OneWay)]
@@ -290,6 +377,7 @@ public class ConnectionManagerTests
         var connection = rig.CreateConnection();
         attempt.Completion.SetResult(connection);
         Assert.Same(connection, await first.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
+        Assert.Equal(attempt.CancellationToken, connection.InitializationToken);
         Assert.Same(connection, await second.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
         var reused = rig.Manager.GetConnection(rig.Address);
         Assert.True(reused.IsCompletedSuccessfully);
@@ -327,13 +415,57 @@ public class ConnectionManagerTests
         var connection = rig.CreateConnection();
 
         await connection.CloseAsync(exception: null).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
-        await connection.RunAsync().WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        await connection.RunAsync(TestContext.Current.CancellationToken).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
 
         Assert.False(connection.Started.Task.IsCompleted);
         Assert.False(connection.IsValid);
         Assert.True(connection.Initialized.IsFaulted);
         Assert.Equal(1, connection.TransportContext.CloseCount);
         Assert.Equal(1, connection.TransportContext.DisposeCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_PreCanceledInitializationClosesTransportWithoutStarting()
+    {
+        await using var rig = new TestRig();
+        var connection = rig.CreateConnection();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await connection.RunAsync(cancellation.Token).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => connection.Initialized);
+
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.False(connection.Started.Task.IsCompleted);
+        Assert.False(connection.IsValid);
+        Assert.Equal(1, connection.TransportContext.CloseCount);
+        Assert.Equal(1, connection.TransportContext.DisposeCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_CancellationAfterInitializationKeepsConnectionActive()
+    {
+        await using var rig = new TestRig();
+        var connection = rig.CreateConnection();
+        using var cancellation = new CancellationTokenSource();
+        var running = connection.RunAsync(cancellation.Token);
+        try
+        {
+            await connection.Initialized.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            Assert.Equal(cancellation.Token, connection.InitializationToken);
+
+            cancellation.Cancel();
+
+            Assert.True(connection.IsValid);
+            Assert.True(connection.Initialized.IsCompletedSuccessfully);
+            Assert.False(running.IsCompleted);
+            Assert.Equal(0, connection.TransportContext.CloseCount);
+        }
+        finally
+        {
+            await connection.CloseAsync(exception: null).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            await running.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        }
     }
 
     [Fact]
@@ -372,7 +504,7 @@ public class ConnectionManagerTests
         var failure = new InvalidOperationException("Synchronous initialization failure");
         var connection = rig.CreateConnection(initialize: _ => throw failure);
 
-        await connection.RunAsync().WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        await connection.RunAsync(TestContext.Current.CancellationToken).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => connection.Initialized);
 
         Assert.Same(failure, error);
@@ -467,7 +599,10 @@ public class ConnectionManagerTests
 
         public MessageReadRequest CreateReadRequest() => _shared.MessageHandlerShared.GetReceiveMessageHandler();
 
-        public (SiloConnection Connection, TestMessageTransport Context) CreateSiloConnection(bool blockApplicationMessages = false)
+        public (SiloConnection Connection, TestMessageTransport Context) CreateSiloConnection(
+            bool blockApplicationMessages = false,
+            bool outbound = true,
+            Func<MessageTransport, MessageTransport>? wrapTransport = null)
         {
             var context = new TestMessageTransport(blockDisposal: false);
             var local = Substitute.For<ILocalSiloDetails>();
@@ -507,7 +642,7 @@ public class ConnectionManagerTests
                 _messageCenters.Add(messageCenter);
             }
 
-            var connection = new SiloConnection(Address, context, messageCenter!, local, Manager, _options, _shared, null!, PreambleHelper);
+            var connection = new SiloConnection(outbound ? Address : null, wrapTransport?.Invoke(context) ?? context, messageCenter!, local, Manager, _options, _shared, null!, PreambleHelper);
             _connections.Add((connection, context));
             return (connection, context);
         }
@@ -610,13 +745,15 @@ public class ConnectionManagerTests
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource CleanupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseCleanup { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public CancellationToken InitializationToken { get; private set; }
         public Action<Message>? SendObserver { get; set; }
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
         protected override TimeSpan CloseConnectionTimeout => TestTimeout;
         protected override IMessageCenter MessageCenter => null!;
 
-        protected override async Task RunAsyncCore()
+        protected override async Task RunAsyncCore(CancellationToken cancellationToken)
         {
+            InitializationToken = cancellationToken;
             try
             {
                 if (_initialize is not null)
@@ -631,7 +768,7 @@ public class ConnectionManagerTests
                     throw new ConnectionAbortedException("Initialization read terminated");
                 }
 
-                await base.RunAsyncCore();
+                await base.RunAsyncCore(cancellationToken);
             }
             finally
             {
@@ -744,6 +881,63 @@ public class ConnectionManagerTests
 
             public override ValueTask DisposeAsync() => inner.DisposeAsync();
         }
+    }
+
+    private sealed class PreambleTransport(MessageTransport inner, ArcBufferWriter preamble, Func<bool> isPublished) : MessageTransport
+    {
+        private bool _readPreamble;
+        private bool _writePreamble;
+
+        public WriteRequest? PendingWrite { get; private set; }
+        public bool PublishedBeforeWrite { get; private set; }
+        public override CancellationToken Closed => inner.Closed;
+        public override IFeatureCollection Features => inner.Features;
+
+        public override bool EnqueueRead(ReadRequest request)
+        {
+            if (_readPreamble)
+            {
+                return inner.EnqueueRead(request);
+            }
+
+            _readPreamble = true;
+            Assert.True(request.OnRead(new ArcBufferReader(preamble)));
+            return true;
+        }
+
+        public override bool EnqueueWrite(WriteRequest request)
+        {
+            if (_writePreamble)
+            {
+                return inner.EnqueueWrite(request);
+            }
+
+            _writePreamble = true;
+            PublishedBeforeWrite = isPublished();
+            PendingWrite = request;
+            return true;
+        }
+
+        public void CompleteWrite(Exception? error = null)
+        {
+            if (PendingWrite is { } request)
+            {
+                PendingWrite = null;
+                if (error is null)
+                {
+                    request.SetResult();
+                }
+                else
+                {
+                    request.SetException(error);
+                }
+            }
+        }
+
+        public override ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default) =>
+            inner.CloseAsync(closeException, cancellationToken);
+
+        public override ValueTask DisposeAsync() => inner.DisposeAsync();
     }
 
     private sealed class QueuedSynchronizationContext : SynchronizationContext

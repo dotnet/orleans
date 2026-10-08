@@ -13,6 +13,25 @@ namespace Orleans.TestingHost.Tests;
 public class InMemoryTransportTests
 {
     [Fact]
+    public async Task PreCanceledBindLeavesEndpointUnregistered()
+    {
+        var hub = new InMemoryTransportConnectionHub();
+        var endpoint = new IPEndPoint(IPAddress.Loopback, 12347);
+        await using var listener = new InMemoryTransportListener("test", endpoint.ToString(), hub);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => listener.BindAsync(cancellation.Token).AsTask());
+
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => hub.GetConnectionListenerFactoryAsync(endpoint.ToString(), cancellation.Token).AsTask());
+        await listener.BindAsync(TestContext.Current.CancellationToken);
+        Assert.Same(listener, await hub.GetConnectionListenerFactoryAsync(endpoint.ToString(), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public void TestClusterOptions_DefaultConnectionTransport_IsInMemory()
     {
         Assert.Equal(ConnectionTransportType.InMemory, new TestClusterOptions().ConnectionTransport);

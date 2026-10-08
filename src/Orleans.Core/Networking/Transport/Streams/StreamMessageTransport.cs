@@ -38,10 +38,11 @@ internal abstract partial class StreamMessageTransport : MessageTransportBase
 
     protected abstract Stream Stream { get; }
 
-    public virtual void Start()
+    public virtual void Start(CancellationToken cancellationToken = default)
     {
         using var _ = new ExecutionContextSuppressor();
-        _runTask = Task.Run(RunAsync);
+        // Run canceled startup attempts so accepted requests complete before disposal.
+        _runTask = Task.Run(() => RunAsync(cancellationToken), CancellationToken.None);
     }
 
     public override CancellationToken Closed => _connectionClosedCts.Token;
@@ -187,13 +188,14 @@ internal abstract partial class StreamMessageTransport : MessageTransportBase
         return true;
     }
 
-    private async Task RunAsync()
+    private async Task RunAsync(CancellationToken cancellationToken)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding);
 
         try
         {
-            await RunAsyncCore();
+            cancellationToken.ThrowIfCancellationRequested();
+            await RunAsyncCore(cancellationToken);
         }
         catch (Exception exception)
         {
@@ -230,8 +232,9 @@ internal abstract partial class StreamMessageTransport : MessageTransportBase
         }
     }
 
-    protected virtual async Task RunAsyncCore()
+    protected virtual async Task RunAsyncCore(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var readsTask = ProcessReads();
