@@ -212,6 +212,11 @@ namespace Orleans.Runtime.Messaging
                 }
                 else
                 {
+                    if (TryRerouteMessageToDeadSilo(msg))
+                    {
+                        return;
+                    }
+
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
                         existingConnection.Send(msg);
@@ -249,17 +254,47 @@ namespace Orleans.Runtime.Messaging
                                 try
                                 {
                                     var sender = await connectionTask;
-                                    sender.Send(msg);
+                                    if (!messageCenter.TryRerouteMessageToDeadSilo(msg))
+                                    {
+                                        sender.Send(msg);
+                                    }
                                 }
                                 catch (Exception exception)
                                 {
-                                    messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                                    if (!messageCenter.TryRerouteMessageToDeadSilo(msg))
+                                    {
+                                        messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+        }
+
+        private bool TryRerouteMessageToDeadSilo(Message message)
+        {
+            if (message.Direction is not (Message.Directions.Request or Message.Directions.OneWay)
+                || message.RetryCount != 0
+                || message.TargetGrain.IsSystemTarget()
+                || message.TargetGrain.IsClient()
+                || message.TargetSilo is not { } targetSilo
+                || !siloStatusOracle.IsDeadSilo(targetSilo))
+            {
+                return false;
+            }
+
+            // Connection acquisition and cached placement can outlive the target silo.
+            // Re-address before the first transport attempt; failed writes can have uncertain outcomes.
+            messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, message);
+            ProcessRequestToInvalidActivation(
+                message,
+                new GrainAddress { GrainId = message.TargetGrain, SiloAddress = targetSilo },
+                forwardingAddress: null,
+                failedOperation: "Target silo is known to be dead",
+                exc: new SiloUnavailableException());
+            return true;
         }
 
         public void DispatchLocalMessage(Message message) => ReceiveMessage(message);
