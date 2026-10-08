@@ -281,6 +281,86 @@ namespace NonSilo.Tests.Membership
             await Shutdown();
         }
 
+        /// <summary>
+        /// An intermediary only learns that an unresponsive target has failed once its own probe of the target times out, so it must be
+        /// given less time than this silo waits for its response. Otherwise, the intermediary's response races this silo's own timeout,
+        /// the probe usually completes as unknown, and an unresponsive (rather than crashed) silo is not declared dead.
+        /// </summary>
+        [Fact]
+        public async Task SiloHealthMonitor_Indirect_UnresponsiveTargetFailsProbe()
+        {
+            _clusterMembershipOptions.ProbeTimeout = TimeSpan.FromMilliseconds(500);
+            _clusterMembershipOptions.EnableIndirectProbes = true;
+
+            var intermediary = Silo("127.0.0.1:1234@1234");
+            _membershipSnapshot = Snapshot(2, Member(_localSilo, SiloStatus.Active), Member(_monitor.SiloAddress, SiloStatus.Active), Member(intermediary, SiloStatus.Active));
+
+            // The target never responds: direct probes fail, and the intermediary reports failure once the timeout it was given elapses.
+            _prober.Probe(default, default).ThrowsForAnyArgs(info => new TimeoutException("No response"));
+            _prober.ProbeIndirectly(default, default, default, default).ReturnsForAnyArgs(async info =>
+            {
+                var targetProbeTimeout = info.ArgAt<TimeSpan>(2);
+                await Task.Delay(targetProbeTimeout);
+                return new IndirectProbeResponse
+                {
+                    FailureMessage = "Requested probe timeout exceeded",
+                    IntermediaryHealthScore = 0,
+                    ProbeResponseTime = targetProbeTimeout,
+                    Succeeded = false
+                };
+            });
+            _monitor.Start();
+
+            // The first two probes are direct.
+            for (var expectedFailedProbes = 1; expectedFailedProbes <= 2; expectedFailedProbes++)
+            {
+                var directTimerCall = await _timerCalls.Reader.ReadAsync();
+                directTimerCall.Completion.TrySetResult(true);
+
+                var directProbeResult = await _probeResults.Reader.ReadAsync();
+                Assert.Equal(ProbeResultStatus.Failed, directProbeResult.Status);
+                Assert.Equal(expectedFailedProbes, directProbeResult.FailedProbeCount);
+                Assert.True(directProbeResult.IsDirectProbe);
+            }
+
+            // The third probe is performed via the intermediary, whose failure response must arrive before this silo stops waiting.
+            _prober.ClearReceivedCalls();
+            var timerCall = await _timerCalls.Reader.ReadAsync();
+            timerCall.Completion.TrySetResult(true);
+
+            var probeResult = await _probeResults.Reader.ReadAsync();
+            Assert.Equal(ProbeResultStatus.Failed, probeResult.Status);
+            Assert.Equal(3, probeResult.FailedProbeCount);
+            Assert.False(probeResult.IsDirectProbe);
+            Assert.Equal(0, probeResult.IntermediaryHealthDegradationScore);
+
+            // This silo waits 2 * ProbeTimeout for an indirect probe, reserving one ProbeTimeout for the intermediary's response.
+            var args = _prober.ReceivedCalls().Single().GetArguments();
+            Assert.Equal(intermediary, Assert.IsType<SiloAddress>(args[0]));
+            Assert.Equal(_monitor.SiloAddress, Assert.IsType<SiloAddress>(args[1]));
+            Assert.Equal(_clusterMembershipOptions.ProbeTimeout, Assert.IsType<TimeSpan>(args[2]));
+
+            await Shutdown();
+        }
+
+        [Theory]
+        [InlineData(10, 0, 5)]
+        [InlineData(15, 1, 10)]
+        [InlineData(20, 2, 15)]
+        public void SiloHealthMonitor_IndirectProbeTargetTimeout_ReservesTimeForResponse(int timeoutSeconds, int localDegradationScore, int expectedSeconds)
+        {
+            var targetProbeTimeout = SiloHealthMonitor.CalculateIndirectProbeTargetTimeout(TimeSpan.FromSeconds(timeoutSeconds), localDegradationScore);
+
+            Assert.Equal(TimeSpan.FromSeconds(expectedSeconds), targetProbeTimeout);
+        }
+
+        [Fact]
+        public void SiloHealthMonitor_IndirectProbeTargetTimeout_RejectsInvalidArguments()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => SiloHealthMonitor.CalculateIndirectProbeTargetTimeout(TimeSpan.Zero, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => SiloHealthMonitor.CalculateIndirectProbeTargetTimeout(TimeSpan.FromSeconds(10), -1));
+        }
+
         private static ClusterMembershipSnapshot Snapshot(long version, params ClusterMember[] members)
             => new ClusterMembershipSnapshot(
                 ImmutableDictionary.CreateRange(

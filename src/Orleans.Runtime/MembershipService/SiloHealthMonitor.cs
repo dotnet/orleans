@@ -158,7 +158,8 @@ namespace Orleans.Runtime.MembershipService
                     }
 
                     var isDirectProbe = !_clusterMembershipOptions.CurrentValue.EnableIndirectProbes || _failedProbes < _clusterMembershipOptions.CurrentValue.NumMissedProbesLimit - 1 || otherNodes.Length == 0;
-                    var timeout = GetTimeout(isDirectProbe);
+                    var localDegradationScore = GetLocalDegradationScore();
+                    var timeout = GetTimeout(isDirectProbe, localDegradationScore);
                     var cancellation = new CancellationTokenSource(timeout);
 
                     if (isDirectProbe)
@@ -174,7 +175,8 @@ namespace Orleans.Runtime.MembershipService
                         // Select a timeout which will allow the intermediary node to attempt to probe the target node and still respond to this node
                         // if the remote node does not respond in time.
                         // Attempt to account for local health degradation by extending the timeout period.
-                        probeResult = await this.ProbeIndirectly(intermediary, timeout, cancellation.Token).ConfigureAwait(false);
+                        var directProbeTimeout = CalculateIndirectProbeTargetTimeout(timeout, localDegradationScore);
+                        probeResult = await this.ProbeIndirectly(intermediary, directProbeTimeout, cancellation.Token).ConfigureAwait(false);
 
                         // If the intermediary is not entirely healthy, remove it from consideration and continue to probe.
                         // Note that all recused silos will be included in the consideration set the next time cluster membership changes.
@@ -197,16 +199,20 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
 
-            TimeSpan GetTimeout(bool isDirectProbe)
+            int GetLocalDegradationScore()
             {
-                var additionalTimeout = 0;
-
-                if (_clusterMembershipOptions.CurrentValue.ExtendProbeTimeoutDuringDegradation)
+                if (!_clusterMembershipOptions.CurrentValue.ExtendProbeTimeoutDuringDegradation)
                 {
-                    // Attempt to account for local health degradation by extending the timeout period.
-                    var localDegradationScore = _localSiloHealthMonitor.GetLocalHealthDegradationScore(DateTime.UtcNow);
-                    additionalTimeout += localDegradationScore;
+                    return 0;
                 }
+
+                // Attempt to account for local health degradation by extending the timeout period.
+                return _localSiloHealthMonitor.GetLocalHealthDegradationScore(DateTime.UtcNow);
+            }
+
+            TimeSpan GetTimeout(bool isDirectProbe, int localDegradationScore)
+            {
+                var additionalTimeout = localDegradationScore;
 
                 if (!isDirectProbe)
                 {
@@ -216,6 +222,31 @@ namespace Orleans.Runtime.MembershipService
 
                 return _clusterMembershipOptions.CurrentValue.ProbeTimeout.Multiply(1 + additionalTimeout);
             }
+        }
+
+        /// <summary>
+        /// Gets the timeout which an intermediary should use when probing the target silo on this silo's behalf.
+        /// </summary>
+        /// <remarks>
+        /// Part of <paramref name="timeout"/> is reserved for the intermediary's response to reach this silo. If the intermediary
+        /// waited for all of <paramref name="timeout"/>, its response for an unresponsive target would race this silo's own timeout
+        /// and usually lose, so the probe would complete as <see cref="ProbeResultStatus.Unknown"/> instead of failing.
+        /// </remarks>
+        internal static TimeSpan CalculateIndirectProbeTargetTimeout(TimeSpan timeout, int localDegradationScore)
+        {
+            if (timeout <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(timeout), timeout, "The timeout must be positive.");
+            }
+
+            if (localDegradationScore < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(localDegradationScore), localDegradationScore, "The local health degradation score must not be negative.");
+            }
+
+            var extensionFactor = 1 + localDegradationScore;
+            var responseAllowanceTicks = Math.Max(1, timeout.Ticks / (extensionFactor + 1));
+            return TimeSpan.FromTicks(timeout.Ticks - responseAllowanceTicks);
         }
 
         /// <summary>
