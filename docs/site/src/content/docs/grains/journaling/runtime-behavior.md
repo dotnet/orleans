@@ -136,6 +136,26 @@ Standalone callers own that cleanup explicitly. A previously captured write reta
 outcome and acknowledgement bookkeeping. Owner-canceled initial recovery and idle shutdown complete
 through normal shutdown; admitted write/delete storage cancellation remains terminal.
 
+### Durable Jobs shard retirement
+
+When a shard runner terminates, including after an unexpected executor failure, the local Durable Jobs
+manager withdraws its writable and cached references and retains responsibility for cleanup until
+disposal finishes. Journaled shard retirement closes mutation admission and waits for previously
+accepted operations at a queued completion barrier. Ownership cleanup then samples the drained job
+count, releases populated shards for discovery, and deletes empty shard journals.
+
+Scheduling calls which retained a retiring instance retry against a writable replacement. Queued jobs
+acknowledged before retirement remain in the journal and recover through a fresh canonical
+instance on discovery. Discovery retains distinct replacement instances while an old runner finishes
+cleanup. Canonical lookups skip retiring instances, and local publication and activation check the
+instance lifetime again when delayed creation or discovery results arrive. A later sweep opens a fresh
+instance after eviction. Cleanup removes tracking entries by instance identity.
+
+Cleanup failures are logged, and an unexpected executor failure remains the runner's failure. A prior
+journal I/O failure fences deletion, preserving the persisted journal for recovery in a fresh instance.
+Failed closure or ownership cleanup also evicts and disposes the retired local instance. Investigate
+the logged storage or metadata failure and allow a fresh discovery sweep to recover persisted work.
+
 ## Compaction
 
 Each provider reports when its journal crosses a configured storage threshold. The next `WriteStateAsync`:

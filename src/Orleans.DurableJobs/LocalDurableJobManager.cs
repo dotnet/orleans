@@ -147,6 +147,10 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     // Create new shard
                     var endTime = shardKey.StartTime.Add(_options.ShardDuration);
                     var newShard = await _shardManager.CreateShardAsync(shardKey.StartTime, endTime, CreateShardMetadata(shardKey), schedulingToken);
+                    if (IsRetiredShard(newShard))
+                    {
+                        continue;
+                    }
 
                     LogCreatingNewShard(_logger, shardKey.StartTime, shardKey.Stripe);
                     // Own successful creations even if cancellation raced with the provider returning.
@@ -247,7 +251,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         CancelForShutdown(_requestCts, "requests");
         // Drain requests and activation publication before taking the execution snapshot.
         await admissionDrained;
-        var runningShards = _runningShards.Values.Select(entry => entry.Task).ToArray();
+        var runningShards = _runningShards.Values.Select(static entry => entry.Task).ToArray();
         CancelForShutdown(_cts, "execution");
 
         try
@@ -514,6 +518,13 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var assignedCount = 0;
         await foreach (var shard in _shardManager.DiscoverJobShardsAsync(maxDueTime, budget, cancellationToken))
         {
+            // A result can outlive its runner while discovery is awaiting its next yield.
+            if (IsRetiredShard(shard))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                continue;
+            }
+
             // Running tasks own their exact shard instance through cleanup, including after cache withdrawal.
             if ((!_runningShards.TryGetValue(shard.Id, out var running) || !ReferenceEquals(running.Shard, shard))
                 && _shardCache.TryAdd(shard.Id, shard))
@@ -607,6 +618,13 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private void TryActivateShard(IJobShard shard)
     {
+        if (IsRetiredShard(shard))
+        {
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
+            return;
+        }
+
         var shardId = shard.Id;
         // Only start if not already running
         if (_runningShards.ContainsKey(shardId))
@@ -628,8 +646,19 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
 
         var workItem = new AsyncClosureWorkItem(() => RunShardWithCleanupAsync(shard), this);
-        if (!_runningShards.TryAdd(shardId, new RunningShard(shard, workItem.Task)))
+        var running = new RunningShard(shard, workItem.Task);
+        if (!_runningShards.TryAdd(shardId, running))
         {
+            return;
+        }
+
+        // A previous runner can finish retirement between the lifetime check and registration.
+        if (IsRetiredShard(shard))
+        {
+            var entry = new KeyValuePair<string, RunningShard>(shardId, running);
+            ((ICollection<KeyValuePair<string, RunningShard>>)_runningShards).Remove(entry);
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
             return;
         }
 
@@ -640,6 +669,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private async Task RunShardWithCleanupAsync(IJobShard shard)
     {
+        var running = _runningShards[shard.Id];
         try
         {
             try
@@ -650,12 +680,12 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             {
                 // Execution cancellation leaves ownership cleanup with this runner.
             }
-            finally
-            {
-                // Unregistering can dispose the shard. Withdraw its references before releasing ownership.
-                TryRemoveWritableShard(shard);
-                TryRemoveCachedShard(shard);
-            }
+        }
+        finally
+        {
+            // Unregistering can dispose the shard. Withdraw its references before releasing ownership.
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
 
             // Cleanup is canceled by the shutdown deadline, independently of execution.
             try
@@ -667,12 +697,14 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             {
                 LogErrorUnregisteringShard(_logger, ex, shard.Id);
             }
-        }
-        finally
-        {
+
             await DisposeShardAsync(shard);
 
-            _runningShards.TryRemove(shard.Id, out _);
+            // Scheduling can publish a retained creation result during cleanup.
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
+            var runningEntry = new KeyValuePair<string, RunningShard>(shard.Id, running);
+            ((ICollection<KeyValuePair<string, RunningShard>>)_runningShards).Remove(runningEntry);
         }
     }
 
@@ -696,6 +728,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private bool IsWritableShard(WritableShardKey shardKey, IJobShard shard)
         => _writeableShards.TryGetValue(shardKey, out var existingShard) && ReferenceEquals(existingShard, shard);
+
+    private static bool IsRetiredShard(IJobShard shard) => shard is JournaledJobShard { IsRetired: true };
 
     private bool IsCachedShard(IJobShard shard)
         => _shardCache.TryGetValue(shard.Id, out var existingShard) && ReferenceEquals(existingShard, shard);
@@ -770,6 +804,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         }
 
         public bool HasCachedShard(string shardId) => manager._shardCache.ContainsKey(shardId);
+
+        public bool TryGetCachedShard(string shardId, out IJobShard? shard) => manager._shardCache.TryGetValue(shardId, out shard);
     }
 
     private WritableShardKey GetWritableShardKey(ScheduleJobRequest request)

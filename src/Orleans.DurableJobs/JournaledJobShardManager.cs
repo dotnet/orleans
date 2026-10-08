@@ -226,6 +226,11 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
         cancellationToken.ThrowIfCancellationRequested();
         if (descriptor.Owner is { } owner && owner.Equals(SiloAddress))
         {
+            if (cachedShard is { IsRetired: true })
+            {
+                return default;
+            }
+
             if (!ReferenceEquals(provider, WriteProvider) && !descriptor.Closed)
             {
                 var updated = await UpdateMetadataAsync(
@@ -241,7 +246,8 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
                 descriptor = ShardCatalogProperties.From(provider, entry.Id, updated)!;
             }
 
-            return (cachedShard ?? await GetOrOpenShardAsync(descriptor, cancellationToken), false);
+            var shard = cachedShard ?? await GetOrOpenShardAsync(descriptor, cancellationToken);
+            return (shard is { IsRetired: false } ? shard : null, false);
         }
 
         var isAdopted = false;
@@ -291,7 +297,10 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
                 throw new InvalidOperationException($"Created DurableJobs shard '{shardId}' without readable journal storage properties.");
             }
 
-            return await GetOrOpenShardAsync(descriptor, cancellationToken, isNew: true);
+            if (await GetOrOpenShardAsync(descriptor, cancellationToken, isNew: true) is { } shard)
+            {
+                return shard;
+            }
         }
     }
 
@@ -302,6 +311,14 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
 
         try
         {
+            if (!_jobShardCache.TryGetValue(shard.Id, out var canonical) || !ReferenceEquals(canonical, journaledShard))
+            {
+                throw new InvalidOperationException($"Cannot unregister DurableJobs shard '{shard.Id}' because it is not the current local instance.");
+            }
+
+            // The queue barrier drains accepted mutations; stale references reject new mutations.
+            await journaledShard.RetireAsync(cancellationToken);
+
             var descriptor = await GetDescriptorAsync(journaledShard.Provider, journaledShard.StorageId, cancellationToken)
                 ?? throw new InvalidOperationException($"Cannot unregister DurableJobs shard '{shard.Id}' because its catalog properties were not found.");
 
@@ -337,9 +354,18 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
         }
         finally
         {
-            _jobShardCache.TryRemove(shard.Id, out _);
-            _ownedShards.TryRemove(shard.Id, out _);
-            await journaledShard.DisposeAsync();
+            try
+            {
+                await journaledShard.DisposeAsync();
+            }
+            finally
+            {
+                var entry = new KeyValuePair<string, JournaledJobShard>(shard.Id, journaledShard);
+                if (((ICollection<KeyValuePair<string, JournaledJobShard>>)_jobShardCache).Remove(entry))
+                {
+                    _ownedShards.TryRemove(shard.Id, out _);
+                }
+            }
         }
     }
 
@@ -498,19 +524,19 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
             cancellationToken);
     }
 
-    private async ValueTask<JournaledJobShard> GetOrOpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken, bool isNew = false)
+    private async ValueTask<JournaledJobShard?> GetOrOpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken, bool isNew = false)
     {
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (_jobShardCache.TryGetValue(descriptor.ShardId.Value, out var existing))
             {
-                return existing;
+                return existing.IsRetired ? null : existing;
             }
 
             var candidate = new ShardOpen(
                 cancellationToken,
-                new Lazy<Task<JournaledJobShard>>(() => OpenAndCacheShardAsync(descriptor, cancellationToken, isNew)));
+                new Lazy<Task<JournaledJobShard?>>(() => OpenAndCacheShardAsync(descriptor, cancellationToken, isNew)));
             var opening = _openingShards.GetOrAdd(descriptor.ShardId.Value, candidate);
             var task = opening.Task.Value;
             if (!ReferenceEquals(opening, candidate))
@@ -520,7 +546,8 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
 
             try
             {
-                return await task.WaitAsync(cancellationToken);
+                var shard = await task.WaitAsync(cancellationToken);
+                return shard is { IsRetired: false } ? shard : null;
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested
                 && opening.InitiatingCancellation.IsCancellationRequested && task.IsCanceled)
@@ -530,15 +557,15 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
         }
     }
 
-    private sealed record ShardOpen(CancellationToken InitiatingCancellation, Lazy<Task<JournaledJobShard>> Task);
+    private sealed record ShardOpen(CancellationToken InitiatingCancellation, Lazy<Task<JournaledJobShard?>> Task);
 
-    private async Task<JournaledJobShard> OpenAndCacheShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken, bool isNew)
+    private async Task<JournaledJobShard?> OpenAndCacheShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken, bool isNew)
     {
         try
         {
             if (_jobShardCache.TryGetValue(descriptor.ShardId.Value, out var existing))
             {
-                return existing;
+                return existing.IsRetired ? null : existing;
             }
 
             var shard = await OpenShardAsync(descriptor, cancellationToken, isNew);
