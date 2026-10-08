@@ -2288,7 +2288,7 @@ public class DemoClass
             frameworkSymbol.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
                 .Select(static source => (source.HintName, Source: source.SourceText.ToString())));
         var source = ConcatenateGeneratedSources(managed);
-        Assert.Contains("IInvokable.InvokeAndCopy", source);
+        Assert.Contains("IInvokable.Invoke(", source);
         Assert.Contains("IRawResponseWriter", source);
         Assert.Contains("AddRawResponseReader", source);
         Assert.DoesNotContain("#if NET5_0_OR_GREATER", source);
@@ -3668,16 +3668,27 @@ public class DemoClass
         Assert.Contains("ResponsePool.GetGenerated<", response);
         Assert.Contains("_factory = null", response);
         Assert.Contains("options.AddRawResponseReader<int>", response);
-        Assert.Contains("IInvokable.InvokeAndCopy", proxy);
+        Assert.Contains("IInvokable.Invoke(", proxy);
+        Assert.DoesNotContain("InvokeAndCopy", proxy);
+        Assert.Contains("InvocationContext context", proxy);
+        Assert.Contains("if (resultTask.IsCompleted)", proxy);
+        Assert.Contains("resultTask.GetAwaiter().GetResult()", proxy);
         Assert.Contains("factory.RentCopied(value, contexts)", proxy);
-        Assert.Contains("var original = await Invoke();", proxy);
-        Assert.Contains("OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier)", proxy);
+        Assert.Contains("context.InvokeCompatibility(this)", proxy);
+        Assert.DoesNotContain("CopyResponseAndDispose", proxy);
         Assert.DoesNotContain("MakeGenericType", response);
         var holders = CSharpSyntaxTree.ParseText(response, cancellationToken: TestContext.Current.CancellationToken)
             .GetCompilationUnitRoot(TestContext.Current.CancellationToken).DescendantNodes()
             .OfType<ClassDeclarationSyntax>().Where(static type => type.BaseList?.ToString().Contains("IRawResponseWriter", StringComparison.Ordinal) == true).ToArray();
         var holder = Assert.Single(holders);
         Assert.Null(holder.TypeParameterList);
+        var invocation = CSharpSyntaxTree.ParseText(proxy, cancellationToken: TestContext.Current.CancellationToken)
+            .GetCompilationUnitRoot(TestContext.Current.CancellationToken).DescendantNodes()
+            .OfType<MethodDeclarationSyntax>().Single(static method => method.ExplicitInterfaceSpecifier is not null
+                && method.Identifier.ValueText == "Invoke");
+        Assert.DoesNotContain(invocation.Modifiers, static modifier => modifier.IsKind(SyntaxKind.AsyncKeyword));
+        Assert.Equal(1, invocation.DescendantNodes().OfType<InvocationExpressionSyntax>().Count(
+            static expression => expression.Expression is IdentifierNameSyntax { Identifier.ValueText: "InvokeInner" }));
         var factory = CSharpSyntaxTree.ParseText(response, cancellationToken: TestContext.Current.CancellationToken)
             .GetCompilationUnitRoot(TestContext.Current.CancellationToken).DescendantNodes()
             .OfType<ClassDeclarationSyntax>().Single(static type => type.Identifier.ValueText.EndsWith("Factory", StringComparison.Ordinal));
@@ -3715,7 +3726,7 @@ public class DemoClass
         var result = RunSourceGenerator(compilation);
         Assert.Empty(result.Diagnostics);
         var proxy = Assert.Single(result.GeneratedSources, static item => item.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal)).SourceText.ToString();
-        Assert.DoesNotContain("IInvokable.InvokeAndCopy", proxy);
+        Assert.DoesNotContain("InvocationContext context", proxy);
     }
 
     private static GeneratorRunResult RunSourceGenerator(

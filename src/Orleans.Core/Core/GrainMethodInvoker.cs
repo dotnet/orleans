@@ -4,10 +4,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
-using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
-using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Serializers;
 
 namespace Orleans.Runtime
 {
@@ -19,10 +16,8 @@ namespace Orleans.Runtime
         private readonly Message message;
         private readonly List<IIncomingGrainCallFilter> filters;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
-        private readonly DeepCopier<Response> responseCopier;
         private readonly IGrainContext grainContext;
-        private readonly ICodecProvider codecProvider;
-        private readonly CopyContextPool copyContexts;
+        private readonly InvocationContext invocationContext;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainMethodInvoker"/> class.
@@ -32,26 +27,20 @@ namespace Orleans.Runtime
         /// <param name="request">The request.</param>
         /// <param name="filters">The invocation interceptors.</param>
         /// <param name="interfaceToImplementationMapping">The implementation map.</param>
-        /// <param name="responseCopier">The response copier.</param>
-        /// <param name="codecProvider">The provider for generated response dependencies.</param>
-        /// <param name="copyContexts">The pool for isolating source-known invocation results.</param>
+        /// <param name="invocationContext">The provider-owned services used to isolate invocation results.</param>
         public GrainMethodInvoker(
             Message message,
             IGrainContext grainContext,
             IInvokable request,
             List<IIncomingGrainCallFilter> filters,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
-            DeepCopier<Response> responseCopier,
-            ICodecProvider codecProvider,
-            CopyContextPool copyContexts) : base(request)
+            InvocationContext invocationContext) : base(request)
         {
             this.message = message;
             this.grainContext = grainContext;
             this.filters = filters;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
-            this.responseCopier = responseCopier;
-            this.codecProvider = codecProvider;
-            this.copyContexts = copyContexts;
+            this.invocationContext = invocationContext;
         }
 
         public override object Grain => grainContext.GrainInstance!;
@@ -87,7 +76,7 @@ namespace Orleans.Runtime
 
         protected override async Task InvokeInner()
         {
-            Response = await Request.InvokeAndCopy(codecProvider, copyContexts, responseCopier);
+            Response = await Request.Invoke(invocationContext);
             if (Response.Exception is { } exception)
                 ExceptionDispatchInfo.Capture(exception).Throw();
         }

@@ -3124,7 +3124,7 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableData> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
@@ -3160,7 +3160,7 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableData> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3203,7 +3203,7 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3245,7 +3245,7 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3317,7 +3317,7 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableData> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3531,7 +3531,7 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<global::Orleans.MembershipTableData> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3566,7 +3566,7 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -3670,7 +3670,7 @@ namespace OrleansCodeGen.Orleans
 
         protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -4297,7 +4297,7 @@ namespace OrleansCodeGen.Orleans.Placement.Rebalancing
 
         protected override System.Threading.Tasks.ValueTask<global::Orleans.Placement.Rebalancing.RebalancingReport> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -6018,7 +6018,7 @@ namespace OrleansCodeGen.Orleans.Runtime
 
         protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -6370,7 +6370,7 @@ namespace OrleansCodeGen.Orleans.Runtime
 
         protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -6408,7 +6408,7 @@ namespace OrleansCodeGen.Orleans.Runtime
 
         protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
@@ -6543,7 +6543,7 @@ namespace OrleansCodeGen.Orleans.Runtime
 
         protected override System.Threading.Tasks.Task<int> InvokeInner() { throw null; }
 
-        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier) { throw null; }
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }

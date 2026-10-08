@@ -30,20 +30,29 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Guid> InvokeInner() => _target.GetGuidValue();
-        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context)
         {
             try
             {
-                var factory = global::OrleansCodeGen.TestProject.RpcResponse_5C3A711CFactory.Resolve(provider);
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_5C3A711CFactory.Resolve(context.CodecProvider);
                 if (!factory.IsSupported)
-                {
-                    var original = await Invoke();
-                    if (original.Exception is not null)
-                        return original;
-                    return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
-                }
+                    return context.InvokeCompatibility(this);
+                var resultTask = InvokeInner();
+                if (resultTask.IsCompleted)
+                    return new(factory.RentCopied(resultTask.GetAwaiter().GetResult(), context.CopyContextPool));
+                return CompleteInvokeAsync(resultTask, factory, context.CopyContextPool);
+            }
+            catch (global::System.Exception exception)
+            {
+                return new(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
 
-                global::System.Guid value = await InvokeInner();
+        private static async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> CompleteInvokeAsync(global::System.Threading.Tasks.Task<global::System.Guid> resultTask, global::OrleansCodeGen.TestProject.RpcResponse_5C3A711CFactory factory, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            try
+            {
+                global::System.Guid value = await resultTask;
                 return factory.RentCopied(value, contexts);
             }
             catch (global::System.Exception exception)
@@ -86,20 +95,29 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.GetStringKey();
-        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context)
         {
             try
             {
-                var factory = global::OrleansCodeGen.TestProject.RpcResponse_9146C7E3Factory.Resolve(provider);
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_9146C7E3Factory.Resolve(context.CodecProvider);
                 if (!factory.IsSupported)
-                {
-                    var original = await Invoke();
-                    if (original.Exception is not null)
-                        return original;
-                    return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
-                }
+                    return context.InvokeCompatibility(this);
+                var resultTask = InvokeInner();
+                if (resultTask.IsCompleted)
+                    return new(factory.RentCopied(resultTask.GetAwaiter().GetResult(), context.CopyContextPool));
+                return CompleteInvokeAsync(resultTask, factory, context.CopyContextPool);
+            }
+            catch (global::System.Exception exception)
+            {
+                return new(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
 
-                string value = await InvokeInner();
+        private static async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> CompleteInvokeAsync(global::System.Threading.Tasks.Task<string> resultTask, global::OrleansCodeGen.TestProject.RpcResponse_9146C7E3Factory factory, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            try
+            {
+                string value = await resultTask;
                 return factory.RentCopied(value, contexts);
             }
             catch (global::System.Exception exception)
@@ -142,20 +160,29 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Tuple<global::System.Guid, string>> InvokeInner() => _target.GetGuidAndStringKey();
-        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context)
         {
             try
             {
-                var factory = global::OrleansCodeGen.TestProject.RpcResponse_6A3EE8F4Factory.Resolve(provider);
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_6A3EE8F4Factory.Resolve(context.CodecProvider);
                 if (!factory.IsSupported)
-                {
-                    var original = await Invoke();
-                    if (original.Exception is not null)
-                        return original;
-                    return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
-                }
+                    return context.InvokeCompatibility(this);
+                var resultTask = InvokeInner();
+                if (resultTask.IsCompleted)
+                    return new(factory.RentCopied(resultTask.GetAwaiter().GetResult(), context.CopyContextPool));
+                return CompleteInvokeAsync(resultTask, factory, context.CopyContextPool);
+            }
+            catch (global::System.Exception exception)
+            {
+                return new(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
 
-                global::System.Tuple<global::System.Guid, string> value = await InvokeInner();
+        private static async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> CompleteInvokeAsync(global::System.Threading.Tasks.Task<global::System.Tuple<global::System.Guid, string>> resultTask, global::OrleansCodeGen.TestProject.RpcResponse_6A3EE8F4Factory factory, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            try
+            {
+                global::System.Tuple<global::System.Guid, string> value = await resultTask;
                 return factory.RentCopied(value, contexts);
             }
             catch (global::System.Exception exception)
@@ -198,20 +225,29 @@ namespace OrleansCodeGen.TestProject
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Tuple<long, string>> InvokeInner() => _target.GetIntegerAndStringKey();
-        async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(global::Orleans.Serialization.Serializers.ICodecProvider provider, global::Orleans.Serialization.Cloning.CopyContextPool contexts, global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+        global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context)
         {
             try
             {
-                var factory = global::OrleansCodeGen.TestProject.RpcResponse_AFB713E4Factory.Resolve(provider);
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_AFB713E4Factory.Resolve(context.CodecProvider);
                 if (!factory.IsSupported)
-                {
-                    var original = await Invoke();
-                    if (original.Exception is not null)
-                        return original;
-                    return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
-                }
+                    return context.InvokeCompatibility(this);
+                var resultTask = InvokeInner();
+                if (resultTask.IsCompleted)
+                    return new(factory.RentCopied(resultTask.GetAwaiter().GetResult(), context.CopyContextPool));
+                return CompleteInvokeAsync(resultTask, factory, context.CopyContextPool);
+            }
+            catch (global::System.Exception exception)
+            {
+                return new(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
 
-                global::System.Tuple<long, string> value = await InvokeInner();
+        private static async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> CompleteInvokeAsync(global::System.Threading.Tasks.Task<global::System.Tuple<long, string>> resultTask, global::OrleansCodeGen.TestProject.RpcResponse_AFB713E4Factory factory, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            try
+            {
+                global::System.Tuple<long, string> value = await resultTask;
                 return factory.RentCopied(value, contexts);
             }
             catch (global::System.Exception exception)

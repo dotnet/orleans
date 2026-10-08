@@ -3609,10 +3609,23 @@ namespace Orleans.Serialization.Invocation
         string GetMethodName();
         object? GetTarget();
         System.Threading.Tasks.ValueTask<Response> Invoke();
-        System.Threading.Tasks.ValueTask<Response> InvokeAndCopy(Serializers.ICodecProvider codecProvider, Cloning.CopyContextPool copyContextPool, DeepCopier<Response> responseCopier);
+        System.Threading.Tasks.ValueTask<Response> Invoke(InvocationContext context);
         void SetArgument(int index, object value);
         void SetTarget(ITargetHolder holder);
         bool TryCancel();
+    }
+
+    public sealed partial class InvocationContext
+    {
+        public InvocationContext(Serializers.ICodecProvider codecProvider, Cloning.CopyContextPool copyContextPool, DeepCopier<Response> responseCopier) { }
+
+        public Serializers.ICodecProvider CodecProvider { get { throw null; } }
+
+        public Cloning.CopyContextPool CopyContextPool { get { throw null; } }
+
+        public DeepCopier<Response> ResponseCopier { get { throw null; } }
+
+        public System.Threading.Tasks.ValueTask<Response> InvokeCompatibility(IInvokable request) { throw null; }
     }
 
     public static partial class InvokablePool

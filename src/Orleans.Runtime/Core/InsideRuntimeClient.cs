@@ -16,9 +16,9 @@ using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
-using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
@@ -54,9 +54,7 @@ namespace Orleans.Runtime
         private IGrainReferenceRuntime grainReferenceRuntime = null!;
         private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
-        private readonly DeepCopier<Response> responseCopier;
-        private readonly ICodecProvider responseCodecProvider;
-        private readonly CopyContextPool responseCopyContexts;
+        private readonly InvocationContext invocationContext;
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
@@ -87,9 +85,10 @@ namespace Orleans.Runtime
             this.loggerFactory = loggerFactory;
             this.messagingOptions = messagingOptions.Value;
             this.messagingTrace = messagingTrace;
-            this.responseCopier = deepCopier.GetCopier<Response>();
-            this.responseCodecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
-            this.responseCopyContexts = serviceProvider.GetRequiredService<CopyContextPool>();
+            this.invocationContext = new(
+                serviceProvider.GetRequiredService<ICodecProvider>(),
+                serviceProvider.GetRequiredService<CopyContextPool>(),
+                deepCopier.GetCopier<Response>());
             var period = Max(TimeSpan.FromMilliseconds(1), Min(this.messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
@@ -325,14 +324,13 @@ namespace Orleans.Runtime
                                 if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
                                 {
                                     using var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping,
-                                        this.responseCopier, this.responseCodecProvider, this.responseCopyContexts);
+                                        this.invocationContext);
                                     await invoker.Invoke();
                                     response = invoker.TakeResponse();
                                 }
                                 else
                                 {
-                                    response = await invokable.InvokeAndCopy(
-                                        this.responseCodecProvider, this.responseCopyContexts, this.responseCopier);
+                                    response = await invokable.Invoke(this.invocationContext);
                                     isCopied = response.Exception is null;
                                 }
 

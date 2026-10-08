@@ -204,7 +204,7 @@ public sealed class SelfWritingResponseFilterTests
         };
         return new GrainMethodInvoker(
             message, grainContext, request, [filter], new InterfaceToImplementationMappingCache(),
-            responseCopier, codecProvider, copyContexts);
+            new InvocationContext(codecProvider, copyContexts, responseCopier));
     }
 
     private sealed class CallbackFilter(Func<IIncomingGrainCallContext, Task> callback) : IIncomingGrainCallFilter
@@ -251,13 +251,12 @@ public sealed class SelfWritingResponseFilterTests
             throw new InvalidOperationException("Direct invocations must not use the legacy Invoke path.");
         }
 
-        public ValueTask<Response> InvokeAndCopy(
-            ICodecProvider codecProvider, CopyContextPool copyContextPool, DeepCopier<Response> responseCopier)
+        public ValueTask<Response> Invoke(InvocationContext context)
         {
             DirectCalls++;
-            CodecProvider = codecProvider;
-            CopyContexts = copyContextPool;
-            ResponseCopier = responseCopier;
+            CodecProvider = context.CodecProvider;
+            CopyContexts = context.CopyContextPool;
+            ResponseCopier = context.ResponseCopier;
             if (failure is not null)
             {
                 ReturnedResponse = Response.FromException(failure);

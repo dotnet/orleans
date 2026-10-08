@@ -1,8 +1,8 @@
-using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator;
@@ -160,25 +160,38 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                 result.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), out var responseName))
         {
             var type = result.TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var returnType = method.Method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             var factory = $"global::{RpcResponseHolderGenerator.GetNamespace(_generationContext.Compilation)}.{responseName}Factory";
             classDeclaration = classDeclaration.AddBaseListTypes(SimpleBaseType(ParseTypeName("global::Orleans.Serialization.Invocation.IInvokable")));
             classDeclaration = classDeclaration.AddMembers(ParseMemberDeclaration($$"""
-                async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>
-                    global::Orleans.Serialization.Invocation.IInvokable.InvokeAndCopy(
-                        global::Orleans.Serialization.Serializers.ICodecProvider provider,
-                        global::Orleans.Serialization.Cloning.CopyContextPool contexts,
-                        global::Orleans.Serialization.DeepCopier<global::Orleans.Serialization.Invocation.Response> responseCopier)
+                global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>
+                    global::Orleans.Serialization.Invocation.IInvokable.Invoke(
+                        global::Orleans.Serialization.Invocation.InvocationContext context)
                 {
                     try
                     {
-                        var factory = {{factory}}.Resolve(provider);
+                        var factory = {{factory}}.Resolve(context.CodecProvider);
                         if (!factory.IsSupported)
-                        {
-                            var original = await Invoke();
-                            if (original.Exception is not null) return original;
-                            return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CopyResponseAndDispose(original, responseCopier);
-                        }
-                        {{type}} value = await InvokeInner();
+                            return context.InvokeCompatibility(this);
+                        var resultTask = InvokeInner();
+                        if (resultTask.IsCompleted)
+                            return new(factory.RentCopied(resultTask.GetAwaiter().GetResult(), context.CopyContextPool));
+                        return CompleteInvokeAsync(resultTask, factory, context.CopyContextPool);
+                    }
+                    catch (global::System.Exception exception)
+                    {
+                        return new(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+                    }
+                }
+                """)!,
+                ParseMemberDeclaration($$"""
+                private static async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response>
+                    CompleteInvokeAsync({{returnType}} resultTask, {{factory}} factory,
+                        global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+                {
+                    try
+                    {
+                        {{type}} value = await resultTask;
                         return factory.RentCopied(value, contexts);
                     }
                     catch (global::System.Exception exception)

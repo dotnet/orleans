@@ -93,8 +93,9 @@ public sealed class RpcResponseHolderNamingTests
         using var secondRequest = requests[1];
         firstRequest.SetTarget(new TargetHolder(target!));
         secondRequest.SetTarget(new TargetHolder(target!));
-        using var first = await firstRequest.InvokeAndCopy(provider, contexts, copier);
-        using var second = await secondRequest.InvokeAndCopy(provider, contexts, copier);
+        var invocationContext = new InvocationContext(provider, contexts, copier);
+        using var first = await firstRequest.Invoke(invocationContext);
+        using var second = await secondRequest.Invoke(invocationContext);
         Assert.IsAssignableFrom<IRawResponseWriter>(first);
         Assert.IsAssignableFrom<IRawResponseWriter>(second);
         Assert.NotEqual(first.GetType(), second.GetType());

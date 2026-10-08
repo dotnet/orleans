@@ -54,7 +54,7 @@ public sealed class SelfWritingResponseOwnershipTests
         if (behavior == "Throw")
         {
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await ((IInvokable)request).InvokeAndCopy(provider, contexts, copier));
+                await ((IInvokable)request).Invoke(new InvocationContext(provider, contexts, copier)));
             Assert.Same(counts.CopyFailure, exception);
             Assert.Equal(1, counts.Rents);
             Assert.Equal(1, counts.Returns);
@@ -62,7 +62,7 @@ public sealed class SelfWritingResponseOwnershipTests
         }
         else
         {
-            var response = await ((IInvokable)request).InvokeAndCopy(provider, contexts, copier);
+            var response = await ((IInvokable)request).Invoke(new InvocationContext(provider, contexts, copier));
             Assert.Equal(1, counts.ResponseCopies);
             Assert.Equal(behavior == "Same" ? 0 : 1, counts.PayloadCopies);
             Assert.Equal(behavior == "Same" ? 0 : 1, counts.Returns);
@@ -794,11 +794,11 @@ public sealed class SelfWritingResponseOwnershipTests
 
     private sealed class DirectRequest(Payload payload, Counts counts) : LegacyRequest(payload, counts), IInvokable
     {
-        public override ValueTask<Response> Invoke() => throw new InvalidOperationException("The direct request uses InvokeAndCopy.");
+        public override ValueTask<Response> Invoke() => throw new InvalidOperationException("The direct request uses the contextual invocation contract.");
 
-        public ValueTask<Response> InvokeAndCopy(ICodecProvider provider, CopyContextPool contexts, DeepCopier<Response> responseCopier)
+        public ValueTask<Response> Invoke(InvocationContext context)
         {
-            ReturnedResponse = CountedResponse.Rent(Counters.Copy(Payload), Counters, provider.GetCodec<Payload>());
+            ReturnedResponse = CountedResponse.Rent(Counters.Copy(Payload), Counters, context.CodecProvider.GetCodec<Payload>());
             AfterInvocation?.Invoke();
             return ValueTask.FromResult(ReturnedResponse);
         }
@@ -813,7 +813,7 @@ public sealed class SelfWritingResponseOwnershipTests
     private sealed class DirectExceptionRequest(Exception failure, Counts counts) : ExceptionRequest(failure, counts), IInvokable
     {
         public override ValueTask<Response> Invoke() => throw new InvalidOperationException("Use the isolated invocation contract.");
-        public ValueTask<Response> InvokeAndCopy(ICodecProvider provider, CopyContextPool contexts, DeepCopier<Response> copier)
+        public ValueTask<Response> Invoke(InvocationContext context)
             => ValueTask.FromResult(Response.FromException(Failure));
     }
 

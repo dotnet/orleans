@@ -53,6 +53,8 @@ public static class RpcResponseContracts
         using var services = CreateServices();
         var provider = services.GetRequiredService<CodecProvider>();
         var contexts = services.GetRequiredService<CopyContextPool>();
+        var invocationContext = new InvocationContext(provider, contexts,
+            new DeepCopier<Response>(provider.GetDeepCopier<Response>(), contexts));
         var target = new SelfWritingTarget();
         IRpcSelfWriting proxy = new global::OrleansCodeGen.Orleans.NativeAotSmoke.Proxy_IRpcSelfWriting(provider, contexts);
         _ = proxy.Boolean();
@@ -62,8 +64,7 @@ public static class RpcResponseContracts
         _ = proxy.Payload();
         using var request = ((RpcTupleProxyBase)proxy).Captured!;
         request.SetTarget(target);
-        using var response = await request.InvokeAndCopy(provider, contexts,
-            new DeepCopier<Response>(provider.GetDeepCopier<Response>(), contexts));
+        using var response = await request.Invoke(invocationContext);
         Ensure(response is IRawResponseWriter && !response.GetType().IsGenericType,
             "The actual generated invokable creates a non-generic self-writing holder.");
         var value = response.GetResult<RpcResponsePayload>();
@@ -84,12 +85,39 @@ public static class RpcResponseContracts
         var decoded = reconstructed.GetResult<RpcResponsePayload>();
         Ensure(decoded is not null && ReferenceEquals(decoded, decoded.Left), "The static reader reconstructs the self-writing cyclic holder.");
 
+        var booleanCompletion = new System.Threading.Tasks.TaskCompletionSource<bool>();
+        target.BooleanResult = booleanCompletion.Task;
+        _ = proxy.Boolean();
+        using (var pendingRequest = ((RpcTupleProxyBase)proxy).Captured!)
+        {
+            pendingRequest.SetTarget(target);
+            var invocation = pendingRequest.Invoke(invocationContext);
+            Ensure(!invocation.IsCompleted, "Pending tasks use asynchronous generated completion.");
+            booleanCompletion.SetResult(true);
+            using var result = await invocation;
+            Ensure(result is IRawResponseWriter && result.GetResult<bool>(), "Asynchronous task completion produces a concrete holder.");
+        }
+
+        var integerCompletion = new System.Threading.Tasks.TaskCompletionSource<int>();
+        target.IntegerResult = new(integerCompletion.Task);
+        _ = proxy.Integer();
+        using (var pendingRequest = ((RpcTupleProxyBase)proxy).Captured!)
+        {
+            pendingRequest.SetTarget(target);
+            var invocation = pendingRequest.Invoke(invocationContext);
+            Ensure(!invocation.IsCompleted, "Pending value tasks use asynchronous generated completion.");
+            integerCompletion.SetResult(42);
+            using var result = await invocation;
+            Ensure(result is IRawResponseWriter && result.GetResult<int>() == 42, "Asynchronous value-task completion produces a concrete holder.");
+        }
+
         async System.Threading.Tasks.Task Check<T>(IInvokable invocation, T expected)
         {
             using var request = invocation;
             request.SetTarget(target);
-            using var result = await request.InvokeAndCopy(provider, contexts,
-                new DeepCopier<Response>(provider.GetDeepCopier<Response>(), contexts));
+            var pending = request.Invoke(invocationContext);
+            Ensure(pending.IsCompletedSuccessfully, "Completed task and value-task results use the generated synchronous path.");
+            using var result = await pending;
             Ensure(result is IRawResponseWriter && Equals(expected, result.GetResult<T>()), "Generated primitive responses bind direct writers.");
             var output = new ArrayBufferWriter<byte>();
             using (var session = services.GetRequiredService<SerializerSessionPool>().GetSession())
@@ -115,11 +143,13 @@ public static class RpcResponseContracts
     private sealed class SelfWritingTarget : IRpcSelfWriting, ITargetHolder
     {
         public RpcResponsePayload Result { get; } = new() { Value = 47 };
+        public System.Threading.Tasks.Task<bool> BooleanResult { get; set; } = System.Threading.Tasks.Task.FromResult(true);
+        public System.Threading.Tasks.ValueTask<int> IntegerResult { get; set; } = new(42);
         public SelfWritingTarget() => Result.Left = Result;
         public object GetTarget() => this;
         public object? GetComponent(Type type) => type.IsInstanceOfType(this) ? this : null;
-        public System.Threading.Tasks.Task<bool> Boolean() => System.Threading.Tasks.Task.FromResult(true);
-        public System.Threading.Tasks.ValueTask<int> Integer() => new(42);
+        public System.Threading.Tasks.Task<bool> Boolean() => BooleanResult;
+        public System.Threading.Tasks.ValueTask<int> Integer() => IntegerResult;
         public System.Threading.Tasks.Task<RpcResponsePayload> Payload() => System.Threading.Tasks.Task.FromResult(Result);
     }
 #endif

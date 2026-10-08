@@ -10,8 +10,10 @@ using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans
 {
@@ -24,7 +26,7 @@ namespace Orleans
         private readonly IRuntimeClient runtimeClient;
         private readonly ILogger logger;
         private readonly DeepCopier deepCopier;
-        private readonly DeepCopier<Response> _responseCopier;
+        private readonly InvocationContext _invocationContext;
         private readonly MessagingTrace messagingTrace;
         private readonly AdmissionGate _invocations = new();
         private readonly AdmissionGate _cancellations = new();
@@ -46,7 +48,10 @@ namespace Orleans
             this.runtimeClient = runtimeClient;
             this.deepCopier = deepCopier;
             this.messagingTrace = messagingTrace;
-            _responseCopier = responseCopier;
+            _invocationContext = new(
+                runtimeClient.ServiceProvider.GetRequiredService<ICodecProvider>(),
+                runtimeClient.ServiceProvider.GetRequiredService<CopyContextPool>(),
+                responseCopier);
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.logger = logger;
         }
@@ -388,8 +393,7 @@ namespace Orleans
                         if (filters is { Count: > 0 } || LocalObject is IIncomingGrainCallFilter)
                         {
                             using var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping,
-                                _manager._responseCopier, _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializers.ICodecProvider>(),
-                                _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
+                                _manager._invocationContext);
                             await invoker.Invoke();
                             response = invoker.TakeResponse();
                             // Filters can introduce grain-owned references anywhere in the result graph.
@@ -397,9 +401,7 @@ namespace Orleans
                         }
                         else
                         {
-                            response = await request.InvokeAndCopy(
-                                _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializers.ICodecProvider>(),
-                                _manager.runtimeClient.ServiceProvider.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>(), _manager._responseCopier);
+                            response = await request.Invoke(_manager._invocationContext);
                             isCopied = response.Exception is null;
                         }
 

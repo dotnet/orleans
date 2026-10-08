@@ -31,7 +31,16 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static Response CopyResponseAndDispose(Response response, DeepCopier<Response> copier)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(copier);
-            return CopyResponseAndDispose(response, copier, static (value, service) => service.Copy(value)!);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(response);
+            Response? copy = null;
+            try
+            {
+                return copy = copier.Copy(response)!;
+            }
+            finally
+            {
+                ReleaseSupersededResponse(response, copy);
+            }
         }
 
         /// <summary>
@@ -43,21 +52,21 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static Response CopyResponseAndDispose(Response response, DeepCopier copier)
         {
             ArgumentNullExceptionPolyfill.ThrowIfNull(copier);
-            return CopyResponseAndDispose(response, copier, static (value, service) => service.Copy(value)!);
-        }
-
-        private static Response CopyResponseAndDispose<TCopier>(Response response, TCopier copier, Func<Response, TCopier, Response> copyResponse)
-        {
             ArgumentNullExceptionPolyfill.ThrowIfNull(response);
             Response? copy = null;
             try
             {
-                return copy = copyResponse(response, copier);
+                return copy = copier.Copy(response)!;
             }
             finally
             {
-                if (!ReferenceEquals(response, copy)) response.Dispose();
+                ReleaseSupersededResponse(response, copy);
             }
+        }
+
+        private static void ReleaseSupersededResponse(Response response, Response? copy)
+        {
+            if (!ReferenceEquals(response, copy)) response.Dispose();
         }
 
         /// <summary>
