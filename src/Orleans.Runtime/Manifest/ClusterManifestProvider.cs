@@ -94,34 +94,32 @@ namespace Orleans.Runtime.Metadata
         internal ManifestUpdateAttemptDiagnostics? LastAttemptDiagnostics => Volatile.Read(ref _lastAttemptDiagnostics);
 
         /// <summary>
-        /// Gets a best-effort, paired snapshot of the published manifest and the diagnostics for the most
-        /// recent attempt to update it, for use in diagnostic messages. The diagnostics are captured before
-        /// the manifest, so the common case - reading the pair while no attempt is concluding - cannot pair a
-        /// newer manifest with older (already-superseded) diagnostics. This ordering does not, however,
-        /// guarantee full atomicity with attempt completion or peer-repair publication: a silo can still be
-        /// reported as both pending (in the diagnostics) and already published (in the manifest) if a fetch
-        /// completes, or peer repair publishes a partial manifest, between the two reads.
+        /// Gets the published manifest and latest attempt diagnostics which coexisted during the read.
+        /// The attempt's membership version identifies the reconciliation in progress; the manifest can
+        /// reflect newer membership synchronized by <see cref="Current"/> before its next attempt starts.
         /// </summary>
         internal (ClusterManifest Manifest, ManifestUpdateAttemptDiagnostics? Diagnostics) GetManifestAndDiagnosticsSnapshot()
         {
-            var diagnostics = LastAttemptDiagnostics;
-            var manifest = Current;
+            ManifestUpdateAttemptDiagnostics? diagnostics;
+            ClusterManifest manifest;
+            do
+            {
+                diagnostics = LastAttemptDiagnostics;
+                manifest = Current;
+            }
+            while (!ReferenceEquals(diagnostics, LastAttemptDiagnostics));
+
             return (manifest, diagnostics);
         }
 
         /// <summary>
-        /// Records that an individual silo's manifest fetch, for the attempt identified by <paramref name="attemptId"/>,
-        /// is no longer outstanding: either it completed (successfully or via peer repair), or it failed. Concurrent
-        /// fetches for different silos can complete in any order, so this uses a lock-free compare-and-swap loop
-        /// against the single attempt snapshot rather than assuming a single writer. A direct fetch that is still
-        /// running when its attempt concludes (e.g. because peer repair filled every other missing silo first) is
-        /// not canceled, so its eventual completion is ignored here if a newer attempt has since started: otherwise
-        /// it could remove a silo from, or attribute a stale failure to, diagnostics describing a different attempt.
+        /// Records a fetch completion for its originating attempt. Compare-and-swap preserves concurrent
+        /// completions, and the attempt identity keeps late fetches isolated from newer attempts.
         /// </summary>
         /// <param name="attemptId">The identity of the attempt this fetch was started for.</param>
         /// <param name="siloAddress">The silo whose fetch is no longer outstanding.</param>
         /// <param name="exception">The failure, if the fetch did not succeed. <see langword="null"/> for a success
-        /// (including one superseded by peer repair) or a cancellation, neither of which is a fetch failure.</param>
+        /// (including one superseded by peer repair) or cancellation requested by the fetch's token.</param>
         private void MarkManifestFetchComplete(long attemptId, SiloAddress siloAddress, Exception? exception)
         {
             ManifestUpdateAttemptDiagnostics? original;
@@ -131,8 +129,6 @@ namespace Orleans.Runtime.Metadata
                 original = Volatile.Read(ref _lastAttemptDiagnostics);
                 if (original is null || original.AttemptId != attemptId)
                 {
-                    // Either no attempt is in flight, or a newer attempt has since started: this completion
-                    // belongs to a superseded attempt and must not mutate the current one's diagnostics.
                     return;
                 }
 
@@ -278,17 +274,22 @@ namespace Orleans.Runtime.Metadata
             }
 
             var attemptId = Interlocked.Increment(ref _attemptSequence);
+            var pendingSilos = missingSilos.ToImmutableHashSet();
+            ManifestUpdateAttemptDiagnostics? previous;
+            ManifestUpdateAttemptDiagnostics attempt;
+            do
             {
-                var previous = Volatile.Read(ref _lastAttemptDiagnostics);
-                Volatile.Write(ref _lastAttemptDiagnostics, new ManifestUpdateAttemptDiagnostics(
+                previous = Volatile.Read(ref _lastAttemptDiagnostics);
+                attempt = new ManifestUpdateAttemptDiagnostics(
                     attemptId,
                     clusterMembership.Version,
                     _timeProvider.GetUtcNow().UtcDateTime,
-                    missingSilos.ToImmutableHashSet(),
+                    pendingSilos,
                     previous?.LastFailedSilo,
                     previous?.LastFailureMessage,
-                    previous?.LastFailureAt));
+                    previous?.LastFailureAt);
             }
+            while (!ReferenceEquals(Interlocked.CompareExchange(ref _lastAttemptDiagnostics, attempt, previous), previous));
 
             using var peerRepairCancellation = cache is not null && missingSilos.Count > 1
                 ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
@@ -366,10 +367,14 @@ namespace Orleans.Runtime.Metadata
                     MarkManifestFetchComplete(attemptId, siloAddress, exception: null);
                     return (siloAddress, manifest, null);
                 }
+                catch (OperationCanceledException exception) when (requestCancellationToken.IsCancellationRequested)
+                {
+                    MarkManifestFetchComplete(attemptId, siloAddress, exception: null);
+                    return (siloAddress, null, exception);
+                }
                 catch (Exception exception)
                 {
-                    // A canceled fetch is superseded (e.g. by peer repair), not failed: do not record it as a failure.
-                    MarkManifestFetchComplete(attemptId, siloAddress, exception is OperationCanceledException ? null : exception);
+                    MarkManifestFetchComplete(attemptId, siloAddress, exception);
                     return (siloAddress, null, exception);
                 }
             }
@@ -383,10 +388,7 @@ namespace Orleans.Runtime.Metadata
                 if (result.Exception is Exception exception)
                 {
                     fetchSuccess = false;
-                    if (exception is not OperationCanceledException)
-                    {
-                        LogWarningErrorRetrievingSiloManifest(exception, result.Key);
-                    }
+                    LogWarningErrorRetrievingSiloManifest(exception, result.Key);
                 }
                 else
                 {

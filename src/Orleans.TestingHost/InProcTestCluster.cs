@@ -474,11 +474,6 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         {
             var expectedSiloSet = activeSilos.Select(static silo => silo.SiloAddress).ToHashSet();
 
-            // Take one snapshot per observer, pairing each manifest with the diagnostics captured just before it,
-            // rather than reading them from two separate, independently-progressing LINQ pipelines. This narrows
-            // (but does not eliminate) the window in which a fetch completion or peer-repair publication between
-            // the two reads could still pair a pending-looking diagnostic with an already-published silo; see
-            // GetManifestAndDiagnosticsSnapshot for details.
             var snapshots = activeSilos.Select((silo, index) =>
             {
                 var (manifest, diagnostics) = manifestProviders[index].GetManifestAndDiagnosticsSnapshot();

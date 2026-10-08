@@ -43,7 +43,7 @@ public partial class ClusterManifestProviderTests
 
     private static ClusterManifestProvider CreateClusterManifestProvider(
         SiloAddress localSilo,
-        TestClusterMembershipService membership,
+        IClusterMembershipService membership,
         IInternalGrainFactory grainFactory,
         ClusterManifestOptions? options = null,
         ClusterManifestInstruments? instruments = null) =>
@@ -266,7 +266,7 @@ public partial class ClusterManifestProviderTests
 
     private static ClusterManifestProvider CreateClusterManifestProvider(
         SiloAddress localSilo,
-        TestClusterMembershipService membership,
+        IClusterMembershipService membership,
         IInternalGrainFactory grainFactory,
         TimeProvider timeProvider,
         ILogger<ClusterManifestProvider> logger,
