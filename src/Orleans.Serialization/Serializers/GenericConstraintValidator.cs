@@ -49,9 +49,7 @@ internal static class GenericConstraintValidator
                 return GenericConstraintValidationResult.Invalid;
             if ((attributes & GenericParameterAttributes.DefaultConstructorConstraint) != 0 && !argument.IsValueType)
             {
-#if NET10_0_OR_GREATER
                 if (argument.IsAbstract) return GenericConstraintValidationResult.Invalid;
-#endif
                 if (metadata.TryGetValue(argument, out var argumentMetadata))
                 {
                     if (!argumentMetadata.HasPublicParameterlessConstructor) return GenericConstraintValidationResult.Invalid;

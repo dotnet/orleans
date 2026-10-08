@@ -1137,12 +1137,7 @@ public class ManifestContractTests
     [InlineData(typeof(ReferenceConstrainedCopier<>), typeof(int), false)]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PublicConstructorTarget), true)]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PrivateConstructorTarget), false)]
-    // MakeGenericType permits an abstract new()-constrained argument on .NET 8 and rejects it on .NET 10.
-#if NET10_0_OR_GREATER
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), false)]
-#else
-    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), true)]
-#endif
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(int), true)]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(int?), true)]
     [InlineData(typeof(ComparableConstrainedCopier<>), typeof(string), true)]
@@ -1186,6 +1181,37 @@ public class ManifestContractTests
         var input = "preserved";
         Assert.Same(input, root.ReferenceCopier.DeepCopy(input, null!));
         Assert.Equal(17, root.ValueCopier.DeepCopy(17, null!));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AbstractConstructorConstraintRejectionPreservesPendingConstruction(bool captureMetadata)
+    {
+        var attempts = 0;
+        var implementation = new CountingGenericImplementation(typeof(ConstructorConstrainedCopier<>));
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+        {
+            if (captureMetadata) options.AddGenericArgumentMetadata(typeof(AbstractConstructorTarget));
+            options.AddSerializationContract(typeof(ParameterCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+            options.AddSerializationContract(implementation, typeof(IDeepCopier<>), SerializationType.Parameter(0));
+            options.AddSerializerService<IDeepCopier<AbstractConstructorTarget>>(provider =>
+            {
+                attempts++;
+                Assert.True(((CodecProvider)provider).IsConstructionPending);
+                return provider.GetDeepCopier<AbstractConstructorTarget>();
+            });
+        })).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+
+        var copier = GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<AbstractConstructorTarget>>(null!, provider);
+
+        Assert.IsType<ParameterCopier<AbstractConstructorTarget>>(copier);
+        Assert.Same(copier, provider.GetDeepCopier<AbstractConstructorTarget>());
+        Assert.Same(copier, GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<AbstractConstructorTarget>>(null!, provider));
+        Assert.Equal(0, implementation.ClosureAttempts);
+        Assert.Equal(1, attempts);
+        Assert.False(provider.IsConstructionPending);
     }
 
     private sealed class ConstraintSelection(IDeepCopier<string> referenceCopier, IDeepCopier<int> valueCopier)
@@ -1382,6 +1408,7 @@ public class ManifestContractTests
     [InlineData(typeof(ReferenceConstrainedCopier<>), typeof(string), true)]
     [InlineData(typeof(ReferenceConstrainedCopier<>), typeof(int), false)]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(int), true)]
+    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), false)]
     [InlineData(typeof(BaseConstrainedCopier<>), typeof(ConstraintDerived), true)]
     [InlineData(typeof(BaseConstrainedCopier<>), typeof(string), false)]
     [InlineData(typeof(DisposableConstrainedCopier<>), typeof(System.IO.MemoryStream), true)]
@@ -1406,11 +1433,7 @@ public class ManifestContractTests
     [Theory]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PublicConstructorTarget), true)]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PrivateConstructorTarget), false)]
-#if NET10_0_OR_GREATER
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), false)]
-#else
-    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), true)]
-#endif
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(string), false)]
     [InlineData(typeof(ComparableConstrainedCopier<>), typeof(string), true)]
     [InlineData(typeof(ComparableConstrainedCopier<>), typeof(int), true)]
