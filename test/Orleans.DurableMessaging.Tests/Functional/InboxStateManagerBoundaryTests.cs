@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -5,6 +6,7 @@ using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
+using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
@@ -29,11 +31,25 @@ public sealed class InboxStateManagerBoundaryTests
         builder.Services.AddKeyedScoped<IDurableDictionaryCommandCodec<string, int>>(selectedFormat, (sp, _) =>
             new TrackingCodec((IDurableDictionaryCommandCodec<string, int>)ActivatorUtilities.CreateInstance(sp, codecType)));
         builder.Services.AddScoped<Dependency>();
+        var grainType = GrainType.Create("codec-scope");
+        var manifest = new GrainManifest(
+            ImmutableDictionary<GrainType, GrainProperties>.Empty.Add(
+                grainType, new GrainProperties(
+                    ImmutableDictionary<string, string>.Empty.WithComparers(StringComparer.Ordinal, StringComparer.Ordinal))),
+            ImmutableDictionary<GrainInterfaceType, GrainInterfaceProperties>.Empty);
+        var manifestProvider = Substitute.For<IClusterManifestProvider>();
+        manifestProvider.LocalGrainManifest.Returns(manifest);
+        manifestProvider.Current.Returns(new ClusterManifest(
+            new MajorMinorVersion(1, 0),
+            ImmutableDictionary<SiloAddress, GrainManifest>.Empty,
+            [manifest]));
+        builder.Services.AddSingleton(manifestProvider);
+        builder.Services.AddSingleton<GrainPropertiesResolver>();
         builder.Services.AddScoped<IGrainContext>(sp =>
         {
             var context = Substitute.For<IGrainContext>();
             context.ActivationServices.Returns(sp);
-            context.GrainId.Returns(GrainId.Create("codec-scope", Guid.NewGuid().ToString("N")));
+            context.GrainId.Returns(GrainId.Create(grainType, IdSpan.Create(Guid.NewGuid().ToString("N"))));
             context.ObservableLifecycle.Returns(Substitute.For<IGrainLifecycle>());
             return context;
         });
@@ -47,6 +63,8 @@ public sealed class InboxStateManagerBoundaryTests
         await using (var scope = services.CreateAsyncScope())
         {
             var sp = scope.ServiceProvider;
+            Assert.Same(manifest.Grains[grainType],
+                sp.GetRequiredService<GrainPropertiesResolver>().GetGrainProperties(sp.GetRequiredService<IGrainContext>().GrainId.Type));
             var app = sp.GetRequiredService<IDurableStateManager>();
             journalOwner = sp.GetRequiredService<IJournaledStateManager>();
             Assert.Same(app, journalOwner);
