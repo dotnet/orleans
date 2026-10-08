@@ -19,9 +19,11 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorTestBase
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Complete_StagesBusinessOutputAndDedupeBeforeHandlerReturn(bool prepared)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Complete_StagesBusinessOutputAndDedupeBeforeHandlerReturn(bool prepared, bool throughOutbox)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
@@ -29,8 +31,16 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         {
             var batch = prepared ? await self.Context.Outbox.PrepareSendAsync([self.Output], token) : null;
             self.Mutate();
-            if (batch is null) self.Context.Send(self.Output);
-            else self.Context.Send(batch);
+            if (batch is null)
+            {
+                if (throughOutbox) self.Context.Outbox.Send(self.Output);
+                else self.Context.Send(self.Output);
+            }
+            else
+            {
+                if (throughOutbox) self.Context.Outbox.Send(batch);
+                else self.Context.Send(batch);
+            }
             self.Context.Complete();
             AssertCompletedState(rig, self.Context.Envelope);
             Assert.Equal(1, Assert.Single(rig.Effects).Value.Count);
@@ -81,7 +91,9 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         var finished = await FinishedAsync(rig);
         handler.Release.TrySetResult();
         await WaitAsync(Task.WhenAll(preceding, queued, finished));
-        Assert.All(rig.Grain.Captures.Where(snapshot => snapshot.Effects.Count != 0), snapshot =>
+        var capturedEffects = rig.Grain.Captures.Where(snapshot => snapshot.Effects.Count != 0).ToArray();
+        Assert.NotEmpty(capturedEffects);
+        Assert.All(capturedEffects, snapshot =>
         {
             Assert.Equal(0, snapshot.InboxCount);
             Assert.Equal(1, snapshot.ProcessedMessageCount);
@@ -257,11 +269,15 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task UnderlyingSendFailure_RetainsFirstCauseEvenWhenCaught(bool prepared, bool replaced)
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public async Task UnderlyingSendFailure_RetainsFirstCauseEvenWhenCaught(bool prepared, bool replaced, bool throughOutbox)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
@@ -272,8 +288,16 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
             var batch = prepared ? await self.Context.Outbox.PrepareSendAsync([self.Output], token) : null;
             try
             {
-                if (batch is null) self.Context.Send(self.Output);
-                else self.Context.Outbox.Send(batch);
+                if (batch is null)
+                {
+                    if (throughOutbox) self.Context.Outbox.Send(self.Output);
+                    else self.Context.Send(self.Output);
+                }
+                else
+                {
+                    if (throughOutbox) self.Context.Outbox.Send(batch);
+                    else self.Context.Send(batch);
+                }
             }
             catch (IOException)
             {

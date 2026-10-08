@@ -204,8 +204,9 @@ only the immutable acceptance or ownership facts of that operation. Ownership-ch
 operations retain the inbox gate through this acknowledgement.
 Application code completes fallible checks before applying shared changes, so every
 staged mutation is safe to commit. Inbox processing requests persistence after
-successful staging. A failed preparation or apply operation surfaces directly and
-releases owned preparation resources. Genuine journal failures
+successful staging. Before-completion handler failures use the documented preparation
+outcome, and completed handler failures retain actual persistence before surfacing.
+Both paths release owned preparation resources. Genuine journal failures
 remain subject to the manager's internal failure fence and waiter completion; the
 inbox catches its failed write and stops local processing with the original observed
 cause. Operation lifetime tracking keeps shutdown waiting for actual writes and
