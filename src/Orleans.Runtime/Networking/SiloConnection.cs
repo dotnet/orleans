@@ -185,6 +185,12 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 await Task.WhenAll(ReadPreamble(), WritePreamble());
+                if (this.RemoteSiloAddress is not null)
+                {
+                    // Publish after the local preamble so message writes preserve protocol ordering.
+                    this.connectionManager.OnConnected(this.RemoteSiloAddress, this);
+                }
+
                 await base.RunAsyncCore();
             }
             catch (Exception exception) when ((error = exception) is null)
@@ -229,7 +235,6 @@ namespace Orleans.Runtime.Messaging
                 if (preamble.SiloAddress is not null)
                 {
                     this.RemoteSiloAddress = preamble.SiloAddress;
-                    this.connectionManager.OnConnected(preamble.SiloAddress, this);
                 }
             }
         }

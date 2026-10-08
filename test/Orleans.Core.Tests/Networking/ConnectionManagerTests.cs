@@ -38,6 +38,79 @@ public class ConnectionManagerTests
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task SiloConnection_PublishesAfterBothPreamblesComplete(bool outbound, bool failWrite)
+    {
+        await using var rig = new TestRig();
+        using var preamble = new ArcBufferWriter();
+        var serializerTransport = Substitute.For<MessageTransport>();
+        serializerTransport.EnqueueWrite(Arg.Any<WriteRequest>()).Returns(call =>
+        {
+            var request = call.Arg<WriteRequest>();
+            using var bytes = request.Buffers.ConsumeSlice(request.Buffers.Length);
+            foreach (var segment in bytes.MemorySegments)
+            {
+                preamble.Write(segment.Span);
+            }
+
+            request.SetResult();
+            return true;
+        });
+        await rig.PreambleHelper.Write(serializerTransport, new ConnectionPreamble
+        {
+            NodeIdentity = Constants.SiloDirectConnectionId,
+            SiloAddress = rig.Address,
+            ClusterId = "test-cluster"
+        });
+        PreambleTransport transport = null!;
+        var (connection, _) = rig.CreateSiloConnection(
+            outbound: outbound,
+            wrapTransport: inner => transport = new PreambleTransport(
+                inner, preamble, () => rig.Manager.TryGetConnection(rig.Address, out _)));
+
+        var running = connection.RunAsync();
+        try
+        {
+            Assert.NotNull(transport.PendingWrite);
+            Assert.False(transport.PublishedBeforeWrite);
+            Assert.Equal(rig.Address, connection.RemoteSiloAddress);
+            Assert.False(connection.Initialized.IsCompleted);
+            Assert.False(rig.Manager.TryGetConnection(rig.Address, out _));
+            Assert.Equal(0, rig.Manager.ConnectionCount);
+
+            if (failWrite)
+            {
+                var error = new ConnectionClosedException("Preamble write failed.");
+                transport.CompleteWrite(error);
+                var actual = await Assert.ThrowsAsync<ConnectionClosedException>(
+                    () => connection.Initialized.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
+                Assert.Same(error, actual);
+                await running.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+                Assert.False(rig.Manager.TryGetConnection(rig.Address, out _));
+                Assert.Equal(0, rig.Manager.ConnectionCount);
+            }
+            else
+            {
+                transport.CompleteWrite();
+                await connection.Initialized.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+
+                Assert.True(rig.Manager.TryGetConnection(rig.Address, out var published));
+                Assert.Same(connection, published);
+                Assert.Equal(1, rig.Manager.ConnectionCount);
+            }
+        }
+        finally
+        {
+            transport.CompleteWrite();
+            await connection.CloseAsync(exception: null).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            await running.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Theory]
     [InlineData((int)Message.Directions.Request)]
     [InlineData((int)Message.Directions.Response)]
     [InlineData((int)Message.Directions.OneWay)]
@@ -467,7 +540,10 @@ public class ConnectionManagerTests
 
         public MessageReadRequest CreateReadRequest() => _shared.MessageHandlerShared.GetReceiveMessageHandler();
 
-        public (SiloConnection Connection, TestMessageTransport Context) CreateSiloConnection(bool blockApplicationMessages = false)
+        public (SiloConnection Connection, TestMessageTransport Context) CreateSiloConnection(
+            bool blockApplicationMessages = false,
+            bool outbound = true,
+            Func<MessageTransport, MessageTransport>? wrapTransport = null)
         {
             var context = new TestMessageTransport(blockDisposal: false);
             var local = Substitute.For<ILocalSiloDetails>();
@@ -507,7 +583,7 @@ public class ConnectionManagerTests
                 _messageCenters.Add(messageCenter);
             }
 
-            var connection = new SiloConnection(Address, context, messageCenter!, local, Manager, _options, _shared, null!, PreambleHelper);
+            var connection = new SiloConnection(outbound ? Address : null, wrapTransport?.Invoke(context) ?? context, messageCenter!, local, Manager, _options, _shared, null!, PreambleHelper);
             _connections.Add((connection, context));
             return (connection, context);
         }
@@ -744,6 +820,63 @@ public class ConnectionManagerTests
 
             public override ValueTask DisposeAsync() => inner.DisposeAsync();
         }
+    }
+
+    private sealed class PreambleTransport(MessageTransport inner, ArcBufferWriter preamble, Func<bool> isPublished) : MessageTransport
+    {
+        private bool _readPreamble;
+        private bool _writePreamble;
+
+        public WriteRequest? PendingWrite { get; private set; }
+        public bool PublishedBeforeWrite { get; private set; }
+        public override CancellationToken Closed => inner.Closed;
+        public override IFeatureCollection Features => inner.Features;
+
+        public override bool EnqueueRead(ReadRequest request)
+        {
+            if (_readPreamble)
+            {
+                return inner.EnqueueRead(request);
+            }
+
+            _readPreamble = true;
+            Assert.True(request.OnRead(new ArcBufferReader(preamble)));
+            return true;
+        }
+
+        public override bool EnqueueWrite(WriteRequest request)
+        {
+            if (_writePreamble)
+            {
+                return inner.EnqueueWrite(request);
+            }
+
+            _writePreamble = true;
+            PublishedBeforeWrite = isPublished();
+            PendingWrite = request;
+            return true;
+        }
+
+        public void CompleteWrite(Exception? error = null)
+        {
+            if (PendingWrite is { } request)
+            {
+                PendingWrite = null;
+                if (error is null)
+                {
+                    request.SetResult();
+                }
+                else
+                {
+                    request.SetException(error);
+                }
+            }
+        }
+
+        public override ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default) =>
+            inner.CloseAsync(closeException, cancellationToken);
+
+        public override ValueTask DisposeAsync() => inner.DisposeAsync();
     }
 
     private sealed class QueuedSynchronizationContext : SynchronizationContext

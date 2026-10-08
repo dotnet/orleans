@@ -15,6 +15,8 @@ For each remote `SiloAddress`, `ConnectionManager` keeps a `ConnectionEntry` con
 
 Connection establishment has a bounded `OpenConnectionTimeout`. A failed attempt clears the pending task, removes defunct connections, records the failure, and applies the configured retry delay before another attempt. A timeout classifies the transport attempt as failed; application processing outcome requires separate reconciliation.
 
+Silo connections become available for message sends after the peer's protocol preamble is validated and the local preamble write completes. This handshake boundary keeps each preamble ahead of framed messages on the transport, including when a peer sends its preamble before the local write is queued.
+
 Source: [`ConnectionManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Networking/ConnectionManager.cs), [`Connection`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Networking/Connection.cs), and [`SiloConnection`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Networking/SiloConnection.cs).
 
 The TCP transport enables keep-alive on outbound and accepted sockets. By default, the operating system sends the first probe after 90 seconds of idle time, then probes every 30 seconds and allows 10 unanswered probes before terminating the connection. Accepted sockets use the current options for their named listener, so each silo or gateway listener applies its configured keep-alive policy to new connections. When the platform reports an unsupported keep-alive option, the transport logs that option and retains supported settings; tuning continues for the other supported options.
