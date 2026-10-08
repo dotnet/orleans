@@ -787,12 +787,14 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         using var handler = rig.Handler;
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        OperationCanceledException? cancellationFailure = null;
         handler.Remainder = async (self, token) =>
         {
             using var observation = token.Register(() => cancellationObserved.TrySetResult());
             _ = self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token);
             await cancellationObserved.Task;
-            token.ThrowIfCancellationRequested();
+            try { token.ThrowIfCancellationRequested(); }
+            catch (OperationCanceledException exception) { cancellationFailure = exception; throw; }
             return self.ApplyEffect;
         };
         using var input = await DeliverToHandlerAsync(rig);
@@ -802,12 +804,13 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
                 && state.DeclaringType == ReceiverTestServices.GetImplementationType("DurableInboxExtension")).Timer;
         using var preparation = rig.Outbox.BlockNextPreparation(ignoreCancellation: true);
         var writes = WriteCount(rig);
+        var completion = GetHandlerCompletion(rig);
         handler.Continue.TrySetResult();
         await preparation.WaitAsync();
         await OnTurnAsync(rig.Context, timer.Dispose);
         await WaitAsync(cancellationObserved.Task);
-        var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
-        Assert.IsAssignableFrom<OperationCanceledException>(failure);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+        Assert.False(completion.IsCompleted);
         Assert.False(preparation.Operation!.Completed.IsCompleted);
         Assert.False(rig.Context.Deactivated.IsCompleted);
         Assert.Equal(0, handler.Applied);
@@ -818,12 +821,201 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
         if (providerFails) preparation.Fail(lateFailure);
         else preparation.Release();
         await WaitAsync(preparation.Operation.Completed);
-        Assert.NotSame(lateFailure, failure);
+        Assert.NotSame(lateFailure, cancellationFailure);
         if (providerFails) Assert.Same(lateFailure, preparation.Operation.Failure);
         else Assert.Null(preparation.Operation.Failure);
-        await AssertFaultReplayAsync(rig, input.Value, failure, writes, expectedBatchCount: providerFails ? 1 : 2);
+        await WaitAsync(completion);
+        await events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
+            item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, timer),
+            TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.IsAssignableFrom<OperationCanceledException>(cancellationFailure);
+        Assert.Equal(writes, WriteCount(rig));
+        Assert.Single(rig.InboxState);
+        Assert.Empty(rig.ProcessedState);
+        AssertDisposed(rig.Outbox, providerFails ? 1 : 2);
+        await AssertHealthyWriteAsync(rig);
         Assert.Equal(2, rig.Outbox.PreparationsStarted);
         Assert.Equal(2, rig.Outbox.PreparationsCompleted);
+        handler.Remainder = static (self, _) => ValueTask.FromResult<Action>(self.ApplyEffect);
+        Assert.Same(DurableJobRunResult.Completed, await RunPumpAsync(rig));
+        AssertSuccess(rig.Grain.GetSnapshotForTest(), input.Value, outputCount: 0);
+        Assert.Same(rig.Context, Fixture.GetGrainContext(rig.Receiver));
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DurableJobCancellation_BeforeApplyPreservesActivationAndCommittedOwner(bool returnAction)
+    {
+        var rig = await CreateAsync(acquireFirst: false);
+        using var handler = rig.Handler;
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        using var input = await DeliverToHandlerAsync(rig);
+        var localTimer = Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
+            item => ReferenceEquals(item.GrainContext, rig.Context) && IsInboxTimer(item.Timer)).Timer;
+        await OnTurnAsync(rig.Context, localTimer.Dispose);
+        await WaitForTimerAsync(events, localTimer);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
+        var ownerId = rig.Grain.GetSnapshotForTest().InboxJobId;
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        OperationCanceledException? cancellationFailure = null;
+        handler.Remainder = async (self, token) =>
+        {
+            ready.TrySetResult();
+            await resume.Task;
+            if (!returnAction)
+            {
+                try { token.ThrowIfCancellationRequested(); }
+                catch (OperationCanceledException exception) { cancellationFailure = exception; throw; }
+            }
+            return self.ApplyEffect;
+        };
+        handler.Continue.TrySetResult();
+        using var attempt = new CancellationTokenSource();
+        var run = await StartPumpAsync(rig, events, attempt.Token);
+        try
+        {
+            await WaitAsync(ready.Task);
+            await OnTurnAsync(rig.Context, attempt.Cancel);
+        }
+        finally
+        {
+            resume.TrySetResult();
+        }
+        await WaitForTimerAsync(events, run.Timer);
+        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => PollPumpAsync(rig, run.Context));
+        if (!returnAction) Assert.Same(cancellationFailure, failure);
+        Assert.Equal(0, handler.Applied);
+        Assert.Empty(rig.Effects);
+        Assert.Single(rig.InboxState);
+        Assert.Empty(rig.ProcessedState);
+        var snapshot = rig.Grain.GetSnapshotForTest();
+        Assert.Equal(ownerId, snapshot.InboxJobId);
+        Assert.Same(job, snapshot.InboxJob);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+        await AssertHealthyWriteAsync(rig);
+        handler.Remainder = static (self, _) => ValueTask.FromResult<Action>(self.ApplyEffect);
+        Assert.Same(DurableJobRunResult.Completed, await RunPumpAsync(rig));
+        AssertSuccess(rig.Grain.GetSnapshotForTest(), input.Value, outputCount: 0);
+        Assert.Same(rig.Context, Fixture.GetGrainContext(rig.Receiver));
+    }
+
+    [Fact]
+    public async Task CancellationAfterPartialApply_RemainsTerminalAndReplaysCommittedState()
+    {
+        var rig = await CreateAsync(acquireFirst: false);
+        using var handler = rig.Handler;
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        IGrainTimer timer = null!;
+        OperationCanceledException? failure = null;
+        handler.Remainder = (self, token) => ValueTask.FromResult<Action>(() =>
+        {
+            self.ApplyEffect();
+            timer.Dispose();
+            failure = new OperationCanceledException("Apply canceled after staging a business effect.", token);
+            throw failure;
+        });
+        using var input = await DeliverToHandlerAsync(rig);
+        timer = Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
+            item => ReferenceEquals(item.GrainContext, rig.Context) && IsInboxTimer(item.Timer)).Timer;
+        var writes = WriteCount(rig);
+        handler.Continue.TrySetResult();
+        Assert.Same(Assert.IsAssignableFrom<OperationCanceledException>(
+            await WaitAsync(rig.Grain.DeactivationFailure.Task)), failure);
+        Assert.Equal(1, handler.Applied);
+        Assert.Equal(ExpectedEffect(input.Value), Assert.Single(rig.Effects).Value);
+        await AssertFaultReplayAsync(rig, input.Value, failure!, writes, expectedBatchCount: 0);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AttemptCancellation_AfterStagingRetainsOwnedWriteOutcome(bool failWrite)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        using var input = await DeliverToHandlerAsync(rig);
+        var timer = Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
+            item => ReferenceEquals(item.GrainContext, rig.Context) && IsInboxTimer(item.Timer)).Timer;
+        var completion = GetHandlerCompletion(rig);
+        var writes = WriteCount(rig);
+        using var storage = Fixture.Storage.BlockWrite(rig.JournalId);
+        handler.Continue.TrySetResult();
+        await storage.WaitUntilEnteredAsync();
+        await OnTurnAsync(rig.Context, timer.Dispose);
+        Assert.False(completion.IsCompleted);
+        Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
+        var failure = new OperationCanceledException("Storage canceled after handler staging.", new CancellationToken(canceled: true));
+        if (failWrite) storage.Fail(failure);
+        else storage.Release();
+        await WaitAsync(completion);
+        if (failWrite)
+        {
+            Assert.Same(failure, await WaitAsync(rig.Grain.DeactivationFailure.Task));
+            Assert.Equal(writes, WriteCount(rig));
+            AssertSuccess(rig.Grain.GetSnapshotForTest(), input.Value, outputCount: 0);
+            await WaitAsync(rig.Context.Deactivated);
+            AssertDisposed(rig.Outbox, 1);
+            await rig.Receiver.GetSnapshotAsync();
+            AssertDeadLetter(await Fixture.WaitForDeadLetterCountAsync(rig.Receiver, 1), input.Value);
+            Assert.Empty(Fixture.GetStagedOutput(rig.Receiver));
+        }
+        else
+        {
+            AssertSuccess(rig.Grain.GetSnapshotForTest(), input.Value, outputCount: 0);
+            AssertDisposed(rig.Outbox, 1);
+            await AssertHealthyWriteAsync(rig);
+        }
+    }
+
+    private static bool IsInboxTimer(IGrainTimer timer) =>
+        timer.GetType().GenericTypeArguments is [var state]
+        && state.DeclaringType == ReceiverTestServices.GetImplementationType("DurableInboxExtension");
+
+    private static Task WaitForTimerAsync(DiagnosticEventCollector events, IGrainTimer timer) =>
+        events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
+            item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, timer),
+            TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+    private async Task<(JobContext Context, IGrainTimer Timer)> StartPumpAsync(
+        Harness rig, DiagnosticEventCollector events, CancellationToken cancellationToken)
+    {
+        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
+        var run = new JobContext(job);
+        var createdBefore = events.Events.Count;
+        await OnTurnAsync(rig.Context, async () =>
+        {
+            var extension = rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
+            Assert.Same(rig.Context, ReceiverTestServices.CurrentGrainContext);
+            Assert.True((await ((IDurableJobFeatureHandler)extension).ExecuteJobAsync(run, cancellationToken)).IsInProgress);
+        });
+        var timer = Assert.Single(events.Events.Skip(createdBefore).Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
+            item => ReferenceEquals(item.GrainContext, rig.Context) && IsInboxTimer(item.Timer)).Timer;
+        return (run, timer);
+    }
+
+    private static async Task<DurableJobRunResult> PollPumpAsync(Harness rig, JobContext run)
+    {
+        DurableJobRunResult result = null!;
+        await OnTurnAsync(rig.Context, async () =>
+        {
+            var extension = rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
+            Assert.Same(rig.Context, ReceiverTestServices.CurrentGrainContext);
+            result = await ((IDurableJobFeatureHandler)extension).ExecuteJobAsync(run, TestContext.Current.CancellationToken);
+        });
+        return result;
+    }
+
+    private async Task<DurableJobRunResult> RunPumpAsync(Harness rig)
+    {
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        var run = await StartPumpAsync(rig, events, TestContext.Current.CancellationToken);
+        await WaitForTimerAsync(events, run.Timer);
+        return await PollPumpAsync(rig, run.Context);
     }
 
     private sealed class JobContext(DurableJob job) : IJobRunContext

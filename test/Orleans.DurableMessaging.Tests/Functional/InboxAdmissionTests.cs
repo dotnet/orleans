@@ -234,7 +234,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task OwnedTimerCancellation_DuringHandlerPreparation_DeactivatesAndFreshActivationRetries()
+    public async Task OwnedTimerCancellation_DuringHandlerPreparation_PreservesActivationAndRetries()
     {
         var receiver = NewGrain();
         using var envelope = CreateEnvelope(receiver, NewMessage(113, "attempt-cancel"), "messages/attempt-cancel");
@@ -249,15 +249,17 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
                 && item.Timer.GetType().GenericTypeArguments is [var state]
                 && state.DeclaringType == ReceiverTestServices.GetImplementationType("DurableInboxExtension")).Timer;
         await OnTurnAsync(context, timer.Dispose);
-        var failure = await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.IsAssignableFrom<OperationCanceledException>(failure);
+        await events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
+            item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, timer),
+            TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.False(grain.DeactivationFailure.Task.IsCompleted);
+        Assert.False(context.Deactivated.IsCompleted);
         Assert.Empty(grain.GetSnapshotForTest().Effects);
         Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
         handler.Release();
-        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        _ = await receiver.GetSnapshotAsync();
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope.Value)).Status);
         var recovered = await Fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
+        Assert.Equal(grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
         Assert.Equal(1, recovered.ProcessedMessageCount);
     }

@@ -387,8 +387,17 @@ internal sealed partial class DurableInboxExtension :
             }
             AcknowledgeWrite(operation);
         }
+        catch (OperationCanceledException) when (_failure is null
+            && operation is HandlerWrite { StagingStarted: false } handler
+            && handler.Cancellation.IsCancellationRequested
+            && handler.Execution?.SendFailure is null)
+        {
+            throw;
+        }
         catch (Exception exception) when (exception is not JournaledStatePostCommitException
-            && (exception is not OperationCanceledException || _failure is not null || !_shutdownToken.IsCancellationRequested))
+            && (exception is not OperationCanceledException || _failure is not null || !_shutdownToken.IsCancellationRequested
+                || operation is HandlerWrite { StagingStarted: true }
+                || operation is HandlerWrite { Execution.SendFailure: not null }))
         {
             LatchFailure(exception);
             try
@@ -593,6 +602,7 @@ internal sealed partial class DurableInboxExtension :
                     throw new InvalidOperationException("The invoked inbox handler lost its pending message before capture.");
                 }
 
+                handler.StagingStarted = true;
                 if (handler.Error is null)
                 {
                     ApplyHandler(handler);
@@ -1050,6 +1060,7 @@ internal sealed partial class DurableInboxExtension :
         public Action? Apply { get; set; }
         public HandlerExecution? Execution { get; set; }
         public bool HandlerInvoked { get; set; }
+        public bool StagingStarted { get; set; }
         public bool Skipped { get; set; }
         public bool DeadLetter { get; set; }
         public Exception? Error { get; set; }

@@ -196,7 +196,8 @@ public sealed class ControlledJournalStorageProvider : IJournalStorageProvider, 
         public Task WaitUntilEnteredAsync() => _plan.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         public void Release() => _plan.Release.TrySetResult();
         public void Dispose() => Release();
-        public void Fail() => _plan.Release.TrySetException(new IOException("Injected blocked journal write failure."));
+        public void Fail() => Fail(new IOException("Injected blocked journal write failure."));
+        public void Fail(Exception exception) => _plan.Release.TrySetException(exception);
     }
 
     private sealed class ControlledJournalStorage(

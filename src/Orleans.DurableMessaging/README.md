@@ -162,6 +162,12 @@ current attempt and phase before applying repeated-send semantics. A caught or r
 scope violation retains its original cause and prevents a successful completion commit.
 An action-time failure ends the inbox operation and requests a fresh activation.
 
+Cancellation of a job attempt before handler staging leaves the committed inbox and
+owner available for another attempt on the same activation. Attempt retirement drains
+started preparations and releases their batches before completion. Once the action
+starts staging, failures retain terminal handling; an admitted journal write continues
+through its actual outcome independently of attempt cancellation.
+
 Optional early preparation keeps business state, outgoing intents, and inbox completion unchanged.
 Independent journal writes can persist previously staged changes while preparation
 awaits. The runtime revalidates inbox ownership before applying business effects,
