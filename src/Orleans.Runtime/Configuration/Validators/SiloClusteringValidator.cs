@@ -1,5 +1,4 @@
 using System;
-using System.Threading;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -96,15 +95,13 @@ namespace Orleans.Runtime.Configuration
                 failureDetectionTimeoutTicks = maxProbeCycleTime.Ticks * clusterMembershipOptions.NumMissedProbesLimit;
             }
 
-            if (clusterMembershipOptions.TableRefreshTimeout <= TimeSpan.Zero
-                && clusterMembershipOptions.TableRefreshTimeout != Timeout.InfiniteTimeSpan)
+            if (clusterMembershipOptions.TableRefreshTimeout <= TimeSpan.Zero)
             {
-                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.TableRefreshTimeout)} ({clusterMembershipOptions.TableRefreshTimeout}) must be greater than 0 or Timeout.InfiniteTimeSpan.");
+                throw new OrleansConfigurationException($"{nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.TableRefreshTimeout)} ({clusterMembershipOptions.TableRefreshTimeout}) must be greater than 0.");
             }
 
             var tableRefreshTimeoutTicks = clusterMembershipOptions.TableRefreshTimeout.Ticks;
-            if (tableRefreshTimeoutTicks > 0
-                && tableRefreshTimeoutTicks > (TimeSpan.MaxValue.Ticks - failureDetectionTimeoutTicks) / 2)
+            if (tableRefreshTimeoutTicks > (TimeSpan.MaxValue.Ticks - failureDetectionTimeoutTicks) / 2)
             {
                 throw new OrleansConfigurationException($"The failure detection timeout plus twice {nameof(ClusterMembershipOptions)}.{nameof(ClusterMembershipOptions.TableRefreshTimeout)} ({clusterMembershipOptions.TableRefreshTimeout}) must not exceed {TimeSpan.MaxValue}.");
             }

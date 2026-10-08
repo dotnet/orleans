@@ -296,10 +296,7 @@ namespace Orleans.Runtime.MembershipService
             LogDebugStartingPeriodicMembershipTableRefreshes(this.log);
             try
             {
-                var refreshPeriod = this.clusterMembershipOptions.TableRefreshTimeout;
-                TimeSpan? overrideDelayPeriod = refreshPeriod == Timeout.InfiniteTimeSpan
-                    ? refreshPeriod
-                    : RandomTimeSpan.Next(refreshPeriod);
+                TimeSpan? overrideDelayPeriod = RandomTimeSpan.Next(this.clusterMembershipOptions.TableRefreshTimeout);
                 var runningFailures = 0;
                 while (true)
                 {

@@ -1235,7 +1235,6 @@ namespace NonSilo.Tests.Membership
         [Theory]
         [InlineData(0.5)]
         [InlineData(60d * 24 * 60 * 60 * 1000)]
-        [InlineData(Timeout.Infinite)]
         public async Task ClusterHealthMonitor_ReevaluationSupportsTableRefreshIntervalAndStreamCompletion(double milliseconds)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
