@@ -171,17 +171,23 @@ ends outgoing staging for the attempt. A successful method return without comple
 reports an explicit contract error. Method errors after completion retain the staged
 logical outcome through actual persistence and cleanup, then surface the original error.
 
-Cancellation of a job attempt before handler staging leaves the committed inbox and
-owner available for another attempt on the same activation. Attempt retirement drains
-started preparations and releases their batches before completion. Once the action
-starts staging, failures retain terminal handling; an admitted journal write continues
-through its actual outcome independently of attempt cancellation.
+Before `Complete()`, ordinary handler errors follow bounded retry/dead-letter accounting
+under the trusted local-preparation contract. Attempt cancellation retains the committed
+inbox and owner for another attempt on the same activation. The runtime owns started
+acquisitions and releases them through their actual outcomes.
+
+After `Complete()`, a handler exception is logged and retained while the ordinary
+owned write persists the completed logical outcome. The exception is reported after
+acknowledgement and cleanup. Subsequent wakeups observe completion and deduplication.
+Actual persistence failure remains authoritative and terminal; any earlier handler
+exception remains recorded. An admitted write continues independently of attempt
+cancellation, and completion of the valid synchronous final block is preserved.
 
 Optional early preparation keeps business state, outgoing intents, and inbox completion unchanged.
 Independent journal writes can persist previously staged changes while preparation
-awaits. The runtime revalidates inbox ownership before applying business effects,
-staging output, and recording `(SenderId, MessageId)` deduplication in one
-synchronous turn. Scheduling failures during preparation follow the ordinary bounded
+awaits. The runtime validates input and ownership before handler entry. The handler's
+synchronous final block joins business effects, staged output and `(SenderId, MessageId)`
+deduplication through `Complete()`. Scheduling failures during preparation follow the ordinary bounded
 retry/dead-letter policy; handlers can catch them and prepare a safe alternative outcome.
 Each started acquisition remains owned through its actual result. Attempt cleanup
 drains outstanding acquisitions and disposes unused results, including preparations

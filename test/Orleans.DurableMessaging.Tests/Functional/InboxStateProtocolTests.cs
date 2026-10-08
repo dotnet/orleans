@@ -47,7 +47,7 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task UnexpectedApplyFailure_RequestsDeactivationWithoutImplicitWrite()
+    public async Task HandlerFailureBeforeComplete_AccountsPreparationOutcomeWithoutMutationInference()
     {
         var receiver = NewGrain();
         const string route = "messages/no-earlier-write";
@@ -60,8 +60,7 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
         var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
-        var captures = grain.Captures.Count;
-        var failure = new IOException("Unexpected Apply failure must not trigger a feature write.");
+        var failure = new IOException("Local preparation failed before Complete.");
         await OnTurnAsync(context, () =>
         {
             Assert.Equal(0, manager.PendingWriteByteCount);
@@ -69,18 +68,19 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         });
 
         handler.Release();
-        Assert.Same(failure, await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
-        Assert.Equal(captures, grain.Captures.Count);
-        Assert.Equal(1, Assert.Single(grain.GetSnapshotForTest().Effects).Count);
-        Assert.Equal(1, grain.GetSnapshotForTest().InboxCount);
-        Assert.Equal(0, grain.GetSnapshotForTest().ProcessedMessageCount);
+        var completed = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
+        Assert.Contains(failure.Message, Assert.Single(completed.InboxDeadLetters).Reason, StringComparison.Ordinal);
+        Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        Assert.Empty(completed.Effects);
+        Assert.Equal(0, completed.InboxCount);
+        Assert.Equal(1, completed.ProcessedMessageCount);
+        Assert.False(grain.DeactivationFailure.Task.IsCompleted);
+        await receiver.RequestDeactivationAsync();
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
-        _ = await receiver.GetSnapshotAsync();
-        var recovered = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        var recovered = await receiver.GetSnapshotAsync();
         Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, recovered.ActivationId);
-        Assert.Equal(1, Assert.Single(recovered.Effects).Count);
+        Assert.Empty(recovered.Effects);
+        Assert.Equal(completed.InboxDeadLetters, recovered.InboxDeadLetters);
         Assert.Equal(1, recovered.ProcessedMessageCount);
         Assert.Equal(0, recovered.InboxCount);
     }

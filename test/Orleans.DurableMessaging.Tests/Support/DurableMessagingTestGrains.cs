@@ -406,7 +406,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             .WithBody(message)
             .Build();
 
-    private async ValueTask<Action> PrepareAsync(
+    private async ValueTask HandleAsync(
         DurableTestMessage message,
         IInboxHandlerContext context,
         CancellationToken cancellationToken)
@@ -438,25 +438,23 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                     .WithBody(message with { ForwardTo = null, ThrowDuringPreparation = false }).Build();
                 outgoing = await context.Outbox.PrepareSendAsync([envelope], cancellationToken);
             }
-            return () =>
+            if (NextApplyFailure is { } failure)
             {
-                _effects.TryGetValue(message.LogicalId, out var prior);
-                _effects[message.LogicalId] = new DurableEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
-                ApplyAttempted.TrySetResult();
-                if (NextApplyFailure is { } failure)
-                {
-                    NextApplyFailure = null;
-                    throw failure;
-                }
-                if (outgoing is { } output)
+                NextApplyFailure = null;
+                throw failure;
+            }
+            _effects.TryGetValue(message.LogicalId, out var prior);
+            _effects[message.LogicalId] = new DurableEffect(message.LogicalId, (prior?.Count ?? 0) + 1, message.Sequence, message.Value);
+            ApplyAttempted.TrySetResult();
+            if (outgoing is { } output)
+            {
+                context.Send(output);
+                if (context.Envelope.RouteKey == "messages/duplicate-output")
                 {
                     context.Send(output);
-                    if (context.Envelope.RouteKey == "messages/duplicate-output")
-                    {
-                        context.Send(output);
-                    }
                 }
-            };
+            }
+            context.Complete();
         }
         finally
         {
@@ -503,11 +501,11 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 || context.Envelope.RouteKey == "typed";
         }
 
-        public ValueTask<Action> PrepareAsync(
+        public ValueTask HandleAsync(
             DurableTestMessage? message,
             IInboxHandlerContext context,
             CancellationToken cancellationToken) =>
-            owner.PrepareAsync(
+            owner.HandleAsync(
                 message ?? throw new InvalidOperationException("A durable test message is required."),
                 context,
                 cancellationToken);
@@ -530,11 +528,11 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             return true;
         }
 
-        public ValueTask<Action> PrepareAsync(
+        public ValueTask HandleAsync(
             DurableTestMessage? message,
             IInboxHandlerContext context,
             CancellationToken cancellationToken) =>
-            owner.PrepareAsync(
+            owner.HandleAsync(
                 message ?? throw new InvalidOperationException("A durable test message is required."),
                 context,
                 cancellationToken);
@@ -569,11 +567,11 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             return true;
         }
 
-        public ValueTask<Action> PrepareAsync(
+        public ValueTask HandleAsync(
             DurableTestMessage? message,
             IInboxHandlerContext context,
             CancellationToken cancellationToken) =>
-            owner.PrepareAsync(
+            owner.HandleAsync(
                 message ?? throw new InvalidOperationException("A durable test message is required."),
                 context,
                 cancellationToken);
@@ -581,7 +579,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     private sealed class NullReferenceMessageHandler(DurableMessagingTestGrain owner) : IInboxHandler<string?>
     {
-        public ValueTask<Action> PrepareAsync(
+        public ValueTask HandleAsync(
             string? message,
             IInboxHandlerContext context,
             CancellationToken cancellationToken)
@@ -591,13 +589,15 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 throw new InvalidOperationException("Expected a null reference message.");
             }
 
-            return ValueTask.FromResult<Action>(() => owner._nullReferenceMessageCalls++);
+            owner._nullReferenceMessageCalls++;
+            context.Complete();
+            return ValueTask.CompletedTask;
         }
     }
 
     private sealed class NullNullableValueMessageHandler(DurableMessagingTestGrain owner) : IInboxHandler<int?>
     {
-        public ValueTask<Action> PrepareAsync(
+        public ValueTask HandleAsync(
             int? message,
             IInboxHandlerContext context,
             CancellationToken cancellationToken)
@@ -607,7 +607,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 throw new InvalidOperationException("Expected a null nullable value message.");
             }
 
-            return ValueTask.FromResult<Action>(() => owner._nullNullableValueMessageCalls++);
+            owner._nullNullableValueMessageCalls++;
+            context.Complete();
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -615,9 +617,11 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     {
         public bool CanHandle(IInboxHandlerContext context) => true;
 
-        public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
-            return ValueTask.FromResult(onCall);
+            onCall();
+            context.Complete();
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -626,9 +630,11 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         public bool CanHandle(IInboxHandlerContext context) =>
             string.Equals(context.Envelope.RouteKey, route, StringComparison.Ordinal);
 
-        public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
-            return ValueTask.FromResult(onCall);
+            onCall();
+            context.Complete();
+            return ValueTask.CompletedTask;
         }
     }
 

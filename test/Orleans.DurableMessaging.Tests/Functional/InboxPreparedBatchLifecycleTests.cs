@@ -1,17 +1,17 @@
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Serialization.Session;
 using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Functional;
 
-// The controlled outbox observes local capabilities only. All effects, inbox accounting,
-// capture, acknowledgement and replay use the real journal and receiver runtime.
 [Collection(DurableMessagingClusterCollection.Name)]
 [TestSuite("BVT")]
 [TestProvider("None")]
@@ -19,387 +19,340 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorTestBase
 {
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task PreparationDuringAction_IsTerminalEvenWhenCaughtOrReplaced(bool caught, bool replaced)
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Complete_StagesBusinessOutputAndDedupeBeforeHandlerReturn(bool prepared)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        Exception? rejection = null;
-        var replacement = new IOException("Replacement action failure must not win.");
-        handler.Remainder = (self, _) => ValueTask.FromResult<Action>(() =>
+        handler.Body = async (self, token) =>
         {
-            self.ApplyEffect();
-            try { PrepareInSynchronousPhase(self.Context, self.Output); }
-            catch (InvalidOperationException exception)
-            {
-                rejection = exception;
-                if (!caught) throw;
-                if (replaced) throw replacement;
-            }
-        });
-        using var input = await DeliverToHandlerAsync(rig);
-        var writes = WriteCount(rig);
-        handler.Continue.TrySetResult();
-        var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
-        Assert.Same(Assert.IsType<InvalidOperationException>(rejection), failure);
-        Assert.NotSame(replacement, failure);
-        Assert.Equal(1, handler.Applied);
-        Assert.Equal(1, rig.Outbox.PreparationsStarted);
-        Assert.Equal(1, rig.Outbox.PreparationsCompleted);
-        Assert.Equal(ExpectedEffect(input.Value), Assert.Single(rig.Effects).Value);
-        await AssertFaultReplayAsync(rig, input.Value, failure, writes);
+            var batch = prepared ? await self.Context.Outbox.PrepareSendAsync([self.Output], token) : null;
+            self.Mutate();
+            if (batch is null) self.Context.Send(self.Output);
+            else self.Context.Send(batch);
+            self.Context.Complete();
+            AssertCompletedState(rig, self.Context.Envelope);
+            Assert.Equal(1, Assert.Single(rig.Effects).Value.Count);
+            Assert.Single(rig.Outbox);
+        };
+        using var input = await DeliverAsync(rig);
+        using var storage = Fixture.Storage.BlockAcknowledgement(rig.Journal);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await storage.WaitUntilEnteredAsync();
+        Assert.False(finished.IsCompleted);
+        if (prepared) Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
+        storage.Release();
+        await WaitAsync(finished);
+        AssertSuccess(rig, input.Value, outputCount: 1);
+        if (prepared) AssertDisposed(rig.Outbox, 1);
+        await DeactivateAsync(rig);
+        var recovered = await rig.Receiver.GetSnapshotAsync();
+        Assert.Equal(1, Assert.Single(recovered.Effects).Count);
+        Assert.Equal(1, recovered.ProcessedMessageCount);
+        Assert.Equal(1, recovered.OutboxCount);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
     }
 
     [Fact]
-    public async Task RetainedFacade_CannotPrepareAfterAttempt_AndManagerRemainsHealthy()
+    public async Task Complete_PrecedingWriterCapturesCompletionWithBusinessAcrossReturnContinuation()
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        using var input = await DeliverToHandlerAsync(rig);
-        var ack = AwaitHandlerCompletionAsync(rig);
-        handler.Continue.TrySetResult();
-        var acknowledged = await WaitAsync(ack);
-        AssertAcknowledgedIds(acknowledged, input.Value);
-        AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 0);
-        // A subsequent handler's entry is a public, deterministic prior-retirement barrier.
-        using var next = new LifecycleHandler(rig.Effects, acquireFirst: false);
-        await RegisterAsync(rig, "prepared/next", next);
-        using var nextInput = CreateEnvelope(rig.Receiver, NewMessage(402, "next"), "prepared/next");
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, nextInput.Value)).Status);
-        await WaitAsync(next.Ready.Task);
-        Assert.Equal(1, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
-        var count = rig.Outbox.PreparationsStarted;
-        var rejection = await Assert.ThrowsAsync<InvalidOperationException>(() => OnTurnAsync(rig.Context, async () =>
+        using var input = await DeliverAsync(rig);
+        using var storage = Fixture.Storage.BlockWrite(rig.Journal);
+        var preceding = OnTurnAsync(rig.Context, async () =>
         {
-            await handler.Context.Outbox.PrepareSendAsync([handler.Output]);
-        }));
-        Assert.Contains("PrepareAsync", rejection.Message, StringComparison.Ordinal);
-        Assert.Equal(count, rig.Outbox.PreparationsStarted);
-        await AssertHealthyWriteAsync(rig);
-        next.Continue.TrySetResult();
-        var completed = await Fixture.WaitForEffectCountAsync(rig.Receiver, 2);
-        Assert.Equal(2, completed.ProcessedMessageCount);
-        Assert.Equal(0, completed.InboxCount);
-        Assert.Equal(new[] { input.Value.MessageId, nextInput.Value.MessageId }.Order(),
-            completed.Effects.Select(effect => effect.LogicalId).Order());
-        Assert.All(completed.Effects, effect => Assert.Equal(1, effect.Count));
-        Assert.Equal(0, rig.Outbox.SendCalls);
-        Assert.Equal(0, completed.OutboxCount);
-        Assert.Empty(completed.InboxDeadLetters);
-        Assert.Empty(completed.OutboxDeadLetters);
-        Assert.Equal(new[] { (input.Value.SenderId, input.Value.MessageId), (nextInput.Value.SenderId, nextInput.Value.MessageId) }
-            .OrderBy(key => key.MessageId), rig.ProcessedState.Select(entry => entry.Key).OrderBy(key => key.MessageId));
-        await DeactivateAsync(rig);
-        AssertDisposed(rig.Outbox, 1);
+            rig.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "prior";
+            await rig.Manager.WriteStateAsync(CancellationToken.None);
+        });
+        await storage.WaitUntilEnteredAsync();
+        var queued = OnTurnAsync(rig.Context, async () => await rig.Manager.WriteStateAsync(CancellationToken.None));
+        handler.Body = (self, _) =>
+        {
+            self.Mutate();
+            self.Context.Send(self.Output);
+            self.Context.Complete();
+            AssertCompletedState(rig, input.Value);
+            storage.Release();
+            return ValueTask.CompletedTask;
+        };
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(Task.WhenAll(preceding, queued, finished));
+        Assert.All(rig.Grain.Captures.Where(snapshot => snapshot.Effects.Count != 0), snapshot =>
+        {
+            Assert.Equal(0, snapshot.InboxCount);
+            Assert.Equal(1, snapshot.ProcessedMessageCount);
+            Assert.Equal(1, snapshot.OutboxCount);
+        });
+        AssertSuccess(rig, input.Value, outputCount: 1);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task RetainedFacade_CannotPrepareDuringAnotherAttemptEvenWhenCaught(bool caught)
+    public async Task HandlerFailure_BeforeVsAfterCompleteUsesActualLogicalOutcome(bool completed)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        var error = new IOException("Handler outcome.");
+        handler.Body = (self, _) =>
+        {
+            if (completed)
+            {
+                self.Mutate();
+                self.Context.Send(self.Output);
+                self.Context.Complete();
+            }
+            throw error;
+        };
+        using var input = await DeliverAsync(rig);
+        var timer = GetTimer(events, rig);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+        var stop = (GrainTimerEvents.TickStop)(await TimerStoppedAsync(events, timer)).Payload!;
+        if (completed)
+        {
+            Assert.Same(error, stop.Exception);
+            AssertSuccess(rig, input.Value, outputCount: 1);
+            Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+        }
+        else
+        {
+            Assert.Null(stop.Exception);
+            Assert.Empty(rig.Effects);
+            Assert.Empty(rig.Outbox);
+            Assert.Equal(input.Value.MessageId, Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters).MessageId);
+        }
+        await AssertHealthyAsync(rig);
+        await DeactivateAsync(rig);
+        var replay = await rig.Receiver.GetSnapshotAsync();
+        Assert.Equal(completed ? 1 : 0, replay.Effects.Count);
+        Assert.Equal(1, replay.ProcessedMessageCount);
+        Assert.Equal(completed ? 0 : 1, replay.InboxDeadLetters.Count);
+    }
+
+    [Fact]
+    public async Task SuccessfulReturnWithoutComplete_IsExplicitTerminalMisuse()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        handler.Body = (_, _) => ValueTask.CompletedTask;
+        using var input = await DeliverAsync(rig);
+        var writes = Writes(rig);
+        handler.Release.TrySetResult();
+        var error = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
+        Assert.Contains("must call Complete", error.Message, StringComparison.Ordinal);
+        Assert.Equal(writes, Writes(rig));
+        Assert.Single(rig.Inbox);
+        Assert.Empty(rig.Processed);
+        Assert.Empty(rig.Effects);
+        await AssertFailureReplayAsync(rig, input.Value);
+    }
+
+    [Fact]
+    public async Task RepeatedComplete_SameActiveAttemptStagesExactlyOnce()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        handler.Body = (self, _) =>
+        {
+            self.Mutate();
+            self.Context.Complete();
+            var timestamp = Assert.Single(rig.Processed).Value;
+            self.Context.Complete();
+            Assert.Equal(timestamp, Assert.Single(rig.Processed).Value);
+            return ValueTask.CompletedTask;
+        };
+        using var input = await DeliverAsync(rig);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+        AssertSuccess(rig, input.Value, outputCount: 0);
+        await AssertHealthyAsync(rig);
+    }
+
+    [Theory]
+    [InlineData("send")]
+    [InlineData("prepare")]
+    [InlineData("complete")]
+    public async Task RetainedContext_AfterRetirementRejectsAndKeepsOwnerHealthy(string operation)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        using var input = await DeliverAsync(rig);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            OnTurnAsync(rig.Context, () => InvokeContextOperation(handler, operation)));
+        Assert.Contains("inactive or different attempt", error.Message, StringComparison.Ordinal);
+        AssertSuccess(rig, input.Value, outputCount: 0);
+        await AssertHealthyAsync(rig);
+    }
+
+    [Theory]
+    [InlineData("send")]
+    [InlineData("prepare")]
+    [InlineData("complete")]
+    public async Task RetainedContext_DuringOtherAttemptRetainsFirstMisuse(string operation)
     {
         var rig = await CreateAsync();
         using var first = rig.Handler;
-        first.Remainder = (_, _) => ValueTask.FromResult<Action>(() => { });
-        using var one = await DeliverToHandlerAsync(rig);
-        var ack = AwaitHandlerCompletionAsync(rig);
-        first.Continue.TrySetResult();
-        AssertAcknowledgedIds(await WaitAsync(ack), one.Value);
-        using var second = new LifecycleHandler(rig.Effects);
-        Exception? rejection = null;
-        second.Remainder = async (self, token) =>
+        using var one = await DeliverAsync(rig);
+        var finished = await FinishedAsync(rig);
+        first.Release.TrySetResult();
+        await WaitAsync(finished);
+        using var second = new TestHandler(rig.Effects);
+        InvalidOperationException? rejection = null;
+        second.Body = (_, _) =>
         {
-            try { await first.Context.Outbox.PrepareSendAsync([self.Output], token); }
-            catch (InvalidOperationException exception)
-            {
-                rejection = exception;
-                if (!caught) throw;
-            }
-            return self.ApplyEffect;
+            try { InvokeContextOperation(first, operation); }
+            catch (InvalidOperationException error) { rejection = error; }
+            throw new IOException("Replacement failure.");
         };
-        await RegisterAsync(rig, "prepared/next", second);
-        using var two = CreateEnvelope(rig.Receiver, NewMessage(403, "second"), "prepared/next");
+        await OnTurnAsync(rig.Context, () =>
+            rig.Context.ActivationServices.GetRequiredService<IDurableInbox>().RegisterHandler("async/next", second));
+        using var two = CreateEnvelope(rig.Receiver, NewMessage(502, "next"), "async/next");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, two.Value)).Status);
-        await WaitAsync(second.Ready.Task);
-        Assert.Equal(1, rig.Outbox.PreparedBatches[0].DisposeCalls);
-        var writes = WriteCount(rig);
-        second.Continue.TrySetResult();
+        await WaitAsync(second.Entered.Task);
+        second.Release.TrySetResult();
         var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
         Assert.Same(Assert.IsType<InvalidOperationException>(rejection), failure);
-        Assert.Equal(0, second.Applied);
-        Assert.Equal(2, rig.Outbox.PreparationsStarted);
-        Assert.Equal(2, rig.Outbox.PreparationsCompleted);
-        Assert.Empty(rig.Effects);
-        await AssertFaultReplayAsync(rig, two.Value, failure, writes, processedBefore: 1, expectedBatchCount: 2);
+        Assert.Equal(1, Assert.Single(rig.Effects).Value.Count);
+        await WaitAsync(rig.Context.Deactivated);
     }
 
-    [Fact]
-    public async Task SelectionPreparation_IsRejectedBeforeProviderAcquisition()
+    [Theory]
+    [InlineData("send")]
+    [InlineData("prepare")]
+    public async Task OperationAfterComplete_RejectsButPersistsCompletedLogicalOutcome(string operation)
     {
-        var rig = await CreateAsync(register: false);
+        var rig = await CreateAsync();
         using var handler = rig.Handler;
-        var selection = new PreparingSelectionHandler();
-        await OnTurnAsync(rig.Context, () =>
-            rig.Context.ActivationServices.GetRequiredService<IDurableInbox>().RegisterHandler(selection));
-        using var input = CreateEnvelope(rig.Receiver, NewMessage(404, "selection"), "prepared/selection");
-        var rejection = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverAsync(rig.Receiver, input.Value));
-        Assert.IsType<InvalidOperationException>(selection.Rejection);
-        Assert.Contains("selection is read-only", rejection.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(0, selection.PrepareCalls);
-        Assert.Equal(0, rig.Outbox.PreparationsStarted);
-        Assert.Equal(0, rig.Outbox.PreparationsCompleted);
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        InvalidOperationException? rejection = null;
+        handler.Body = (self, _) =>
+        {
+            self.Mutate();
+            self.Context.Complete();
+            try { InvokeContextOperation(self, operation); }
+            catch (InvalidOperationException error) { rejection = error; }
+            return ValueTask.CompletedTask;
+        };
+        using var input = await DeliverAsync(rig);
+        var timer = GetTimer(events, rig);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+        Assert.Same(rejection, ((GrainTimerEvents.TickStop)(await TimerStoppedAsync(events, timer)).Payload!).Exception);
+        Assert.Contains("already called Complete", rejection!.Message, StringComparison.Ordinal);
+        AssertSuccess(rig, input.Value, outputCount: 0);
         Assert.Empty(rig.Outbox.PreparedBatches);
-        Assert.Equal(0, rig.Outbox.SendCalls);
+        await AssertHealthyAsync(rig);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task UnderlyingSendFailure_RetainsFirstCauseEvenWhenCaught(bool prepared, bool replaced)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        var error = new IOException("Underlying Send failed.");
+        rig.Outbox.NextSendFailure = error;
+        handler.Body = async (self, token) =>
+        {
+            var batch = prepared ? await self.Context.Outbox.PrepareSendAsync([self.Output], token) : null;
+            try
+            {
+                if (batch is null) self.Context.Send(self.Output);
+                else self.Context.Outbox.Send(batch);
+            }
+            catch (IOException)
+            {
+                if (replaced) throw new InvalidOperationException("Replacement.");
+            }
+            self.Context.Complete();
+        };
+        using var input = await DeliverAsync(rig);
+        var writes = Writes(rig);
+        handler.Release.TrySetResult();
+        Assert.Same(error, await WaitAsync(rig.Grain.DeactivationFailure.Task));
+        Assert.Equal(writes, Writes(rig));
         Assert.Empty(rig.Effects);
         Assert.Empty(rig.Outbox);
-        Assert.Equal(0, rig.Grain.GetSnapshotForTest().InboxCount);
-        await AssertHealthyWriteAsync(rig);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task UncaughtPreparationFailure_RetainsAcquiredBatchUntilAccountingAck(bool providerFailure)
-    {
-        var rig = await CreateAsync();
-        using var handler = rig.Handler;
-        var failure = new IOException(providerFailure ? "Second preparation failed." : "Ordinary handler preparation failed.");
-        handler.Remainder = async (self, token) =>
-        {
-            if (providerFailure) await self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token);
-            throw failure;
-        };
-        using var input = await DeliverToHandlerAsync(rig);
-        using var preparation = providerFailure ? rig.Outbox.BlockNextPreparation() : null;
-        var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
-        var ack = AwaitHandlerCompletionAsync(rig);
-        try
-        {
-            handler.Continue.TrySetResult();
-            if (preparation is not null)
-            {
-                await preparation.WaitAsync();
-                preparation.Fail(failure);
-            }
-            await storage.WaitUntilEnteredAsync();
-            Assert.Equal(0, handler.Applied);
-            Assert.Equal(0, rig.Outbox.SendCalls);
-            Assert.Empty(rig.Outbox);
-            Assert.Empty(rig.Effects);
-            Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
-            Assert.False(ack.IsCompleted);
-        }
-        finally { storage.Release(); }
-        var acknowledged = await WaitAsync(ack);
-        AssertAcknowledgedIds(acknowledged, input.Value);
-        Assert.Equal(new[] { 1 }, acknowledged.DisposeCalls);
-        AssertDeadLetter(acknowledged.Snapshot, input.Value, failure.Message, attempts: 1);
-        Assert.Equal(providerFailure ? 2 : 1, rig.Outbox.PreparationsStarted);
-        Assert.Equal(rig.Outbox.PreparationsStarted, rig.Outbox.PreparationsCompleted);
-        if (preparation is not null) Assert.Same(failure, preparation.Operation!.Failure);
-        await AssertHealthyWriteAsync(rig);
-        await DeactivateAsync(rig);
-        AssertDisposed(rig.Outbox, 1);
-        AssertDeadLetter(await rig.Receiver.GetSnapshotAsync(), input.Value, failure.Message, attempts: 1);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task CaughtPreparationFailure_AllowsSafeAlternativeAndUnusedBatchRetires(bool acquireFirst)
-    {
-        var rig = await CreateAsync(acquireFirst);
-        using var handler = rig.Handler;
-        var failure = new IOException("Provider acquisition failed, not an API violation.");
-        Exception? caught = null;
-        handler.Remainder = async (self, token) =>
-        {
-            try { await self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token); }
-            catch (IOException exception) { caught = exception; }
-            return self.ApplyEffect;
-        };
-        using var input = await DeliverToHandlerAsync(rig);
-        using var preparation = rig.Outbox.BlockNextPreparation();
-        var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
-        var ack = AwaitHandlerCompletionAsync(rig);
-        try
-        {
-            handler.Continue.TrySetResult();
-            await preparation.WaitAsync();
-            preparation.Fail(failure);
-            await storage.WaitUntilEnteredAsync();
-            Assert.Same(failure, caught);
-            Assert.All(rig.Outbox.PreparedBatches, batch => Assert.Equal(0, batch.DisposeCalls));
-            Assert.Equal(1, handler.Applied);
-            Assert.Equal(0, rig.Outbox.SendCalls);
-            Assert.Empty(rig.Outbox);
-            Assert.False(ack.IsCompleted);
-        }
-        finally { storage.Release(); }
-        var acknowledged = await WaitAsync(ack);
-        AssertAcknowledgedIds(acknowledged, input.Value);
-        Assert.Equal(acquireFirst ? new[] { 1 } : Array.Empty<int>(), acknowledged.DisposeCalls);
-        AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 0);
-        Assert.Same(failure, preparation.Operation!.Failure);
-        Assert.Equal(acquireFirst ? 2 : 1, rig.Outbox.PreparationsStarted);
-        Assert.Equal(rig.Outbox.PreparationsStarted, rig.Outbox.PreparationsCompleted);
-        await AssertHealthyWriteAsync(rig);
-        await DeactivateAsync(rig);
-        AssertDisposed(rig.Outbox, acquireFirst ? 1 : 0);
-        AssertSuccess(await rig.Receiver.GetSnapshotAsync(), input.Value, outputCount: 0);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task SuccessfulAction_RetainsUsedAndUnusedBatchesThroughActualAck(bool throughOutbox)
-    {
-        var rig = await CreateAsync();
-        using var handler = rig.Handler;
-        handler.Remainder = async (self, token) =>
-        {
-            self.UnusedBatch = await self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token);
-            return () =>
-            {
-                self.ApplyEffect();
-                self.Send(self.Batch!, throughOutbox);
-                self.Send(self.Batch!, throughOutbox); // Same live batch, same Action: idempotent staging.
-            };
-        };
-        using var input = await DeliverToHandlerAsync(rig);
-        var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
-        var ack = AwaitHandlerCompletionAsync(rig);
-        try
-        {
-            handler.Continue.TrySetResult();
-            await storage.WaitUntilEnteredAsync();
-            Assert.Equal(1, handler.Applied);
-            Assert.Equal(2, rig.Outbox.SendCalls);
-            Assert.Equal(handler.Output.MessageId, Assert.Single(rig.Outbox).Key);
-            Assert.Equal(handler.Output.MessageId, Assert.Single(rig.Grain.OutputCaptures[^1]));
-            Assert.Equal(2, rig.Outbox.PreparedBatches.Count);
-            Assert.True(rig.Outbox.PreparedBatches[0].IsStaged);
-            Assert.False(rig.Outbox.PreparedBatches[1].IsStaged);
-            Assert.All(rig.Outbox.PreparedBatches, batch => Assert.Equal(0, batch.DisposeCalls));
-            Assert.False(ack.IsCompleted);
-        }
-        finally { storage.Release(); }
-        var acknowledged = await WaitAsync(ack);
-        AssertAcknowledgedIds(acknowledged, input.Value);
-        Assert.Equal(new[] { 1, 1 }, acknowledged.DisposeCalls);
-        AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 1);
-        Assert.Equal(handler.Output.MessageId, Assert.Single(rig.Outbox.PreparedBatches[0].MessageIds));
-        Assert.Equal(handler.UnusedOutput.MessageId, Assert.Single(rig.Outbox.PreparedBatches[1].MessageIds));
-        Assert.Equal(2, rig.Outbox.PreparationsStarted);
-        Assert.Equal(2, rig.Outbox.PreparationsCompleted);
-        await AssertHealthyWriteAsync(rig);
-        await DeactivateAsync(rig);
-        AssertDisposed(rig.Outbox, 2);
-        AssertSuccess(await rig.Receiver.GetSnapshotAsync(), input.Value, outputCount: 1);
-        Assert.Equal(handler.Output.MessageId, Assert.Single(Fixture.GetStagedOutput(rig.Receiver)).MessageId);
-    }
-
-    [Fact]
-    public async Task ThrowingActionBeforeSend_RetiresBatchAndReplaysOriginalCause()
-    {
-        var rig = await CreateAsync();
-        using var handler = rig.Handler;
-        var failure = new IOException("Action failed before sending.");
-        handler.Remainder = (_, _) => ValueTask.FromResult<Action>(() => throw failure);
-        using var input = await DeliverToHandlerAsync(rig);
-        var writes = WriteCount(rig);
-        handler.Continue.TrySetResult();
-        Assert.Same(failure, await WaitAsync(rig.Grain.DeactivationFailure.Task));
-        Assert.Equal(1, handler.Applied);
-        Assert.Empty(rig.Effects);
-        await AssertFaultReplayAsync(rig, input.Value, failure, writes);
-    }
-
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(true, true)]
-    public async Task UnderlyingSendFailure_FirstExceptionWinsEvenWhenCaughtOrReplaced(bool throughOutbox, bool replaced)
-    {
-        var rig = await CreateAsync();
-        using var handler = rig.Handler;
-        var failure = new IOException("Synchronous staging failed.");
-        var replacement = new IOException("Replacement must not become the terminal cause.");
-        Exception? caught = null;
-        handler.Remainder = (self, _) => ValueTask.FromResult<Action>(() =>
-        {
-            self.ApplyEffect();
-            try { self.Send(self.Batch!, throughOutbox); }
-            catch (IOException exception) { caught = exception; }
-            if (replaced) throw replacement;
-        });
-        using var input = await DeliverToHandlerAsync(rig);
-        await OnTurnAsync(rig.Context, () => rig.Outbox.NextSendFailure = failure);
-        var writes = WriteCount(rig);
-        handler.Continue.TrySetResult();
-        Assert.Same(failure, await WaitAsync(rig.Grain.DeactivationFailure.Task));
-        Assert.Same(failure, caught);
-        Assert.Equal(1, handler.Applied);
-        Assert.Equal(ExpectedEffect(input.Value), Assert.Single(rig.Effects).Value);
         Assert.Equal(1, rig.Outbox.SendCalls);
-        Assert.Null(rig.Outbox.NextSendFailure);
-        Assert.False(Assert.Single(rig.Outbox.PreparedBatches).IsStaged);
-        await AssertFaultReplayAsync(rig, input.Value, failure, writes, expectedSendCalls: 1);
+        await AssertFailureReplayAsync(rig, input.Value);
+        AssertDisposed(rig.Outbox, prepared ? 1 : 0);
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task CompletedUnconsumedPreparation_RejectsBeforeAction(bool synchronous, bool canceled)
+    [InlineData("foreign")]
+    [InlineData("disposed")]
+    [InlineData("wrong-attempt")]
+    public async Task InvalidBatch_RejectsAndRespectsOriginalOwner(string kind)
     {
-        var rig = await CreateAsync(acquireFirst: false);
+        var rig = await CreateAsync();
         using var handler = rig.Handler;
-        Exception providerFailure = canceled
-            ? new OperationCanceledException("Unconsumed canceled acquisition.", new CancellationToken(canceled: true))
-            : new IOException("Unconsumed failed acquisition.");
-        handler.Remainder = async (self, token) =>
+        IPreparedOutboxBatch? batch = null;
+        if (kind == "foreign")
         {
-            var preparation = self.Context.Outbox.PrepareSendAsync([self.Output], token);
-            if (!synchronous)
+            await OnTurnAsync(rig.Context, async () =>
+                batch = await rig.Outbox.PrepareSendAsync([CreateOutput(rig)], CancellationToken.None));
+        }
+        else if (kind == "wrong-attempt")
+        {
+            handler.Body = async (self, token) =>
             {
-                // Completion notification and status inspection leave GetResult unconsumed.
-                var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                preparation.GetAwaiter().OnCompleted(() => completed.TrySetResult());
-                await completed.Task.WaitAsync(token);
+                batch = await self.Context.Outbox.PrepareSendAsync([self.Output], token);
+                self.Context.Complete();
+            };
+            using var seed = await DeliverAsync(rig);
+            var done = await FinishedAsync(rig);
+            handler.Release.TrySetResult();
+            await WaitAsync(done);
+        }
+        using var current = kind == "wrong-attempt" ? new TestHandler(rig.Effects) : null;
+        var active = current ?? handler;
+        if (current is not null)
+            await OnTurnAsync(rig.Context, () => rig.Context.ActivationServices.GetRequiredService<IDurableInbox>()
+                .RegisterHandler("async/next", current));
+        active.Body = async (self, token) =>
+        {
+            if (kind == "disposed")
+            {
+                batch = await self.Context.Outbox.PrepareSendAsync([self.Output], token);
+                batch.Dispose();
             }
-            Assert.True(preparation.IsCompleted);
-            Assert.False(preparation.IsCompletedSuccessfully);
-            Assert.Equal(canceled, preparation.IsCanceled);
-            Assert.Equal(!canceled, preparation.IsFaulted);
-            return self.ApplyEffect;
+            self.Context.Send(batch!);
+            self.Context.Complete();
         };
-        using var input = await DeliverToHandlerAsync(rig);
-        using var acquisition = rig.Outbox.BlockNextPreparation();
-        if (synchronous) acquisition.Fail(providerFailure);
-        var writes = WriteCount(rig);
-        var completion = GetHandlerCompletion(rig);
-        handler.Continue.TrySetResult();
-        await acquisition.WaitAsync();
-        if (!synchronous) acquisition.Fail(providerFailure);
-        await WaitAsync(completion);
-        Assert.Equal(0, handler.Applied);
-        Assert.True(rig.Grain.DeactivationFailure.Task.IsCompletedSuccessfully);
-        var failure = Assert.IsType<InvalidOperationException>(await rig.Grain.DeactivationFailure.Task);
-        Assert.Contains("consume", failure.Message, StringComparison.Ordinal);
-        if (canceled)
-            Assert.Equal(((OperationCanceledException)providerFailure).CancellationToken,
-                Assert.IsAssignableFrom<OperationCanceledException>(failure.InnerException).CancellationToken);
-        else
-            Assert.Same(providerFailure, failure.InnerException);
-        Assert.Empty(rig.Effects);
-        Assert.Equal(1, rig.Outbox.PreparationsStarted);
-        Assert.Equal(1, rig.Outbox.PreparationsCompleted);
-        await AssertFaultReplayAsync(rig, input.Value, failure, writes, expectedBatchCount: 0);
+        using var input = CreateEnvelope(rig.Receiver, NewMessage(503, kind),
+            current is null ? "async/handler" : "async/next");
+        try
+        {
+            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, input.Value)).Status);
+            await WaitAsync(active.Entered.Task);
+            active.Release.TrySetResult();
+            var error = await WaitAsync(rig.Grain.DeactivationFailure.Task);
+            if (kind == "disposed") Assert.IsType<ObjectDisposedException>(error);
+            else Assert.IsType<InvalidOperationException>(error);
+            await WaitAsync(rig.Context.Deactivated);
+            if (kind == "foreign") Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
+            else AssertDisposed(rig.Outbox, 1);
+        }
+        finally
+        {
+            if (kind == "foreign") batch?.Dispose();
+        }
+        AssertDisposed(rig.Outbox, 1);
     }
 
     [Theory]
@@ -411,193 +364,44 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
     [InlineData(true, false, true)]
     [InlineData(true, true, false)]
     [InlineData(true, true, true)]
-    public async Task ConsumedPreparationFailure_AllowsCaughtAlternativeWithPreservedContext(bool synchronous, bool canceled, bool asTask)
+    public async Task CaughtAcquisitionFailure_AllowsSafeAlternative(bool synchronous, bool canceled, bool asTask)
     {
-        var rig = await CreateAsync(acquireFirst: false);
+        var rig = await CreateAsync();
         using var handler = rig.Handler;
         Exception providerFailure = canceled
-            ? new OperationCanceledException("Caught canceled acquisition.", new CancellationToken(canceled: true))
-            : new IOException("Caught failed acquisition.");
+            ? new OperationCanceledException("Provider canceled.", new CancellationToken(canceled: true))
+            : new IOException("Provider failed.");
         Exception? caught = null;
-        handler.Remainder = async (self, token) =>
+        handler.Body = async (self, token) =>
         {
-            var scheduler = TaskScheduler.Current;
             try
             {
-                var preparation = self.Context.Outbox.PrepareSendAsync([self.Output], token);
-                if (asTask) await preparation.AsTask();
-                else await preparation;
+                var pending = self.Context.Outbox.PrepareSendAsync([self.Output], token);
+                if (asTask) await pending.AsTask();
+                else await pending;
             }
-            catch (Exception exception) when (exception is IOException or OperationCanceledException)
-            {
-                caught = exception;
-            }
-            Assert.Same(scheduler, TaskScheduler.Current);
+            catch (Exception error) when (error is IOException or OperationCanceledException) { caught = error; }
             Assert.Same(rig.Context, ReceiverTestServices.CurrentGrainContext);
             var alternative = await self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token);
-            self.UnusedBatch = alternative;
-            return () =>
-            {
-                self.ApplyEffect();
-                self.Context.Send(alternative);
-            };
+            self.Mutate();
+            self.Context.Send(alternative);
+            self.Context.Complete();
         };
-        using var input = await DeliverToHandlerAsync(rig);
+        using var input = await DeliverAsync(rig);
         using var acquisition = rig.Outbox.BlockNextPreparation();
         if (synchronous) acquisition.Fail(providerFailure);
-        using var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
-        var ack = AwaitHandlerCompletionAsync(rig);
-        handler.Continue.TrySetResult();
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
         await acquisition.WaitAsync();
         if (!synchronous) acquisition.Fail(providerFailure);
-        await storage.WaitUntilEnteredAsync();
-        Assert.All(rig.Outbox.PreparedBatches, batch => Assert.Equal(0, batch.DisposeCalls));
-        Assert.False(ack.IsCompleted);
-        storage.Release();
-        var acknowledged = await WaitAsync(ack);
-        if (canceled && asTask)
+        await WaitAsync(finished);
+        if (canceled)
             Assert.Equal(((OperationCanceledException)providerFailure).CancellationToken,
                 Assert.IsAssignableFrom<OperationCanceledException>(caught).CancellationToken);
-        else
-            Assert.Same(providerFailure, caught);
-        AssertAcknowledgedIds(acknowledged, input.Value);
-        AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 1);
-        Assert.Equal(handler.UnusedOutput.MessageId, Assert.Single(rig.Outbox).Key);
-        Assert.Equal(1, handler.Applied);
-        Assert.Equal(1, rig.Outbox.SendCalls);
-        Assert.Equal(2, rig.Outbox.PreparationsStarted);
-        Assert.Equal(2, rig.Outbox.PreparationsCompleted);
-        Assert.Equal(new[] { 1 }, acknowledged.DisposeCalls);
-        await AssertHealthyWriteAsync(rig);
-        await DeactivateAsync(rig);
+        else Assert.Same(providerFailure, caught);
+        AssertSuccess(rig, input.Value, outputCount: 1);
         AssertDisposed(rig.Outbox, 1);
-        AssertSuccess(await rig.Receiver.GetSnapshotAsync(), input.Value, outputCount: 1);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task TaskConversion_ConsumesValueTaskButLeavesTaskFailureToCaller(bool canceled)
-    {
-        var rig = await CreateAsync(acquireFirst: false);
-        using var handler = rig.Handler;
-        Exception providerFailure = canceled
-            ? new OperationCanceledException("Task-owned cancellation.", new CancellationToken(canceled: true))
-            : new IOException("Task-owned failure.");
-        Task<IPreparedOutboxBatch>? callerOwnedTask = null;
-        handler.Remainder = (self, token) =>
-        {
-            callerOwnedTask = self.Context.Outbox.PrepareSendAsync([self.Output], token).AsTask();
-            Assert.True(callerOwnedTask.IsCompleted);
-            Assert.Equal(canceled, callerOwnedTask.IsCanceled);
-            Assert.Equal(!canceled, callerOwnedTask.IsFaulted);
-            return ValueTask.FromResult<Action>(self.ApplyEffect);
-        };
-        using var input = await DeliverToHandlerAsync(rig);
-        using var acquisition = rig.Outbox.BlockNextPreparation();
-        acquisition.Fail(providerFailure);
-        var ack = AwaitHandlerCompletionAsync(rig);
-        handler.Continue.TrySetResult();
-        var acknowledged = await WaitAsync(ack);
-        AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 0);
-        Assert.Equal(1, handler.Applied);
-        Assert.Equal(0, rig.Outbox.SendCalls);
-        Assert.NotNull(callerOwnedTask);
-        if (canceled)
-        {
-            var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => callerOwnedTask);
-            Assert.Equal(((OperationCanceledException)providerFailure).CancellationToken, failure.CancellationToken);
-        }
-        else
-        {
-            Assert.Same(providerFailure, await Assert.ThrowsAsync<IOException>(() => callerOwnedTask));
-        }
-        Assert.Empty(rig.Outbox.PreparedBatches);
-        await AssertHealthyWriteAsync(rig);
-        await DeactivateAsync(rig);
-        AssertSuccess(await rig.Receiver.GetSnapshotAsync(), input.Value, outputCount: 0);
-    }
-
-    [Fact]
-    public async Task CompletedUnconsumedSuccessfulPreparation_RetiresUnusedBatchAfterAck()
-    {
-        var rig = await CreateAsync(acquireFirst: false);
-        using var handler = rig.Handler;
-        handler.Remainder = (self, token) =>
-        {
-            var preparation = self.Context.Outbox.PrepareSendAsync([self.Output], token);
-            Assert.True(preparation.IsCompletedSuccessfully);
-            return ValueTask.FromResult<Action>(self.ApplyEffect);
-        };
-        using var input = await DeliverToHandlerAsync(rig);
-        using var storage = Fixture.Storage.BlockAcknowledgement(rig.JournalId);
-        var ack = AwaitHandlerCompletionAsync(rig);
-        handler.Continue.TrySetResult();
-        await storage.WaitUntilEnteredAsync();
-        Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
-        Assert.False(ack.IsCompleted);
-        storage.Release();
-        var acknowledged = await WaitAsync(ack);
-        AssertSuccess(acknowledged.Snapshot, input.Value, outputCount: 0);
-        Assert.Equal(new[] { 1 }, acknowledged.DisposeCalls);
-        Assert.Equal(1, handler.Applied);
-        Assert.Equal(0, rig.Outbox.SendCalls);
-        Assert.False(Assert.Single(rig.Outbox.PreparedBatches).IsStaged);
-        await AssertHealthyWriteAsync(rig);
-        await DeactivateAsync(rig);
-        AssertDisposed(rig.Outbox, 1);
-        AssertSuccess(await rig.Receiver.GetSnapshotAsync(), input.Value, outputCount: 0);
-    }
-
-    [Fact]
-    public async Task CanceledBeforePreparation_SubmitCompletesWithoutStagingOrWaitingForAck()
-    {
-        var rig = await CreateAsync(acquireFirst: false);
-        using var handler = rig.Handler;
-        using var input = await DeliverToHandlerAsync(rig);
-        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
-        var ownershipId = job.Metadata!["orleans.messaging.ownership-id"];
-        var writes = WriteCount(rig);
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-        await OnTurnAsync(rig.Context, async () =>
-        {
-            var type = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
-            var extension = rig.Context.ActivationServices.GetRequiredService(type);
-            var operations = CancellationCleanupProbe.Field<System.Collections.IList>(extension, "_pendingWrites");
-            var existing = operations.Cast<object>().ToArray();
-            Assert.Single(existing);
-            var generation = type.GetField("_stateGeneration", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(extension)!;
-            var owner = Activator.CreateInstance(type.GetNestedType("PumpOwner", BindingFlags.NonPublic)!,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, binder: null,
-                args: [ownershipId, job, generation], culture: null)!;
-            var handlerWrite = type.GetNestedType("HandlerWrite", BindingFlags.NonPublic)!;
-            var operation = Activator.CreateInstance(handlerWrite,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, binder: null,
-                args: [owner, input.Value, cancellation.Token], culture: null)!;
-            Assert.Equal(0, rig.Manager.PendingWriteByteCount);
-            var submission = (ValueTask)type.GetMethod("SubmitAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(extension, [operation])!;
-            Assert.True(submission.IsCompletedSuccessfully);
-            await submission;
-            Assert.True((bool)handlerWrite.GetProperty("Skipped")!.GetValue(operation)!);
-            Assert.Equal(existing, operations.Cast<object>());
-            var finished = (TaskCompletionSource)handlerWrite.GetProperty("Finished")!.GetValue(operation)!;
-            Assert.True(finished.Task.IsCompletedSuccessfully);
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-                await ((IDurableJobFeatureHandler)extension).ExecuteJobAsync(new JobContext(job), cancellation.Token));
-        });
-        Assert.Equal(1, handler.PreparationCalls);
-        Assert.Equal(0, handler.Applied);
-        Assert.Equal(0, rig.Outbox.PreparationsStarted);
-        Assert.Equal(writes, WriteCount(rig));
-        Assert.Empty(rig.Effects);
-        Assert.Single(rig.InboxState);
-        Assert.Empty(rig.ProcessedState);
-        var completion = AwaitHandlerCompletionAsync(rig);
-        handler.Continue.TrySetResult();
-        await WaitAsync(completion);
-        await AssertHealthyWriteAsync(rig);
+        await AssertHealthyAsync(rig);
     }
 
     [Theory]
@@ -605,661 +409,495 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public async Task ForgottenPreparation_RejectsBeforeActionAndDrainsLateProviderOutcome(bool acquireFirst, bool providerFails)
+    public async Task UnusedAcquisition_RetiresActualLateOutcomeAfterAck(bool late, bool providerFails)
     {
-        var rig = await CreateAsync(acquireFirst);
+        var rig = await CreateAsync();
         using var handler = rig.Handler;
-        handler.Remainder = (self, token) =>
+        handler.Body = (self, token) =>
         {
-            _ = self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token);
-            return ValueTask.FromResult<Action>(self.ApplyEffect);
+            _ = self.Context.Outbox.PrepareSendAsync([self.Output], token);
+            self.Mutate();
+            self.Context.Complete();
+            return ValueTask.CompletedTask;
         };
-        using var input = await DeliverToHandlerAsync(rig);
-        using var preparation = rig.Outbox.BlockNextPreparation(ignoreCancellation: true);
-        var providerFailure = new IOException("Late unawaited provider failure.");
-        var writes = WriteCount(rig);
-        handler.Continue.TrySetResult();
-        await preparation.WaitAsync();
-        var failure = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
-        Assert.Equal("Inbox handlers must await every batch preparation before returning their synchronous apply action.", failure.Message);
-        Assert.Equal(0, handler.Applied);
-        Assert.False(preparation.Operation!.Completed.IsCompleted);
-        Assert.False(rig.Context.Deactivated.IsCompleted);
-        Assert.Equal(acquireFirst ? 2 : 1, rig.Outbox.PreparationsStarted);
-        Assert.Equal(acquireFirst ? 1 : 0, rig.Outbox.PreparationsCompleted);
-        Assert.All(rig.Outbox.PreparedBatches, batch => Assert.Equal(0, batch.DisposeCalls));
-        if (providerFails) preparation.Fail(providerFailure);
-        else preparation.Release();
-        await WaitAsync(preparation.Operation.Completed);
-        if (providerFails) Assert.Same(providerFailure, preparation.Operation.Failure);
-        else
+        using var input = await DeliverAsync(rig);
+        using var acquisition = rig.Outbox.BlockNextPreparation(ignoreCancellation: true);
+        var error = new IOException("Unused acquisition failed.");
+        if (!late)
         {
-            Assert.Null(preparation.Operation.Failure);
-            Assert.Equal(handler.UnusedOutput.MessageId, Assert.Single(preparation.Operation.Batch!.MessageIds));
+            if (providerFails) acquisition.Fail(error);
+            else acquisition.Release();
         }
-        await AssertFaultReplayAsync(rig, input.Value, failure, writes,
-            expectedBatchCount: (acquireFirst ? 1 : 0) + (providerFails ? 0 : 1));
-        Assert.Equal(acquireFirst ? 2 : 1, rig.Outbox.PreparationsCompleted);
-        Assert.Equal((acquireFirst ? 1 : 0) + (providerFails ? 0 : 1), rig.Outbox.PreparedBatches.Count);
-        Assert.All(rig.Outbox.PreparedBatches, batch => Assert.False(batch.IsStaged));
+        var finished = await FinishedAsync(rig);
+        using var storage = Fixture.Storage.BlockAcknowledgement(rig.Journal);
+        handler.Release.TrySetResult();
+        await acquisition.WaitAsync();
+        await storage.WaitUntilEnteredAsync();
+        Assert.False(finished.IsCompleted);
+        storage.Release();
+        if (late)
+        {
+            Assert.False(finished.IsCompleted);
+            if (providerFails) acquisition.Fail(error);
+            else acquisition.Release();
+        }
+        await WaitAsync(finished);
+        AssertSuccess(rig, input.Value, outputCount: 0);
+        Assert.True(acquisition.Operation!.Completed.IsCompleted);
+        if (providerFails) Assert.Same(error, acquisition.Operation.Failure);
+        AssertDisposed(rig.Outbox, providerFails ? 0 : 1);
+        await AssertHealthyAsync(rig);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task PendingPreparation_AfterTerminalMisuse_DrainsWithoutReplacingOriginalCause(bool providerFails)
+    public async Task MissingComplete_DrainsAcquisitionWithoutReplacingMisuse(bool providerFails)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        Exception? rejection = null;
-        var replacement = new IOException("Ordinary failure after terminal misuse.");
-        handler.Remainder = (self, token) =>
+        handler.Body = (self, token) =>
         {
-            _ = self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token);
-            try { self.Context.Send(self.Batch!); }
-            catch (InvalidOperationException exception) { rejection = exception; }
-            throw replacement;
+            _ = self.Context.Outbox.PrepareSendAsync([self.Output], token);
+            return ValueTask.CompletedTask;
         };
-        using var input = await DeliverToHandlerAsync(rig);
-        using var preparation = rig.Outbox.BlockNextPreparation(ignoreCancellation: true);
-        var providerFailure = new IOException("Late acquisition failure must not replace misuse.");
-        var writes = WriteCount(rig);
-        handler.Continue.TrySetResult();
-        await preparation.WaitAsync();
-        var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
-        Assert.Same(Assert.IsType<InvalidOperationException>(rejection), failure);
-        Assert.Contains("synchronous apply action", failure.Message, StringComparison.Ordinal);
-        Assert.NotSame(replacement, failure);
-        Assert.Equal(0, handler.Applied);
-        Assert.False(preparation.Operation!.Completed.IsCompleted);
+        using var input = await DeliverAsync(rig);
+        using var acquisition = rig.Outbox.BlockNextPreparation(ignoreCancellation: true);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await acquisition.WaitAsync();
+        var error = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
+        Assert.Contains("must call Complete", error.Message, StringComparison.Ordinal);
+        Assert.False(finished.IsCompleted);
         Assert.False(rig.Context.Deactivated.IsCompleted);
-        Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
-        if (providerFails) preparation.Fail(providerFailure);
-        else preparation.Release();
-        await WaitAsync(preparation.Operation.Completed);
-        if (providerFails) Assert.Same(providerFailure, preparation.Operation.Failure);
-        else Assert.Null(preparation.Operation.Failure);
-        await AssertFaultReplayAsync(rig, input.Value, failure, writes, expectedBatchCount: providerFails ? 1 : 2);
-        Assert.Equal(2, rig.Outbox.PreparationsStarted);
-        Assert.Equal(2, rig.Outbox.PreparationsCompleted);
-        Assert.Equal(providerFails ? 1 : 2, rig.Outbox.PreparedBatches.Count);
-    }
-
-    [Theory]
-    [InlineData(false, "foreign")]
-    [InlineData(true, "foreign")]
-    [InlineData(false, "disposed")]
-    [InlineData(true, "disposed")]
-    [InlineData(false, "wrong-attempt")]
-    [InlineData(true, "wrong-attempt")]
-    public async Task CurrentFacade_InvalidBatchIsTerminalAndRespectsApplicationOwnership(bool throughOutbox, string kind)
-    {
-        var rig = await CreateAsync();
-        using var first = rig.Handler;
-        IPreparedOutboxBatch? invalid = null;
-        JournaledTestOutbox.BatchObservation? applicationObservation = null;
-        LifecycleHandler current = first;
-        var processedBefore = 0;
-        if (kind == "foreign")
-        {
-            using var applicationOutput = CreateEnvelope(rig.Receiver, NewMessage(405, "application-owned"), "output");
-            await OnTurnAsync(rig.Context, async () =>
-            {
-                invalid = await rig.Outbox.PrepareSendAsync([applicationOutput.Value]);
-            });
-            applicationObservation = Assert.Single(rig.Outbox.PreparedBatches);
-        }
-        else if (kind == "wrong-attempt")
-        {
-            first.Remainder = (_, _) => ValueTask.FromResult<Action>(() => { });
-            using var one = await DeliverToHandlerAsync(rig);
-            var ack = AwaitHandlerCompletionAsync(rig);
-            first.Continue.TrySetResult();
-            AssertAcknowledgedIds(await WaitAsync(ack), one.Value);
-            invalid = first.Batch;
-            current = new LifecycleHandler(rig.Effects);
-            await RegisterAsync(rig, "prepared/next", current);
-            processedBefore = 1;
-        }
-        try
-        {
-            using var currentLease = current;
-            Exception? rejection = null;
-            current.Remainder = (self, _) => ValueTask.FromResult<Action>(() =>
-            {
-                if (kind == "disposed")
-                {
-                    invalid = self.Batch!;
-                    invalid.Dispose();
-                }
-                try { self.Send(invalid!, throughOutbox); }
-                catch (Exception exception) { rejection = exception; }
-                self.ApplyEffect(); // Catching capability misuse cannot make this durable.
-            });
-            using var input = CreateEnvelope(rig.Receiver, NewMessage(406, "invalid-capability"),
-                kind == "wrong-attempt" ? "prepared/next" : "prepared/lifecycle");
-            Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, input.Value)).Status);
-            await WaitAsync(current.Ready.Task);
-            if (kind == "wrong-attempt") Assert.Equal(1, rig.Outbox.PreparedBatches[0].DisposeCalls);
-            var writes = WriteCount(rig);
-            current.Continue.TrySetResult();
-            var failure = await WaitAsync(rig.Grain.DeactivationFailure.Task);
-            if (kind == "disposed") Assert.IsType<ObjectDisposedException>(rejection);
-            else Assert.IsType<InvalidOperationException>(rejection);
-            Assert.Same(rejection, failure);
-            Assert.Equal(1, current.Applied);
-            Assert.Equal(ExpectedEffect(input.Value), Assert.Single(rig.Effects).Value);
-            Assert.Equal(0, rig.Outbox.SendCalls);
-            Assert.Equal(writes, WriteCount(rig));
-            Assert.Empty(rig.Outbox);
-            Assert.Equal((input.Value.SenderId, input.Value.MessageId), Assert.Single(rig.InboxState).Key);
-            Assert.Equal(processedBefore, rig.ProcessedState.Count);
-            Assert.False(rig.ProcessedState.ContainsKey((input.Value.SenderId, input.Value.MessageId)));
-            await WaitAsync(rig.Context.Deactivated);
-            foreach (var observation in rig.Outbox.PreparedBatches)
-                Assert.Equal(ReferenceEquals(observation, applicationObservation) ? 0 : 1, observation.DisposeCalls);
-            if (applicationObservation is not null) Assert.False(applicationObservation.IsStaged);
-            var expectedPreparations = kind == "disposed" ? 1 : 2;
-            Assert.Equal(expectedPreparations, rig.Outbox.PreparationsStarted);
-            Assert.Equal(expectedPreparations, rig.Outbox.PreparationsCompleted);
-            Assert.Equal(expectedPreparations, rig.Outbox.PreparedBatches.Count);
-            Assert.All(rig.Outbox.PreparedBatches, batch => Assert.False(batch.IsStaged));
-            await rig.Receiver.GetSnapshotAsync();
-            var recovered = await Fixture.WaitForDeadLetterCountAsync(rig.Receiver, 1);
-            AssertDeadLetter(recovered, input.Value, processedBefore: processedBefore);
-            Assert.True(Processed(Fixture.GetGrainContext(rig.Receiver)).ContainsKey((input.Value.SenderId, input.Value.MessageId)));
-            Assert.Empty(Fixture.GetStagedOutput(rig.Receiver));
-        }
-        finally
-        {
-            // Only the application owns a raw batch; runtime wrapper handles are retired by the inbox.
-            if (applicationObservation is not null) invalid!.Dispose();
-        }
-        if (applicationObservation is not null) Assert.Equal(1, applicationObservation.DisposeCalls);
+        var providerError = new IOException("Late provider.");
+        if (providerFails) acquisition.Fail(providerError);
+        else acquisition.Release();
+        await WaitAsync(finished);
+        Assert.Same(error, await rig.Grain.DeactivationFailure.Task);
+        await AssertFailureReplayAsync(rig, input.Value);
+        AssertDisposed(rig.Outbox, providerFails ? 0 : 1);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task OwnedHandlerCancellation_DrainsLateAcquisitionAndPreservesCancellation(bool providerFails)
+    public async Task AttemptCancellation_BeforeCompleteDrainsLateAcquisitionAndKeepsOwner(bool providerFails)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        OperationCanceledException? cancellationFailure = null;
-        handler.Remainder = async (self, token) =>
+        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        handler.Body = async (self, token) =>
         {
-            using var observation = token.Register(() => cancellationObserved.TrySetResult());
-            _ = self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token);
-            await cancellationObserved.Task;
-            try { token.ThrowIfCancellationRequested(); }
-            catch (OperationCanceledException exception) { cancellationFailure = exception; throw; }
-            return self.ApplyEffect;
+            using var registration = token.Register(() => canceled.TrySetResult());
+            _ = self.Context.Outbox.PrepareSendAsync([self.Output], token);
+            await canceled.Task;
+            token.ThrowIfCancellationRequested();
         };
-        using var input = await DeliverToHandlerAsync(rig);
-        var timer = Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
-            item => ReferenceEquals(item.GrainContext, rig.Context)
-                && item.Timer.GetType().GenericTypeArguments is [var state]
-                && state.DeclaringType == ReceiverTestServices.GetImplementationType("DurableInboxExtension")).Timer;
-        using var preparation = rig.Outbox.BlockNextPreparation(ignoreCancellation: true);
-        var writes = WriteCount(rig);
-        var completion = GetHandlerCompletion(rig);
-        handler.Continue.TrySetResult();
-        await preparation.WaitAsync();
+        using var input = await DeliverAsync(rig);
+        using var acquisition = rig.Outbox.BlockNextPreparation(ignoreCancellation: true);
+        var timer = GetTimer(events, rig);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await acquisition.WaitAsync();
         await OnTurnAsync(rig.Context, timer.Dispose);
-        await WaitAsync(cancellationObserved.Task);
+        await WaitAsync(canceled.Task);
+        Assert.False(finished.IsCompleted);
         Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
-        Assert.False(completion.IsCompleted);
-        Assert.False(preparation.Operation!.Completed.IsCompleted);
-        Assert.False(rig.Context.Deactivated.IsCompleted);
-        Assert.Equal(0, handler.Applied);
-        Assert.Equal(0, rig.Outbox.SendCalls);
-        Assert.Empty(rig.Outbox.Messages);
-        Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
-        var lateFailure = new IOException("Provider failed after owned handler cancellation.");
-        if (providerFails) preparation.Fail(lateFailure);
-        else preparation.Release();
-        await WaitAsync(preparation.Operation.Completed);
-        Assert.NotSame(lateFailure, cancellationFailure);
-        if (providerFails) Assert.Same(lateFailure, preparation.Operation.Failure);
-        else Assert.Null(preparation.Operation.Failure);
-        await WaitAsync(completion);
-        await events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
-            item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, timer),
-            TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.IsAssignableFrom<OperationCanceledException>(cancellationFailure);
-        Assert.Equal(writes, WriteCount(rig));
-        Assert.Single(rig.InboxState);
-        Assert.Empty(rig.ProcessedState);
-        AssertDisposed(rig.Outbox, providerFails ? 1 : 2);
-        await AssertHealthyWriteAsync(rig);
-        Assert.Equal(2, rig.Outbox.PreparationsStarted);
-        Assert.Equal(2, rig.Outbox.PreparationsCompleted);
-        handler.Remainder = static (self, _) => ValueTask.FromResult<Action>(self.ApplyEffect);
+        var providerError = new IOException("Late canceled acquisition.");
+        if (providerFails) acquisition.Fail(providerError);
+        else acquisition.Release();
+        await WaitAsync(finished);
+        await TimerStoppedAsync(events, timer);
+        Assert.Single(rig.Inbox);
+        Assert.Empty(rig.Processed);
+        Assert.Empty(rig.Effects);
+        AssertDisposed(rig.Outbox, providerFails ? 0 : 1);
+        await AssertHealthyAsync(rig);
+        handler.Body = static (self, _) => { self.Mutate(); self.Context.Complete(); return default; };
         Assert.Same(DurableJobRunResult.Completed, await RunPumpAsync(rig));
-        AssertSuccess(rig.Grain.GetSnapshotForTest(), input.Value, outputCount: 0);
+        AssertSuccess(rig, input.Value, outputCount: 0);
         Assert.Same(rig.Context, Fixture.GetGrainContext(rig.Receiver));
-        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task DurableJobCancellation_BeforeApplyPreservesActivationAndCommittedOwner(bool returnAction)
+    public async Task DurableJobCancellation_BeforeCompleteRetainsExactOwnerAndRetries(bool cancellationCheck)
     {
-        var rig = await CreateAsync(acquireFirst: false);
+        var rig = await CreateAsync();
         using var handler = rig.Handler;
-        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        using var input = await DeliverToHandlerAsync(rig);
-        var localTimer = Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
-            item => ReferenceEquals(item.GrainContext, rig.Context) && IsInboxTimer(item.Timer)).Timer;
+        using var localEvents = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        using var input = await DeliverAsync(rig);
+        var localTimer = GetTimer(localEvents, rig);
         await OnTurnAsync(rig.Context, localTimer.Dispose);
-        await WaitForTimerAsync(events, localTimer);
+        await TimerStoppedAsync(localEvents, localTimer);
         Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
-        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
-        var ownerId = rig.Grain.GetSnapshotForTest().InboxJobId;
-        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        OperationCanceledException? cancellationFailure = null;
-        handler.Remainder = async (self, token) =>
+        OperationCanceledException? expected = null;
+        handler.Body = async (_, token) =>
         {
-            ready.TrySetResult();
-            await resume.Task;
-            if (!returnAction)
+            entered.TrySetResult();
+            try
             {
-                try { token.ThrowIfCancellationRequested(); }
-                catch (OperationCanceledException exception) { cancellationFailure = exception; throw; }
+                if (cancellationCheck)
+                {
+                    await resume.Task;
+                    token.ThrowIfCancellationRequested();
+                }
+                else await resume.Task.WaitAsync(token);
             }
-            return self.ApplyEffect;
+            catch (OperationCanceledException error) { expected = error; throw; }
         };
-        handler.Continue.TrySetResult();
-        using var attempt = new CancellationTokenSource();
-        var run = await StartPumpAsync(rig, events, attempt.Token);
+        handler.Release.TrySetResult();
+        var snapshot = rig.Grain.GetSnapshotForTest();
+        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
+        var run = new JobContext(job);
+        var feature = (IDurableJobFeatureHandler)rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
+        using var jobEvents = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        using var cancellation = new CancellationTokenSource();
+        await OnTurnAsync(rig.Context, async () => Assert.True(
+            (await feature.ExecuteJobAsync(run, cancellation.Token)).IsInProgress));
+        var timer = GetTimer(jobEvents, rig);
         try
         {
-            await WaitAsync(ready.Task);
-            await OnTurnAsync(rig.Context, attempt.Cancel);
+            await WaitAsync(entered.Task);
+            await OnTurnAsync(rig.Context, cancellation.Cancel);
         }
         finally
         {
             resume.TrySetResult();
         }
-        await WaitForTimerAsync(events, run.Timer);
-        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => PollPumpAsync(rig, run.Context));
-        if (!returnAction) Assert.Same(cancellationFailure, failure);
-        Assert.Equal(0, handler.Applied);
+        await TimerStoppedAsync(jobEvents, timer);
+        var failure = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            OnTurnAsync(rig.Context, async () => await feature.ExecuteJobAsync(run, TestContext.Current.CancellationToken)));
+        Assert.Same(expected, failure);
+        Assert.Single(rig.Inbox);
+        Assert.Empty(rig.Processed);
         Assert.Empty(rig.Effects);
-        Assert.Single(rig.InboxState);
-        Assert.Empty(rig.ProcessedState);
-        var snapshot = rig.Grain.GetSnapshotForTest();
-        Assert.Equal(ownerId, snapshot.InboxJobId);
-        Assert.Same(job, snapshot.InboxJob);
-        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
-        await AssertHealthyWriteAsync(rig);
-        handler.Remainder = static (self, _) => ValueTask.FromResult<Action>(self.ApplyEffect);
+        Assert.Equal(snapshot.InboxJobId, rig.Grain.GetSnapshotForTest().InboxJobId);
+        Assert.Same(snapshot.InboxJob, rig.Grain.GetSnapshotForTest().InboxJob);
+        await AssertHealthyAsync(rig);
+        handler.Body = static (self, _) => { self.Mutate(); self.Context.Complete(); return default; };
         Assert.Same(DurableJobRunResult.Completed, await RunPumpAsync(rig));
-        AssertSuccess(rig.Grain.GetSnapshotForTest(), input.Value, outputCount: 0);
+        AssertSuccess(rig, input.Value, outputCount: 0);
         Assert.Same(rig.Context, Fixture.GetGrainContext(rig.Receiver));
-    }
-
-    [Fact]
-    public async Task CancellationAfterPartialApply_RemainsTerminalAndReplaysCommittedState()
-    {
-        var rig = await CreateAsync(acquireFirst: false);
-        using var handler = rig.Handler;
-        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        IGrainTimer timer = null!;
-        OperationCanceledException? failure = null;
-        handler.Remainder = (self, token) => ValueTask.FromResult<Action>(() =>
-        {
-            self.ApplyEffect();
-            timer.Dispose();
-            failure = new OperationCanceledException("Apply canceled after staging a business effect.", token);
-            throw failure;
-        });
-        using var input = await DeliverToHandlerAsync(rig);
-        timer = Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
-            item => ReferenceEquals(item.GrainContext, rig.Context) && IsInboxTimer(item.Timer)).Timer;
-        var writes = WriteCount(rig);
-        handler.Continue.TrySetResult();
-        Assert.Same(Assert.IsAssignableFrom<OperationCanceledException>(
-            await WaitAsync(rig.Grain.DeactivationFailure.Task)), failure);
-        Assert.Equal(1, handler.Applied);
-        Assert.Equal(ExpectedEffect(input.Value), Assert.Single(rig.Effects).Value);
-        await AssertFaultReplayAsync(rig, input.Value, failure!, writes, expectedBatchCount: 0);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task AttemptCancellation_AfterStagingRetainsOwnedWriteOutcome(bool failWrite)
+    public async Task CancellationInFinalBlock_CompleteAndOwnedWritePreserveOutcome(bool failWrite)
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        using var input = await DeliverToHandlerAsync(rig);
-        var timer = Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
-            item => ReferenceEquals(item.GrainContext, rig.Context) && IsInboxTimer(item.Timer)).Timer;
-        var completion = GetHandlerCompletion(rig);
-        var writes = WriteCount(rig);
-        using var storage = Fixture.Storage.BlockWrite(rig.JournalId);
-        handler.Continue.TrySetResult();
+        IGrainTimer timer = null!;
+        handler.Body = async (self, token) =>
+        {
+            var batch = await self.Context.Outbox.PrepareSendAsync([self.Output], token);
+            self.Mutate();
+            timer.Dispose();
+            self.Context.Send(batch);
+            self.Context.Complete();
+        };
+        using var input = await DeliverAsync(rig);
+        timer = GetTimer(events, rig);
+        using var storage = Fixture.Storage.BlockWrite(rig.Journal);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
         await storage.WaitUntilEnteredAsync();
-        await OnTurnAsync(rig.Context, timer.Dispose);
-        Assert.False(completion.IsCompleted);
+        AssertCompletedState(rig, input.Value);
+        Assert.False(finished.IsCompleted);
         Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
-        var failure = new OperationCanceledException("Storage canceled after handler staging.", new CancellationToken(canceled: true));
+        var failure = new OperationCanceledException("Actual storage canceled.", new CancellationToken(canceled: true));
         if (failWrite) storage.Fail(failure);
         else storage.Release();
-        await WaitAsync(completion);
+        await WaitAsync(finished);
+        AssertDisposed(rig.Outbox, 1);
         if (failWrite)
         {
             Assert.Same(failure, await WaitAsync(rig.Grain.DeactivationFailure.Task));
-            Assert.Equal(writes, WriteCount(rig));
-            AssertSuccess(rig.Grain.GetSnapshotForTest(), input.Value, outputCount: 0);
-            await WaitAsync(rig.Context.Deactivated);
-            AssertDisposed(rig.Outbox, 1);
-            await rig.Receiver.GetSnapshotAsync();
-            AssertDeadLetter(await Fixture.WaitForDeadLetterCountAsync(rig.Receiver, 1), input.Value);
-            Assert.Empty(Fixture.GetStagedOutput(rig.Receiver));
+            await AssertFailureReplayAsync(rig, input.Value);
         }
         else
         {
-            AssertSuccess(rig.Grain.GetSnapshotForTest(), input.Value, outputCount: 0);
-            AssertDisposed(rig.Outbox, 1);
-            await AssertHealthyWriteAsync(rig);
+            AssertSuccess(rig, input.Value, outputCount: 1);
+            await AssertHealthyAsync(rig);
         }
     }
 
-    private static bool IsInboxTimer(IGrainTimer timer) =>
-        timer.GetType().GenericTypeArguments is [var state]
-        && state.DeclaringType == ReceiverTestServices.GetImplementationType("DurableInboxExtension");
-
-    private static Task WaitForTimerAsync(DiagnosticEventCollector events, IGrainTimer timer) =>
-        events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
-            item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, timer),
-            TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-
-    private async Task<(JobContext Context, IGrainTimer Timer)> StartPumpAsync(
-        Harness rig, DiagnosticEventCollector events, CancellationToken cancellationToken)
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CompletionWrite_HookOutcomePreservesActualCommit(bool postCommit)
     {
-        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
-        var run = new JobContext(job);
-        var createdBefore = events.Events.Count;
-        await OnTurnAsync(rig.Context, async () =>
-        {
-            var extension = rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
-            Assert.Same(rig.Context, ReceiverTestServices.CurrentGrainContext);
-            Assert.True((await ((IDurableJobFeatureHandler)extension).ExecuteJobAsync(run, cancellationToken)).IsInProgress);
-        });
-        var timer = Assert.Single(events.Events.Skip(createdBefore).Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
-            item => ReferenceEquals(item.GrainContext, rig.Context) && IsInboxTimer(item.Timer)).Timer;
-        return (run, timer);
-    }
-
-    private static async Task<DurableJobRunResult> PollPumpAsync(Harness rig, JobContext run)
-    {
-        DurableJobRunResult result = null!;
-        await OnTurnAsync(rig.Context, async () =>
-        {
-            var extension = rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
-            Assert.Same(rig.Context, ReceiverTestServices.CurrentGrainContext);
-            result = await ((IDurableJobFeatureHandler)extension).ExecuteJobAsync(run, TestContext.Current.CancellationToken);
-        });
-        return result;
-    }
-
-    private async Task<DurableJobRunResult> RunPumpAsync(Harness rig)
-    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
         using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
-        var run = await StartPumpAsync(rig, events, TestContext.Current.CancellationToken);
-        await WaitForTimerAsync(events, run.Timer);
-        return await PollPumpAsync(rig, run.Context);
+        using var input = await DeliverAsync(rig);
+        var error = new IOException("Journal hook failed.");
+        await OnTurnAsync(rig.Context, () => rig.Manager.Hooks.Add(new JournaledStateHook
+        {
+            BeforeOperation = postCommit ? null : (_, _) => throw error,
+            AfterOperation = postCommit ? (_, _) => throw error : null
+        }));
+        var timer = GetTimer(events, rig);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await WaitAsync(finished);
+        if (postCommit)
+        {
+            Assert.IsType<JournaledStatePostCommitException>(
+                ((GrainTimerEvents.TickStop)(await TimerStoppedAsync(events, timer)).Payload!).Exception);
+            AssertSuccess(rig, input.Value, outputCount: 0);
+            await OnTurnAsync(rig.Context, rig.Manager.Hooks.Clear);
+            await AssertHealthyAsync(rig);
+        }
+        else
+        {
+            var failure = Assert.IsType<JournaledStatePreCommitException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
+            Assert.Same(error, failure.InnerException);
+            await AssertFailureReplayAsync(rig, input.Value);
+        }
     }
 
-    private sealed class JobContext(DurableJob job) : IJobRunContext
+    [Fact]
+    public async Task PostCompleteHandlerFailure_WithStorageFailureKeepsStorageCauseAuthoritative()
     {
-        public DurableJob Job { get; } = job;
-        public string RunId { get; } = Guid.NewGuid().ToString("N");
-        public int DequeueCount => 1;
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        var handlerError = new InvalidOperationException("After Complete.");
+        handler.Body = (self, _) => { self.Mutate(); self.Context.Complete(); throw handlerError; };
+        using var input = await DeliverAsync(rig);
+        using var storage = Fixture.Storage.BlockWrite(rig.Journal);
+        var finished = await FinishedAsync(rig);
+        handler.Release.TrySetResult();
+        await storage.WaitUntilEnteredAsync();
+        var storageError = new IOException("Storage failed.");
+        storage.Fail(storageError);
+        await WaitAsync(finished);
+        Assert.Same(storageError, await WaitAsync(rig.Grain.DeactivationFailure.Task));
+        await AssertFailureReplayAsync(rig, input.Value);
     }
 
-    private async Task<Harness> CreateAsync(bool acquireFirst = true, bool register = true)
+    [Fact]
+    public async Task StopAndDelete_DrainCompletedWriteAndLateUnusedAcquisition()
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        handler.Body = (self, token) =>
+        {
+            _ = self.Context.Outbox.PrepareSendAsync([self.Output], token);
+            self.Mutate();
+            self.Context.Complete();
+            return default;
+        };
+        using var input = await DeliverAsync(rig);
+        using var acquisition = rig.Outbox.BlockNextPreparation(ignoreCancellation: true);
+        using var storage = Fixture.Storage.BlockAcknowledgement(rig.Journal);
+        handler.Release.TrySetResult();
+        await acquisition.WaitAsync();
+        await storage.WaitUntilEnteredAsync();
+        var deleting = rig.Receiver.DeleteStateAndDeactivateAsync();
+        Assert.False(deleting.IsCompleted);
+        storage.Release();
+        acquisition.Release();
+        await WaitAsync(deleting);
+        await WaitAsync(rig.Context.Deactivated);
+        AssertDisposed(rig.Outbox, 1);
+        var recovered = await rig.Receiver.GetSnapshotAsync();
+        Assert.Empty(recovered.Effects);
+        Assert.Equal(0, recovered.InboxCount);
+        Assert.Equal(0, recovered.ProcessedMessageCount);
+        Assert.Equal(0, recovered.OutboxCount);
+    }
+
+    private async Task<Rig> CreateAsync()
     {
         var receiver = NewGrain();
         await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var services = context.ActivationServices;
         var effects = services.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEffect>>("test-effects");
-        var result = new Harness(receiver, context, Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance),
-            services.GetRequiredService<IJournaledStateManager>(),
-            (JournaledTestOutbox)services.GetRequiredService<IDurableOutbox>(), effects,
-            new LifecycleHandler(effects, acquireFirst));
-        if (register) await RegisterAsync(result, "prepared/lifecycle", result.Handler);
-        return result;
+        var handler = new TestHandler(effects);
+        var rig = new Rig(receiver, context, Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance),
+            services.GetRequiredService<IJournaledStateManager>(), (JournaledTestOutbox)services.GetRequiredService<IDurableOutbox>(),
+            effects, handler,
+            services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"),
+            services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("__orleans.durable-messaging.inbox-processed"));
+        await OnTurnAsync(context, () => services.GetRequiredService<IDurableInbox>().RegisterHandler("async/handler", handler));
+        return rig;
     }
 
-    private static Task RegisterAsync(Harness rig, string route, IInboxHandler handler) =>
-        OnTurnAsync(rig.Context, () => rig.Context.ActivationServices.GetRequiredService<IDurableInbox>().RegisterHandler(route, handler));
-
-    private async Task<EnvelopeLease> DeliverToHandlerAsync(Harness rig)
+    private async Task<EnvelopeLease> DeliverAsync(Rig rig)
     {
-        var input = CreateEnvelope(rig.Receiver, NewMessage(401, "prepared-lifecycle"), "prepared/lifecycle");
+        var input = CreateEnvelope(rig.Receiver, NewMessage(501, "async-handler"), "async/handler");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, input.Value)).Status);
-        await WaitAsync(rig.Handler.Ready.Task);
-        Assert.Equal((input.Value.SenderId, input.Value.MessageId), Assert.Single(rig.InboxState).Key);
-        if (rig.Handler.Batch is not null)
-        {
-            var batch = Assert.Single(rig.Outbox.PreparedBatches);
-            Assert.Equal(rig.Handler.Output.MessageId, Assert.Single(batch.MessageIds));
-            Assert.False(batch.IsStaged);
-            Assert.Equal(0, batch.DisposeCalls);
-        }
+        await WaitAsync(rig.Handler.Entered.Task);
         return input;
     }
 
-    private static async Task<Acknowledgement> AwaitHandlerCompletionAsync(Harness rig)
+    private static DurableEnvelope CreateOutput(Rig rig) => new DurableEnvelopeBuilder(
+        rig.Context.ActivationServices.GetRequiredService<SerializerSessionPool>(), rig.Receiver.GetGrainId())
+        .To(rig.Receiver.GetGrainId(), "output").WithBody(41).Build();
+
+    private static void InvokeContextOperation(TestHandler handler, string operation)
     {
-        await GetHandlerCompletion(rig);
-        Acknowledgement completion = null!;
-        await OnTurnAsync(rig.Context, () => completion = new(
-            rig.Grain.GetSnapshotForTest(), rig.Outbox.PreparedBatches.Select(batch => batch.DisposeCalls).ToArray(),
-            rig.ProcessedState.Select(entry => entry.Key).ToArray(), rig.InboxState.Select(entry => entry.Key).ToArray()));
-        return completion;
+        switch (operation)
+        {
+            case "complete": handler.Context.Complete(); break;
+            case "send": handler.Context.Send(handler.Output); break;
+            case "prepare": _ = handler.Context.Outbox.PrepareSendAsync([handler.Output]); break;
+            default: throw new ArgumentException(nameof(operation));
+        }
     }
 
-    private static Task GetHandlerCompletion(Harness rig)
+    private static void AssertCompletedState(Rig rig, DurableEnvelope input)
     {
-        var extension = rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
-        var pending = CancellationCleanupProbe.Field<System.Collections.IList>(extension, "_pendingWrites");
-        var operation = Assert.Single(pending.Cast<object>(), item => item.GetType().Name == "HandlerWrite");
-        var finished = (TaskCompletionSource)operation.GetType().GetProperty("Finished")!.GetValue(operation)!;
-        return finished.Task;
+        Assert.Empty(rig.Inbox);
+        Assert.Equal((input.SenderId, input.MessageId), Assert.Single(rig.Processed).Key);
     }
 
-    private int WriteCount(Harness rig) => Fixture.Storage.GetSuccessfulWriteCount(rig.JournalId);
+    private static void AssertSuccess(Rig rig, DurableEnvelope input, int outputCount)
+    {
+        AssertCompletedState(rig, input);
+        Assert.Equal(new DurableEffect(input.MessageId, 1, 501, "async-handler"), Assert.Single(rig.Effects).Value);
+        Assert.Equal(outputCount, rig.Outbox.Count);
+        Assert.Empty(rig.Grain.GetSnapshotForTest().InboxDeadLetters);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+    }
 
-    private static async Task AssertHealthyWriteAsync(Harness rig)
+    private int Writes(Rig rig) => Fixture.Storage.GetSuccessfulWriteCount(rig.Journal);
+    private static async Task AssertHealthyAsync(Rig rig)
     {
         await OnTurnAsync(rig.Context, async () =>
         {
-            rig.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "healthy-after-preparation";
-            await rig.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            rig.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "healthy";
+            await rig.Manager.WriteStateAsync(CancellationToken.None);
         });
         Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
     }
 
-    private static async Task DeactivateAsync(Harness rig)
+    private static async Task DeactivateAsync(Rig rig)
     {
         await rig.Receiver.RequestDeactivationAsync();
         await WaitAsync(rig.Context.Deactivated);
     }
 
-    private async Task AssertFaultReplayAsync(Harness rig, DurableEnvelope input, Exception failure, int writes,
-        int processedBefore = 0, int expectedSendCalls = 0, int expectedBatchCount = 1)
+    private async Task AssertFailureReplayAsync(Rig rig, DurableEnvelope input)
     {
-        Assert.Equal(writes, WriteCount(rig));
-        Assert.Equal(expectedSendCalls, rig.Outbox.SendCalls);
-        Assert.Empty(rig.Outbox);
-        var live = rig.Grain.GetSnapshotForTest();
-        Assert.Equal(1, live.InboxCount);
-        Assert.Equal(processedBefore, live.ProcessedMessageCount);
-        Assert.Empty(live.InboxDeadLetters);
-        Assert.Equal((input.SenderId, input.MessageId), Assert.Single(rig.InboxState).Key);
-        Assert.False(rig.ProcessedState.ContainsKey((input.SenderId, input.MessageId)));
         await WaitAsync(rig.Context.Deactivated);
-        AssertDisposed(rig.Outbox, expectedBatchCount);
         await rig.Receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForDeadLetterCountAsync(rig.Receiver, 1);
-        AssertDeadLetter(recovered, input, processedBefore: processedBefore);
-        Assert.True(Processed(Fixture.GetGrainContext(rig.Receiver)).ContainsKey((input.SenderId, input.MessageId)));
-        Assert.Empty(Fixture.GetStagedOutput(rig.Receiver));
+        Assert.Empty(recovered.Effects);
+        Assert.Equal(0, recovered.OutboxCount);
+        Assert.Equal(1, recovered.ProcessedMessageCount);
+        Assert.Equal(input.MessageId, Assert.Single(recovered.InboxDeadLetters).MessageId);
     }
 
     private static void AssertDisposed(JournaledTestOutbox outbox, int expected)
     {
         Assert.Equal(expected, outbox.PreparedBatches.Count);
-        Assert.All(outbox.PreparedBatches, batch =>
+        Assert.All(outbox.PreparedBatches, batch => Assert.Equal(1, batch.DisposeCalls));
+    }
+
+    private static async Task<Task> FinishedAsync(Rig rig)
+    {
+        Task result = null!;
+        await OnTurnAsync(rig.Context, () =>
         {
-            Assert.Equal(1, batch.DisposeCalls);
-            Assert.Same(batch, outbox.Preparations.Single(operation => operation.Id == batch.PreparationId).Batch);
+            var extension = rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
+            var pending = CancellationCleanupProbe.Field<System.Collections.IList>(extension, "_pendingWrites");
+            var operation = Assert.Single(pending.Cast<object>(), item => item.GetType().Name == "HandlerWrite");
+            result = ((TaskCompletionSource)operation.GetType().GetProperty("Finished")!.GetValue(operation)!).Task;
         });
+        return result;
     }
 
-    private static IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> Processed(IGrainContext context) =>
-        context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>(
-            "__orleans.durable-messaging.inbox-processed");
+    private static IGrainTimer GetTimer(DiagnosticEventCollector events, Rig rig) =>
+        Assert.Single(events.Events.Select(item => item.Payload).OfType<GrainTimerEvents.Created>(),
+            item => ReferenceEquals(item.GrainContext, rig.Context) && IsInboxTimer(item.Timer)).Timer;
+    private static bool IsInboxTimer(IGrainTimer timer) => timer.GetType().GenericTypeArguments is [var type]
+        && type.DeclaringType == ReceiverTestServices.GetImplementationType("DurableInboxExtension");
+    private static Task<DiagnosticEvent> TimerStoppedAsync(DiagnosticEventCollector events, IGrainTimer timer) =>
+        events.WaitForEventAsync(nameof(GrainTimerEvents.TickStop),
+            item => item.Payload is GrainTimerEvents.TickStop stop && ReferenceEquals(stop.Timer, timer),
+            TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
 
-    private static IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> Inbox(IGrainContext context) =>
-        context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(
-            "__orleans.durable-messaging.inbox");
-
-    private static void AssertAcknowledgedIds(Acknowledgement acknowledgement, DurableEnvelope input)
+    private async Task<DurableJobRunResult> RunPumpAsync(Rig rig)
     {
-        Assert.Equal((input.SenderId, input.MessageId), Assert.Single(acknowledgement.ProcessedIds));
-        Assert.Empty(acknowledgement.InboxIds);
+        using var events = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
+        var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, rig.Receiver.GetGrainId()));
+        var run = new JobContext(job);
+        var feature = (IDurableJobFeatureHandler)rig.Context.ActivationServices.GetRequiredService(CancellationCleanupProbe.ExtensionType);
+        await OnTurnAsync(rig.Context, async () => Assert.True(
+            (await feature.ExecuteJobAsync(run, TestContext.Current.CancellationToken)).IsInProgress));
+        var timer = GetTimer(events, rig);
+        await TimerStoppedAsync(events, timer);
+        DurableJobRunResult result = null!;
+        await OnTurnAsync(rig.Context, async () => result = await feature.ExecuteJobAsync(run, TestContext.Current.CancellationToken));
+        return result;
     }
 
-    private static void PrepareInSynchronousPhase(IInboxHandlerContext context, DurableEnvelope output)
+    private static Task OnTurnAsync(IGrainContext context, Action action) =>
+        OnTurnAsync(context, () => { action(); return Task.CompletedTask; });
+    private static Task OnTurnAsync(IGrainContext context, Func<Task> action)
     {
-        // A guard can throw synchronously or return an already-faulted ValueTask. Never block
-        // the activation if a regression incorrectly starts asynchronous provider acquisition.
-        var preparation = context.Outbox.PrepareSendAsync([output]);
-        Assert.True(preparation.IsCompleted, "A forbidden preparation must reject before provider acquisition.");
-        preparation.GetAwaiter().GetResult();
-    }
-
-    private static DurableEffect ExpectedEffect(DurableEnvelope input) => new(input.MessageId, 1, 401, "prepared-lifecycle");
-
-    private static void AssertSuccess(DurableEndpointSnapshot snapshot, DurableEnvelope input, int outputCount)
-    {
-        Assert.Equal(ExpectedEffect(input), Assert.Single(snapshot.Effects));
-        Assert.Equal(0, snapshot.InboxCount);
-        Assert.Equal(1, snapshot.ProcessedMessageCount);
-        Assert.Equal(outputCount, snapshot.OutboxCount);
-        Assert.Empty(snapshot.InboxDeadLetters);
-        Assert.Empty(snapshot.OutboxDeadLetters);
-    }
-
-    private static void AssertDeadLetter(DurableEndpointSnapshot snapshot, DurableEnvelope input,
-        string? reason = null, int? attempts = null, int processedBefore = 0)
-    {
-        Assert.Empty(snapshot.Effects);
-        Assert.Equal(0, snapshot.InboxCount);
-        Assert.Equal(0, snapshot.OutboxCount);
-        Assert.Equal(processedBefore + 1, snapshot.ProcessedMessageCount);
-        var deadLetter = Assert.Single(snapshot.InboxDeadLetters);
-        Assert.Equal(input.MessageId, deadLetter.MessageId);
-        Assert.Equal(input.RouteKey, deadLetter.Route);
-        if (reason is not null) Assert.Equal(reason, deadLetter.Reason);
-        if (attempts is not null) Assert.Equal(attempts.Value, deadLetter.AttemptCount);
-        Assert.Empty(snapshot.OutboxDeadLetters);
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        context.Scheduler.QueueAction(() => { _ = CompleteAsync(); });
+        return done.Task;
+        async Task CompleteAsync()
+        {
+            try
+            {
+                Assert.Same(context, ReceiverTestServices.CurrentGrainContext);
+                await action();
+                done.SetResult();
+            }
+            catch (Exception error) { done.SetException(error); }
+        }
     }
 
     private static Task WaitAsync(Task task) => task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
     private static Task<T> WaitAsync<T>(Task<T> task) => task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-
-    private static Task OnTurnAsync(IGrainContext context, Action action) =>
-        OnTurnAsync(context, () => { action(); return Task.CompletedTask; });
-
-    private static Task OnTurnAsync(IGrainContext context, Func<Task> action)
-    {
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        context.Scheduler.QueueAction(() => { _ = CompleteAsync(); });
-        return completion.Task;
-
-        async Task CompleteAsync()
-        {
-            try { await action(); completion.SetResult(); }
-            catch (Exception exception) { completion.SetException(exception); }
-        }
-    }
-
-    private sealed record Acknowledgement(DurableEndpointSnapshot Snapshot, int[] DisposeCalls,
-        (GrainId SenderId, Guid MessageId)[] ProcessedIds, (GrainId SenderId, Guid MessageId)[] InboxIds);
-    private sealed record Harness(IDurableMessagingTestGrain Receiver, IGrainContext Context, DurableMessagingTestGrain Grain,
+    private sealed record Rig(IDurableMessagingTestGrain Receiver, IGrainContext Context, DurableMessagingTestGrain Grain,
         IJournaledStateManager Manager, JournaledTestOutbox Outbox, IDurableDictionary<Guid, DurableEffect> Effects,
-        LifecycleHandler Handler)
+        TestHandler Handler, IDurableDictionary<(GrainId, Guid), DurableEnvelope> Inbox,
+        IDurableDictionary<(GrainId, Guid), DateTimeOffset> Processed)
     {
-        public JournalId JournalId => Orleans.Journaling.JournalId.FromGrainId(Receiver.GetGrainId());
-        // Retain failed state instances before deactivation disposes the service scope.
-        public IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> InboxState { get; } = Inbox(Context);
-        public IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> ProcessedState { get; } = Processed(Context);
+        public JournalId Journal => JournalId.FromGrainId(Receiver.GetGrainId());
     }
 
-    private sealed class LifecycleHandler(IDurableDictionary<Guid, DurableEffect> effects, bool acquireFirst = true) : IInboxHandler, IDisposable
+    private sealed class TestHandler(IDurableDictionary<Guid, DurableEffect> effects) : IInboxHandler, IDisposable
     {
-        public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public TaskCompletionSource Continue { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public IInboxHandlerContext Context { get; private set; } = null!;
         public DurableEnvelope Output { get; private set; }
         public DurableEnvelope UnusedOutput { get; private set; }
-        public IPreparedOutboxBatch? Batch { get; private set; }
-        public IPreparedOutboxBatch? UnusedBatch { get; set; }
-        public int Applied { get; private set; }
-        public int PreparationCalls { get; private set; }
-        public Func<LifecycleHandler, CancellationToken, ValueTask<Action>> Remainder { get; set; } =
-            static (self, _) => ValueTask.FromResult<Action>(self.ApplyEffect);
-
-        public bool CanHandle(IInboxHandlerContext context) => false; // Registered by exact route.
-        public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        public Func<TestHandler, CancellationToken, ValueTask> Body { get; set; } =
+            static (self, _) => { self.Mutate(); self.Context.Complete(); return default; };
+        public bool CanHandle(IInboxHandlerContext context) => false;
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
-            PreparationCalls++;
             Context = context;
             Output = context.CreateEnvelope().To(context.GrainId, "output").WithBody(41).Build();
-            UnusedOutput = context.CreateEnvelope().To(context.GrainId, "unused-output").WithBody(42).Build();
-            if (acquireFirst) Batch = await context.Outbox.PrepareSendAsync([Output], cancellationToken);
-            Ready.TrySetResult();
-            await Continue.Task.WaitAsync(cancellationToken);
-            var action = await Remainder(this, cancellationToken);
-            return () => { Applied++; action(); };
+            UnusedOutput = context.CreateEnvelope().To(context.GrainId, "unused").WithBody(42).Build();
+            Entered.TrySetResult();
+            await Release.Task.WaitAsync(cancellationToken);
+            await Body(this, cancellationToken);
         }
-
-        public void ApplyEffect() => effects[Context.Envelope.MessageId] = ExpectedEffect(Context.Envelope);
-        public void Send(IPreparedOutboxBatch batch, bool throughOutbox)
-        {
-            if (throughOutbox) Context.Outbox.Send(batch);
-            else Context.Send(batch);
-        }
-        public void Dispose() => Continue.TrySetResult(); // Runtime, not handler, owns the batches.
+        public void Mutate() => effects[Context.Envelope.MessageId] =
+            new DurableEffect(Context.Envelope.MessageId, 1, 501, "async-handler");
+        public void Dispose() => Release.TrySetResult();
     }
-
-    private sealed class PreparingSelectionHandler : IInboxHandler
+    private sealed class JobContext(DurableJob job) : IJobRunContext
     {
-        public Exception? Rejection { get; private set; }
-        public int PrepareCalls { get; private set; }
-        public bool CanHandle(IInboxHandlerContext context)
-        {
-            if (context.Envelope.RouteKey != "prepared/selection") return false;
-            try { PrepareInSynchronousPhase(context, context.Envelope); }
-            catch (InvalidOperationException exception) { Rejection = exception; throw; }
-            return true;
-        }
-        public ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
-        {
-            PrepareCalls++;
-            return ValueTask.FromResult<Action>(() => { });
-        }
+        public DurableJob Job { get; } = job;
+        public string RunId { get; } = Guid.NewGuid().ToString("N");
+        public int DequeueCount => 1;
     }
 }

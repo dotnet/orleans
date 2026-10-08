@@ -107,7 +107,7 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
         public bool Finished { get; private set; }
         public OperationCanceledException? Cancellation { get; private set; }
         public bool CanHandle(IInboxHandlerContext context) => true;
-        public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             using var registration = cancellationToken.Register(() =>
             {
@@ -119,7 +119,7 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
             {
                 await Release.Task;
                 cancellationToken.ThrowIfCancellationRequested();
-                return () => throw new InvalidOperationException("A canceled handler must never apply.");
+                throw new InvalidOperationException("A canceled handler must never complete.");
             }
             catch (OperationCanceledException exception)
             {

@@ -107,7 +107,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         return Task.CompletedTask;
     }
     public bool CanHandle(IInboxHandlerContext context) => context.Envelope.RouteKey == Route;
-    public async ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         if (HandlerOverride is { } handler) return await handler.PrepareAsync(context, cancellationToken);
         if (_handlers.TryGet(context.GrainId, Route, out var barrier))
@@ -118,12 +118,10 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         var value = Observation.Value!.Value + 1;
         var outgoing = context.CreateEnvelope().To(OutputTarget, "output").WithBody(value).Build();
         var batch = await context.Outbox.PrepareSendAsync([outgoing], cancellationToken);
-        return () =>
-        {
-            Observation.Value.Value = value;
-            context.Send(batch);
-            HandlerCalls++;
-        };
+        Observation.Value.Value = value;
+        context.Send(batch);
+        HandlerCalls++;
+        context.Complete();
     }
     public void Dispose() => Disposals++;
     public static IEnumerable<IStateMachine> ReadMessagingStates(IJournaledStateManager manager)

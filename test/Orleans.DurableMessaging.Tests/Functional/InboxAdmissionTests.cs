@@ -107,12 +107,12 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
     }
 
     [Fact]
-    public async Task PhysicalOwnerInvalidationDuringPreparation_RejectsBeforeHandlerApply()
+    public async Task PhysicalCallbackMismatch_DuringPreparationPreservesCommittedOwner()
     {
         using var attempt = await PrepareAttemptAsync("owner-invalidation");
         var value = attempt.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<DurableJob>>("__orleans.durable-messaging.inbox-job-handle");
         var previous = value.Value!;
-        await OnTurnAsync(attempt.Context, () => value.Value = new DurableJob
+        var mismatched = new DurableJob
         {
             Id = previous.Id,
             ShardId = "different-physical-shard",
@@ -120,23 +120,25 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
             Name = previous.Name,
             TargetGrainId = previous.TargetGrainId,
             DueTime = previous.DueTime
-        });
+        };
+        var feature = (IDurableJobFeatureHandler)attempt.Context.ActivationServices.GetRequiredService(
+            ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
+        DurableJobRunResult result = null!;
+        await OnTurnTaskAsync(attempt.Context, async () =>
+            result = await feature.ExecuteJobAsync(new CallbackContext(mismatched), TestContext.Current.CancellationToken));
+        Assert.Same(DurableJobRunResult.Completed, result);
+        Assert.Same(previous, value.Value);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId);
-        attempt.Preparation.Release();
-        var failure = Assert.IsType<InvalidOperationException>(
-            await attempt.Grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
-        Assert.Contains("acknowledged physical job", failure.Message, StringComparison.Ordinal);
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(attempt.JournalId));
-        var failed = attempt.Grain.GetSnapshotForTest();
-        Assert.Empty(failed.Effects);
-        Assert.Equal(1, failed.InboxCount);
-        Assert.Equal(0, failed.ProcessedMessageCount);
+        var pending = attempt.Grain.GetSnapshotForTest();
+        Assert.Empty(pending.Effects);
+        Assert.Equal(1, pending.InboxCount);
+        Assert.Equal(0, pending.ProcessedMessageCount);
         Assert.False(attempt.Grain.ApplyAttempted.Task.IsCompleted);
         Assert.Empty(attempt.Outbox.Messages);
-        await attempt.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        _ = await attempt.Receiver.GetSnapshotAsync();
+        attempt.Preparation.Release();
         var recovered = await Fixture.WaitForEffectCountAsync(attempt.Receiver, 1);
-        Assert.NotEqual(failed.ActivationId, recovered.ActivationId);
+        Assert.Equal(pending.ActivationId, recovered.ActivationId);
         Assert.Equal(1, Assert.Single(recovered.Effects).Count);
         Assert.Empty(recovered.InboxDeadLetters);
     }
@@ -360,5 +362,12 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         public IJournaledStateManager Manager => Context.ActivationServices.GetRequiredService<IJournaledStateManager>();
         public JournalId JournalId => JournalId.FromGrainId(Receiver.GetGrainId());
         public void Dispose() { Preparation.Dispose(); Handler.Dispose(); }
+    }
+
+    private sealed class CallbackContext(DurableJob job) : IJobRunContext
+    {
+        public DurableJob Job { get; } = job;
+        public string RunId { get; } = Guid.NewGuid().ToString("N");
+        public int DequeueCount => 1;
     }
 }
