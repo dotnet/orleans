@@ -295,9 +295,7 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
                 throw new InvalidOperationException($"Created DurableJobs shard '{shardId}' without readable journal storage properties.");
             }
 
-            var shard = await OpenShardAsync(descriptor, cancellationToken);
-            _jobShardCache[shard.Id] = shard;
-            return shard;
+            return await GetOrOpenShardAsync(descriptor, cancellationToken);
         }
     }
 

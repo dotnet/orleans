@@ -30,7 +30,7 @@ public interface IJobShardManagerTestScope : IAsyncDisposable
 
     DateTimeOffset Now { get; }
 
-    JobShardManager CreateManager(TestSilo silo, DurableJobsOptions? options = null);
+    JobShardManager CreateManager(TestSilo silo, DurableJobsOptions? options = null, Func<IJournalStorageProvider, IJournalStorageProvider>? decorateStorage = null);
 
     void SetSiloStatus(TestSilo silo, SiloStatus status);
 }
@@ -93,11 +93,13 @@ public class JournaledJobShardManagerTestScope : IJobShardManagerTestScope
 
     public DateTimeOffset Now => DateTimeOffset.UtcNow;
 
-    public JobShardManager CreateManager(TestSilo silo, DurableJobsOptions? options = null)
+    public JobShardManager CreateManager(TestSilo silo, DurableJobsOptions? options = null, Func<IJournalStorageProvider, IJournalStorageProvider>? decorateStorage = null)
         => new JournaledJobShardManager(
             new TestLocalSiloDetails(silo.SiloAddress),
             _services.GetRequiredService<IJournaledStateManagerFactory>(),
-            _services.GetRequiredService<IJournalStorageProvider>(),
+            decorateStorage is null
+                ? _services.GetRequiredService<IJournalStorageProvider>()
+                : decorateStorage(_services.GetRequiredService<IJournalStorageProvider>()),
             _services.GetRequiredService<IJournalStorageCatalog>(),
             _membership,
             _services,
