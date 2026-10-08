@@ -474,12 +474,13 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
         {
             var expectedSiloSet = activeSilos.Select(static silo => silo.SiloAddress).ToHashSet();
 
-            // Take one snapshot per observer so the observed manifest and its diagnostics describe the same
-            // instant, rather than being read from two separate, independently-progressing LINQ pipelines.
+            // Take one snapshot per observer so the observed manifest and its diagnostics describe states that
+            // could actually have coexisted (diagnostics are captured no later than the manifest, so a race with
+            // a concurrent publish or new attempt can only make the manifest newer, never contradict the
+            // diagnostics), rather than being read from two separate, independently-progressing LINQ pipelines.
             var snapshots = activeSilos.Select((silo, index) =>
             {
-                var manifest = manifestProviders[index].Current;
-                var diagnostics = manifestProviders[index].LastAttemptDiagnostics;
+                var (manifest, diagnostics) = manifestProviders[index].GetManifestAndDiagnosticsSnapshot();
                 var observerTime = silo.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
                 return (Silo: silo, Manifest: manifest, Diagnostics: diagnostics, ObserverTime: observerTime);
             }).ToArray();
@@ -501,7 +502,10 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// against, the peers it is still waiting on, how long the attempt has been outstanding, and the most
     /// recent fetch failure, if any. Used to diagnose a cluster-manifest convergence timeout.
     /// </summary>
-    private static string DescribePendingFetch(
+    /// <remarks><see langword="internal"/> (rather than <see langword="private"/>) solely so its exact output
+    /// format can be unit-tested directly from <c>Orleans.Core.Tests</c> without requiring a full in-process
+    /// cluster convergence timeout.</remarks>
+    internal static string DescribePendingFetch(
         SiloAddress observer,
         ClusterManifest manifest,
         ManifestUpdateAttemptDiagnostics? diagnostics,
