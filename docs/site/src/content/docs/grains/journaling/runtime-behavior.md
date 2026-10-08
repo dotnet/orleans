@@ -59,6 +59,27 @@ helper forwards to that same manager:
 
 Concurrent calls made while the same kind of write is queued can share that queued operation. Each caller observes its completion or failure. Calls made after a storage operation starts are processed by a later operation.
 
+### Serialized buffer ownership
+
+The journal owner pins each captured serialized batch through the storage
+operation's actual completion. A successful acknowledgement consumes the captured
+prefix; entries staged during I/O remain pending for a later capture.
+
+The <xref:Orleans.Journaling.IJournalStorage.AppendAsync*> and
+<xref:Orleans.Journaling.IJournalStorage.ReplaceAsync*> contracts lend their
+serialized input until the returned operation completes. Storage implementations
+finish consuming or copying that input within this lifetime. The built-in volatile
+provider additionally supports an internal retained-buffer contract: it acquires
+independent page references before publication. Stored bytes and active reader
+snapshots retain their own references after the manager releases its capture.
+
+Ownership follows the actual provider outcome. If a provider commits and then
+reports an error, its stored references still represent that committed outcome,
+which a fresh owner replays. Caller cancellation ends the caller's wait while
+the capture and actual I/O remain owned. Snapshot replacement or deletion releases
+the storage generation's references, and overlapping readers release their
+captured references when their reads finish.
+
 > [!IMPORTANT]
 > In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.
 

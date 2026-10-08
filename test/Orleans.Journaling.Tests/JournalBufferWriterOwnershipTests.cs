@@ -371,6 +371,75 @@ public sealed class JournalBufferWriterOwnershipTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Consume_TrimsOversizedDrainedCapacityWithoutInvalidatingCapturedOrActiveBuffers(bool activeEntry)
+    {
+        using var writer = new CacheBoundWriter();
+        var payload = Enumerable.Repeat((byte)42, 128 * 1024).ToArray();
+        using (var entry = writer.CreateJournalStreamWriter(new(1)).BeginEntry())
+        {
+            payload.AsSpan().CopyTo(entry.Writer.GetSpan(payload.Length));
+            entry.Writer.Advance(payload.Length);
+            entry.Commit();
+        }
+        using var captured = writer.GetBuffer();
+        Assert.Equal(payload, captured.ToArray());
+        if (activeEntry)
+        {
+            using var entry = writer.CreateJournalStreamWriter(new(2)).BeginEntry();
+            var borrowed = entry.Writer.GetMemory(256 * 1024);
+            writer.Consume(captured);
+            using (var empty = writer.GetBuffer()) Assert.Equal(256 * 1024, empty.First.Array.Length);
+            borrowed.Span[0] = 99;
+            entry.Writer.Advance(1);
+            entry.Commit();
+            using var next = writer.GetBuffer();
+            Assert.Equal(new byte[] { 99 }, next.ToArray());
+            writer.Consume(next);
+        }
+        else
+        {
+            writer.Consume(captured);
+        }
+        using var drained = writer.GetBuffer();
+        Assert.Equal(0, drained.Length);
+        Assert.Equal(16 * 1024, drained.First.Array.Length);
+        Assert.Equal(payload, captured.ToArray());
+    }
+
+    [Fact]
+    public void AbortedEntry_TrimsOversizedIdleCapacityAndPreservesCapture()
+    {
+        using var writer = new CacheBoundWriter();
+        using (var entry = writer.CreateJournalStreamWriter(new(1)).BeginEntry())
+        {
+            entry.Writer.GetSpan(128 * 1024)[0] = 42;
+            entry.Writer.Advance(1);
+            entry.Commit();
+        }
+        using var captured = writer.GetBuffer();
+        using (var entry = writer.CreateJournalStreamWriter(new(2)).BeginEntry())
+        {
+            // Consuming while an empty entry is active must leave its writable memory untouched.
+            var borrowed = entry.Writer.GetMemory(1);
+            writer.Consume(captured);
+            borrowed.Span[0] = 99;
+            entry.Writer.Advance(1);
+            // Dispose rolls this entry back. The idle oversized tail can now be released.
+        }
+        using var drained = writer.GetBuffer();
+        Assert.Equal(0, drained.Length);
+        Assert.Equal(16 * 1024, drained.First.Array.Length);
+        Assert.Equal(new byte[] { 42 }, captured.ToArray());
+    }
+
+    private sealed class CacheBoundWriter : JournalBufferWriter
+    {
+        protected override void FinishEntry(JournalStreamId streamId) { }
+    }
+
     private sealed class ActiveEntryPatchingWriter : JournalBufferWriter
     {
         protected override void StartEntry(JournalStreamId streamId)

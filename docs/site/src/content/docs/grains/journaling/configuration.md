@@ -196,4 +196,20 @@ fewer full-state copies; smaller limits bound retained append history and replay
 work more tightly. Size both limits alongside the current snapshot and application
 deduplication retention.
 
+Volatile storage retains immutable, reference-counted journal pages. The journal
+writer, stored history, and each active reader have independent ownership.
+Snapshot replacement and deletion release retired storage references while
+existing readers finish against their captured bytes and metadata. Borrowed
+writes copy into provider-owned pages; the built-in journal manager can share
+its owned pages through the storage implementation's explicit retained-buffer
+capability.
+
+The Arc page cache retains at most **4 MiB** and caches individual pages up to
+**1 MiB**. A drained inactive manager writer and a borrowed-write tail retain at
+most one **16 KiB** page. These cache limits are separate from live stored data,
+reader-pinned retired snapshots, and the BCL array pool. Capacity planning includes
+the complete retained journal and overlapping readers as well as cached buffers.
+Closing an individual manager or storage handle preserves shared history;
+replacement, deletion, or the shared store's end of lifetime releases its pages.
+
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.

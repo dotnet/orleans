@@ -568,43 +568,56 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
 internal sealed class ArcBufferPagePool
 {
+    internal const int MaximumRetainedBytes = 4 * 1024 * 1024;
+    internal const int MaximumRetainedPageSize = 1024 * 1024;
     public static ArcBufferPagePool Shared { get; } = new();
     public const int MinimumPageSize = 16 * 1024;
     private readonly ConcurrentQueue<ArcBufferPage> _pages = new();
     private readonly ConcurrentQueue<ArcBufferPage> _largePages = new();
+    private readonly int _maximumRetainedBytes;
+    private int _retainedBytes;
+    private int _retainedPages;
 
-    private ArcBufferPagePool() { }
+    internal ArcBufferPagePool(int maximumRetainedBytes = MaximumRetainedBytes)
+        => _maximumRetainedBytes = maximumRetainedBytes;
+
+    internal int RetainedBytes => Volatile.Read(ref _retainedBytes);
+    internal int RetainedPages => Volatile.Read(ref _retainedPages);
 
     public ArcBufferPage Rent(int size = -1)
     {
-        ArcBufferPage? block;
-        if (size <= MinimumPageSize)
-        {
-            if (!_pages.TryDequeue(out block))
-            {
-                block = new ArcBufferPage(size);
-            }
-        }
-        else if (_largePages.TryDequeue(out block))
-        {
-            block.ResizeLargeSegment(size);
-            return block;
-        }
+        var queue = size <= MinimumPageSize ? _pages : _largePages;
+        if (!queue.TryDequeue(out var block)) return new ArcBufferPage(size);
 
-        return block ?? new ArcBufferPage(size);
+        Interlocked.Add(ref _retainedBytes, -block.Array.Length);
+        Interlocked.Decrement(ref _retainedPages);
+        if (size > MinimumPageSize) block.ResizeLargeSegment(size);
+        return block;
     }
 
     internal void Return(ArcBufferPage block)
     {
         Debug.Assert(block.IsValid);
-        if (block.IsMinimumSize)
+        var size = block.Array.Length;
+        if (size <= MaximumRetainedPageSize)
         {
-            _pages.Enqueue(block);
+            var retained = Volatile.Read(ref _retainedBytes);
+            while (size <= _maximumRetainedBytes - retained)
+            {
+                var observed = Interlocked.CompareExchange(ref _retainedBytes, retained + size, retained);
+                if (observed == retained)
+                {
+                    Interlocked.Increment(ref _retainedPages);
+                    (block.IsMinimumSize ? _pages : _largePages).Enqueue(block);
+                    return;
+                }
+
+                retained = observed;
+            }
         }
-        else
-        {
-            _largePages.Enqueue(block);
-        }
+
+        // Do not keep pinned minimum-sized arrays or oversized rented arrays indefinitely.
+        block.ReleaseArray();
     }
 }
 
@@ -679,6 +692,12 @@ public sealed class ArcBufferPage
 
             Array = ArrayPool<byte>.Shared.Rent(length);
         }
+    }
+
+    internal void ReleaseArray()
+    {
+        if (!IsMinimumSize) ArrayPool<byte>.Shared.Return(Array);
+        Array = [];
     }
 
     /// <summary>
