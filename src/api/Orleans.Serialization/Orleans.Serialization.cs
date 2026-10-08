@@ -854,10 +854,55 @@ namespace Orleans.Serialization.Buffers
         public readonly System.Span<byte> GetSpan(int sizeHint = 0) { throw null; }
     }
 
+    [GenerateSerializer]
+    [Immutable]
+    public sealed partial class BufferPackage
+    {
+        internal BufferPackage() { }
+
+        public ImmutableBuffer Buffer { get { throw null; } }
+
+        public int Count { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlyCollection<string> Keys { get { throw null; } }
+
+        public bool TryGetBytes(string key, out System.ReadOnlyMemory<byte> bytes) { throw null; }
+    }
+
+    public sealed partial class BufferPackageBuilder
+    {
+        public void Add(string key, System.Action<System.Buffers.IBufferWriter<byte>> write) { }
+
+        public void Add(string key, System.ReadOnlySpan<byte> bytes) { }
+
+        public BufferPackage Build() { throw null; }
+    }
+
     public static partial class BufferWriterExtensions
     {
         public static Writer<TBufferWriter> CreateWriter<TBufferWriter>(this TBufferWriter buffer, Session.SerializerSession session)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { throw null; }
+    }
+
+    [GenerateSerializer]
+    [Immutable]
+    public sealed partial class ImmutableBuffer
+    {
+        public ImmutableBuffer(ArcBuffer bytes) { }
+
+        public ImmutableBuffer(System.Buffers.ReadOnlySequence<byte> bytes) { }
+
+        public ImmutableBuffer(System.ReadOnlySpan<byte> bytes) { }
+
+        public static ImmutableBuffer Empty { get { throw null; } }
+
+        public int Length { get { throw null; } }
+
+        public System.ReadOnlyMemory<byte> Memory { get { throw null; } }
+
+        public System.Buffers.ReadOnlySequence<byte> AsReadOnlySequence() { throw null; }
+
+        public static ImmutableBuffer Create(System.Action<System.Buffers.IBufferWriter<byte>> write) { throw null; }
     }
 
     [Immutable]
@@ -4846,6 +4891,45 @@ namespace OrleansCodeGen.Orleans.Serialization
     public sealed partial class Copier_UnsupportedWireTypeException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Serialization.UnsupportedWireTypeException, global::Orleans.Serialization.SerializerException>
     {
         public Copier_UnsupportedWireTypeException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
+    }
+}
+
+namespace OrleansCodeGen.Orleans.Serialization.Buffers
+{
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_BufferPackage : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Buffers.BufferPackage>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_BufferPackage(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.Buffers.BufferPackage> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.Buffers.BufferPackage instance) { }
+
+        public global::Orleans.Serialization.Buffers.BufferPackage ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Serialization.Buffers.BufferPackage instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Serialization.Buffers.BufferPackage value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_ImmutableBuffer : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.Buffers.ImmutableBuffer>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_ImmutableBuffer(global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.Buffers.ImmutableBuffer> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.Buffers.ImmutableBuffer instance) { }
+
+        public global::Orleans.Serialization.Buffers.ImmutableBuffer ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Serialization.Buffers.ImmutableBuffer instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Serialization.Buffers.ImmutableBuffer value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 }
 
