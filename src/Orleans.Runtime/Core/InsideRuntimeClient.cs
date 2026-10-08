@@ -17,6 +17,8 @@ using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
 
@@ -52,6 +54,8 @@ namespace Orleans.Runtime
         private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
         private readonly DeepCopier<Response> responseCopier;
+        private readonly ICodecProvider responseCodecProvider;
+        private readonly CopyContextPool responseCopyContexts;
 
         public InsideRuntimeClient(
             ILocalSiloDetails siloDetails,
@@ -83,6 +87,8 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions.Value;
             this.messagingTrace = messagingTrace;
             this.responseCopier = deepCopier.GetCopier<Response>();
+            this.responseCodecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
+            this.responseCopyContexts = serviceProvider.GetRequiredService<CopyContextPool>();
             var period = Max(TimeSpan.FromMilliseconds(1), Min(this.messagingOptions.ResponseTimeout, TimeSpan.FromSeconds(1)));
             this.callbackTimer = new PeriodicTimer(period, timeProvider);
 
@@ -229,6 +235,7 @@ namespace Orleans.Runtime
             if (request.IsExpired)
             {
                 this.messagingTrace.OnDropExpiredMessage(request, MessagingInstruments.Phase.Respond);
+                response.Dispose();
                 return;
             }
 
@@ -303,7 +310,8 @@ namespace Orleans.Runtime
                     RequestContextExtensions.Import(message.RequestContextData);
                 }
 
-                Response response;
+                Response? response = null;
+                var isCopied = false;
                 try
                 {
                     switch (message.BodyObject)
@@ -315,15 +323,16 @@ namespace Orleans.Runtime
                                 CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
                                 if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
                                 {
-                                    var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
+                                    using var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping,
+                                        this.responseCopier, this.responseCodecProvider, this.responseCopyContexts);
                                     await invoker.Invoke();
-                                    response = invoker.Response!;
+                                    response = invoker.TakeResponse();
                                 }
                                 else
                                 {
-                                    response = await invokable.Invoke();
-                                    // The copier preserves the null state of its input.
-                                    response = this.responseCopier.Copy(response)!;
+                                    response = await ResponseCopyBoundary.InvokeAndCopy(invokable,
+                                        this.responseCodecProvider, this.responseCopyContexts, this.responseCopier);
+                                    isCopied = invokable is not IResponseInvokable || response.Exception is null;
                                 }
 
                                 invokable.Dispose();
@@ -335,36 +344,47 @@ namespace Orleans.Runtime
                 }
                 catch (Exception exc1)
                 {
+                    response?.Dispose();
                     response = Response.FromException(exc1);
+                    isCopied = false;
                 }
 
-                if (response.Exception is { } invocationException)
+                try
                 {
-                    LogGrainInvokeException(this.invokeExceptionLogger, message.Direction != Message.Directions.OneWay ? LogLevel.Debug : LogLevel.Warning, invocationException, message);
-
-                    // If a grain allowed an inconsistent state exception to escape and the exception originated from
-                    // this activation, then deactivate it.
-                    if (invocationException is InconsistentStateException ise && ise.IsSourceActivation)
+                    if (response.Exception is { } invocationException)
                     {
-                        // Mark the exception so that it doesn't deactivate any other activations.
-                        ise.IsSourceActivation = false;
+                        LogGrainInvokeException(this.invokeExceptionLogger, message.Direction != Message.Directions.OneWay ? LogLevel.Debug : LogLevel.Warning, invocationException, message);
 
-                        LogDeactivatingInconsistentState(this.invokeExceptionLogger, target, invocationException);
+                        // If a grain allowed an inconsistent state exception to escape and the exception originated from
+                        // this activation, then deactivate it.
+                        if (invocationException is InconsistentStateException ise && ise.IsSourceActivation)
+                        {
+                            // Mark the exception so that it doesn't deactivate any other activations.
+                            ise.IsSourceActivation = false;
 
-                        if (target is ActivationData ad && message.RequestContextData.TryGetActivityContext() is { } ac)
-                        {
-                            ad.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)), ac);
-                        }
-                        else
-                        {
-                            target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
+                            LogDeactivatingInconsistentState(this.invokeExceptionLogger, target, invocationException);
+
+                            if (target is ActivationData ad && message.RequestContextData.TryGetActivityContext() is { } ac)
+                            {
+                                ad.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)), ac);
+                            }
+                            else
+                            {
+                                target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
+                            }
                         }
                     }
-                }
 
-                if (message.Direction != Message.Directions.OneWay)
+                    if (message.Direction != Message.Directions.OneWay)
+                    {
+                        var outgoing = response;
+                        response = null;
+                        SafeSendResponse(message, outgoing, isCopied);
+                    }
+                }
+                finally
                 {
-                    SafeSendResponse(message, response);
+                    response?.Dispose();
                 }
 
                 return;
@@ -380,17 +400,28 @@ namespace Orleans.Runtime
             }
         }
 
-        private void SafeSendResponse(Message message, Response response)
+        private void SafeSendResponse(Message message, Response response, bool isCopied)
         {
+            Response? ownedResponse = response;
             try
             {
-                // The copier preserves the null state of its input.
-                SendResponse(message, (Response)this._deepCopier.Copy(response)!);
+                if (!isCopied && !message.IsExpired)
+                {
+                    ownedResponse = null;
+                    ownedResponse = ResponseCopyBoundary.CopyAndDispose(response, this._deepCopier);
+                }
+
+                SendResponse(message, ownedResponse);
+                ownedResponse = null;
             }
             catch (Exception exc)
             {
                 LogWarningResponseFailed(this.logger, exc);
                 SendResponse(message, Response.FromException(exc));
+            }
+            finally
+            {
+                ownedResponse?.Dispose();
             }
         }
 

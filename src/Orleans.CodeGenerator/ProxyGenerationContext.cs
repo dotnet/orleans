@@ -18,15 +18,28 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
     private readonly Dictionary<INamedTypeSymbol, InvokableMethodProxyBase> _interfaceProxyBases = new(SymbolEqualityComparer.Default);
 
     internal ProxyGenerationContext(Compilation compilation, CodeGeneratorOptions options)
-        : this(compilation, options, LibraryTypes.FromCompilation(compilation, options))
+        : this(compilation, options, LibraryTypes.FromCompilation(compilation, options), [])
     {
     }
 
-    internal ProxyGenerationContext(Compilation compilation, CodeGeneratorOptions options, LibraryTypes libraryTypes)
+    internal ProxyGenerationContext(
+        Compilation compilation,
+        CodeGeneratorOptions options,
+        ImmutableArray<(string TypeName, string HolderName)> responseNames)
+        : this(compilation, options, LibraryTypes.FromCompilation(compilation, options), responseNames)
+    {
+    }
+
+    internal ProxyGenerationContext(
+        Compilation compilation,
+        CodeGeneratorOptions options,
+        LibraryTypes libraryTypes,
+        ImmutableArray<(string TypeName, string HolderName)> responseNames)
     {
         Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
         Options = options ?? throw new ArgumentNullException(nameof(options));
         LibraryTypes = libraryTypes ?? throw new ArgumentNullException(nameof(libraryTypes));
+        RpcResponseNames = responseNames.ToDictionary(static entry => entry.TypeName, static entry => entry.HolderName, StringComparer.Ordinal);
         InvokableBaseTypeResolver = new InvokableBaseTypeResolver(compilation);
         MetadataModel = new MetadataModel();
         ProxyGenerator = new ProxyGenerator(this, new CopierGenerator(this));
@@ -41,6 +54,7 @@ internal sealed class ProxyGenerationContext : IGeneratorServices
     internal MetadataModel MetadataModel { get; }
     internal ProxyGenerator ProxyGenerator { get; }
     internal InvokableGenerator InvokableGenerator { get; }
+    internal IReadOnlyDictionary<string, string> RpcResponseNames { get; }
 
     internal void AddMember(string ns, MemberDeclarationSyntax member)
     {
