@@ -24,6 +24,25 @@ public class TcpMessageTransportKeepAliveTests
 {
     private const string ListenerName = "silo";
 
+    [Fact]
+    public async Task Listener_PreCanceledBindLeavesSocketUnallocated()
+    {
+        var tcpOptions = Substitute.For<IOptionsMonitor<TcpMessageTransportOptions>>();
+        tcpOptions.Get(ListenerName).Returns(new TcpMessageTransportOptions { FastPath = false });
+        await using var listener = CreateListener(tcpOptions);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => listener.BindAsync(cancellation.Token).AsTask());
+
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.Null(typeof(TcpMessageTransportListener)
+            .GetField("_listenSocket", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(listener));
+        await listener.BindAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(GetSocket(listener, "_listenSocket").LocalEndPoint);
+    }
+
     [Theory]
     [InlineData(SocketOptionName.KeepAlive, SocketError.ProtocolOption, false)]
     [InlineData(SocketOptionName.TcpKeepAliveTime, SocketError.ProtocolOption, false)]

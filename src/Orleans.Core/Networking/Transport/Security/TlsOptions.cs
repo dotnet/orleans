@@ -127,8 +127,16 @@ public class TlsOptions
         }
     }
 
-    internal CancellationTokenSource CreateHandshakeCancellationTokenSource() =>
-        _handshakeTimeout == Timeout.InfiniteTimeSpan
-            ? new CancellationTokenSource()
-            : new CancellationTokenSource(_handshakeTimeout);
+    internal CancellationTokenSource CreateHandshakeCancellationTokenSource(
+        CancellationToken cancellationToken = default,
+        CancellationToken connectionClosed = default)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, connectionClosed);
+        if (_handshakeTimeout != Timeout.InfiniteTimeSpan)
+        {
+            source.CancelAfter(_handshakeTimeout);
+        }
+
+        return source;
+    }
 }

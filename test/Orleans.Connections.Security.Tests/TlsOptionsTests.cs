@@ -70,7 +70,7 @@ public class TlsOptionsTests
 
         Assert.Equal(Timeout.InfiniteTimeSpan, options.HandshakeTimeout);
         Assert.Equal(Timeout.InfiniteTimeSpan, copiedOptions.HandshakeTimeout);
-        using var cancellationTokenSource = options.CreateHandshakeCancellationTokenSource();
+        using var cancellationTokenSource = options.CreateHandshakeCancellationTokenSource(TestContext.Current.CancellationToken);
         Assert.False(cancellationTokenSource.IsCancellationRequested);
     }
 
@@ -84,8 +84,56 @@ public class TlsOptionsTests
         };
 
         Assert.Equal(maximum, options.HandshakeTimeout);
-        using var cancellationTokenSource = options.CreateHandshakeCancellationTokenSource();
+        using var cancellationTokenSource = options.CreateHandshakeCancellationTokenSource(TestContext.Current.CancellationToken);
         Assert.True(cancellationTokenSource.Token.CanBeCanceled);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void HandshakeCancellation_LinksEstablishmentAndTransportClosure(bool infiniteTimeout, bool closeTransport)
+    {
+        var options = new TlsOptions
+        {
+            HandshakeTimeout = infiniteTimeout ? Timeout.InfiniteTimeSpan : TimeSpan.FromMinutes(1)
+        };
+        using var establishment = new CancellationTokenSource();
+        using var transportClosed = new CancellationTokenSource();
+        using var handshake = options.CreateHandshakeCancellationTokenSource(establishment.Token, transportClosed.Token);
+        Assert.False(handshake.IsCancellationRequested);
+
+        if (closeTransport)
+        {
+            transportClosed.Cancel();
+        }
+        else
+        {
+            establishment.Cancel();
+        }
+
+        Assert.True(handshake.IsCancellationRequested);
+        Assert.Equal(!closeTransport, establishment.IsCancellationRequested);
+        Assert.Equal(closeTransport, transportClosed.IsCancellationRequested);
+    }
+
+    [Fact]
+    public void DisposedHandshakeCancellation_DetachesEstablishmentAndTransportClosure()
+    {
+        var options = new TlsOptions { HandshakeTimeout = Timeout.InfiniteTimeSpan };
+        using var establishment = new CancellationTokenSource();
+        using var transportClosed = new CancellationTokenSource();
+        using var handshake = options.CreateHandshakeCancellationTokenSource(establishment.Token, transportClosed.Token);
+        var callbacks = 0;
+        using var registration = handshake.Token.Register(() => callbacks++);
+
+        handshake.Dispose();
+        establishment.Cancel();
+        transportClosed.Cancel();
+
+        Assert.Equal(0, callbacks);
+        Assert.False(handshake.IsCancellationRequested);
     }
 
     [Fact]

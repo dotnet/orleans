@@ -38,11 +38,13 @@ public class ConnectionManagerTests
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(true, true)]
-    public async Task SiloConnection_PublishesAfterBothPreamblesComplete(bool outbound, bool failWrite)
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    public async Task SiloConnection_PublishesAfterBothPreamblesComplete(bool outbound, bool failWrite, bool cancelEstablishment)
     {
         await using var rig = new TestRig();
         using var preamble = new ArcBufferWriter();
@@ -71,7 +73,8 @@ public class ConnectionManagerTests
             wrapTransport: inner => transport = new PreambleTransport(
                 inner, preamble, () => rig.Manager.TryGetConnection(rig.Address, out _)));
 
-        var running = connection.RunAsync();
+        using var cancellation = new CancellationTokenSource();
+        var running = connection.RunAsync(cancellation.Token);
         try
         {
             Assert.NotNull(transport.PendingWrite);
@@ -81,7 +84,18 @@ public class ConnectionManagerTests
             Assert.False(rig.Manager.TryGetConnection(rig.Address, out _));
             Assert.Equal(0, rig.Manager.ConnectionCount);
 
-            if (failWrite)
+            if (cancelEstablishment)
+            {
+                cancellation.Cancel();
+                transport.CompleteWrite();
+                var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => connection.Initialized.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
+                Assert.Equal(cancellation.Token, error.CancellationToken);
+                await running.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+                Assert.False(rig.Manager.TryGetConnection(rig.Address, out _));
+                Assert.Equal(0, rig.Manager.ConnectionCount);
+            }
+            else if (failWrite)
             {
                 var error = new ConnectionClosedException("Preamble write failed.");
                 transport.CompleteWrite(error);
@@ -363,6 +377,7 @@ public class ConnectionManagerTests
         var connection = rig.CreateConnection();
         attempt.Completion.SetResult(connection);
         Assert.Same(connection, await first.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
+        Assert.Equal(attempt.CancellationToken, connection.InitializationToken);
         Assert.Same(connection, await second.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
         var reused = rig.Manager.GetConnection(rig.Address);
         Assert.True(reused.IsCompletedSuccessfully);
@@ -400,13 +415,57 @@ public class ConnectionManagerTests
         var connection = rig.CreateConnection();
 
         await connection.CloseAsync(exception: null).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
-        await connection.RunAsync().WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        await connection.RunAsync(TestContext.Current.CancellationToken).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
 
         Assert.False(connection.Started.Task.IsCompleted);
         Assert.False(connection.IsValid);
         Assert.True(connection.Initialized.IsFaulted);
         Assert.Equal(1, connection.TransportContext.CloseCount);
         Assert.Equal(1, connection.TransportContext.DisposeCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_PreCanceledInitializationClosesTransportWithoutStarting()
+    {
+        await using var rig = new TestRig();
+        var connection = rig.CreateConnection();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await connection.RunAsync(cancellation.Token).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => connection.Initialized);
+
+        Assert.Equal(cancellation.Token, error.CancellationToken);
+        Assert.False(connection.Started.Task.IsCompleted);
+        Assert.False(connection.IsValid);
+        Assert.Equal(1, connection.TransportContext.CloseCount);
+        Assert.Equal(1, connection.TransportContext.DisposeCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_CancellationAfterInitializationKeepsConnectionActive()
+    {
+        await using var rig = new TestRig();
+        var connection = rig.CreateConnection();
+        using var cancellation = new CancellationTokenSource();
+        var running = connection.RunAsync(cancellation.Token);
+        try
+        {
+            await connection.Initialized.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            Assert.Equal(cancellation.Token, connection.InitializationToken);
+
+            cancellation.Cancel();
+
+            Assert.True(connection.IsValid);
+            Assert.True(connection.Initialized.IsCompletedSuccessfully);
+            Assert.False(running.IsCompleted);
+            Assert.Equal(0, connection.TransportContext.CloseCount);
+        }
+        finally
+        {
+            await connection.CloseAsync(exception: null).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            await running.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        }
     }
 
     [Fact]
@@ -445,7 +504,7 @@ public class ConnectionManagerTests
         var failure = new InvalidOperationException("Synchronous initialization failure");
         var connection = rig.CreateConnection(initialize: _ => throw failure);
 
-        await connection.RunAsync().WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        await connection.RunAsync(TestContext.Current.CancellationToken).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => connection.Initialized);
 
         Assert.Same(failure, error);
@@ -686,13 +745,15 @@ public class ConnectionManagerTests
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource CleanupStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseCleanup { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public CancellationToken InitializationToken { get; private set; }
         public Action<Message>? SendObserver { get; set; }
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
         protected override TimeSpan CloseConnectionTimeout => TestTimeout;
         protected override IMessageCenter MessageCenter => null!;
 
-        protected override async Task RunAsyncCore()
+        protected override async Task RunAsyncCore(CancellationToken cancellationToken)
         {
+            InitializationToken = cancellationToken;
             try
             {
                 if (_initialize is not null)
@@ -707,7 +768,7 @@ public class ConnectionManagerTests
                     throw new ConnectionAbortedException("Initialization read terminated");
                 }
 
-                await base.RunAsyncCore();
+                await base.RunAsyncCore(cancellationToken);
             }
             finally
             {

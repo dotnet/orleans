@@ -591,7 +591,7 @@ public class MessageTransportLifecycleTests
     [Fact]
     public async Task MessageTransportStream_ReadCancellation_ClosesInnerTransport()
     {
-        var transport = new CancelableTransport();
+        await using var transport = new CancelableTransport();
         await using var stream = new MessageTransportStream(transport, MemoryPool<byte>.Shared);
         using var cancellation = new CancellationTokenSource();
 
@@ -605,7 +605,7 @@ public class MessageTransportLifecycleTests
     [Fact]
     public async Task MessageTransportStream_WriteCancellation_ClosesInnerTransport()
     {
-        var transport = new CancelableTransport();
+        await using var transport = new CancelableTransport();
         await using var stream = new MessageTransportStream(transport, MemoryPool<byte>.Shared);
         using var cancellation = new CancellationTokenSource();
 
@@ -736,7 +736,7 @@ public class MessageTransportLifecycleTests
     public async Task StreamMessageTransport_WriteFailure_WakesIdleReadLoop()
     {
         await using var transport = new TestStreamMessageTransport(new FailingWriteStream());
-        transport.Start();
+        transport.Start(TestContext.Current.CancellationToken);
         using var request = new BufferedWriteRequest([1]);
         var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = transport.Closed.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), closed);
@@ -760,6 +760,67 @@ public class MessageTransportLifecycleTests
                 TestContext.Current.CancellationToken).AsTask());
 
         Assert.True(inner.Disposed);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    public async Task TlsEstablishmentCancellation_InterruptsAuthenticationAndFailsQueuedRequests(bool server, bool completeWrites, bool closeInnerTransport)
+    {
+        await using var inner = new CancelableTransport(completeWrites);
+        var tlsOptions = new TlsOptions
+        {
+            HandshakeTimeout = Timeout.InfiniteTimeSpan,
+            ClientCertificateMode = RemoteCertificateMode.NoCertificate,
+            RemoteCertificateMode = RemoteCertificateMode.NoCertificate,
+            LocalServerCertificateSelector = static (_, _) => null,
+            OnAuthenticateAsClient = static (_, options) => options.TargetHost = "localhost"
+        };
+        var options = Substitute.For<IOptionsMonitor<TlsOptions>>();
+        options.CurrentValue.Returns(tlsOptions);
+        options.Get(Arg.Any<string>()).Returns(tlsOptions);
+        using var cancellation = new CancellationTokenSource();
+        await using var connector = new TlsMessageTransportConnector(new TestConnector(inner), options, NullLoggerFactory.Instance);
+        await using var listener = new TlsMessageTransportListener(new TestListener(inner), options, NullLoggerFactory.Instance);
+        await using var transport = server
+            ? Assert.IsAssignableFrom<MessageTransport>(await listener.AcceptAsync(cancellation.Token))
+            : await connector.CreateAsync(new IPEndPoint(IPAddress.Loopback, 1), cancellation.Token);
+        using var request = new BufferedWriteRequest([1]);
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = transport.Closed.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), closed);
+
+        Assert.True(transport.EnqueueWrite(request));
+        var pendingIo = server || completeWrites ? inner.ReadStarted.Task : inner.WriteStarted.Task;
+        await pendingIo.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.False(request.Completion.IsCompleted);
+
+        if (closeInnerTransport)
+        {
+            await inner.CloseAsync(new ConnectionClosedException(), TestContext.Current.CancellationToken);
+        }
+        else
+        {
+            cancellation.Cancel();
+        }
+
+        if (closeInnerTransport && !server && !completeWrites)
+        {
+            await Assert.ThrowsAsync<ConnectionClosedException>(
+                () => request.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        }
+        else
+        {
+            var error = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => request.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+            Assert.True(error.CancellationToken.IsCancellationRequested);
+        }
+
+        await closed.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.True(inner.CloseCalled);
     }
 
     [Theory]
@@ -927,36 +988,75 @@ public class MessageTransportLifecycleTests
         public void Dispose() => _releaseSend.Dispose();
     }
 
-    private sealed class CancelableTransport : MessageTransport
+    private sealed class CancelableTransport(bool completeWrites = false) : MessageTransport
     {
+        private readonly CancellationTokenSource _closed = new();
         private ReadRequest? _read;
         private WriteRequest? _write;
+        private int _disposed;
 
-        public bool CloseCalled { get; private set; }
-        public override CancellationToken Closed => default;
+        public bool CloseCalled => _closed.IsCancellationRequested;
+        public TaskCompletionSource ReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource WriteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public override CancellationToken Closed => _closed.Token;
         public override IFeatureCollection Features { get; } = new FeatureCollection();
 
         public override bool EnqueueRead(ReadRequest request)
         {
+            if (CloseCalled)
+            {
+                return false;
+            }
+
             _read = request;
+            ReadStarted.TrySetResult();
             return true;
         }
 
         public override bool EnqueueWrite(WriteRequest request)
         {
-            _write = request;
+            if (CloseCalled)
+            {
+                return false;
+            }
+
+            if (completeWrites)
+            {
+                using var bytes = request.Buffers.ConsumeSlice(request.Buffers.Length);
+                request.SetResult();
+            }
+            else
+            {
+                _write = request;
+            }
+
+            WriteStarted.TrySetResult();
             return true;
         }
 
         public override ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default)
         {
-            CloseCalled = true;
+            if (CloseCalled)
+            {
+                return default;
+            }
+
+            _closed.Cancel();
             var error = closeException ?? new ConnectionClosedException();
-            _read?.OnCanceled();
-            var write = _write;
-            _write = null;
+            var read = Interlocked.Exchange(ref _read, null);
+            read?.OnCanceled();
+            var write = Interlocked.Exchange(ref _write, null);
             write?.SetException(error);
             return default;
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                await CloseAsync(null);
+                _closed.Dispose();
+            }
         }
     }
 

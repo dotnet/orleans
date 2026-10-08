@@ -66,6 +66,7 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
 
     public override ValueTask BindAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_listenSocket != null)
         {
             throw new InvalidOperationException("Transport already bound");

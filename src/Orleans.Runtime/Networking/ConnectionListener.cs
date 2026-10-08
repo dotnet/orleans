@@ -182,7 +182,7 @@ internal abstract partial class ConnectionListener
         {
             try
             {
-                await connection.RunAsync();
+                await connection.RunAsync(_shutdownCancellation.Token);
                 LogConnectionTerminated(TransportTrace, connection);
             }
             catch (Exception exception)

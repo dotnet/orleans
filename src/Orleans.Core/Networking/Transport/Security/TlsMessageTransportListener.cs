@@ -40,7 +40,7 @@ internal sealed partial class TlsMessageTransportListener(
             try
             {
                 var transport = new ServerTlsMessageTransport(innerTransport, _tlsOptions.Get(ListenerName), _logger);
-                transport.Start();
+                transport.Start(cancellationToken);
                 return transport;
             }
             catch (Exception exception)

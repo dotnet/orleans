@@ -74,6 +74,7 @@ internal class InMemoryTransportListener : MessageTransportListener
 
     public override ValueTask BindAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_endpointValue is not null)
         {
             _hub.RegisterConnectionListenerFactory(_endpointValue, this);
