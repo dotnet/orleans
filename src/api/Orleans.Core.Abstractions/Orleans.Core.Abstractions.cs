@@ -3033,7 +3033,7 @@ namespace Orleans.Runtime
 
         public override int GetHashCode() { throw null; }
 
-        public uint[] GetUniformHashCodes(int numHashes) { throw null; }
+        public System.Collections.Immutable.ImmutableArray<uint> GetUniformHashCodes(int numHashes) { throw null; }
 
         public bool IsPredecessorOf(SiloAddress other) { throw null; }
 

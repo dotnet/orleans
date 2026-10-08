@@ -27,6 +27,22 @@ Before any rolling deployment, including an internally qualified cross-major dep
 
 Use the compatibility and selector strategies described in [Deploy new versions of grains](../grains/grain-versioning/deploying-new-versions-of-grains.md) for application contract changes. Those strategies don't establish runtime-major compatibility.
 
+## Uniform silo hash API compatibility
+
+In Orleans 10.4.1, <xref:Orleans.Runtime.SiloAddress.GetUniformHashCodes*> returns an <xref:System.Collections.Immutable.ImmutableArray`1> which shares the silo's cached hash storage. Rebuild callers compiled against the earlier `uint[]` return type. Use `ToArray()` when a mutable buffer is needed, or `Sort()` to obtain a sorted immutable result while preserving the cached values.
+
+## Distributed-directory partition mapping
+
+For rolling upgrades between distributed-directory versions, preserve each silo's numbered partitions across the old and new binaries. Orleans 10.4.1 exposes <xref:Orleans.Configuration.GrainDirectoryOptions.GetPartitionBoundaries> alongside <xref:Orleans.Configuration.GrainDirectoryOptions.PartitionsPerSilo> so applications can retain an earlier mapping.
+
+Distributed-directory clusters running Orleans 10.0.1 through 10.1 use `30` partitions per silo, with partition indices assigned after sorting the uniform hashes in ascending unsigned order. Configure every new silo with that count and a boundary function which returns the sorted immutable hashes:
+
+:::code language="csharp" source="../snippets/compiled/Deployment/DirectoryPartitioningSnippet.cs" id="legacy_directory_partitions":::
+
+Sorting the immutable hash array preserves the silo's cached hash order and the legacy partition identities and ring boundaries. Retain the legacy count and function after completing the upgrade and in subsequent releases. Existing Orleans 10.4.0 clusters retain their current count and mapping: by default, one partition uses <xref:Orleans.Runtime.SiloAddress.GetConsistentHashCode*>, and multiple partitions use uniform hashes in generation order.
+
+Qualify the complete upgrade with the application's actual old and new binaries, including activation uniqueness, range handoff, and silo failure recovery. The mapping function supplies partition compatibility for an existing distributed-directory cluster. Changing directory implementations requires separate handoff qualification.
+
 ## Recommended parallel-cluster sequence
 
 1. Build the target version from the same application contract revision used to validate old-state reads.

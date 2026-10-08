@@ -47,6 +47,12 @@ Replace a bounded number of silos at a time. Pause when error rate, latency, mem
 
 Orleans grain versioning can route calls among compatible grain implementations, but it doesn't make arbitrary application or storage changes compatible. See [Deploy new versions of grains](../grains/grain-versioning/deploying-new-versions-of-grains.md) and [Backward compatibility guidelines](../grains/grain-versioning/backward-compatibility-guidelines.md).
 
+### Distributed-directory upgrade compatibility
+
+Rolling upgrades using the experimental [distributed grain directory](../host/grain-directory.md#strongly-consistent-in-cluster-directory) preserve both the partition count and the mapping from hash boundaries to partition numbers. Directory requests and ownership-transfer snapshots address those numbered partitions, so all silos must agree on their ranges.
+
+Retain the established count and boundary function throughout rollout and rollback. See [Distributed-directory partition mapping](../migration/deployment-and-rollback.md#distributed-directory-partition-mapping) for version-specific configuration and upgrade qualification.
+
 ## Blue-green upgrades
 
 Use blue-green deployment when versions can't safely coexist in one Orleans cluster.
