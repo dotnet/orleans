@@ -7,7 +7,7 @@ namespace Orleans.DurableJobs.Diagnostics;
 
 internal static class DurableJobsEvents
 {
-    internal const string ListenerName = "Orleans.DurableJobs.ShardManager";
+    internal const string ListenerName = "Orleans.DurableJobs";
 
     private static readonly DiagnosticListener Listener = new(ListenerName);
 
