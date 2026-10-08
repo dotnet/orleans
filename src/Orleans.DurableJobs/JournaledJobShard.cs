@@ -111,6 +111,8 @@ internal sealed class JournaledJobShard : IJobShard
     /// </summary>
     internal JournalId StorageId => JobShardId.Parse(Id).ToJournalId();
 
+    internal bool IsRetired => Volatile.Read(ref _retiring) || Volatile.Read(ref _disposed) != 0;
+
     /// <inheritdoc/>
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _state.ConsumeDurableJobsAsync();
 

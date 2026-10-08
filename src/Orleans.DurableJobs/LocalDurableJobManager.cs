@@ -147,6 +147,10 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     // Create new shard
                     var endTime = shardKey.StartTime.Add(_options.ShardDuration);
                     var newShard = await _shardManager.CreateShardAsync(shardKey.StartTime, endTime, CreateShardMetadata(shardKey), schedulingToken);
+                    if (IsRetiredShard(newShard))
+                    {
+                        continue;
+                    }
 
                     LogCreatingNewShard(_logger, shardKey.StartTime, shardKey.Stripe);
                     // Own successful creations even if cancellation raced with the provider returning.
@@ -514,6 +518,13 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         var assignedCount = 0;
         await foreach (var shard in _shardManager.DiscoverJobShardsAsync(maxDueTime, budget, cancellationToken))
         {
+            // A result can outlive its runner while discovery is awaiting its next yield.
+            if (IsRetiredShard(shard))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                continue;
+            }
+
             // Running tasks own their exact shard instance through cleanup, including after cache withdrawal.
             if ((!_runningShards.TryGetValue(shard.Id, out var running) || !ReferenceEquals(running.Shard, shard))
                 && _shardCache.TryAdd(shard.Id, shard))
@@ -607,6 +618,13 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private void TryActivateShard(IJobShard shard)
     {
+        if (IsRetiredShard(shard))
+        {
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
+            return;
+        }
+
         var shardId = shard.Id;
         // Only start if not already running
         if (_runningShards.ContainsKey(shardId))
@@ -671,6 +689,9 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
             await DisposeShardAsync(shard);
 
+            // Scheduling can publish a retained creation result during cleanup.
+            TryRemoveWritableShard(shard);
+            TryRemoveCachedShard(shard);
             var runningEntry = new KeyValuePair<string, RunningShard>(shard.Id, running);
             ((ICollection<KeyValuePair<string, RunningShard>>)_runningShards).Remove(runningEntry);
         }
@@ -696,6 +717,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     private bool IsWritableShard(WritableShardKey shardKey, IJobShard shard)
         => _writeableShards.TryGetValue(shardKey, out var existingShard) && ReferenceEquals(existingShard, shard);
+
+    private static bool IsRetiredShard(IJobShard shard) => shard is JournaledJobShard { IsRetired: true };
 
     private bool IsCachedShard(IJobShard shard)
         => _shardCache.TryGetValue(shard.Id, out var existingShard) && ReferenceEquals(existingShard, shard);

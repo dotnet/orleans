@@ -1278,6 +1278,218 @@ public class LocalDurableJobManagerTests
     }
 
     [Fact]
+    public async Task FaultedRunner_DelayedDiscoveryRejectsRetiredShardAndRecoversJobs()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var storage = new VolatileJournalStorageProvider();
+        var interceptedStorage = new InterceptingJournalStorageProvider(storage);
+        await using var services = CreateJournaledServices(storage, time, interceptedStorage);
+        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var membership = new TestClusterMembershipService();
+        membership.SetSiloStatus(owner, SiloStatus.Active);
+        var shardManager = CreateJournaledShardManager(owner, services, membership, options);
+        var now = time.GetUtcNow();
+        await using var original = await shardManager.CreateShardAsync(now, now.Add(options.ShardDuration), new Dictionary<string, string>(), token);
+        var job = await original.TryScheduleJobAsync(CreateScheduleRequest(now.AddSeconds(30)), token);
+        Assert.NotNull(job);
+        var fault = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failure = new InvalidOperationException("Unexpected consumer failure.");
+        var tracked = CreateFaultingShard(original, fault, failure);
+        var captured = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deliverDiscovery = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var closingStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resumeClosing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        interceptedStorage.BeforeMetadataUpdate = async ct =>
+        {
+            closingStarted.SetResult();
+            await resumeClosing.Task.WaitAsync(ct);
+        };
+        var trackingManager = new TestJobShardManager
+        {
+            DiscoverShards = (_, _, ct) => DiscoverAsync(ct),
+            UnregisterShard = (shard, ct) => shardManager.UnregisterShardAsync(ReferenceEquals(shard, tracked) ? original : shard, ct),
+            IsShardOwned = shardManager.IsShardOwnedByLocalSiloAsync
+        };
+        var logger = new RecordingLogger<LocalDurableJobManager>();
+        var manager = CreateManager(trackingManager, time, options, logger: logger);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        accessor.AddWritableShard(now, tracked);
+        accessor.TryActivateShard(tracked);
+        Assert.True(accessor.TryGetRunningShardTask(original.Id, out var runner));
+        var discovery = accessor.ProcessShardCheckCycleAsync(token);
+        try
+        {
+            await captured.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            fault.SetResult();
+            await closingStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.Empty(await shardManager.AssignJobShardsAsync(now, 0, token));
+            Assert.False(discovery.IsCompleted);
+            Assert.False(runner!.IsCompleted);
+            AssertSchedulingCacheEmpty(accessor);
+            interceptedStorage.BeforeMetadataUpdate = null;
+            resumeClosing.SetResult();
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => runner.WaitAsync(TimeSpan.FromSeconds(5), token)));
+            Assert.False(accessor.TryGetRunningShardTask(original.Id, out _));
+            deliverDiscovery.SetResult();
+            await discovery.WaitAsync(TimeSpan.FromSeconds(5), token);
+            AssertSchedulingCacheEmpty(accessor);
+            Assert.False(accessor.TryGetRunningShardTask(original.Id, out _));
+            accessor.TryActivateShard(original);
+            Assert.False(accessor.TryGetRunningShardTask(original.Id, out _));
+            Assert.Same(tracked, Assert.Single(trackingManager.UnregisteredShards));
+
+            var recovered = Assert.Single(await shardManager.AssignJobShardsAsync(now, 1, token));
+            Assert.NotSame(original, recovered);
+            Assert.Equal(1, await recovered.GetJobCountAsync());
+            trackingManager.DiscoverShards = (_, _, ct) => shardManager.DiscoverJobShardsAsync(now, 0, ct);
+            await accessor.ProcessShardCheckCycleAsync(token);
+            Assert.True(accessor.TryGetCachedShard(original.Id, out var cached));
+            Assert.Same(recovered, cached);
+            Assert.True(await manager.CancelAsync(job, token));
+            Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
+        }
+        finally
+        {
+            resumeClosing.TrySetResult();
+            deliverDiscovery.TrySetResult();
+            fault.TrySetResult();
+            interceptedStorage.BeforeMetadataUpdate = null;
+            await discovery.WaitAsync(TimeSpan.FromSeconds(5), token);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => runner!.WaitAsync(TimeSpan.FromSeconds(5), token));
+            await CreateLifecycleObserver(manager).OnStop(token).WaitAsync(TimeSpan.FromSeconds(5), token);
+        }
+
+        AssertSchedulingCacheEmpty(accessor);
+        Assert.Null(await storage.CreateStorage(JobShardId.Parse(original.Id).ToJournalId()).GetMetadataAsync(token));
+
+        async IAsyncEnumerable<IJobShard> DiscoverAsync([EnumeratorCancellation] CancellationToken ct)
+        {
+            var shard = Assert.Single(await shardManager.AssignJobShardsAsync(now, 0, ct));
+            Assert.Same(original, shard);
+            captured.SetResult();
+            await deliverDiscovery.Task.WaitAsync(ct);
+            yield return shard;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Scheduling_DelayedCreationRejectsRetiringCanonicalShard(bool beforeCanonicalLookup)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var storage = new VolatileJournalStorageProvider();
+        var interceptedStorage = new InterceptingJournalStorageProvider(storage);
+        await using var services = CreateJournaledServices(storage, time, interceptedStorage);
+        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var membership = new TestClusterMembershipService();
+        membership.SetSiloStatus(owner, SiloStatus.Active);
+        var shardManager = CreateJournaledShardManager(owner, services, membership, options);
+        var now = time.GetUtcNow();
+        var created = new TaskCompletionSource<IJobShard>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deliverCreation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var creationMetadataRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var closingStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resumeClosing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fault = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var failure = new InvalidOperationException("Unexpected consumer failure.");
+        IJobShard? tracked = null;
+        IJobShard? canonical = null;
+        if (beforeCanonicalLookup)
+        {
+            var reads = 0;
+            interceptedStorage.BeforeMetadataRead = async ct =>
+            {
+                if (Interlocked.Increment(ref reads) == 1)
+                {
+                    creationMetadataRead.SetResult();
+                    await deliverCreation.Task.WaitAsync(ct);
+                }
+            };
+        }
+
+        var trackingManager = new TestJobShardManager
+        {
+            CreateShard = async (start, end, metadata, ct) =>
+            {
+                var shard = await shardManager.CreateShardAsync(start, end, metadata, ct);
+                if (created.TrySetResult(shard) && !beforeCanonicalLookup)
+                {
+                    await deliverCreation.Task.WaitAsync(ct);
+                }
+
+                return shard;
+            },
+            UnregisterShard = (shard, ct) => shardManager.UnregisterShardAsync(ReferenceEquals(shard, tracked) ? canonical! : shard, ct),
+            IsShardOwned = shardManager.IsShardOwnedByLocalSiloAsync
+        };
+        var logger = new RecordingLogger<LocalDurableJobManager>();
+        var manager = CreateManager(trackingManager, time, options, logger: logger);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        var scheduling = manager.ScheduleJobAsync(CreateScheduleRequest(now.AddSeconds(30)), token);
+        if (beforeCanonicalLookup)
+        {
+            await creationMetadataRead.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            canonical = Assert.Single(await shardManager.AssignJobShardsAsync(now, 0, token));
+        }
+
+        await using var original = canonical ?? await created.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+        canonical = original;
+        var existingJob = await original.TryScheduleJobAsync(CreateScheduleRequest(now.AddSeconds(30)), token);
+        Assert.NotNull(existingJob);
+        tracked = CreateFaultingShard(original, fault, failure);
+        trackingManager.AssignedShards.Add(tracked);
+        await accessor.ProcessShardCheckCycleAsync(token);
+        Assert.True(accessor.TryGetRunningShardTask(original.Id, out var runner));
+        interceptedStorage.BeforeMetadataUpdate = async ct =>
+        {
+            closingStarted.SetResult();
+            await resumeClosing.Task.WaitAsync(ct);
+        };
+        try
+        {
+            fault.SetResult();
+            await closingStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            deliverCreation.SetResult();
+            var scheduled = await scheduling.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.NotEqual(original.Id, scheduled.ShardId);
+            Assert.False(accessor.HasCachedShard(original.Id));
+            Assert.True(accessor.TryGetWritableShard(now, out var writable));
+            Assert.Equal(scheduled.ShardId, writable!.Id);
+            Assert.Equal(beforeCanonicalLookup ? 1 : 2, trackingManager.CreateShardCallCount);
+            interceptedStorage.BeforeMetadataUpdate = null;
+            resumeClosing.SetResult();
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => runner!.WaitAsync(TimeSpan.FromSeconds(5), token)));
+            Assert.True(accessor.TryGetWritableShard(now, out var current));
+            Assert.Same(writable, current);
+            trackingManager.AssignedShards.Clear();
+            trackingManager.DiscoverShards = (_, _, ct) => shardManager.DiscoverJobShardsAsync(now, 1, ct);
+            await accessor.ProcessShardCheckCycleAsync(token);
+            Assert.True(accessor.TryGetCachedShard(original.Id, out var recovered));
+            Assert.NotSame(original, recovered);
+            Assert.True(await manager.CancelAsync(existingJob, token));
+            Assert.True(await manager.CancelAsync(scheduled, token));
+            Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
+        }
+        finally
+        {
+            deliverCreation.TrySetResult();
+            resumeClosing.TrySetResult();
+            fault.TrySetResult();
+            interceptedStorage.BeforeMetadataUpdate = null;
+            await scheduling.WaitAsync(TimeSpan.FromSeconds(5), token);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => runner!.WaitAsync(TimeSpan.FromSeconds(5), token));
+            await CreateLifecycleObserver(manager).OnStop(token).WaitAsync(TimeSpan.FromSeconds(5), token);
+        }
+
+        AssertSchedulingCacheEmpty(accessor);
+    }
+
+    [Fact]
     public async Task FaultedRunner_WithFencedJournalPreservesPersistedJobsAndLogsCleanupFailure()
     {
         var token = TestContext.Current.CancellationToken;
@@ -3935,6 +4147,8 @@ public class LocalDurableJobManagerTests
     {
         public Func<CancellationToken, ValueTask>? BeforeWrite { get; set; }
 
+        public Func<CancellationToken, ValueTask>? BeforeMetadataRead { get; set; }
+
         public Func<CancellationToken, ValueTask>? BeforeMetadataUpdate { get; set; }
 
         public bool RejectMetadataUpdates { get; set; }
@@ -3952,7 +4166,15 @@ public class LocalDurableJobManagerTests
             public ValueTask<bool> CreateIfNotExistsAsync(IReadOnlyDictionary<string, string>? metadata = null, CancellationToken cancellationToken = default)
                 => inner.CreateIfNotExistsAsync(metadata, cancellationToken);
 
-            public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default) => inner.GetMetadataAsync(cancellationToken);
+            public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
+            {
+                if (provider.BeforeMetadataRead is { } beforeRead)
+                {
+                    await beforeRead(cancellationToken);
+                }
+
+                return await inner.GetMetadataAsync(cancellationToken);
+            }
 
             public async ValueTask<IJournalMetadata?> UpdateMetadataAsync(
                 IReadOnlyDictionary<string, string>? set = null,

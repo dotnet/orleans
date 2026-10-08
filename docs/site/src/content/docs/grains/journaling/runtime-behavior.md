@@ -147,7 +147,9 @@ count, releases populated shards for discovery, and deletes empty shard journals
 Scheduling calls which retained a retiring instance retry against a writable replacement. Queued jobs
 acknowledged before retirement remain in the journal and recover through a fresh canonical
 instance on discovery. Discovery retains distinct replacement instances while an old runner finishes
-cleanup, and cleanup removes tracking entries by instance identity.
+cleanup. Canonical lookups skip retiring instances, and local publication and activation check the
+instance lifetime again when delayed creation or discovery results arrive. A later sweep opens a fresh
+instance after eviction. Cleanup removes tracking entries by instance identity.
 
 Cleanup failures are logged, and an unexpected executor failure remains the runner's failure. A prior
 journal I/O failure fences deletion, preserving the persisted journal for recovery in a fresh instance.
