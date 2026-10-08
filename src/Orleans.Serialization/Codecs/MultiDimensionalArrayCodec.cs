@@ -169,6 +169,12 @@ namespace Orleans.Serialization.Codecs
 
         private static void EnsureSufficientData<TInput>(ref Reader<TInput> reader, int[] lengths)
         {
+            // A zero in any dimension makes the complete element count zero.
+            if (Array.IndexOf(lengths, 0) >= 0)
+            {
+                return;
+            }
+
             var remaining = (ulong)reader.Remaining;
             ulong elementCount = 1;
             foreach (var length in lengths)
@@ -178,7 +184,7 @@ namespace Orleans.Serialization.Codecs
                     return;
                 }
 
-                if (length != 0 && elementCount > remaining / (uint)length)
+                if (elementCount > remaining / (uint)length)
                 {
                     ThrowInvalidSizeException(lengths, reader.Remaining);
                 }
