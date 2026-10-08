@@ -78,24 +78,14 @@ namespace Orleans.Runtime.MembershipService
             return tableManager.CleanupDefunctSiloEntries(beforeDate, cancellationToken);
         }
 
-        [Obsolete("Use ReadRowAsync instead.")]
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var entries = await tableManager.FindSiloEntryAndTableVersionRow(key, cancellationToken);
-                MembershipTableData data = Convert(entries);
-                LogDebugReadMyEntry(key, data);
-                return data;
-            }
-            catch (Exception exc)
-            {
-                LogWarningIntermediateErrorReadingSiloEntry(exc, key, tableManager.TableName);
-                throw;
-            }
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use ReadAllAsync instead.")]

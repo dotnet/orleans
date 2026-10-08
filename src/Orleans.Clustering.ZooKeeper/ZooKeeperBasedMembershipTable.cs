@@ -136,27 +136,19 @@ namespace Orleans.Runtime.Membership
         }
 
         /// <summary>
-        /// Atomically reads the Membership Table information about a given silo.
-        /// The returned MembershipTableData includes one MembershipEntry entry for a given silo and the 
-        /// TableVersion for this table. The MembershipEntry and the TableVersion have to be read atomically.
+        /// Point reads are not supported. Read a complete snapshot and select the row from that snapshot.
         /// </summary>
         /// <param name="siloAddress">The address of the silo whose membership information needs to be read.</param>
-        /// <returns>The membership information for a given silo: MembershipTableData consisting one MembershipEntry entry and
-        /// TableVersion, read atomically.</returns>
-        [Obsolete("Use ReadRowAsync instead.")]
+        /// <returns>A faulted task indicating that point reads are not supported.</returns>
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress siloAddress) => ReadRowAsync(siloAddress, CancellationToken.None);
 
         /// <inheritdoc />
-        /// <remarks>
-        /// Connection-loss failures in native reads are retried up to four times on the operation's session.
-        /// Before each retry, the operation waits up to the session timeout for that session's next connected event.
-        /// When the wait expires or the session becomes terminal, the retry proceeds and preserves the native outcome.
-        /// The table and child versions fence each complete snapshot pass. Concurrent canonical
-        /// modifications restart the pass until the fence is stable or the caller cancels the operation.
-        /// </remarks>
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
-            return ReadAsync(() => _createSession(true), _readRetryPipeline, siloAddress, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         /// <summary>

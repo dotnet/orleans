@@ -102,6 +102,17 @@ formats, state factories, and activation lifecycle integration. Use `AddJournalS
 for an application-supplied storage provider. `AddJournaling` is core setup; a provider registration
 supplies the backing storage.
 
+Apply `[JournalStorageProvider("orders")]` to a grain class to select a named
+provider registered using, for example, `AddAzureBlobJournalStorage("orders", options => ...)`.
+Grain types without an explicit selection use `Default`. `DurableGrain` helpers,
+injected durable values and collections, and journaling-backed persistent state all
+share the activation's manager and selected storage. Register the same names and
+physical namespaces on every silo hosting the grain type.
+
+Recovery reads the selected provider's physical namespace using the existing
+journal identity. Changing the selection for a grain type with existing journals
+requires a deliberate data migration or cutover strategy, including rollback.
+
 JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, Orleans treats it as legacy OrleansBinary data for compatibility.
 
 If you already have data written with the OrleansBinary format, you can keep using it while you plan a migration:

@@ -595,6 +595,16 @@ namespace Orleans.Journaling
         public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class)]
+    public sealed partial class JournalStorageProviderAttribute : System.Attribute, Metadata.IGrainPropertiesProviderAttribute
+    {
+        public JournalStorageProviderAttribute(string providerName) { }
+
+        public string ProviderName { get { throw null; } }
+
+        public void Populate(System.IServiceProvider services, System.Type grainClass, Runtime.GrainType grainType, System.Collections.Generic.Dictionary<string, string> properties) { }
+    }
+
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>
     {
         private readonly int _dummyPrimitive;

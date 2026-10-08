@@ -1,0 +1,19 @@
+using System;
+
+namespace Orleans.Connections.Transport.Sockets;
+
+[Serializable]
+internal sealed class AddressInUseException : Exception
+{
+    public AddressInUseException()
+    {
+    }
+
+    public AddressInUseException(string? message) : base(message)
+    {
+    }
+
+    public AddressInUseException(string? message, Exception? innerException) : base(message, innerException)
+    {
+    }
+}

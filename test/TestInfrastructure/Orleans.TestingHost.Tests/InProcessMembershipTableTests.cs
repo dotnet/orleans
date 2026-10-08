@@ -25,20 +25,20 @@ public sealed class InProcessMembershipTableTests
         await Insert(entry);
         if (update)
         {
-            var current = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+            var current = await _table.ReadAllAsync(_cancellationToken);
             entry.Status = SiloStatus.Active;
-            Assert.True(await _table.UpdateRowAsync(entry, Assert.Single(current.Members).Item2, current.Version.Next(), _cancellationToken));
+            Assert.True(await _table.UpdateRowAsync(entry, current.TryGet(entry.SiloAddress)!.Item2, current.Version.Next(), _cancellationToken));
         }
 
         var expectedStatus = entry.Status;
         var expectedHeartbeat = entry.IAmAliveTime;
-        var before = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var before = await _table.ReadAllAsync(_cancellationToken);
         var etag = Assert.Single(before.Members).Item2;
         entry.Status = SiloStatus.Dead;
         entry.IAmAliveTime = expectedHeartbeat.AddDays(1);
         entry.SuspectTimes!.Clear();
 
-        var after = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var after = await _table.ReadAllAsync(_cancellationToken);
         var stored = Assert.Single(after.Members);
         Assert.NotSame(entry, stored.Item1);
         Assert.Equal(before.Version, after.Version);
@@ -48,19 +48,15 @@ public sealed class InProcessMembershipTableTests
         Assert.Equal(Tuple.Create(suspector, DateTime.UnixEpoch), Assert.Single(stored.Item1.SuspectTimes!));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Reads_ReturnIndependentMutableSnapshots(bool readAll)
+    [Fact]
+    public async Task Reads_ReturnIndependentMutableSnapshots()
     {
         var entry = CreateEntry(SiloStatus.Joining);
         var suspector = SiloAddress.FromParsableString("127.0.0.1:20000@1");
         entry.AddSuspector(suspector, DateTime.UnixEpoch);
         await Insert(entry);
-        var snapshot = readAll
-            ? await _table.ReadAllAsync(_cancellationToken)
-            : await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
-        var snapshotRow = Assert.Single(snapshot.Members);
+        var snapshot = await _table.ReadAllAsync(_cancellationToken);
+        var snapshotRow = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(entry.SiloAddress));
         var heartbeat = new MembershipEntry
         {
             SiloAddress = entry.SiloAddress,
@@ -73,7 +69,7 @@ public sealed class InProcessMembershipTableTests
         snapshotRow.Item1.IAmAliveTime = DateTime.UnixEpoch;
         snapshotRow.Item1.SuspectTimes!.Clear();
 
-        var after = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var after = await _table.ReadAllAsync(_cancellationToken);
         var stored = Assert.Single(after.Members).Item1;
         Assert.Equal(snapshot.Version, after.Version);
         Assert.Equal(SiloStatus.Joining, stored.Status);
@@ -95,7 +91,7 @@ public sealed class InProcessMembershipTableTests
         entry.ProxyPort = 20000;
         entry.AddSuspector(SiloAddress.FromParsableString("127.0.0.1:20001@1"), DateTime.UnixEpoch);
         await Insert(entry);
-        var before = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var before = await _table.ReadAllAsync(_cancellationToken);
         // The owning silo can report the same time or a clock adjustment.
         var heartbeat = new MembershipEntry
         {
@@ -105,7 +101,7 @@ public sealed class InProcessMembershipTableTests
 
         await _table.UpdateIAmAliveAsync(heartbeat, _cancellationToken);
 
-        var after = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var after = await _table.ReadAllAsync(_cancellationToken);
         var stored = Assert.Single(after.Members);
         Assert.Equal(before.Version, after.Version);
         Assert.Equal(Assert.Single(before.Members).Item2, stored.Item2);
@@ -140,7 +136,7 @@ public sealed class InProcessMembershipTableTests
         entry.Status = SiloStatus.Active;
         Assert.True(await _table.UpdateRowAsync(entry, Assert.Single(initial.Members).Item2, initial.Version.Next(), _cancellationToken));
 
-        var after = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var after = await _table.ReadAllAsync(_cancellationToken);
         var stored = Assert.Single(after.Members);
         Assert.Equal(initial.Version.Version + 1, after.Version.Version);
         Assert.NotEqual(initial.Version.VersionEtag, after.Version.VersionEtag);
@@ -181,15 +177,15 @@ public sealed class InProcessMembershipTableTests
     {
         var entry = CreateEntry(SiloStatus.Active);
         await Insert(entry);
-        var beforeUpdate = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var beforeUpdate = await _table.ReadAllAsync(_cancellationToken);
         entry.Status = SiloStatus.Dead;
         entry.AddSuspector(SiloAddress.FromParsableString("127.0.0.1:20000@1"), DateTime.UnixEpoch.AddDays(10));
         Assert.True(await _table.UpdateRowAsync(entry, Assert.Single(beforeUpdate.Members).Item2, beforeUpdate.Version.Next(), _cancellationToken));
-        var beforeCleanup = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var beforeCleanup = await _table.ReadAllAsync(_cancellationToken);
 
         await _table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch.AddDays(5), _cancellationToken);
 
-        var after = await _table.ReadRowAsync(entry.SiloAddress, _cancellationToken);
+        var after = await _table.ReadAllAsync(_cancellationToken);
         var stored = Assert.Single(after.Members);
         Assert.Equal(beforeCleanup.Version, after.Version);
         Assert.Equal(Assert.Single(beforeCleanup.Members).Item2, stored.Item2);
@@ -229,6 +225,55 @@ public sealed class InProcessMembershipTableTests
         Assert.Equal(before.TryGet(entries[2].SiloAddress)!.Item2, survivor.Item2);
         await _table.CleanupDefunctSiloEntriesAsync(cutoff, _cancellationToken);
         Assert.Equal(after.Version, (await _table.ReadAllAsync(_cancellationToken)).Version);
+    }
+
+    [Fact]
+    public async Task RowReads_AreUnsupportedWithoutChangingTable()
+    {
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+        var entry = CreateEntry(SiloStatus.Active);
+        await Insert(entry);
+        var before = await _table.ReadAllAsync(_cancellationToken);
+        foreach (var key in new[] { entry.SiloAddress, null! })
+        {
+#pragma warning disable CS0618 // Intentional retired legacy/async contract coverage, including unused null key.
+            var legacy = _table.ReadRow(key);
+            var current = _table.ReadRowAsync(key, _cancellationToken);
+#pragma warning restore CS0618
+            Assert.True(legacy.IsFaulted);
+            Assert.True(current.IsFaulted);
+            Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+            Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => current)).Message);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+#pragma warning disable CS0618 // Cancellation precedes retirement and key inspection.
+            var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => _table.ReadRowAsync(key, cancellation.Token));
+#pragma warning restore CS0618
+            Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        }
+
+        foreach (var name in new[] { nameof(IMembershipTable.ReadRow), nameof(IMembershipTable.ReadRowAsync) })
+        {
+            var obsolete = Assert.IsType<ObsoleteAttribute>(
+                Attribute.GetCustomAttribute(typeof(InProcessMembershipTable).GetMethod(name)!, typeof(ObsoleteAttribute)));
+            Assert.Equal(guidance, obsolete.Message);
+            Assert.False(obsolete.IsError);
+        }
+
+        AssertSameSnapshot(before, await _table.ReadAllAsync(_cancellationToken));
+    }
+
+    private static void AssertSameSnapshot(MembershipTableData expected, MembershipTableData actual)
+    {
+        Assert.Equal(expected.Version, actual.Version);
+        Assert.Equal(expected.Members.Count, actual.Members.Count);
+        foreach (var expectedRow in expected.Members)
+        {
+            var actualRow = Assert.IsType<Tuple<MembershipEntry, string>>(actual.TryGet(expectedRow.Item1.SiloAddress));
+            Assert.Equal(expectedRow.Item2, actualRow.Item2);
+            Assert.Equal(expectedRow.Item1.ToFullString(), actualRow.Item1.ToFullString());
+        }
     }
 
     private async Task Insert(MembershipEntry entry)

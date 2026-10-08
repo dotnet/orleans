@@ -216,8 +216,8 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
             IAmAliveTime = DateTime.UnixEpoch
         };
         Assert.True(await table.InsertRowAsync(entry, initial.Version.Next(), token));
-        var before = await table.ReadRowAsync(entry.SiloAddress, token);
-        var (membershipEntry, rowToken) = Assert.Single(before.Members);
+        var before = await table.ReadAllAsync(token);
+        var (membershipEntry, rowToken) = Assert.IsType<Tuple<MembershipEntry, string>>(before.TryGet(entry.SiloAddress));
 
         entry.IAmAliveTime = entry.IAmAliveTime.AddMinutes(1);
         await table.UpdateIAmAliveAsync(entry, token);
@@ -226,8 +226,8 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
         Assert.True(await table.UpdateRowAsync(membershipEntry, rowToken, before.Version.Next(), token));
         Assert.False(await table.UpdateRowAsync(membershipEntry, rowToken, before.Version.Next(), token));
 
-        var after = await table.ReadRowAsync(entry.SiloAddress, token);
-        var updated = Assert.Single(after.Members).Item1;
+        var after = await table.ReadAllAsync(token);
+        var updated = after.TryGet(entry.SiloAddress)!.Item1;
         Assert.Equal(SiloStatus.Dead, updated.Status);
         Assert.Equal(membershipEntry.SuspectTimes, updated.SuspectTimes);
         Assert.Equal(before.Version.Version + 1, after.Version.Version);
@@ -257,7 +257,7 @@ public class CosmosMembershipTableTests : MembershipTableTestsBase
     }
 
     [Fact, TestCategory("Functional")]
-    public async Task MembershipTable_Cosmos_ReadRow_Insert_Read()
+    public async Task MembershipTable_Cosmos_ReadAll_Insert_TryGet()
     {
         await MembershipTable_ReadRow_Insert_Read();
     }

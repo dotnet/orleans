@@ -670,6 +670,30 @@ try {
             'Runtime crash dump upload must run after a failed test coordinator.'
     }
 
+    Invoke-Test 'reduces hosted runner hang dump size' {
+        $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--hangdump-type'")).Count `
+            'Only the two standard test launch paths may configure hang diagnostics.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--hangdump'\s*\r?\n")).Count `
+            'Both test launch paths must enable hang diagnostics.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--hangdump-timeout'\s*'10m'")).Count `
+            'Both test launch paths must preserve the inactivity threshold.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--hangdump-type'\s*'Heap'")).Count `
+            'Both test launch paths must retain managed heap and stack diagnostics while excluding mapped images.'
+        Assert-Equal `
+            2 `
+            ([regex]::Matches($dotnetTestAction, "'--crashdump-type'\s*'Full'")).Count `
+            'Process crashes must retain full diagnostics independently of bounded hang capture.'
+    }
+
     Invoke-Test 'captures Windows net10 test host diagnostics' {
         $dotnetTestAction = Get-Content -Raw -LiteralPath $dotnetTestActionPath
         $archiveTestResultsAction = Get-Content -Raw -LiteralPath $archiveTestResultsActionPath

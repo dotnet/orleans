@@ -2,6 +2,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -22,28 +23,56 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     {
         private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
 
+        internal static void EnterServiceResolution(ICodecProvider provider, CodecProvider.ConstructionScope scope)
+            => ResolutionState.Value!.Enter(null!, provider, scope);
+        internal static void ExitServiceResolution() => ResolutionState.Value!.Exit();
+        internal static CodecProvider.ConstructionScope? GetConstructionScope(ICodecProvider provider)
+            => ResolutionState.Value!.GetConstructionScope(provider);
+
         private sealed class RecursiveServiceResolutionState
         {
             private int _depth;
 
-            public List<object> Callers { get; } = new List<object>();
+            public List<(object Caller, ICodecProvider? Provider)> Callers { get; } = new();
+            private readonly List<(ICodecProvider? Provider, int CallerStart, CodecProvider.ConstructionScope? Scope)> _active = new();
+            public ICodecProvider? Provider => _active.Count > 0 ? _active[^1].Provider : null;
 
-            public void Enter(object caller)
+            public CodecProvider.ConstructionScope? GetConstructionScope(ICodecProvider provider)
+            {
+                foreach (var frame in _active)
+                {
+                    if (frame.Scope is not null && ReferenceEquals(frame.Provider, provider)) return frame.Scope;
+                }
+                return null;
+            }
+
+            public void Enter(object caller, ICodecProvider? provider = null, CodecProvider.ConstructionScope? scope = null)
             {
                 ++_depth;
+                var owner = provider ?? Provider;
+                var callerOwner = Provider ?? owner;
+                var callerStart = ReferenceEquals(owner, Provider) ? -1 : Callers.Count;
+                _active.Add((owner, callerStart, scope));
                 if (caller is not null)
                 {
-                    Callers.Add(caller);
+                    Callers.Add((caller, callerOwner));
                 }
             }
 
             public void Exit()
             {
+                var callerStart = _active[^1].CallerStart;
+                _active.RemoveAt(_active.Count - 1);
+                if (callerStart >= 0)
+                {
+                    Callers.RemoveRange(callerStart, Callers.Count - callerStart);
+                }
                 if (--_depth <= 0)
                 {
                     Callers.Clear();
                 }
             }
+
         }
 
         /// <summary>
@@ -68,24 +97,39 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
             try
             {
-                state.Enter(caller);
+                state.Enter(caller, codecProvider);
 
 
                 foreach (var c in state.Callers)
                 {
-                    if (c is TService s && !(c is IServiceHolder<TService>))
+                    if (ReferenceEquals(c.Provider, codecProvider) && c.Caller is TService s && !(c.Caller is IServiceHolder<TService>))
                     {
                         return s;
                     }
                 }
 
-                var val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
+                TService val;
+                if (codecProvider is CodecProvider provider)
+                {
+                    if (provider.TryGetSerializerService(typeof(TService), out var registered))
+                    {
+                        return (TService)registered;
+                    }
+
+                }
+
+                val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
                 while (val is IServiceHolder<TService> wrapping)
                 {
                     val = wrapping.Value;
                 }
 
                 return val;
+            }
+            catch (Exception exception)
+            {
+                if (codecProvider is CodecProvider provider) provider.RecordConstructionFailure(exception);
+                throw;
             }
             finally
             {
@@ -103,20 +147,28 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static TService UnwrapService<TService>(object caller, TService service)
         {
             var state = ResolutionState.Value!;
+            var callerProvider = state.Provider;
+            var serviceProvider = service is IServiceHolder<TService> holder ? holder.Provider as ICodecProvider : null;
 
             try
             {
-                state.Enter(caller);
+                state.Enter(caller, serviceProvider);
 
                 foreach (var c in state.Callers)
                 {
-                    if (c is TService s and not IServiceHolder<TService>)
+                    if (ReferenceEquals(c.Provider, state.Provider) && c.Caller is TService s and not IServiceHolder<TService>)
                     {
                         return s;
                     }
                 }
 
-                return Unwrap(service);
+                var result = Unwrap(service);
+                return result;
+            }
+            catch (Exception exception)
+            {
+                if ((callerProvider ?? state.Provider) is CodecProvider provider) provider.RecordConstructionFailure(exception);
+                throw;
             }
             finally
             {
@@ -134,15 +186,15 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             }
         }
 
-        internal static object? TryGetService(Type serviceType)
+        internal static object? TryGetService(Type serviceType, ICodecProvider codecProvider)
         {
             var state = ResolutionState.Value!;
             foreach (var c in state.Callers)
             {
-                var type = c?.GetType();
-                if (serviceType == type)
+                if (ReferenceEquals(c.Provider, codecProvider) && c.Caller is not IServiceHolder<object>
+                    && serviceType.IsInstanceOfType(c.Caller))
                 {
-                    return c;
+                    return c.Caller;
                 }
             }
 
@@ -153,6 +205,21 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         /// Returns the provided copier if it's not shallow-copyable.
         /// </summary>
         public static IDeepCopier<T>? GetOptionalCopier<T>(IDeepCopier<T> copier) => copier is IOptionalDeepCopier o && o.IsShallowCopyable() ? null : copier;
+
+        internal static bool IsShallowCopyable([NotNullWhen(false)] IDeepCopier? copier)
+            => copier is null || copier is IOptionalDeepCopier optional && optional.IsShallowCopyable();
+
+        internal static bool IsShallowCopyable<TCopier>(ref int cache, TCopier copier, Func<TCopier, bool> calculate)
+        {
+            var result = Volatile.Read(ref cache);
+            if (result == 0)
+            {
+                result = calculate(copier) ? 1 : 2;
+                Volatile.Write(ref cache, result);
+            }
+
+            return result == 1;
+        }
 
         /// <summary>        
         /// Generated code helper method which throws an <see cref="ArgumentOutOfRangeException"/>.

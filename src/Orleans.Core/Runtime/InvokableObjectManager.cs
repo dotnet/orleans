@@ -213,6 +213,7 @@ namespace Orleans
                     LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
+                    message.Dispose();
                     return;
                 }
 
@@ -306,6 +307,10 @@ namespace Orleans
                 }
             }
 
+            [System.Diagnostics.CodeAnalysis.SuppressMessage(
+                "Reliability",
+                "CA2000:Dispose objects before losing scope",
+                Justification = "Each dequeued message is transferred to ProcessMessageAsync, which completes or rejects the request.")]
             private async Task LocalObjectMessagePumpAsync()
             {
                 while (TryDequeueMessage(out var message))
@@ -339,6 +344,7 @@ namespace Orleans
                     if (message.IsExpired)
                     {
                         _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
+                        message.Dispose();
                         return;
                     }
 

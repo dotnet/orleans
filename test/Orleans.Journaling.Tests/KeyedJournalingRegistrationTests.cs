@@ -295,6 +295,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         builder.Services.AddSerializer();
         builder.Services.AddLogging();
         builder.Services.AddMetrics();
+        builder.Services.AddSingleton(CreateGrainPropertiesResolver());
         builder.Services.AddSingleton<OrleansInstruments>();
         builder.Services.Configure<JsonJournalOptions>(options => options.AddTypeInfoResolver(JournalingTestsJsonContext.Default));
         builder.Services.AddSingleton(TimeProvider.System);

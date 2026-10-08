@@ -258,12 +258,14 @@ internal sealed class CassandraClusteringTable : IMembershipTable, IDisposable
         return await ReadConsistentAsync(null, cancellationToken);
     }
 
-    [Obsolete("Use ReadRowAsync instead.")]
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
     Task<MembershipTableData> IMembershipTable.ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-    public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+    public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
-        return await ReadConsistentAsync(key, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
     }
 
     private async Task<MembershipTableData> ReadConsistentAsync(SiloAddress? key, CancellationToken cancellationToken)

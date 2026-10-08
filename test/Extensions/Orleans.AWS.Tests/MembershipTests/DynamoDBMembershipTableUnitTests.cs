@@ -21,10 +21,39 @@ namespace AWSUtils.Tests.MembershipTests
     public class DynamoDBMembershipTableUnitTests
     {
         [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task RetiredRowReadsRejectWithoutInitializationOrStorage(bool initialized)
+        {
+            using var client = new RequestClient();
+            var table = initialized ? CreateTable(client) : new DynamoDBMembershipTable(
+                NullLoggerFactory.Instance, Options.Create(new DynamoDBClusteringOptions()),
+                Options.Create(new ClusterOptions { ClusterId = "cluster" }));
+            const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+#pragma warning disable CS0618 // Verify the retired compatibility entry points.
+            var legacy = table.ReadRow(null!);
+            var asynchronous = table.ReadRowAsync(null!, TestContext.Current.CancellationToken);
+            var token = new CancellationToken(canceled: true);
+            var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadRowAsync(null!, token));
+#pragma warning restore CS0618
+            Assert.True(legacy.IsFaulted);
+            Assert.True(asynchronous.IsFaulted);
+            Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+            Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => asynchronous)).Message);
+            Assert.Equal(token, canceled.CancellationToken);
+            Assert.Equal(0, client.ReadCount);
+            Assert.Equal(0, client.WriteCount);
+            Assert.Equal(0, client.DeleteCount);
+            foreach (var name in new[] { "ReadRow", "ReadRowAsync" })
+            {
+                Assert.Equal(guidance, table.GetType().GetMethod(name)!.GetCustomAttribute<ObsoleteAttribute>()!.Message);
+            }
+        }
+
+        [Theory]
         [InlineData("Initialize")]
         [InlineData("Delete")]
         [InlineData("Cleanup")]
-        [InlineData("ReadRow")]
         [InlineData("ReadAll")]
         [InlineData("Insert")]
         [InlineData("Update")]
@@ -47,7 +76,6 @@ namespace AWSUtils.Tests.MembershipTests
                 "Initialize" => table.InitializeMembershipTableAsync(true, token),
                 "Delete" => table.DeleteMembershipTableEntriesAsync("cluster", token),
                 "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, token),
-                "ReadRow" => table.ReadRowAsync(silo, token),
                 "ReadAll" => table.ReadAllAsync(token),
                 "Insert" => table.InsertRowAsync(entry, version, token),
                 "Update" => table.UpdateRowAsync(entry, "etag", version, token),
@@ -631,7 +659,7 @@ namespace AWSUtils.Tests.MembershipTests
 
         public static IEnumerable<object[]> MalformedRecencyAttributes()
         {
-            foreach (var operation in new[] { "ReadRow", "ReadAll", "Cleanup" })
+            foreach (var operation in new[] { "ReadAll", "Cleanup" })
             {
                 foreach (var attribute in new[]
                 {
@@ -691,7 +719,6 @@ namespace AWSUtils.Tests.MembershipTests
 
             var exception = await Assert.ThrowsAsync<FormatException>(() => operation switch
             {
-                "ReadRow" => table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken),
                 "ReadAll" => table.ReadAllAsync(TestContext.Current.CancellationToken),
                 "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken),
                 _ => throw new ArgumentOutOfRangeException(nameof(operation))
@@ -705,7 +732,6 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Theory]
-        [InlineData("ReadRow")]
         [InlineData("ReadAll")]
         [InlineData("Cleanup")]
         public async Task MembershipOperationsPreserveAbsentLegacyRecencyAttributes(string operation)
@@ -738,12 +764,9 @@ namespace AWSUtils.Tests.MembershipTests
 
             switch (operation)
             {
-                case "ReadRow":
                 case "ReadAll":
-                    var result = operation == "ReadRow"
-                        ? await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken)
-                        : await table.ReadAllAsync(TestContext.Current.CancellationToken);
-                    var member = Assert.Single(result.Members).Item1;
+                    var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+                    var member = result.TryGet(entry.SiloAddress)!.Item1;
                     Assert.Equal(default, member.IAmAliveTime);
                     Assert.Equal(default, member.StartTime);
                     Assert.True(member.SuspectTimes is null || member.SuspectTimes.Count == 0);
@@ -885,14 +908,12 @@ namespace AWSUtils.Tests.MembershipTests
             var heartbeats = 0;
             using var client = new RequestClient
             {
-                ReadTransaction = _ =>
+                Read = _ =>
                 {
                     reads++;
-                    return new TransactGetItemsResponse
-                    {
-                        Responses = [new ItemResponse { Item = row }, new ItemResponse { Item = version }]
-                    };
+                    return new GetItemResponse { Item = version };
                 },
+                Query = _ => new QueryResponse { Items = [row, version], LastEvaluatedKey = [] },
                 Update = request =>
                 {
                     heartbeats++;
@@ -922,8 +943,8 @@ namespace AWSUtils.Tests.MembershipTests
             };
             var table = CreateTable(client);
             var address = SiloAddress.New(IPAddress.Loopback, 11111, 1);
-            var snapshot = await table.ReadRowAsync(address, TestContext.Current.CancellationToken);
-            var (entry, etag) = Assert.Single(snapshot.Members);
+            var snapshot = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+            var (entry, etag) = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(address));
 
             await table.UpdateIAmAliveAsync(new MembershipEntry
             {
@@ -943,7 +964,7 @@ namespace AWSUtils.Tests.MembershipTests
             Assert.Equal(1, reads);
             Assert.Equal(1, heartbeats);
             Assert.Equal(1, client.WriteCount);
-            Assert.Equal(0, client.ReadCount);
+            Assert.Equal(1, client.ReadCount);
         }
 
         [Theory]
@@ -1049,6 +1070,16 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Fact]
+        public void ConcurrentReadConformanceWorkloadCrossesQueryPageAfterCleanup()
+        {
+            const int maximumQueryPageBytes = 1024 * 1024;
+            const int cleanedRows = 2;
+            Assert.True(
+                (DynamoDBMembershipTableTest.ConcurrentReadRowCount - cleanedRows) * DynamoDBMembershipTableTest.ConcurrentReadRowPadding
+                    > maximumQueryPageBytes);
+        }
+
+        [Fact]
         public async Task ReadAllReturnsCompleteViewWhenMutationFollowsQuery()
         {
             var reads = 0;
@@ -1141,33 +1172,21 @@ namespace AWSUtils.Tests.MembershipTests
         [Theory]
         [InlineData(false)]
         [InlineData(true)]
-        public async Task ReadRowRequiresMembershipHistory(bool versionExists)
+        public async Task ReadAllRequiresMembershipHistory(bool versionExists)
         {
             using var client = new RequestClient
             {
-                ReadTransaction = request =>
-                {
-                    Assert.Equal(2, request.TransactItems.Count);
-                    Assert.Equal("127.0.0.1-11111-1", request.TransactItems[0].Get.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S);
-                    Assert.Equal("VersionRow", request.TransactItems[1].Get.Key[SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME].S);
-                    Assert.All(request.TransactItems, item =>
-                    {
-                        Assert.Equal("membership", item.Get.TableName);
-                        Assert.Equal("cluster", item.Get.Key[SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME].S);
-                    });
-                    return new TransactGetItemsResponse
-                    {
-                        Responses = [new ItemResponse(), versionExists ? new ItemResponse { Item = CreateVersion(7).GetFields(true) } : new ItemResponse()]
-                    };
-                }
+                Read = _ => new GetItemResponse { Item = versionExists ? CreateVersion(7).GetFields(true) : [] },
+                Query = _ => new QueryResponse { Items = [CreateVersion(7).GetFields(true)], LastEvaluatedKey = [] }
             };
             var table = CreateTable(client);
-            var pending = table.ReadRowAsync(SiloAddress.New(IPAddress.Loopback, 11111, 1), TestContext.Current.CancellationToken);
+            var pending = table.ReadAllAsync(TestContext.Current.CancellationToken);
 
             if (versionExists)
             {
                 var result = await pending;
                 Assert.Empty(result.Members);
+                Assert.Null(result.TryGet(SiloAddress.New(IPAddress.Loopback, 11111, 1)));
                 Assert.Equal(7, result.Version.Version);
                 Assert.Equal("7", result.Version.VersionEtag);
             }
@@ -1195,7 +1214,7 @@ namespace AWSUtils.Tests.MembershipTests
 
         public static IEnumerable<object[]> MalformedMembershipTokens()
         {
-            foreach (var operation in new[] { "ReadRow", "ReadRowMember", "ReadAllBefore", "ReadAllQuery", "ReadAllMember", "CleanupMember" })
+            foreach (var operation in new[] { "ReadAllBefore", "ReadAllQuery", "ReadAllMember", "CleanupMember" })
             {
                 foreach (var attribute in new[] { SiloInstanceRecord.MEMBERSHIP_VERSION_PROPERTY_NAME, SiloInstanceRecord.ETAG_PROPERTY_NAME })
                 {
@@ -1257,7 +1276,6 @@ namespace AWSUtils.Tests.MembershipTests
 
             var exception = await Assert.ThrowsAsync<FormatException>(() => operation switch
             {
-                "ReadRow" or "ReadRowMember" => table.ReadRowAsync(address, TestContext.Current.CancellationToken),
                 "CleanupMember" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, TestContext.Current.CancellationToken),
                 _ => table.ReadAllAsync(TestContext.Current.CancellationToken)
             });
@@ -1269,11 +1287,9 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Theory]
-        [InlineData(false, 0)]
-        [InlineData(true, 0)]
-        [InlineData(false, int.MaxValue)]
-        [InlineData(true, int.MaxValue)]
-        public async Task MembershipReadsAcceptValidVersionAttributes(bool readAll, int version)
+        [InlineData(0)]
+        [InlineData(int.MaxValue)]
+        public async Task MembershipReadsAcceptValidVersionAttributes(int version)
         {
             var fields = CreateVersion(version).GetFields(includeKeys: true);
             using var client = new RequestClient
@@ -1287,9 +1303,7 @@ namespace AWSUtils.Tests.MembershipTests
             };
             var table = CreateTable(client);
 
-            var result = readAll
-                ? await table.ReadAllAsync(TestContext.Current.CancellationToken)
-                : await table.ReadRowAsync(SiloAddress.New(IPAddress.Loopback, 11111, 1), TestContext.Current.CancellationToken);
+            var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
 
             Assert.Equal(version, result.Version.Version);
             Assert.Equal(version.ToString(CultureInfo.InvariantCulture), result.Version.VersionEtag);

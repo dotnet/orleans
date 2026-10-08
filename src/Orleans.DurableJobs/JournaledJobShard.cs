@@ -25,6 +25,7 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly SingleWaiterAutoResetEvent _pendingOperationSignal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly Task _operationProcessor;
+    private bool _retiring;
     private int _disposed;
 
     /// <summary>
@@ -110,6 +111,8 @@ internal sealed class JournaledJobShard : IJobShard
     /// </summary>
     internal JournalId StorageId => JobShardId.Parse(Id).ToJournalId();
 
+    internal bool IsRetired => Volatile.Read(ref _retiring) || Volatile.Read(ref _disposed) != 0;
+
     /// <inheritdoc/>
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _state.ConsumeDurableJobsAsync();
 
@@ -121,15 +124,31 @@ internal sealed class JournaledJobShard : IJobShard
     {
         ThrowIfDisposed();
 
-        var operation = new MarkAsCompleteOperation(cancellationToken);
-        try
+        using var operation = new MarkAsCompleteOperation(cancellationToken);
+        EnqueueOperation(operation);
+        await operation.Task.ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes mutation admission and drains accepted operations before ownership cleanup.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the completion barrier wait.</param>
+    internal async Task RetireAsync(CancellationToken cancellationToken)
+    {
+        using var operation = new MarkAsCompleteOperation(cancellationToken);
+        lock (_pendingOperationsLock)
         {
-            EnqueueOperation(operation);
-            await operation.Task.ConfigureAwait(false);
+            ThrowIfDisposed();
+            _retiring = true;
+            _pendingOperations.Enqueue(operation);
+            _pendingOperationSignal.Signal();
         }
-        finally
+
+        // Canceling the wait lets unregistration dispose the shard and cancel owned closing I/O.
+        await operation.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (!_state.IsAddingCompleted)
         {
-            operation.Dispose();
+            throw new InvalidOperationException($"Cannot retire DurableJobs shard '{Id}' because closing it failed.");
         }
     }
 
@@ -141,16 +160,9 @@ internal sealed class JournaledJobShard : IJobShard
         ArgumentNullException.ThrowIfNull(jobContext);
         ThrowIfDisposed();
 
-        var operation = new StartAttemptOperation(jobContext.Job.Id, cancellationToken);
-        try
-        {
-            EnqueueOperation(operation);
-            return await operation.Task.ConfigureAwait(false);
-        }
-        finally
-        {
-            operation.Dispose();
-        }
+        using var operation = new StartAttemptOperation(jobContext.Job.Id, cancellationToken);
+        EnqueueOperation(operation);
+        return await operation.Task.ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -159,16 +171,9 @@ internal sealed class JournaledJobShard : IJobShard
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
         ThrowIfDisposed();
 
-        var operation = new RemoveJobOperation(jobId, cancellationToken);
-        try
-        {
-            EnqueueOperation(operation);
-            return await operation.Task.ConfigureAwait(false);
-        }
-        finally
-        {
-            operation.Dispose();
-        }
+        using var operation = new RemoveJobOperation(jobId, cancellationToken);
+        EnqueueOperation(operation);
+        return await operation.Task.ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -180,16 +185,9 @@ internal sealed class JournaledJobShard : IJobShard
         ArgumentNullException.ThrowIfNull(jobContext);
         ThrowIfDisposed();
 
-        var operation = new RetryJobLaterOperation(jobContext, newDueTime, resetDequeueCount: false, cancellationToken);
-        try
-        {
-            EnqueueOperation(operation);
-            return await operation.Task.ConfigureAwait(false);
-        }
-        finally
-        {
-            operation.Dispose();
-        }
+        using var operation = new RetryJobLaterOperation(jobContext, newDueTime, resetDequeueCount: false, cancellationToken);
+        EnqueueOperation(operation);
+        return await operation.Task.ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -201,20 +199,13 @@ internal sealed class JournaledJobShard : IJobShard
         ArgumentNullException.ThrowIfNull(jobContext);
         ThrowIfDisposed();
 
-        var operation = new RetryJobLaterOperation(
+        using var operation = new RetryJobLaterOperation(
             jobContext,
             newDueTime,
             resetDequeueCount: true,
             cancellationToken);
-        try
-        {
-            EnqueueOperation(operation);
-            return await operation.Task.ConfigureAwait(false);
-        }
-        finally
-        {
-            operation.Dispose();
-        }
+        EnqueueOperation(operation);
+        return await operation.Task.ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -223,16 +214,9 @@ internal sealed class JournaledJobShard : IJobShard
         request.Validate();
         ThrowIfDisposed();
 
-        var operation = new ScheduleJobOperation(request, cancellationToken);
-        try
-        {
-            EnqueueOperation(operation);
-            return await operation.Task.ConfigureAwait(false);
-        }
-        finally
-        {
-            operation.Dispose();
-        }
+        using var operation = new ScheduleJobOperation(request, cancellationToken);
+        EnqueueOperation(operation);
+        return await operation.Task.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -244,16 +228,9 @@ internal sealed class JournaledJobShard : IJobShard
     {
         ThrowIfDisposed();
 
-        var operation = new DeleteStateOperation(cancellationToken);
-        try
-        {
-            EnqueueOperation(operation);
-            await operation.Task.ConfigureAwait(false);
-        }
-        finally
-        {
-            operation.Dispose();
-        }
+        using var operation = new DeleteStateOperation(cancellationToken);
+        EnqueueOperation(operation);
+        await operation.Task.ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -287,6 +264,7 @@ internal sealed class JournaledJobShard : IJobShard
         lock (_pendingOperationsLock)
         {
             ThrowIfDisposed();
+            ObjectDisposedException.ThrowIf(_retiring && operation is not DeleteStateOperation, this);
             _pendingOperations.Enqueue(operation);
             _pendingOperationSignal.Signal();
         }

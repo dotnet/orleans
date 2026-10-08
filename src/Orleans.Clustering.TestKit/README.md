@@ -75,7 +75,7 @@ Handle registration and teardown's ownership snapshot share one lifecycle lock.
 Admitted factory calls, provider initialization, terminal deletion, native probes,
 and late-owner disposal remain
 owned until their actual tasks finish. Caller cancellation ends that caller's
-wait; the factory and tokenless-compatible initialization keep their original
+wait; the factory and provider initialization keep their original
 owners alive. An acquisition which finishes after disposal or history retirement
 disposes its returned owner before reporting the lifetime error. Teardown waits
 for these admitted operations before deleting scopes or disposing shared owners.
@@ -94,8 +94,7 @@ scopes are retired; teardown disposes their owners directly. A deletion request
 which fails after invocation also retires its handles, since it may have
 committed. Subsequent histories use a new fixture with fresh owners.
 Ordinary membership operations receive their scenario cancellation token. The
-fixture's ownership tracking covers its lifecycle callbacks, rather than hidden
-work behind a provider's canceled compatibility adapter. Handle disposers release
+fixture tracks its lifecycle callbacks through completion. Handle disposers release
 their declared resources according to the real SDK close, abort, or drain
 contract; any resulting infrastructure failures remain observable.
 Use non-secret provider labels: diagnostics include labels, cluster IDs, opaque
@@ -103,7 +102,7 @@ tokens, identities, and mismatched persisted fields.
 
 ## Independently discoverable direct guarantees
 
-Expose each runner method as a separate fact/test in your framework. All return
+Expose each runner method below as a separate fact/test in your framework. All return
 `Task` and take `CancellationToken cancellationToken = default`. Every provider
 runs the same behavioral assertions.
 
@@ -123,19 +122,20 @@ runs the same behavioral assertions.
 | G12 | `UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects` |
 | G13 | `InsertRow_DuplicateIdentity_ReturnsFalseWithoutSideEffects` |
 | G14 | `UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects` |
-| G15 | `ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities` |
+| G15 | `ReadAll_SelectsPresentAndAbsentIdentities` |
 | G16 | `Reads_RetainedObjectsRemainUnchangedAfterLaterWrites` |
 | G17 | `InsertRow_MutatingInputAndSuspectList_DoesNotMutateStoredState` |
 | G18 | `UpdateRow_MutatingInputAndSuspectList_DoesNotMutateStoredState` |
 | G19 | `Reads_MutatingReturnedEntryAndSuspectList_DoesNotMutateStoredState` |
 | G20 | `ConcurrentCrossRowUpdates_SharedTableVersion_HaveExactlyOneWinner` |
 | G21 | `ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews` |
-| G22 | `ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews` |
 | G23 | `InitializeMembershipTable_RepeatedWithData_PreservesCommittedState` |
 | G24 | `Clusters_SharedBackendWithOverlappingSiloAddresses_AreIsolated` |
 | G25 | `CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows` |
 | G26 | `DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster` |
 | G27 | `DeleteMembershipTableEntries_DifferentClusterId_NeverDeletesConfiguredCluster` |
+
+The suite exposes 26 direct cases plus generated conformance.
 
 The generated fact is conventionally named
 `MembershipTable_ModelBased_GeneratedConformance`; it calls
@@ -145,6 +145,8 @@ asynchronous lifecycle hooks, with a fresh fixture and isolated scopes per case.
 The public runner executes the complete generated suite. Repository hosted
 system-target tests distribute the same seed-17 manifest across four xUnit cases
 (240, 240, 240, and 239 histories), preserving every history and operation count.
+The generated model includes 18 operation kinds. Present and absent entry
+observations select entries from `ReadAllAsync` snapshots using `TryGet`.
 
 ## Comparison and protocol rules
 
@@ -242,8 +244,8 @@ errors and infrastructure exceptions propagate.
 
 Concurrency uses materialized ready/start/completion gates, exact winner counts,
 and immediate per-observation checks against known before/after histories.
-ReadAll and ReadRow scenarios race readers against both forward updates and
-Dead-row cleanup, including the transition from a present point row to absence.
+The ReadAll scenario races readers against both forward updates and Dead-row
+cleanup, including the transition from a present row to absence in the snapshot.
 The cleanup scenario checks idempotent cleanup through both handles and accepts
 either an unchanged version or one atomic increment. Provider-native tests cover
 overlapping cleanup attempts and their contention/error behavior; the runtime
@@ -253,13 +255,16 @@ range 3–10000) bounds the multi-row workload without changing any assertion.
 An adapter must select a safe count which crosses its backend's actual paging
 or streaming boundary. Retain provider-specific pagination tests which force
 those boundaries explicitly.
-Setup uses one initial point read, one insert and verifying point read per row,
-then two full views checked against independently constructed canonical entries.
-Each insertion verifies an exact +1 commit, a fresh table token, and expected
-canonical row fields. For N rows this is
-N+1 point reads, N inserts, two full reads, and 3N membership-row observations.
-These count provider API calls; provider-specific instrumentation measures their
-native request costs.
+Setup uses one initial empty full snapshot, then one `InsertRowAsync` call and
+one `ReadAllAsync` verification per row. Each verification obtains the current
+table ETag for the next insert and checks the inserted row's canonical fields
+against the independently constructed input. Two final full views are compared
+against all independently expected canonical entries.
+
+For N rows this is N bool-returning inserts, N+3 full reads, and
+N(N+1)/2 + 2N returned membership rows. At N=4096, setup returns 8,398,848 rows;
+at N=1001 it returns 503,503 rows. Provider-specific instrumentation measures
+native requests, paging, and retry costs.
 
 Accordant generates and executes operation sequences using transition coverage.
 Required constrained prefixes reach stale table snapshots after cross-row and same-row commits,

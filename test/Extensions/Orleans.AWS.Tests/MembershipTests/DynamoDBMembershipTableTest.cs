@@ -26,6 +26,9 @@ namespace AWSUtils.Tests.MembershipTests
     [TestArea("Membership")]
     public class DynamoDBMembershipTableTest : MembershipTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
+        internal const int ConcurrentReadRowCount = 48;
+        internal const int ConcurrentReadRowPadding = 40 * 1024;
+
         public DynamoDBMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())
         {
         }
@@ -51,8 +54,10 @@ namespace AWSUtils.Tests.MembershipTests
             return new TestOwnedDynamoDBMembershipTable(this.loggerFactory, Options.Create(options), clusterOptions);
         }
 
-        // Persisted fields and suspect votes exceed DynamoDB's 1 MiB query page at this count.
-        protected override int ConformanceConcurrencyRowCount => 4096;
+        // Large rows cross DynamoDB's 1 MiB query boundary while keeping full-snapshot setup bounded.
+        // ReadAllRetriesWhenCanonicalMutationCrossesPages provides deterministic inter-page retry coverage.
+        protected override int ConformanceConcurrencyRowCount => ConcurrentReadRowCount;
+        protected override int ConformanceConcurrencyRowPadding => ConcurrentReadRowPadding;
 
         protected override MembershipTableTestFixture CreateConformanceFixture()
         {
@@ -183,7 +188,7 @@ namespace AWSUtils.Tests.MembershipTests
         }
 
         [Fact, TestCategory("Functional")]
-        public async Task MembershipTable_DynamoDB_ReadRow_Insert_Read()
+        public async Task MembershipTable_DynamoDB_ReadAll_Insert_TryGet()
         {
             await MembershipTable_ReadRow_Insert_Read();
         }

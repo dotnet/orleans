@@ -174,25 +174,14 @@ internal partial class CosmosMembershipTable : IMembershipTable
         }
     }
 
-    [Obsolete("Use ReadRowAsync instead.")]
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
     public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
 
-    public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+    public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var id = ConstructSiloEntityId(key);
-
-        try
-        {
-            var snapshot = await ReadMembershipSnapshot(id, cancellationToken).ConfigureAwait(false);
-            return ConvertToTableData(snapshot.Silos, snapshot.Version);
-        }
-        catch (Exception exc) when (exc is not OperationCanceledException)
-        {
-            LogWarningFailureReadingSiloEntry(exc, key, _clusterId);
-            WrappedException.CreateAndRethrow(exc);
-            throw;
-        }
+        return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
     }
 
     [Obsolete("Use ReadAllAsync instead.")]

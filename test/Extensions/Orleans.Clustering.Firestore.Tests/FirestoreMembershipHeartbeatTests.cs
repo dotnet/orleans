@@ -24,6 +24,37 @@ public sealed class FirestoreMembershipHeartbeatTests
     private static readonly string VersionPath = $"{CollectionPath}/{Partition}";
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetiredRowReadsRejectWithoutInitializationOrStorage(bool initialized)
+    {
+        var client = new MembershipClient();
+        var table = initialized ? CreateTable(client) : new FirestoreMembershipTable(
+            NullLoggerFactory.Instance, Options.Create(new FirestoreOptions()),
+            Options.Create(new ClusterOptions { ClusterId = "cluster" }));
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+#pragma warning disable CS0618 // Verify the retired compatibility entry points.
+        var legacy = table.ReadRow(null!);
+        var asynchronous = table.ReadRowAsync(null!, TestContext.Current.CancellationToken);
+        var token = new CancellationToken(canceled: true);
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadRowAsync(null!, token));
+#pragma warning restore CS0618
+        Assert.True(legacy.IsFaulted);
+        Assert.True(asynchronous.IsFaulted);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => asynchronous)).Message);
+        Assert.Equal(token, canceled.CancellationToken);
+        Assert.Equal(0, client.Transactions);
+        Assert.Empty(client.Reads);
+        Assert.Empty(client.Queries);
+        Assert.Empty(client.Commits);
+        foreach (var name in new[] { "ReadRow", "ReadRowAsync" })
+        {
+            Assert.Equal(guidance, table.GetType().GetMethod(name)!.GetCustomAttribute<ObsoleteAttribute>()!.Message);
+        }
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(1)]
     public async Task HeartbeatUsesOneTimestampOnlyWrite(int hours)
@@ -180,10 +211,8 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.All(concurrentState, pair => Assert.Equal(pair.Value, client.Documents[pair.Key]));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task MembershipReadsReturnEachRowETagAndPreserveTableVersionAcrossHeartbeat(bool readAll)
+    [Fact]
+    public async Task MembershipReadsReturnEachRowETagAndPreserveTableVersionAcrossHeartbeat()
     {
         var client = new MembershipClient();
         var entry = Entry();
@@ -195,10 +224,7 @@ public sealed class FirestoreMembershipHeartbeatTests
         var before = await Read();
         Assert.Equal(ETag(original), before.TryGet(entry.SiloAddress)!.Item2);
         Assert.NotEqual(before.Version.VersionEtag, before.TryGet(entry.SiloAddress)!.Item2);
-        if (readAll)
-        {
-            Assert.Equal(ETag(other), before.TryGet(Entry(2).SiloAddress)!.Item2);
-        }
+        Assert.Equal(ETag(other), before.TryGet(Entry(2).SiloAddress)!.Item2);
 
         await table.UpdateIAmAliveAsync(entry, TestContext.Current.CancellationToken);
 
@@ -208,15 +234,10 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Equal(before.Version.VersionEtag, after.Version.VersionEtag);
         Assert.All(after.Members, row => Assert.Equal(ETag(client.Documents[RowPath(row.Item1)]), row.Item2));
         Assert.NotEqual(before.TryGet(entry.SiloAddress)!.Item2, after.TryGet(entry.SiloAddress)!.Item2);
-        if (readAll)
-        {
-            Assert.Equal(before.TryGet(Entry(2).SiloAddress)!.Item2, after.TryGet(Entry(2).SiloAddress)!.Item2);
-        }
+        Assert.Equal(before.TryGet(Entry(2).SiloAddress)!.Item2, after.TryGet(Entry(2).SiloAddress)!.Item2);
         Assert.Equal(entry.IAmAliveTime, after.TryGet(entry.SiloAddress)!.Item1.IAmAliveTime);
 
-        Task<MembershipTableData> Read() => readAll
-            ? table.ReadAllAsync(TestContext.Current.CancellationToken)
-            : table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
+        Task<MembershipTableData> Read() => table.ReadAllAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -227,8 +248,8 @@ public sealed class FirestoreMembershipHeartbeatTests
         client.AddRow(entry, DateTime.UnixEpoch);
         client.Documents[VersionPath].UpdateTime = Timestamp.FromDateTime(DateTime.UnixEpoch.AddSeconds(1));
         var table = CreateTable(client);
-        var snapshot = await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
-        var row = Assert.Single(snapshot.Members);
+        var snapshot = await table.ReadAllAsync(TestContext.Current.CancellationToken);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(entry.SiloAddress));
         row.Item1.Status = SiloStatus.ShuttingDown;
         entry.IAmAliveTime = Now;
 
@@ -241,8 +262,8 @@ public sealed class FirestoreMembershipHeartbeatTests
             row.Item1, row.Item2, snapshot.Version.Next(), TestContext.Current.CancellationToken));
 
         Assert.Equal(1, client.Transactions);
-        Assert.Equal(2, Assert.Single(client.Reads).Documents.Count);
-        Assert.Empty(client.Queries);
+        Assert.Empty(client.Reads);
+        Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, Assert.Single(client.Queries).ConsistencySelectorCase);
         Assert.Equal(new[] { 0, 1, 2 }, client.Commits.Select(commit => commit.Writes.Count));
         Assert.Equal((long)SiloStatus.ShuttingDown, client.Documents[RowPath(entry)].Fields[nameof(SiloInstanceEntity.Status)].IntegerValue);
         Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
@@ -821,50 +842,32 @@ public sealed class FirestoreMembershipHeartbeatTests
         Assert.Equal(version, client.Documents[VersionPath]);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task MembershipReadsUseOneStrongNativeSnapshot(bool readAll)
+    [Fact]
+    public async Task MembershipReadsUseOneStrongNativeSnapshot()
     {
         var client = new MembershipClient();
         var entry = Entry();
         client.AddRow(entry, Now);
         var table = CreateTable(client);
 
-        var result = readAll
-            ? await table.ReadAllAsync(TestContext.Current.CancellationToken)
-            : await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(7, result.Version.Version);
-        Assert.Equal(entry.SiloAddress, Assert.Single(result.Members).Item1.SiloAddress);
-        Assert.Equal(Now, Assert.Single(result.Members).Item1.IAmAliveTime);
+        Assert.Equal(entry.SiloAddress, result.TryGet(entry.SiloAddress)!.Item1.SiloAddress);
+        Assert.Equal(Now, result.TryGet(entry.SiloAddress)!.Item1.IAmAliveTime);
         Assert.Equal(1, client.Transactions);
+        var query = Assert.Single(client.Queries);
+        Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, query.ConsistencySelectorCase);
+        Assert.False(query.Transaction.IsEmpty);
+        Assert.Equal(2, client.QueryDocumentReads);
+        Assert.Empty(client.Reads);
         var commit = Assert.Single(client.Commits);
+        Assert.Equal(query.Transaction, commit.Transaction);
         Assert.Empty(commit.Writes);
-        if (readAll)
-        {
-            var query = Assert.Single(client.Queries);
-            Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, query.ConsistencySelectorCase);
-            Assert.False(query.Transaction.IsEmpty);
-            Assert.Equal(2, client.QueryDocumentReads);
-            Assert.Empty(client.Reads);
-            Assert.Equal(query.Transaction, commit.Transaction);
-        }
-        else
-        {
-            var read = Assert.Single(client.Reads);
-            Assert.Equal(new[] { VersionPath, RowPath(entry) }, read.Documents);
-            Assert.Equal(BatchGetDocumentsRequest.ConsistencySelectorOneofCase.Transaction, read.ConsistencySelectorCase);
-            Assert.False(read.Transaction.IsEmpty);
-            Assert.Equal(read.Transaction, commit.Transaction);
-            Assert.Empty(client.Queries);
-        }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task MembershipReadsConsumeOneSnapshotDuringStreamedChanges(bool readAll)
+    [Fact]
+    public async Task MembershipReadsConsumeOneSnapshotDuringStreamedChanges()
     {
         var client = new MembershipClient();
         var entry = Entry();
@@ -886,48 +889,29 @@ public sealed class FirestoreMembershipHeartbeatTests
         };
         var table = CreateTable(client);
 
-        var result = readAll
-            ? await table.ReadAllAsync(TestContext.Current.CancellationToken)
-            : await table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken);
+        var result = await table.ReadAllAsync(TestContext.Current.CancellationToken);
 
-        var row = Assert.Single(result.Members);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(result.TryGet(entry.SiloAddress));
         Assert.Equal(8, client.Documents[VersionPath].Fields[nameof(ClusterVersionEntity.MembershipVersion)].IntegerValue);
         Assert.Equal(8, result.Version.Version);
         Assert.Equal(ETag(client.Documents[VersionPath]), result.Version.VersionEtag);
         Assert.Equal(8, row.Item1.ProxyPort);
         Assert.Equal(ETag(client.Documents[document.Name]), row.Item2);
         Assert.Equal(2, client.Transactions);
+        Assert.Equal(2, client.Queries.Count);
         Assert.Equal(2, client.Commits.Count);
+        Assert.Empty(client.Reads);
+        Assert.All(client.Queries, query =>
+        {
+            Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, query.ConsistencySelectorCase);
+            Assert.False(query.Transaction.IsEmpty);
+        });
+        Assert.Equal(client.Queries.Select(query => query.Transaction), client.Commits.Select(commit => commit.Transaction));
         Assert.All(client.Commits, commit => Assert.Empty(commit.Writes));
-        if (readAll)
-        {
-            Assert.Equal(2, client.Queries.Count);
-            Assert.Empty(client.Reads);
-            Assert.All(client.Queries, query =>
-            {
-                Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, query.ConsistencySelectorCase);
-                Assert.False(query.Transaction.IsEmpty);
-            });
-            Assert.Equal(client.Queries.Select(query => query.Transaction), client.Commits.Select(commit => commit.Transaction));
-        }
-        else
-        {
-            Assert.Equal(2, client.Reads.Count);
-            Assert.Empty(client.Queries);
-            Assert.All(client.Reads, read =>
-            {
-                Assert.Equal(BatchGetDocumentsRequest.ConsistencySelectorOneofCase.Transaction, read.ConsistencySelectorCase);
-                Assert.False(read.Transaction.IsEmpty);
-                Assert.Equal(new[] { VersionPath, document.Name }, read.Documents);
-            });
-            Assert.Equal(client.Reads.Select(read => read.Transaction), client.Commits.Select(commit => commit.Transaction));
-        }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task MembershipReadsRequireVersionDocument(bool readAll)
+    [Fact]
+    public async Task MembershipReadsRequireVersionDocument()
     {
         var client = new MembershipClient();
         var entry = Entry();
@@ -935,60 +919,45 @@ public sealed class FirestoreMembershipHeartbeatTests
         client.Documents.Remove(VersionPath);
         var table = CreateTable(client);
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => readAll
-            ? table.ReadAllAsync(TestContext.Current.CancellationToken)
-            : table.ReadRowAsync(entry.SiloAddress, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => table.ReadAllAsync(TestContext.Current.CancellationToken));
 
         Assert.Empty(client.Commits);
         Assert.Equal(1, client.Reads.Count + client.Queries.Count);
         Assert.Equal(1, client.Transactions);
-        if (readAll)
-        {
-            var query = Assert.Single(client.Queries);
-            Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, query.ConsistencySelectorCase);
-        }
-        else
-        {
-            var read = Assert.Single(client.Reads);
-            Assert.Equal(BatchGetDocumentsRequest.ConsistencySelectorOneofCase.Transaction, read.ConsistencySelectorCase);
-        }
+        var query = Assert.Single(client.Queries);
+        Assert.Equal(RunQueryRequest.ConsistencySelectorOneofCase.Transaction, query.ConsistencySelectorCase);
     }
 
     [Fact]
-    public async Task ReadRowReturnsVersionForMissingSiloInOneRequest()
+    public async Task ReadAllReturnsVersionForMissingSiloInOneTransaction()
     {
         var client = new MembershipClient();
         var version = client.Documents[VersionPath].Clone();
 
-        var result = await CreateTable(client).ReadRowAsync(Entry().SiloAddress, TestContext.Current.CancellationToken);
+        client.AddRow(Entry(2), Now);
+        var result = await CreateTable(client).ReadAllAsync(TestContext.Current.CancellationToken);
 
-        Assert.Empty(result.Members);
+        Assert.Null(result.TryGet(Entry().SiloAddress));
+        Assert.Equal(Entry(2).SiloAddress, Assert.Single(result.Members).Item1.SiloAddress);
         Assert.Equal(7, result.Version.Version);
         Assert.Equal(ETag(version), result.Version.VersionEtag);
-        var read = Assert.Single(client.Reads);
-        Assert.Equal(2, read.Documents.Count);
-        Assert.Equal(BatchGetDocumentsRequest.ConsistencySelectorOneofCase.Transaction, read.ConsistencySelectorCase);
-        Assert.Empty(client.Queries);
+        Assert.Empty(client.Reads);
+        Assert.Equal(2, client.QueryDocumentReads);
+        Assert.Single(client.Queries);
         Assert.Equal(1, client.Transactions);
-        var commit = Assert.Single(client.Commits);
-        Assert.Equal(read.Transaction, commit.Transaction);
-        Assert.Empty(commit.Writes);
+        Assert.Empty(Assert.Single(client.Commits).Writes);
     }
 
     [Theory]
-    [InlineData(false, StatusCode.PermissionDenied)]
-    [InlineData(true, StatusCode.PermissionDenied)]
-    [InlineData(false, StatusCode.NotFound)]
-    [InlineData(true, StatusCode.NotFound)]
-    public async Task MembershipReadsPropagateNativeFailures(bool readAll, StatusCode status)
+    [InlineData(StatusCode.PermissionDenied)]
+    [InlineData(StatusCode.NotFound)]
+    public async Task MembershipReadsPropagateNativeFailures(StatusCode status)
     {
         var failure = new RpcException(new Status(status, "native-read-failure"));
         var client = new MembershipClient { ReadFailure = failure };
         var table = CreateTable(client);
 
-        var exception = await Assert.ThrowsAsync<RpcException>(() => readAll
-            ? table.ReadAllAsync(TestContext.Current.CancellationToken)
-            : table.ReadRowAsync(Entry().SiloAddress, TestContext.Current.CancellationToken));
+        var exception = await Assert.ThrowsAsync<RpcException>(() => table.ReadAllAsync(TestContext.Current.CancellationToken));
 
         Assert.Same(failure, exception);
         Assert.Equal(1, client.Transactions);
@@ -997,7 +966,6 @@ public sealed class FirestoreMembershipHeartbeatTests
     }
 
     [Theory]
-    [InlineData("ReadRow")]
     [InlineData("ReadAll")]
     [InlineData("InsertRow")]
     [InlineData("UpdateRow")]
@@ -1005,7 +973,7 @@ public sealed class FirestoreMembershipHeartbeatTests
     public async Task NativeMembershipOperationsNormalizeCallerCancellation(string operation)
     {
         var failure = new RpcException(new Status(StatusCode.Cancelled, "native-cancellation"));
-        var reads = operation is "ReadRow" or "ReadAll" or "Cleanup";
+        var reads = operation is "ReadAll" or "Cleanup";
         var client = new MembershipClient { ReadFailure = reads ? failure : null, CommitFailure = reads ? null : failure };
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         client.BeforeRead = cancellation.Cancel;
@@ -1023,7 +991,6 @@ public sealed class FirestoreMembershipHeartbeatTests
 
         Task Execute() => operation switch
         {
-            "ReadRow" => table.ReadRowAsync(entry.SiloAddress, cancellation.Token),
             "ReadAll" => table.ReadAllAsync(cancellation.Token),
             "InsertRow" => table.InsertRowAsync(entry, NextVersion(client), cancellation.Token),
             "UpdateRow" => table.UpdateRowAsync(entry, ETag(client.Documents[VersionPath]), NextVersion(client), cancellation.Token),

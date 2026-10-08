@@ -1497,8 +1497,6 @@ namespace NonSilo.Tests.Membership
             var membershipTarget = Substitute.For<IMembershipTableSystemTarget>();
             membershipTarget.ReadAllAsync(Arg.Any<CancellationToken>())
                 .Returns(call => backingTable.ReadAllAsync(call.ArgAt<CancellationToken>(0)));
-            membershipTarget.ReadRowAsync(Arg.Any<SiloAddress>(), Arg.Any<CancellationToken>())
-                .Returns(call => backingTable.ReadRowAsync(call.ArgAt<SiloAddress>(0), call.ArgAt<CancellationToken>(1)));
             membershipTarget.InsertRowAsync(Arg.Any<MembershipEntry>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
                 .Returns(call => backingTable.InsertRowAsync(call.ArgAt<MembershipEntry>(0), call.ArgAt<TableVersion>(1), call.ArgAt<CancellationToken>(2)));
             membershipTarget.UpdateRowAsync(Arg.Any<MembershipEntry>(), Arg.Any<string>(), Arg.Any<TableVersion>(), Arg.Any<CancellationToken>())
@@ -1506,6 +1504,13 @@ namespace NonSilo.Tests.Membership
             var grainFactory = Substitute.For<IInternalGrainFactory>();
             grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableType, Arg.Any<SiloAddress>())
                 .Returns(membershipTarget);
+            if (backingTable is IMembershipTableSystemTarget suppliedTarget)
+            {
+                // Retired-row tests inspect calls on the actual receiver substitute.
+                grainFactory.GetSystemTarget<IMembershipTableSystemTarget>(Constants.SystemMembershipTableType, Arg.Any<SiloAddress>())
+                    .Returns(suppliedTarget);
+            }
+
             var services = Substitute.For<IServiceProvider>();
             services.GetService(typeof(IOptions<DevelopmentClusterMembershipOptions>)).Returns(
                 Options.Create(new DevelopmentClusterMembershipOptions { PrimarySiloEndpoint = primarySilo.Endpoint }));
@@ -1517,11 +1522,54 @@ namespace NonSilo.Tests.Membership
         }
 
         [Theory]
-        [InlineData(100, false)]
-        [InlineData(101, false)]
-        [InlineData(100, true)]
-        [InlineData(101, true)]
-        public async Task DevelopmentMembershipReadChecksVersionLearnedFromGossip(int tableVersion, bool readRow)
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task DevelopmentMembershipRowReads_AreUnsupportedWithoutRpc(bool initialized)
+        {
+            const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+            var target = Substitute.For<IMembershipTableSystemTarget>();
+            var provider = CreateSystemTargetBasedMembershipTable(target);
+            if (initialized)
+            {
+                await provider.InitializeMembershipTableAsync(true, TestContext.Current.CancellationToken);
+            }
+
+            target.ClearReceivedCalls();
+            foreach (var key in new[] { this.localSilo, null! })
+            {
+#pragma warning disable CS0618 // Retired entrypoints must fault without inspecting the key or forwarding RPC.
+                var legacy = provider.ReadRow(key);
+                var current = provider.ReadRowAsync(key, TestContext.Current.CancellationToken);
+#pragma warning restore CS0618
+                Assert.True(legacy.IsFaulted);
+                Assert.True(current.IsFaulted);
+                Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+                Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => current)).Message);
+                using var cancellation = new CancellationTokenSource();
+                cancellation.Cancel();
+#pragma warning disable CS0618 // Cancellation must precede retirement and any provider access.
+                var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => provider.ReadRowAsync(key, cancellation.Token));
+#pragma warning restore CS0618
+                Assert.Equal(cancellation.Token, canceled.CancellationToken);
+            }
+
+            foreach (var name in new[] { nameof(IMembershipTable.ReadRow), nameof(IMembershipTable.ReadRowAsync) })
+            {
+                var obsolete = Assert.IsType<ObsoleteAttribute>(
+                    Attribute.GetCustomAttribute(typeof(SystemTargetBasedMembershipTable).GetMethod(name)!, typeof(ObsoleteAttribute)));
+                Assert.Equal(guidance, obsolete.Message);
+                Assert.False(obsolete.IsError);
+            }
+
+            Assert.Empty(target.ReceivedCalls());
+            this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default, default, default);
+        }
+
+        [Theory]
+        [InlineData(100)]
+        [InlineData(101)]
+        public async Task DevelopmentMembershipReadChecksVersionLearnedFromGossip(int tableVersion)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var local = Entry(this.localSilo, SiloStatus.Active, DateTimeOffset.UnixEpoch);
@@ -1551,11 +1599,7 @@ namespace NonSilo.Tests.Membership
             }
 
             backing.ReadAllAsync(Arg.Any<CancellationToken>()).Returns(new MembershipTableData(entries, version));
-            backing.ReadRowAsync(this.localSilo, Arg.Any<CancellationToken>())
-                .Returns(new MembershipTableData(Tuple.Create(local, "local"), version));
-            var read = readRow
-                ? provider.ReadRowAsync(this.localSilo, cancellationToken)
-                : provider.ReadAllAsync(cancellationToken);
+            var read = provider.ReadAllAsync(cancellationToken);
             if (tableVersion < accepted.Version.Value)
             {
                 var error = await Assert.ThrowsAsync<OrleansException>(() => read);
@@ -1572,10 +1616,8 @@ namespace NonSilo.Tests.Membership
             Assert.Same(accepted, manager.MembershipTableSnapshot);
         }
 
-        [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task DevelopmentMembershipReadChecksCommittedWriteVersion(bool readRow)
+        [Fact]
+        public async Task DevelopmentMembershipReadChecksCommittedWriteVersion()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var backing = new InMemoryMembershipTable(new TableVersion(1, "1"));
@@ -1588,9 +1630,7 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Joining, manager.CurrentStatus);
             backing.Version = new TableVersion(1, "reset");
 
-            var read = readRow
-                ? provider.ReadRowAsync(this.localSilo, cancellationToken)
-                : provider.ReadAllAsync(cancellationToken);
+            var read = provider.ReadAllAsync(cancellationToken);
             var error = await Assert.ThrowsAsync<OrleansException>(() => read);
 
             Assert.Contains("version decreased from 2 to 1", error.Message, StringComparison.Ordinal);
@@ -1598,10 +1638,8 @@ namespace NonSilo.Tests.Membership
             Assert.Same(accepted, manager.MembershipTableSnapshot);
         }
 
-        [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task DevelopmentMembershipReadObservesCancellationBeforeReportingRollback(bool readRow)
+        [Fact]
+        public async Task DevelopmentMembershipReadObservesCancellationBeforeReportingRollback()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var backing = Substitute.For<IMembershipTable>();
@@ -1614,11 +1652,8 @@ namespace NonSilo.Tests.Membership
             var accepted = manager.MembershipTableSnapshot;
             var read = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
             backing.ReadAllAsync(Arg.Any<CancellationToken>()).Returns(read.Task);
-            backing.ReadRowAsync(Arg.Any<SiloAddress>(), Arg.Any<CancellationToken>()).Returns(read.Task);
             using var cancellation = new CancellationTokenSource();
-            var pending = readRow
-                ? provider.ReadRowAsync(this.localSilo, cancellation.Token)
-                : provider.ReadAllAsync(cancellation.Token);
+            var pending = provider.ReadAllAsync(cancellation.Token);
 
             cancellation.Cancel();
             read.SetResult(new MembershipTableData(new TableVersion(1, "1")));
@@ -1667,10 +1702,8 @@ namespace NonSilo.Tests.Membership
             Assert.Same(accepted, manager.MembershipTableSnapshot);
         }
 
-        [Theory]
-        [InlineData(false)]
-        [InlineData(true)]
-        public async Task OlderDevelopmentReadCompletingAfterNewerReadIsNotATableReset(bool readRow)
+        [Fact]
+        public async Task OlderDevelopmentReadCompletingAfterNewerReadIsNotATableReset()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var original = await new InMemoryMembershipTable(new TableVersion(100, "old"),
@@ -1684,10 +1717,7 @@ namespace NonSilo.Tests.Membership
             await manager.Refresh(cancellationToken: cancellationToken, requireFresh: true);
             var read = new TaskCompletionSource<MembershipTableData>(TaskCreationOptions.RunContinuationsAsynchronously);
             backing.ReadAllAsync(Arg.Any<CancellationToken>()).Returns(read.Task);
-            backing.ReadRowAsync(Arg.Any<SiloAddress>(), Arg.Any<CancellationToken>()).Returns(read.Task);
-            Task pending = readRow
-                ? provider.ReadRowAsync(this.localSilo, cancellationToken)
-                : manager.Refresh(cancellationToken: cancellationToken, requireFresh: true);
+            Task pending = manager.Refresh(cancellationToken: cancellationToken, requireFresh: true);
             try
             {
                 Assert.False(pending.IsCompleted);
@@ -1915,12 +1945,17 @@ namespace NonSilo.Tests.Membership
                 CancellationToken cancellationToken = default) =>
                 inner.CleanupDefunctSiloEntriesAsync(beforeDate, cancellationToken);
 
+            [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
             public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key);
 
+            [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
             public Task<MembershipTableData> ReadRowAsync(
                 SiloAddress key,
-                CancellationToken cancellationToken = default) =>
-                inner.ReadRowAsync(key, cancellationToken);
+                CancellationToken cancellationToken = default)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
+            }
 
             public Task<MembershipTableData> ReadAll() => ReadAllAsync();
 
@@ -2014,5 +2049,6 @@ namespace NonSilo.Tests.Membership
         {
             return new MembershipEntry { SiloAddress = address, Status = status, IAmAliveTime = iAmAliveTime.UtcDateTime, StartTime = iAmAliveTime.UtcDateTime };
         }
+
     }
 }

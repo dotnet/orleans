@@ -52,16 +52,18 @@ namespace Orleans.Serialization.Codecs
     [RegisterCopier]
     public sealed class ImmutableStackCopier<T> : IDeepCopier<ImmutableStack<T>>, IOptionalDeepCopier
     {
-        private readonly IDeepCopier<T>? _copier;
+        private int _shallowCopyable;
+        private readonly IDeepCopier<T> _copier;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ImmutableStackCopier{T}"/> class.
         /// </summary>
         /// <param name="copier">The element copier.</param>
-        public ImmutableStackCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.GetOptionalCopier(copier);
+        public ImmutableStackCopier(IDeepCopier<T> copier) => _copier = OrleansGeneratedCodeHelper.UnwrapService(this, copier);
 
         /// <inheritdoc />
-        public bool IsShallowCopyable() => _copier is null;
+        public bool IsShallowCopyable() => OrleansGeneratedCodeHelper.IsShallowCopyable(
+            ref _shallowCopyable, this, static self => OrleansGeneratedCodeHelper.IsShallowCopyable(self._copier));
 
         /// <inheritdoc/>
         [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(input))]
@@ -73,7 +75,7 @@ namespace Orleans.Serialization.Codecs
                 return result!;
 
             System.Diagnostics.Debug.Assert(input is not null);
-            if (input.IsEmpty || _copier is null)
+            if (input.IsEmpty || IsShallowCopyable())
                 return input;
 
             // There is a possibility for infinite recursion here if any value in the input collection is able to take part in a cyclic reference.
@@ -82,7 +84,7 @@ namespace Orleans.Serialization.Codecs
 
             var items = new List<T>();
             foreach (var item in input)
-                items.Add(_copier!.DeepCopy(item, context)!);
+                items.Add(_copier.DeepCopy(item, context)!);
 
             var res = ImmutableStack.CreateRange(items);
             context.RecordCopy(input, res);

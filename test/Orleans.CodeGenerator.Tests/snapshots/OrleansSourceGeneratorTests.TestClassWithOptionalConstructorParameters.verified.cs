@@ -137,8 +137,10 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_OptionalCtorParams));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_OptionalCtorParams));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_OptionalCtorParams), typeof(global::TestProject.OptionalCtorParams));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_OptionalCtorParams), typeof(global::TestProject.OptionalCtorParams));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_OptionalCtorParams), typeof(global::TestProject.OptionalCtorParams));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_OptionalCtorParams), typeof(global::TestProject.OptionalCtorParams));
         }
     }
 }

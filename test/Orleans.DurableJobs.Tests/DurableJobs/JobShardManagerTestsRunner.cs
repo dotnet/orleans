@@ -1,5 +1,7 @@
 #nullable enable
 
+using System.Buffers;
+using Orleans.Journaling;
 using TestExtensions;
 using Xunit;
 
@@ -50,6 +52,79 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
         Assert.NotEqual(shard1.Id, shard2.Id);
         Assert.Contains(assigned, shard => shard.Id == shard1.Id && shard.Metadata!["index"] == "1");
         Assert.Contains(assigned, shard => shard.Id == shard2.Id && shard.Metadata!["index"] == "2");
+    }
+
+    [Fact]
+    public async Task CreationRacingWithDiscoverySharesShardAndConsumesScheduledJob()
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cts.CancelAfter(TimeSpan.FromSeconds(30));
+        var cancellationToken = cts.Token;
+        await using var scope = await fixture.CreateScopeAsync(cancellationToken);
+        var published = new TaskCompletionSource<JournalId>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resumeCreation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var manager = scope.CreateManager(
+            scope.ActiveSilo,
+            decorateStorage: inner => new CreationGatedStorageProvider(inner, published, resumeCreation.Task));
+        var now = scope.Now;
+        var metadata = Metadata("purpose", "creation-discovery-race");
+        var creation = manager.CreateShardAsync(now.AddMinutes(-1), now.AddMinutes(5), metadata, cancellationToken);
+        using var consumptionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task<IJobRunContext>? consumption = null;
+        IJobShard? discovered = null;
+        IJobShard? created = null;
+        try
+        {
+            var storageId = await published.Task.WaitAsync(cancellationToken);
+            Assert.False(creation.IsCompleted);
+            discovered = Assert.Single(await manager.AssignJobShardsAsync(now.AddMinutes(5), maxNewClaims: 0, cancellationToken));
+            Assert.Equal(storageId, JobShardId.Parse(discovered.Id).ToJournalId());
+            Assert.Equal(metadata, discovered.Metadata);
+            Assert.False(discovered.IsAddingCompleted);
+            Assert.False(creation.IsCompleted);
+            consumption = TakeOneAsync(discovered, consumptionCancellation.Token);
+            Assert.False(consumption.IsCompleted);
+
+            resumeCreation.SetResult();
+            created = await creation.WaitAsync(cancellationToken);
+            Assert.Same(discovered, created);
+            Assert.Same(created, Assert.Single(await manager.AssignJobShardsAsync(now.AddMinutes(5), maxNewClaims: 0, cancellationToken)));
+
+            var scheduled = await created.TryScheduleJobAsync(CreateRequest(now, "racing-job"), cancellationToken);
+            Assert.NotNull(scheduled);
+            var run = await consumption.WaitAsync(cancellationToken);
+            Assert.Equal(scheduled.Id, run.Job.Id);
+            Assert.Equal("racing-job", run.Job.Name);
+            Assert.Equal(1, await discovered.GetJobCountAsync());
+
+            await discovered.RemoveJobAsync(run.Job.Id, cancellationToken);
+            Assert.Equal(0, await created.GetJobCountAsync());
+            await manager.UnregisterShardAsync(created, cancellationToken);
+            Assert.Empty(await manager.AssignJobShardsAsync(now.AddMinutes(5), maxNewClaims: 0, cancellationToken));
+        }
+        finally
+        {
+            consumptionCancellation.Cancel();
+            if (consumption is not null)
+            {
+                try
+                {
+                    await consumption;
+                }
+                catch (OperationCanceledException) when (consumptionCancellation.IsCancellationRequested)
+                {
+                    // Stop the pending consumer when an earlier assertion fails.
+                }
+            }
+
+            resumeCreation.TrySetResult();
+            created ??= await creation;
+            await created.DisposeAsync();
+            if (discovered is not null)
+            {
+                await discovered.DisposeAsync();
+            }
+        }
     }
 
     [Fact]
@@ -363,4 +438,58 @@ public abstract class JobShardManagerTestsRunner(IJobShardManagerTestFixture fix
     }
 
     private static Dictionary<string, string> Metadata(string key, string value) => new(StringComparer.Ordinal) { [key] = value };
+
+    private sealed class CreationGatedStorageProvider(
+        IJournalStorageProvider inner,
+        TaskCompletionSource<JournalId> published,
+        Task resumeCreation) : IJournalStorageProvider
+    {
+        public IJournalStorage CreateStorage(JournalId journalId)
+            => new CreationGatedStorage(inner.CreateStorage(journalId), journalId, published, resumeCreation);
+
+        private sealed class CreationGatedStorage(
+            IJournalStorage inner,
+            JournalId journalId,
+            TaskCompletionSource<JournalId> published,
+            Task resumeCreation) : IJournalStorage
+        {
+            public bool IsCompactionRequested => inner.IsCompactionRequested;
+
+            public async ValueTask<bool> CreateIfNotExistsAsync(
+                IReadOnlyDictionary<string, string>? metadata = null,
+                CancellationToken cancellationToken = default)
+            {
+                var created = await inner.CreateIfNotExistsAsync(metadata, cancellationToken);
+                if (created)
+                {
+                    published.SetResult(journalId);
+                    await resumeCreation.WaitAsync(cancellationToken);
+                }
+
+                return created;
+            }
+
+            public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
+                => inner.GetMetadataAsync(cancellationToken);
+
+            public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
+                IReadOnlyDictionary<string, string>? set = null,
+                IEnumerable<string>? remove = null,
+                string? expectedETag = null,
+                CancellationToken cancellationToken = default)
+                => inner.UpdateMetadataAsync(set, remove, expectedETag, cancellationToken);
+
+            public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+                => inner.ReadAsync(consumer, cancellationToken);
+
+            public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+                => inner.AppendAsync(value, cancellationToken);
+
+            public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+                => inner.ReplaceAsync(value, cancellationToken);
+
+            public ValueTask DeleteAsync(CancellationToken cancellationToken)
+                => inner.DeleteAsync(cancellationToken);
+        }
+    }
 }

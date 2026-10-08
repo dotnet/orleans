@@ -108,17 +108,15 @@ namespace Orleans.Runtime.MembershipService
 
         public Task DeleteMembershipTableEntriesAsync(string clusterId, CancellationToken cancellationToken = default) => this.grain.DeleteMembershipTableEntriesAsync(clusterId, cancellationToken);
 
-        [Obsolete("Use ReadRowAsync instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) =>
+            Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
 
-        public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var observedVersion = GetCurrentVersion();
-            var table = await this.grain.ReadRowAsync(key, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            ValidateVersion(observedVersion, table);
-            return table;
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use ReadAllAsync instead.")]
@@ -259,13 +257,15 @@ namespace Orleans.Runtime.MembershipService
             return Task.CompletedTask;
         }
 
-        [Obsolete("Use ReadRowAsync instead.")]
-        public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key, CancellationToken.None);
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRow(SiloAddress key) =>
+            Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
 
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(table.Read(key));
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use ReadAllAsync instead.")]

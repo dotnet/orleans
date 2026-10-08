@@ -454,6 +454,7 @@ namespace Orleans.Runtime
                         break;
                     case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
+                        message.Dispose();
                         return;
                     default:
                         LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
@@ -479,11 +480,13 @@ namespace Orleans.Runtime
             else
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
+                message.Dispose();
             }
         }
 
         private void ProcessStatusResponse(Message message)
         {
+            using var statusMessage = message;
             var status = (StatusResponse)message.BodyObject!;
             callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
             var request = callback?.Message;

@@ -17,6 +17,41 @@ namespace Orleans.Serialization.UnitTests
     [TestArea("Serialization")]
     public class TypeConverterTests
     {
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(true, false)]
+        [InlineData(false, true)]
+        [InlineData(true, true)]
+        public void AllowingVectorAndRankOneArraysKeepsVectorResolutionIndependentOfRegistrationOrder(bool vectorFirst, bool withContext)
+        {
+            var vector = typeof(int[]);
+            var nonVector = typeof(int).MakeArrayType(1);
+            Assert.NotEqual(vector, nonVector);
+            var options = new TypeManifestOptions();
+            AllowArrays(options);
+            Assert.Equal("System.Int32[]", Assert.Single(options.AllowedTypes));
+
+            var registrations = new ServiceCollection().AddSerializer();
+            if (withContext) registrations.AddSerializerContext(new AllowedArrayContext());
+            registrations.Configure<TypeManifestOptions>(AllowArrays);
+            using var services = registrations.BuildServiceProvider();
+            var resolver = services.GetRequiredService<TypeResolver>();
+            Assert.Same(vector, resolver.ResolveType("System.Int32[]"));
+            Assert.Same(vector, services.GetRequiredService<TypeConverter>().Parse("int[]"));
+            var serializer = services.GetRequiredService<Serializer>();
+            int[] input = [13, 17];
+            var restored = Assert.IsType<int[]>(serializer.Deserialize<object>(serializer.SerializeToArray((object)input)));
+            Assert.Equal(input, restored);
+            Assert.NotSame(input, restored);
+            Assert.Same(vector, resolver.ResolveType("System.Int32[]"));
+
+            void AllowArrays(TypeManifestOptions manifest)
+            {
+                manifest.AddAllowedType(vectorFirst ? vector : nonVector);
+                manifest.AddAllowedType(vectorFirst ? nonVector : vector);
+            }
+        }
+
         [Fact]
         public void TypeConverter_FailsClosed_WhenAllFiltersHaveNoOpinion_AndAllowAllTypesIsFalse()
         {
@@ -663,6 +698,9 @@ namespace Orleans.Serialization.UnitTests
             public bool? IsTypeAllowed(Type type) => filter(type);
         }
     }
+
+    [GenerateSerializerContext<int[]>]
+    internal partial class AllowedArrayContext : SerializerContext;
 
     internal sealed class TypeConverterTestsUnconfiguredType
     {

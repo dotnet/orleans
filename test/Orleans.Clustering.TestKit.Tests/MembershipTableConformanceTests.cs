@@ -39,7 +39,7 @@ public sealed class MembershipTableConformanceTests
     [Fact]
     public Task UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects() => Run((r, ct) => r.UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects(ct));
     [Fact]
-    public Task ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities() => Run((r, ct) => r.ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities(ct));
+    public Task ReadAll_SelectsPresentAndAbsentIdentities() => Run((r, ct) => r.ReadAll_SelectsPresentAndAbsentIdentities(ct));
     [Fact]
     public Task Reads_RetainedObjectsRemainUnchangedAfterLaterWrites() => Run((r, ct) => r.Reads_RetainedObjectsRemainUnchangedAfterLaterWrites(ct));
     [Fact]
@@ -52,8 +52,25 @@ public sealed class MembershipTableConformanceTests
     public Task ConcurrentCrossRowUpdates_SharedTableVersion_HaveExactlyOneWinner() => Run((r, ct) => r.ConcurrentCrossRowUpdates_SharedTableVersion_HaveExactlyOneWinner(ct));
     [Fact]
     public Task ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews() => Run((r, ct) => r.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct));
-    [Fact]
-    public Task ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews() => Run((r, ct) => r.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct));
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ObsoleteScenarios_UseSupportedSnapshots(bool concurrent)
+    {
+        var backend = new IdealizedMembershipBackend();
+        await backend.Fixture().RunAsync((fixture, ct) =>
+        {
+            var runner = new MembershipTableTestRunner(fixture, concurrencyRowCount: 5);
+#pragma warning disable CS0618 // Exercise retained public scenario aliases.
+            return concurrent ? runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct)
+                : runner.ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities(ct);
+#pragma warning restore CS0618
+        }, TestContext.Current.CancellationToken);
+        Assert.Equal(0, backend.PointReads);
+        Assert.Empty(backend.Partitions);
+        Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
+    }
 
     [Theory]
     [InlineData(5, false, false)]
@@ -61,21 +78,41 @@ public sealed class MembershipTableConformanceTests
     [InlineData(4096, false, false)]
     [InlineData(4096, true, false)]
     [InlineData(4096, false, true)]
-    public async Task ConcurrentReadSetup_UsesLinearPointReadsAndIndependentFinalView(int rows, bool tableVersionRowEtags, bool physicalRowEtags)
+    public async Task ConcurrentReadSetup_UsesFullSnapshotsAndIndependentFinalView(int rows, bool tableVersionRowEtags, bool physicalRowEtags)
     {
         var backend = new IdealizedMembershipBackend { TableVersionRowEtags = tableVersionRowEtags, PhysicalRowEtags = physicalRowEtags };
         await backend.Fixture().RunAsync(async (fixture, ct) =>
         {
             await new MembershipTableTestRunner(fixture, concurrencyRowCount: rows).SeedConcurrentRows(ct);
             Assert.Equal(rows, backend.Inserts);
-            Assert.Equal(rows + 1, backend.PointReads);
-            Assert.Equal(2, backend.FullReads);
-            Assert.Equal(3 * rows, backend.RowsObserved);
+            Assert.Equal(0, backend.PointReads);
+            Assert.Equal(rows + 3, backend.FullReads);
+            Assert.Equal(rows * (rows + 1) / 2 + 2 * rows, backend.RowsObserved);
             var partition = backend.Partitions[fixture.ClusterId];
             Assert.Equal(rows, partition.Version);
             Assert.Equal(rows, partition.Rows.Count);
             for (var i = 1; i <= rows; i++)
                 Assert.Equal($"host-{i}", partition.Rows[MembershipTableTestData.CreateEntry(i).SiloAddress].Item1.HostName);
+        }, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task ConcurrentReadSetup_AppliesConfiguredRowPadding()
+    {
+        const int rows = 5;
+        const int rowPadding = 1024;
+        var backend = new IdealizedMembershipBackend();
+        await backend.Fixture().RunAsync(async (fixture, ct) =>
+        {
+            await new MembershipTableTestRunner(fixture, seed: 0, output: null, concurrencyRowCount: rows, concurrencyRowPadding: rowPadding)
+                .SeedConcurrentRows(ct);
+            var partition = backend.Partitions[fixture.ClusterId];
+            for (var i = 1; i <= rows; i++)
+            {
+                Assert.Equal(
+                    $"host-{i}{new string('x', rowPadding)}",
+                    partition.Rows[MembershipTableTestData.CreateEntry(i).SiloAddress].Item1.HostName);
+            }
         }, TestContext.Current.CancellationToken);
     }
     [Fact]
@@ -198,14 +235,13 @@ public sealed class MembershipTableConformanceTests
             (runner, ct) => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitStatusChange(ct),
             (runner, ct) => runner.UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects(ct),
             (runner, ct) => runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct),
-            (runner, ct) => runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct),
             (runner, ct) => runner.CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(ct)
         ];
         foreach (var scenario in scenarios)
             await backend.Fixture().RunAsync(
                 (fixture, ct) => scenario(new MembershipTableTestRunner(fixture, concurrencyRowCount: 5), ct),
                 TestContext.Current.CancellationToken);
-        Assert.Equal(13, backend.CleanupBatches);
+        Assert.Equal(11, backend.CleanupBatches);
         Assert.Empty(backend.Partitions);
         Assert.Equal(backend.CreatedHandles, backend.DisposedHandles);
     }
@@ -307,7 +343,6 @@ public sealed class MembershipTableConformanceTests
             (runner, ct) => runner.UpdateRow_TokensCapturedBeforeHeartbeat_CommitVoteChange(ct),
             (runner, ct) => runner.ConcurrentCrossRowUpdates_SharedTableVersion_HaveExactlyOneWinner(ct),
             (runner, ct) => runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct),
-            (runner, ct) => runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct),
         ];
         foreach (var scenario in scenarios)
         {
@@ -350,14 +385,13 @@ public sealed class MembershipTableConformanceTests
             (r, ct) => r.UpdateRow_StaleSnapshotAfterSameRowCommit_ReturnsFalseWithoutSideEffects(ct),
             (r, ct) => r.InsertRow_DuplicateIdentity_ReturnsFalseWithoutSideEffects(ct),
             (r, ct) => r.UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects(ct),
-            (r, ct) => r.ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities(ct),
+            (r, ct) => r.ReadAll_SelectsPresentAndAbsentIdentities(ct),
             (r, ct) => r.Reads_RetainedObjectsRemainUnchangedAfterLaterWrites(ct),
             (r, ct) => r.InsertRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(ct),
             (r, ct) => r.UpdateRow_MutatingInputAndSuspectList_DoesNotMutateStoredState(ct),
             (r, ct) => r.Reads_MutatingReturnedEntryAndSuspectList_DoesNotMutateStoredState(ct),
             (r, ct) => r.ConcurrentCrossRowUpdates_SharedTableVersion_HaveExactlyOneWinner(ct),
             (r, ct) => r.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct),
-            (r, ct) => r.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct),
             (r, ct) => r.InitializeMembershipTable_RepeatedWithData_PreservesCommittedState(ct),
             (r, ct) => r.Clusters_SharedBackendWithOverlappingSiloAddresses_AreIsolated(ct),
             (r, ct) => r.CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(ct),
@@ -369,7 +403,7 @@ public sealed class MembershipTableConformanceTests
                 (fixture, ct) => scenario(new MembershipTableTestRunner(fixture, concurrencyRowCount: 5), ct),
                 TestContext.Current.CancellationToken);
 
-        Assert.Equal(27, scenarios.Length);
+        Assert.Equal(26, scenarios.Length);
         Assert.Equal(0, backend.InsertsWithSuspectVotes);
         Assert.Equal(0, backend.RowConditionChecks);
         Assert.True(backend.HeartbeatRowMetadataChanges > 0);

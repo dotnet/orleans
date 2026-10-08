@@ -171,38 +171,14 @@ namespace Orleans.Clustering.DynamoDB
             }
         }
 
-        [Obsolete("Use ReadRowAsync instead.")]
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
         public Task<MembershipTableData> ReadRow(SiloAddress siloAddress) => ReadRowAsync(siloAddress, CancellationToken.None);
 
-        public async Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
+        [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+        public Task<MembershipTableData> ReadRowAsync(SiloAddress siloAddress, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var siloEntryKeys = new Dictionary<string, AttributeValue>
-                {
-                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
-                    { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.ConstructSiloIdentity(siloAddress)) }
-                };
-
-                var versionEntryKeys = new Dictionary<string, AttributeValue>
-                {
-                    { $"{SiloInstanceRecord.DEPLOYMENT_ID_PROPERTY_NAME}", new AttributeValue(this.clusterId) },
-                    { $"{SiloInstanceRecord.SILO_IDENTITY_PROPERTY_NAME}", new AttributeValue(SiloInstanceRecord.TABLE_VERSION_ROW) }
-                };
-
-                var entries = await storage.GetEntriesTxAsync(this.options.TableName,
-                    new[] { siloEntryKeys, versionEntryKeys }, ParseRecord, cancellationToken);
-
-                MembershipTableData data = Convert(entries.ToList());
-                LogTraceReadMyEntry(siloAddress, data);
-                return data;
-            }
-            catch (Exception exc)
-            {
-                LogWarningIntermediateErrorReadingSiloEntry(exc, siloAddress, this.options.TableName);
-                throw;
-            }
+            return Task.FromException<MembershipTableData>(new NotSupportedException("Use ReadAllAsync and MembershipTableData.TryGet instead."));
         }
 
         [Obsolete("Use ReadAllAsync instead.")]

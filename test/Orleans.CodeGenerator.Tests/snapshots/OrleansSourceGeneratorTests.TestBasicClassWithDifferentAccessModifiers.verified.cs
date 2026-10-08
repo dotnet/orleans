@@ -209,12 +209,16 @@ namespace OrleansCodeGen.TestProject
     {
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_PublicDemoData));
-            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_InternalDemoData));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_PublicDemoData));
-            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_InternalDemoData));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_PublicDemoData));
-            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_InternalDemoData));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_PublicDemoData), typeof(global::TestProject.PublicDemoData));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_PublicDemoData), typeof(global::TestProject.PublicDemoData));
+            config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_InternalDemoData), typeof(global::TestProject.InternalDemoData));
+            config.AddBaseCodec(typeof(OrleansCodeGen.TestProject.Codec_InternalDemoData), typeof(global::TestProject.InternalDemoData));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_PublicDemoData), typeof(global::TestProject.PublicDemoData));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_PublicDemoData), typeof(global::TestProject.PublicDemoData));
+            config.AddCopier(typeof(OrleansCodeGen.TestProject.Copier_InternalDemoData), typeof(global::TestProject.InternalDemoData));
+            config.AddBaseCopier(typeof(OrleansCodeGen.TestProject.Copier_InternalDemoData), typeof(global::TestProject.InternalDemoData));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_PublicDemoData), typeof(global::TestProject.PublicDemoData));
+            config.AddActivator(typeof(OrleansCodeGen.TestProject.Activator_InternalDemoData), typeof(global::TestProject.InternalDemoData));
         }
     }
 }

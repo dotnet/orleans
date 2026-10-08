@@ -282,7 +282,7 @@ namespace UnitTests.MembershipTests
             foreach (var membershipEntry in membershipEntries)
             {
                 Assert.True(await membershipTable.InsertRowAsync(membershipEntry, version.Next(), cancellationToken));
-                version = (await membershipTable.ReadRowAsync(membershipEntry.SiloAddress, cancellationToken)).Version;
+                version = (await membershipTable.ReadAllAsync(cancellationToken)).Version;
             }
 
             var gateways = await gatewayListProvider.GetGateways();
@@ -370,7 +370,7 @@ namespace UnitTests.MembershipTests
 
             Assert.Single(data.Members);
 
-            data = await membershipTable.ReadRowAsync(newEntry.SiloAddress, cancellationToken);
+            data = await membershipTable.ReadAllAsync(cancellationToken);
             Assert.Equal(newTableVersion.Version, data.Version.Version);
 
             logger.LogInformation("Membership.ReadAll returned TableVersion={TableVersion} Data={Data}", data.Version, data);
@@ -379,12 +379,13 @@ namespace UnitTests.MembershipTests
             Assert.NotNull(data.Version.VersionEtag);
             Assert.NotEqual(newTableVersion.VersionEtag, data.Version.VersionEtag);
             Assert.Equal(newTableVersion.Version, data.Version.Version);
-            var membershipEntry = data.Members[0].Item1;
-            string eTag = data.Members[0].Item2;
-            logger.LogInformation("Membership.ReadRow returned MembershipEntry ETag={ETag} Entry={Entry}", eTag, membershipEntry);
+            var selected = Assert.IsType<Tuple<MembershipEntry, string>>(data.TryGet(newEntry.SiloAddress));
+            var membershipEntry = selected.Item1;
+            string eTag = selected.Item2;
+            logger.LogInformation("Membership.ReadAll snapshot selected MembershipEntry ETag={ETag} Entry={Entry}", eTag, membershipEntry);
 
             Assert.NotNull(eTag);
-            Assert.NotNull(membershipEntry);
+            Assert.Equal(newEntry.ToFullString(), membershipEntry.ToFullString());
         }
 
         protected async Task MembershipTable_ReadAll_Insert_ReadAll()

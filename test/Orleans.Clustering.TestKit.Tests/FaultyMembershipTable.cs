@@ -6,10 +6,10 @@ internal enum MembershipFault
 {
     IgnoreTableToken, FalseWriteChangesMembership, VersionJump, HeartbeatInvalidatesRowCondition, HeartbeatChangesTableToken, HeartbeatChangesMembership,
     AliasInsert, AliasUpdate, AliasRead, MutateRetainedReads, ClearOnInitialize, InsertChangesExistingRow,
-    CleanupNonDead, CleanupCutoffInclusive, DeleteConfiguredScope, TornReadAll, TornReadRow, RefuseStatusWrite,
-    IgnoreUpdatedVoteTime, PreserveClearedVotes, CrossClusterPointRead,
+    CleanupNonDead, CleanupCutoffInclusive, DeleteConfiguredScope, TornReadAll, RefuseStatusWrite,
+    IgnoreUpdatedVoteTime, PreserveClearedVotes, CrossClusterRead,
     ResurrectCompactedRow, DeletePrefixScopes, HeartbeatStorageFailure,
-    CleanupChangesRetainedFields, CleanupVersionRollback, CleanupRoundsExclusiveCutoff, TornCleanupReadAll, TornCleanupReadRow,
+    CleanupChangesRetainedFields, CleanupVersionRollback, CleanupRoundsExclusiveCutoff, TornCleanupReadAll,
     DeleteNoOp, DeletePartial, DeleteStorageFailure, DeleteCommitThenFailure, DeleteThenRejectForeign, HeartbeatCancellation,
     IgnoreHeartbeatWrite
 }
@@ -101,7 +101,7 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
 
     public async Task CleanupDefunctSiloEntriesAsync(DateTimeOffset beforeDate, CancellationToken cancellationToken = default)
     {
-        if (Fault is MembershipFault.TornCleanupReadAll or MembershipFault.TornCleanupReadRow)
+        if (Fault == MembershipFault.TornCleanupReadAll)
         {
             control.TornBefore = await inner.ReadAllAsync(cancellationToken);
             Volatile.Write(ref control.TornArmed, 1);
@@ -116,7 +116,7 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
         var before = Fault == MembershipFault.CleanupVersionRollback ? await inner.ReadAllAsync(cancellationToken) : null;
         await inner.CleanupDefunctSiloEntriesAsync(beforeDate, cancellationToken);
         control.CleanupCompleted = true;
-        if (Fault is MembershipFault.TornCleanupReadAll or MembershipFault.TornCleanupReadRow)
+        if (Fault == MembershipFault.TornCleanupReadAll)
             control.Committed.TrySetResult();
         if (before is not null)
             Mutate(partition =>
@@ -187,14 +187,14 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
     {
         Interlocked.Increment(ref control.UpdateCalls);
         if (Fault == MembershipFault.ResurrectCompactedRow && control.CleanupCompleted
-            && (await inner.ReadRowAsync(entry.SiloAddress, cancellationToken)).Members.Count == 0)
+            && (await inner.ReadAllAsync(cancellationToken)).TryGet(entry.SiloAddress) is null)
         {
             control.Injected++;
             return await inner.InsertRowAsync(entry, tableVersion, cancellationToken);
         }
         if (Fault is MembershipFault.IgnoreUpdatedVoteTime or MembershipFault.PreserveClearedVotes)
         {
-            var existing = (await inner.ReadRowAsync(entry.SiloAddress, cancellationToken)).TryGet(entry.SiloAddress);
+            var existing = (await inner.ReadAllAsync(cancellationToken)).TryGet(entry.SiloAddress);
             if (existing is not null)
             {
                 entry = IdealizedMembershipTable.Clone(entry);
@@ -229,7 +229,7 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
                 return inner.UpdateRowAsync(entry, etag, current, cancellationToken).GetAwaiter().GetResult();
             }
         }
-        if (Fault is MembershipFault.TornReadAll or MembershipFault.TornReadRow)
+        if (Fault == MembershipFault.TornReadAll)
         {
             control.TornBefore = await inner.ReadAllAsync(cancellationToken);
             Volatile.Write(ref control.TornArmed, 1);
@@ -250,7 +250,7 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
             });
         if (success && Fault == MembershipFault.MutateRetainedReads)
             MutateRetained(entry);
-        if (Fault is MembershipFault.TornReadAll or MembershipFault.TornReadRow)
+        if (Fault == MembershipFault.TornReadAll)
             control.Committed.TrySetResult();
         return success;
     }
@@ -279,30 +279,31 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
     }
 
     public async Task<MembershipTableData> ReadAllAsync(CancellationToken cancellationToken = default)
-        => await Read(null, cancellationToken);
-    public async Task<MembershipTableData> ReadRowAsync(SiloAddress key, CancellationToken cancellationToken = default)
     {
-        if (Fault == MembershipFault.CrossClusterPointRead)
+        if (Fault == MembershipFault.CrossClusterRead)
         {
             string? wrongCluster;
             lock (control.Backend.Sync)
             {
-                wrongCluster = control.Backend.Partitions.FirstOrDefault(p => p.Key != cluster && p.Value.Rows.ContainsKey(key)).Key;
+                wrongCluster = control.Backend.VersionedUpdates > 0
+                    && control.Backend.Partitions.TryGetValue(cluster, out var own)
+                    ? control.Backend.Partitions.FirstOrDefault(p => p.Key != cluster && p.Value.Version > own.Version && p.Value.Rows.Count > 0).Key
+                    : null;
             }
             if (wrongCluster is not null)
             {
                 control.Injected++;
                 await using var handle = new MembershipTableTestHandle(control.Backend.Create(wrongCluster),
                     () => control.Backend.DisposeHandleAsync(wrongCluster));
-                return await handle.Table.ReadRowAsync(key, cancellationToken);
+                return await handle.Table.ReadAllAsync(cancellationToken);
             }
         }
-        return await Read(key, cancellationToken);
+        return await Read(cancellationToken);
     }
 
-    private async Task<MembershipTableData> Read(SiloAddress? key, CancellationToken ct)
+    private async Task<MembershipTableData> Read(CancellationToken ct)
     {
-        if (Fault is MembershipFault.TornCleanupReadAll or MembershipFault.TornCleanupReadRow)
+        if (Fault == MembershipFault.TornCleanupReadAll)
         {
             var current = await inner.ReadAllAsync(ct);
             // The Dead transition has one verification read and two baseline reads before
@@ -310,45 +311,42 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
             var racingRead = Volatile.Read(ref control.TornArmed) != 0
                 || (current.Members.Any(row => row.Item1.Status == SiloStatus.Dead)
                     && Interlocked.Increment(ref control.ReadsWithDeadTarget) > 3);
-            if (racingRead && ((key is null && Fault == MembershipFault.TornCleanupReadAll)
-                || (key is not null && Fault == MembershipFault.TornCleanupReadRow)))
+            if (racingRead)
             {
                 await control.WriterArmed.Task.WaitAsync(ct);
                 control.ReadStarted.TrySetResult();
                 await control.Committed.Task.WaitAsync(ct);
                 current = await inner.ReadAllAsync(ct);
                 control.Injected++;
-                return new(control.TornBefore!.Members.Where(row => key is null || row.Item1.SiloAddress.Equals(key)).ToList(), current.Version);
+                return new(control.TornBefore!.Members.ToList(), current.Version);
             }
         }
-        if (Fault is MembershipFault.TornReadAll or MembershipFault.TornReadRow)
+        if (Fault == MembershipFault.TornReadAll)
         {
-            // Both fault modes observe two full setup validation reads and two full
-            // round-boundary reads before holding the selected readers at the writer barrier.
+            // The last insert verification, two final setup reads, and two round-boundary reads precede the writer barrier.
             var current = await inner.ReadAllAsync(ct);
-            var fullReads = key is null && current.Version.Version == 5
+            var fullReads = current.Version.Version == 5
                 ? Interlocked.Increment(ref control.ReadsAtFiveRows)
                 : Volatile.Read(ref control.ReadsAtFiveRows);
-            var torn = (key is null && Fault == MembershipFault.TornReadAll) || (key is not null && Fault == MembershipFault.TornReadRow);
-            if (torn && (fullReads > 4 || (key is not null && fullReads >= 4)))
+            if (fullReads > 5)
                 await control.WriterArmed.Task.WaitAsync(ct);
-            if (torn && Volatile.Read(ref control.TornArmed) != 0)
+            if (Volatile.Read(ref control.TornArmed) != 0)
             {
                 control.ReadStarted.TrySetResult();
                 await control.Committed.Task.WaitAsync(ct);
                 current = await inner.ReadAllAsync(ct);
                 control.Injected++;
-                var oldRows = control.TornBefore!.Members.Where(p => key is null || p.Item1.SiloAddress.Equals(key)).ToList();
+                var oldRows = control.TornBefore!.Members.ToList();
                 return new(oldRows, current.Version);
             }
         }
-        var result = key is null ? await inner.ReadAllAsync(ct) : await inner.ReadRowAsync(key, ct);
+        var result = await inner.ReadAllAsync(ct);
         if (Fault == MembershipFault.AliasRead)
         {
             lock (control.Backend.Sync)
             {
                 var partition = control.Backend.Partitions[cluster];
-                result = new(partition.Rows.Where(p => key is null || p.Key.Equals(key)).Select(p => p.Value).ToList(), result.Version);
+                result = new(partition.Rows.Values.ToList(), result.Version);
                 control.Injected++;
             }
         }
@@ -393,7 +391,9 @@ internal sealed class FaultyMembershipTable(MembershipFaultController control, s
     public Task DeleteMembershipTableEntries(string clusterId) => DeleteMembershipTableEntriesAsync(clusterId);
     public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate) => CleanupDefunctSiloEntriesAsync(beforeDate);
     public Task<MembershipTableData> ReadAll() => ReadAllAsync();
-    public Task<MembershipTableData> ReadRow(SiloAddress key) => ReadRowAsync(key);
+    [Obsolete("Use ReadAllAsync and MembershipTableData.TryGet instead.")]
+    public Task<MembershipTableData> ReadRow(SiloAddress key) =>
+        Task.FromException<MembershipTableData>(new NotSupportedException());
     public Task<bool> InsertRow(MembershipEntry entry, TableVersion tableVersion) => InsertRowAsync(entry, tableVersion);
     public Task<bool> UpdateRow(MembershipEntry entry, string etag, TableVersion tableVersion) => UpdateRowAsync(entry, etag, tableVersion);
     public Task UpdateIAmAlive(MembershipEntry entry) => UpdateIAmAliveAsync(entry);

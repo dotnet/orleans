@@ -177,6 +177,7 @@ namespace Orleans.Messaging
             if (!Running)
             {
                 LogNotRunning(msg);
+                msg.Dispose();
                 return;
             }
 
@@ -366,9 +367,17 @@ namespace Orleans.Messaging
             this.messageHandler = handler;
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage(
+            "Reliability",
+            "CA2000:Dispose objects before losing scope",
+            Justification = "Ownership of the rejection message is transferred to the local message dispatcher.")]
         public void RejectMessage(Message msg, string reason, Exception? exc = null)
         {
-            if (!Running) return;
+            if (!Running)
+            {
+                msg.Dispose();
+                return;
+            }
 
             if (msg.Direction != Message.Directions.Request)
             {
@@ -381,6 +390,8 @@ namespace Orleans.Messaging
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);
             }
+
+            msg.Dispose();
         }
 
         internal void OnGatewayConnectionOpen()

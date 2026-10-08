@@ -18,6 +18,47 @@ namespace Tester.Redis.Clustering;
 public sealed class RedisMembershipTableCancellationTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PointReads_AreUnsupportedWithoutBackendAccess(bool initialized)
+    {
+        var backend = new MembershipBackend();
+        var factoryCalls = 0;
+        using var table = CreateTable(_ =>
+        {
+            factoryCalls++;
+            return Task.FromResult((backend.Multiplexer, true));
+        });
+        if (initialized)
+        {
+            await table.InitializeMembershipTableAsync(true, TestContext.Current.CancellationToken);
+        }
+
+        backend.Database.ClearReceivedCalls();
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+        var address = CreateEntry().SiloAddress;
+#pragma warning disable CS0618 // Verify both retired entrypoints and cancellation precedence.
+        var legacy = table.ReadRow(address);
+        var current = table.ReadRowAsync(address, TestContext.Current.CancellationToken);
+        Assert.True(legacy.IsFaulted);
+        Assert.True(current.IsFaulted);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+        Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => current)).Message);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(() => table.ReadRowAsync(address, cancellation.Token));
+#pragma warning restore CS0618
+        Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        Assert.Equal(initialized ? 1 : 0, factoryCalls);
+        Assert.Empty(backend.Database.ReceivedCalls());
+        foreach (var name in new[] { "ReadRow", "ReadRowAsync" })
+        {
+            var obsolete = Assert.Single(typeof(RedisMembershipTable).GetMethod(name)!.GetCustomAttributes(typeof(ObsoleteAttribute), false));
+            Assert.Equal(guidance, Assert.IsType<ObsoleteAttribute>(obsolete).Message);
+        }
+    }
+
+    [Theory]
     [InlineData("Initialize")]
     [InlineData("Delete")]
     [InlineData("ReadAll")]
@@ -45,7 +86,9 @@ public sealed class RedisMembershipTableCancellationTests
             "Initialize" => table.InitializeMembershipTableAsync(true, token),
             "Delete" => table.DeleteMembershipTableEntriesAsync("cluster", token),
             "ReadAll" => table.ReadAllAsync(token),
+#pragma warning disable CS0618 // Verify the retired API's cancellation precedence.
             "ReadRow" => table.ReadRowAsync(entry.SiloAddress, token),
+#pragma warning restore CS0618
             "Insert" => table.InsertRowAsync(entry, version, token),
             "Update" => table.UpdateRowAsync(entry, "0", version, token),
             "Heartbeat" => table.UpdateIAmAliveAsync(entry, token),
@@ -432,17 +475,17 @@ public sealed class RedisMembershipTableCancellationTests
     }
 
     [Fact]
-    public async Task ReadRow_CanceledDuringCommand_DoesNotReturnSuccess()
+    public async Task ReadAll_CanceledDuringCommand_DoesNotReturnSuccess()
     {
-        var execution = new TaskCompletionSource<RedisValue[]>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var execution = new TaskCompletionSource<HashEntry[]>(TaskCreationOptions.RunContinuationsAsynchronously);
         var database = Substitute.For<IDatabase>();
-        database.HashGetAsync(Arg.Any<RedisKey>(), Arg.Any<RedisValue[]>()).Returns(execution.Task);
+        database.HashGetAllAsync(Arg.Any<RedisKey>()).Returns(execution.Task);
         var muxer = Substitute.For<IConnectionMultiplexer>();
         muxer.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(database);
         using var table = CreateTable(_ => Task.FromResult((muxer, true)));
         await table.InitializeMembershipTableAsync(false, TestContext.Current.CancellationToken);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var read = table.ReadRowAsync(SiloAddress.New(IPAddress.Loopback, 11111, 1), cancellation.Token);
+        var read = table.ReadAllAsync(cancellation.Token);
         Assert.False(read.IsCompleted);
 
         cancellation.Cancel();
@@ -451,8 +494,8 @@ public sealed class RedisMembershipTableCancellationTests
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         Assert.False(execution.Task.IsCompleted);
-        _ = database.Received(1).HashGetAsync(Arg.Any<RedisKey>(), Arg.Any<RedisValue[]>());
-        execution.SetResult(["0", RedisValue.Null]);
+        _ = database.Received(1).HashGetAllAsync(Arg.Any<RedisKey>());
+        execution.SetResult([new HashEntry("Version", "0")]);
     }
 
     [Theory]
@@ -824,10 +867,8 @@ public sealed class RedisMembershipTableCancellationTests
         backend.Database.DidNotReceive().CreateTransaction();
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Reads_ReturnCoherentRowAndVersion(bool readAll)
+    [Fact]
+    public async Task Reads_ReturnCoherentRowAndVersion()
     {
         var backend = new MembershipBackend();
         using var table = CreateTable(_ => Task.FromResult((backend.Multiplexer, true)));
@@ -842,11 +883,11 @@ public sealed class RedisMembershipTableCancellationTests
             backend.Rows["Version"] = "2";
         };
 
-        var snapshot = readAll ? await table.ReadAllAsync(token) : await table.ReadRowAsync(entry.SiloAddress, token);
+        var snapshot = await table.ReadAllAsync(token);
 
         Assert.Equal(1, snapshot.Version.Version);
         Assert.Equal("1", snapshot.Version.VersionEtag);
-        var row = Assert.Single(snapshot.Members);
+        var row = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(entry.SiloAddress));
         Assert.Equal("1", row.Item2);
         Assert.Equal(SiloStatus.Active, row.Item1.Status);
         Assert.Equal((RedisValue)"2", backend.Rows["Version"]);
@@ -864,8 +905,8 @@ public sealed class RedisMembershipTableCancellationTests
         await table.InitializeMembershipTableAsync(true, token);
         var entry = CreateEntry();
         Assert.True(await table.InsertRowAsync(entry, new TableVersion(1, "0"), token));
-        var snapshot = await table.ReadRowAsync(entry.SiloAddress, token);
-        var rowEtag = Assert.Single(snapshot.Members).Item2;
+        var snapshot = await table.ReadAllAsync(token);
+        var rowEtag = Assert.IsType<Tuple<MembershipEntry, string>>(snapshot.TryGet(entry.SiloAddress)).Item2;
         var nextVersion = snapshot.Version.Next();
         var heartbeat = CreateEntry();
         heartbeat.IAmAliveTime = entry.IAmAliveTime.AddTicks(10);
@@ -974,7 +1015,6 @@ public sealed class RedisMembershipTableCancellationTests
 
     [Theory]
     [InlineData("ReadAll")]
-    [InlineData("ReadRow")]
     [InlineData("Cleanup")]
     public async Task Operations_LostHistory_ReportsMissingVersion(string operation)
     {
@@ -989,7 +1029,6 @@ public sealed class RedisMembershipTableCancellationTests
         var error = await Assert.ThrowsAsync<RedisClusteringException>(() => operation switch
         {
             "ReadAll" => table.ReadAllAsync(token),
-            "ReadRow" => table.ReadRowAsync(entry.SiloAddress, token),
             "Cleanup" => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.MaxValue, token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });

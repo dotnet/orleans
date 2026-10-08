@@ -1,15 +1,17 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Threading.Channels;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Time.Testing;
 using NonSilo.Tests.Utilities;
 using NSubstitute;
+using Orleans.Connections;
+using Orleans.Connections.Transport;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
+using Orleans.Internal;
 using Orleans.Messaging;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
@@ -890,8 +892,12 @@ namespace NonSilo.Tests.Membership
             return CreateClusterHealthMonitorTestRig(clusterMembershipOptions, this.connectionManager);
         }
 
-        private ClusterHealthMonitorTestRig CreateClusterHealthMonitorTestRig(ClusterMembershipOptions clusterMembershipOptions, ConnectionManager connManager)
+        private ClusterHealthMonitorTestRig CreateClusterHealthMonitorTestRig(
+            ClusterMembershipOptions clusterMembershipOptions,
+            ConnectionManager connManager,
+            TimeProvider? timeProvider = null)
         {
+            timeProvider ??= TimeProvider.System;
             var manager = new MembershipTableManager(
                 localSiloDetails: this.localSiloDetails,
                 clusterMembershipOptions: Options.Create(clusterMembershipOptions),
@@ -901,7 +907,8 @@ namespace NonSilo.Tests.Membership
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
                 timerFactory: new AsyncTimerFactory(this.loggerFactory),
                 this.lifecycle,
-                timeProvider: TimeProvider.System);
+                timeProvider: timeProvider);
+            manager.GetDateTimeUtcNow = () => timeProvider.GetUtcNow().UtcDateTime;
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
 
@@ -916,7 +923,7 @@ namespace NonSilo.Tests.Membership
                 this.fatalErrorHandler,
                 null!,
                 connManager,
-                TimeProvider.System);
+                timeProvider);
 
             ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(this.lifecycle);
 
@@ -931,7 +938,7 @@ namespace NonSilo.Tests.Membership
                 this.localSiloHealthMonitor,
                 manager,
                 this.localSiloDetails,
-                TimeProvider.System);
+                timeProvider);
 
             return new(
                 manager: manager,
@@ -944,17 +951,15 @@ namespace NonSilo.Tests.Membership
         /// </summary>
         private TestConnection CreateTestConnection(ILoggerFactory loggerFactory)
         {
-            var features = new Microsoft.AspNetCore.Http.Features.FeatureCollection();
-            var context = Substitute.For<ConnectionContext>();
-            context.Features.Returns(features);
-            ConnectionDelegate middleware = _ => Task.CompletedTask;
+            var transport = Substitute.For<MessageTransport>();
+            transport.Features.Returns(new FeatureCollection());
             var services = new ServiceCollection();
             services.AddMetrics();
             services.AddSingleton<OrleansInstruments>();
             services.AddSingleton<MessagingInstruments>();
+            services.AddSingleton<NetworkingInstruments>();
             services.AddSingleton<MessagingProcessingInstruments>();
             var serviceProvider = services.BuildServiceProvider();
-            var orleansInstruments = serviceProvider.GetRequiredService<OrleansInstruments>();
             var messagingInstruments = serviceProvider.GetRequiredService<MessagingInstruments>();
             var messagingTrace = new MessagingTrace(
                 loggerFactory,
@@ -964,25 +969,428 @@ namespace NonSilo.Tests.Membership
                 serviceProvider,
                 null!,
                 messagingTrace,
-                orleansInstruments,
+                new ConnectionTrace(loggerFactory),
                 messagingInstruments,
-                loggerFactory.CreateLogger<Connection>(),
+                serviceProvider.GetRequiredService<NetworkingInstruments>(),
                 new NoOpMessageStatisticsSink());
-            return new TestConnection(context, middleware, shared);
+            return new TestConnection(transport, shared);
         }
 
-        private sealed class TestConnection(ConnectionContext context, ConnectionDelegate middleware, ConnectionCommon shared)
-            : Connection(context, middleware, shared)
+        private sealed class TestConnection(MessageTransport transport, ConnectionCommon shared)
+            : Connection(transport, shared)
         {
             protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+            protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
             protected override IMessageCenter MessageCenter => null!;
             protected override bool PrepareMessageForSend(Message msg) => true;
-            protected override void OnReceivedMessage(Message msg) { }
-            protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes) { }
-            protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) { }
-            protected override void OnSendMessageFailure(Message message, string error) { }
+            protected internal override void OnReceivedMessage(Message msg) { }
+            protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
+            protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
             protected override void RetryMessage(Message msg, Exception? ex = null) { }
             public void SimulateMessageReceived() => MarkMessageReceived();
+        }
+
+        [Theory]
+        [InlineData(0)]
+        [InlineData(3)]
+        public async Task ClusterHealthMonitor_JoiningSiloReevaluatesStalePeersThroughNormalDeathVotes(int healthyPeerCount)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var options = new ClusterMembershipOptions
+            {
+                IAmAliveTablePublishTimeout = TimeSpan.FromSeconds(15),
+                NumMissedTableIAmAliveLimit = 5,
+                TableRefreshTimeout = TimeSpan.FromSeconds(15),
+                ProbeTimeout = TimeSpan.FromMilliseconds(20),
+                MaxJoinAttemptTime = TimeSpan.FromMinutes(3),
+                NumMissedProbesLimit = 3,
+                NumVotesForDeathDeclaration = 2,
+                EnableIndirectProbes = false,
+            };
+            var clock = new MonitorSelectionTimeProvider(options.TableRefreshTimeout);
+            var peer = Silo("127.0.0.1:200@100");
+            var peerEntry = Entry(peer, SiloStatus.Active, clock.GetUtcNow());
+            var table = await this.membershipTable.ReadAllAsync(cancellationToken);
+            Assert.True(await this.membershipTable.InsertRowAsync(peerEntry, table.Version.Next(), cancellationToken));
+            var healthyPeers = Enumerable.Range(0, healthyPeerCount)
+                .Select(index => Entry(Silo($"127.0.0.2:{300 + index}@100"), SiloStatus.Active, clock.GetUtcNow()))
+                .ToArray();
+            foreach (var entry in healthyPeers)
+            {
+                table = await this.membershipTable.ReadAllAsync(cancellationToken);
+                Assert.True(await this.membershipTable.InsertRowAsync(entry, table.Version.Next(), cancellationToken));
+            }
+
+            var probeTicks = Channel.CreateUnbounded<TaskCompletionSource<bool>>();
+            this.timerFactory.CreateDelegate = (_, _) => new DelegateAsyncTimer(_ =>
+            {
+                var tick = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                Assert.True(probeTicks.Writer.TryWrite(tick));
+                return tick.Task;
+            });
+            var rig = CreateClusterHealthMonitorTestRig(options, this.connectionManager, clock);
+            var createMonitor = rig.TestAccessor.CreateMonitor;
+            rig.TestAccessor.CreateMonitor = silo => silo.Equals(peer) ? createMonitor(silo) : new SiloHealthMonitor(
+                silo, rig.TestAccessor.OnProbeResult, rig.OptionsMonitor, this.loggerFactory, this.prober,
+                new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ => Task.FromResult(false))),
+                this.localSiloHealthMonitor, rig.Manager, this.localSiloDetails, clock);
+            var validationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            this.prober.Probe(Arg.Any<SiloAddress>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(call =>
+                {
+                    if (!call.ArgAt<SiloAddress>(0).Equals(peer))
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    if (call.ArgAt<int>(1) == 0)
+                    {
+                        validationStarted.TrySetResult();
+                    }
+
+                    return Task.FromException(new SiloUnavailableException("The previous silo has exited."));
+                });
+            using var agent = new MembershipAgent(
+                rig.Manager, this.localSiloDetails, this.fatalErrorHandler, Options.Create(options),
+                this.loggerFactory.CreateLogger<MembershipAgent>(),
+                new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ => Task.FromResult(false))),
+                this.prober, clock);
+            ((MembershipAgent.ITestAccessor)agent).GetDateTime = () => clock.GetUtcNow().UtcDateTime;
+            ((ILifecycleParticipant<ISiloLifecycle>)agent).Participate(this.lifecycle);
+            using var events = new DiagnosticEventCollector(MembershipEvents.ListenerName);
+            using var startupCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var started = this.lifecycle.OnStart(startupCancellation.Token);
+            TaskCompletionSource<bool>? pendingTick = null;
+            try
+            {
+                await validationStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                await clock.TimerCreated.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                var joiningSnapshot = rig.Manager.MembershipTableSnapshot;
+                Assert.Equal(SiloStatus.Joining, rig.Manager.CurrentStatus);
+                Assert.Empty(rig.TestAccessor.MonitoredSilos);
+                Assert.False(started.IsCompleted);
+                Assert.Empty(joiningSnapshot.Entries[peer].GetFreshVotes(clock.GetUtcNow().UtcDateTime, options.DeathVoteExpirationTimeout));
+
+                clock.Advance(options.AllowedIAmAliveMissPeriod + options.TableRefreshTimeout);
+                foreach (var entry in healthyPeers)
+                {
+                    await this.membershipTable.UpdateIAmAliveAsync(entry.WithIAmAliveTime(clock.GetUtcNow().UtcDateTime), cancellationToken);
+                }
+
+                if (healthyPeerCount > 0)
+                {
+                    await rig.Manager.Refresh(cancellationToken: cancellationToken, requireFresh: true);
+                }
+
+                pendingTick = await probeTicks.Reader.ReadAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                if (healthyPeerCount == 0)
+                {
+                    Assert.Same(joiningSnapshot, rig.Manager.MembershipTableSnapshot);
+                }
+
+                Assert.Equal(SiloStatus.Joining, rig.Manager.CurrentStatus);
+
+                var suspected = WaitForMembershipSnapshot(events, snapshot =>
+                    snapshot.Entries.TryGetValue(peer, out var entry)
+                    && entry.GetFreshVotes(clock.GetUtcNow().UtcDateTime, options.DeathVoteExpirationTimeout).Count > 0,
+                    cancellationToken);
+                for (var probe = 1; probe <= options.NumMissedProbesLimit; ++probe)
+                {
+                    pendingTick.SetResult(true);
+                    pendingTick = await probeTicks.Reader.ReadAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                    if (probe < options.NumMissedProbesLimit)
+                    {
+                        Assert.Equal(SiloStatus.Active, rig.Manager.MembershipTableSnapshot.GetSiloStatus(peer));
+                        Assert.Empty(rig.Manager.MembershipTableSnapshot.Entries[peer].SuspectTimes ?? []);
+                    }
+                }
+
+                var suspectedSnapshot = await suspected;
+                Assert.Equal([this.localSilo], suspectedSnapshot.Entries[peer]
+                    .GetFreshVotes(clock.GetUtcNow().UtcDateTime, options.DeathVoteExpirationTimeout)
+                    .Select(vote => vote.Item1).Distinct());
+                Assert.Equal(healthyPeerCount == 0 ? SiloStatus.Dead : SiloStatus.Active, suspectedSnapshot.GetSiloStatus(peer));
+                if (healthyPeerCount == 0)
+                {
+                    await started.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                    Assert.Equal(SiloStatus.Active, rig.Manager.CurrentStatus);
+                }
+                else
+                {
+                    Assert.False(started.IsCompleted);
+                    Assert.Equal(SiloStatus.Joining, rig.Manager.CurrentStatus);
+                    startupCancellation.Cancel();
+                    await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                        () => started.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+                }
+
+                Assert.True(clock.GetUtcNow().UtcDateTime - peerEntry.IAmAliveTime < options.MaxJoinAttemptTime);
+                this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default!, default!, default!);
+            }
+            finally
+            {
+                startupCancellation.Cancel();
+                pendingTick?.TrySetResult(false);
+                await started.SuppressThrowing();
+                await StopLifecycle(cancellationToken);
+                rig.Manager.Dispose();
+            }
+        }
+
+        [Theory]
+        [InlineData(true, 0)]
+        [InlineData(false, 0)]
+        [InlineData(false, 60)]
+        public async Task ClusterHealthMonitor_JoiningSiloMonitorsPeerWhichBecomesStaleWithoutMembershipUpdates(bool reachable, int refreshPeriodDays)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var clock = new FakeTimeProvider();
+            var options = new ClusterMembershipOptions
+            {
+                IAmAliveTablePublishTimeout = TimeSpan.FromSeconds(15),
+                NumMissedTableIAmAliveLimit = 5,
+                TableRefreshTimeout = refreshPeriodDays == 0 ? TimeSpan.FromSeconds(15) : TimeSpan.FromDays(refreshPeriodDays),
+            };
+            var peer = Silo("127.0.0.1:200@100");
+            var snapshot = new MembershipTableSnapshot(
+                new MembershipVersion(1),
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty
+                    .Add(this.localSilo, Entry(this.localSilo, SiloStatus.Joining, clock.GetUtcNow()))
+                    .Add(peer, Entry(peer, SiloStatus.Active, clock.GetUtcNow())));
+            var updates = new ControlledMembershipUpdateStream();
+            var manager = Substitute.For<IMembershipManager>();
+            manager.CurrentSnapshot.Returns(snapshot);
+            manager.LocalSiloStatus.Returns(SiloStatus.Joining);
+            manager.MembershipUpdates.Returns(updates);
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(options);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            await using var monitor = new ClusterHealthMonitor(
+                this.localSiloDetails, manager, this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
+                optionsMonitor, this.fatalErrorHandler, null!, this.connectionManager, clock);
+            var accessor = (ClusterHealthMonitor.ITestAccessor)monitor;
+            var monitorCreated = new TaskCompletionSource<SiloAddress>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var probeTicks = Channel.CreateUnbounded<TaskCompletionSource<bool>>();
+            var results = Channel.CreateUnbounded<SiloHealthMonitor.ProbeResult>();
+            var onProbeResult = accessor.OnProbeResult;
+            accessor.OnProbeResult = async (siloMonitor, result) =>
+            {
+                await onProbeResult(siloMonitor, result);
+                Assert.True(results.Writer.TryWrite(result));
+            };
+            this.prober.Probe(Arg.Any<SiloAddress>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
+                .Returns(reachable ? Task.CompletedTask : Task.FromException(new SiloUnavailableException("The peer is unreachable.")));
+            accessor.CreateMonitor = silo =>
+            {
+                monitorCreated.SetResult(silo);
+                return new SiloHealthMonitor(
+                    silo, accessor.OnProbeResult, optionsMonitor, this.loggerFactory, this.prober,
+                    new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ =>
+                    {
+                        var tick = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        Assert.True(probeTicks.Writer.TryWrite(tick));
+                        return tick.Task;
+                    })),
+                    this.localSiloHealthMonitor, manager, this.localSiloDetails, clock);
+            };
+            ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(lifecycle);
+
+            await lifecycle.OnStart(cancellationToken);
+            TaskCompletionSource<bool>? pendingTick = null;
+            try
+            {
+                updates.Publish(snapshot);
+                await updates.WaitForReadAsync(2, cancellationToken);
+                Assert.Empty(accessor.MonitoredSilos);
+                Assert.False(snapshot.Entries[peer].HasMissedIAmAlives(options, clock.GetUtcNow().UtcDateTime));
+
+                clock.Advance(options.AllowedIAmAliveMissPeriod + options.TableRefreshTimeout);
+
+                Assert.True(snapshot.Entries[peer].HasMissedIAmAlives(options, clock.GetUtcNow().UtcDateTime));
+                Assert.Equal(peer, await monitorCreated.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+                Assert.Same(snapshot, manager.CurrentSnapshot);
+                Assert.Equal(snapshot.Version, accessor.ObservedVersion);
+                await manager.DidNotReceive().TrySuspectSilo(
+                    Arg.Any<SiloAddress>(), Arg.Any<SiloAddress?>(), Arg.Any<CancellationToken>());
+                pendingTick = await probeTicks.Reader.ReadAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                for (var probe = 1; probe <= options.NumMissedProbesLimit; ++probe)
+                {
+                    pendingTick.SetResult(true);
+                    var result = await results.Reader.ReadAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                    Assert.Equal(reachable ? SiloHealthMonitor.ProbeResultStatus.Succeeded : SiloHealthMonitor.ProbeResultStatus.Failed, result.Status);
+                    Assert.Equal(reachable ? 0 : probe, result.FailedProbeCount);
+                    await manager.Received(!reachable && probe == options.NumMissedProbesLimit ? 1 : 0)
+                        .TrySuspectSilo(peer, null, Arg.Any<CancellationToken>());
+                    pendingTick = await probeTicks.Reader.ReadAsync(cancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                }
+            }
+            finally
+            {
+                pendingTick?.TrySetResult(false);
+                await lifecycle.OnStop(cancellationToken);
+                await updates.Completed.WaitAsync(cancellationToken);
+            }
+        }
+
+        [Theory]
+        [InlineData(0.5)]
+        [InlineData(60d * 24 * 60 * 60 * 1000)]
+        public async Task ClusterHealthMonitor_ReevaluationSupportsTableRefreshIntervalAndStreamCompletion(double milliseconds)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var period = TimeSpan.FromMilliseconds(milliseconds);
+            TimeProvider clock = milliseconds is > 0 and < 1 ? TimeProvider.System : new FakeTimeProvider();
+            var snapshot = new MembershipTableSnapshot(
+                new MembershipVersion(1),
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty
+                    .Add(this.localSilo, Entry(this.localSilo, SiloStatus.Joining, clock.GetUtcNow())));
+            var updates = new ControlledMembershipUpdateStream();
+            var manager = Substitute.For<IMembershipManager>();
+            manager.CurrentSnapshot.Returns(snapshot);
+            manager.LocalSiloStatus.Returns(SiloStatus.Joining);
+            manager.MembershipUpdates.Returns(updates);
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(new ClusterMembershipOptions { TableRefreshTimeout = period });
+            this.fatalErrorHandler.IsUnexpected(Arg.Any<Exception>()).Returns(true);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            await using var monitor = new ClusterHealthMonitor(
+                this.localSiloDetails, manager, this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
+                optionsMonitor, this.fatalErrorHandler, null!, this.connectionManager, clock);
+            var accessor = (ClusterHealthMonitor.ITestAccessor)monitor;
+            ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(lifecycle);
+
+            await lifecycle.OnStart(cancellationToken);
+            try
+            {
+                updates.Publish(snapshot);
+                await updates.WaitForReadAsync(2, cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                Assert.Equal(snapshot.Version, accessor.ObservedVersion);
+
+                updates.Complete();
+                await updates.Completed.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                Assert.Empty(monitor.SiloMonitors);
+                this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default!, default!, default!);
+            }
+            finally
+            {
+                await lifecycle.OnStop(cancellationToken);
+            }
+        }
+
+        [Fact]
+        public async Task ClusterHealthMonitor_ActiveSiloReevaluatesStalePeersAndPreservesExistingMonitors()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var clock = new FakeTimeProvider();
+            var options = new ClusterMembershipOptions
+            {
+                NumProbedSilos = 1,
+                NumVotesForDeathDeclaration = 1,
+                TableRefreshTimeout = TimeSpan.FromSeconds(15),
+            };
+            var peers = new[] { Silo("127.0.0.1:200@100"), Silo("127.0.0.1:300@100") };
+            var ring = peers.Append(this.localSilo).OrderBy(silo => silo.GetConsistentHashCode(0)).ToArray();
+            var ringPeer = ring[(Array.IndexOf(ring, this.localSilo) + 1) % ring.Length];
+            var stalePeer = peers.Single(silo => !silo.Equals(ringPeer));
+            var snapshot = new MembershipTableSnapshot(
+                new MembershipVersion(1),
+                peers.Append(this.localSilo).ToImmutableDictionary(
+                    silo => silo,
+                    silo => Entry(silo, SiloStatus.Active, clock.GetUtcNow())));
+            var updates = new ControlledMembershipUpdateStream();
+            var manager = Substitute.For<IMembershipManager>();
+            manager.CurrentSnapshot.Returns(snapshot);
+            manager.LocalSiloStatus.Returns(SiloStatus.Active);
+            manager.MembershipUpdates.Returns(updates);
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(options);
+            this.fatalErrorHandler.IsUnexpected(Arg.Any<Exception>()).Returns(true);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            await using var monitor = new ClusterHealthMonitor(
+                this.localSiloDetails, manager, this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
+                optionsMonitor, this.fatalErrorHandler, null!, this.connectionManager, clock);
+            var accessor = (ClusterHealthMonitor.ITestAccessor)monitor;
+            var stalePeerMonitorCreated = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            accessor.CreateMonitor = silo =>
+            {
+                if (silo.Equals(stalePeer))
+                {
+                    stalePeerMonitorCreated.SetResult();
+                }
+
+                return new SiloHealthMonitor(
+                    silo, accessor.OnProbeResult, optionsMonitor, this.loggerFactory, this.prober,
+                    new DelegateAsyncTimerFactory((_, _) => new DelegateAsyncTimer(_ => Task.FromResult(false))),
+                    this.localSiloHealthMonitor, manager, this.localSiloDetails, clock);
+            };
+            ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(lifecycle);
+
+            await lifecycle.OnStart(cancellationToken);
+            try
+            {
+                updates.Publish(snapshot);
+                await updates.WaitForReadAsync(2, cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                var originalMonitor = Assert.Single(accessor.MonitoredSilos);
+                Assert.Equal(ringPeer, originalMonitor.Key);
+                Assert.False(stalePeerMonitorCreated.Task.IsCompleted);
+                Assert.False(snapshot.Entries[stalePeer].HasMissedIAmAlives(options, clock.GetUtcNow().UtcDateTime));
+
+                clock.Advance(options.AllowedIAmAliveMissPeriod + options.TableRefreshTimeout);
+                await stalePeerMonitorCreated.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                updates.Complete();
+                await updates.Completed.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+
+                Assert.Equal(2, accessor.MonitoredSilos.Count);
+                Assert.Contains(stalePeer, accessor.MonitoredSilos.Keys);
+                Assert.Same(originalMonitor.Value, accessor.MonitoredSilos[ringPeer]);
+                Assert.Equal(snapshot.Version, accessor.ObservedVersion);
+                await manager.DidNotReceive().TrySuspectSilo(
+                    Arg.Any<SiloAddress>(), Arg.Any<SiloAddress?>(), Arg.Any<CancellationToken>());
+                this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default!, default!, default!);
+            }
+            finally
+            {
+                await lifecycle.OnStop(cancellationToken);
+                await updates.Completed.WaitAsync(cancellationToken);
+            }
+        }
+
+        [Fact]
+        public async Task ClusterHealthMonitor_MembershipUpdateFailureRemainsVisibleWithPendingReevaluation()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var clock = new FakeTimeProvider();
+            var updates = new ControlledMembershipUpdateStream();
+            var manager = Substitute.For<IMembershipManager>();
+            manager.CurrentSnapshot.Returns(new MembershipTableSnapshot(
+                MembershipVersion.MinValue, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty));
+            manager.MembershipUpdates.Returns(updates);
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(new ClusterMembershipOptions());
+            var fatal = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+            this.fatalErrorHandler.IsUnexpected(Arg.Any<Exception>()).Returns(true);
+            this.fatalErrorHandler.When(handler => handler.OnFatalException(Arg.Any<object>(), Arg.Any<string>(), Arg.Any<Exception>()))
+                .Do(call => fatal.SetResult(call.ArgAt<Exception>(2)));
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            await using var monitor = new ClusterHealthMonitor(
+                this.localSiloDetails, manager, this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
+                optionsMonitor, this.fatalErrorHandler, null!, this.connectionManager, clock);
+            ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(lifecycle);
+            await lifecycle.OnStart(cancellationToken);
+            try
+            {
+                await updates.WaitForReadAsync(1, cancellationToken);
+                var failure = new InvalidOperationException("Membership provider failed.");
+                updates.Complete(failure);
+
+                Assert.Same(failure, await fatal.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken));
+                await updates.Completed.WaitAsync(cancellationToken);
+                Assert.Empty(monitor.SiloMonitors);
+            }
+            finally
+            {
+                await lifecycle.OnStop(cancellationToken);
+            }
         }
 
         [Fact]
@@ -1060,6 +1468,24 @@ namespace NonSilo.Tests.Membership
                     ImmutableDictionary<SiloAddress, MembershipEntry>.Empty.Add(joiningEntry.SiloAddress, joiningEntry));
         }
 
+        private sealed class MonitorSelectionTimeProvider(TimeSpan period) : FakeTimeProvider(DateTimeOffset.UtcNow)
+        {
+            private readonly TaskCompletionSource _timerCreated = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public Task TimerCreated => _timerCreated.Task;
+
+            public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan timerPeriod)
+            {
+                var timer = base.CreateTimer(callback, state, dueTime, timerPeriod);
+                if (dueTime == period)
+                {
+                    _timerCreated.TrySetResult();
+                }
+
+                return timer;
+            }
+        }
+
         private sealed class ControlledMembershipUpdateStream : IAsyncEnumerable<MembershipTableSnapshot>
         {
             private readonly Channel<MembershipTableSnapshot> _updates = Channel.CreateUnbounded<MembershipTableSnapshot>();
@@ -1072,7 +1498,7 @@ namespace NonSilo.Tests.Membership
 
             public void Publish(MembershipTableSnapshot snapshot) => Assert.True(_updates.Writer.TryWrite(snapshot));
 
-            public void Complete() => _updates.Writer.TryComplete();
+            public void Complete(Exception? exception = null) => _updates.Writer.TryComplete(exception);
 
             public Task WaitForReadAsync(int readCount, CancellationToken cancellationToken)
             {

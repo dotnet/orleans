@@ -10,6 +10,8 @@ public abstract class MembershipTableConformanceTestsBase
     protected abstract MembershipTableTestFixture CreateConformanceFixture();
 
     protected virtual int ConformanceConcurrencyRowCount => 128;
+    // Padding is appended to HostName and must fit the provider's persisted string limit.
+    protected virtual int ConformanceConcurrencyRowPadding => 0;
 
     protected virtual void WriteConformanceOutput(string message)
         => TestContext.Current.TestOutputHelper?.WriteLine(message);
@@ -33,7 +35,8 @@ public abstract class MembershipTableConformanceTestsBase
                     fixture,
                     seed: 17,
                     output: WriteConformanceOutput,
-                    concurrencyRowCount: ConformanceConcurrencyRowCount),
+                    concurrencyRowCount: ConformanceConcurrencyRowCount,
+                    concurrencyRowPadding: ConformanceConcurrencyRowPadding),
                 cancellationToken),
             TestContext.Current.CancellationToken);
 
@@ -94,8 +97,8 @@ public abstract class MembershipTableConformanceTestsBase
         => RunConformance((runner, ct) => runner.UpdateRow_MissingIdentityWithRealToken_ReturnsFalseWithoutSideEffects(ct));
 
     [Fact]
-    public Task ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities()
-        => RunConformance((runner, ct) => runner.ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities(ct));
+    public Task ReadAll_SelectsPresentAndAbsentIdentities()
+        => RunConformance((runner, ct) => runner.ReadAll_SelectsPresentAndAbsentIdentities(ct));
 
     [Fact]
     public Task Reads_RetainedObjectsRemainUnchangedAfterLaterWrites()
@@ -120,10 +123,6 @@ public abstract class MembershipTableConformanceTestsBase
     [Fact]
     public Task ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews()
         => RunConformance((runner, ct) => runner.ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(ct));
-
-    [Fact]
-    public Task ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews()
-        => RunConformance((runner, ct) => runner.ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(ct));
 
     [Fact]
     public Task InitializeMembershipTable_RepeatedWithData_PreservesCommittedState()

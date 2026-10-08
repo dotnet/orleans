@@ -77,6 +77,8 @@ namespace Orleans.Clustering.TestKit
 
     public sealed partial class MembershipTableTestRunner
     {
+        public MembershipTableTestRunner(MembershipTableTestFixture fixture, int seed, System.Action<string>? output, int concurrencyRowCount, int concurrencyRowPadding) { }
+
         public MembershipTableTestRunner(MembershipTableTestFixture fixture, int seed = 0, System.Action<string>? output = null, int concurrencyRowCount = 128) { }
 
         public System.Threading.Tasks.Task CleanupDefunctSiloEntries_RemovesOnlyStrictlyOldDeadRows(System.Threading.CancellationToken cancellationToken = default) { throw null; }
@@ -87,6 +89,7 @@ namespace Orleans.Clustering.TestKit
 
         public System.Threading.Tasks.Task ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        [System.Obsolete("Use ConcurrentReadAll_ReturnsOnlyAtomicCommittedViews instead.")]
         public System.Threading.Tasks.Task ConcurrentReadRow_ReturnsOnlyAtomicCommittedViews(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task DeleteMembershipTableEntries_DeletesOwnClusterAndPreservesOtherCluster(System.Threading.CancellationToken cancellationToken = default) { throw null; }
@@ -107,6 +110,9 @@ namespace Orleans.Clustering.TestKit
 
         public System.Threading.Tasks.Task Lifecycle_DeadRemainsTerminalAfterCompaction_SuccessorUsesNewGeneration(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        public System.Threading.Tasks.Task ReadAll_SelectsPresentAndAbsentIdentities(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        [System.Obsolete("Use ReadAll_SelectsPresentAndAbsentIdentities instead.")]
         public System.Threading.Tasks.Task ReadRow_AndReadAll_AgreeForPresentAndAbsentIdentities(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task Reads_MaySkipCommittedVersions_WithoutSkippingHistoryValidation(System.Threading.CancellationToken cancellationToken = default) { throw null; }

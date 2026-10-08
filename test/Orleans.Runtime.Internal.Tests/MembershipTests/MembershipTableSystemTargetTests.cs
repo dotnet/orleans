@@ -66,9 +66,10 @@ public sealed class MembershipTableSystemTargetTests : IDisposable
             () => _target.DeleteMembershipTableEntriesAsync(clusterId, _cancellationToken));
 
         Assert.Equal("clusterId", exception.ParamName);
-        AssertUnchanged(before, await _target.ReadAllAsync(_cancellationToken));
+        var after = await _target.ReadAllAsync(_cancellationToken);
+        AssertUnchanged(before, after);
         var entry = Assert.Single(before.Members).Item1;
-        AssertUnchanged(before, await _target.ReadRowAsync(entry.SiloAddress, _cancellationToken));
+        Assert.Equal(entry.ToFullString(), after.TryGet(entry.SiloAddress)!.Item1.ToFullString());
     }
 
     [Fact]
@@ -82,7 +83,7 @@ public sealed class MembershipTableSystemTargetTests : IDisposable
         // Deletion ends this target's table lifetime, including after another initialization request.
         await Assert.ThrowsAsync<NullReferenceException>(() => _target.ReadAllAsync(_cancellationToken));
         await _target.InitializeMembershipTableAsync(true, _cancellationToken);
-        await Assert.ThrowsAsync<NullReferenceException>(() => _target.ReadRowAsync(entry.SiloAddress, _cancellationToken));
+        await Assert.ThrowsAsync<NullReferenceException>(() => _target.ReadAllAsync(_cancellationToken));
         await Assert.ThrowsAsync<NullReferenceException>(() => _target.InsertRowAsync(entry, before.Version.Next(), _cancellationToken));
     }
 
@@ -100,6 +101,55 @@ public sealed class MembershipTableSystemTargetTests : IDisposable
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
         AssertUnchanged(before, await _target.ReadAllAsync(_cancellationToken));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RowReads_AreUnsupportedBeforeTableAccess(bool terminallyDeleted)
+    {
+        const string guidance = "Use ReadAllAsync and MembershipTableData.TryGet instead.";
+        var before = await SeedTable();
+        if (terminallyDeleted)
+        {
+            await _target.DeleteMembershipTableEntriesAsync(ClusterId, _cancellationToken);
+        }
+
+        foreach (var key in new[] { Assert.Single(before.Members).Item1.SiloAddress, null! })
+        {
+#pragma warning disable CS0618 // Retired legacy and async APIs must return faulted tasks even after table deletion.
+            var legacy = _target.ReadRow(key);
+            var current = _target.ReadRowAsync(key, _cancellationToken);
+#pragma warning restore CS0618
+            Assert.True(legacy.IsFaulted);
+            Assert.True(current.IsFaulted);
+            Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => legacy)).Message);
+            Assert.Equal(guidance, (await Assert.ThrowsAsync<NotSupportedException>(() => current)).Message);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+#pragma warning disable CS0618 // Pre-cancellation must win over unsupported and null/deleted table access.
+            var canceled = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => _target.ReadRowAsync(key, cancellation.Token));
+#pragma warning restore CS0618
+            Assert.Equal(cancellation.Token, canceled.CancellationToken);
+        }
+
+        foreach (var name in new[] { nameof(_target.ReadRow), nameof(_target.ReadRowAsync) })
+        {
+            var obsolete = Assert.IsType<ObsoleteAttribute>(
+                Attribute.GetCustomAttribute(typeof(MembershipTableSystemTarget).GetMethod(name)!, typeof(ObsoleteAttribute)));
+            Assert.Equal(guidance, obsolete.Message);
+            Assert.False(obsolete.IsError);
+        }
+
+        if (terminallyDeleted)
+        {
+            await Assert.ThrowsAsync<NullReferenceException>(() => _target.ReadAllAsync(_cancellationToken));
+        }
+        else
+        {
+            AssertUnchanged(before, await _target.ReadAllAsync(_cancellationToken));
+        }
     }
 
     private async Task<MembershipTableData> SeedTable()
@@ -138,4 +188,5 @@ public sealed class MembershipTableSystemTargetTests : IDisposable
         _target.Dispose();
         _services.Dispose();
     }
+
 }

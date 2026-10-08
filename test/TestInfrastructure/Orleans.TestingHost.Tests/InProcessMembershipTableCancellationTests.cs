@@ -69,7 +69,9 @@ public sealed class InProcessMembershipTableCancellationTests
             nameof(IMembershipTable.InitializeMembershipTableAsync) => table.InitializeMembershipTableAsync(true, cancellationToken),
             nameof(IMembershipTable.DeleteMembershipTableEntriesAsync) => table.DeleteMembershipTableEntriesAsync("cluster", cancellationToken),
             nameof(IMembershipTable.CleanupDefunctSiloEntriesAsync) => table.CleanupDefunctSiloEntriesAsync(DateTimeOffset.UnixEpoch.AddDays(1), cancellationToken),
+#pragma warning disable CS0618 // Intentional retired-row cancellation coverage.
             nameof(IMembershipTable.ReadRowAsync) => table.ReadRowAsync(entry.SiloAddress, cancellationToken),
+#pragma warning restore CS0618
             nameof(IMembershipTable.ReadAllAsync) => table.ReadAllAsync(cancellationToken),
             nameof(IMembershipTable.InsertRowAsync) => table.InsertRowAsync(entry, version, cancellationToken),
             nameof(IMembershipTable.UpdateRowAsync) => table.UpdateRowAsync(entry, etag, version, cancellationToken),

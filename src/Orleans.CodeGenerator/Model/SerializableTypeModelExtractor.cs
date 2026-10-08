@@ -487,5 +487,3 @@ internal static class SerializableTypeModelExtractor
         return members.Values;
     }
 }
-
-

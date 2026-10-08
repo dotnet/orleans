@@ -333,6 +333,7 @@ public sealed class JournaledGrainCompositionTests(JournalCompositionFixture fix
     {
         var builder = new CompositionSiloBuilder();
         builder.Services.AddLogging();
+        builder.Services.AddSingleton(JournalingTestBase.CreateGrainPropertiesResolver());
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddKeyedSingleton<TimeProvider>(KeyedService.AnyKey, static (services, _) => services.GetRequiredService<TimeProvider>());
         builder.AddVolatileJournalStorage().UseJsonJournalFormat(JournalingTestsJsonContext.Default);
@@ -397,6 +398,8 @@ public sealed class JournalCompositionFixture : IntegrationTestFixture
             silo.Services.AddScoped<JournalCompositionFeature>();
             silo.Services.AddSingleton<JournalCompositionStorageProvider>();
             silo.Services.AddSingleton<IJournalStorageProvider>(static services => services.GetRequiredService<JournalCompositionStorageProvider>());
+            silo.AddJournalStorage("provider-A", static _ => new JournalCompositionStorageProvider());
+            silo.AddJournalStorage("provider-B", static _ => new JournalCompositionStorageProvider());
             silo.Services.AddSingleton<IConfigureGrainTypeComponents, JournalCompositionConfigurator>();
         });
     }
