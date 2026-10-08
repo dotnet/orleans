@@ -77,27 +77,7 @@ public abstract class DurableMessagingBehaviorTestBase : IAsyncLifetime
     {
         var sessions = Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("external-test-sender", Guid.NewGuid().ToString("N"));
-        var builder = new DurableEnvelopeBuilder(sessions, sender).To(receiver.GetGrainId(), route);
-        var envelope = body switch
-        {
-            DurableTestMessage message => builder.WithBody(message).Build(),
-            string text => builder.WithBody(text).Build(),
-            _ => throw new ArgumentException($"Unsupported test body type {body.GetType()}.", nameof(body)),
-        };
-        return new EnvelopeLease(envelope);
-    }
-
-    protected EnvelopeLease CreateEnvelope<T>(
-        IDurableMessagingTestGrain receiver,
-        T body,
-        string route,
-        Action<DurableEnvelopeBuilder>? configure = null)
-    {
-        var sessions = Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
-        var sender = GrainId.Create("external-test-sender", Guid.NewGuid().ToString("N"));
-        var builder = new DurableEnvelopeBuilder(sessions, sender).To(receiver.GetGrainId(), route);
-        configure?.Invoke(builder);
-        return new EnvelopeLease(builder.WithBody<T>(body).Build());
+        return new EnvelopeLease(TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), route, body));
     }
 
     protected sealed class EnvelopeLease(DurableEnvelope value) : IDisposable

@@ -80,12 +80,7 @@ public class SnapshotProbeTests
             [],
             null,
             0,
-            0,
-            0,
             null,
-            0,
-            0,
-            0,
             null,
             null);
 }

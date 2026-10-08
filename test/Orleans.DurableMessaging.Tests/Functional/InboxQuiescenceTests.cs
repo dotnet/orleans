@@ -105,50 +105,6 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         Assert.Null(deleted.InboxJobId);
     }
 
-    [Fact]
-    public async Task OwnerDelete_WaitsForControlledPreparationBeforeStorageDelete()
-    {
-        var receiver = NewGrain();
-        _ = await receiver.GetSnapshotAsync();
-        var context = Fixture.GetGrainContext(receiver);
-        var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
-        var outbox = GetOutbox(context);
-        var extension = context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
-        using var preparation = outbox.BlockNextPreparation(ignoreCancellation: true);
-        using var envelope = CreateEnvelope(receiver, NewMessage(162, "application-preparation"), "output/prepared");
-        var acquisition = PrepareOnTurnAsync(context, outbox, envelope.Value);
-        await preparation.WaitAsync();
-        using var storage = Fixture.Storage.BlockDelete(JournalId.FromGrainId(receiver.GetGrainId()));
-        var deleteEntered = storage.WaitUntilEnteredAsync();
-        var deletion = receiver.DeleteStateAndDeactivateAsync();
-        await outbox.Stopping.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        Assert.False(deletion.IsCompleted);
-        Assert.False(deleteEntered.IsCompleted);
-        Assert.False(preparation.Operation!.Completed.IsCompleted);
-        Assert.Equal(0, outbox.SendCalls);
-        preparation.Release();
-        using (var batch = await acquisition)
-        {
-            await deleteEntered;
-            AssertStopped(extension, outbox);
-            Assert.True(preparation.Operation.Completed.IsCompleted);
-            var observed = Assert.Single(outbox.PreparedBatches);
-            Assert.Equal(envelope.Value.MessageId, Assert.Single(observed.MessageIds));
-            Assert.Equal(0, observed.DisposeCalls);
-            Assert.Throws<InvalidOperationException>(() => outbox.Send(batch));
-        }
-        Assert.Equal(1, Assert.Single(outbox.PreparedBatches).DisposeCalls);
-        Assert.Empty(grain.GetSnapshotForTest().Effects);
-        Assert.Empty(outbox.Messages);
-        storage.Release();
-        await deletion;
-        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        var fresh = await receiver.GetSnapshotAsync();
-        Assert.NotEqual(grain.GetSnapshotForTest().ActivationId, fresh.ActivationId);
-        Assert.Empty(fresh.Effects);
-        Assert.Equal(0, fresh.InboxCount);
-        Assert.Equal(0, fresh.OutboxCount);
-    }
 
     [Fact]
     public async Task OwnerDelete_DrainsCanceledDeliveryAndGateWaiterBeforeReset()
@@ -301,9 +257,6 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var outbox = GetOutbox(context);
         using var staged = CreateEnvelope(receiver, NewMessage(193, "staged-output"), "output/staged");
-        using var prepared = CreateEnvelope(receiver, NewMessage(194, "prepared-output"), "output/prepared");
-        var batch = await PrepareOnTurnAsync(context, outbox, prepared.Value);
-        try
         {
             await receiver.StageOutputAsync(staged.Value);
             Assert.Equal(staged.Value.MessageId, Assert.Single(outbox.Messages).MessageId);
@@ -315,18 +268,8 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
             Assert.Empty(outbox.Messages);
             Assert.Empty(grain.GetSnapshotForTest().Effects);
             Assert.True(outbox.Stopping.IsCompleted);
-            Assert.Throws<InvalidOperationException>(() => outbox.Send(batch));
-            await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await outbox.PrepareSendAsync([prepared.Value], TestContext.Current.CancellationToken));
-            Assert.Equal(0, outbox.PreparedBatches[0].DisposeCalls);
+            Assert.Throws<InvalidOperationException>(() => outbox.Send(staged.Value));
         }
-        finally
-        {
-            batch.Dispose();
-        }
-        Assert.Equal(1, outbox.PreparedBatches[0].DisposeCalls);
-        batch.Dispose();
-        Assert.Equal(2, outbox.PreparedBatches[0].DisposeCalls);
         Assert.Empty(outbox.Messages);
         var fresh = await receiver.GetSnapshotAsync();
         Assert.NotEqual(before.ActivationId, fresh.ActivationId);
@@ -348,7 +291,6 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
     private static void AssertStopped(object extension, JournaledTestOutbox outbox)
     {
         Assert.True(outbox.Stopping.IsCompleted);
-        Assert.Equal(outbox.PreparationsStarted, outbox.PreparationsCompleted);
         Assert.False(CancellationCleanupProbe.CoordinatorIsActive(extension));
         Assert.Empty(CancellationCleanupProbe.Field<IList>(extension, "_pendingWrites"));
         Assert.Equal(0, CancellationCleanupProbe.Field<int>(extension, "_metricsActive"));
@@ -357,17 +299,6 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
         var entries = (IDictionary)results.GetType().GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(results)!;
         Assert.DoesNotContain(entries.Keys.Cast<object>(),
             key => (string)key.GetType().GetProperty("JobName")!.GetValue(key)! == ReceiverTestServices.InboxJobName);
-    }
-
-    private static Task<IPreparedOutboxBatch> PrepareOnTurnAsync(IGrainContext context, JournaledTestOutbox outbox, DurableEnvelope envelope)
-    {
-        var started = new TaskCompletionSource<Task<IPreparedOutboxBatch>>(TaskCreationOptions.RunContinuationsAsynchronously);
-        context.Scheduler.QueueAction(() =>
-        {
-            try { started.SetResult(outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken).AsTask()); }
-            catch (Exception exception) { started.SetException(exception); }
-        });
-        return started.Task.Unwrap();
     }
 
     private static IList GetPending(IGrainContext context)

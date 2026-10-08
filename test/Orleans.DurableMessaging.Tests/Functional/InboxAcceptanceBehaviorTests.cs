@@ -163,9 +163,7 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
             MessageId = original.Value.MessageId,
             SenderId = GrainId.Create("other-sender", "same-message-id"),
             ReceiverId = original.Value.ReceiverId,
-            RouteKey = original.Value.RouteKey,
-            Data = original.Value.Data,
-            CreatedAt = original.Value.CreatedAt
+            Payload = original.Value.Payload,
         };
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original.Value)).Status);

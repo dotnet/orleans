@@ -1,11 +1,10 @@
+using Documentation.Grains.DurableMessaging;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Serialization.Session;
 using Xunit;
-using NotificationGrain = Documentation.Grains.DurableMessaging.NotificationGrain;
 
 namespace Orleans.DurableMessaging.Tests.Documentation;
 
@@ -15,115 +14,71 @@ namespace Orleans.DurableMessaging.Tests.Documentation;
 public sealed class DurableMessagingSnippetTests : IDisposable
 {
     private readonly ServiceProvider _services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+    private static readonly GrainId Sender = GrainId.Create("sender", "snippet");
+    private static readonly GrainId Receiver = GrainId.Create("notification", "snippet");
+    private Serializer Serializer => _services.GetRequiredService<Serializer>();
 
     [Theory]
     [InlineData(null)]
     [InlineData("orders/2026/42")]
-    public async Task NotificationReply_PreservesOptionalCorrelationKey(string? correlationKey)
+    public async Task NotificationReply_PreservesOptionalApplicationOperationKey(string? operationKey)
     {
-        var sessions = _services.GetRequiredService<SerializerSessionPool>();
-        var sender = GrainId.Create("sender", "snippet");
-        var receiver = GrainId.Create("notification", "snippet");
-        var requestBuilder = new DurableEnvelopeBuilder(sessions, sender)
-            .To(receiver, "notifications")
-            .WithReplyTo(sender)
-            .WithBody("received message");
-        if (correlationKey is not null)
-        {
-            requestBuilder.WithCorrelationKey(correlationKey);
-        }
+        var key = operationKey is null ? null : HierarchicalKey.Create(operationKey);
+        var attempt = Create(new Notify("received message", key, Sender));
+        var handling = attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
-        var request = requestBuilder.Build();
-        var inbox = Substitute.For<IDurableInbox>();
-        var outbox = Substitute.For<IDurableOutbox>();
-        var count = Substitute.For<IDurableValue<int>>();
-        count.Value.Returns(7);
-        var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(request);
-        context.Outbox.Returns(outbox);
-        context.CreateEnvelope().Returns(_ => new DurableEnvelopeBuilder(sessions, receiver));
-        using var cancellation = new CancellationTokenSource();
-        var events = new List<string>();
-        count.When(value => value.Value = Arg.Any<int>()).Do(_ => events.Add("count"));
-        DurableEnvelope? sentReply = null;
-        context.When(value => value.Send(Arg.Any<DurableEnvelope>()))
-            .Do(call =>
-            {
-                sentReply = call.Arg<DurableEnvelope>();
-                events.Add("send");
-            });
-        context.When(value => value.Complete()).Do(_ => events.Add("complete"));
-        var grain = new NotificationGrain(inbox, count);
-
-        var handling = grain.HandleAsync(context, cancellation.Token);
         Assert.True(handling.IsCompletedSuccessfully);
-        Assert.Equal(new[] { "count", "send", "complete" }, events);
+        Assert.Equal(new[] { "count", "send", "complete" }, attempt.Events);
         await handling;
-
-        var reply = Assert.IsType<DurableEnvelope>(sentReply);
-        Assert.Equal(request.CorrelationKey, reply.CorrelationKey);
-        Assert.Equal(sender, reply.ReceiverId);
-        Assert.Equal(receiver, reply.SenderId);
-        Assert.Equal("notifications/received", reply.RouteKey);
-        Assert.True(reply.Data.TryGetBody<string>(out var body));
-        Assert.Equal("received message", body);
-        count.Received(1).Value = 8;
-        context.Received(1).Send(reply);
-        context.Received(1).Complete();
-        await outbox.DidNotReceive().PrepareSendAsync(
-            Arg.Any<IReadOnlyList<DurableEnvelope>>(), Arg.Any<CancellationToken>());
+        var reply = Assert.Single(attempt.Output);
+        Assert.Equal(Sender, reply.ReceiverId);
+        Assert.Equal(Receiver, reply.SenderId);
+        Assert.NotEqual(attempt.Context.Envelope.MessageId, reply.MessageId);
+        Assert.Equal(new NotificationReceived("received message", key),
+            new ApplicationPayload(Serializer).Decode<NotificationReceived>(reply.Payload));
+        Assert.Equal(8, attempt.Count.Value);
+        if (key is not null)
+        {
+            Assert.Equal("received message", Assert.Single(attempt.Ledger).Value);
+        }
+        attempt.Inbox.Received(1).RegisterHandler(attempt.Grain);
+        attempt.Outbox.Received(1).Send(reply);
+        attempt.Context.Received(1).Complete();
     }
 
     [Fact]
     public async Task NotificationHandling_PreMutationCancellationPreservesBusinessState()
     {
-        var inbox = Substitute.For<IDurableInbox>();
-        var count = Substitute.For<IDurableValue<int>>();
-        var context = Substitute.For<IInboxHandlerContext>();
-        var grain = new NotificationGrain(inbox, count);
+        var attempt = Create(new Notify("received message", ResponseDestination: Sender));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await grain.HandleAsync(context, cancellation.Token));
+            await attempt.Grain.HandleAsync(attempt.Context, cancellation.Token));
 
-        count.DidNotReceive().Value = Arg.Any<int>();
-        context.DidNotReceive().CreateEnvelope();
-        context.DidNotReceive().Send(Arg.Any<DurableEnvelope>());
-        context.DidNotReceive().Complete();
+        Assert.Equal(7, attempt.Count.Value);
+        Assert.Empty(attempt.Ledger);
+        Assert.Empty(attempt.Output);
+        Assert.Empty(attempt.Events);
     }
 
     [Fact]
     public async Task NotificationHandling_CancellationDuringLocalPreparationPreservesBusinessState()
     {
-        var sessions = _services.GetRequiredService<SerializerSessionPool>();
-        var sender = GrainId.Create("sender", "canceled-snippet");
-        var receiver = GrainId.Create("notification", "canceled-snippet");
-        var request = new DurableEnvelopeBuilder(sessions, sender)
-            .To(receiver, "notifications")
-            .WithReplyTo(sender)
-            .WithBody("prepared message")
-            .Build();
-        var inbox = Substitute.For<IDurableInbox>();
-        var count = Substitute.For<IDurableValue<int>>();
-        count.Value.Returns(7);
-        var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(request);
+        var attempt = Create(new Notify("prepared message", ResponseDestination: Sender));
         using var cancellation = new CancellationTokenSource();
-        context.CreateEnvelope().Returns(_ =>
-        {
-            cancellation.Cancel();
-            return new DurableEnvelopeBuilder(sessions, receiver);
-        });
-        var grain = new NotificationGrain(inbox, count);
+        // Reading the prior business value is still local preparation. Cancellation
+        // at that boundary must be observed after the reply has been encoded.
+        attempt.Count.OnRead = cancellation.Cancel;
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await grain.HandleAsync(context, cancellation.Token));
+            await attempt.Grain.HandleAsync(attempt.Context, cancellation.Token));
 
-        context.Received(1).CreateEnvelope();
-        count.DidNotReceive().Value = Arg.Any<int>();
-        context.DidNotReceive().Send(Arg.Any<DurableEnvelope>());
-        context.DidNotReceive().Complete();
+        attempt.Count.OnRead = null;
+        Assert.Equal(7, attempt.Count.Value);
+        Assert.Empty(attempt.Output);
+        Assert.Empty(attempt.Ledger);
+        Assert.Empty(attempt.Events);
     }
 
     [Theory]
@@ -131,72 +86,38 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     [InlineData(true)]
     public async Task NotificationHandling_CancellationAfterFirstMutationCompletesBeforeMethodReturns(bool replyRequested)
     {
-        var sessions = _services.GetRequiredService<SerializerSessionPool>();
-        var sender = GrainId.Create("sender", "late-cancellation-snippet");
-        var receiver = GrainId.Create("notification", "late-cancellation-snippet");
-        var builder = new DurableEnvelopeBuilder(sessions, sender)
-            .To(receiver, "notifications")
-            .WithBody("prepared message");
-        if (replyRequested)
-        {
-            builder.WithReplyTo(sender);
-        }
-        var request = builder.Build();
-        var inbox = Substitute.For<IDurableInbox>();
-        var count = Substitute.For<IDurableValue<int>>();
-        count.Value.Returns(7);
-        var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(request);
-        context.CreateEnvelope().Returns(_ => new DurableEnvelopeBuilder(sessions, receiver));
+        var key = HierarchicalKey.Create("notifications/late-cancellation");
+        var attempt = Create(new Notify("prepared message", key, replyRequested ? Sender : null));
         using var cancellation = new CancellationTokenSource();
-        var events = new List<string>();
-        count.When(value => value.Value = 8).Do(_ =>
+        attempt.Count.OnWrite = () =>
         {
             Assert.False(cancellation.IsCancellationRequested);
-            events.Add("count");
             cancellation.Cancel();
-        });
-        context.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(_ => events.Add("send"));
-        context.When(value => value.Complete()).Do(_ => events.Add("complete"));
-        var grain = new NotificationGrain(inbox, count);
+        };
 
-        var handling = grain.HandleAsync(context, cancellation.Token);
+        var handling = attempt.Grain.HandleAsync(attempt.Context, cancellation.Token);
 
         Assert.True(handling.IsCompletedSuccessfully);
         Assert.True(cancellation.IsCancellationRequested);
-        Assert.Equal(replyRequested ? new[] { "count", "send", "complete" } : new[] { "count", "complete" }, events);
+        Assert.Equal(replyRequested ? new[] { "count", "send", "complete" } : new[] { "count", "complete" }, attempt.Events);
+        Assert.Equal("prepared message", Assert.Single(attempt.Ledger).Value);
         await handling;
-        count.Received(1).Value = 8;
-        context.Received(1).Complete();
+        Assert.Equal(8, attempt.Count.Value);
+        attempt.Context.Received(1).Complete();
     }
 
     [Fact]
     public async Task NotificationWithoutReply_StagesCountAndCompletes()
     {
-        var sessions = _services.GetRequiredService<SerializerSessionPool>();
-        var request = new DurableEnvelopeBuilder(sessions, GrainId.Create("sender", "snippet"))
-            .To(GrainId.Create("notification", "snippet"), "notifications")
-            .WithBody("received message")
-            .Build();
-        var inbox = Substitute.For<IDurableInbox>();
-        var count = Substitute.For<IDurableValue<int>>();
-        count.Value.Returns(7);
-        var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(request);
-        var events = new List<string>();
-        count.When(value => value.Value = Arg.Any<int>()).Do(_ => events.Add("count"));
-        context.When(value => value.Complete()).Do(_ => events.Add("complete"));
-        var grain = new NotificationGrain(inbox, count);
+        var attempt = Create(new Notify("received message"));
+        var handling = attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
-        var handling = grain.HandleAsync(context, TestContext.Current.CancellationToken);
         Assert.True(handling.IsCompletedSuccessfully);
-        Assert.Equal(new[] { "count", "complete" }, events);
+        Assert.Equal(new[] { "count", "complete" }, attempt.Events);
         await handling;
-
-        count.Received(1).Value = 8;
-        context.DidNotReceive().CreateEnvelope();
-        context.DidNotReceive().Send(Arg.Any<DurableEnvelope>());
-        context.Received(1).Complete();
+        Assert.Equal(8, attempt.Count.Value);
+        Assert.Empty(attempt.Output);
+        attempt.Context.Received(1).Complete();
     }
 
     [Theory]
@@ -205,26 +126,133 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     [InlineData(" ")]
     public async Task NotificationHandling_InvalidBodyLeavesBusinessAndCompletionUnchanged(string? body)
     {
-        var sessions = _services.GetRequiredService<SerializerSessionPool>();
-        var request = new DurableEnvelopeBuilder(sessions, GrainId.Create("sender", "invalid-snippet"))
-            .To(GrainId.Create("notification", "invalid-snippet"), "notifications")
-            .WithBody(body)
-            .Build();
-        var inbox = Substitute.For<IDurableInbox>();
-        var count = Substitute.For<IDurableValue<int>>();
-        var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(request);
-        var grain = new NotificationGrain(inbox, count);
-
+        var attempt = Create(new Notify(body));
         var exception = await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await grain.HandleAsync(context, TestContext.Current.CancellationToken));
+            await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
         Assert.Contains("nonempty string", exception.Message, StringComparison.Ordinal);
-        count.DidNotReceive().Value = Arg.Any<int>();
-        context.DidNotReceive().CreateEnvelope();
-        context.DidNotReceive().Send(Arg.Any<DurableEnvelope>());
-        context.DidNotReceive().Complete();
+        Assert.Equal(7, attempt.Count.Value);
+        Assert.Empty(attempt.Ledger);
+        Assert.Empty(attempt.Output);
+        Assert.Empty(attempt.Events);
+    }
+
+    [Fact]
+    public async Task NotificationHandling_FreshTransportIdentityReusesBusinessOperation()
+    {
+        var key = HierarchicalKey.Create("campaigns/42/recipients/alice");
+        var attempt = Create(new Notify("campaign text", key, Sender));
+        await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+        var duplicate = new ApplicationPayload(Serializer).Envelope(Sender, Receiver, new Notify("campaign text", key, Sender));
+        Assert.NotEqual(attempt.Context.Envelope.MessageId, duplicate.MessageId);
+        attempt.Context.Envelope.Returns(duplicate);
+        await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+
+        Assert.Equal(8, attempt.Count.Value);
+        Assert.Single(attempt.Ledger);
+        Assert.Equal(new[] { "count", "send", "complete", "send", "complete" }, attempt.Events);
+        Assert.Equal(2, attempt.Output.Count);
+        var codec = new ApplicationPayload(Serializer);
+        Assert.Equal(codec.Decode<NotificationReceived>(attempt.Output[0].Payload),
+            codec.Decode<NotificationReceived>(attempt.Output[1].Payload));
+    }
+
+    [Fact]
+    public async Task NotificationHandling_ConflictingOperationKeyPreservesOriginalText()
+    {
+        var key = HierarchicalKey.Create("campaigns/42/recipients/alice");
+        var attempt = Create(new Notify("original", key));
+        await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+        attempt.Context.Envelope.Returns(new ApplicationPayload(Serializer).Envelope(Sender, Receiver, new Notify("conflict", key)));
+        attempt.Events.Clear();
+
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+
+        Assert.Equal(8, attempt.Count.Value);
+        Assert.Equal("original", Assert.Single(attempt.Ledger).Value);
+        Assert.Empty(attempt.Output);
+        Assert.Empty(attempt.Events);
+    }
+
+    [Fact]
+    public async Task NotificationHandling_UnexpectedApplicationKindPreservesBusinessState()
+    {
+        var attempt = Create(new NotificationReceived("receipt", null));
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+
+        Assert.Equal(7, attempt.Count.Value);
+        Assert.Empty(attempt.Events);
+        Assert.Empty(attempt.Output);
+    }
+
+    [Fact]
+    public void ShipmentPackage_EntriesRemainIndependentlyDecodableAfterSourceMutation()
+    {
+        var request = new ReserveStock(HierarchicalKey.Create("orders/42/inventory/reserve"), 3, Sender);
+        byte[] manifest = [1, 2, 3];
+        var encoded = ShipmentPackage.Encode(Serializer, request, manifest);
+        manifest[0] = 99;
+        var decoded = ShipmentPackage.Decode(Serializer, encoded);
+
+        Assert.Equal(request, decoded.Request);
+        Assert.Equal(new byte[] { 1, 2, 3 }, decoded.Manifest.ToArray());
+        var package = Assert.IsType<Orleans.Serialization.Buffers.BufferPackage>(
+            Serializer.Deserialize<Orleans.Serialization.Buffers.BufferPackage>(encoded.Memory));
+        Assert.Equal(new[] { "manifest", "reservation" }, package.Keys.Order().ToArray());
+        Assert.False(package.TryGetBytes("missing", out _));
+    }
+
+    [Fact]
+    public void ImmutablePayload_ArcOwnersReleasedBeforeApplicationDecode()
+    {
+        var serializer = _services.GetRequiredService<Serializer<Notify>>();
+        var message = new Notify("frozen", HierarchicalKey.Create("campaigns/42/alice"), Sender);
+        var payload = ArcPayloadSnapshot.Encode(serializer, message);
+        // Exercise fresh Arc writer reuse after the helper released its owners.
+        var other = ArcPayloadSnapshot.Encode(serializer, message with { Text = "different bytes" });
+
+        Assert.Equal(message, serializer.Deserialize(payload.Memory));
+        Assert.Equal("different bytes", serializer.Deserialize(other.Memory)!.Text);
+        Assert.Equal(payload.Length, payload.Memory.Length);
+    }
+
+    private Attempt Create(object message)
+    {
+        var inbox = Substitute.For<IDurableInbox>();
+        var outbox = Substitute.For<IDurableOutbox>();
+        var context = Substitute.For<IInboxHandlerContext>();
+        context.Envelope.Returns(new ApplicationPayload(Serializer).Envelope(Sender, Receiver, message));
+        var events = new List<string>();
+        var output = new List<DurableEnvelope>();
+        var count = new TestCount(events);
+        var ledger = new TestLedger();
+        outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
+        {
+            output.Add(call.Arg<DurableEnvelope>());
+            events.Add("send");
+        });
+        context.When(value => value.Complete()).Do(_ => events.Add("complete"));
+        return new(new NotificationGrain(inbox, outbox, Serializer, count, ledger), inbox, outbox, context, count, ledger, output, events);
     }
 
     public void Dispose() => _services.Dispose();
+
+    private sealed record Attempt(NotificationGrain Grain, IDurableInbox Inbox, IDurableOutbox Outbox,
+        IInboxHandlerContext Context, TestCount Count, TestLedger Ledger, List<DurableEnvelope> Output, List<string> Events);
+
+    private sealed class TestLedger : Dictionary<HierarchicalKey, string>, IDurableDictionary<HierarchicalKey, string>;
+
+    private sealed class TestCount(List<string> events) : IDurableValue<int>
+    {
+        private int _value = 7;
+        public Action? OnRead { get; set; }
+        public Action? OnWrite { get; set; }
+        public int Value
+        {
+            get { OnRead?.Invoke(); return _value; }
+            set { _value = value; events.Add("count"); OnWrite?.Invoke(); }
+        }
+    }
 }

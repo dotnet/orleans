@@ -8,13 +8,12 @@ namespace Orleans.DurableMessaging;
 
 /// <summary>
 /// Provides access to journaled pending messages and their capacity limit.
-/// Registers and selects handlers using exact routes or envelope metadata.
+/// Registers the single handler for this inbox.
 /// </summary>
 internal sealed class DurableInbox : IDurableInbox
 {
     private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inbox;
-    private readonly List<IInboxHandler> _handlers;
-    private readonly Dictionary<string, IInboxHandler> _exactRouteHandlers;
+    private IInboxHandler? _handler;
     private readonly int _capacity;
 
     /// <summary>
@@ -30,8 +29,6 @@ internal sealed class DurableInbox : IDurableInbox
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capacity);
 
         _inbox = inbox;
-        _handlers = new List<IInboxHandler>();
-        _exactRouteHandlers = new Dictionary<string, IInboxHandler>(StringComparer.Ordinal);
         _capacity = capacity;
     }
 
@@ -76,93 +73,22 @@ internal sealed class DurableInbox : IDurableInbox
     }
 
     /// <summary>
-    /// Registers a handler that will be evaluated using its CanHandle method.
-    /// When no exact route is registered, handlers are evaluated in registration order (first-match-wins).
+    /// Registers the single handler for this inbox.
     /// </summary>
-    /// <param name="handler">The handler implementation.</param>
     public void RegisterHandler(IInboxHandler handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
-
-        _handlers.Add(handler);
-
-    }
-
-    /// <summary>
-    /// Tries to find a handler for the given context.
-    /// Exact route registrations take precedence; otherwise, returns the first generic handler
-    /// that returns true from CanHandle.
-    /// </summary>
-    /// <param name="context">The inbox handler context containing envelope metadata.</param>
-    /// <param name="handler">The handler if found; otherwise, null.</param>
-    /// <returns>True if a handler was found; otherwise, false.</returns>
-    internal bool TryFindHandler(IInboxHandlerContext context, [MaybeNullWhen(false)] out IInboxHandler handler)
-    {
-        ArgumentNullException.ThrowIfNull(context);
-
-        var routeKey = context.Envelope.RouteKey;
-        if (string.IsNullOrWhiteSpace(routeKey))
+        if (_handler is not null)
         {
-            handler = null;
-            return false;
+            throw new InvalidOperationException("A handler is already registered for this durable inbox.");
         }
 
-        if (_exactRouteHandlers.TryGetValue(routeKey, out handler))
-        {
-            return true;
-        }
-
-        foreach (var candidate in _handlers)
-        {
-            if (candidate.CanHandle(context))
-            {
-                handler = candidate;
-                return true;
-            }
-        }
-
-        handler = null;
-        return false;
+        _handler = handler;
     }
 
-    /// <summary>
-    /// Registers a handler for a specific route.
-    /// </summary>
-    /// <param name="routeKey">The route key to handle.</param>
-    /// <param name="handler">The handler implementation.</param>
-    public void RegisterHandler(string routeKey, IInboxHandler handler)
+    internal bool TryGetHandler([MaybeNullWhen(false)] out IInboxHandler handler)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
-        ArgumentNullException.ThrowIfNull(handler);
-
-        if (!_exactRouteHandlers.TryAdd(routeKey, handler))
-        {
-            throw new InvalidOperationException($"A handler is already registered for exact route '{routeKey}'.");
-        }
-    }
-
-    /// <summary>
-    /// Checks if a route has a registered handler.
-    /// </summary>
-    /// <param name="routeKey">The route key to check.</param>
-    /// <returns>True if a handler is registered for this route; otherwise, false.</returns>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="routeKey"/> is null, empty, or whitespace.</exception>
-    public bool HasHandler(string routeKey)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
-        return _exactRouteHandlers.ContainsKey(routeKey);
-    }
-
-    /// <summary>
-    /// Tries to get a handler for a specific route.
-    /// </summary>
-    /// <param name="routeKey">The route key to get the handler for.</param>
-    /// <param name="handler">The registered handler instance if found.</param>
-    /// <returns>True if a handler is registered for this route; otherwise, false.</returns>
-    /// <exception cref="ArgumentException">Thrown if <paramref name="routeKey"/> is null, empty, or whitespace.</exception>
-    public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(routeKey);
-        return _exactRouteHandlers.TryGetValue(routeKey, out handler);
+        handler = _handler;
+        return handler is not null;
     }
 }

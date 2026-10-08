@@ -19,7 +19,7 @@ using Orleans.Timers;
 namespace Orleans.DurableMessaging;
 
 /// <summary>
-/// Prepares and stages outbound messages using owner-bound durable collections.
+/// Stages outbound messages using owner-bound durable collections.
 /// The sequence state associates message cohorts with journal acknowledgement.
 /// </summary>
 internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeatureHandler, ILifecycleObserver, IJournaledStateCaptureHook
@@ -65,9 +65,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private OwnershipProposal? _preparedOwnership;
     private string? _preparingOwnershipId;
     private Task? _ownershipPreparation;
-    private int _activePreparations;
-    private int _liveBatches;
-    private TaskCompletionSource? _preparationsDrained;
+    private int _activeOwnershipPreparations;
+    private TaskCompletionSource? _ownershipPreparationsDrained;
     private int _activeWrites;
     private TaskCompletionSource? _writesDrained;
     private string? _committingOwnershipId;
@@ -178,131 +177,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
         _messages.TryGetValue(messageId, out envelope);
 
-    public ValueTask<IPreparedOutboxBatch> PrepareSendAsync(
-        IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(messages);
-        cancellationToken.ThrowIfCancellationRequested();
-        ValidateReady();
-        var unique = new Dictionary<Guid, DurableEnvelope>(messages.Count);
-        foreach (var envelope in messages)
-        {
-            ValidateEnvelope(envelope, nameof(messages));
-            if (unique.TryGetValue(envelope.MessageId, out var existing))
-            {
-                ValidateEquivalent(existing, envelope);
-            }
-            else
-            {
-                unique.Add(envelope.MessageId, envelope);
-            }
-        }
-        return PrepareBatchAsync(unique.Values.ToArray(), cancellationToken);
-    }
-
-    private async ValueTask<IPreparedOutboxBatch> PrepareBatchAsync(DurableEnvelope[] messages, CancellationToken cancellationToken)
-    {
-        await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
-        StartPreparation();
-        var operation = PrepareUnderGateAsync(messages);
-        try
-        {
-            var batch = await operation.WaitAsync(cancellationToken).ConfigureAwait(true);
-            CompletePreparation();
-            return batch;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            ReleaseUnclaimedAsync(operation).Ignore();
-            throw;
-        }
-        catch
-        {
-            CompletePreparation();
-            throw;
-        }
-    }
-
-    private async Task ReleaseUnclaimedAsync(Task<IPreparedOutboxBatch> operation)
-    {
-        try
-        {
-            (await operation.ConfigureAwait(true)).Dispose();
-        }
-        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
-        {
-        }
-        catch (Exception exception)
-        {
-            LogPreparationFailed(_logger, exception);
-        }
-        finally
-        {
-            CompletePreparation();
-        }
-    }
-
-    private async Task<IPreparedOutboxBatch> PrepareUnderGateAsync(DurableEnvelope[] messages)
-    {
-        PendingMessage[]? entries = null;
-        var reserved = false;
-        try
-        {
-            ValidateReady();
-            if (messages.Length > 0) RestorePendingRetirement();
-            entries = new PendingMessage[messages.Length];
-            for (var i = 0; i < messages.Length; i++)
-            {
-                var envelope = messages[i];
-                if (_pendingMessages.TryGetValue(envelope.MessageId, out var pending))
-                {
-                    ValidateEquivalent(pending.Envelope, envelope);
-                }
-                else
-                {
-                    var existing = _messages.TryGetValue(envelope.MessageId, out var current);
-                    if (existing)
-                    {
-                        ValidateEquivalent(current, envelope);
-                    }
-                    pending = new(envelope) { Staged = existing, Captured = existing, Acknowledged = existing };
-                }
-                entries[i] = pending;
-            }
-            foreach (var pending in entries)
-            {
-                _pendingMessages[pending.Envelope.MessageId] = pending;
-                pending.References++;
-            }
-            reserved = true;
-            if (messages.Length > 0)
-            {
-                _idleRetirementAt = null;
-                await PrepareOwnershipAsync(replaceExisting: false).ConfigureAwait(true);
-            }
-            ValidateReady();
-            _liveBatches++;
-            reserved = false;
-            return new PreparedBatch(this, _stateGeneration, entries);
-        }
-        finally
-        {
-            if (reserved)
-            {
-                foreach (var entry in entries!)
-                {
-                    entry.References--;
-                    ReleaseEntry(entry);
-                }
-            }
-            _gate.Release();
-            ReleaseUnusedOwnership();
-        }
-    }
-
     private async ValueTask PrepareOwnershipAsync(bool replaceExisting, CancellationToken cancellationToken = default)
     {
-        if (HasPreparedOwnership() || HasCommittedOwnership() && (!replaceExisting || _liveBatches > 0))
+        if (HasPreparedOwnership() || HasCommittedOwnership() && !replaceExisting)
         {
             return;
         }
@@ -358,8 +235,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
 
         ValidateReady();
-        // Owned writes can retain _gate through ACK. Share scheduling, not that gate, with preparation.
-        StartPreparation();
+        // Owned writes can retain _gate through ACK. Share scheduling, not that gate, with the capture hook.
+        StartOwnershipPreparation();
         try
         {
             await PrepareOwnershipAsync(replaceExisting: false, cancellationToken).ConfigureAwait(true);
@@ -368,7 +245,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
         finally
         {
-            CompletePreparation();
+            CompleteOwnershipPreparation();
         }
     }
 
@@ -379,6 +256,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         if (_pendingMessages.TryGetValue(envelope.MessageId, out var pending))
         {
             ValidateEquivalent(pending.Envelope, envelope);
+            return;
         }
         else if (_messages.TryGetValue(envelope.MessageId, out var existing))
         {
@@ -417,56 +295,15 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     private void StageMessage(PendingMessage pending)
     {
-        if (pending.Staged)
-        {
-            return;
-        }
         RestorePendingRetirement();
         var state = new OutboxMessageState { EnqueuedAt = _jobTimeProvider.GetUtcNow() };
         _idleRetirementAt = null;
         _messages.Add(pending.Envelope.MessageId, pending.Envelope);
         _messageStates.Add(pending.Envelope.MessageId, state);
-        pending.Staged = true;
         _unacknowledgedMessageCount++;
         EnsureMetricsActive();
         ReconcileOutboxDepth();
         _instruments.OnOutboxMessageSent(_grainType);
-    }
-
-    public void Send(IPreparedOutboxBatch batch)
-    {
-        ArgumentNullException.ThrowIfNull(batch);
-        ValidateReady();
-        if (batch is not PreparedBatch prepared || !ReferenceEquals(prepared.Owner, this))
-        {
-            throw new InvalidOperationException("The prepared batch belongs to another outbox.");
-        }
-        ObjectDisposedException.ThrowIf(prepared.Disposed, batch);
-        ValidateGeneration(prepared.Generation);
-        if (prepared.Entries.Length > 0 && !HasCommittedOwnership() && !HasPreparedOwnership())
-        {
-            throw new InvalidOperationException("The prepared batch lost its acknowledged durable job ownership.");
-        }
-        if (prepared.Staged)
-        {
-            return;
-        }
-        try
-        {
-            if (prepared.Entries.Any(static entry => !entry.Staged) && !HasCommittedOwnership())
-            {
-                ApplyPreparedOwnership();
-            }
-            foreach (var pending in prepared.Entries)
-            {
-                StageMessage(pending);
-            }
-            prepared.Staged = true;
-        }
-        catch (Exception exception)
-        {
-            FailStaging(exception);
-        }
     }
 
     private static void ValidateEquivalent(DurableEnvelope existing, DurableEnvelope envelope)
@@ -478,40 +315,17 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
-    private void ReleaseBatch(PreparedBatch batch)
+    private void StartOwnershipPreparation()
     {
-        if (batch.Generation != _stateGeneration)
-        {
-            return;
-        }
-        foreach (var pending in batch.Entries)
-        {
-            pending.References--;
-            ReleaseEntry(pending);
-        }
-        _liveBatches--;
-        ReleaseUnusedOwnership();
+        _activeOwnershipPreparations++;
     }
 
-    private void ReleaseEntry(PendingMessage pending)
+    private void CompleteOwnershipPreparation()
     {
-        if (pending.References == 0 && (!pending.Staged || pending.Acknowledged))
+        if (--_activeOwnershipPreparations == 0)
         {
-            _pendingMessages.Remove(pending.Envelope.MessageId);
-        }
-    }
-
-    private void StartPreparation()
-    {
-        _activePreparations++;
-    }
-
-    private void CompletePreparation()
-    {
-        if (--_activePreparations == 0)
-        {
-            var waiter = _preparationsDrained;
-            _preparationsDrained = null;
+            var waiter = _ownershipPreparationsDrained;
+            _ownershipPreparationsDrained = null;
             waiter?.TrySetResult();
         }
         ReleaseUnusedOwnership();
@@ -519,7 +333,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     private void ReleaseUnusedOwnership()
     {
-        if (_liveBatches == 0 && _activePreparations == 0 && _unacknowledgedMessageCount == 0 && !_captureStarted && _gate.CurrentCount != 0)
+        if (_activeOwnershipPreparations == 0 && _unacknowledgedMessageCount == 0 && !_captureStarted && _gate.CurrentCount != 0)
         {
             _preparedOwnership = null;
         }
@@ -644,7 +458,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private DateTimeOffset GetIdleRetirementAt() => _idleRetirementAt ??=
         DurableMessagingTime.AddClamped(_jobTimeProvider.GetUtcNow(), _idleRetirementGracePeriod);
 
-    private bool CanRetireOwner() => Count == 0 && _liveBatches == 0 && _activePreparations == 0
+    private bool CanRetireOwner() => Count == 0 && _activeOwnershipPreparations == 0
         && _unacknowledgedMessageCount == 0 && !_captureStarted && _activeWrites == 0;
 
     private void ClearOwner(PumpOwner owner)
@@ -688,7 +502,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             return;
         }
         var messages = _unacknowledgedMessageCount == 0 ? []
-            : _pendingMessages.Values.Where(static entry => entry.Staged && !entry.Captured).ToArray();
+            : _pendingMessages.Values.Where(static entry => !entry.Captured).ToArray();
         var ownerChanged = !string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
             || !(_durableJob is null && _job.Value is null || DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value))
             || !string.Equals(_durableCompletedJobId, _completedJobId.Value, StringComparison.Ordinal);
@@ -720,9 +534,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _durableCompletedJobId = _committingCompletedJobId;
         foreach (var message in _capturedMessages)
         {
-            message.Acknowledged = true;
             _unacknowledgedMessageCount--;
-            ReleaseEntry(message);
+            _pendingMessages.Remove(message.Envelope.MessageId);
         }
         _capturedMessages = [];
         _captureStarted = false;
@@ -783,7 +596,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         _previousCompletedOwner = null;
         _pendingMessages.Clear();
         _unacknowledgedMessageCount = 0;
-        _liveBatches = 0;
         _preparedOwnership = null;
         _capturedMessages = [];
         _captureStarted = false;
@@ -922,7 +734,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         || (_job.Value is not null && !DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value));
 
     private bool IsPendingAcknowledgement(Guid id) =>
-        _pendingMessages.TryGetValue(id, out var pending) && pending.Staged && !pending.Acknowledged;
+        _pendingMessages.ContainsKey(id);
 
     private Items<DeliveryCandidate> SelectMessages()
     {
@@ -1008,7 +820,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         catch (Exception exception)
         {
             LogDeliveryError(_logger, exception, candidate.Envelope.MessageId, candidate.Envelope.SenderId,
-                candidate.Envelope.ReceiverId, candidate.Envelope.RouteKey, candidate.Envelope.CorrelationKey?.ToString());
+                candidate.Envelope.ReceiverId);
             return new(candidate, null, exception.ToString(), Stopwatch.GetElapsedTime(start), Expired: false);
         }
     }
@@ -1172,7 +984,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         state.LastError = outcome.Error ?? status switch
         {
             DeliveryStatus.Backpressured => "The receiver is backpressured.",
-            DeliveryStatus.RouteNotFound => outcome.Result?.Message ?? "The receiver has no compatible route.",
+            DeliveryStatus.HandlerNotFound => outcome.Result?.Message ?? "The receiver has no registered inbox handler.",
             _ => $"Unexpected delivery status '{status}'."
         };
         if (outcome.Expired || state.AttemptCount >= _maxDeliveryAttempts
@@ -1208,7 +1020,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             DeliveryStatus.Duplicate => "duplicate",
             DeliveryStatus.DeadLettered => "deadlettered",
             DeliveryStatus.Backpressured => "backpressured",
-            DeliveryStatus.RouteNotFound => "route_not_found",
+            DeliveryStatus.HandlerNotFound => "handler_not_found",
             null => "error",
             _ => status.Value.ToString().ToLowerInvariant()
         };
@@ -1219,18 +1031,16 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             case DeliveryStatus.Accepted:
             case DeliveryStatus.Duplicate:
             case DeliveryStatus.DeadLettered:
-                LogMessageDelivered(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, envelope.RouteKey,
-                    status.Value, envelope.CorrelationKey?.ToString());
+                LogMessageDelivered(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, status.Value);
                 break;
             case DeliveryStatus.Backpressured:
-                LogDeliveryBackpressured(_logger, envelope.MessageId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+                LogDeliveryBackpressured(_logger, envelope.MessageId, envelope.ReceiverId);
                 break;
-            case DeliveryStatus.RouteNotFound:
-                LogDeliveryRouteNotFound(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId,
-                    envelope.RouteKey, envelope.CorrelationKey?.ToString(), outcome.Result?.Message);
+            case DeliveryStatus.HandlerNotFound:
+                LogDeliveryHandlerNotFound(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, outcome.Result?.Message);
                 break;
             case { } unexpected:
-                LogUnexpectedDeliveryStatus(_logger, unexpected, envelope.MessageId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+                LogUnexpectedDeliveryStatus(_logger, unexpected, envelope.MessageId, envelope.SenderId, envelope.ReceiverId);
                 break;
         }
     }
@@ -1314,9 +1124,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
             {
                 try
                 {
-                    if (_activePreparations != 0)
+                    if (_activeOwnershipPreparations != 0)
                     {
-                        await (_preparationsDrained ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task.ConfigureAwait(true);
+                        await (_ownershipPreparationsDrained ??= new(TaskCreationOptions.RunContinuationsAsynchronously)).Task.ConfigureAwait(true);
                     }
                 }
                 finally
@@ -1333,12 +1143,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private void Stop()
     {
         _stateGeneration++;
-        _liveBatches = 0;
         _preparedOwnership = null;
-        foreach (var entry in _pendingMessages.Values.Where(static entry => !entry.Staged).ToArray())
-        {
-            _pendingMessages.Remove(entry.Envelope.MessageId);
-        }
         _pumpCoordinator.Reset();
         _pumpResults.Clear(JobName);
         try
@@ -1441,11 +1246,11 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     internal async Task EnsureJobScheduledAsync(bool replaceExisting, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(true);
-        StartPreparation();
+        StartOwnershipPreparation();
         try
         {
             ValidateReady();
-            if (_messages.Count > 0 && ((replaceExisting && _liveBatches == 0) || !HasCommittedOwnership()))
+            if (_messages.Count > 0 && (replaceExisting || !HasCommittedOwnership()))
             {
                 await PrepareOwnershipAsync(replaceExisting, CancellationToken.None).ConfigureAwait(true);
                 await SubmitAsync(new OwnershipWrite(_stateGeneration)).ConfigureAwait(true);
@@ -1454,7 +1259,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         finally
         {
             _gate.Release();
-            CompletePreparation();
+            CompleteOwnershipPreparation();
         }
     }
 
@@ -1634,7 +1439,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                 return DurableMessagingJobOwnership.IsCompleted(_durableCompletedJobId, jobId)
                     ? DurableJobRunResult.Completed : DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
-            if (Count == 0 && _liveBatches == 0 && _activePreparations == 0)
+            if (Count == 0 && _activeOwnershipPreparations == 0)
             {
                 if (!clearOwnershipWhenEmpty)
                 {
@@ -1655,7 +1460,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
                     return DurableJobRunResult.Completed;
                 }
             }
-            if (_unacknowledgedMessageCount > 0 || (Count == 0 && _liveBatches > 0))
+            if (_unacknowledgedMessageCount > 0)
             {
                 return DurableJobRunResult.InProgress(TimeSpan.FromMilliseconds(10));
             }
@@ -1690,9 +1495,6 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     [LoggerMessage(Level = LogLevel.Error, Message = "Requesting deactivation after an outbox staging failure failed.")]
     private static partial void LogDeactivationFailed(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "An unclaimed outbox preparation failed.")]
-    private static partial void LogPreparationFailed(ILogger logger, Exception exception);
-
     [LoggerMessage(Level = LogLevel.Error, Message = "An outbox cancellation callback failed during cleanup.")]
     private static partial void LogCancellationFailed(ILogger logger, Exception exception);
 
@@ -1708,28 +1510,28 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Delivered message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (Status: {Status}, CorrelationKey: {CorrelationKey})")]
-    private static partial void LogMessageDelivered(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, DeliveryStatus status, string? correlationKey);
+        Message = "Delivered message {MessageId} from {SenderId} to {ReceiverId} (Status: {Status})")]
+    private static partial void LogMessageDelivered(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, DeliveryStatus status);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Route not found for message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey}): {Message}")]
-    private static partial void LogDeliveryRouteNotFound(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey, string? message);
+        Message = "No inbox handler for message {MessageId} from {SenderId} to {ReceiverId}: {Message}")]
+    private static partial void LogDeliveryHandlerNotFound(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string? message);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Backpressured delivering message {MessageId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey}), will retry later")]
-    private static partial void LogDeliveryBackpressured(ILogger logger, Guid messageId, GrainId receiverId, string routeKey, string? correlationKey);
+        Message = "Backpressured delivering message {MessageId} to {ReceiverId}, will retry later")]
+    private static partial void LogDeliveryBackpressured(ILogger logger, Guid messageId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Unexpected delivery status {Status} for message {MessageId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogUnexpectedDeliveryStatus(ILogger logger, DeliveryStatus status, Guid messageId, string routeKey, string? correlationKey);
+        Message = "Unexpected delivery status {Status} for message {MessageId} from {SenderId} to {ReceiverId}")]
+    private static partial void LogUnexpectedDeliveryStatus(ILogger logger, DeliveryStatus status, Guid messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Error,
-        Message = "Error delivering message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogDeliveryError(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey);
+        Message = "Error delivering message {MessageId} from {SenderId} to {ReceiverId}")]
+    private static partial void LogDeliveryError(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Information,
@@ -1823,28 +1625,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private sealed class PendingMessage(DurableEnvelope envelope)
     {
         public DurableEnvelope Envelope { get; } = envelope;
-        public int References { get; set; }
-        public bool Staged { get; set; }
         public bool Captured { get; set; }
-        public bool Acknowledged { get; set; }
     }
 
-    private sealed class PreparedBatch(DurableOutbox owner, long generation, PendingMessage[] entries) : IPreparedOutboxBatch
-    {
-        public DurableOutbox Owner { get; } = owner;
-        public long Generation { get; } = generation;
-        public PendingMessage[] Entries { get; } = entries;
-        public bool Staged { get; set; }
-        public bool Disposed { get; private set; }
-        public void Dispose()
-        {
-            if (!Disposed)
-            {
-                Disposed = true;
-                Owner.ReleaseBatch(this);
-            }
-        }
-    }
     private sealed record OwnershipProposal(string Id, long Sequence, DurableJob Job, PumpOwner PreviousOwner);
     private readonly record struct DeliveryCandidate(DurableEnvelope Envelope, OutboxMessageState? State);
     private readonly record struct DeliveryOutcome(DeliveryCandidate Candidate, DeliveryResult? Result, string? Error, TimeSpan Duration, bool Expired);

@@ -1,8 +1,10 @@
+using System.Buffers;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Serialization.Session;
+using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Contracts;
@@ -10,333 +12,232 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableMessaging")]
-public sealed class DurableEnvelopeContractTests : IDisposable
+public sealed class DurableEnvelopeContractTests
 {
-    private readonly ServiceProvider _services;
-    private readonly SerializerSessionPool _sessions;
-
-    public DurableEnvelopeContractTests()
-    {
-        var services = new ServiceCollection();
-        services.AddSerializer();
-        _services = services.BuildServiceProvider();
-        _sessions = _services.GetRequiredService<SerializerSessionPool>();
-    }
-
-    [Fact]
-    public void EnvelopeBuilder_Constructor_DefaultSender_ThrowsArgumentException()
-    {
-        var exception = Assert.Throws<ArgumentException>(() => new DurableEnvelopeBuilder(_sessions, default));
-
-        Assert.Equal("senderId", exception.ParamName);
-    }
-
-    [Fact]
-    public void EnvelopeBuilder_Constructor_NullSessionPool_ThrowsArgumentNullException()
-    {
-        var sender = GrainId.Create("sender", "constructor");
-
-        var exception = Assert.Throws<ArgumentNullException>(() => new DurableEnvelopeBuilder(null!, sender));
-
-        Assert.Equal("sessionPool", exception.ParamName);
-    }
-
-    [Fact]
-    public void EnvelopeBuilder_Constructor_ValidSender_PreservesIdentity()
-    {
-        var sender = GrainId.Create("sender", "constructor");
-        var envelope = new DurableEnvelopeBuilder(_sessions, sender)
-            .To(GrainId.Create("receiver", "constructor"), "route")
-            .WithBody("payload")
-            .Build();
-
-        Assert.Equal(sender, envelope.SenderId);
-        Assert.True(envelope.Data.TryGetBody<string>(out var body));
-        Assert.Equal("payload", body);
-    }
-
-    [Fact]
-    public void EnvelopeBuilder_Complete_RoundTripsAllEnvelopeFieldsIncludingGeneralReplyTo()
-    {
-        var sender = GrainId.Create("sender", "17");
-        var receiver = GrainId.Create("receiver", "23");
-        var replyTo = GrainId.Create("audit", "general-reply");
-        var correlation = HierarchicalKey.Create("orders/2026/42");
-        var before = DateTimeOffset.UtcNow;
-
-        var envelope = new DurableEnvelopeBuilder(_sessions, sender)
-            .WithContextValue("tenant", "northwind")
-            .To(receiver, "orders/submit")
-            .WithReplyTo(replyTo)
-            .WithCorrelationKey(correlation)
-            .WithBody(new TestMessage(42, "ship"))
-            .WithContextValue("attempt", 3)
-            .Build();
-
-        Assert.NotEqual(Guid.Empty, envelope.MessageId);
-        Assert.Equal(sender, envelope.SenderId);
-        Assert.Equal(receiver, envelope.ReceiverId);
-        Assert.Equal("orders/submit", envelope.RouteKey);
-        Assert.Equal(correlation, envelope.CorrelationKey);
-        Assert.Equal(replyTo, envelope.ReplyTo);
-        Assert.InRange(envelope.CreatedAt, before, DateTimeOffset.UtcNow);
-        Assert.True(envelope.Data.TryGetBody<TestMessage>(out var body));
-        Assert.Equal(new TestMessage(42, "ship"), body);
-        Assert.True(envelope.Data.TryGetContextValue<string>("tenant", out var tenant));
-        Assert.Equal("northwind", tenant);
-        Assert.True(envelope.Data.TryGetContextValue<int>("attempt", out var attempt));
-        Assert.Equal(3, attempt);
-        Assert.Equal(["attempt", "tenant"], envelope.Data.ContextKeys.Order());
-
-    }
-
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void EnvelopeBuilder_NullTypedCorrelationKey_RejectsWithoutChangingMetadata(bool hasCorrelationKey)
+    [InlineData("empty")]
+    [InlineData("span")]
+    [InlineData("sequence")]
+    [InlineData("arc")]
+    public void EnvelopeSerializer_RoundTripsOpaquePayloadAcrossIndependentProviders(string payloadKind)
     {
-        var sender = GrainId.Create("sender", "correlation-validation");
-        var receiver = GrainId.Create("receiver", "correlation-validation");
-        var builder = new DurableEnvelopeBuilder(_sessions, sender)
-            .To(receiver, "correlation/validate")
-            .WithBody("payload");
-        var correlationKey = hasCorrelationKey ? HierarchicalKey.Create("orders/2026/42") : null;
-        if (correlationKey is not null)
+        byte[] expected = payloadKind == "empty" ? [] : [0x00, 0xff, 0x80, 0x13, 0xea, 0x7f, 0x00];
+        var source = expected.ToArray();
+        ImmutableBuffer payload;
+        switch (payloadKind)
         {
-            builder.WithCorrelationKey(correlationKey);
+            case "empty":
+                payload = ImmutableBuffer.Empty;
+                break;
+            case "span":
+                payload = new ImmutableBuffer(source.AsSpan());
+                break;
+            case "sequence":
+                var first = new Segment(source.AsMemory(0, 2));
+                var last = first.Append(source.AsMemory(2, 3)).Append(source.AsMemory(5));
+                payload = new ImmutableBuffer(new ReadOnlySequence<byte>(first, 0, last, last.Memory.Length));
+                break;
+            case "arc":
+                using (var writer = new ArcBufferWriter())
+                {
+                    writer.Write(source);
+                    using var arc = writer.PeekSlice(writer.Length);
+                    payload = new ImmutableBuffer(arc);
+                }
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(payloadKind));
         }
 
-        var exception = Assert.Throws<ArgumentNullException>(() => builder.WithCorrelationKey((HierarchicalKey)null!));
+        var envelope = Envelope(payload);
+        Array.Fill(source, (byte)0x41);
+        using var sendingServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var receivingServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var wire = sendingServices.GetRequiredService<Serializer<DurableEnvelope>>().SerializeToArray(envelope);
+        var decoded = receivingServices.GetRequiredService<Serializer<DurableEnvelope>>().Deserialize(wire);
+        GC.Collect();
 
-        Assert.Equal("correlationKey", exception.ParamName);
-        var envelope = builder.Build();
-        Assert.Equal(correlationKey, envelope.CorrelationKey);
-        Assert.Equal(sender, envelope.SenderId);
-        Assert.Equal(receiver, envelope.ReceiverId);
-        Assert.Equal("correlation/validate", envelope.RouteKey);
-        Assert.True(envelope.Data.TryGetBody<string>(out var body));
-        Assert.Equal("payload", body);
+        AssertEnvelope(decoded, expected);
+        AssertEnvelope(envelope, expected);
+        Assert.NotSame(payload, decoded.Payload);
     }
 
     [Fact]
-    public void EnvelopeBuilder_MissingRequiredField_ThrowsWithoutProducingEnvelope()
+    public void EnvelopeDeepCopy_SharesImmutablePayloadAndPreservesEnvelopeValues()
     {
-        var sender = GrainId.Create("sender", "missing");
-        var receiver = GrainId.Create("receiver", "missing");
+        byte[] source = [0x00, 0xff, 0x80, 0xea];
+        var envelope = Envelope(new ImmutableBuffer(source.AsSpan()));
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
 
-        var missingBody = new DurableEnvelopeBuilder(_sessions, sender).To(receiver, "route");
-        var missingTarget = new DurableEnvelopeBuilder(_sessions, sender).WithBody("payload");
+        var copied = services.GetRequiredService<DeepCopier>().Copy(envelope);
+        Array.Fill(source, (byte)0x42);
+        GC.Collect();
 
-        var bodyError = Assert.Throws<InvalidOperationException>(() => missingBody.Build());
-        var targetError = Assert.Throws<InvalidOperationException>(() => missingTarget.Build());
-        Assert.Contains("body", bodyError.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("route", targetError.Message, StringComparison.OrdinalIgnoreCase);
+        AssertEnvelope(copied, [0x00, 0xff, 0x80, 0xea]);
+        Assert.Same(envelope.Payload, copied.Payload);
+        AssertEnvelope(envelope, [0x00, 0xff, 0x80, 0xea]);
     }
 
     [Fact]
-    public void EnvelopeBuilder_DuplicateBodyAndContextKey_RejectsAmbiguousMetadata()
+    public void EnvelopeSerializer_RepeatedPayloadReferences_PreserveGraphSharing()
     {
-        var builder = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "duplicate"))
-            .To(GrainId.Create("receiver", "duplicate"), "route")
-            .WithBody("first")
-            .WithContextValue("trace", "one");
-
-        var bodyError = Assert.Throws<InvalidOperationException>(() => builder.WithBody("second"));
-        var contextError = Assert.Throws<InvalidOperationException>(() => builder.WithContextValue("trace", "two"));
-        Assert.Contains("already", bodyError.Message, StringComparison.Ordinal);
-        Assert.Contains("trace", contextError.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void EnvelopeBuilder_AfterBuild_RejectsEveryMutation()
-    {
-        var builder = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "built"))
-            .To(GrainId.Create("receiver", "built"), "route")
-            .WithBody("payload");
-        _ = builder.Build();
-
-        Assert.Throws<InvalidOperationException>(() => builder.To(GrainId.Create("receiver", "other"), "other"));
-        Assert.Throws<InvalidOperationException>(() => builder.WithBody("other"));
-        Assert.Throws<InvalidOperationException>(() => builder.WithContextValue("key", "value"));
-        Assert.Throws<InvalidOperationException>(() => builder.WithCorrelationKey("correlation"));
-        Assert.Throws<InvalidOperationException>(() => builder.WithReplyTo(GrainId.Create("reply", "other")));
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void EnvelopeBuilder_InvalidRoute_Throws(string? route)
-    {
-        var builder = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "route"));
-        Assert.ThrowsAny<ArgumentException>(() => builder.To(GrainId.Create("receiver", "route"), route!));
-    }
-
-    [Fact]
-    public void EnvelopeBuilder_DefaultDestination_ThrowsAtConfiguration()
-    {
-        var targetBuilder = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "target"));
-        var replyBuilder = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "reply"));
-
-        var targetException = Assert.Throws<ArgumentException>(() => targetBuilder.To(default, "route"));
-        var replyException = Assert.Throws<ArgumentException>(() => replyBuilder.WithReplyTo(default));
-
-        Assert.Equal("target", targetException.ParamName);
-        Assert.Equal("replyTo", replyException.ParamName);
-    }
-
-    [Fact]
-    public void EnvelopeData_WrongBodyOrContextType_FailsWithoutCorruptingOtherValues()
-    {
-        var envelope = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "types"))
-            .To(GrainId.Create("receiver", "types"), "types")
-            .WithContextValue("count", 7)
-            .WithContextValue("label", "valid")
-            .WithBody(new TestMessage(9, "body"))
-            .Build();
-
-        Assert.False(envelope.Data.TryGetBody<string>(out var wrongBody));
-        Assert.Null(wrongBody);
-        Assert.False(envelope.Data.TryGetContextValue<Guid>("count", out var wrongContext));
-        Assert.Equal(Guid.Empty, wrongContext);
-        Assert.True(envelope.Data.TryGetBody<TestMessage>(out var body));
-        Assert.NotNull(body);
-        Assert.Equal(9, body.Id);
-        Assert.True(envelope.Data.TryGetContextValue<string>("label", out var label));
-        Assert.Equal("valid", label);
-        Assert.True(envelope.Data.GetBodyBytes().Length > 0);
-        Assert.True(envelope.Data.TryGetContextBytes("count", out var rawCount));
-        Assert.True(rawCount.Length > 0);
-        Assert.False(envelope.Data.TryGetContextBytes("absent", out var absent));
-        Assert.True(absent.IsEmpty);
-
-    }
-
-    [Fact]
-    public void EnvelopeData_DeepCopyOwnsContextIndexMap()
-    {
-        var envelope = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "copy"))
-            .To(GrainId.Create("receiver", "copy"), "copy")
-            .WithContextValue("tenant", "northwind")
-            .WithBody(new TestMessage(42, "copy"))
-            .Build();
-        var copy = _services.GetRequiredService<DeepCopier>().Copy(envelope);
-        var field = typeof(DurableEnvelopeData).GetField(
-            "_contextIndices",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var originalIndices = Assert.IsType<Dictionary<string, (int Offset, int Length)>>(
-            field.GetValue(envelope.Data));
-        var copiedIndices = Assert.IsType<Dictionary<string, (int Offset, int Length)>>(
-            field.GetValue(copy.Data));
-
-        Assert.NotSame(originalIndices, copiedIndices);
-        originalIndices.Add("mutated-after-copy", default);
-        Assert.False(copy.Data.HasContextKey("mutated-after-copy"));
-    }
-
-    [Fact]
-    public void EnvelopeSerializer_RoundTripsCorrelationReplyBodyAndContext()
-    {
-        var serializer = _services.GetRequiredService<Serializer<DurableEnvelope>>();
-        var correlation = HierarchicalKey.Create("orders/42/dispatch");
-        var replyTo = GrainId.Create("audit", "42");
-        var envelope = new DurableEnvelopeBuilder(_sessions, GrainId.Create("sender", "42"))
-            .To(GrainId.Create("receiver", "42"), "orders/dispatch")
-            .WithCorrelationKey(correlation)
-            .WithReplyTo(replyTo)
-            .WithContextValue("tenant", "northwind")
-            .WithBody(new TestMessage(42, "dispatch"))
-            .Build();
-
-        var copy = serializer.Deserialize(serializer.SerializeToArray(envelope));
-
-        Assert.Equal(envelope.MessageId, copy.MessageId);
-        Assert.Equal(correlation, copy.CorrelationKey);
-        Assert.Equal(replyTo, copy.ReplyTo);
-        Assert.True(copy.Data.TryGetBody<TestMessage>(out var body));
-        Assert.Equal(new TestMessage(42, "dispatch"), body);
-        Assert.True(copy.Data.TryGetContextValue<string>("tenant", out var tenant));
-        Assert.Equal("northwind", tenant);
-    }
-
-    [Fact]
-    public void TypedReadsRejectWireCompatibleDeclaredTypeMismatches()
-    {
-        var envelope = new DurableEnvelopeBuilder(
-                _sessions,
-                GrainId.Create("sender", "typed-mismatch"))
-            .To(GrainId.Create("receiver", "typed-mismatch"), "typed/mismatch")
-            .WithBody(42)
-            .WithContextValue("attempt", 7)
-            .Build();
-
-        Assert.True(envelope.Data.TryGetBody<int>(out var body));
-        Assert.Equal(42, body);
-        Assert.False(envelope.Data.TryGetBody<uint>(out _));
-        Assert.True(envelope.Data.TryGetContextValue<int>("attempt", out var attempt));
-        Assert.Equal(7, attempt);
-        Assert.False(envelope.Data.TryGetContextValue<uint>("attempt", out _));
-    }
-
-    [Fact]
-    public void DeclaredTypeMetadataRoundTripsWithEnvelope()
-    {
-        var envelope = new DurableEnvelopeBuilder(
-                _sessions,
-                GrainId.Create("sender", "typed-roundtrip"))
-            .To(GrainId.Create("receiver", "typed-roundtrip"), "typed/roundtrip")
-            .WithBody(42)
-            .WithContextValue("attempt", 7)
-            .Build();
-        var serializer = _services.GetRequiredService<Serializer<DurableEnvelope>>();
-
-        var copy = serializer.Deserialize(serializer.SerializeToArray(envelope));
-
-        Assert.True(copy.Data.TryGetBody<int>(out var body));
-        Assert.Equal(42, body);
-        Assert.False(copy.Data.TryGetBody<uint>(out _));
-        Assert.True(copy.Data.TryGetContextValue<int>("attempt", out var attempt));
-        Assert.Equal(7, attempt);
-        Assert.False(copy.Data.TryGetContextValue<uint>("attempt", out _));
-    }
-
-    [Fact]
-    public void OutboxEquivalenceIncludesDeclaredTypeMetadata()
-    {
-        var sender = GrainId.Create("sender", "typed-equivalence");
-        var receiver = GrainId.Create("receiver", "typed-equivalence");
-        var first = new DurableEnvelopeBuilder(_sessions, sender)
-            .To(receiver, "typed/equivalence")
-            .WithBody(0)
-            .Build();
-        var secondTemplate = new DurableEnvelopeBuilder(_sessions, sender)
-            .To(receiver, "typed/equivalence")
-            .WithBody(0U)
-            .Build();
-        var second = new DurableEnvelope
+        byte[] source = [0xff, 0x00, 0x81];
+        var first = Envelope(new ImmutableBuffer(source.AsSpan()));
+        var second = first with
         {
-            MessageId = first.MessageId,
-            SenderId = secondTemplate.SenderId,
-            ReceiverId = secondTemplate.ReceiverId,
-            RouteKey = secondTemplate.RouteKey,
-            CorrelationKey = secondTemplate.CorrelationKey,
-            ReplyTo = secondTemplate.ReplyTo,
-            Data = secondTemplate.Data,
-            CreatedAt = first.CreatedAt,
+            MessageId = Guid.Parse("32222222-2222-2222-2222-222222222222"),
+            ReceiverId = GrainId.Create("receiver", "other")
         };
+        using var sendingServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var receivingServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
 
-        var equivalenceType = typeof(IDurableOutbox).Assembly.GetType(
-            "Orleans.DurableMessaging.DurableEnvelopeEquivalence",
-            throwOnError: true)!;
-        var areEquivalent = equivalenceType.GetMethod(
-            "AreEquivalent",
-            BindingFlags.Static | BindingFlags.Public)!;
+        var wire = sendingServices.GetRequiredService<Serializer<DurableEnvelope[]>>().SerializeToArray([first, second]);
+        Array.Fill(source, (byte)0x43);
+        var decoded = receivingServices.GetRequiredService<Serializer<DurableEnvelope[]>>().Deserialize(wire)!;
 
-        Assert.False((bool)areEquivalent.Invoke(null, [first, second])!);
+        Assert.Equal(2, decoded.Length);
+        AssertEnvelope(decoded[0], [0xff, 0x00, 0x81]);
+        Assert.Equal(second.MessageId, decoded[1].MessageId);
+        Assert.Equal(first.SenderId, decoded[1].SenderId);
+        Assert.Equal(second.ReceiverId, decoded[1].ReceiverId);
+        Assert.Equal(new byte[] { 0xff, 0x00, 0x81 }, decoded[1].Payload.Memory.ToArray());
+        Assert.Same(decoded[0].Payload, decoded[1].Payload);
+        Assert.NotSame(first.Payload, decoded[0].Payload);
     }
 
-    public void Dispose() => _services.Dispose();
+    [Fact]
+    public void OpaqueContracts_ExposeExactPublicSurfaceAndReservedIds()
+    {
+        Assert.True(typeof(DurableEnvelope).IsPublic);
+        Assert.True(typeof(DurableEnvelope).IsValueType);
+        Assert.Single(typeof(DurableEnvelope).GetCustomAttributes<IsReadOnlyAttribute>());
+        Assert.Single(typeof(DurableEnvelope).GetCustomAttributes<GenerateSerializerAttribute>());
+        Assert.Equal("Orleans.DurableMessaging.DurableEnvelope", Assert.Single(
+            typeof(DurableEnvelope).GetCustomAttributes<AliasAttribute>()).Alias);
+        AssertSurface(typeof(DurableEnvelope),
+            Property("MessageId", typeof(Guid), true),
+            Property("SenderId", typeof(GrainId), true),
+            Property("ReceiverId", typeof(GrainId), true),
+            Property("Payload", typeof(ImmutableBuffer), true));
+        AssertIds(typeof(DurableEnvelope), ("MessageId", 0u), ("SenderId", 1u), ("ReceiverId", 2u), ("Payload", 8u));
+        foreach (var property in typeof(DurableEnvelope).GetProperties())
+        {
+            Assert.Single(property.GetCustomAttributes<RequiredMemberAttribute>());
+            Assert.Contains(typeof(IsExternalInit), property.SetMethod!.ReturnParameter.GetRequiredCustomModifiers());
+        }
 
-    [GenerateSerializer, Immutable]
-    public sealed record TestMessage([property: Id(0)] int Id, [property: Id(1)] string Action);
+        Assert.False(typeof(IInboxHandler).IsGenericType);
+        AssertSurface(typeof(IInboxHandler),
+            Method("HandleAsync", typeof(ValueTask), typeof(IInboxHandlerContext), typeof(CancellationToken)));
+        AssertSurface(typeof(IInboxHandlerContext),
+            Property("Envelope", typeof(DurableEnvelope)), Method("Complete", typeof(void)));
+        AssertSurface(typeof(IDurableInbox),
+            Property("Count", typeof(int)), Property("Capacity", typeof(int)),
+            Property("Messages", typeof(IEnumerable<DurableEnvelope>)),
+            Method("RegisterHandler", typeof(void), typeof(IInboxHandler)),
+            Method("TryGetMessage", typeof(bool), typeof(GrainId), typeof(Guid), typeof(DurableEnvelope).MakeByRefType()));
+        AssertSurface(typeof(IDurableOutbox),
+            Property("Count", typeof(int)), Property("Messages", typeof(IEnumerable<DurableEnvelope>)),
+            Method("Send", typeof(void), typeof(DurableEnvelope)),
+            Method("TryGetMessage", typeof(bool), typeof(Guid), typeof(DurableEnvelope).MakeByRefType()));
+        Assert.True(Assert.Single(typeof(IDurableInbox).GetMethod("TryGetMessage")!.GetParameters(), p => p.ParameterType.IsByRef).IsOut);
+        Assert.True(Assert.Single(typeof(IDurableOutbox).GetMethod("TryGetMessage")!.GetParameters(), p => p.ParameterType.IsByRef).IsOut);
+
+        Assert.Equal(new[] { "Accepted:0", "Backpressured:2", "DeadLettered:6", "Duplicate:1", "HandlerNotFound:3" },
+            Enum.GetNames<DeliveryStatus>().Select(name => $"{name}:{(int)Enum.Parse<DeliveryStatus>(name)}").Order(StringComparer.Ordinal));
+        AssertIds(typeof(DeliveryResult), ("Status", 0u), ("Message", 2u));
+        AssertSurface(typeof(DeliveryResult), Property("Status", typeof(DeliveryStatus), true), Property("Message", typeof(string), true),
+            StaticMethod("Accepted", typeof(DeliveryResult)), StaticMethod("Duplicate", typeof(DeliveryResult)),
+            StaticMethod("Backpressured", typeof(DeliveryResult)), StaticMethod("HandlerNotFound", typeof(DeliveryResult)),
+            StaticMethod("DeadLettered", typeof(DeliveryResult), typeof(string)));
+
+        Assert.True(typeof(ImmutableBuffer).IsPublic);
+        Assert.True(typeof(ImmutableBuffer).IsSealed);
+        Assert.Single(typeof(ImmutableBuffer).GetCustomAttributes<ImmutableAttribute>());
+        Assert.Single(typeof(ImmutableBuffer).GetCustomAttributes<GenerateSerializerAttribute>());
+        Assert.Empty(typeof(ImmutableBuffer).GetInterfaces());
+        Assert.Equal(new[] { typeof(ArcBuffer), typeof(ReadOnlySequence<byte>), typeof(ReadOnlySpan<byte>) }.Select(TypeName).Order(StringComparer.Ordinal),
+            typeof(ImmutableBuffer).GetConstructors().Select(c => TypeName(Assert.Single(c.GetParameters()).ParameterType)).Order(StringComparer.Ordinal));
+        AssertSurface(typeof(ImmutableBuffer), Property("Memory", typeof(ReadOnlyMemory<byte>)),
+            Property("Length", typeof(int)), "static " + Property("Empty", typeof(ImmutableBuffer)),
+            Method("AsReadOnlySequence", typeof(ReadOnlySequence<byte>)),
+            StaticMethod("Create", typeof(ImmutableBuffer), typeof(Action<IBufferWriter<byte>>)));
+
+        string[] removed =
+        [
+            "DurableEnvelopeBuilder", "DurableEnvelopeData", "IInboxHandler`1",
+            "RouteKeyHandler", "RoutePrefixHandler", "CorrelationHandler", "IPreparedOutboxBatch"
+        ];
+        var exported = typeof(DurableEnvelope).Assembly.GetExportedTypes();
+        foreach (var name in removed)
+        {
+            Assert.DoesNotContain(exported, type => type.FullName == $"Orleans.DurableMessaging.{name}"
+                || (type.Namespace == "Orleans.DurableMessaging" && type.Name.StartsWith(name + "`", StringComparison.Ordinal)));
+        }
+    }
+
+    private static void AssertIds(Type type, params (string Name, uint Id)[] expected)
+    {
+        var actual = type.GetMembers(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .SelectMany(member => member.GetCustomAttributes<IdAttribute>().Select(id => (member.Name, id.Id)))
+            .OrderBy(pair => pair.Name, StringComparer.Ordinal).ToArray();
+        Assert.Equal(expected.OrderBy(pair => pair.Name, StringComparer.Ordinal), actual);
+        Assert.Equal(expected.Length, actual.Select(pair => pair.Id).Distinct().Count());
+    }
+
+    private static void AssertSurface(Type type, params string[] expected)
+    {
+        var types = new[] { type }.Concat(type.GetInterfaces());
+        var actual = types.SelectMany(t => t.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static))
+            .Where(member => member.DeclaringType != typeof(object) && member.DeclaringType != typeof(ValueType))
+            .Select(member => member switch
+            {
+                PropertyInfo property => (property.GetMethod!.IsStatic ? "static " : "") +
+                    Property(property.Name, property.PropertyType, property.SetMethod is not null),
+                MethodInfo method when !method.IsSpecialName => (method.IsStatic ? "static " : "") +
+                    Method(method.Name, method.ReturnType, method.GetParameters().Select(p => p.ParameterType).ToArray()) +
+                    (method.IsGenericMethod ? $" generic:{method.GetGenericArguments().Length}" : ""),
+                MethodInfo => null,
+                ConstructorInfo => null,
+                _ => $"unexpected:{member.MemberType}:{member.Name}"
+            }).Where(signature => signature is not null).Distinct().Order(StringComparer.Ordinal);
+        Assert.Equal(expected.Order(StringComparer.Ordinal), actual);
+    }
+
+    private static string Property(string name, Type type, bool set = false) =>
+        $"property {TypeName(type)} {name} get{(set ? "/set" : "")}";
+    private static string Method(string name, Type result, params Type[] parameters) =>
+        $"method {TypeName(result)} {name}({string.Join(",", parameters.Select(TypeName))})";
+    private static string StaticMethod(string name, Type result, params Type[] parameters) => "static " + Method(name, result, parameters);
+    private static string TypeName(Type type) => type.FullName!;
+
+    private static DurableEnvelope Envelope(ImmutableBuffer payload) => new()
+    {
+        MessageId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+        SenderId = GrainId.Create("sender", "contract"),
+        ReceiverId = GrainId.Create("receiver", "contract"),
+        Payload = payload
+    };
+
+    private static void AssertEnvelope(DurableEnvelope envelope, byte[] expected)
+    {
+        Assert.Equal(Guid.Parse("11111111-1111-1111-1111-111111111111"), envelope.MessageId);
+        Assert.Equal(GrainId.Create("sender", "contract"), envelope.SenderId);
+        Assert.Equal(GrainId.Create("receiver", "contract"), envelope.ReceiverId);
+        Assert.Equal(expected.Length, envelope.Payload.Length);
+        Assert.Equal(expected, envelope.Payload.Memory.ToArray());
+        Assert.Equal(expected, envelope.Payload.AsReadOnlySequence().ToArray());
+    }
+
+    private sealed class Segment : ReadOnlySequenceSegment<byte>
+    {
+        public Segment(ReadOnlyMemory<byte> memory) => Memory = memory;
+
+        public Segment Append(ReadOnlyMemory<byte> memory)
+        {
+            var next = new Segment(memory) { RunningIndex = RunningIndex + Memory.Length };
+            Next = next;
+            return next;
+        }
+    }
 }

@@ -11,7 +11,7 @@ The `Microsoft.Orleans.DurableMessaging` package provides a grain-scoped inbox a
 outbox built on Orleans Journaling and Durable Jobs. It preserves application
 message effects and outgoing messages across activation loss.
 
-Use this page for the routing, commit, execution, and recovery model. Continue with:
+Use this page for the payload, commit, execution, and recovery model. Continue with:
 
 - [Idempotency and hierarchical operation keys](durable-messaging-idempotency.md)
   for transport identities, durable business-outcome ledgers, and external effects.
@@ -22,17 +22,79 @@ Use this page for the routing, commit, execution, and recovery model. Continue w
 
 ## Message and routing model
 
-Each <xref:Orleans.DurableMessaging.DurableEnvelope> identifies its sender, target,
-route, message ID, optional <xref:Orleans.DurableMessaging.HierarchicalKey> correlation, optional
-`ReplyTo` grain ID, and an opaque serialized body. Exact route registrations take
-precedence. When no exact route is registered, a receiver evaluates generic handlers in
-registration order. Handlers can select envelopes by route prefix, correlation hierarchy,
-or arbitrary metadata, and typed handlers deserialize the body only when selected. The
-receiving grain verifies that the envelope target matches its own identity before
-deduplication or persistence.
+Each <xref:Orleans.DurableMessaging.DurableEnvelope> has exactly four transport
+members: `MessageId` (<xref:System.Guid>), `SenderId` and `ReceiverId`
+(<xref:Orleans.Runtime.GrainId>), and required `Payload`
+(<xref:Orleans.Serialization.Buffers.ImmutableBuffer>). The receiving grain verifies
+that the receiver matches its own identity before deduplication or persistence.
 
-`ReplyTo` is general message metadata. Applications decide which route and body to use
-for a follow-up message.
+Register one <xref:Orleans.DurableMessaging.IInboxHandler> with
+<xref:Orleans.DurableMessaging.IDurableInbox.RegisterHandler*>. That handler decodes
+and dispatches the application's message kinds. Requests and responses carry their
+business-operation keys, response destinations, and versioning inside ordinary
+application records. The transport only sees opaque bytes and the three identities.
+A receiver without a registered handler returns
+<xref:Orleans.DurableMessaging.DeliveryStatus.HandlerNotFound>; the result factory
+<xref:Orleans.DurableMessaging.DeliveryResult.HandlerNotFound*> reports
+`No inbox handler is registered.`. An unknown application kind instead fails during
+application decoding/dispatch and follows handler retry/dead-letter policy.
+
+> [!WARNING]
+> This prerelease introduces an envelope format with opaque `Payload` at `Id(8)`;
+> retired legacy field IDs 3 through 7 remain reserved. Migrate persisted legacy
+> envelopes and journal replay history before switching. A drain-based migration
+> also requires an acknowledged compatible snapshot to replace earlier append
+> records. Include retained dead letters needed for replay. See
+> [Prerelease envelope migration](durable-messaging-operations.md#migrate-legacy-prerelease-envelopes).
+
+### Encode ordinary application values
+
+Use <xref:Orleans.Serialization.Serializer> or
+<xref:Orleans.Serialization.Serializer`1> in an application-local codec. This helper
+encodes concrete record types as the application's message discriminator, with
+operation identity and optional response destination in the request:
+
+:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_payload" language="csharp":::
+
+`ImmutableBuffer` freezes raw managed bytes. Its
+<xref:Orleans.Serialization.Buffers.ImmutableBuffer.Memory> is read-only;
+<xref:Orleans.Serialization.Buffers.ImmutableBuffer.Length> is the raw byte count and
+<xref:Orleans.Serialization.Buffers.ImmutableBuffer.Empty> represents zero bytes.
+Copying constructors snapshot a borrowed
+`ReadOnlySpan<byte>`, `ReadOnlySequence<byte>`, or
+<xref:Orleans.Serialization.Buffers.ArcBuffer>. After copying an Arc input, immediately
+dispose its owner. <xref:Orleans.Serialization.Buffers.ImmutableBuffer.Create*>
+accepts an `Action<IBufferWriter<byte>>` and snapshots the callback's
+written bytes once. Retaining the callback writer or mutating the source cannot
+change the result. Consumers treat exposed read-only memory as immutable, including
+when using memory interop APIs.
+
+Managed immutable backing avoids retaining a minimum 16 KiB Arc page for every tiny
+message. Outbox staging, RPC serialization/copying, and journal values can share
+immutable references safely; persistence and networking still perform their own
+encoding and I/O. Application record decoding remains explicit at the receiver.
+
+When an existing encoder writes to an Arc writer, snapshot its raw bytes into the
+immutable payload and release both writer and slice owners immediately:
+
+:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_arc_snapshot" language="csharp":::
+
+### Carry independently encoded items
+
+<xref:Orleans.Serialization.Buffers.BufferPackage> is a reusable application value
+for keyed raw entries. <xref:Orleans.Serialization.Buffers.BufferPackageBuilder>
+accepts a raw span or a synchronous writer callback with
+<xref:Orleans.Serialization.Buffers.BufferPackageBuilder.Add*>, then
+<xref:Orleans.Serialization.Buffers.BufferPackageBuilder.Build*> freezes the package
+and builder. <xref:Orleans.Serialization.Buffers.BufferPackage.Keys> inspects the
+index; <xref:Orleans.Serialization.Buffers.BufferPackage.TryGetBytes*> returns an
+entry's read-only bytes without decoding other entries.
+<xref:Orleans.Serialization.Buffers.BufferPackage.Count> gives the entry count and
+<xref:Orleans.Serialization.Buffers.BufferPackage.Buffer> exposes the frozen raw backing. Each key has an application-defined
+encoding. Encode the package itself with an ordinary serializer when using it as an
+envelope payload:
+
+:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_buffer_package" language="csharp":::
 
 ## Commit and delivery guarantees
 
@@ -43,22 +105,13 @@ Durable Messaging has the following boundaries:
   changes. Before the next journal capture, an outbox persistence hook confirms a
   durable self-wakeup and stages its ownership handle. Ordinary persistence captures
   the messages and ownership with the business effects.
-- Optionally awaiting <xref:Orleans.DurableMessaging.IDurableOutbox.PrepareSendAsync*> copies and
-  validates the envelopes, reserves their identities, and confirms a durable self-wakeup
-  before application state changes. The returned
-  <xref:Orleans.DurableMessaging.IPreparedOutboxBatch> retains those prerequisites.
-  Preparation keeps message depth and journaled state unchanged.
-- Calling <xref:Orleans.DurableMessaging.IDurableOutbox.Send*> with that batch
-  synchronously stages its intents alongside business changes. Outbox inspection includes
-  staged intents and journaled messages once per ID. An ordinary journal write captures
-  the envelopes, ownership generation, and exact returned job handle with those effects.
-  Acknowledgement releases exactly the captured messages for dispatch; intents staged
+- Outbox inspection includes staged and journaled messages once per ID. An ordinary
+  journal write captures envelopes and wakeup ownership with business effects.
+  Acknowledgement releases exactly that captured cohort for dispatch; intents staged
   during storage I/O await another write.
-- Repeatedly sending the same live batch within its valid scope is idempotent. Equivalent
-  envelopes sharing a `MessageId` coalesce while their original intent is prepared,
-  staged, or durable. Every call validates activation, scope, and lifetime first.
-  Reusing an ID with different routing, correlation, body, or request-context content
-  throws before intent admission.
+- Equivalent envelopes sharing a live `MessageId` coalesce while the original intent
+  is staged or durable. Reusing that ID with a different sender, receiver, or payload
+  throws before intent admission. Preserve the original envelope when retransmitting.
 - Handlers use <xref:Orleans.DurableMessaging.IInboxHandler.HandleAsync*> for
   asynchronous local preparation followed by complete shared updates and
   <xref:Orleans.DurableMessaging.IInboxHandlerContext.Complete*>. From the first
@@ -128,17 +181,18 @@ for scheduling and recovery-budget guidance.
 
 ## Handler preparation and terminal recovery
 
-<xref:Orleans.DurableMessaging.IInboxHandler.CanHandle*> is a pure metadata predicate.
-Exact registration preserves handler identity; generic predicates run in registration
-order. Selection keeps shared application state unchanged. Its context exposes envelope
-metadata and grain identity, and validates access to outgoing-message operations.
+The single registered handler receives the envelope through
+<xref:Orleans.DurableMessaging.IInboxHandlerContext.Envelope>. Its context exposes
+only that envelope and `Complete()`. Inject
+<xref:Orleans.DurableMessaging.IDurableOutbox> directly for outgoing messages.
+Application dispatch, validation, authorization, and decoding run inside the handler.
 
 <xref:Orleans.DurableMessaging.IInboxHandler.HandleAsync*> returns a
 <xref:System.Threading.Tasks.ValueTask>. Perform fallible computation, asynchronous
 I/O, validation and envelope serialization using operation-local values. Recheck
 relevant preconditions and observe cancellation before the first shared mutation.
 Then apply the complete business update, stage outgoing messages using
-`context.Send(envelope)`, and call <xref:Orleans.DurableMessaging.IInboxHandlerContext.Complete*>.
+`outbox.Send(envelope)`, and call <xref:Orleans.DurableMessaging.IInboxHandlerContext.Complete*>.
 From the first shared-state mutation until the handler method completes, perform
 these operations without an intervening await, including after `Complete()`.
 This is the handler's coding contract; ordinary journaled collections remain the
@@ -154,17 +208,16 @@ acknowledgement establishes durability and releases the captured outgoing cohort
 for dispatch.
 
 The journal owner's final capture hook establishes a durable wakeup for outgoing
-intents. A handler can optionally await `context.Outbox.PrepareSendAsync` before
-its first shared mutation when it needs the wakeup prerequisite established earlier,
-then stage its batch synchronously. Handle or propagate preparation errors before
-applying shared updates. Earlier journal writes can complete while preparation
-awaits because the proposed business effects are still local.
+intents before capture. Applications construct and encode outgoing envelopes locally
+before the first shared mutation, then call the directly injected outbox's synchronous
+`Send(envelope)` in the final block. Earlier journal writes can complete during
+asynchronous local preparation because proposed business effects are still local.
 
 Every successful handler calls `Complete()`, including handlers which produce no
-business or outgoing-message changes. A successful return which omits completion
-reports a handler contract error and retires the owner. Context operations retain
-their actual attempt, activation and resource lifetimes. Completion ends outgoing
-staging for that attempt; metadata remains available for inspection.
+business or outgoing-message changes. A successful return which omits completion reports
+a handler contract error and retires the owner. Context operations retain their actual
+attempt, activation and resource lifetimes. Completion ends that attempt; the received
+envelope remains available for inspection.
 
 An expected failure before completion follows preparation retry/dead-letter policy
 under the coding contract. A handler error after completion is reported after
@@ -173,20 +226,12 @@ preserved, so the runtime completes the logical operation rather than reapplying
 its business effects. Actual storage failures retain terminal handling and their
 original outcome.
 
-The handler facade retains started acquisition tasks and prepared batches through
-their actual outcome and the attempt's persistence lifetime, disposing unused or
-late results during retirement. Ordinary application methods await every
-preparation and dispose each successful batch after their synchronous mutation/staging
-and journal-write scope. Disposing an unstaged batch releases its reservation; disposing
-a staged batch preserves its cohort's ownership through acknowledgement. An empty batch
-is a valid no-op which requires no new job.
-
 Durable Messaging uses standard named journaled dictionaries and values. Journaling
 supplies their capture, acknowledgement, replay and reset protocol. The outbox's
 existing journaled sequence state associates captured message identities and wake-up
 ownership with the storage acknowledgement, releasing exactly that cohort for dispatch.
 The outbox's final <xref:Orleans.Journaling.IJournaledStateCaptureHook> establishes durable wake-up
-ownership before capture; explicit batch preparation can establish it before staging.
+ownership before capture.
 Application and messaging code
 complete their preconditions before applying synchronous changes, so the registered
 <xref:Orleans.Journaling.IStateMachine> instances are ready for capture when the journal
@@ -231,15 +276,14 @@ the owner. A fresh owner handles subsequent messages. Durable attempts and timer
 turns retain their own cancellation lifetimes: an outgoing remote batch keeps its
 durable attempt token across timer turns.
 
-Cancellation observed before the handler's first shared mutation leaves
-the committed inbox message and physical owner available for a replacement attempt
-on the same activation. Retirement drains started preparations and releases their
-batches before completing the canceled attempt. The handler observes cancellation
-before its final update. Once it begins that update, it completes the business changes,
-outgoing staging, completion and method return without awaiting. Attempt cancellation
-which arrives during this uninterrupted block leaves completion and the subsequent
-owned write intact. The write and its resources stay owned through the actual storage
-outcome.
+Cancellation observed before the handler's first shared mutation leaves the committed
+inbox message and physical owner available for a replacement attempt on the same
+activation. Retirement drains owned runtime operations before completing the canceled
+attempt. The handler observes cancellation before its final update. Once it begins that
+update, it completes the business changes, outgoing staging, completion and method
+return without awaiting. Attempt cancellation which arrives during this uninterrupted
+block leaves completion and the subsequent owned write intact. The write and its
+resources stay owned through the actual storage outcome.
 
 ## Backpressure, retries, and dead letters
 
@@ -257,10 +301,9 @@ so dead-letter storage remains bounded by the application's retention policy.
 Removal is staged in the grain's journaled state and becomes durable with its next
 journal write.
 
-Malformed typed bodies follow the same retry and dead-letter path during handler
-deserialization, while later envelopes remain available for recovery and processing.
-A successfully decoded null body is delivered as null. Typed handler parameters are
-explicitly null-capable and handlers which require a non-null body must validate it.
+Malformed application payloads follow the retry and dead-letter path when the handler's
+ordinary serializer or validation fails. Later envelopes remain available for recovery
+and processing. Applications validate null results and unknown message kinds explicitly.
 
 Processed-record maintenance begins at the earliest tracked expiry and amortizes
 subsequent maintenance cycles to at most once per quarter of the deduplication window.
@@ -326,7 +369,7 @@ lifetimes. An ordinary grain selecting messaging can use that owner by registeri
 its states and enrolling the owner in the grain lifecycle.
 
 Durable Messaging selects the built-in `orleans-binary`
-journal format so opaque envelope bodies and request-context slices recover exactly.
+journal format so opaque envelope payloads recover exactly.
 Durable Messaging grains use non-reentrant execution. Activation validates the grain's
 execution model and reports conflicting `Reentrant`, `MayInterleave`, `AlwaysInterleave`,
 or `StatelessWorker` declarations. Resolved grain properties govern the reentrancy checks,
@@ -346,8 +389,9 @@ Capacity and retention settings bound storage growth and define the effectively-
 window. Monitor inbox depth, outbox depth, retry failures, dead letters, and oldest
 pending-message age. Keep deduplication retention longer than the maximum expected
 outbox retry age. The `orleans-durable-messaging-orphaned-jobs-reclaimed` counter
-identifies terminal cleanup of schedule-before-commit crash remnants.
-Message outcome counters group by grain type and status; pending and processed
-duplicates each record one duplicate receipt. Sent-message counters and latency
-histograms group by grain type, orphan metrics retain job name, and depth gauges report
-aggregate pending work. Routing keys remain available in message diagnostics.
+identifies terminal cleanup of schedule-before-commit crash remnants. Message outcome
+counters group by grain type and status; pending and processed duplicates each record
+one duplicate receipt. Sent-message counters and latency histograms group by grain type,
+orphan metrics retain job name, and depth gauges report aggregate pending work. Envelope
+identities remain available in message diagnostics; decode application operation keys in
+authorized application diagnostics.

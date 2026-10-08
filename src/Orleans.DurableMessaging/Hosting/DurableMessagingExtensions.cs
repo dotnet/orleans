@@ -10,7 +10,6 @@ using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Runtime;
-using Orleans.Serialization.Session;
 using Orleans.Timers;
 
 namespace Orleans.Hosting;
@@ -98,7 +97,6 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredService<IGrainContext>(),
                 sp.GetRequiredService<ITimerRegistry>(),
                 stateManager,
-                sp.GetRequiredService<SerializerSessionPool>(),
                 sp.GetRequiredService<ILogger<DurableInboxExtension>>(),
                 sp.GetRequiredService<DurableMessagingInstruments>(),
                 sp.GetRequiredService<DurableInbox>(),
@@ -110,7 +108,6 @@ public static class DurableMessagingExtensions
                 sp.GetRequiredKeyedService<IDurableValue<DurableJob>>(DurableMessagingStateNames.InboxJobHandle),
                 sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxCompletedJobId),
                 sp.GetRequiredKeyedService<IDurableValue<long>>(DurableMessagingStateNames.InboxJobSequence),
-                sp.GetRequiredService<IDurableOutbox>(),
                 sp.GetRequiredService<ILocalDurableJobManager>(),
                 sp.GetRequiredService<IDurableJobHandlerRegistry>(),
                 sp.GetRequiredService<DurableMessagingPumpResults>(),
@@ -131,7 +128,6 @@ public static class DurableMessagingExtensions
             _ = sp.GetRequiredKeyedService<IDurableValue<DurableJob>>(DurableMessagingStateNames.InboxJobHandle);
             _ = sp.GetRequiredKeyedService<IDurableValue<string>>(DurableMessagingStateNames.InboxCompletedJobId);
             _ = sp.GetRequiredKeyedService<IDurableValue<long>>(DurableMessagingStateNames.InboxJobSequence);
-            _ = sp.GetRequiredService<IDurableOutbox>();
             return new DurableInbox(
                 sp.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(DurableMessagingStateNames.Inbox),
                 sp.GetServices<IInboxHandler>(),

@@ -11,8 +11,6 @@ using Orleans.DurableJobs;
 using Orleans.DurableMessaging.Configuration;
 using Orleans.Journaling;
 using Orleans.Runtime;
-using Orleans.Serialization;
-using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Timers;
 
@@ -39,7 +37,6 @@ internal sealed partial class DurableInboxExtension :
     private readonly string _grainType;
     private readonly ITimerRegistry _timerRegistry;
     private readonly IJournaledStateManager _stateManager;
-    private readonly SerializerSessionPool _sessionPool;
     private readonly ILogger<DurableInboxExtension> _logger;
     private readonly DurableMessagingInstruments _instruments;
     private readonly DurableInbox _durableInbox;
@@ -51,7 +48,6 @@ internal sealed partial class DurableInboxExtension :
     private readonly IDurableValue<DurableJob> _job;
     private readonly IDurableValue<string> _completedJobId;
     private readonly IDurableValue<long> _jobSequence;
-    private readonly IDurableOutbox _outbox;
     private readonly ILocalDurableJobManager _jobManager;
     private readonly TimeProvider _timeProvider;
     private readonly TimeProvider _jobTimeProvider;
@@ -95,19 +91,16 @@ internal sealed partial class DurableInboxExtension :
     /// </summary>
     /// <param name="grainContext">The grain context for this extension.</param>
     /// <param name="stateManager">State manager for atomic persistence.</param>
-    /// <param name="sessionPool">Serializer session pool for envelope creation.</param>
     /// <param name="logger">Logger for diagnostics.</param>
     /// <param name="instruments">Journaling metrics.</param>
     /// <param name="durableInbox">The grain's durable inbox (shared with grain DI).</param>
     /// <param name="inboxDict">Durable dictionary for inbox messages.</param>
     /// <param name="processed">Durable dictionary for processed message tracking.</param>
-    /// <param name="outbox">Durable outbox for sending response messages.</param>
     /// <param name="options">Durable messaging options.</param>
     public DurableInboxExtension(
         IGrainContext grainContext,
         ITimerRegistry timerRegistry,
         IJournaledStateManager stateManager,
-        SerializerSessionPool sessionPool,
         ILogger<DurableInboxExtension> logger,
         DurableMessagingInstruments instruments,
         DurableInbox durableInbox,
@@ -119,7 +112,6 @@ internal sealed partial class DurableInboxExtension :
         IDurableValue<DurableJob> job,
         IDurableValue<string> completedJobId,
         IDurableValue<long> jobSequence,
-        IDurableOutbox outbox,
         ILocalDurableJobManager jobManager,
         IDurableJobHandlerRegistry jobHandlers,
         DurableMessagingPumpResults pumpResults,
@@ -130,7 +122,6 @@ internal sealed partial class DurableInboxExtension :
         ArgumentNullException.ThrowIfNull(grainContext);
         ArgumentNullException.ThrowIfNull(timerRegistry);
         ArgumentNullException.ThrowIfNull(stateManager);
-        ArgumentNullException.ThrowIfNull(sessionPool);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(instruments);
         ArgumentNullException.ThrowIfNull(durableInbox);
@@ -142,7 +133,6 @@ internal sealed partial class DurableInboxExtension :
         ArgumentNullException.ThrowIfNull(job);
         ArgumentNullException.ThrowIfNull(completedJobId);
         ArgumentNullException.ThrowIfNull(jobSequence);
-        ArgumentNullException.ThrowIfNull(outbox);
         ArgumentNullException.ThrowIfNull(jobManager);
         ArgumentNullException.ThrowIfNull(jobHandlers);
         ArgumentNullException.ThrowIfNull(pumpResults);
@@ -154,7 +144,6 @@ internal sealed partial class DurableInboxExtension :
         _grainType = grainContext.GrainId.Type.ToString();
         _timerRegistry = timerRegistry;
         _stateManager = stateManager;
-        _sessionPool = sessionPool;
         _logger = logger;
         _instruments = instruments;
         _durableInbox = durableInbox;
@@ -166,7 +155,6 @@ internal sealed partial class DurableInboxExtension :
         _job = job;
         _completedJobId = completedJobId;
         _jobSequence = jobSequence;
-        _outbox = outbox;
         _jobManager = jobManager;
         _pumpResults = pumpResults;
         _timeProvider = timeProvider;
@@ -186,37 +174,10 @@ internal sealed partial class DurableInboxExtension :
             this);
     }
 
-    private bool TryFindHandlerWithinMutationBoundary(IInboxHandlerContext context, [MaybeNullWhen(false)] out IInboxHandler handler)
-    {
-        var previous = _handlerExecution.Value;
-        var execution = new HandlerExecution(this);
-        _handlerExecution.Value = execution;
-        try
-        {
-            var result = _durableInbox.TryFindHandler(context, out handler);
-            ThrowIfHandlerOperationRejected(execution);
-            return result;
-        }
-        finally
-        {
-            _handlerExecution.Value = previous;
-        }
-    }
-
-    private static void ThrowIfHandlerOperationRejected(HandlerExecution execution) => execution.SendFailure?.Throw();
+    private static void ThrowIfHandlerOperationRejected(HandlerExecution execution) => execution.RejectionFailure?.Throw();
 
     public int Count => _inboxDict.Count;
     public int Capacity => _maxCapacity;
-
-    public void RegisterHandler(string routeKey, IInboxHandler handler)
-    {
-        _durableInbox.RegisterHandler(routeKey, handler);
-        LogHandlerRegistered(_logger, routeKey, _grainContext.GrainId);
-    }
-
-    public bool HasHandler(string routeKey) => _durableInbox.HasHandler(routeKey);
-    public bool TryGetHandler(string routeKey, [MaybeNullWhen(false)] out IInboxHandler handler) =>
-        _durableInbox.TryGetHandler(routeKey, out handler);
 
     public async ValueTask<DeliveryResult> DeliverAsync(DurableEnvelope envelope, CancellationToken cancellationToken = default)
     {
@@ -264,10 +225,11 @@ internal sealed partial class DurableInboxExtension :
                 return DeliveryResult.Backpressured();
             }
 
-            if (!TryFindHandlerWithinMutationBoundary(new InboxHandlerSelectionContext(envelope, _grainContext.GrainId), out _))
+            if (!_durableInbox.TryGetHandler(out _))
             {
-                _instruments.OnInboxMessageReceived(_grainType, "route_not_found");
-                return DeliveryResult.RouteNotFound(envelope.RouteKey);
+                _instruments.OnInboxMessageReceived(_grainType, "handler_not_found");
+                LogHandlerNotFound(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId);
+                return DeliveryResult.HandlerNotFound();
             }
 
             var generation = _stateGeneration;
@@ -285,7 +247,7 @@ internal sealed partial class DurableInboxExtension :
                 ValidateReady();
                 ScheduleLocalDrain();
                 _instruments.OnInboxMessageReceived(_grainType, "accepted");
-                LogMessageAccepted(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId, envelope.RouteKey, envelope.CorrelationKey?.ToString());
+                LogMessageAccepted(_logger, envelope.MessageId, envelope.SenderId, envelope.ReceiverId);
                 return DeliveryResult.Accepted();
             }
             finally
@@ -394,14 +356,14 @@ internal sealed partial class DurableInboxExtension :
         catch (OperationCanceledException) when (_failure is null
             && operation is HandlerWrite { Completed: false } handler
             && handler.Cancellation.IsCancellationRequested
-            && handler.Execution?.SendFailure is null)
+            && handler.Execution?.RejectionFailure is null)
         {
             throw;
         }
         catch (Exception exception) when (exception is not JournaledStatePostCommitException
             && (exception is not OperationCanceledException || _failure is not null || !_shutdownToken.IsCancellationRequested
                 || operation is HandlerWrite { Completed: true }
-                || operation is HandlerWrite { Execution.SendFailure: not null }))
+                || operation is HandlerWrite { Execution.RejectionFailure: not null }))
         {
             LatchFailure(exception);
             try
@@ -417,18 +379,8 @@ internal sealed partial class DurableInboxExtension :
         }
         finally
         {
-            try
-            {
-                if (operation is HandlerWrite { Execution: { } execution })
-                {
-                    await execution.RetireAsync().ConfigureAwait(true);
-                }
-            }
-            finally
-            {
-                _pendingWrites.Remove(operation);
-                operation.SignalFinished();
-            }
+            _pendingWrites.Remove(operation);
+            operation.SignalFinished();
         }
 
         if (operation is HandlerWrite { PostCompletionFailure: { } failure })
@@ -503,25 +455,24 @@ internal sealed partial class DurableInboxExtension :
         }
 
         // Both pump entry points already combine activation shutdown with their attempt scope.
-        // Borrow that scope through method completion and actual batch retirement.
+        // Borrow that scope through handler completion and the owned journal write.
         var combinedToken = operation.Cancellation;
         var previous = _handlerExecution.Value;
         var execution = operation.Execution = new HandlerExecution(this, operation);
         _handlerExecution.Value = execution;
         try
         {
-            var found = _durableInbox.TryFindHandler(new InboxHandlerSelectionContext(operation.Envelope, _grainContext.GrainId), out var handler);
-            ThrowIfHandlerOperationRejected(execution);
+            var found = _durableInbox.TryGetHandler(out var handler);
             if (!found)
             {
-                operation.Error = new InvalidOperationException("No compatible handler is registered.");
+                operation.Error = new InvalidOperationException("No inbox handler is registered.");
                 operation.DeadLetter = true;
                 return;
             }
 
             execution.Active = true;
             await handler!.HandleAsync(new InboxHandlerContext(
-                operation.Envelope, _grainContext.GrainId, execution, _sessionPool, execution.Complete),
+                operation.Envelope, execution.Complete),
                 combinedToken).ConfigureAwait(true);
             ThrowIfHandlerOperationRejected(execution);
             if (!operation.Completed)
@@ -532,22 +483,22 @@ internal sealed partial class DurableInboxExtension :
         }
         catch (Exception exception) when (operation.Completed)
         {
-            operation.PostCompletionFailure = execution.SendFailure ?? ExceptionDispatchInfo.Capture(exception);
+            operation.PostCompletionFailure = execution.RejectionFailure ?? ExceptionDispatchInfo.Capture(exception);
             LogHandlerException(_logger, operation.PostCompletionFailure.SourceException,
                 operation.Envelope.MessageId, operation.Envelope.SenderId,
-                operation.Envelope.RouteKey, operation.Envelope.CorrelationKey?.ToString());
+                operation.Envelope.ReceiverId);
         }
-        catch (Exception) when (execution.SendFailure is not null)
+        catch (Exception) when (execution.RejectionFailure is not null)
         {
-            execution.SendFailure.Throw();
+            execution.RejectionFailure.Throw();
             throw;
         }
         catch (Exception exception) when (!combinedToken.IsCancellationRequested && _failure is null)
         {
-            // Before Complete, conforming handlers report failures during local preparation.
+            // Before Complete, handler failures retain the message for retry or dead-lettering.
             operation.Error = exception;
             LogHandlerException(_logger, exception, operation.Envelope.MessageId, operation.Envelope.SenderId,
-                operation.Envelope.RouteKey, operation.Envelope.CorrelationKey?.ToString());
+                operation.Envelope.ReceiverId);
         }
         finally
         {
@@ -755,9 +706,6 @@ internal sealed partial class DurableInboxExtension :
     [LoggerMessage(Level = LogLevel.Error, Message = "Requesting deactivation after an inbox persistence failure failed.")]
     private static partial void LogDeactivationRequestFailure(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "A retained inbox batch acquisition failed while its attempt resources were retired.")]
-    private static partial void LogRetiredAcquisitionFailure(ILogger logger, Exception exception);
-
     private void InitializeRecoveredState()
     {
         _stateGeneration++;
@@ -810,7 +758,7 @@ internal sealed partial class DurableInboxExtension :
     {
         var operations = _pendingWrites.Select(static operation => operation.WaitForFinished()).Append(_activeDelivery).ToArray();
         StopProcessing();
-        // Owned work outlives caller cancellation and drains through actual persistence and batch retirement.
+        // Owned work outlives caller cancellation and drains through handler completion and actual persistence.
         await Task.WhenAll(operations).ConfigureAwait(
             ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
     }
@@ -847,136 +795,29 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    private sealed class HandlerExecution(DurableInboxExtension owner, HandlerWrite? operation = null) : IDurableOutbox
+    private sealed class HandlerExecution(DurableInboxExtension owner, HandlerWrite operation)
     {
-        private List<Task<IPreparedOutboxBatch>>? _preparations;
-        private List<HandlerBatch>? _batches;
-
         public DurableInboxExtension Owner { get; } = owner;
         public bool Active { get; set; }
-        public ExceptionDispatchInfo? SendFailure { get; private set; }
-        public int Count => Owner._outbox.Count;
-        public IEnumerable<DurableEnvelope> Messages => Owner._outbox.Messages;
-        public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
-            Owner._outbox.TryGetMessage(messageId, out envelope);
-
-        public ValueTask<IPreparedOutboxBatch> PrepareSendAsync(
-            IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken = default)
-        {
-            ValidateScope();
-            var preparation = AcquireBatchAsync(messages, cancellationToken);
-            (_preparations ??= []).Add(preparation);
-            preparation.Ignore();
-            return new ValueTask<IPreparedOutboxBatch>(preparation);
-        }
-
-        private async Task<IPreparedOutboxBatch> AcquireBatchAsync(
-            IReadOnlyList<DurableEnvelope> messages, CancellationToken cancellationToken)
-        {
-            var prepared = await Owner._outbox.PrepareSendAsync(messages, cancellationToken).ConfigureAwait(true);
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var batch = new HandlerBatch(this, prepared);
-                (_batches ??= []).Add(batch);
-                return batch;
-            }
-            catch
-            {
-                prepared.Dispose();
-                throw;
-            }
-        }
+        public ExceptionDispatchInfo? RejectionFailure { get; private set; }
 
         public void Complete()
         {
             ValidateAttempt();
-            if (operation is not { } handler)
-            {
-                throw new InvalidOperationException("Handler selection cannot complete a message.");
-            }
-            if (handler.Completed)
+            if (operation.Completed)
             {
                 return;
             }
             try
             {
-                Owner.StageHandlerCompletion(handler);
+                // Business state and directly injected outbox sends have already been staged.
+                // Stage inbox removal and dedupe synchronously, before the owned write can await.
+                Owner.StageHandlerCompletion(operation);
             }
             catch (Exception exception)
             {
                 RejectOperation(exception);
                 throw;
-            }
-        }
-
-        public void Send(DurableEnvelope envelope)
-        {
-            ValidateScope();
-            try
-            {
-                Owner._outbox.Send(envelope);
-            }
-            catch (Exception exception)
-            {
-                RejectOperation(exception);
-                throw;
-            }
-        }
-
-        public void Send(IPreparedOutboxBatch batch)
-        {
-            ValidateScope();
-            try
-            {
-                ArgumentNullException.ThrowIfNull(batch);
-                if (batch is not HandlerBatch owned || !ReferenceEquals(owned.Execution, this))
-                {
-                    throw new InvalidOperationException("The prepared batch belongs to another outbox or handler attempt.");
-                }
-
-                Owner._outbox.Send(owned.Prepared);
-            }
-            catch (Exception exception)
-            {
-                RejectOperation(exception);
-                throw;
-            }
-        }
-
-        public async ValueTask RetireAsync()
-        {
-            Active = false;
-            if (_preparations is { } preparations)
-            {
-                foreach (var preparation in preparations)
-                {
-                    Task completion = preparation;
-                    await completion.ConfigureAwait(
-                        ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
-                    if (completion.Exception is { } failure)
-                    {
-                        LogRetiredAcquisitionFailure(Owner._logger, failure);
-                    }
-                }
-            }
-
-            if (_batches is { } batches)
-            {
-                foreach (var batch in batches)
-                {
-                    batch.Dispose();
-                }
-            }
-        }
-
-        private void ValidateScope()
-        {
-            ValidateAttempt();
-            if (operation?.Completed == true)
-            {
-                RejectOperation(new InvalidOperationException(
-                    "The inbox handler attempt has already called Complete."));
             }
         }
 
@@ -993,22 +834,12 @@ internal sealed partial class DurableInboxExtension :
         [DoesNotReturn]
         public void RejectOperation(Exception exception)
         {
-            SendFailure ??= ExceptionDispatchInfo.Capture(exception);
+            RejectionFailure ??= ExceptionDispatchInfo.Capture(exception);
             if (_handlerExecution.Value is { } current && ReferenceEquals(current.Owner, Owner))
             {
-                current.SendFailure ??= SendFailure;
+                current.RejectionFailure ??= RejectionFailure;
             }
-            SendFailure.Throw();
-        }
-
-        private sealed class HandlerBatch(HandlerExecution execution, IPreparedOutboxBatch prepared) : IPreparedOutboxBatch
-        {
-            private IPreparedOutboxBatch? _prepared = prepared;
-            public HandlerExecution Execution { get; } = execution;
-            public IPreparedOutboxBatch Prepared =>
-                _prepared ?? throw new ObjectDisposedException(nameof(IPreparedOutboxBatch));
-
-            public void Dispose() => Interlocked.Exchange(ref _prepared, null)?.Dispose();
+            RejectionFailure.Throw();
         }
     }
 
@@ -1451,54 +1282,19 @@ internal sealed partial class DurableInboxExtension :
     private static partial void LogDeliveryOperationFailed(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId grainId);
 
     [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Registered handler for route '{RouteKey}' on grain {GrainId}")]
-    private static partial void LogHandlerRegistered(ILogger logger, string routeKey, GrainId grainId);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Duplicate message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogDuplicateMessageDetected(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey);
-
-    [LoggerMessage(
-        Level = LogLevel.Debug,
-        Message = "Duplicate message {MessageId} from {SenderId} already in inbox for {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogDuplicateMessageInInbox(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey);
-
-    [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Inbox at capacity ({Count}/{Capacity}) for grain {GrainId}, rejecting message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogBackpressureRejection(ILogger logger, int count, int capacity, GrainId grainId, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
-
-    [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "No handler registered for route '{RouteKey}' on grain {GrainId}, rejecting message {MessageId} from {SenderId} (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogRouteNotFound(ILogger logger, string routeKey, GrainId grainId, Guid messageId, GrainId senderId, string? correlationKey);
+        Message = "No inbox handler registered for message {MessageId} from {SenderId} to {ReceiverId}")]
+    private static partial void LogHandlerNotFound(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Accepted message {MessageId} from {SenderId} to {ReceiverId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogMessageAccepted(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string routeKey, string? correlationKey);
+        Message = "Accepted message {MessageId} from {SenderId} to {ReceiverId}")]
+    private static partial void LogMessageAccepted(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Error,
-        Message = "Error processing message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogProcessingError(ILogger logger, Exception exception, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
-
-    [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "Handler for route '{RouteKey}' not found during processing of message {MessageId} (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogHandlerNotFoundDuringProcessing(ILogger logger, string routeKey, Guid messageId, string? correlationKey);
-
-    [LoggerMessage(
-        Level = LogLevel.Information,
-        Message = "Processed message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogMessageProcessed(ILogger logger, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
-
-    [LoggerMessage(
-        Level = LogLevel.Error,
-        Message = "Handler threw exception for message {MessageId} from {SenderId} on route '{RouteKey}' (CorrelationKey: {CorrelationKey})")]
-    private static partial void LogHandlerException(ILogger logger, Exception exception, Guid messageId, GrainId senderId, string routeKey, string? correlationKey);
+        Message = "Handler threw exception for message {MessageId} from {SenderId} to {ReceiverId}")]
+    private static partial void LogHandlerException(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Information,

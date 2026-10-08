@@ -66,9 +66,8 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
 
     public async Task SendAsync(GrainId target, string route, DurableTestMessage message)
     {
-        var envelope = new DurableEnvelopeBuilder(_sessions, this.GetGrainId()).To(target, route).WithBody(message).Build();
-        using var batch = await _outbox.PrepareSendAsync([envelope]);
-        _outbox.Send(batch);
+        var envelope = TestApplicationProtocol.Create(_sessions, this.GetGrainId(), target, route, message);
+        _outbox.Send(envelope);
         await _owner.WriteStateAsync();
     }
 
@@ -83,17 +82,14 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
         return Task.CompletedTask;
     }
 
-    public bool CanHandle(IInboxHandlerContext context) => true;
 
     public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        Assert.True(context.Envelope.Data.TryGetBody<DurableTestMessage>(out var body));
-        var message = Assert.IsType<DurableTestMessage>(body);
-        IPreparedOutboxBatch? outgoing = null;
+        var message = Assert.IsType<DurableTestMessage>(TestApplicationProtocol.Read(_sessions, context.Envelope).Body);
+        DurableEnvelope? outgoing = null;
         if (message.ForwardTo is { } target)
         {
-            var envelope = context.CreateEnvelope().To(target, "messages/forwarded").WithBody(message with { ForwardTo = null }).Build();
-            outgoing = await context.Outbox.PrepareSendAsync([envelope], cancellationToken);
+            outgoing = TestApplicationProtocol.Create(_sessions, this.GetGrainId(), target, "messages/forwarded", message with { ForwardTo = null });
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -102,7 +98,7 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
         _effects[message.LogicalId] = effect;
         if (outgoing is { } batch)
         {
-            context.Send(batch);
+            _outbox.Send(batch);
         }
         context.Complete();
     }

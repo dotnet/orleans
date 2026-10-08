@@ -9,7 +9,7 @@ Each invocation performs **1,024 delivered and acknowledged handler steps**. A
 journal hook observes actual successful acknowledgement for every distinct hop.
 The driver awaits all 1,024 acknowledgements; cleanup verifies exact total and
 per-grain business-effect counts. The measured path includes envelope construction
-and serialization, scheduling, inbox acceptance, handler execution, journal writes,
+and ordinary application serialization, scheduling, inbox acceptance, handler execution, journal writes,
 dispatch, transport deduplication, and the completion observer. It excludes cluster
 startup, activation, ring configuration, warm-up, validation queries, and shutdown.
 
@@ -34,6 +34,25 @@ Iteration setup recreates the cluster and warms one complete chain. Each iterati
 contains one measured invocation, keeping journal and deduplication history bounded
 and comparable. The benchmark uses real time and normal pumps. BDN controls
 iteration repetition; there is no polling or manually driven pump.
+
+## Opaque encoding and memory
+
+The non-generic inbox handler explicitly decodes `SequentialMessage` with the
+ordinary `Serializer<SequentialMessage>` service. Each outgoing hop encodes the
+record into an `ImmutableBuffer`; the transport only sees sender, receiver, message
+ID, and frozen raw bytes. The benchmark still traverses the production pipeline:
+it neither invokes the next handler directly nor signals completion before storage
+acknowledgement.
+
+Payload creation snapshots application-writer bytes once into managed immutable
+backing. Staging, transport, and journal values can safely share that immutable
+reference. A tiny hop does not retain a minimum 16 KiB pooled `ArcBuffer` page.
+An application using `new ImmutableBuffer(arcBuffer)` can immediately dispose
+its Arc owner after construction. Journal storage buffers have their own independent
+lifetimes and remain part of the retained-memory budget.
+
+This encoding/ownership change warrants new measurements on the same machine;
+no timing result is implied by this README.
 
 ## Run
 
@@ -60,7 +79,6 @@ the same grain count, chain length, job preset, and snapshot thresholds. The
 retained-state budget includes transport deduplication history, application state,
 and the bounded append history between snapshots.
 
-The larger chain keeps measured iterations above 100 ms on the optimized path.
 Keep invocation length fixed for comparisons: the warm chain contributes to the
 retained state captured by later snapshots.
 

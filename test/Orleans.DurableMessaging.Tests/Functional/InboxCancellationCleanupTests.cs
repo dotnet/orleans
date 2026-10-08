@@ -35,7 +35,7 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
         using var logs = new CancellationCleanupProbe.Logs();
         Fixture.Cluster.Silos[0].ServiceProvider.GetRequiredService<ILoggerFactory>().AddProvider(logs);
         using var handler = new CancelingHandler(throws);
-        await OnTurnAsync(context, () => context.ActivationServices.GetRequiredService<IDurableInbox>().RegisterHandler("cancel-cleanup", handler));
+        await OnTurnAsync(context, () => grain.HandlerOverride = handler);
         using var envelope = CreateEnvelope(receiver, NewMessage(310, "cancellation"), "cancel-cleanup");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
@@ -106,7 +106,7 @@ public sealed class InboxCancellationCleanupTests : DurableMessagingBehaviorTest
         public int CallbackCalls { get; private set; }
         public bool Finished { get; private set; }
         public OperationCanceledException? Cancellation { get; private set; }
-        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             using var registration = cancellationToken.Register(() =>

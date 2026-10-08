@@ -195,10 +195,23 @@ public sealed class MessagingProviderCutoverTests
         Assert.NotEqual(committedA.Id, duplicateA.Id);
         Assert.Equal(committedA.Metadata![OwnershipKey], duplicateA.Metadata![OwnershipKey]);
         fixture.Jobs.FailAfterNext = true;
-        await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
+        if (outbox)
+        {
+            var prerequisite = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => retried.CommitAsync(second, outbox));
+            var cause = Assert.IsType<IOException>(prerequisite.InnerException);
+            Assert.Equal("Injected lost schedule response after durable append.", cause.Message);
+        }
+        else
+        {
+            await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
+        }
         var ambiguousA = fixture.Jobs.Scheduled.Last();
-        Assert.Equal(0, retried.Count(outbox));
-        await retried.Manager.WriteStateAsync(Token);
+        // Send now stages immediately. The failed journal prerequisite has not captured or ACKed
+        // that intent. Reopening discards it while retaining the orphan's real durable job.
+        Assert.Equal(outbox ? 1 : 0, retried.Count(outbox));
+        Assert.Null(retried.Handle(outbox).Value);
+        Assert.Null(retried.Generation(outbox).Value);
+        if (!outbox) await retried.Manager.WriteStateAsync(Token);
         retried = await fixture.ReopenAsync(retried);
         Assert.Equal(0, retried.Count(outbox));
         Assert.Null(retried.Handle(outbox).Value);
@@ -217,10 +230,23 @@ public sealed class MessagingProviderCutoverTests
         Assert.Null(await fixture.B.CreateStorage(ShardJournal(drain)).GetMetadataAsync(Token));
 
         fixture.Jobs.FailAfterNext = true;
-        await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
+        if (outbox)
+        {
+            var prerequisite = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => retried.CommitAsync(second, outbox));
+            var cause = Assert.IsType<IOException>(prerequisite.InnerException);
+            Assert.Equal("Injected lost schedule response after durable append.", cause.Message);
+        }
+        else
+        {
+            await Assert.ThrowsAsync<IOException>(() => retried.CommitAsync(second, outbox));
+        }
         var ambiguousB = fixture.Jobs.Scheduled.Last();
-        Assert.Equal(0, retried.Count(outbox));
-        await retried.Manager.WriteStateAsync(Token);
+        // Send now stages immediately. The failed journal prerequisite has not captured or ACKed
+        // that intent. Reopening discards it while retaining the orphan's real durable job.
+        Assert.Equal(outbox ? 1 : 0, retried.Count(outbox));
+        Assert.Null(retried.Handle(outbox).Value);
+        Assert.Null(retried.Generation(outbox).Value);
+        if (!outbox) await retried.Manager.WriteStateAsync(Token);
         retried = await fixture.ReopenAsync(retried);
         Assert.Equal(0, retried.Count(outbox));
         Assert.Null(retried.Handle(outbox).Value);
@@ -580,10 +606,7 @@ public sealed class MessagingProviderCutoverTests
         }
 
         public DurableEnvelope Envelope(Endpoint owner, bool outbox, Endpoint? sink = null) =>
-            new DurableEnvelopeBuilder(Services.GetRequiredService<SerializerSessionPool>(), outbox ? owner.GrainId : GrainId.Create("external", "sender"))
-                .To(outbox ? (sink?.GrainId ?? GrainId.Create("unused", "sink")) : owner.GrainId, "record")
-                .WithBody("effect")
-                .Build();
+            TestApplicationProtocol.Create(Services.GetRequiredService<SerializerSessionPool>(), outbox ? owner.GrainId : GrainId.Create("external", "sender"), outbox ? (sink?.GrainId ?? GrainId.Create("unused", "sink")) : owner.GrainId, "record", "effect");
 
         public async Task AssertTerminalCallbackAsync(Endpoint endpoint, DurableJob job, bool outbox)
         {
@@ -704,7 +727,7 @@ public sealed class MessagingProviderCutoverTests
             InboxExtension = (IDurableInboxExtension)services.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
             Timers = services.GetRequiredService<ManualTimers>();
             Effects = effects;
-            Inbox.RegisterHandler("record", new RecordHandler(Effects));
+            Inbox.RegisterHandler(new RecordHandler(Effects));
         }
 
         public string Provider { get; }
@@ -745,8 +768,7 @@ public sealed class MessagingProviderCutoverTests
         {
             if (outbox)
             {
-                using var batch = await Outbox.PrepareSendAsync([envelope], Token);
-                Outbox.Send(batch);
+                Outbox.Send(envelope);
                 await Manager.WriteStateAsync(Token);
             }
             else
@@ -767,7 +789,7 @@ public sealed class MessagingProviderCutoverTests
 
     private sealed class RecordHandler(IDurableDictionary<Guid, int> effects) : IInboxHandler
     {
-        public bool CanHandle(IInboxHandlerContext context) => true;
+
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

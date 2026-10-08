@@ -18,6 +18,96 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
     {
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task ArbitraryRawPayload_AcceptanceReplayForwardAndBusinessCompletionRequireNoApplicationCodec(int sends)
+    {
+        var receiver = Fixture.Client.GetGrain<IRawPayloadTestGrain>(Guid.NewGuid());
+        var sink = Fixture.Client.GetGrain<IRawPayloadTestGrain>(Guid.NewGuid());
+        await receiver.ConfigureForwardAsync(sink.GetGrainId(), sends);
+        _ = await sink.GetSnapshotAsync();
+        Assert.True(Fixture.Cluster.TryGetGrainContext(receiver.GetGrainId(), out var original));
+        Assert.True(Fixture.Cluster.TryGetGrainContext(sink.GetGrainId(), out var sinkContext));
+        var sinkGrain = Assert.IsType<RawPayloadTestGrain>(sinkContext.GrainInstance);
+        sinkGrain.ExpectedAcknowledgedEffects = sends;
+        var bytes = System.Text.Encoding.UTF8.GetBytes("raw application bytes\0\u03c0/forward").Concat(new byte[] { 0xff, 0x80, 0x01 }).ToArray();
+        var envelope = new DurableEnvelope
+        {
+            MessageId = Guid.NewGuid(),
+            SenderId = GrainId.Create("raw-external-sender", "1"),
+            ReceiverId = receiver.GetGrainId(),
+            Payload = new Orleans.Serialization.Buffers.ImmutableBuffer(bytes)
+        };
+        Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope)).Status);
+        await original.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var accepted = Assert.IsType<RawPayloadTestGrain>(original.GrainInstance).GetSnapshotForTest();
+        Assert.Equal(1, accepted.InboxCount);
+        Assert.Empty(accepted.Effects);
+
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        using var replay = Fixture.Storage.BlockRead(journal);
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), RawPayloadTestGrain.HandlerBarrier);
+        var activation = receiver.GetSnapshotAsync();
+        await replay.WaitUntilEnteredAsync();
+        replay.Release();
+        await handler.WaitUntilEnteredAsync();
+        Assert.True(Fixture.Cluster.TryGetGrainContext(receiver.GetGrainId(), out var current));
+        Assert.NotSame(original, current);
+        var grain = Assert.IsType<RawPayloadTestGrain>(current.GrainInstance);
+        var pending = Assert.Single(current.ActivationServices.GetRequiredService<IDurableInbox>().Messages);
+        Assert.Equal(bytes, pending.Payload.Memory.ToArray());
+        Assert.Empty(grain.GetSnapshotForTest().Effects);
+        using var completion = Fixture.Storage.BlockWrite(journal);
+        handler.Release();
+        await completion.WaitUntilEnteredAsync();
+        var staged = grain.GetSnapshotForTest();
+        Assert.Equal(0, staged.InboxCount);
+        Assert.Equal(sends, staged.OutboxCount);
+        Assert.Equal(1, staged.ProcessedCount);
+        Assert.Equal(new RawPayloadEffect(envelope.MessageId, Convert.ToBase64String(bytes), 1), Assert.Single(staged.Effects));
+        var forwarded = current.ActivationServices.GetRequiredService<IDurableOutbox>().Messages.ToArray();
+        Assert.Equal(sends, forwarded.Length);
+        Assert.Equal(sends, forwarded.Select(output => output.MessageId).Distinct().Count());
+        Assert.Contains(forwarded, output => output.MessageId == envelope.MessageId);
+        Assert.All(forwarded, output =>
+        {
+            Assert.Equal(receiver.GetGrainId(), output.SenderId);
+            Assert.Equal(sink.GetGrainId(), output.ReceiverId);
+            Assert.Equal(bytes, output.Payload.Memory.ToArray());
+            Assert.Same(pending.Payload, output.Payload);
+        });
+        Assert.False(grain.Acknowledged.IsCompleted);
+        Assert.False(sinkGrain.Acknowledged.IsCompleted);
+        completion.Release();
+        await activation;
+        var delivered = await sinkGrain.Acknowledged.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var acknowledged = await grain.Acknowledged.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Equal(Assert.Single(acknowledged.Effects), Assert.Single(delivered.Effects, effect => effect.MessageId == envelope.MessageId));
+        Assert.Equal(sends, delivered.Effects.Length);
+        Assert.All(delivered.Effects, effect =>
+        {
+            Assert.Equal(Convert.ToBase64String(bytes), effect.Bytes);
+            Assert.Equal(1, effect.Count);
+        });
+        Assert.Equal(0, acknowledged.OutboxCount);
+        Assert.Equal(sends, delivered.ProcessedCount);
+        Assert.Empty(current.ActivationServices.GetRequiredService<IDurableMessagingDiagnostics>().InboxDeadLetters);
+        Assert.Empty(current.ActivationServices.GetRequiredService<IDurableMessagingDiagnostics>().OutboxDeadLetters);
+        await receiver.RequestDeactivationAsync();
+        await current.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        var recovered = await receiver.GetSnapshotAsync();
+        Assert.NotEqual(acknowledged.ActivationId, recovered.ActivationId);
+        Assert.Equal(acknowledged.Effects, recovered.Effects);
+        Assert.Equal(1, recovered.ProcessedCount);
+        Assert.Equal(0, recovered.OutboxCount);
+        Assert.Equal(DeliveryStatus.Duplicate, (await receiver.AsReference<IDurableInboxExtension>().DeliverAsync(envelope, TestContext.Current.CancellationToken)).Status);
+        Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
+        var sinkState = await sink.GetSnapshotAsync();
+        Assert.Equal(sends, sinkState.Effects.Length);
+        Assert.All(sinkState.Effects, effect => Assert.Equal(1, effect.Count));
+    }
+
     [Fact]
     public async Task CaptureProbeSnapshot_RemainsStableAcrossLaterWrites()
     {
@@ -99,7 +189,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         Assert.Empty((await sink.GetSnapshotAsync()).Effects);
     }
     [Fact]
-    public async Task HandlerAndRealOutboxPreparation_AllowsIndependentWritesAndPreservesCancelledWriteWait()
+    public async Task HandlerApplicationPreparation_AllowsIndependentWritesAndPreservesCancelledWriteWait()
     {
         var receiver = NewGrain();
         var sink = NewGrain();
@@ -117,9 +207,10 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         Assert.Equal(1, localPreparation.InboxCount);
         Assert.Equal(0, localPreparation.ProcessedMessageCount);
         Assert.Equal(0, localPreparation.OutboxCount);
+        using var applicationPreparation = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/admitted-outgoing/application-preparation");
         using var scheduling = Fixture.JobManagerProbe.BlockNext("orleans.messaging.outbox-flush");
         handler.Release();
-        await scheduling.WaitUntilEnteredAsync();
+        await applicationPreparation.WaitUntilEnteredAsync();
         var preparing = grain.GetSnapshotForTest();
         Assert.Empty(preparing.Effects);
         Assert.Equal(1, preparing.InboxCount);
@@ -130,6 +221,13 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
             .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.DoesNotContain(grain.Captures, snapshot => snapshot.Effects.Count > 0 || snapshot.OutboxCount > 0);
 
+        applicationPreparation.Release();
+        await scheduling.WaitUntilEnteredAsync();
+        var staged = grain.GetSnapshotForTest();
+        Assert.Single(staged.Effects);
+        Assert.Equal(0, staged.InboxCount);
+        Assert.Equal(1, staged.ProcessedMessageCount);
+        Assert.Equal(1, staged.OutboxCount);
         var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId()));
         using var cancellation = new CancellationTokenSource();
         var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));

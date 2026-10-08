@@ -112,8 +112,7 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
         Task<DeliveryResult> rejected = null!;
         await OnTurnAsync(context, () => rejected = inbox.DeliverAsync(envelope.Value, TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => rejected);
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await outbox.PrepareSendAsync([envelope.Value], TestContext.Current.CancellationToken));
+        Assert.Throws<InvalidOperationException>(() => outbox.Send(envelope.Value));
         Assert.Single(grain.GetSnapshotForTest().Effects);
         storage.Release();
         await deleting;

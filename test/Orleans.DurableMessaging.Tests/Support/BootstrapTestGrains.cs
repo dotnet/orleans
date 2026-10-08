@@ -62,7 +62,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         observation.Value = value;
         observation.Inbox = inbox;
         observation.Outbox = outbox;
-        inbox.RegisterHandler(Route, this);
+        inbox.RegisterHandler(this);
     }
 
     public BootstrapObservation Observation { get; }
@@ -81,18 +81,15 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public async Task SendValue(int value)
     {
         var context = Observation.Context;
-        var envelope = new DurableEnvelopeBuilder(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId)
-            .To(OutputTarget, "output").WithBody(value).Build();
-        using var batch = await Observation.Outbox!.PrepareSendAsync([envelope]);
+        var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value);
         Observation.Value!.Value = value;
-        Observation.Outbox.Send(batch);
+        Observation.Outbox!.Send(envelope);
         await Observation.Manager!.WriteStateAsync(CancellationToken.None);
     }
     public async Task SendSynchronousValue(int value)
     {
         var context = Observation.Context;
-        var envelope = new DurableEnvelopeBuilder(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId)
-            .To(OutputTarget, "output").WithBody(value).Build();
+        var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value);
         Observation.Value!.Value = value;
         Observation.Outbox!.Send(envelope);
         await Observation.Manager!.WriteStateAsync(CancellationToken.None);
@@ -106,7 +103,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         ActivationValue = Observation.Value!.Value;
         return Task.CompletedTask;
     }
-    public bool CanHandle(IInboxHandlerContext context) => context.Envelope.RouteKey == Route;
+
     public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         if (HandlerOverride is { } handler)
@@ -114,16 +111,15 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
             await handler.HandleAsync(context, cancellationToken);
             return;
         }
-        if (_handlers.TryGet(context.GrainId, Route, out var barrier))
+        if (_handlers.TryGet(Observation.Context.GrainId, Route, out var barrier))
         {
             barrier.Entered.TrySetResult();
             await barrier.Continue.Task.WaitAsync(cancellationToken);
         }
         var value = Observation.Value!.Value + 1;
-        var outgoing = context.CreateEnvelope().To(OutputTarget, "output").WithBody(value).Build();
-        var batch = await context.Outbox.PrepareSendAsync([outgoing], cancellationToken);
+        var outgoing = TestApplicationProtocol.Create(Observation.Context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), Observation.Context.GrainId, OutputTarget, "output", value);
         Observation.Value.Value = value;
-        context.Send(batch);
+        Observation.Outbox!.Send(outgoing);
         HandlerCalls++;
         context.Complete();
     }

@@ -4,7 +4,6 @@ using NSubstitute;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Documentation;
@@ -16,6 +15,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
 {
     private readonly ServiceProvider _services = new ServiceCollection().AddSerializer().BuildServiceProvider();
     private static readonly GrainId Sender = GrainId.Create("order", "42");
+    private Serializer Serializer => _services.GetRequiredService<Serializer>();
     private static readonly GrainId Receiver = GrainId.Create("inventory", "widget");
 
     [Fact]
@@ -54,16 +54,16 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     {
         var stock = new TestValue<int> { Value = available };
         var ledger = new TestDictionary<HierarchicalKey, ReservationResult>();
-        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Substitute.For<IDurableStateManager>(), stock, ledger);
-        var request = new ReserveStock(HierarchicalKey.Create("orders/42/inventory/widget/reserve"), quantity);
+        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, Substitute.For<IDurableStateManager>(), stock, ledger);
+        var request = new ReserveStock(HierarchicalKey.Create("orders/42/inventory/widget/reserve"), quantity, Sender);
         var first = CreateContext(request, request.OperationKey);
         var second = CreateContext(request, request.OperationKey);
         Assert.NotEqual(first.Context.Envelope.MessageId, second.Context.Envelope.MessageId);
 
-        await grain.HandleAsync(request, first.Context, TestContext.Current.CancellationToken);
+        await grain.HandleAsync(first.Context, TestContext.Current.CancellationToken);
         Assert.Equal(expectedStock, stock.Value);
         stock.Value = expectedStock + 100;
-        await grain.HandleAsync(request, second.Context, TestContext.Current.CancellationToken);
+        await grain.HandleAsync(second.Context, TestContext.Current.CancellationToken);
 
         Assert.Equal(expectedStock + 100, stock.Value);
         var outcome = Assert.Single(ledger).Value;
@@ -73,7 +73,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         Assert.Equal(new[] { "send", "complete" }, first.Events);
         Assert.Equal(new[] { "send", "complete" }, second.Events);
         Assert.Equal(Sender, second.Output[0].ReceiverId);
-        Assert.Equal(request.OperationKey, second.Output[0].CorrelationKey);
+        Assert.Equal(request.OperationKey, ReadBody<ReservationResult>(second.Output[0]).OperationKey);
     }
 
     [Fact]
@@ -83,12 +83,12 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var original = new ReservationResult(key, 3, true);
         var stock = new TestValue<int> { Value = 7 };
         var ledger = new TestDictionary<HierarchicalKey, ReservationResult> { [key] = original };
-        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Substitute.For<IDurableStateManager>(), stock, ledger);
-        var request = new ReserveStock(key, 4);
+        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, Substitute.For<IDurableStateManager>(), stock, ledger);
+        var request = new ReserveStock(key, 4, Sender);
         var attempt = CreateContext(request, key);
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await grain.HandleAsync(request, attempt.Context, TestContext.Current.CancellationToken));
+            await grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
         Assert.Equal(7, stock.Value);
         Assert.Equal(original, Assert.Single(ledger).Value);
@@ -101,14 +101,14 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     {
         var stock = new TestValue<int> { Value = 10 };
         var ledger = new TestDictionary<HierarchicalKey, ReservationResult>();
-        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Substitute.For<IDurableStateManager>(), stock, ledger);
-        var request = new ReserveStock(HierarchicalKey.Create("orders/42/inventory/widget/reserve"), 3);
+        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, Substitute.For<IDurableStateManager>(), stock, ledger);
+        var request = new ReserveStock(HierarchicalKey.Create("orders/42/inventory/widget/reserve"), 3, Sender);
         var attempt = CreateContext(request, request.OperationKey);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await grain.HandleAsync(request, attempt.Context, cancellation.Token));
+            await grain.HandleAsync(attempt.Context, cancellation.Token));
 
         Assert.Equal(10, stock.Value);
         Assert.Empty(ledger);
@@ -128,18 +128,18 @@ public sealed class DurableMessagingRecipeTests : IDisposable
             LoseFirstResponse = !cancelAfterProviderSuccess,
             AfterFirstCharge = cancelAfterProviderSuccess ? cancellation.Cancel : null
         };
-        var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), gateway, ledger);
-        var request = new ChargePayment(HierarchicalKey.Create("tenants/acme/orders/42/payment/charge"), 12.5m, "USD");
+        var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, gateway, ledger);
+        var request = new ChargePayment(HierarchicalKey.Create("tenants/acme/orders/42/payment/charge"), 12.5m, "USD", Sender);
         var first = CreateContext(request, request.OperationKey);
         if (cancelAfterProviderSuccess)
         {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-                await grain.HandleAsync(request, first.Context, cancellation.Token));
+                await grain.HandleAsync(first.Context, cancellation.Token));
         }
         else
         {
             await Assert.ThrowsAsync<IOException>(async () =>
-                await grain.HandleAsync(request, first.Context, cancellation.Token));
+                await grain.HandleAsync(first.Context, cancellation.Token));
         }
         Assert.Empty(ledger);
         Assert.Empty(first.Output);
@@ -147,9 +147,9 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         Assert.Equal(1, gateway.Charges);
 
         var retry = CreateContext(request, request.OperationKey);
-        await grain.HandleAsync(request, retry.Context, TestContext.Current.CancellationToken);
+        await grain.HandleAsync(retry.Context, TestContext.Current.CancellationToken);
         var duplicate = CreateContext(request, request.OperationKey);
-        await grain.HandleAsync(request, duplicate.Context, TestContext.Current.CancellationToken);
+        await grain.HandleAsync(duplicate.Context, TestContext.Current.CancellationToken);
 
         Assert.Equal(1, gateway.Charges);
         Assert.Equal(new[] { request.OperationKey.ToString(), request.OperationKey.ToString() }, gateway.Calls);
@@ -169,15 +169,15 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     {
         var ledger = new TestDictionary<HierarchicalKey, PaymentResult>();
         var gateway = new IdempotentGateway();
-        var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), gateway, ledger);
-        var original = new ChargePayment(HierarchicalKey.Create("orders/42/payment/charge"), 12.5m, "USD");
+        var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, gateway, ledger);
+        var original = new ChargePayment(HierarchicalKey.Create("orders/42/payment/charge"), 12.5m, "USD", Sender);
         var first = CreateContext(original, original.OperationKey);
-        await grain.HandleAsync(original, first.Context, TestContext.Current.CancellationToken);
+        await grain.HandleAsync(first.Context, TestContext.Current.CancellationToken);
         var conflicting = original with { Amount = 25m };
         var attempt = CreateContext(conflicting, conflicting.OperationKey);
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await grain.HandleAsync(conflicting, attempt.Context, TestContext.Current.CancellationToken));
+            await grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
         Assert.Equal(1, gateway.Charges);
         Assert.Single(gateway.Calls);
@@ -194,11 +194,11 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         long incomingVersion, int incomingStock, long expectedVersion, int expectedStock)
     {
         var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
-        var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), snapshot);
+        var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), Serializer, snapshot);
         var update = new StockSnapshot(incomingVersion, incomingStock);
         var attempt = CreateContext(update, HierarchicalKey.Create("stock/widget"));
 
-        var handling = grain.HandleAsync(update, attempt.Context, TestContext.Current.CancellationToken);
+        var handling = grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
         Assert.True(handling.IsCompletedSuccessfully);
         await handling;
@@ -211,46 +211,173 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public async Task Projection_ConflictingVersionPreservesOriginalSnapshot()
     {
         var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
-        var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), snapshot);
+        var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), Serializer, snapshot);
         var update = new StockSnapshot(10, 99);
         var attempt = CreateContext(update, HierarchicalKey.Create("stock/widget"));
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await grain.HandleAsync(update, attempt.Context, TestContext.Current.CancellationToken));
+            await grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
         Assert.Equal(new StockSnapshot(10, 7), snapshot.Value);
         Assert.Empty(attempt.Events);
     }
 
-    private (IInboxHandlerContext Context, List<DurableEnvelope> Output, List<string> Events) CreateContext<T>(
-        T body, HierarchicalKey key)
+    [Fact]
+    public async Task OrderDispatcher_MultipleKindsAndFreshDuplicatesRecordOneOutcomePerStep()
     {
-        var sessions = _services.GetRequiredService<SerializerSessionPool>();
-        var envelope = new DurableEnvelopeBuilder(sessions, Sender)
-            .To(Receiver, "recipe")
-            .WithReplyTo(Sender)
-            .WithCorrelationKey(key)
-            .WithBody(body)
-            .Build();
-        var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(envelope);
-        context.CreateEnvelope().Returns(_ => new DurableEnvelopeBuilder(sessions, Receiver));
-        var output = new List<DurableEnvelope>();
-        var events = new List<string>();
-        context.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
+        var ledger = new TestDictionary<HierarchicalKey, OrderOutcome>();
+        var inbox = Substitute.For<IDurableInbox>();
+        var grain = new OrderOutcomesGrain(inbox, Serializer, ledger);
+        var reservation = new ReservationResult(HierarchicalKey.Create("orders/42/inventory/reserve"), 3, true);
+        var charge = new ChargePayment(HierarchicalKey.Create("orders/42/payment/charge"), 12.5m, "USD", Sender);
+        var payment = new PaymentResult(charge, "provider-charge-1", true);
+        var first = CreateContext(reservation, reservation.OperationKey);
+        var second = CreateContext(payment, charge.OperationKey);
+        var duplicate = CreateContext(reservation, reservation.OperationKey);
+
+        foreach (var attempt in new[] { first, second, duplicate })
         {
-            output.Add(call.Arg<DurableEnvelope>());
+            var handling = grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+            Assert.True(handling.IsCompletedSuccessfully);
+            await handling;
+            Assert.Equal(new[] { "complete" }, attempt.Events);
+            Assert.Empty(attempt.Output);
+        }
+        Assert.Equal(2, await grain.GetCompletedStepCountAsync());
+        Assert.Equal(reservation, ledger[reservation.OperationKey]);
+        Assert.Equal(payment, ledger[charge.OperationKey]);
+        inbox.Received(1).RegisterHandler(grain);
+    }
+
+    [Fact]
+    public async Task OrderDispatcher_ConflictingOutcomePreservesRecordedStep()
+    {
+        var key = HierarchicalKey.Create("orders/42/inventory/reserve");
+        var original = new ReservationResult(key, 3, true);
+        var ledger = new TestDictionary<HierarchicalKey, OrderOutcome> { [key] = original };
+        var grain = new OrderOutcomesGrain(Substitute.For<IDurableInbox>(), Serializer, ledger);
+        var attempt = CreateContext(original with { Reserved = false }, key);
+
+        await Assert.ThrowsAsync<ArgumentException>(async () =>
+            await grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+
+        Assert.Equal(original, Assert.Single(ledger).Value);
+        Assert.Empty(attempt.Events);
+        Assert.Empty(attempt.Output);
+    }
+
+    [Fact]
+    public async Task Campaign_FanoutStagesFrozenRecipientIntentsBeforeAwaitingAcknowledgement()
+    {
+        var campaigns = new TestDictionary<Guid, NotificationCampaign>();
+        var outbox = Substitute.For<IDurableOutbox>();
+        var state = Substitute.For<IDurableStateManager>();
+        var grainContext = Substitute.For<IGrainContext>();
+        grainContext.GrainId.Returns(Sender);
+        var grain = new CampaignGrain(outbox, state, campaigns, Serializer, grainContext);
+        var id = Guid.Parse("3dd3fbec-0197-47cf-9233-92ecbddcd057");
+        GrainId[] original = [GrainId.Create("notification", "alice"), GrainId.Create("notification", "bob")];
+        var recipients = original.ToArray();
+        var outputs = new List<DurableEnvelope>();
+        var events = new List<string>();
+        var acknowledgement = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
+        {
+            outputs.Add(call.Arg<DurableEnvelope>());
             events.Add("send");
         });
+        state.WriteStateAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            Assert.Equal(2, outputs.Count);
+            Assert.Single(campaigns);
+            events.Add("write");
+            return new ValueTask(acknowledgement.Task);
+        });
+
+        var publish = grain.PublishAsync(id, "campaign text", recipients);
+        Assert.False(publish.IsCompleted);
+        Assert.Equal(new[] { "send", "send", "write" }, events);
+        recipients[0] = GrainId.Create("notification", "mutated-source");
+        Assert.Equal(original, campaigns[id].Recipients);
+        Assert.Equal(original, outputs.Select(envelope => envelope.ReceiverId));
+        Assert.Equal(2, outputs.Select(envelope => envelope.MessageId).Distinct().Count());
+        var root = HierarchicalKey.Create("campaigns").CreateChildKey(id.ToString("N"));
+        for (var index = 0; index < outputs.Count; index++)
+        {
+            var envelope = outputs[index];
+            Assert.Equal(Sender, envelope.SenderId);
+            var payload = ReadBody<Notify>(envelope);
+            Assert.Equal("campaign text", payload.Text);
+            Assert.Equal(root.CreateChildKey(Uri.EscapeDataString(original[index].ToString())), payload.OperationKey);
+            Assert.Null(payload.ResponseDestination);
+        }
+        acknowledgement.SetResult();
+        await publish;
+        await grain.PublishAsync(id, "campaign text", original);
+        Assert.Equal(2, outputs.Count);
+        Assert.Single(campaigns);
+        Assert.Equal(new[] { "send", "send", "write", "write" }, events);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Campaign_ConflictingSubmissionPreservesRecordedContentAndIntents(bool changeRecipients)
+    {
+        var id = Guid.Parse("3dd3fbec-0197-47cf-9233-92ecbddcd057");
+        GrainId[] original = [GrainId.Create("notification", "alice")];
+        var campaign = new NotificationCampaign("original", original);
+        var campaigns = new TestDictionary<Guid, NotificationCampaign> { [id] = campaign };
+        var outbox = Substitute.For<IDurableOutbox>();
+        var state = Substitute.For<IDurableStateManager>();
+        var context = Substitute.For<IGrainContext>();
+        context.GrainId.Returns(Sender);
+        var grain = new CampaignGrain(outbox, state, campaigns, Serializer, context);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => grain.PublishAsync(id,
+            changeRecipients ? "original" : "changed",
+            changeRecipients ? [GrainId.Create("notification", "bob")] : original));
+
+        Assert.Same(campaign, Assert.Single(campaigns).Value);
+        Assert.Equal(original, campaign.Recipients);
+        outbox.DidNotReceive().Send(Arg.Any<DurableEnvelope>());
+        await state.DidNotReceive().WriteStateAsync(Arg.Any<CancellationToken>());
+    }
+
+    private readonly IDurableOutbox Outbox = Substitute.For<IDurableOutbox>();
+    private readonly Dictionary<Guid, (List<DurableEnvelope> Output, List<string> Events)> _attempts = [];
+    private Guid _activeAttempt;
+
+    private (IInboxHandlerContext Context, List<DurableEnvelope> Output, List<string> Events) CreateContext<T>(
+        T body, HierarchicalKey key) where T : class
+    {
+        // key is business protocol data, never transport metadata.
+        ArgumentNullException.ThrowIfNull(key);
+        var envelope = new ApplicationPayload(Serializer).Envelope(Sender, Receiver, body);
+        var context = Substitute.For<IInboxHandlerContext>();
+        context.Envelope.Returns(_ =>
+        {
+            _activeAttempt = envelope.MessageId;
+            return envelope;
+        });
+        var output = new List<DurableEnvelope>();
+        var events = new List<string>();
+        _attempts.Add(envelope.MessageId, (output, events));
+        if (_attempts.Count == 1)
+        {
+            Outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
+            {
+                var active = _attempts[_activeAttempt];
+                active.Output.Add(call.Arg<DurableEnvelope>());
+                active.Events.Add("send");
+            });
+        }
         context.When(value => value.Complete()).Do(_ => events.Add("complete"));
         return (context, output, events);
     }
 
-    private static T ReadBody<T>(DurableEnvelope envelope)
-    {
-        Assert.True(envelope.Data.TryGetBody<T>(out var result));
-        return result!;
-    }
+    private T ReadBody<T>(DurableEnvelope envelope) where T : class =>
+        new ApplicationPayload(Serializer).Decode<T>(envelope.Payload);
 
     public void Dispose() => _services.Dispose();
 

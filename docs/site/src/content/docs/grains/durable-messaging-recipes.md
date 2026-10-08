@@ -18,14 +18,18 @@ suited to local execution.
 All handler examples finish local validation, asynchronous preparation, and envelope
 construction before the first shared mutation. Their final shared update, sends,
 `Complete()`, and method return run synchronously. The inbox owns their journal
-write. Ordinary methods explicitly await their application's journal write.
+write. Ordinary methods explicitly await their application's journal write. Register one
+non-generic handler per inbox and inject the outbox directly; record types identify
+application message kinds.
 
 ## Reserve inventory once per order line
 
 Use one inventory grain per tenant/SKU, with `available-stock` and a durable
 `reservations` outcome ledger. The sender derives a leaf operation key using
 [OrderOperationKeys](durable-messaging-idempotency.md#hierarchical-business-operation-keys),
-sets it in the body and correlation metadata, and supplies `ReplyTo`.
+includes it and the response destination in the typed `ReserveStock` application
+record. The [application-local codec](durable-messaging.md#encode-ordinary-application-values)
+encodes that record into the envelope's immutable raw payload.
 
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_inventory" language="csharp":::
 
@@ -89,8 +93,10 @@ recipient set.
 
 The campaign record and every outgoing intent are captured in the same sender
 journal write. Each destination commits independently through the
-[notification handler](durable-messaging.md#deployment-requirements). Correlation
-keys identify each recipient under the campaign root. A successful publish response
+[notification handler](durable-messaging.md#deployment-requirements). Operation
+keys in the `Notify` payload identify each recipient under the campaign root. The
+recipient's durable notification ledger prevents a fresh-ID business duplicate
+from incrementing the count twice, while retaining the original text. A successful publish response
 means the campaign and intents are durable; recipient completion is a later event.
 
 Bound the recipient count and payload size at your ingress according to journal
@@ -102,6 +108,12 @@ client-retry horizon, and use receiver-side business ledgers when recipients nee
 idempotency beyond the inbox's transport window.
 
 ## Combine the recipes into an order workflow
+
+Use one dispatcher when the coordinator receives several application message kinds.
+This example records inventory and payment outcomes under their leaf keys; duplicate
+responses with fresh envelope IDs reuse the recorded outcome:
+
+:::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_dispatcher" language="csharp":::
 
 A per-order coordinator persists its expected step keys and phase, sends
 inventory and payment requests, then completes the initiating command. Each
@@ -129,6 +141,8 @@ storage/provider outcomes against the actual providers used in deployment.
 
 The executable documentation examples in `DurableMessagingRecipeTests` cover
 hierarchical key isolation, repeated reservations, recorded shortages, conflicting
-requests, provider-success/local-cancellation retry, and out-of-order projections.
+requests, provider-success/local-cancellation retry, out-of-order projections, and a single
+dispatcher receiving both response kinds. `DurableMessagingSnippetTests` also checks
+notification-ledger deduplication and independently decoded package entries.
 For runtime guarantees and operating controls, see
 [Durable messaging operations](durable-messaging-operations.md).

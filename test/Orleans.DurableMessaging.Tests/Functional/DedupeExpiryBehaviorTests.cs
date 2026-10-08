@@ -95,10 +95,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
     {
         var sessions = fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("expiry-test-sender", "stable");
-        var built = new DurableEnvelopeBuilder(sessions, sender)
-            .To(receiver.GetGrainId(), "messages/expiry")
-            .WithBody(message)
-            .Build();
+        var built = TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), "messages/expiry", message);
         if (messageId is { } id)
         {
             built = new DurableEnvelope
@@ -106,11 +103,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
                 MessageId = id,
                 SenderId = built.SenderId,
                 ReceiverId = built.ReceiverId,
-                RouteKey = built.RouteKey,
-                CorrelationKey = built.CorrelationKey,
-                ReplyTo = built.ReplyTo,
-                Data = built.Data,
-                CreatedAt = built.CreatedAt,
+                Payload = built.Payload,
             };
         }
 

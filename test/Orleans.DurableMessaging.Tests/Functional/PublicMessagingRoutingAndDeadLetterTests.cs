@@ -19,10 +19,12 @@ public sealed class PublicMessagingRoutingAndDeadLetterTests : DurableMessagingB
     }
 
     [Fact]
-    public async Task RouteNotFound_OutboxRetriesThenDeadLettersWithoutReceiverPersistence()
+    public async Task HandlerNotFound_OutboxRetriesThenDeadLettersWithoutReceiverPersistence()
     {
         var sender = NewGrain();
         var receiver = NewGrain();
+        await receiver.ConfigureHandlerAsync(false);
+        await RefreshSeededOwnerAsync(receiver);
 
         await sender.SendAsync(
             receiver.GetGrainId(),
@@ -34,7 +36,7 @@ public sealed class PublicMessagingRoutingAndDeadLetterTests : DurableMessagingB
         var deadLetter = Assert.Single(senderState.OutboxDeadLetters);
         Assert.Equal("unknown/outbox-route", deadLetter.Route);
         Assert.Equal(3, deadLetter.AttemptCount);
-        Assert.Contains("No handler", deadLetter.Reason, StringComparison.Ordinal);
+        Assert.Contains("No inbox handler", deadLetter.Reason, StringComparison.Ordinal);
         var receiverState = await receiver.GetSnapshotAsync();
         Assert.Equal(0, receiverState.InboxCount);
         Assert.Empty(receiverState.Effects);
@@ -46,6 +48,8 @@ public sealed class PublicMessagingRoutingAndDeadLetterTests : DurableMessagingB
     {
         var sender = NewGrain();
         var receiver = NewGrain();
+        await receiver.ConfigureHandlerAsync(false);
+        await RefreshSeededOwnerAsync(receiver);
         var messageId = await sender.SendAsync(
             receiver.GetGrainId(),
             "unknown/removable-outbox-route",

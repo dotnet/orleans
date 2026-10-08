@@ -18,7 +18,7 @@ messaging. Persist business state, operation ledgers, and messaging state throug
 same grain-scoped journal manager. Keep state names stable and application-owned;
 the `__orleans.durable-messaging.*` names belong to the messaging implementation.
 The messaging journal uses the `orleans-binary` format so envelope bytes recover
-with their declared body and context types.
+exactly as opaque application payloads. The application owns record decoding.
 
 Use non-reentrant grains. Activation validates execution properties, and grain
 pumps run as non-interleaving timer turns. A handler preparing asynchronously can
@@ -77,7 +77,7 @@ transaction rate. The supported range is zero through 4,294,967,294 milliseconds
 | `Accepted` | The receiver committed the inbox admission. Await a correlated application result or query its operation ledger for business completion. |
 | `Duplicate` | The receiver already has the transport identity pending or processed within retention. The outbox can finish that delivery. |
 | `Backpressured` | The sender retains the envelope and retries according to its policy. Examine pending depth, oldest age, and handler preparation latency. |
-| `RouteNotFound` | The receiver's current registrations cannot select a handler. Examine deployment skew and route compatibility; delivery failures follow the configured retry/dead-letter policy. |
+| `HandlerNotFound` | No inbox handler is registered at the receiver. `DeliveryResult.HandlerNotFound()` reports `No inbox handler is registered.`. Check activation registration and deployment skew; delivery failures follow retry/dead-letter policy. |
 | `DeadLettered` | The remote outcome completes the outbox delivery as a terminal receiver outcome. Inspect the receiver's diagnostics and business status. |
 
 An ordinary sender's successful journal write establishes durability of its outgoing
@@ -89,7 +89,7 @@ correlated reply for end-to-end business confirmation.
 
 | Symptom | Boundary and remedy |
 | --- | --- |
-| Repeated handler errors | Validate body type, route, and local preparation dependencies. Business rejections should be recorded outcomes; persistent preparation errors reach dead letters. |
+| Repeated handler errors | Validate application record type/version, operation key, response destination, and local preparation dependencies. Business rejections should be recorded outcomes; persistent preparation errors reach dead letters. |
 | Successful return without `Complete()` | A handler contract error retires the owner. Ensure every successful branch, including no-effect outcomes, calls `Complete()` and returns synchronously. |
 | Handler error after `Complete()` | The runtime persists the staged completion and output, cleans up, then reports the error. Diagnose the original error using the committed business state. |
 | `JournaledStatePreCommitException` | A persistence prerequisite failed before storage. Complete changes remain staged. Choose explicit persistence retry or retire the owner and reconcile fresh replay. |
@@ -117,7 +117,7 @@ Authorize replay and diagnostic access separately from ordinary submissions.
 
 For a replay:
 
-1. Repair the preparation dependency, route, or payload compatibility issue.
+1. Repair the preparation dependency, handler registration, or application-payload compatibility issue.
 2. Query participant ledgers and external provider outcomes using the original
    business-operation key.
 3. Submit the recovered request through an authorized grain method. Keep that key
@@ -149,7 +149,7 @@ The `Microsoft.Orleans` meter exposes these messaging instruments:
 Export metrics with the application's telemetry pipeline. Alert on sustained depth
 growth, oldest pending age from application diagnostics, repeated failure outcomes,
 and storage latency. Combine them with Journaling and Durable Jobs health signals.
-Log correlation and operation keys for incident investigation, and keep
+Log application workflow and operation keys for incident investigation, and keep
 high-cardinality tenant/order keys in logs or traces rather than metric dimensions.
 
 Capacity includes pending envelopes, opaque serialized bodies, processed transport
@@ -158,6 +158,13 @@ costs depend on these retained sets. Measure activation replay time and storage
 throughput alongside steady-state handling.
 
 ### Budget allocations and owned memory
+
+Payloads have managed immutable backing: creation snapshots application-writer bytes
+once, and staging/transport/journal values safely share immutable references.
+`new ImmutableBuffer(arcBuffer)` permits the caller to dispose the Arc owner
+immediately. Tiny payloads therefore retain their raw bytes rather than a minimum
+16 KiB Arc page each. Count managed payload length and retained envelope references
+separately from transient serialization and storage buffers.
 
 Track allocation rate and retained memory separately. A processing-rate budget
 expressed as bytes per acknowledged message describes how much garbage the
@@ -185,28 +192,55 @@ separate from the benchmark result.
 
 ## Deploy compatible message contracts
 
-Keep route names and serialization identifiers stable. Serializable bodies use
-`GenerateSerializer` and stable `Id` members; retain readers for messages written
-before a rolling upgrade. Explicitly version business semantics and route names
-when an incompatible payload or operation policy changes.
+### Migrate legacy prerelease envelopes
 
-Deploy compatible receiving handlers before new producers emit a route. Retire a
-route after pending messages, retained dead letters, and authorized replays have
+The new prerelease envelope format carries its opaque `Payload` at serialization
+`Id(8)`. Transport identities retain IDs 0, 1, and 2. Retired legacy envelope fields
+at IDs 3 through 7 remain reserved and must not be reused.
+
+**Migrate legacy prerelease envelopes and their journal replay history before
+switching to the new core.** Quiesce producers and use the legacy reader to drain
+pending inbox/outbox work and reconcile retained dead letters and authorized
+replays. Earlier append records still contain legacy envelopes even after current
+queues become empty. Complete a storage compaction which acknowledges a snapshot
+containing only compatible live state, or explicitly rewrite that history and
+remaining envelopes into the new format. Preserve business state and processed
+identities throughout the migration.
+
+This is a coordinated format transition: validate fresh recovery of the resulting
+journals with the new reader before activating the new deployment and admitting
+producers. Validation includes pending envelopes, processed identities, retained
+dead letters, and application state.
+
+### Evolve application payload records
+
+Within the new envelope format, keep application message-kind and serialization
+identifiers stable. Typed payload records use `GenerateSerializer` and stable `Id`
+members; preserve readers for previously encoded application records. Explicitly
+version business semantics and application message kinds when an incompatible
+payload or operation policy changes.
+
+Deploy compatible application dispatchers before new producers emit a message kind.
+Retire a kind after pending messages, retained dead letters, and authorized replays have
 been handled. Query old workflow ledgers during the transition. Coordinate
 idempotency-key encoding changes so equivalent requests keep their identity.
 
-Derive tenant ownership and authorized destinations from trusted ingress. Envelope
-correlation and request-context values are application metadata. Validate them against
-that trusted ownership before preparing external effects or changing business state.
-Limit serialized payload sizes and keep secrets out of bodies, keys, and diagnostic
-logs.
+Derive tenant ownership and authorized destinations from trusted ingress. Workflow keys
+and response destinations decoded from the payload are application metadata. Validate
+them against that trusted ownership before preparing external effects or changing
+business state. Limit serialized payload sizes and keep secrets out of bodies, keys, and
+diagnostic logs.
 
 ## Measure sequential throughput
 
 The repository's `DurableMessaging.Sequential` benchmark measures a single chain
 through 2, 4, or 8 interacting grains on one silo. It performs 1,024 sequential
 durable deliveries per invocation and awaits actual journal acknowledgement of every
-handler step. Normal inbox/outbox pumps and real time drive progress.
+handler step. Its non-generic handler decodes an ordinary `SequentialMessage`
+record with `Serializer<SequentialMessage>` and stages an encoded immutable payload
+through the directly injected outbox. Normal inbox/outbox pumps and real time drive
+progress; the journal hook observes actual acknowledgements independently of handler
+return, and cleanup checks exact total and per-grain business-effect counts.
 
 Run from the repository root:
 

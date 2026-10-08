@@ -20,15 +20,14 @@ For complete grain examples, see [Practical recipes](durable-messaging-recipes.m
 | Identity | Owner and scope | Purpose |
 | --- | --- | --- |
 | `(SenderId, MessageId)` | The receiving grain's inbox | Coalesces retransmission of an envelope while it is pending or its processed record is retained. |
-| `CorrelationKey` | The application's workflow | Groups related requests, responses, and child steps using a hierarchy. |
+| Workflow root in the payload | The application's protocol | Groups related requests, responses, and child steps using a hierarchy. |
 | Business-operation key | A journaled application ledger | Recognizes the same business request across fresh envelope IDs, different producers, and longer retention periods. |
 | External idempotency key | The external system's account or API namespace | Makes a retried external side effect return the original provider outcome. |
 
-<xref:Orleans.DurableMessaging.DurableEnvelopeBuilder.Build*> creates a fresh
-`MessageId` and creation timestamp. The outbox retains that envelope across its own
-delivery retries. An application which reconstructs a request creates another transport
-identity, so its receiver uses a business-operation ledger to recognize the logical
-request.
+The application assigns a fresh `MessageId` when constructing a new envelope. The outbox
+retains that envelope across its own delivery retries. An application which reconstructs
+a request creates another transport identity, so its receiver uses a business-operation
+ledger to recognize the logical request.
 
 For example, two envelopes can share the operation key
 `tenants/acme/orders/42/payment/charge` while having different message IDs. The inbox
@@ -55,9 +54,8 @@ Configuration requires `MaxOutboxRetryAge < DeduplicationWindow`. Producer fleet
 use compatible policies, and an operator replay after this window relies on the
 application ledger.
 
-The outbox coalesces equivalent envelopes with a live message ID across prepared,
-staged, and durable intents. Equivalence includes receiver, route, correlation,
-reply destination, timestamp, body, and request-context bytes and types. Preserve
+The outbox coalesces equivalent envelopes with a live message ID across staged and
+durable intents. Equivalence includes sender, receiver, and raw payload bytes. Preserve
 the original envelope when explicitly resubmitting it; an ID binds to its original
 content. Reuse with conflicting content raises an error.
 
@@ -107,8 +105,8 @@ its descendants at segment boundaries: `orders/42` matches `orders/42/payment`,
 whereas `orders/420/payment` belongs to another order. A key is its own ancestor;
 `IsChildOf` tests exactly one additional segment.
 
-The runtime uses correlation for selection and diagnostics. Business deduplication
-is an explicit lookup in an application-owned
+The application decodes operation keys from its typed payload records. Business
+deduplication is an explicit lookup in an application-owned
 <xref:Orleans.Journaling.IDurableDictionary`2>. Store the full leaf key for exact
 operation matching. Use ancestor checks for grouping or authorization after deriving
 the authorized root from trusted caller identity.

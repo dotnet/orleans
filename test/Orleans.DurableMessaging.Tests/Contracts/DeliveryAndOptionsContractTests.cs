@@ -102,14 +102,14 @@ public sealed class DeliveryAndOptionsContractTests
     [Fact]
     public void DeliveryResult_EachFactory_PreservesStatusAndPayload()
     {
-        var routeMissing = DeliveryResult.RouteNotFound("orders/missing");
+        var handlerMissing = DeliveryResult.HandlerNotFound();
         var deadLettered = DeliveryResult.DeadLettered("poison body");
 
         Assert.Equal(DeliveryStatus.Accepted, DeliveryResult.Accepted().Status);
         Assert.Equal(DeliveryStatus.Duplicate, DeliveryResult.Duplicate().Status);
         Assert.Equal(DeliveryStatus.Backpressured, DeliveryResult.Backpressured().Status);
-        Assert.Equal(DeliveryStatus.RouteNotFound, routeMissing.Status);
-        Assert.Equal("No handler for route 'orders/missing'", routeMissing.Message);
+        Assert.Equal(DeliveryStatus.HandlerNotFound, handlerMissing.Status);
+        Assert.Equal("No inbox handler is registered.", handlerMissing.Message);
         Assert.Equal(DeliveryStatus.DeadLettered, deadLettered.Status);
         Assert.Equal("poison body", deadLettered.Message);
     }
@@ -122,7 +122,7 @@ public sealed class DeliveryAndOptionsContractTests
                 DeliveryStatus.Accepted,
                 DeliveryStatus.Duplicate,
                 DeliveryStatus.Backpressured,
-                DeliveryStatus.RouteNotFound,
+                DeliveryStatus.HandlerNotFound,
                 DeliveryStatus.DeadLettered
             ],
             Enum.GetValues<DeliveryStatus>());

@@ -41,7 +41,6 @@ internal static class ReceiverTestServices
             sp.GetRequiredService<IGrainContext>(),
             sp.GetRequiredService<ITimerRegistry>(),
             sp.GetRequiredService<IJournaledStateManager>(),
-            sp.GetRequiredService<SerializerSessionPool>(),
             sp.GetRequiredService(typeof(ILogger<>).MakeGenericType(extensionType)),
             sp.GetRequiredService(instrumentsType),
             sp.GetRequiredService(inboxType),
@@ -53,7 +52,6 @@ internal static class ReceiverTestServices
             GetValue<DurableJob>(sp, "inbox-job-handle"),
             GetValue<string>(sp, "inbox-completed-job-id"),
             GetValue<long>(sp, "inbox-job-sequence"),
-            sp.GetRequiredService<IDurableOutbox>(),
             sp.GetRequiredService<ILocalDurableJobManager>(),
             sp.GetRequiredService<IDurableJobHandlerRegistry>(),
             sp.GetRequiredService(pumpResultsType),
@@ -74,7 +72,6 @@ internal static class ReceiverTestServices
             _ = GetValue<DurableJob>(sp, "inbox-job-handle");
             _ = GetValue<string>(sp, "inbox-completed-job-id");
             _ = GetValue<long>(sp, "inbox-job-sequence");
-            _ = sp.GetRequiredService<IDurableOutbox>();
             return CreateInstance(inboxType,
                 GetDictionary<(GrainId, Guid), DurableEnvelope>(sp, "inbox"),
                 sp.GetServices<IInboxHandler>(), options.MaxCapacity);

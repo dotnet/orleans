@@ -39,8 +39,8 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         Assert.Equal(1, receiverState.OutboxCount);
         var outgoing = Assert.Single(output);
         Assert.Equal(sink.GetGrainId(), outgoing.ReceiverId);
-        Assert.Equal("messages/forwarded", outgoing.RouteKey);
-        Assert.True(outgoing.Data.TryGetBody<DurableTestMessage>(out var body));
+        Assert.Equal("messages/forwarded", TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>(), outgoing).Route);
+        var body = TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>(), outgoing).Body;
         Assert.Equal(new DurableTestMessage(logicalId, 7, "atomic"), body);
         Assert.Equal(1, receiverState.ProcessedMessageCount);
         await receiver.RequestDeactivationAsync();
@@ -83,68 +83,6 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         Assert.Empty(recovered.Effects);
         Assert.Empty(Fixture.GetStagedOutput(receiver));
         Assert.Equal(envelope.Value.MessageId, Assert.Single(recovered.InboxDeadLetters).MessageId);
-    }
-
-    [Fact]
-    public async Task HandlerSelectionFailure_IsDeadLettered()
-    {
-        var receiver = NewGrain();
-        using var envelope = CreateEnvelope(
-            receiver,
-            NewMessage(80, "selection-failure"),
-            "messages/selection-failure");
-
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-        var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
-
-        Assert.Empty(state.Effects);
-        var deadLetter = Assert.Single(state.InboxDeadLetters);
-        Assert.Contains("Injected handler selection failure", deadLetter.Reason, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task HandlerSelection_CannotStageOutboundMessages()
-    {
-        var receiver = NewGrain();
-        using var envelope = CreateEnvelope(
-            receiver,
-            NewMessage(81, "selection-mutation"),
-            "messages/selection-mutation");
-
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
-        var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
-
-        Assert.Empty(state.Effects);
-        Assert.Equal(0, state.OutboxCount);
-        Assert.Empty(state.OutboxDeadLetters);
-        var deadLetter = Assert.Single(state.InboxDeadLetters);
-        Assert.Contains("selection is read-only", deadLetter.Reason, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task SelectionMiss_PreservesUnrelatedStagedEffectsForNextWrite()
-    {
-        var receiver = NewGrain();
-        var original = await receiver.GetSnapshotAsync();
-        var journalId = JournalId.FromGrainId(receiver.GetGrainId());
-        var writes = Fixture.Storage.GetSuccessfulWriteCount(journalId);
-        var staged = new DurableEffect(Guid.NewGuid(), 1, 82, "application-staging");
-        await receiver.StageEffectAsync(staged);
-        using var envelope = CreateEnvelope(receiver, NewMessage(83, "route-miss"), "unknown/selection");
-
-        var result = await DeliverAsync(receiver, envelope.Value);
-        var selected = await receiver.GetSnapshotAsync();
-
-        Assert.Equal(DeliveryStatus.RouteNotFound, result.Status);
-        Assert.Equal(staged, Assert.Single(selected.Effects));
-        Assert.Equal(0, selected.InboxCount);
-        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journalId));
-        await receiver.RetryWriteStateAsync();
-        await receiver.RequestDeactivationAsync();
-        var recovered = await receiver.GetSnapshotAsync();
-        Assert.NotEqual(original.ActivationId, recovered.ActivationId);
-        Assert.Equal(staged, Assert.Single(recovered.Effects));
-        Assert.Equal(0, recovered.InboxCount);
     }
 
     [Fact]
@@ -210,36 +148,4 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         Assert.Empty(Fixture.GetStagedOutput(receiver));
     }
 
-    [Fact]
-    public async Task NullBodyAndContext_DecodeSuccessfullyAndTypedHandlersReceiveNull()
-    {
-        var receiver = NewGrain();
-        using var referenceEnvelope = CreateEnvelope<string?>(
-            receiver,
-            body: null,
-            route: "nullable/reference",
-            builder => builder
-                .WithContextValue<string?>("null-reference", null)
-                .WithContextValue<int?>("null-value", null));
-
-        Assert.True(referenceEnvelope.Value.Data.TryGetBody<string?>(out var referenceBody));
-        Assert.Null(referenceBody);
-        Assert.True(referenceEnvelope.Value.Data.TryGetContextValue<string?>("null-reference", out var referenceContext));
-        Assert.Null(referenceContext);
-        Assert.True(referenceEnvelope.Value.Data.TryGetContextValue<int?>("null-value", out var valueContext));
-        Assert.Null(valueContext);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, referenceEnvelope.Value)).Status);
-
-        using var valueEnvelope = CreateEnvelope<int?>(receiver, body: null, route: "nullable/value");
-        Assert.True(valueEnvelope.Value.Data.TryGetBody<int?>(out var valueBody));
-        Assert.Null(valueBody);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, valueEnvelope.Value)).Status);
-
-        var completed = await Fixture.SnapshotProbe.WaitAsync(
-            receiver.GetGrainId(),
-            static snapshot => snapshot.NullReferenceMessageCalls == 1
-                && snapshot.NullNullableValueMessageCalls == 1);
-        Assert.Equal(1, completed.NullReferenceMessageCalls);
-        Assert.Equal(1, completed.NullNullableValueMessageCalls);
-    }
 }

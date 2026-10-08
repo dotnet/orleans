@@ -26,7 +26,7 @@ public interface IDurableInboxExtension : IGrainExtension
     /// </remarks>
     /// <returns>Result indicating delivery/processing status.</returns>
     /// <exception cref="ArgumentException">
-    /// <paramref name="envelope"/> has an empty message ID, a default sender, missing data,
+    /// <paramref name="envelope"/> has an empty message ID, a default sender, missing payload,
     /// or identifies a receiver other than the grain handling the call.
     /// </exception>
     [Alias("DeliverAsync")]

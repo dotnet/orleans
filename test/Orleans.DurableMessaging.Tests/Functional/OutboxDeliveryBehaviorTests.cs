@@ -117,7 +117,7 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
     }
 
     [Fact]
-    public async Task OutboxPreparationFailure_KeepsActivationHealthyAndRetryUsesNewOwnership()
+    public async Task OutboxSchedulingPrerequisiteFailure_KeepsActivationHealthyAndRetryUsesNewOwnership()
     {
         const string jobName = "orleans.messaging.outbox-flush";
         var sender = NewGrain();
@@ -128,21 +128,21 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
         var message = NewMessage(55, "schedule-retry");
         Fixture.JobManagerProbe.FailAfterNext(jobName);
 
-        await Assert.ThrowsAsync<IOException>(() => sender.SendAsync(receiver.GetGrainId(), "messages/schedule-retry", message));
+        var prerequisite = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => sender.SendAsync(receiver.GetGrainId(), "messages/schedule-retry", message));
+        Assert.IsType<IOException>(prerequisite.InnerException);
         Assert.False(oldContext.Deactivated.IsCompleted);
-        await sender.RetryWriteStateAsync();
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
         var healthy = await sender.GetSnapshotAsync();
         Assert.Equal(before.ActivationId, healthy.ActivationId);
         Assert.Same(oldManager, Fixture.GetGrainContext(sender).ActivationServices.GetRequiredService<IJournaledStateManager>());
-        Assert.Equal(0, healthy.OutboxCount);
+        Assert.Equal(1, healthy.OutboxCount);
         Assert.Null(healthy.OutboxJob);
         var orphan = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(jobName, sender.GetGrainId()));
 
         var receiverWrite = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         try
         {
-            await sender.SendAsync(receiver.GetGrainId(), "messages/schedule-retry", message);
+            await sender.RetryWriteStateAsync();
             await receiverWrite.WaitUntilEnteredAsync();
             var committed = Fixture.GetSnapshot(sender);
             var jobs = Fixture.JobManagerProbe.GetScheduledJobs(jobName, sender.GetGrainId());

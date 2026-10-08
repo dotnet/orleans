@@ -5,7 +5,7 @@ outboxes built on Orleans Journaling and Durable Jobs. Configure their storage f
 the deployment, then call `AddDurableMessaging` on the silo builder. The
 `IServiceCollection` overload registers the same messaging services. Grains implement
 `IDurableMessagingGrain` or derive from `DurableGrain`, inject `IDurableInbox` to
-register handlers, and inject `IDurableOutbox` to enqueue envelopes.
+register their single handler, and inject `IDurableOutbox` to enqueue envelopes.
 
 `AddDurableMessaging` selects the built-in `orleans-binary` journal format from the
 default JSON format and preserves an explicit binary configuration. Another
@@ -16,102 +16,107 @@ capacity, batches, retries, deduplication, and dead-letter retention.
 
 The protocol and runtime provide:
 
-- `DurableEnvelope` identifies a message by sender and message ID and carries its
-  destination, route, correlation key, reply destination, and creation timestamp.
-- `DurableEnvelopeBuilder` serializes the body and each request-context value into
-  an envelope buffer. `DurableEnvelopeData` supports deferred typed reads and raw
-  byte access, preserving declared type metadata across serialization and copying.
-- `HierarchicalKey` provides escaped, slash-separated correlation keys with
-  segment-aware parent, child, and ancestor comparisons.
-- `IDurableInbox`, `IDurableOutbox`, and `IDurableInboxExtension` define message
+- `DurableEnvelope` has `MessageId` (`Guid`), `SenderId` and `ReceiverId`
+  (`GrainId`), and required `Payload` (`ImmutableBuffer` from
+  `Orleans.Serialization.Buffers`). Payload bytes are opaque to the transport.
+- `ImmutableBuffer` is managed immutable raw backing. Its copying constructors take
+  `ReadOnlySpan<byte>`, `ReadOnlySequence<byte>`, or `ArcBuffer`; `Create` accepts a
+  synchronous `Action<IBufferWriter<byte>>`. Construction snapshots borrowed bytes
+  once. Callers can immediately reuse source memory or dispose Arc owners.
+  `Memory`, `Length`, `Empty`, and `AsReadOnlySequence` expose read-only raw bytes.
+  Treat that memory as immutable, including when using memory interop APIs.
+- Staging, RPC copying, and journal values safely share immutable payload references.
+  Tiny messages do not each retain a minimum 16 KiB Arc page. Networking and storage
+  still encode and transfer data using their own operation-owned buffers.
+- `BufferPackage` is an independently reusable immutable value for keyed raw items.
+  `BufferPackageBuilder.Add(key, span)` or `Add(key, writerCallback)` supplies each
+  entry; `Build` freezes the builder and package. `Keys` and `TryGetBytes` inspect
+  independently encoded entries. Encode the package with an ordinary serializer
+  when carrying it as an envelope payload.
+- Application-local helpers use ordinary `Serializer<T>` or `Serializer` to encode
+  and decode typed records. Those records own business-operation keys, request/response
+  destinations, message kinds, and protocol versions. `HierarchicalKey` supplies
+  segment-aware equality and ancestry for application business ledgers.
+- `IDurableInbox`, `IDurableOutbox`, and `IDurableInboxExtension` define handler
   registration, inspection, enqueue, and delivery operations. `DeliveryResult` and
-  `DeliveryStatus` describe delivery outcomes.
-- `IDurableOutbox.Send(envelope)` synchronously stages an outgoing envelope. The final journal
-  capture hook establishes its durable self-wakeup before capture; dispatch
+  `DeliveryStatus` describe delivery outcomes. An absent registered handler returns
+  `HandlerNotFound` (numeric value 3); `DeliveryResult.HandlerNotFound()` reports
+  `No inbox handler is registered.`.
+- `IDurableOutbox.Send(envelope)` synchronously stages an outgoing envelope. The final
+  journal capture hook establishes its durable self-wakeup before capture; dispatch
   follows acknowledgement of the exact captured messages and physical owner pair.
-- `IPreparedOutboxBatch` is an optional opaque, activation-local disposable handle returned
-  by `IDurableOutbox.PrepareSendAsync`. `Send(batch)` synchronously stages its prepared
-  outgoing intents.
-- `IInboxHandler` and `IInboxHandler<TMessage>` define metadata selection and
-  `HandleAsync`, which returns a `ValueTask` for the handler method outcome.
-  `RouteKeyHandler`, `RoutePrefixHandler`, and `CorrelationHandler` match exact ordinal
-  routes, route prefixes at segment boundaries, and correlation
-  hierarchies. `IInboxHandlerContext` exposes the envelope and outbound-message helpers.
+- `IInboxHandler` has only `ValueTask HandleAsync(IInboxHandlerContext,
+  CancellationToken)`. The inbox has a single `RegisterHandler(handler)` registration.
+  Use one application dispatcher for multiple message kinds. Its context exposes only
+  `Envelope` and `Complete()`; inject `IDurableOutbox` directly to stage messages.
 - `DurableInboxOptions` supplies defaults and validates capacity, retry, retention,
   and batch limits, including an outbox retry age shorter than the deduplication window.
 
+## Prerelease envelope migration
+
+The new prerelease envelope format places opaque `Payload` at serialization `Id(8)`.
+Identity fields retain IDs 0, 1, and 2; retired legacy fields at IDs 3 through 7 remain
+reserved and must not be reused.
+
+**Migrate legacy prerelease envelopes and their journal replay history before
+switching to the new core.** Quiesce producers, drain pending work using the legacy
+reader, and reconcile retained dead letters required for replay. Earlier append
+records still contain legacy envelopes after current queues become empty. Complete
+an acknowledged compatible snapshot which replaces that history, or explicitly
+migrate the history and remaining envelopes. Preserve business state and processed
+identities. Coordinate the format transition and validate fresh recovery with the
+new reader before activating the new deployment and admitting producers.
+
+## Handler and persistence boundaries
+
 Handlers perform asynchronous I/O, validation, envelope construction, and cancellation
-checks using local values before the first shared business or journaled mutation.
-From that first shared mutation through method completion, execute synchronously with
-no awaits. Apply complete safe-to-commit changes, stage outgoing envelopes or optional
-prepared batches, call `context.Complete()`, and return without further awaits.
-This mutation boundary is the handler implementation's trusted responsibility.
+checks using local values before the first shared business or journaled mutation. From
+that first shared mutation through method completion, execute synchronously with no
+awaits. Apply complete safe-to-commit changes, stage outgoing envelopes, call
+`context.Complete()`, and return without further awaits. This mutation boundary is the
+handler implementation's trusted responsibility.
 
 `Complete()` synchronously stages inbox completion and deduplication in that same turn.
 The runtime awaits `HandleAsync`'s outcome and then owns actual journal persistence,
 acknowledgement, and resource cleanup. A valid final block completes even if attempt
 cancellation arrives after shared updates have begun; check cancellation beforehand.
 Repeated completion in the same still-active completed attempt coalesces after attempt
-identity validation. Wrong-attempt and retired completion calls are rejected. Sending
-and further preparation end at completion; metadata remains inspectable.
+identity validation. Wrong-attempt and retired completion calls are rejected. The
+handler stages all outgoing work before completion; the envelope remains inspectable.
 
-Ordinary applications use `outbox.Send(envelope)` alongside business updates
-and await their usual journal write:
-
-```csharp
-businessState.Value = nextValue;
-outbox.Send(envelope);
-await stateManager.WriteStateAsync(cancellationToken);
-```
+Ordinary application methods prepare and encode outgoing envelopes locally, apply
+business updates, call `outbox.Send(envelope)`, and await their usual journal write.
+Compiled notification, inventory, payment, projection, fan-out, and dispatcher examples
+live in the [documentation snippets](../../docs/site/src/content/docs/snippets/compiled/Grains/).
+Handlers instead call `context.Complete()` after staging the final shared update and
+return without awaiting; the runtime owns their write and acknowledgement.
 
 The outbox registers the owner's single `IJournaledStateCaptureHook`. Ordinary before
 callbacks run first; the work loop then directly awaits this final prerequisite and
-synchronously captures state. The outbox confirms a viable durable self-wakeup for
-all staged intents, including messages arriving during ordinary hooks or its own scheduling. Scheduling uses the owned
-journal-operation and feature-shutdown lifetimes. Caller cancellation ends only the
-caller wait. A `JournaledStatePreCommitException` reports a failed prerequisite before
-capture: ordinary callers can restore the prerequisite and explicitly retry the write
-with their business changes and message intents still pending. Feature-owned operations
-retire their owner after a prerequisite failure and recover from the durable outcome.
-A `JournaledStatePostCommitException` reports failed post-persistence work after actual
-acknowledgement; business effects and messaging acknowledgements remain committed.
+synchronously captures state. The outbox confirms a viable durable self-wakeup for all
+staged intents, including messages arriving during ordinary hooks or its own scheduling.
+Scheduling uses the owned journal-operation and feature-shutdown lifetimes. Caller
+cancellation ends only the caller wait. A `JournaledStatePreCommitException` reports a
+failed prerequisite before capture: ordinary callers can restore the prerequisite and
+explicitly retry the write with their business changes and message intents still
+pending. Feature-owned operations retire their owner after a prerequisite failure and
+recover from the durable outcome. A `JournaledStatePostCommitException` reports failed
+post-persistence work after actual acknowledgement; business effects and messaging
+acknowledgements remain committed.
 
 External dispatch starts after the corresponding captured intents and owner pair are
-acknowledged. Messages staged during a storage await belong to a later capture. The
-hook shares actual scheduling with early preparation independently of the gate retained
-by feature-owned writes through acknowledgement. Owner retirement and subsequent sends preserve exact physical
-job identity and generation boundaries.
+acknowledged. Messages staged during a storage await belong to a later capture. The hook
+retains actual scheduling ownership through the write outcome, independently of the gate
+retained by feature-owned writes through acknowledgement. Owner retirement and
+subsequent sends preserve exact physical job identity and generation boundaries.
 
-For an early prerequisite, await `context.Outbox.PrepareSendAsync(messages, cancellationToken)`
-before the first shared mutation, then call `context.Send(batch)` and `context.Complete()`
-in the final non-yielding part of `HandleAsync`.
-Ordinary callers can likewise acquire a batch before business mutation. Preparation
-copies and validates the collection and confirms the wakeup before staging; empty
-batches are valid no-ops. Durable state determines work for duplicate and orphan wakeups,
-and wakeups defer while local preparation or persistence is unresolved.
-
-The handler runtime tracks preparations from their start and owns resulting batches
-through attempt completion, including late results after cancellation or failure. Keep
-the batch alive through the handler method and subsequent owned persistence. Ordinary callers must await every preparation
-operation and dispose each successfully returned batch. Their disposal scope spans
-synchronous business mutations, `Send(batch)`, and the ordinary journal-write await.
-Disposal abandons unstaged preparation; staged wakeup and intent ownership stays with
-its pending/captured/acknowledged cohort through the actual persistence outcome. When
-a caller cancels its wait, owned scheduling continues and releases the unclaimed batch
-after its actual outcome. Activation retirement cleans up remaining owned preparation.
-
-Repeatedly sending the same live already-staged batch has no additional effect within
-a valid current scope. Every call requires the owning activation and scope; handler
-sends require their matching active attempt before completion. Outside-scope, stale, wrong-attempt,
-disposed, or foreign handles are rejected before mutation.
-Envelope identity/equivalence checks retain the existing routing, payload and declared-type
-metadata semantics.
-
-Handlers await and handle preparation results before their first shared mutation.
-Started acquisition tasks and resulting batches stay owned through their actual
-outcomes and attempt retirement, including unused and late results. Applications
-handle the outcome of tasks created using `AsTask()`. Their final shared updates,
-outgoing staging, completion, and method return follow the no-await coding contract.
+Equivalent enqueues with a live `MessageId` coalesce across staged and durable
+intents. The ID binds to its original sender, receiver, and raw payload bytes.
+Conflicting content fails before admission. Preserve the original envelope for
+retransmission. Application business deduplication is separate: decode a stable
+operation key, verify its original immutable request, and reuse the journaled outcome
+across fresh IDs or different producers. `(SenderId, MessageId)` transport deduplication
+continues to identify envelope retries within the configured retention window.
 
 `IDurableMessagingGrain` is a local capability which selects durable messaging activation
 setup. Implement it on a grain class, an application base class, or an application grain
@@ -120,16 +125,16 @@ Selection is cached with the concrete grain type, and each activation reuses its
 inbox, outbox, and registered journaled messaging states.
 
 Setup validates the grain's execution model after the runtime assigns the constructed
-grain instance and before lifecycle startup, journal initialization, or replay. Supported
-activations use a single, noninterleaving grain execution model. Validation uses
-the resolved grain properties which configure runtime interleaving and the runtime's
-resolved placement strategy, including custom metadata and keyed placement aliases.
-Grain construction and local state registration precede validation. The standard state manager enrolls in the
-grain lifecycle during grain-bound construction. Standard `IDurableStateManager`
-and `IJournaledStateManager` services alias that same scoped manager. Application
-code uses the typed named-state API and ordinary writes; messaging uses the journal
-owner for state-machine registration and persistence. Shared setup resolves the
-complete messaging graph before recovery closes registration.
+grain instance and before lifecycle startup, journal initialization, or replay.
+Supported activations use a single, noninterleaving grain execution model. Validation
+uses the resolved grain properties which configure runtime interleaving and the
+runtime's resolved placement strategy, including custom metadata and keyed placement
+aliases. Grain construction and local state registration precede validation. The
+standard state manager enrolls in the grain lifecycle during grain-bound construction.
+Standard `IDurableStateManager` and `IJournaledStateManager` services alias that same
+scoped manager. Application code uses the typed named-state API and ordinary writes;
+messaging uses the journal owner for state-machine registration and persistence. Shared
+setup resolves the complete messaging graph before recovery closes registration.
 
 The inbox uses eight canonical standard `IDurableDictionary` and `IDurableValue`
 states under the existing stream names. Keyed Journaling registrations bind them
@@ -157,24 +162,25 @@ The inbox accepts a message after DurableJobs confirms scheduling and the journa
 commits the envelope together with its ownership generation and exact returned job
 handle. Admission counts acknowledged pending work in constant time from inbox and
 provisional-acceptance counts. Recovery restores that pair and repairs an absent owner
-for pending work.
-Callbacks validate generation and physical job identity before processing.
-Delivery requires a nonempty message ID, a nondefault sender, and an envelope data
-container before duplicate lookup or admission. Serialized null message bodies remain
-valid payloads. Empty-owner clearing shares the inbox admission gate with delivery,
-so direct interleaved delivery proceeds after the clear's durable outcome.
+for pending work. Callbacks validate generation and physical job identity before
+processing. Delivery requires a nonempty message ID, a nondefault sender, and a nonnull
+immutable payload before duplicate lookup or admission. Empty raw payloads are valid;
+application decoding and null validation belong to the handler. Empty-owner clearing
+shares the inbox admission gate with delivery, so direct interleaved delivery proceeds
+after the clear's durable outcome.
 
-The handler context and its outbox belong to the current active attempt. They permit
-local preparation and outgoing staging before completion, retaining actual owner and
-resource lifetime checks. `Complete()` stages inbox completion synchronously and
-ends outgoing staging for the attempt. A successful method return without completion
-reports an explicit contract error. Method errors after completion retain the staged
-logical outcome through actual persistence and cleanup, then surface the original error.
+The handler context belongs to the current active attempt. It exposes the received
+envelope and attempt-scoped completion. The directly injected outbox retains owning
+activation and lifetime checks for outgoing staging. `Complete()` stages inbox
+completion synchronously and marks the logical outcome for that attempt. A successful
+method return without completion reports an explicit contract error. Method errors after
+completion retain the staged logical outcome through actual persistence and cleanup,
+then surface the original error.
 
 Before `Complete()`, ordinary handler errors follow bounded retry/dead-letter accounting
 under the trusted local-preparation contract. Attempt cancellation retains the committed
-inbox and owner for another attempt on the same activation. The runtime owns started
-acquisitions and releases them through their actual outcomes.
+inbox and owner for another attempt on the same activation. The runtime owns admitted
+persistence operations through their actual outcomes.
 
 After `Complete()`, a handler exception is logged and retained while the ordinary
 owned write persists the completed logical outcome. The exception is reported after
@@ -183,16 +189,11 @@ Actual persistence failure remains authoritative and terminal; any earlier handl
 exception remains recorded. An admitted write continues independently of attempt
 cancellation, and completion of the valid synchronous final block is preserved.
 
-Optional early preparation keeps business state, outgoing intents, and inbox completion unchanged.
-Independent journal writes can persist previously staged changes while preparation
-awaits. The runtime validates input and ownership before handler entry. The handler's
-synchronous final block joins business effects, staged output and `(SenderId, MessageId)`
-deduplication through `Complete()`. Scheduling failures during preparation follow the ordinary bounded
-retry/dead-letter policy; handlers can catch them and prepare a safe alternative outcome.
-Each started acquisition remains owned through its actual result. Attempt cleanup
-drains outstanding acquisitions and disposes unused results, including preparations
-which user code failed to await. Successfully acquired handles remain owned through
-the attempt's persistence outcome.
+Asynchronous application I/O and decoding precede shared mutations. Independent
+journal writes can persist earlier valid state during local preparation. The final
+synchronous block joins business effects, outgoing intents, and inbox deduplication
+through `Complete()`. Unknown application message kinds and malformed payloads fail
+inside the handler and follow processing retry/dead-letter policy.
 An accepted message whose handler is absent on a later activation completes immediately
 into dead-letter storage. Its processed marker suppresses duplicates through the
 configured deduplication window.
@@ -206,11 +207,11 @@ Application code completes fallible checks before applying shared changes, so ev
 staged mutation is safe to commit. Inbox processing requests persistence after
 successful staging. Before-completion handler failures use the documented preparation
 outcome, and completed handler failures retain actual persistence before surfacing.
-Both paths release owned preparation resources. Genuine journal failures
+Both paths retain their owned runtime operations through the actual outcome. Genuine journal failures
 remain subject to the manager's internal failure fence and waiter completion; the
 inbox catches its failed write and stops local processing with the original observed
 cause. Operation lifetime tracking keeps shutdown waiting for actual writes and
-preparation retirement. A fresh activation replays
+operation retirement. A fresh activation replays
 the actual durable outcome, including commits whose acknowledgement failed.
 A delivery caller can cancel its wait while the owned operation retains admission
 through completion. Activation shutdown drains that operation, and delivery failures
@@ -221,12 +222,10 @@ failure remains the cause reported to operation waiters.
 
 Retained duplicates return `Duplicate`; expiry permits
 acceptance again. Capacity limits return `Backpressured` before persistence.
-`CanHandle` implementations are pure metadata predicates, keeping grain and injected
-durable state unchanged. The selection context exposes metadata and grain identity
-and rejects outgoing-message and completion operations. `HandleAsync` prepares local
-values, then stages complete business changes, outgoing messages and completion
-without awaiting from the first mutation through method completion.
-A route miss preserves the grain's staged state for its next journal write.
+`HandleAsync` prepares local values, then stages complete business changes, outgoing
+messages through the directly injected outbox, and completion without awaiting from
+the first shared mutation through method return. Missing handler registration is a
+transport admission outcome; application message-kind dispatch is handler code.
 For full journal deletion, the owner stops and drains its inbox and outbox through
 their existing lifecycle, awaits the advanced owner's actual `DeleteStateAsync`
 operation, then disposes or deactivates that owner. Caller wait cancellation leaves
@@ -246,42 +245,33 @@ It joins admitted writes while the inbox remains busy; durable pump maintenance 
 fresh activation also remove due records. A maintenance-only write requires expired
 records. Delivery still evaluates each duplicate against the exact retention boundary.
 
-Exact route registration retains the original handler instance and takes precedence
-over generic handler selection. Operational diagnostics expose retained dead letters
-and stage their removal for the next journal write.
+Single handler registration retains the original instance. Operational diagnostics
+expose retained dead letters and stage their removal for the next journal write.
+Application-authorized diagnostics decode business keys from payload records.
 
-The builder encodes the body and request context into an envelope buffer which the
-outbox reuses with the owning grain as sender. Synchronous `Send(envelope)` validates and
-stages one message for the next journal capture. Optional `PrepareSendAsync` snapshots and validates
-the complete batch, reserves its message identities, and confirms a durable self-wakeup.
-The returned activation-local batch retains those prerequisites. Preparation leaves
-journaled state and visible message depth unchanged. `Send(batch)` synchronously stages
-the prepared intents alongside application changes before ordinary persistence. Journal
-standard dictionaries encode their commands during synchronous staging; standard values
-encode changed values during capture. `Count`, `Messages`,
-and `TryGetMessage` include staged and acknowledged messages once per ID. `Count`
-and depth metrics use the dictionary count in constant time. Staged intents remain
-delivery-fenced until their exact captured cohort is acknowledged. Repeated
-equivalent enqueues preserve their original message, enqueue time, and commit status.
-Direct envelopes require a nonempty message ID, an owning sender, a nondefault receiver,
-and envelope data before intent admission.
-Serialized null bodies remain valid; route selection supplies delivery and dead-letter
-outcomes. Conflicting IDs fail; equivalence includes routing, timestamps, body and
-context bytes, and declared type metadata.
+Synchronous `Send(envelope)` validates and stages one message for the next journal
+capture. Standard dictionaries encode commands during staging; standard values encode
+changed values at capture. `Count`, `Messages`, and `TryGetMessage` include staged and
+acknowledged messages once per ID. Depth accounting uses dictionary counts in constant
+time. Intents remain delivery-fenced until their exact captured cohort is acknowledged.
+Equivalent enqueues preserve their original enqueue time and commit status. Direct
+envelopes require a nonempty message ID, owning sender, nondefault receiver, and nonnull
+immutable payload before admission. Raw empty bytes are valid; the application decides
+what payload encoding and content are meaningful.
 
 The outbox uses six standard durable collections resolved by their existing keyed
 names from the owning activation or standalone dependency scope. They register with
 that scope's actual advanced owner and use its selected format configuration. The
 seventh state retains the existing job-sequence value and associates outbox messages
 with capture and acknowledgement. Its construction owner supplies the exact long-value
-codec for the selected format. All seven stream names and state encodings remain stable.
+codec for the selected format. All seven stream names remain stable; verify envelope and journal schema
+compatibility independently during upgrades.
 Grain-facing `IDurableStateManager` writes share that same owner and acknowledgement
 boundary.
 Standalone fixtures use `CreateStandalone`, explicitly register their state machines,
 and retain caller ownership of initialization, dependencies, and disposal.
-Feature preparation serializes wakeup acquisition and shares the viable exact owner
-between live batches. It releases the acquisition gate before returning each handle,
-so callers can prepare several batches before applying them. Healthy owners retain
+The final capture hook establishes wakeup ownership for synchronous sends.
+Healthy owners retain
 their exact handles. Feature operations complete ownership, generation and message
 preconditions before applying their prepared commands synchronously. Ordinary journal
 writes persist that safe-to-commit state. The sequence state's capture callback seals
@@ -301,8 +291,8 @@ idempotent terminal cleanup. Obsolete timer turns release their matching waiting
 results and cancellation registrations; stale polls retire only that run's completed
 result. Outbox stop, fault, and deletion clear only outbox result entries. Batch
 cancellation logs callback failures and retains its token source through the actual
-completion of all delivery attempts. Shutdown drains in-flight delivery, preparation
-and outbox-owned writes; retired batches release their resources once, preserving the original operation failure.
+completion of all delivery attempts. Shutdown drains in-flight delivery, scheduling,
+and outbox-owned writes; retired operations release resources once, preserving the original failure.
 Diagnostics expose retained outbox dead letters and stage their removal for the next journal write.
 
 An outbox-owned write failure preserves the first observed error and stops local work;
@@ -318,39 +308,31 @@ The owning grain or standalone host stops and drains both messaging features bef
 awaiting the advanced journal owner's actual deletion. It then disposes or deactivates
 the owner; subsequent use starts with a fresh owner. Canceling a caller's wait leaves
 this cleanup workflow responsible for its actual outcome. Deletion may discard stopped,
-uncommitted intents and prepared handles. Reset clears their state and rotates the
-generation while preserving the stopped lifetime. Old handles remain unusable, and
-later disposal leaves a fresh owner's state intact.
+uncommitted intents. Reset clears their state and rotates the generation while
+preserving the stopped lifetime. Old contexts remain unusable; subsequent work uses a
+fresh owner.
 
-Ordinary callers await each preparation and dispose the returned batch after the
-staging/write scope. The handler facade owns batches through attempt completion,
-including late preparation outcomes. Disposing an unused handle releases only its
-reservation; disposing a staged handle leaves its cohort owned through the actual ACK.
-Equivalent overlapping batches share intent identity, including a completed delivery
-while another live batch still references it. Repeated `Send` of a live staged batch
-is idempotent within its valid scope. Every call validates owner, epoch and lifetime.
-
-A callback defers while scheduling or a provisional commit is unresolved. Once unused
-preparation is released, a wakeup with no corresponding durable work retires harmlessly.
-Caller cancellation ends its wait while scheduling retains resources through the actual
-outcome, including releasing an unclaimed result. Activation shutdown drains owned
-acquisition, preserves callback-error cleanup, and invalidates remaining handles.
+A callback defers while scheduling or a provisional commit is unresolved. A wakeup
+with no corresponding durable work retires harmlessly after recovery confirms the
+outcome. Caller cancellation ends only its wait; actual scheduling and persistence
+retain resources through their outcome. Activation shutdown drains owned operations.
 After successful manager recovery, feature startup schedules repair for wholly absent
 ownership pairs before an ordinary ownership write. Recovery callbacks refresh the
 feature's cached state; malformed pairs report their existing explicit error at startup.
 Scheduling errors before staging leave application and journaled state unchanged.
 
 Handlers and ordinary application methods finish fallible preparation before applying
-complete safe-to-commit business changes and prepared sends in one synchronous turn.
+complete safe-to-commit business changes and outgoing sends in one synchronous turn.
 Already-captured cohorts acknowledge only their own snapshot; mutations staged during
 the storage await remain pending for their own acknowledgement.
 
-Message outcome counters group by grain type and delivery or processing status.
-Each successful duplicate delivery records one received duplicate outcome, whether
-the message is pending in the inbox or retained as processed.
-The sent-message counter and latency histograms group by grain type. Orphaned-job
-metrics retain the job name, and depth gauges report aggregate pending work. Route
-keys continue to select handlers and remain available in message diagnostics.
+Message outcome counters group by grain type and delivery or processing status. Each
+successful duplicate delivery records one received duplicate outcome, whether the
+message is pending in the inbox or retained as processed. The sent-message counter and
+latency histograms group by grain type. Orphaned-job metrics retain the job name, and
+depth gauges report aggregate pending work. Envelope identities remain available in
+message diagnostics. Log decoded application keys only through authorized diagnostics,
+keeping high-cardinality keys out of metrics.
 
 Transport is at-least-once and unordered. Retained deduplication records provide
 effectively-once handler effects. Applications which require ordering carry
@@ -365,6 +347,7 @@ collection. Configure `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters` f
 the application's operational retention policy. Expired and excess records are
 compacted when dead letters are added and when an activation starts.
 
-See the [durable messaging guide](https://dotnet.github.io/orleans/docs/grains/durable-messaging/)
-and [hosting API](https://dotnet.github.io/orleans/docs/api/csharp/microsoft.orleans.durablemessaging/orleans.hosting.durablemessagingextensions/)
+See the [durable messaging
+guide](https://dotnet.github.io/orleans/docs/grains/durable-messaging/) and [hosting
+API](https://dotnet.github.io/orleans/docs/api/csharp/microsoft.orleans.durablemessaging/orleans.hosting.durablemessagingextensions/)
 for configuration and operating guarantees.

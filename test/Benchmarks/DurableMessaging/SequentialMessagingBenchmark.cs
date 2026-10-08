@@ -5,6 +5,8 @@ using Orleans.DurableMessaging;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
 using Orleans.TestingHost;
 
 namespace Benchmarks.DurableMessaging;
@@ -145,7 +147,7 @@ public sealed record SequentialMessage(
     [property: Id(2)] int MessageCount);
 
 /// <summary>Runs each hop through the production inbox, outbox, journal, and durable-job pumps.</summary>
-public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain, IInboxHandler<SequentialMessage>, IJournaledStateHook
+public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain, IInboxHandler, IJournaledStateHook
 {
     private readonly IDurableOutbox _outbox;
     private readonly IDurableStateManager _state;
@@ -153,7 +155,7 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
     private readonly IDurableValue<long> _processed;
     private readonly IDurableValue<SequentialMessage> _progress;
     private readonly CommittedHopProbe _probe;
-    private readonly Orleans.Serialization.Session.SerializerSessionPool _sessions;
+    private readonly Serializer<SequentialMessage> _serializer;
     private SequentialMessage? _captured;
 
     /// <summary>Constructs the ring participant and its acknowledgement observer.</summary>
@@ -166,7 +168,7 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
         [FromKeyedServices("ring-processed")] IDurableValue<long> processed,
         [FromKeyedServices("ring-progress")] IDurableValue<SequentialMessage> progress,
         CommittedHopProbe probe,
-        Orleans.Serialization.Session.SerializerSessionPool sessions)
+        Serializer<SequentialMessage> serializer)
     {
         _outbox = outbox;
         _state = state;
@@ -174,8 +176,8 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
         _processed = processed;
         _progress = progress;
         _probe = probe;
-        _sessions = sessions;
-        inbox.RegisterHandler("benchmark/hop", this);
+        _serializer = serializer;
+        inbox.RegisterHandler(this);
         journal.Hooks.Add(this);
     }
 
@@ -189,10 +191,7 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
     /// <inheritdoc/>
     public async Task StartAsync(Guid runId, int messageCount)
     {
-        var envelope = new DurableEnvelopeBuilder(_sessions, this.GetGrainId())
-            .To(_next.Value, "benchmark/hop")
-            .WithBody(new SequentialMessage(runId, 0, messageCount))
-            .Build();
+        var envelope = CreateEnvelope(new SequentialMessage(runId, 0, messageCount));
         _outbox.Send(envelope);
         await _state.WriteStateAsync();
     }
@@ -202,8 +201,9 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
 
     /// <inheritdoc/>
     public ValueTask HandleAsync(
-        SequentialMessage? message, IInboxHandlerContext context, CancellationToken cancellationToken)
+        IInboxHandlerContext context, CancellationToken cancellationToken)
     {
+        var message = _serializer.Deserialize(context.Envelope.Payload.Memory);
         ArgumentNullException.ThrowIfNull(message);
         if (message.RunId == Guid.Empty || message.Hop < 0 || message.Hop >= message.MessageCount)
         {
@@ -211,10 +211,7 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
         }
         var nextCount = checked(_processed.Value + 1);
         DurableEnvelope? output = message.Hop + 1 < message.MessageCount
-            ? context.CreateEnvelope()
-                .To(_next.Value, "benchmark/hop")
-                .WithBody(message with { Hop = message.Hop + 1 })
-                .Build()
+            ? CreateEnvelope(message with { Hop = message.Hop + 1 })
             : null;
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -222,11 +219,19 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
         _progress.Value = message;
         if (output is { } envelope)
         {
-            context.Send(envelope);
+            _outbox.Send(envelope);
         }
         context.Complete();
         return ValueTask.CompletedTask;
     }
+
+    private DurableEnvelope CreateEnvelope(SequentialMessage message) => new()
+    {
+        MessageId = Guid.NewGuid(),
+        SenderId = this.GetGrainId(),
+        ReceiverId = _next.Value,
+        Payload = ImmutableBuffer.Create(writer => _serializer.Serialize(message, writer))
+    };
 
     /// <inheritdoc/>
     public ValueTask BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)

@@ -38,12 +38,12 @@ public readonly struct DeliveryResult
     public static DeliveryResult Backpressured() => new() { Status = DeliveryStatus.Backpressured };
 
     /// <summary>
-    /// Creates a result indicating no handler was found for the route key.
+    /// Creates a result indicating the receiving inbox has no registered handler.
     /// </summary>
-    public static DeliveryResult RouteNotFound(string routeKey) => new()
+    public static DeliveryResult HandlerNotFound() => new()
     {
-        Status = DeliveryStatus.RouteNotFound,
-        Message = $"No handler for route '{routeKey}'"
+        Status = DeliveryStatus.HandlerNotFound,
+        Message = "No inbox handler is registered."
     };
 
     /// <summary>

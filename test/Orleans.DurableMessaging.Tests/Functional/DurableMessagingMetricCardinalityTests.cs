@@ -68,9 +68,12 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
     [Theory]
     [InlineData(1)]
     [InlineData(64)]
-    public async Task DistinctValidAndUnknownRoutes_KeepFixedMetricSeriesAndRoutingOutcomes(int routeCount)
+    public async Task DistinctApplicationRoutes_KeepFixedMetricSeriesAndMissingHandlerOutcomes(int routeCount)
     {
         var receiver = NewGrain();
+        var missingHandler = NewGrain();
+        await missingHandler.ConfigureHandlerAsync(false);
+        await RefreshSeededOwnerAsync(missingHandler);
         await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var instruments = context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableMessagingInstruments"));
@@ -82,14 +85,14 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
         {
             var unknown = $"unknown/{Guid.NewGuid():N}";
             routes.Add(unknown);
-            using var rejected = CreateEnvelope(receiver, NewMessage(index, "unknown"), unknown);
-            Assert.Equal(DeliveryStatus.RouteNotFound, (await DeliverAsync(receiver, rejected.Value)).Status);
-            Assert.Equal(unknown, rejected.Value.RouteKey);
+            using var rejected = CreateEnvelope(missingHandler, NewMessage(index, "unknown"), unknown);
+            Assert.Equal(DeliveryStatus.HandlerNotFound, (await DeliverAsync(missingHandler, rejected.Value)).Status);
+            Assert.Equal(unknown, TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), rejected.Value).Route);
             var valid = $"messages/cardinality/{Guid.NewGuid():N}";
             routes.Add(valid);
             using var accepted = CreateEnvelope(receiver, NewMessage(index, "accepted"), valid);
             Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, accepted.Value)).Status);
-            Assert.Equal(valid, accepted.Value.RouteKey);
+            Assert.Equal(valid, TestApplicationProtocol.Read(Fixture.Client.ServiceProvider.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), accepted.Value).Route);
             await Fixture.WaitForEffectCountAsync(receiver, index + 1);
         }
 
@@ -99,11 +102,11 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
         Assert.Equal(routeCount * 2, receivedRows.Length);
         Assert.Equal(2, receivedRows.Select(row => row.Series).Distinct().Count());
         var acceptedRows = receivedRows.Where(row => row.Tags.Any(tag => tag.Key == "status" && Equals(tag.Value, "accepted"))).ToArray();
-        var rejectedRows = receivedRows.Where(row => row.Tags.Any(tag => tag.Key == "status" && Equals(tag.Value, "route_not_found"))).ToArray();
+        var rejectedRows = receivedRows.Where(row => row.Tags.Any(tag => tag.Key == "status" && Equals(tag.Value, "handler_not_found"))).ToArray();
         Assert.Equal(routeCount, acceptedRows.Length);
         Assert.Equal(routeCount, rejectedRows.Length);
         Assert.All(acceptedRows, row => row.AssertCounter(grainType, "accepted"));
-        Assert.All(rejectedRows, row => row.AssertCounter(grainType, "route_not_found"));
+        Assert.All(rejectedRows, row => row.AssertCounter(grainType, "handler_not_found"));
         var processed = probe.Read("inbox-messages-processed");
         Assert.Equal(routeCount, processed.Length);
         Assert.Single(processed.Select(row => row.Series).Distinct());

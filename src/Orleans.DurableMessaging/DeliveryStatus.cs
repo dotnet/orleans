@@ -21,9 +21,9 @@ public enum DeliveryStatus
     Backpressured = 2,
 
     /// <summary>
-    /// No handler registered for the specified RouteKey.
+    /// The receiving inbox has no registered handler.
     /// </summary>
-    RouteNotFound = 3,
+    HandlerNotFound = 3,
 
     /// <summary>
     /// The message was moved to the receiver's dead-letter store.

@@ -51,6 +51,7 @@ public class DurableMessagingClusterFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton<TimeProvider>(Clock);
             siloBuilder.Services.UseTimeProviderForBackgroundAreas(TimeProvider.System);
             siloBuilder.Services.AddSingleton(HandlerProbe);
+            siloBuilder.Services.AddSingleton(new TestHandlerConfiguration());
             siloBuilder.Services.AddSingleton(SnapshotProbe);
             siloBuilder.Services.AddSingleton(ActivationProbe);
             siloBuilder.UseInMemoryDurableJobs();

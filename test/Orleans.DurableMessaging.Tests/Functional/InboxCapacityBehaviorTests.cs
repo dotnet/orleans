@@ -24,14 +24,8 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
         var sessions = fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("capacity-test-sender", Guid.NewGuid().ToString("N"));
-        var poison = new DurableEnvelopeBuilder(sessions, sender)
-            .To(receiver.GetGrainId(), "messages/capacity")
-            .WithBody(new DurableTestMessage(Guid.NewGuid(), 31, "poison", ThrowDuringPreparation: true))
-            .Build();
-        var rejected = new DurableEnvelopeBuilder(sessions, sender)
-            .To(receiver.GetGrainId(), "messages/capacity")
-            .WithBody(new DurableTestMessage(Guid.NewGuid(), 32, "accepted-after-capacity"))
-            .Build();
+        var poison = TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), "messages/capacity", new DurableTestMessage(Guid.NewGuid(), 31, "poison", ThrowDuringPreparation: true));
+        var rejected = TestApplicationProtocol.Create(sessions, sender, receiver.GetGrainId(), "messages/capacity", new DurableTestMessage(Guid.NewGuid(), 32, "accepted-after-capacity"));
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, poison)).Status);
         var full = await fixture.WaitForInboxCountAsync(receiver, 1);

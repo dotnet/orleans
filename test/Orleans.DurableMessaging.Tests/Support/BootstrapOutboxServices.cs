@@ -111,25 +111,24 @@ public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurabl
     private readonly List<(GrainId Sender, Guid MessageId, int Value)> _pending = [];
     private (GrainId Sender, Guid MessageId, int Value)[] _captured = [];
     private readonly BootstrapDeliveryProbe _probe;
+    private readonly Orleans.Serialization.Session.SerializerSessionPool _sessions;
     private readonly IDurableDictionaryCommandCodec<Guid, int> _codec;
 
     public BootstrapOutputGrain(IJournaledStateManager manager, IDurableInbox inbox, BootstrapDeliveryProbe probe,
-        IDurableDictionaryCommandCodec<Guid, int> codec)
+        IDurableDictionaryCommandCodec<Guid, int> codec, Orleans.Serialization.Session.SerializerSessionPool sessions)
     {
+        _sessions = sessions;
         _probe = probe;
         _codec = codec;
         manager.RegisterStateMachine("bootstrap-output-values", this);
-        inbox.RegisterHandler("output", this);
+        inbox.RegisterHandler(this);
     }
 
-    public bool CanHandle(IInboxHandlerContext context) => context.Envelope.RouteKey == "output";
     public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!context.Envelope.Data.TryGetBody<int>(out var value))
-        {
-            throw new InvalidOperationException("The bootstrap output must contain an integer.");
-        }
+        var value = (int)(TestApplicationProtocol.Read(_sessions, context.Envelope).Body
+            ?? throw new InvalidOperationException("The bootstrap output must contain an integer."));
         _values.Add(context.Envelope.MessageId, value);
         _pending.Add((context.Envelope.SenderId, context.Envelope.MessageId, value));
         context.Complete();

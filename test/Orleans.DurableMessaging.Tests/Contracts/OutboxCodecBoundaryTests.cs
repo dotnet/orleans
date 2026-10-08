@@ -50,14 +50,13 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(envelope.MessageId, Assert.Single(fixture.Messages).Key);
         await using var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
         var restored = Assert.Single(recovered.Messages).Value;
-        Assert.True(restored.Data.TryGetBody<Payload>(out var payload));
-        Assert.Equal(4096, Assert.IsType<Payload>(payload).Bytes.Length);
+        Assert.Equal(4096, Assert.IsType<Payload>(recovered.ReadApplication(restored).Body).Bytes.Length);
     }
 
     [Fact]
     public async Task DeadLetter_EncodesAtJournalApplicationWithoutPayloadPreflight()
     {
-        await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.RouteNotFound("missing"));
+        await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.HandlerNotFound());
         await fixture.SendAsync(fixture.CreateEnvelope());
         await fixture.WriteAsync(TestContext.Current.CancellationToken);
         await fixture.DeliverAsync();
@@ -89,7 +88,7 @@ public sealed class OutboxCodecBoundaryTests
     }
 
     [Fact]
-    public async Task BodyCodecFailure_IsReportedByBuilderBeforeIntentAdmission()
+    public async Task BodyCodecFailure_IsReportedByApplicationBeforeIntentAdmission()
     {
         await using var fixture = await CodecFixture.CreateAsync();
         fixture.Probe.FailureType = nameof(Payload);
@@ -130,7 +129,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(new[] { phase }, fixture.Probe.Phases(failedType));
         Assert.Equal(stagedMessages, fixture.Messages.Count);
         Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
-        Assert.Same(error, Assert.Throws<InvalidOperationException>(() => fixture.Outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken)));
+        Assert.Same(error, Assert.Throws<InvalidOperationException>(() => fixture.Outbox.Send(envelope)));
         await using var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
         Assert.Empty(recovered.Messages);
         Assert.Null(recovered.Job.Value);
@@ -139,7 +138,7 @@ public sealed class OutboxCodecBoundaryTests
     [Fact]
     public async Task DeadLetterCodecFailure_PreservesPreviouslyCommittedMessageOnFreshReplay()
     {
-        await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.RouteNotFound("missing"));
+        await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.HandlerNotFound());
         var envelope = fixture.CreateEnvelope();
         await fixture.SendAsync(envelope);
         await fixture.WriteAsync(TestContext.Current.CancellationToken);
@@ -185,11 +184,13 @@ public sealed class OutboxCodecBoundaryTests
 
     [Theory]
     [InlineData("message", false)]
+    [InlineData("sender", false)]
     [InlineData("receiver", false)]
-    [InlineData("data", false)]
+    [InlineData("payload", false)]
     [InlineData("message", true)]
+    [InlineData("sender", true)]
     [InlineData("receiver", true)]
-    [InlineData("data", true)]
+    [InlineData("payload", true)]
     public async Task DirectSendMalformedStructure_FailsBeforeIntentOrJournalMutation(string field, bool existingIntent)
     {
         await using var fixture = await CodecFixture.CreateAsync();
@@ -198,17 +199,25 @@ public sealed class OutboxCodecBoundaryTests
         var invalid = field switch
         {
             "message" => valid with { MessageId = Guid.Empty },
+            "sender" => valid with { SenderId = default },
             "receiver" => valid with { ReceiverId = default },
-            "data" => valid with { Data = null! },
+            "payload" => valid with { Payload = null! },
             _ => throw new ArgumentOutOfRangeException(nameof(field))
         };
 
-        var error = Assert.ThrowsAny<ArgumentException>(() => fixture.Outbox.PrepareSendAsync([invalid], TestContext.Current.CancellationToken));
-
-        Assert.Equal(field == "receiver" ? "messages" : "envelope", error.ParamName);
+        if (field == "sender")
+        {
+            var ownership = Assert.Throws<InvalidOperationException>(() => fixture.Outbox.Send(invalid));
+            Assert.Contains("does not match the owning grain", ownership.Message, StringComparison.Ordinal);
+        }
+        else
+        {
+            var error = Assert.ThrowsAny<ArgumentException>(() => fixture.Outbox.Send(invalid));
+            Assert.Equal("envelope", error.ParamName);
+        }
         Assert.Equal(existingIntent ? 1 : 0, fixture.Outbox.Count);
         Assert.Equal(existingIntent ? 1 : 0, fixture.Messages.Count);
-        Assert.Equal(existingIntent ? 1 : 0, fixture.Jobs.ReceivedCalls().Count());
+        Assert.Empty(fixture.Jobs.ReceivedCalls());
         Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
         Assert.Equal(existingIntent ? 1 : 0, fixture.Probe.Count(nameof(DurableEnvelope)));
         Assert.Null(fixture.States.Failure);
@@ -219,16 +228,15 @@ public sealed class OutboxCodecBoundaryTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData(" ")]
-    public async Task DirectSendBlankRoute_PreservesExplicitIdentityNullBodyAndRoutingOutcome(string? route)
+    public async Task DirectSendApplicationRoute_PreservesExplicitIdentityNullBodyAndMissingHandlerOutcome(string? route)
     {
-        await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.RouteNotFound(route!));
+        await using var fixture = await CodecFixture.CreateAsync(delivery: DeliveryResult.HandlerNotFound());
         var message = fixture.CreateNullBodyEnvelope() with
         {
             MessageId = Guid.Parse("89cabd50-d5c6-4bed-a94e-d7c312ed5139"),
-            RouteKey = route!
+            Payload = fixture.EncodeApplication(route!, null)
         };
-        Assert.True(message.Data.TryGetBody<string>(out var body));
-        Assert.Null(body);
+        Assert.Null(fixture.ReadApplication(message).Body);
 
         await fixture.SendAsync(message);
         await fixture.WriteAsync(TestContext.Current.CancellationToken);
@@ -297,7 +305,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(0, recovered.Outbox.Count);
         Assert.Empty(recovered.Messages);
         Assert.Null(recovered.Job.Value);
-        Assert.ThrowsAny<OperationCanceledException>(() => recovered.Outbox.PrepareSendAsync([first], TestContext.Current.CancellationToken));
+        Assert.ThrowsAny<OperationCanceledException>(() => recovered.Outbox.Send(first));
         await using var fresh = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
         await fresh.SendAsync(fresh.CreateEnvelope());
         await fresh.WriteAsync(TestContext.Current.CancellationToken);
@@ -310,17 +318,16 @@ public sealed class OutboxCodecBoundaryTests
     [InlineData(6, false)]
     [InlineData(0, true)]
     [InlineData(6, true)]
-    public async Task PreparedLease_StagingDuringStorageAwaitBelongsToNextCohort(int rotation, bool alreadyPending)
+    public async Task OpaqueSend_StagingDuringStorageAwaitBelongsToNextCohort(int rotation, bool alreadyPending)
     {
         await using var fixture = await CodecFixture.CreateAsync(stateOrder: rotation);
-        using var prepared = await fixture.Outbox.PrepareSendAsync([fixture.CreateEnvelope()], TestContext.Current.CancellationToken);
+        var prepared = fixture.CreateEnvelope();
         if (alreadyPending) await fixture.SendAsync(fixture.CreateEnvelope());
         var storage = fixture.Storage.BlockWrite(fixture.JournalId);
         var write = fixture.WriteAsync(TestContext.Current.CancellationToken).AsTask();
         await storage.WaitUntilEnteredAsync();
         Assert.Equal(alreadyPending ? 1 : 0, fixture.Messages.Count);
         fixture.Outbox.Send(prepared);
-        prepared.Dispose();
         Assert.Equal(alreadyPending ? 2 : 1, fixture.Outbox.Count);
         Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
         storage.Release();
@@ -357,7 +364,7 @@ public sealed class OutboxCodecBoundaryTests
         Assert.IsAssignableFrom<IDurableValue<long>>(sequence);
         Assert.False(fixture.Manager is IDurableStateManager);
         Assert.Equal(0, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
-        using var batch = await fixture.Outbox.PrepareSendAsync([fixture.CreateEnvelope()], TestContext.Current.CancellationToken);
+        var batch = fixture.CreateEnvelope();
         Assert.Equal(0, fixture.Outbox.Count);
         fixture.Outbox.Send(batch);
         await fixture.WriteAsync(TestContext.Current.CancellationToken);
@@ -492,16 +499,15 @@ public sealed class OutboxCodecBoundaryTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public Task SynchronousSend_RespectsPreparedIdentityReservationsAndOriginalEnvelope(bool preparedFirst) => OnOwnerAsync(async () =>
+    public Task SynchronousSend_RespectsOpaqueIdentityAndOriginalEnvelope(bool duplicateFirst) => OnOwnerAsync(async () =>
     {
         await using var fixture = await CodecFixture.CreateAsync();
         var envelope = fixture.CreateEnvelope();
-        if (!preparedFirst) fixture.Outbox.Send(envelope);
-        using var batch = await fixture.Outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken);
-        var conflict = envelope with { RouteKey = "conflicting-route" };
+        if (!duplicateFirst) fixture.Outbox.Send(envelope);
+        fixture.Outbox.Send(envelope);
+        var conflict = envelope with { Payload = fixture.EncodeApplication("conflicting-route", null) };
         Assert.Throws<InvalidOperationException>(() => fixture.Outbox.Send(conflict));
         fixture.Outbox.Send(envelope);
-        fixture.Outbox.Send(batch);
         fixture.Outbox.Send(envelope);
         Assert.Equal(envelope, Assert.Single(fixture.Messages).Value);
         Assert.Equal(1, fixture.Outbox.Count);
@@ -509,8 +515,14 @@ public sealed class OutboxCodecBoundaryTests
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await fixture.DeliverAsync();
         Assert.Empty(fixture.Messages);
+        // There is no prepared-handle reservation after ACK. Sending again is a new intent;
+        // receiver-side durable deduplication owns suppression of repeated business effects.
         fixture.Outbox.Send(envelope);
+        Assert.Equal(envelope.MessageId, Assert.Single(fixture.Messages).Key);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await fixture.DeliverAsync();
         Assert.Empty(fixture.Messages);
+        Assert.Equal(4, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
         Assert.Single(fixture.Jobs.ReceivedCalls());
     });
 
@@ -710,19 +722,19 @@ public sealed class OutboxCodecBoundaryTests
     });
 
     [Fact]
-    public Task SynchronousSend_OverlappingPreparationSharesOnePhysicalWakeup() => OnOwnerAsync(async () =>
+    public Task SynchronousSend_OverlappingWritesShareOnePhysicalWakeup() => OnOwnerAsync(async () =>
     {
         await using var fixture = await CodecFixture.CreateAsync();
         using var scheduling = fixture.BlockSchedule();
         var envelope = fixture.CreateEnvelope();
-        var prepared = fixture.Outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken).AsTask();
+        fixture.Outbox.Send(envelope);
+        var prepared = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await scheduling.WaitAsync();
         fixture.Outbox.Send(envelope);
         var write = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         scheduling.Release();
-        using var batch = await prepared;
+        await prepared;
         await write.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        fixture.Outbox.Send(batch);
         await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Single(fixture.Jobs.ReceivedCalls());
         Assert.Equal(1, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
@@ -1102,10 +1114,13 @@ public sealed class OutboxCodecBoundaryTests
             }
             return result;
         }
-        public DurableEnvelope CreateEnvelope() => new DurableEnvelopeBuilder(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "codec-boundary"))
-            .To(GrainId.Create("receiver", "codec-boundary"), "codec").WithBody(new Payload(new byte[4096])).Build();
-        public DurableEnvelope CreateNullBodyEnvelope() => new DurableEnvelopeBuilder(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "codec-boundary"))
-            .To(GrainId.Create("receiver", "codec-boundary"), "codec").WithBody<string?>(null).Build();
+        public DurableEnvelope CreateEnvelope() => TestApplicationProtocol.Create(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "codec-boundary"), GrainId.Create("receiver", "codec-boundary"), "codec", new Payload(new byte[4096]));
+        public DurableEnvelope CreateNullBodyEnvelope() => TestApplicationProtocol.Create(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "codec-boundary"), GrainId.Create("receiver", "codec-boundary"), "codec", null);
+
+        public ImmutableBuffer EncodeApplication(string route, object? body) =>
+            TestApplicationProtocol.Encode(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), new TestApplicationMessage(route, body));
+        public TestApplicationMessage ReadApplication(DurableEnvelope envelope) =>
+            TestApplicationProtocol.Read(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), envelope);
 
         public object ResolveStandardState(string name)
         {
@@ -1172,11 +1187,11 @@ public sealed class OutboxCodecBoundaryTests
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         }
 
-        public async Task SendAsync(DurableEnvelope envelope)
+        public Task SendAsync(DurableEnvelope envelope)
         {
-            using var batch = await Outbox.PrepareSendAsync([envelope], TestContext.Current.CancellationToken);
             Probe.Phase = "staging";
-            Outbox.Send(batch);
+            Outbox.Send(envelope);
+            return Task.CompletedTask;
         }
 
         public async ValueTask WriteAsync(CancellationToken cancellationToken)

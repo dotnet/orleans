@@ -49,7 +49,6 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
         var completed = stateServices.GetRequiredKeyedService<IDurableValue<string>>("__orleans.durable-messaging.inbox-completed-job-id");
         var sequence = stateServices.GetRequiredKeyedService<IDurableValue<long>>("__orleans.durable-messaging.inbox-job-sequence");
         var handler = Substitute.For<IInboxHandler>();
-        handler.CanHandle(Arg.Any<IInboxHandlerContext>()).Returns(true);
         var inbox = Create("DurableInbox", messages, new[] { handler }, 10);
         var context = Substitute.For<IGrainContext>();
         var grainId = GrainId.Create("eager-inbox", "standalone");
@@ -82,18 +81,17 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
         var timers = Substitute.For<ITimerRegistry>();
         var type = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
         var extension = (IDurableInboxExtension)Create("DurableInboxExtension", context,
-            timers, manager, stateServices.GetRequiredService<SerializerSessionPool>(),
+            timers, manager,
             services.GetRequiredService(typeof(ILogger<>).MakeGenericType(type)),
             services.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableMessagingInstruments")),
             inbox, messages, processed, attempts, deadLetters, ownerId, ownerJob, completed, sequence,
-            Substitute.For<IDurableOutbox>(), jobs, Substitute.For<IDurableJobHandlerRegistry>(),
+            jobs, Substitute.For<IDurableJobHandlerRegistry>(),
             Create("DurableMessagingPumpResults"), TimeProvider.System, TimeProvider.System,
             new DurableInboxOptions { MaxCapacity = 10 });
         using var lifetime = (IDisposable)extension;
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         await ((ILifecycleObserver)extension).OnStart(TestContext.Current.CancellationToken);
-        var envelope = new DurableEnvelopeBuilder(stateServices.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "eager"))
-            .To(grainId, "route").WithBody(42).Build();
+        var envelope = TestApplicationProtocol.Create(stateServices.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "eager"), grainId, "route", 42);
         manager.BeforeCapture = () =>
         {
             Assert.Equal(envelope, Assert.Single(messages).Value);
