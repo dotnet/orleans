@@ -151,6 +151,8 @@ namespace Orleans.DurableMessaging
 
         public static HierarchicalKey Create(HierarchicalKey? parent, string value) { throw null; }
 
+        public static HierarchicalKey Create(scoped params System.ReadOnlySpan<string> values) { throw null; }
+
         public static HierarchicalKey Create(string value) { throw null; }
 
         public HierarchicalKey CreateChildKey(string value) { throw null; }

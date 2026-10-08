@@ -81,8 +81,15 @@ business meaning differs. Retried requests keep the same leaf. Choose the key fr
 stable domain identifiers before sending; generating a random key during handling
 would identify a new operation on every retry.
 
-The following helper percent-encodes opaque tenant and SKU identifiers into single
-segments. All producers use the same normalization and encoding:
+<xref:Orleans.DurableMessaging.HierarchicalKey.Create*> accepts successive hierarchy
+fragments as arguments or a `ReadOnlySpan<string>`. Each fragment follows the same
+segment and escaping rules as <xref:Orleans.DurableMessaging.HierarchicalKey.CreateChildKey*>.
+For example, `"payment/charge"` contributes two segments. Supply at least one
+nonempty fragment.
+
+The following helper constructs the order hierarchy in one call and percent-encodes
+opaque tenant and SKU identifiers into single segments. All producers use the same
+normalization and encoding:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_operation_keys" language="csharp":::
 

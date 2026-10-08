@@ -24,10 +24,8 @@ public static class OrderOperationKeys
             throw new ArgumentException("An order ID must be nonempty.", nameof(orderId));
         }
 
-        return HierarchicalKey.Create("tenants")
-            .CreateChildKey(Uri.EscapeDataString(tenantId))
-            .CreateChildKey("orders")
-            .CreateChildKey(orderId.ToString("N"));
+        return HierarchicalKey.Create(
+            "tenants", Uri.EscapeDataString(tenantId), "orders", orderId.ToString("N"));
     }
 
     public static HierarchicalKey Reservation(HierarchicalKey order, string sku)

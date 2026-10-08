@@ -50,6 +50,7 @@ public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalK
     /// <param name="value">The string value representing the key.</param>
     /// <returns>A new hierarchical key.</returns>
     /// <exception cref="ArgumentException">Thrown when the value contains empty segments.</exception>
+    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
     public static HierarchicalKey Create(string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(value);
@@ -62,11 +63,38 @@ public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalK
     }
 
     /// <summary>
+    /// Creates a new hierarchical key from the specified hierarchy fragments.
+    /// </summary>
+    /// <param name="values">The ordered hierarchy fragments, each containing one or more slash-separated, optionally escaped segments.</param>
+    /// <returns>A new hierarchical key composed by creating a root from the first fragment and appending each subsequent fragment as a child.</returns>
+    /// <remarks>
+    /// Existing escape sequences are preserved. Use <see cref="CreateEscaped(string)"/> to escape literal segment separators.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when a fragment is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty or a fragment is empty, contains empty segments, or contains an invalid escape sequence.</exception>
+    public static HierarchicalKey Create(params ReadOnlySpan<string> values)
+    {
+        if (values.IsEmpty)
+        {
+            throw new ArgumentException("Values must not be empty.", nameof(values));
+        }
+
+        var result = Create(values[0]);
+        for (var i = 1; i < values.Length; i++)
+        {
+            result = result.CreateChildKey(values[i]);
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Creates a new hierarchical key as a child of the specified parent.
     /// </summary>
     /// <param name="parent">The parent key.</param>
     /// <param name="value">The value for the child key.</param>
     /// <returns>A new hierarchical key.</returns>
+    [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
     public static HierarchicalKey Create(HierarchicalKey? parent, string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(value);
