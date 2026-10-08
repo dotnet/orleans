@@ -7,6 +7,7 @@ using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
 using Orleans.Statistics;
 using UnitTests.Grains;
 using Xunit;
@@ -259,6 +260,46 @@ namespace NonSilo.Tests
                         });
                 }).RunConsoleAsync(TestContext.Current.CancellationToken);
             });
+        }
+
+        [Theory]
+        [InlineData(0L, true)]
+        [InlineData(-1L, true)]
+        [InlineData(-TimeSpan.TicksPerMillisecond, true)]
+        [InlineData(-TimeSpan.TicksPerMillisecond, false)]
+        [InlineData(-TimeSpan.TicksPerMillisecond - 1, true)]
+        [InlineData(long.MinValue, true)]
+        public async Task SiloBuilder_ClusterMembershipOptionsRejectsInvalidTableRefreshTimeout(long ticks, bool useLivenessGossip)
+        {
+            using var host = new HostBuilder()
+                .UseOrleans(siloBuilder => siloBuilder
+                    .UseLocalhostClustering()
+                    .Configure<ClusterMembershipOptions>(options =>
+                    {
+                        options.TableRefreshTimeout = TimeSpan.FromTicks(ticks);
+                        options.UseLivenessGossip = useLivenessGossip;
+                    }))
+                .Build();
+
+            var exception = await Assert.ThrowsAsync<OrleansConfigurationException>(
+                () => host.StartAsync(TestContext.Current.CancellationToken));
+
+            Assert.Contains("ClusterMembershipOptions.TableRefreshTimeout", exception.Message);
+            Assert.Contains("must be greater than 0.", exception.Message);
+        }
+
+        [Theory]
+        [InlineData(1L)]
+        [InlineData(TimeSpan.TicksPerMillisecond / 2)]
+        [InlineData(60L * TimeSpan.TicksPerDay)]
+        public void SiloBuilder_ClusterMembershipOptionsAcceptsValidTableRefreshTimeout(long ticks)
+        {
+            using var services = new ServiceCollection()
+                .AddSingleton<IMembershipTable, NoOpMembershipTable>()
+                .Configure<ClusterMembershipOptions>(options => options.TableRefreshTimeout = TimeSpan.FromTicks(ticks))
+                .BuildServiceProvider();
+
+            new SiloClusteringValidator(services).ValidateConfiguration();
         }
 
         /// <summary>
