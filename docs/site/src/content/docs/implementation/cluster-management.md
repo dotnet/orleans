@@ -49,7 +49,9 @@ Compare the snapshot version with the required <xref:Orleans.Runtime.MembershipV
 
 A starting silo writes its row, becomes `Joining`, and validates two-way connectivity with active members before becoming `Active`. This prevents a partitioned process from silently joining one side of a cluster.
 
-The periodic `IAmAlive` value is not the peer heartbeat. It is a timestamp written to the membership row for diagnostics and startup disaster recovery. A sufficiently stale active row can be ignored during the joining connectivity check, allowing a cluster to recover after all processes were lost without cleanly declaring each other dead.
+`IAmAliveTime` is a membership-row liveness timestamp used for diagnostics and startup disaster recovery. A joining silo monitors suspected and stale peers and reevaluates monitoring candidates at the <xref:Orleans.Configuration.ClusterMembershipOptions.TableRefreshTimeout?displayProperty=nameWithType> interval. It compares the latest snapshot's timestamps with current time, so a peer whose timestamp becomes stale during startup enters monitoring even when the membership view remains unchanged.
+
+Those monitors apply the usual failed-probe threshold, connection-liveness checks, and death-vote protocol. Initial connectivity validation continues retrying until each active peer responds or membership records its departure. This allows a replacement silo to recover after an ungraceful process exit and become `Active` through the normal membership protocol.
 
 ## Failure detection and death votes <a name="the-membership-protocol"></a>
 
