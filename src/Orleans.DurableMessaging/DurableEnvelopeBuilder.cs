@@ -32,7 +32,9 @@ namespace Orleans.DurableMessaging;
 ///     .WithContextValue("trace-id", "abc-123")
 ///     .Build();
 /// var batch = await context.Outbox.PrepareSendAsync([envelope], ct);
-/// return () => context.Send(batch);
+/// ct.ThrowIfCancellationRequested();
+/// context.Send(batch);
+/// context.Complete();
 /// </code>
 /// </para>
 /// </remarks>
@@ -207,7 +209,9 @@ public sealed class DurableEnvelopeBuilder : IBufferWriter<byte>
     ///         .WithBody(response)
     ///         .Build();
     ///     var batch = await context.Outbox.PrepareSendAsync([reply], ct);
-    ///     return () => context.Send(batch);
+    ///     ct.ThrowIfCancellationRequested();
+    ///     context.Send(batch);
+    ///     context.Complete();
     /// }
     /// </code>
     /// </example>

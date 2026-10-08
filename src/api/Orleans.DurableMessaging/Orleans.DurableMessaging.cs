@@ -16,9 +16,8 @@ namespace Orleans.DurableMessaging
 
         public bool CanHandle(IInboxHandlerContext context) { throw null; }
 
-        System.Threading.Tasks.ValueTask<System.Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        protected abstract System.Threading.Tasks.ValueTask<System.Action> PrepareAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
+        protected abstract System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     [GenerateSerializer]
@@ -230,7 +229,7 @@ namespace Orleans.DurableMessaging
     public partial interface IInboxHandler
     {
         bool CanHandle(IInboxHandlerContext context);
-        System.Threading.Tasks.ValueTask<System.Action> PrepareAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IInboxHandlerContext
@@ -241,6 +240,7 @@ namespace Orleans.DurableMessaging
 
         IDurableOutbox Outbox { get; }
 
+        void Complete();
         DurableEnvelopeBuilder CreateEnvelope();
         void Send(DurableEnvelope envelope);
         void Send(IPreparedOutboxBatch batch);
@@ -248,9 +248,9 @@ namespace Orleans.DurableMessaging
 
     public partial interface IInboxHandler<TMessage> : IInboxHandler
     {
+        System.Threading.Tasks.ValueTask HandleAsync(TMessage message, IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
         bool IInboxHandler.CanHandle(IInboxHandlerContext context);
-        System.Threading.Tasks.ValueTask<System.Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask<System.Action> PrepareAsync(TMessage message, IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IPreparedOutboxBatch : System.IDisposable
@@ -265,9 +265,8 @@ namespace Orleans.DurableMessaging
 
         public bool CanHandle(IInboxHandlerContext context) { throw null; }
 
-        System.Threading.Tasks.ValueTask<System.Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        protected abstract System.Threading.Tasks.ValueTask<System.Action> PrepareAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
+        protected abstract System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public abstract partial class RoutePrefixHandler : IInboxHandler
@@ -280,9 +279,8 @@ namespace Orleans.DurableMessaging
 
         protected string? GetRouteSuffix(string? routeKey) { throw null; }
 
-        System.Threading.Tasks.ValueTask<System.Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        protected abstract System.Threading.Tasks.ValueTask<System.Action> PrepareAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
+        protected abstract System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 }
 

@@ -37,7 +37,9 @@ namespace Orleans.DurableMessaging;
 ///     .Build();
 ///
 /// var batch = await context.Outbox.PrepareSendAsync([envelope], ct);
-/// return () => context.Send(batch);
+/// ct.ThrowIfCancellationRequested();
+/// context.Send(batch);
+/// context.Complete();
 /// </code>
 /// </example>
 public interface IDurableOutbox
@@ -69,7 +71,7 @@ public interface IDurableOutbox
     /// and before capturing pending state, including messages staged while scheduling is awaited. An explicit write retry retains
     /// pending business changes and messages after a scheduling failure. Dispatch starts after the
     /// captured message and owner pair are acknowledged. Equivalent identities retain the original envelope.
-    /// Handlers call this method from their returned synchronous apply action.
+    /// Handlers call this method before Complete in their synchronous final block and return without awaits.
     /// Use <see cref="PrepareSendAsync"/> to establish the wakeup earlier, before business mutation.
     /// </remarks>
     /// <exception cref="InvalidOperationException">The envelope conflicts with an existing identity, sender, or handler scope.</exception>
@@ -95,10 +97,12 @@ public interface IDurableOutbox
     /// </para>
     /// <para>
     /// Inbox handlers acquire batches through <see cref="IInboxHandlerContext.Outbox"/> during
-    /// <see cref="IInboxHandler.PrepareAsync"/>. The runtime tracks preparations from their start and owns
+    /// <see cref="IInboxHandler.HandleAsync"/>. The runtime tracks preparations from their start and owns
     /// resulting batches through attempt completion, including late results after cancellation or failure.
-    /// Retain a batch for the returned action. Ordinary callers must await every preparation operation and
-    /// dispose each successfully returned batch, keeping its scope through staging and the journal write.
+    /// Retain a batch through the synchronous final block and call <see cref="IInboxHandlerContext.Complete"/>.
+    /// Sending and further preparation are rejected after handler completion or retirement. Ordinary callers
+    /// must await every preparation operation and dispose each successfully returned batch, keeping its scope
+    /// through staging and the journal write.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="messages"/> is null.</exception>
@@ -121,7 +125,7 @@ public interface IDurableOutbox
     /// <para>
     /// Repeatedly sending the same live, already-staged batch has no additional effect within a valid
     /// current scope. Every call requires the batch's owning activation and scope. Handler calls require
-    /// the matching returned action, via its context or outbox. Outside-scope, stale, wrong-attempt,
+    /// the matching active attempt before Complete, via its context or outbox. Outside-scope, stale, wrong-attempt,
     /// disposed, or foreign handles are rejected before any mutation.
     /// </para>
     /// <para>

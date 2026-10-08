@@ -36,7 +36,9 @@ namespace Orleans.DurableMessaging;
 ///     .Build();
 ///
 /// var batch = await context.Outbox.PrepareSendAsync([envelope], ct);
-/// return () => context.Send(batch);
+/// ct.ThrowIfCancellationRequested();
+/// context.Send(batch);
+/// context.Complete();
 /// </code>
 /// </example>
 [GenerateSerializer, Alias("Orleans.DurableMessaging.DurableEnvelope")]
@@ -179,10 +181,12 @@ public readonly struct DurableEnvelope
     ///     .Build();
     ///
     /// var requestBatch = await context.Outbox.PrepareSendAsync([request], ct);
-    /// return () => context.Send(requestBatch);
+    /// ct.ThrowIfCancellationRequested();
+    /// context.Send(requestBatch);
+    /// context.Complete();
     ///
     /// // Handler prepares a reply for synchronous application
-    /// public async ValueTask&lt;Action&gt; PrepareAsync(PaymentRequest request, IInboxHandlerContext context, CancellationToken ct)
+    /// public async ValueTask HandleAsync(PaymentRequest request, IInboxHandlerContext context, CancellationToken ct)
     /// {
     ///     var result = await PreparePaymentAsync(request, ct);
     ///
@@ -195,10 +199,14 @@ public readonly struct DurableEnvelope
     ///             .Build();
     ///
     ///         var batch = await context.Outbox.PrepareSendAsync([response], ct);
-    ///         return () => context.Send(batch);
+    ///         ct.ThrowIfCancellationRequested();
+    ///         context.Send(batch);
+    ///         context.Complete();
+    ///         return;
     ///     }
     ///
-    ///     return static () => { };
+    ///     ct.ThrowIfCancellationRequested();
+    ///     context.Complete();
     /// }
     /// </code>
     /// </example>

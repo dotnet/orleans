@@ -41,7 +41,7 @@ namespace Orleans.DurableMessaging;
 /// </remarks>
 /// <example>
 /// <code>
-/// protected override async ValueTask&lt;Action&gt; PrepareAsync(
+/// protected override async ValueTask HandleAsync(
 ///     IInboxHandlerContext context, CancellationToken ct)
 /// {
 ///     if (!context.Envelope.Data.TryGetBody&lt;WorkflowEvent&gt;(out var workflowEvent))
@@ -50,7 +50,9 @@ namespace Orleans.DurableMessaging;
 ///     }
 ///
 ///     var prepared = await PrepareWorkflowAsync(context.Envelope.CorrelationKey, workflowEvent, ct);
-///     return () =&gt; ApplyWorkflow(prepared);
+///     ct.ThrowIfCancellationRequested();
+///     ApplyWorkflow(prepared);
+///     context.Complete();
 /// }
 /// </code>
 /// </example>
@@ -103,11 +105,11 @@ public abstract class CorrelationHandler : IInboxHandler
     }
 
     /// <summary>
-    /// Prepares a message that matches the configured correlation key or is a descendant.
+    /// Handles a message that matches the configured correlation key or is a descendant.
     /// </summary>
     /// <param name="context">Handler context containing the envelope and methods for sending messages.</param>
-    /// <param name="cancellationToken">The cancellation token for preparation.</param>
-    /// <returns>A task whose result is a non-null synchronous action applying the prepared effects.</returns>
+    /// <param name="cancellationToken">The cancellation token to check before the first shared mutation.</param>
+    /// <returns>A completion representing the handler method outcome.</returns>
     /// <remarks>
     /// <para>
     /// This method is only called when <see cref="CanHandle"/> returns <c>true</c>, meaning the
@@ -118,17 +120,17 @@ public abstract class CorrelationHandler : IInboxHandler
     /// <c>context.Envelope.CorrelationKey</c> to determine if this is an exact match or a child workflow.
     /// </para>
     /// <para>
-    /// Follow the preparation and synchronous application requirements of <see cref="IInboxHandler.PrepareAsync"/>.
-    /// The interface implementation forwards the returned action to Messaging for invocation.
+    /// Follow the local preparation and synchronous final-block requirements of <see cref="IInboxHandler.HandleAsync"/>.
+    /// The interface implementation forwards the method outcome. The handler calls <see cref="IInboxHandlerContext.Complete"/>.
     /// </para>
     /// </remarks>
-    protected abstract ValueTask<Action> PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
+    protected abstract ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Explicit interface implementation that delegates to the protected <see cref="PrepareAsync"/> method.
+    /// Explicit interface implementation that delegates to the protected <see cref="HandleAsync"/> method.
     /// </summary>
-    ValueTask<Action> IInboxHandler.PrepareAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        return PrepareAsync(context, cancellationToken);
+        return HandleAsync(context, cancellationToken);
     }
 }

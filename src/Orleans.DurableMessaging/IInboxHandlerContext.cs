@@ -19,16 +19,17 @@ namespace Orleans.DurableMessaging;
 /// </para>
 /// <para>
 /// Build outbound envelopes in local variables and call <see cref="Send(DurableEnvelope)"/> from the
-/// synchronous action returned by <see cref="IInboxHandler.PrepareAsync"/> alongside business changes.
+/// synchronous final block of <see cref="IInboxHandler.HandleAsync"/> alongside business changes.
+/// Call <see cref="Complete"/> in that block and return without further awaits.
 /// The journal establishes the self-wakeup before capture. Optional <see cref="IDurableOutbox.PrepareSendAsync"/>
-/// establishes this prerequisite earlier and returns a batch to stage from the same action.
+/// establishes this prerequisite earlier and returns a batch to stage in the same final block.
 /// </para>
 /// </remarks>
 /// <example>
 /// <code>
 /// public class OrderHandler : IInboxHandler&lt;OrderRequest&gt;
 /// {
-///     public async ValueTask&lt;Action&gt; PrepareAsync(OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
+///     public async ValueTask HandleAsync(OrderRequest message, IInboxHandlerContext context, CancellationToken ct)
 ///     {
 ///         var result = await PrepareOrderAsync(message, ct);
 ///
@@ -57,11 +58,10 @@ namespace Orleans.DurableMessaging;
 ///             ? new[] { response, fulfillmentMessage }
 ///             : new[] { fulfillmentMessage };
 ///         var batch = await context.Outbox.PrepareSendAsync(messages, ct);
-///         return () =>
-///         {
-///             ApplyPreparedOrder(result);
-///             context.Send(batch);
-///         };
+///         ct.ThrowIfCancellationRequested();
+///         ApplyPreparedOrder(result);
+///         context.Send(batch);
+///         context.Complete();
 ///     }
 /// }
 /// </code>
@@ -116,7 +116,9 @@ public interface IInboxHandlerContext
     ///     .Build();
     ///
     /// var batch = await context.Outbox.PrepareSendAsync([request], ct);
-    /// return () => context.Send(batch);
+    /// ct.ThrowIfCancellationRequested();
+    /// context.Send(batch);
+    /// context.Complete();
     /// </code>
     /// </example>
     GrainId GrainId { get; }
@@ -134,7 +136,7 @@ public interface IInboxHandlerContext
     /// </para>
     /// <para>
     /// The builder and its completed envelope are local preparation values. Stage the envelope with
-    /// <see cref="Send(DurableEnvelope)"/> from the returned action, or optionally establish the wakeup earlier
+    /// <see cref="Send(DurableEnvelope)"/> in the final synchronous block, or optionally establish the wakeup earlier
     /// using <see cref="IDurableOutbox.PrepareSendAsync"/> before staging its batch.
     /// </para>
     /// <para>
@@ -145,7 +147,7 @@ public interface IInboxHandlerContext
     /// <item><description>Call <c>.WithBody(value)</c> to serialize the message body</description></item>
     /// <item><description>Optionally call <c>.WithCorrelationKey()</c>, <c>.WithReplyTo()</c>, <c>.WithContextValue()</c></description></item>
     /// <item><description>Call <c>.Build()</c> to create the envelope</description></item>
-    /// <item><description>Call <see cref="Send(DurableEnvelope)"/> with the envelope from the returned apply action</description></item>
+    /// <item><description>Call <see cref="Send(DurableEnvelope)"/> with the envelope in the final synchronous block</description></item>
     /// <item><description>For an early wakeup prerequisite, optionally await <see cref="IDurableOutbox.PrepareSendAsync"/> and use <see cref="Send(IPreparedOutboxBatch)"/></description></item>
     /// </list>
     /// </remarks>
@@ -170,7 +172,9 @@ public interface IInboxHandlerContext
     ///
     /// var request = requestBuilder.Build();
     /// var batch = await context.Outbox.PrepareSendAsync([envelope, request], ct);
-    /// return () => context.Send(batch);
+    /// ct.ThrowIfCancellationRequested();
+    /// context.Send(batch);
+    /// context.Complete();
     /// </code>
     /// </example>
     DurableEnvelopeBuilder CreateEnvelope();
@@ -181,15 +185,15 @@ public interface IInboxHandlerContext
     /// <param name="batch">The live batch acquired through <see cref="Outbox"/> during preparation.</param>
     /// <remarks>
     /// <para>
-    /// Await <see cref="IDurableOutbox.PrepareSendAsync"/> during <see cref="IInboxHandler.PrepareAsync"/>,
-    /// then call this method from the matching returned action. Apply business changes and stage outgoing
-    /// messages in the same synchronous block. Ordinary journal persistence captures those changes together
-    /// with inbox completion, and acknowledged intents become eligible for dispatch.
+    /// Await <see cref="IDurableOutbox.PrepareSendAsync"/> during <see cref="IInboxHandler.HandleAsync"/>,
+    /// then apply safe-to-commit business changes, stage outgoing messages, and call <see cref="Complete"/>
+    /// in the same synchronous final block. Return without further awaits. The runtime owns the later journal
+    /// write and acknowledgement, after which captured intents become eligible for dispatch.
     /// </para>
     /// <para>
     /// The runtime tracks prepared batches through the attempt and disposes them when it ends. Staging
     /// transfers ownership to the pending/captured/acknowledged outbox cohort. Repeating a send of the same
-    /// live, already-staged batch has no additional effect within the matching attempt's current action.
+    /// live, already-staged batch has no additional effect within the matching active attempt before completion.
     /// Every call validates that scope; outside-scope, stale, wrong-attempt, disposed, or foreign handles
     /// are rejected before mutation.
     /// </para>
@@ -201,7 +205,9 @@ public interface IInboxHandlerContext
     ///     .WithBody(orderData)
     ///     .Build();
     /// var batch = await context.Outbox.PrepareSendAsync([envelope], ct);
-    /// return () => context.Send(batch);
+    /// ct.ThrowIfCancellationRequested();
+    /// context.Send(batch);
+    /// context.Complete();
     /// </code>
     /// </example>
     /// <exception cref="System.ArgumentNullException"><paramref name="batch"/> is null.</exception>
@@ -210,19 +216,40 @@ public interface IInboxHandlerContext
     void Send(IPreparedOutboxBatch batch);
 
     /// <summary>
-    /// Stages an outgoing envelope from this attempt's synchronous apply action.
+    /// Stages an outgoing envelope in this attempt's synchronous final block before completion.
     /// </summary>
     /// <param name="envelope">The fully built outgoing envelope.</param>
     /// <remarks>The journal establishes the self-wakeup before capture and dispatch follows acknowledgement.</remarks>
     void Send(DurableEnvelope envelope) => Outbox.Send(envelope);
 
     /// <summary>
+    /// Synchronously stages inbox completion and deduplication for this handler attempt.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Check cancellation before the first shared mutation. Apply complete safe-to-commit business changes,
+    /// stage outgoing messages, and call this method in one synchronous final block. From the first shared
+    /// mutation through method completion, perform no awaits, including after this call.
+    /// Complete stages logical inbox state; the runtime owns the subsequent storage write and acknowledgement.
+    /// </para>
+    /// <para>
+    /// The runtime validates the exact active attempt. Repeated completion within the same still-active
+    /// completed attempt coalesces. Retired or wrong-attempt contexts are rejected. Send and preparation
+    /// are rejected after completion or retirement; envelope metadata remains available for inspection.
+    /// Completion of a valid final block is preserved when attempt cancellation arrives after it has started.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="System.InvalidOperationException">The context is read-only, retired, or belongs to another attempt.</exception>
+    void Complete();
+
+    /// <summary>
     /// Gets the handler-scoped outbox for sending envelopes, preparing optional batches, and inspecting pending messages.
     /// </summary>
     /// <remarks>
-    /// Stage envelopes with <see cref="Send(DurableEnvelope)"/> from the matching apply action.
+    /// Stage envelopes with <see cref="Send(DurableEnvelope)"/> in the active attempt before completion.
     /// Optional batches acquired with <see cref="IDurableOutbox.PrepareSendAsync"/> during preparation are
-    /// staged with <see cref="Send(IPreparedOutboxBatch)"/>. Both paths enforce attempt ownership.
+    /// staged with <see cref="Send(IPreparedOutboxBatch)"/>. Both paths enforce attempt ownership and reject
+    /// sending or further preparation after completion or retirement.
     /// The runtime owns attempt-end batch disposal and delivery.
     /// </remarks>
     /// <example>
