@@ -89,17 +89,23 @@ namespace Orleans.Runtime.MembershipService
                 using var processingCancellation = CancellationTokenSource.CreateLinkedTokenSource(this.shutdownCancellation.Token);
                 var cancellationToken = processingCancellation.Token;
                 await using var updates = this.membershipManager.MembershipUpdates.GetAsyncEnumerator(cancellationToken);
-                using var timer = new PeriodicTimer(this.clusterMembershipOptions.CurrentValue.TableRefreshTimeout, this.timeProvider);
+                var reevaluationPeriod = this.clusterMembershipOptions.CurrentValue.TableRefreshTimeout;
                 var membershipUpdate = updates.MoveNextAsync().AsTask();
-                var tick = timer.WaitForNextTickAsync(cancellationToken).AsTask();
+                var reevaluation = this.timeProvider.DelayAsync(reevaluationPeriod, cancellationToken);
                 var tableSnapshot = this.membershipManager.CurrentSnapshot;
                 try
                 {
                     while (true)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        await Task.WhenAny(membershipUpdate, tick);
+                        await Task.WhenAny(membershipUpdate, reevaluation);
                         var isMembershipUpdate = membershipUpdate.IsCompleted;
+                        if (reevaluation.IsCompleted)
+                        {
+                            await reevaluation;
+                            reevaluation = this.timeProvider.DelayAsync(reevaluationPeriod, cancellationToken);
+                        }
+
                         if (isMembershipUpdate)
                         {
                             if (!await membershipUpdate)
@@ -109,20 +115,9 @@ namespace Orleans.Runtime.MembershipService
 
                             tableSnapshot = updates.Current;
                         }
-                        else
+                        else if (this.membershipManager.LocalSiloStatus != SiloStatus.Joining)
                         {
-                            if (!await tick)
-                            {
-                                break;
-                            }
-
-                            tick = timer.WaitForNextTickAsync(cancellationToken).AsTask();
-                            if (this.membershipManager.LocalSiloStatus != SiloStatus.Joining)
-                            {
-                                continue;
-                            }
-
-                            // Reevaluate heartbeat staleness in the latest processed view while joining.
+                            continue;
                         }
 
                         var utcNow = this.timeProvider.GetUtcNow().UtcDateTime;
@@ -155,7 +150,7 @@ namespace Orleans.Runtime.MembershipService
                 finally
                 {
                     processingCancellation.Cancel();
-                    await Task.WhenAll(membershipUpdate, tick).SuppressThrowing();
+                    await Task.WhenAll(membershipUpdate, reevaluation).SuppressThrowing();
                 }
             }
             catch (OperationCanceledException) when (shutdownCancellation.IsCancellationRequested)

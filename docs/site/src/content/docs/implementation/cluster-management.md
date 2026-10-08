@@ -51,7 +51,7 @@ A starting silo writes its row, becomes `Joining`, and validates two-way connect
 
 `IAmAliveTime` is a membership-row liveness timestamp used for diagnostics and startup disaster recovery. A joining silo monitors suspected and stale peers and reevaluates monitoring candidates at the <xref:Orleans.Configuration.ClusterMembershipOptions.TableRefreshTimeout?displayProperty=nameWithType> interval. It compares the latest snapshot's timestamps with current time, so a peer whose timestamp becomes stale during startup enters monitoring even when the membership view remains unchanged.
 
-Those monitors apply the usual failed-probe threshold, connection-liveness checks, and death-vote protocol. Initial connectivity validation continues retrying until each active peer responds or membership records its departure. This allows a replacement silo to recover after an ungraceful process exit and become `Active` through the normal membership protocol.
+Those monitors apply the usual failed-probe threshold, connection-liveness checks, and death-vote protocol. Initial connectivity validation retries for up to <xref:Orleans.Configuration.ClusterMembershipOptions.MaxJoinAttemptTime?displayProperty=nameWithType>, completing when each active peer responds or membership records its departure. This allows a replacement silo to recover after an ungraceful process exit and become `Active` through the normal membership protocol.
 
 ## Failure detection and death votes <a name="the-membership-protocol"></a>
 

@@ -1138,9 +1138,10 @@ namespace NonSilo.Tests.Membership
         }
 
         [Theory]
-        [InlineData(true)]
-        [InlineData(false)]
-        public async Task ClusterHealthMonitor_JoiningSiloMonitorsPeerWhichBecomesStaleWithoutMembershipUpdates(bool reachable)
+        [InlineData(true, 0)]
+        [InlineData(false, 0)]
+        [InlineData(false, 60)]
+        public async Task ClusterHealthMonitor_JoiningSiloMonitorsPeerWhichBecomesStaleWithoutMembershipUpdates(bool reachable, int refreshPeriodDays)
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var clock = new FakeTimeProvider();
@@ -1148,7 +1149,7 @@ namespace NonSilo.Tests.Membership
             {
                 IAmAliveTablePublishTimeout = TimeSpan.FromSeconds(15),
                 NumMissedTableIAmAliveLimit = 5,
-                TableRefreshTimeout = TimeSpan.FromSeconds(15),
+                TableRefreshTimeout = refreshPeriodDays == 0 ? TimeSpan.FromSeconds(15) : TimeSpan.FromDays(refreshPeriodDays),
             };
             var peer = Silo("127.0.0.1:200@100");
             var snapshot = new MembershipTableSnapshot(
@@ -1228,6 +1229,52 @@ namespace NonSilo.Tests.Membership
                 pendingTick?.TrySetResult(false);
                 await lifecycle.OnStop(cancellationToken);
                 await updates.Completed.WaitAsync(cancellationToken);
+            }
+        }
+
+        [Theory]
+        [InlineData(0.5)]
+        [InlineData(60d * 24 * 60 * 60 * 1000)]
+        [InlineData(Timeout.Infinite)]
+        public async Task ClusterHealthMonitor_ReevaluationSupportsTableRefreshIntervalAndStreamCompletion(double milliseconds)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var period = TimeSpan.FromMilliseconds(milliseconds);
+            TimeProvider clock = milliseconds is > 0 and < 1 ? TimeProvider.System : new FakeTimeProvider();
+            var snapshot = new MembershipTableSnapshot(
+                new MembershipVersion(1),
+                ImmutableDictionary<SiloAddress, MembershipEntry>.Empty
+                    .Add(this.localSilo, Entry(this.localSilo, SiloStatus.Joining, clock.GetUtcNow())));
+            var updates = new ControlledMembershipUpdateStream();
+            var manager = Substitute.For<IMembershipManager>();
+            manager.CurrentSnapshot.Returns(snapshot);
+            manager.LocalSiloStatus.Returns(SiloStatus.Joining);
+            manager.MembershipUpdates.Returns(updates);
+            var optionsMonitor = Substitute.For<IOptionsMonitor<ClusterMembershipOptions>>();
+            optionsMonitor.CurrentValue.Returns(new ClusterMembershipOptions { TableRefreshTimeout = period });
+            this.fatalErrorHandler.IsUnexpected(Arg.Any<Exception>()).Returns(true);
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            await using var monitor = new ClusterHealthMonitor(
+                this.localSiloDetails, manager, this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
+                optionsMonitor, this.fatalErrorHandler, null!, this.connectionManager, clock);
+            var accessor = (ClusterHealthMonitor.ITestAccessor)monitor;
+            ((ILifecycleParticipant<ISiloLifecycle>)monitor).Participate(lifecycle);
+
+            await lifecycle.OnStart(cancellationToken);
+            try
+            {
+                updates.Publish(snapshot);
+                await updates.WaitForReadAsync(2, cancellationToken).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                Assert.Equal(snapshot.Version, accessor.ObservedVersion);
+
+                updates.Complete();
+                await updates.Completed.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
+                Assert.Empty(monitor.SiloMonitors);
+                this.fatalErrorHandler.DidNotReceiveWithAnyArgs().OnFatalException(default!, default!, default!);
+            }
+            finally
+            {
+                await lifecycle.OnStop(cancellationToken);
             }
         }
 
@@ -1353,7 +1400,7 @@ namespace NonSilo.Tests.Membership
             public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan timerPeriod)
             {
                 var timer = base.CreateTimer(callback, state, dueTime, timerPeriod);
-                if (timerPeriod == period)
+                if (dueTime == period)
                 {
                     _timerCreated.TrySetResult();
                 }
