@@ -191,6 +191,14 @@ the owner. A fresh owner handles subsequent messages. Durable attempts and timer
 turns retain their own cancellation lifetimes: an outgoing remote batch keeps its
 durable attempt token across timer turns.
 
+Cancellation of a durable-job or timer attempt during handler preparation leaves
+the committed inbox message and physical owner available for a replacement attempt
+on the same activation. Retirement drains started preparations and releases their
+batches before completing the canceled attempt. The runtime rechecks cancellation
+before applying handler effects. Once synchronous staging begins, partial-application
+failures retain terminal handling; an admitted journal write and its resources stay
+owned through the actual storage outcome, independently of attempt cancellation.
+
 ## Backpressure, retries, and dead letters
 
 The inbox rejects new, nonduplicate envelopes with `Backpressured` when it reaches
