@@ -18,4 +18,5 @@ internal static class DiagnosticRuleId
     public const string CancellationTokenNotLast = "ORLEANS0113";
     public const string InvalidSerializerContext = "ORLEANS0114";
     public const string UnsupportedSerializerContextType = "ORLEANS0115";
+    public const string UnsupportedRpcResponseFactory = "ORLEANS0116";
 }

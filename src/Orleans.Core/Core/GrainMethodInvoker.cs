@@ -6,13 +6,15 @@ using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Runtime
 {
     /// <summary>
     /// Invokes a request on a grain.
     /// </summary>
-    internal sealed class GrainMethodInvoker : IIncomingGrainCallContext
+    internal sealed class GrainMethodInvoker : IIncomingGrainCallContext, IDisposable
     {
         private readonly Message message;
         private readonly IInvokable request;
@@ -20,6 +22,10 @@ namespace Orleans.Runtime
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private readonly DeepCopier<Response> responseCopier;
         private readonly IGrainContext grainContext;
+        private readonly ICodecProvider codecProvider;
+        private readonly CopyContextPool copyContexts;
+        private Response? response;
+        private List<Response>? otherOwnedResponses;
         private int stage;
 
         /// <summary>
@@ -31,13 +37,17 @@ namespace Orleans.Runtime
         /// <param name="filters">The invocation interceptors.</param>
         /// <param name="interfaceToImplementationMapping">The implementation map.</param>
         /// <param name="responseCopier">The response copier.</param>
+        /// <param name="codecProvider">The provider for generated response dependencies.</param>
+        /// <param name="copyContexts">The pool for isolating source-known invocation results.</param>
         public GrainMethodInvoker(
             Message message,
             IGrainContext grainContext,
             IInvokable request,
             List<IIncomingGrainCallFilter> filters,
             InterfaceToImplementationMappingCache interfaceToImplementationMapping,
-            DeepCopier<Response> responseCopier)
+            DeepCopier<Response> responseCopier,
+            ICodecProvider codecProvider,
+            CopyContextPool copyContexts)
         {
             this.message = message;
             this.request = request;
@@ -45,6 +55,8 @@ namespace Orleans.Runtime
             this.filters = filters;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.responseCopier = responseCopier;
+            this.codecProvider = codecProvider;
+            this.copyContexts = copyContexts;
         }
 
         public IInvokable Request => request;
@@ -65,7 +77,52 @@ namespace Orleans.Runtime
             set => Response = Response.FromResult(value);
         }
 
-        public Response? Response { get; set; }
+        public Response? Response
+        {
+            get => response;
+            set
+            {
+                if (ReferenceEquals(response, value)) return;
+                if (response is { } previous)
+                {
+                    (otherOwnedResponses ??= []).Add(previous);
+                }
+
+                if (value is not null && otherOwnedResponses is { } others)
+                {
+                    for (var i = others.Count - 1; i >= 0; i--)
+                    {
+                        if (ReferenceEquals(value, others[i])) others.RemoveAt(i);
+                    }
+                }
+
+                response = value;
+            }
+        }
+
+        internal Response TakeResponse()
+        {
+            var result = response!;
+            response = null;
+            return result;
+        }
+
+        public void Dispose()
+        {
+            var current = response;
+            response = null;
+            var others = otherOwnedResponses;
+            otherOwnedResponses = null;
+            try
+            {
+                current?.Dispose();
+            }
+            finally
+            {
+                if (others is not null)
+                    foreach (var entry in others) entry.Dispose();
+            }
+        }
 
         public GrainId? SourceId => message.SendingGrain is { IsDefault: false } source ? source : null;
 
@@ -124,15 +181,21 @@ namespace Orleans.Runtime
                 {
                     // Finally call the root-level invoker.
                     stage++;
-                    this.Response = await request.Invoke();
+                    var response = request is IResponseInvokable direct
+                        ? await direct.InvokeAndCopy(codecProvider, copyContexts, responseCopier)
+                        : await request.Invoke();
 
                     // Propagate exceptions to other filters.
-                    if (this.Response.Exception is { } exception)
+                    if (response.Exception is { } exception)
                     {
+                        Response = response;
                         ExceptionDispatchInfo.Capture(exception).Throw();
                     }
 
-                    this.Response = this.responseCopier.Copy(this.Response);
+                    if (request is not IResponseInvokable)
+                        response = ResponseCopyBoundary.CopyAndDispose(response, this.responseCopier);
+
+                    Response = response;
 
                     return;
                 }

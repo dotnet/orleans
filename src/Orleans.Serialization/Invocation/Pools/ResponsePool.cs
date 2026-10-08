@@ -19,6 +19,25 @@ namespace Orleans.Serialization.Invocation
         /// <param name="obj">The value to return to the pool.</param>
         public static void Return<T>(Response<T> obj) => TypedPool<T>.Pool.Return(obj);
 
+        /// <summary>
+        /// Rents a generated concrete response holder.
+        /// </summary>
+        /// <typeparam name="TResponse">The concrete response type.</typeparam>
+        /// <returns>A reset response holder.</returns>
+        public static TResponse GetGenerated<TResponse>() where TResponse : Response, new() => GeneratedPool<TResponse>.Pool.Get();
+
+        /// <summary>
+        /// Returns a generated response after its value and provider dependencies have been cleared.
+        /// </summary>
+        /// <typeparam name="TResponse">The concrete response type.</typeparam>
+        /// <param name="response">The reset response.</param>
+        public static void ReturnGenerated<TResponse>(TResponse response) where TResponse : Response, new() => GeneratedPool<TResponse>.Pool.Return(response);
+
+        private static class GeneratedPool<TResponse> where TResponse : Response, new()
+        {
+            public static readonly ConcurrentObjectPool<TResponse> Pool = new();
+        }
+
         private static class TypedPool<T>
         {
             public static readonly ConcurrentObjectPool<Response<T>> Pool = new();

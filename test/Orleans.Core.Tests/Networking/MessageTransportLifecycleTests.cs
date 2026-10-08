@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Linq;
 using System.Reflection;
 using System.Net;
@@ -149,6 +150,25 @@ public class MessageTransportLifecycleTests
         Assert.Equal(bodyBytes, firstBytes[firstLengths.HeaderLength..(firstLengths.HeaderLength + firstLengths.BodyLength)]);
         Assert.Same(readRequest, message._bodyObject);
         message.Dispose();
+    }
+
+    [Fact]
+    public void MessageReadRequest_ReportsFrameLengthWhileAwaitingPayload()
+    {
+        using var serviceProvider = CreateServiceProvider();
+        var request = new MessageReadRequest(CreateMessageHandlerShared(serviceProvider));
+        using var writer = new ArcBufferWriter();
+        Span<byte> frameHeader = stackalloc byte[Message.LENGTH_HEADER_SIZE];
+        BinaryPrimitives.WriteInt32LittleEndian(frameHeader, 123);
+        BinaryPrimitives.WriteInt32LittleEndian(frameHeader[sizeof(int)..], 456);
+        writer.Write(frameHeader);
+        var reader = new ArcBufferReader(writer);
+
+        Assert.False(((IFramedReadRequest)request).OnRead(reader, out var framedLength));
+        Assert.Equal(Message.LENGTH_HEADER_SIZE + 123 + 456, framedLength);
+        Assert.Equal(0, reader.Length);
+
+        request.Dispose();
     }
 
     [Fact]
@@ -662,9 +682,18 @@ public class MessageTransportLifecycleTests
         listener.Stop();
     }
 
-    [Fact]
-    public async Task SocketMessageTransport_ReadFin_InterruptsBlockedWrite()
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(true, (int)LinuxIoUringReceiveMode.OneShot)]
+    [InlineData(true, (int)LinuxIoUringReceiveMode.Adaptive)]
+    [InlineData(true, (int)LinuxIoUringReceiveMode.Multishot)]
+    public async Task SocketMessageTransport_ReadFin_InterruptsBlockedWrite(bool useLinuxIoUring, int? receiveMode)
     {
+        if (useLinuxIoUring && !IsIoUringTestEnabled())
+        {
+            return;
+        }
+
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         cancellation.CancelAfter(TimeSpan.FromSeconds(10));
         using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -675,7 +704,11 @@ public class MessageTransportLifecycleTests
         await client.ConnectAsync(listener.LocalEndPoint!, cancellation.Token);
         using var peer = await accept;
         peer.ReceiveBufferSize = 1024;
-        await using var transport = new SocketMessageTransport(client, NullLogger.Instance);
+        await using var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring,
+            receiveMode is { } mode ? (LinuxIoUringReceiveMode)mode : null);
         using var request = new BufferedWriteRequest(new byte[2 * 1024 * 1024]);
         var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var registration = transport.Closed.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), closed);
@@ -689,6 +722,59 @@ public class MessageTransportLifecycleTests
 
         await closed.Task.WaitAsync(cancellation.Token);
         Assert.NotNull(await Record.ExceptionAsync(() => request.Completion));
+    }
+
+    [Theory]
+    [InlineData((int)LinuxIoUringReceiveMode.OneShot)]
+    [InlineData((int)LinuxIoUringReceiveMode.Adaptive)]
+    [InlineData((int)LinuxIoUringReceiveMode.Multishot)]
+    public async Task SocketMessageTransport_LinuxIoUringReadFin_KeepsDescriptorUntilSenderRetires(int receiveMode)
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromSeconds(10));
+        var (listener, client, peer) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (peer)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: (LinuxIoUringReceiveMode)receiveMode))
+        {
+            var sender = new PausedSocketSender();
+            typeof(SocketMessageTransport)
+                .GetField("_largeSocketSender", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(transport, sender);
+            using var writeRequest = new BufferedWriteRequest(new byte[64 * 1024], useMultipleBuffers: true);
+            using var readRequest = new FixedLengthReadRequest(1);
+            transport.Start();
+            try
+            {
+                Assert.True(transport.EnqueueWrite(writeRequest));
+                await sender.Started.Task.WaitAsync(cancellation.Token);
+                Assert.True(transport.EnqueueRead(readRequest));
+                peer.Shutdown(SocketShutdown.Send);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => readRequest.Completion.WaitAsync(cancellation.Token));
+
+                Assert.False(client.SafeHandle.IsClosed);
+                Assert.False(writeRequest.Completion.IsCompleted);
+            }
+            finally
+            {
+                sender.Release();
+            }
+
+            await Assert.ThrowsAsync<IOException>(() => writeRequest.Completion.WaitAsync(cancellation.Token));
+            await transport.CloseAsync(null, cancellation.Token);
+            Assert.True(client.SafeHandle.IsClosed);
+        }
     }
 
     [Theory]
@@ -732,6 +818,1612 @@ public class MessageTransportLifecycleTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TcpMessageTransport_IoUringOptionPreservesStartupAndSocketOptions(bool useLinuxIoUring)
+    {
+        if (useLinuxIoUring && !IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        cancellation.CancelAfter(TimeSpan.FromSeconds(10));
+        const string ListenerName = "test";
+        var tcpOptions = Substitute.For<IOptionsMonitor<TcpMessageTransportOptions>>();
+        var options = new TcpMessageTransportOptions
+        {
+            FastPath = false,
+            UseLinuxIoUring = useLinuxIoUring
+        };
+        tcpOptions.CurrentValue.Returns(options);
+        tcpOptions.Get(ListenerName).Returns(options);
+        var listenerOptions = Substitute.For<IOptionsMonitor<TcpMessageTransportListenerOptions>>();
+        listenerOptions.Get(ListenerName).Returns(new TcpMessageTransportListenerOptions
+        {
+            Endpoint = new IPEndPoint(IPAddress.Loopback, 0)
+        });
+        await using var listener = new TcpMessageTransportListener(
+            ListenerName,
+            tcpOptions,
+            listenerOptions,
+            NullLoggerFactory.Instance);
+        await listener.BindAsync(cancellation.Token);
+        var listenSocket = (Socket)typeof(TcpMessageTransportListener)
+            .GetField("_listenSocket", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(listener)!;
+        var accept = listener.AcceptAsync(cancellation.Token).AsTask();
+        var connector = new TcpMessageTransportConnector(tcpOptions, NullLoggerFactory.Instance);
+        await using var client = await connector.CreateAsync(listenSocket.LocalEndPoint!, cancellation.Token);
+        await using var server = await accept;
+        Assert.NotNull(server);
+
+        foreach (var transport in new[] { client, server })
+        {
+            Assert.IsType<SocketMessageTransport>(transport);
+            var socket = (Socket)typeof(SocketMessageTransport)
+                .GetField("_socket", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(transport)!;
+            var sender = typeof(SocketMessageTransport)
+                .GetField("_socketSender", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(transport);
+            Assert.Equal(useLinuxIoUring ? typeof(LinuxIoUringSocketSender) : typeof(SocketSender), sender!.GetType());
+            Assert.True(socket.NoDelay);
+            Assert.NotEqual(0, (int)socket.GetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive)!);
+        }
+
+        byte[] payload = [1, 2, 3, 4, 5];
+        using var readRequest = new FixedLengthReadRequest(payload.Length);
+        using var writeRequest = new BufferedWriteRequest(payload);
+        Assert.True(server.EnqueueRead(readRequest));
+        Assert.True(client.EnqueueWrite(writeRequest));
+        Assert.Equal(payload, await readRequest.Completion.WaitAsync(cancellation.Token));
+        await writeRequest.Completion.WaitAsync(cancellation.Token);
+        await client.CloseAsync(null, cancellation.Token);
+        await server.CloseAsync(null, cancellation.Token);
+    }
+
+    [Theory]
+    [InlineData(5, false)]
+    [InlineData((64 * 1024) + 7, true)]
+    public async Task SocketMessageTransport_LinuxIoUring_RoundTripsData(int payloadSize, bool useMultipleBuffers)
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await using var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+        Assert.Null(transport.MultishotReceiveStatistics);
+        var payload = GC.AllocateUninitializedArray<byte>(payloadSize);
+        for (var i = 0; i < payload.Length; i++)
+        {
+            payload[i] = (byte)i;
+        }
+
+        using var writeRequest = new BufferedWriteRequest(payload, useMultipleBuffers);
+        using var readRequest = new FixedLengthReadRequest(payload.Length);
+
+        transport.Start();
+        Assert.True(transport.EnqueueWrite(writeRequest));
+        var receivedByServer = new byte[payload.Length];
+        var receivedLength = 0;
+        while (receivedLength < receivedByServer.Length)
+        {
+            var length = await server.ReceiveAsync(receivedByServer.AsMemory(receivedLength), TestContext.Current.CancellationToken);
+            Assert.NotEqual(0, length);
+            receivedLength += length;
+        }
+
+        await writeRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.True(transport.EnqueueRead(readRequest));
+        var sentLength = 0;
+        while (sentLength < payload.Length)
+        {
+            sentLength += await server.SendAsync(payload.AsMemory(sentLength), TestContext.Current.CancellationToken);
+        }
+
+        var receivedByTransport = await readRequest.Completion.WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(payload.Length, receivedLength);
+        Assert.Equal(payload, receivedByServer);
+        Assert.Equal(payload.Length, sentLength);
+        Assert.Equal(payload, receivedByTransport);
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task LinuxIoUringSocketSender_PinnedSendCompletesSynchronously()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        {
+            var sender = new LinuxIoUringSocketSender();
+            var payload = GC.AllocateUninitializedArray<byte>(128, pinned: true);
+            Random.Shared.NextBytes(payload);
+
+            var send = sender.SendAsync(
+                client,
+                payload,
+                bufferIsPinned: true,
+                useZeroCopy: false);
+
+            Assert.True(send.IsCompletedSuccessfully);
+            await send;
+            var received = new byte[payload.Length];
+            var receivedLength = await server.ReceiveAsync(
+                received,
+                TestContext.Current.CancellationToken);
+            Assert.Equal(payload.Length, receivedLength);
+            Assert.Equal(payload, received);
+
+            sender.Dispose();
+            Assert.Throws<InvalidOperationException>(() =>
+            {
+                _ = sender.SendAsync(
+                    client,
+                    payload,
+                    bufferIsPinned: true,
+                    useZeroCopy: false);
+            });
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_SmallFramesNeverArmMultishot()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            Assert.Null(transport.MultishotReceiveStatistics);
+            transport.Start();
+            for (var i = 0; i < 12; i++)
+            {
+                var payload = Enumerable.Repeat((byte)i, 1024).ToArray();
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            }
+
+            Assert.Null(transport.MultishotReceiveStatistics);
+            Assert.Equal(0, transport.AdaptivePromotionCount);
+            Assert.False(transport.IsAdaptiveMultishot);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringTinyAdaptive_TinyFramesPromoteAndLargeFramesDemote()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.TinyAdaptive))
+        {
+            var promotionCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var demotionCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            transport.AdaptiveModeChangedForTesting = useMultishot =>
+            {
+                (useMultishot ? promotionCompleted : demotionCompleted).TrySetResult();
+            };
+
+            transport.Start();
+            for (var i = 0; i < 8; i++)
+            {
+                var payload = Enumerable.Repeat((byte)i, 128).ToArray();
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            }
+
+            await promotionCompleted.Task.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+            Assert.True(transport.IsAdaptiveMultishot);
+            Assert.Equal(1, transport.AdaptivePromotionCount);
+
+            var largePayload = Enumerable.Repeat((byte)42, 16 * 1024).ToArray();
+            var queuedTinyPayload = Enumerable.Repeat((byte)43, 128).ToArray();
+            using var largeRequest = new FramedReadRequest(largePayload.Length);
+            using var queuedTinyRequest = new FramedReadRequest(queuedTinyPayload.Length);
+            Assert.True(transport.EnqueueRead(largeRequest));
+            Assert.True(transport.EnqueueRead(queuedTinyRequest));
+            await SendExactly(server, CreateFrame(largePayload).Concat(CreateFrame(queuedTinyPayload)).ToArray());
+            Assert.Equal(
+                largePayload,
+                await largeRequest.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            Assert.Equal(
+                queuedTinyPayload,
+                await queuedTinyRequest.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            await demotionCompleted.Task.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+            Assert.False(transport.IsAdaptiveMultishot);
+            Assert.Equal(1, transport.AdaptiveDemotionCount);
+
+            for (var i = 0; i < 12; i++)
+            {
+                var payload = Enumerable.Repeat((byte)i, 1024).ToArray();
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            }
+
+            largePayload[0] = 43;
+            Assert.Equal(largePayload, await SendFramedAsync(transport, server, largePayload));
+            Assert.False(transport.IsAdaptiveMultishot);
+            Assert.Equal(1, transport.AdaptivePromotionCount);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_TwoConsecutiveLargeFramesPromote()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            var promotionCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            transport.AdaptiveModeChangedForTesting = useMultishot =>
+            {
+                if (useMultishot)
+                {
+                    promotionCompleted.TrySetResult();
+                }
+            };
+
+            transport.Start();
+            var startupPayload = Enumerable.Repeat((byte)41, 86 * 1024).ToArray();
+            Assert.Equal(startupPayload, await SendFramedAsync(transport, server, startupPayload));
+            Assert.Null(transport.MultishotReceiveStatistics);
+            Assert.False(transport.IsAdaptiveMultishot);
+
+            using (var unframedRequest = new FixedLengthReadRequest(1))
+            {
+                Assert.True(transport.EnqueueRead(unframedRequest));
+                Assert.Equal(1, await server.SendAsync(new byte[] { 42 }));
+                Assert.Equal(
+                    new byte[] { 42 },
+                    await unframedRequest.Completion.WaitAsync(
+                        TimeSpan.FromSeconds(10),
+                        TestContext.Current.CancellationToken));
+            }
+
+            var payload = Enumerable.Repeat((byte)43, 16 * 1024).ToArray();
+            Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            Assert.Null(transport.MultishotReceiveStatistics);
+            Assert.False(transport.IsAdaptiveMultishot);
+
+            using (var unknownFramedRequest = new UnknownFramedReadRequest(1))
+            {
+                Assert.True(transport.EnqueueRead(unknownFramedRequest));
+                Assert.Equal(1, await server.SendAsync(new byte[] { 43 }));
+                Assert.Equal(
+                    new byte[] { 43 },
+                    await unknownFramedRequest.Completion.WaitAsync(
+                        TimeSpan.FromSeconds(10),
+                        TestContext.Current.CancellationToken));
+            }
+
+            payload[0] = 44;
+            Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            Assert.Null(transport.MultishotReceiveStatistics);
+            Assert.False(transport.IsAdaptiveMultishot);
+
+            var smallPayload = Enumerable.Repeat((byte)42, 1024).ToArray();
+            Assert.Equal(smallPayload, await SendFramedAsync(transport, server, smallPayload));
+            payload[0] = 45;
+            Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            Assert.Null(transport.MultishotReceiveStatistics);
+            Assert.False(transport.IsAdaptiveMultishot);
+
+            payload[0] = 46;
+            Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            await promotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.True(transport.IsAdaptiveMultishot);
+            Assert.Equal(1, transport.AdaptivePromotionCount);
+            Assert.Equal(0, transport.AdaptiveDemotionCount);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_RepeatedLargeFramesKeepOneReceiveActive()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            transport.Start();
+            var payload = Enumerable.Repeat((byte)43, 32 * 1024).ToArray();
+            Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            payload[0] = 44;
+            Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+
+            for (var i = 0; i < 4; i++)
+            {
+                payload[0] = (byte)i;
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            }
+
+            var statistics = Assert.IsType<(
+                long AdoptedPages,
+                long CompletedSegments,
+                long FinalBuffers,
+                long ReplacementPages,
+                long NoBufferCompletions,
+                long PayloadCopies,
+                ushort BufferGroup,
+                long ReceiveStarts)>(
+                transport.MultishotReceiveStatistics);
+            Assert.Equal(1, statistics.ReceiveStarts);
+            Assert.Equal(1, transport.AdaptivePromotionCount);
+            Assert.Equal(0, transport.AdaptiveDemotionCount);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_LargeToSmallPreservesOrderAndDemotes()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            var demotionStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var allowDemotion = new ManualResetEventSlim();
+            var demotionCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var secondPromotionCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var promotionCount = 0;
+            transport.AdaptiveDemotionStartingForTesting = () =>
+            {
+                demotionStarted.TrySetResult();
+                if (!allowDemotion.Wait(TimeSpan.FromSeconds(10)))
+                {
+                    throw new TimeoutException("Timed out waiting to continue adaptive receive demotion.");
+                }
+            };
+            transport.AdaptiveModeChangedForTesting = useMultishot =>
+            {
+                if (useMultishot)
+                {
+                    if (Interlocked.Increment(ref promotionCount) == 2)
+                    {
+                        secondPromotionCompleted.TrySetResult();
+                    }
+                }
+                else
+                {
+                    demotionCompleted.TrySetResult();
+                }
+            };
+
+            transport.Start();
+            var largePayload = Enumerable.Repeat((byte)44, 32 * 1024).ToArray();
+            Assert.Equal(largePayload, await SendFramedAsync(transport, server, largePayload));
+            largePayload[0] = 45;
+            Assert.Equal(largePayload, await SendFramedAsync(transport, server, largePayload));
+
+            var requests = new FramedReadRequest[8];
+            var frames = new byte[8][];
+            for (var i = 0; i < requests.Length; i++)
+            {
+                var payload = Enumerable.Repeat((byte)(50 + i), 257).ToArray();
+                requests[i] = new FramedReadRequest(payload.Length);
+                frames[i] = CreateFrame(payload);
+                Assert.True(transport.EnqueueRead(requests[i]));
+            }
+
+            var batch = new byte[frames.Sum(static frame => frame.Length)];
+            var batchOffset = 0;
+            foreach (var frame in frames)
+            {
+                frame.CopyTo(batch, batchOffset);
+                batchOffset += frame.Length;
+            }
+
+            await SendExactly(server, batch);
+            await demotionStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            using var finalRequest = new FramedReadRequest(129);
+            var finalPayload = Enumerable.Repeat((byte)99, 129).ToArray();
+            Assert.True(transport.EnqueueRead(finalRequest));
+            var finalSend = SendExactly(server, CreateFrame(finalPayload));
+            allowDemotion.Set();
+
+            for (var i = 0; i < requests.Length; i++)
+            {
+                var expected = Enumerable.Repeat((byte)(50 + i), 257).ToArray();
+                Assert.Equal(
+                    expected,
+                    await requests[i].Completion.WaitAsync(
+                        TimeSpan.FromSeconds(10),
+                        TestContext.Current.CancellationToken));
+                requests[i].Dispose();
+            }
+
+            await finalSend;
+            Assert.Equal(
+                finalPayload,
+                await finalRequest.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            await demotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.False(transport.IsAdaptiveMultishot);
+            Assert.Equal(1, transport.AdaptiveDemotionCount);
+
+            var nextLargePayload = Enumerable.Repeat((byte)100, 32 * 1024).ToArray();
+            Assert.Equal(nextLargePayload, await SendFramedAsync(transport, server, nextLargePayload));
+            Assert.False(transport.IsAdaptiveMultishot);
+            nextLargePayload[0] = 101;
+            Assert.Equal(nextLargePayload, await SendFramedAsync(transport, server, nextLargePayload));
+            await secondPromotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.True(transport.IsAdaptiveMultishot);
+            Assert.Equal(2, transport.AdaptivePromotionCount);
+            var multishotProbe = Enumerable.Repeat((byte)102, 193).ToArray();
+            Assert.Equal(multishotProbe, await SendFramedAsync(transport, server, multishotProbe));
+            Assert.Equal(2, transport.MultishotReceiveStatistics?.ReceiveStarts);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_BacklogDoesNotHotDemote()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            var blockedRequestEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var allowBlockedRequest = new ManualResetEventSlim();
+            var demotionCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            transport.AdaptiveModeChangedForTesting = useMultishot =>
+            {
+                if (!useMultishot)
+                {
+                    demotionCompleted.TrySetResult();
+                }
+            };
+
+            transport.Start();
+            var largePayload = Enumerable.Repeat((byte)61, 32 * 1024).ToArray();
+            Assert.Equal(largePayload, await SendFramedAsync(transport, server, largePayload));
+            largePayload[0] = 62;
+            Assert.Equal(largePayload, await SendFramedAsync(transport, server, largePayload));
+
+            var requests = new FramedReadRequest[9];
+            var frames = new byte[requests.Length][];
+            for (var i = 0; i < requests.Length; i++)
+            {
+                var payload = Enumerable.Repeat((byte)(70 + i), 257).ToArray();
+                requests[i] = new FramedReadRequest(
+                    payload.Length,
+                    beforeComplete: i == requests.Length - 1
+                        ? () =>
+                        {
+                            blockedRequestEntered.TrySetResult();
+                            if (!allowBlockedRequest.Wait(TimeSpan.FromSeconds(10)))
+                            {
+                                throw new TimeoutException("Timed out waiting to complete the backlogged read.");
+                            }
+                        }
+                : null);
+                frames[i] = CreateFrame(payload);
+                Assert.True(transport.EnqueueRead(requests[i]));
+            }
+
+            var batch = new byte[frames.Sum(static frame => frame.Length)];
+            var offset = 0;
+            foreach (var frame in frames)
+            {
+                frame.CopyTo(batch, offset);
+                offset += frame.Length;
+            }
+
+            var send = SendExactly(server, batch);
+            await blockedRequestEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.True(transport.IsAdaptiveMultishot);
+            Assert.Equal(0, transport.AdaptiveDemotionCount);
+
+            allowBlockedRequest.Set();
+            await send;
+            for (var i = 0; i < requests.Length; i++)
+            {
+                var expected = Enumerable.Repeat((byte)(70 + i), 257).ToArray();
+                Assert.Equal(
+                    expected,
+                    await requests[i].Completion.WaitAsync(
+                        TimeSpan.FromSeconds(10),
+                        TestContext.Current.CancellationToken));
+                requests[i].Dispose();
+            }
+
+            await demotionCompleted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            var finalPayload = Enumerable.Repeat((byte)90, 193).ToArray();
+            Assert.Equal(finalPayload, await SendFramedAsync(transport, server, finalPayload));
+            Assert.False(transport.IsAdaptiveMultishot);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_CloseRacesLazyPromotion()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            transport.Start();
+            var payload = Enumerable.Repeat((byte)91, 32 * 1024).ToArray();
+            Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            Assert.Null(transport.MultishotReceiveStatistics);
+
+            var frameObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var allowFrameObservation = new ManualResetEventSlim();
+            using var request = new FramedReadRequest(
+                payload.Length,
+                frameLengthObserved: () =>
+                {
+                    frameObserved.TrySetResult();
+                    if (!allowFrameObservation.Wait(TimeSpan.FromSeconds(10)))
+                    {
+                        throw new TimeoutException("Timed out waiting to continue lazy promotion.");
+                    }
+                });
+            Assert.True(transport.EnqueueRead(request));
+            payload[0] = 92;
+            var send = SendExactly(server, CreateFrame(payload));
+            await frameObserved.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            var close = transport.CloseAsync(null, TestContext.Current.CancellationToken).AsTask();
+            allowFrameObservation.Set();
+
+            await send;
+            await close.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            Assert.Null(transport.MultishotReceiveStatistics);
+            Assert.Equal(0, transport.AdaptivePromotionCount);
+            Assert.False(transport.IsAdaptiveMultishot);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_CloseAfterLazyPublicationDoesNotArm()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            var receiverPublished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var allowPromotion = new ManualResetEventSlim();
+            transport.AdaptiveModeChangedForTesting = useMultishot =>
+            {
+                if (useMultishot)
+                {
+                    receiverPublished.TrySetResult();
+                    if (!allowPromotion.Wait(TimeSpan.FromSeconds(10)))
+                    {
+                        throw new TimeoutException("Timed out waiting to continue published lazy promotion.");
+                    }
+                }
+            };
+
+            transport.Start();
+            var payload = Enumerable.Repeat((byte)93, 32 * 1024).ToArray();
+            Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+
+            using var request = new FramedReadRequest(payload.Length);
+            Assert.True(transport.EnqueueRead(request));
+            await SendExactly(server, CreateFrame(payload).AsMemory(0, sizeof(int) * 2));
+            await receiverPublished.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            var close = transport.CloseAsync(null, TestContext.Current.CancellationToken).AsTask();
+            allowPromotion.Set();
+
+            await close.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => request.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            var statistics = Assert.IsType<(
+                long AdoptedPages,
+                long CompletedSegments,
+                long FinalBuffers,
+                long ReplacementPages,
+                long NoBufferCompletions,
+                long PayloadCopies,
+                ushort BufferGroup,
+                long ReceiveStarts)>(
+                transport.MultishotReceiveStatistics);
+            Assert.Equal(0, statistics.ReceiveStarts);
+            Assert.False(transport.IsSocketReceivePending);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_AlternatingSizesDoesNotThrash()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            transport.Start();
+            var largePayload = Enumerable.Repeat((byte)71, 32 * 1024).ToArray();
+            Assert.Equal(largePayload, await SendFramedAsync(transport, server, largePayload));
+            largePayload[0] = 72;
+            Assert.Equal(largePayload, await SendFramedAsync(transport, server, largePayload));
+
+            for (var i = 0; i < 12; i++)
+            {
+                var size = (i & 1) == 0 ? 1024 : 32 * 1024;
+                var payload = Enumerable.Repeat((byte)i, size).ToArray();
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            }
+
+            var statistics = Assert.IsType<(
+                long AdoptedPages,
+                long CompletedSegments,
+                long FinalBuffers,
+                long ReplacementPages,
+                long NoBufferCompletions,
+                long PayloadCopies,
+                ushort BufferGroup,
+                long ReceiveStarts)>(
+                transport.MultishotReceiveStatistics);
+            Assert.True(transport.IsAdaptiveMultishot);
+            Assert.Equal(1, transport.AdaptivePromotionCount);
+            Assert.Equal(0, transport.AdaptiveDemotionCount);
+            Assert.Equal(1, statistics.ReceiveStarts);
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_CloseCancelsPendingRead(bool promote)
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            transport.Start();
+            if (promote)
+            {
+                var payload = Enumerable.Repeat((byte)72, 32 * 1024).ToArray();
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+                payload[0] = 73;
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            }
+
+            using var request = new FramedReadRequest(128);
+            Assert.True(transport.EnqueueRead(request));
+            Assert.True(SpinWait.SpinUntil(() => transport.IsSocketReceivePending, TimeSpan.FromSeconds(10)));
+
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken).AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => request.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_FinCancelsPendingRead(bool promote)
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        var (listener, client, server) = await CreateSocketPair();
+        using (listener)
+        using (client)
+        using (server)
+        await using (var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive))
+        {
+            transport.Start();
+            if (promote)
+            {
+                var payload = Enumerable.Repeat((byte)73, 32 * 1024).ToArray();
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+                payload[0] = 74;
+                Assert.Equal(payload, await SendFramedAsync(transport, server, payload));
+            }
+
+            using var request = new FramedReadRequest(128);
+            Assert.True(transport.EnqueueRead(request));
+            server.Shutdown(SocketShutdown.Send);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => request.Completion.WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringMultishot_RoundTripsFragmentedDataAndRearms()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await using var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Multishot);
+        Assert.NotNull(transport.MultishotReceiveStatistics);
+        transport.Start();
+
+        for (var iteration = 0; iteration < 2; iteration++)
+        {
+            var payload = GC.AllocateUninitializedArray<byte>((32 * 16 * 1024) + 37);
+            for (var i = 0; i < payload.Length; i++)
+            {
+                payload[i] = (byte)(i + iteration);
+            }
+
+            using var request = new FixedLengthReadRequest(payload.Length);
+            Assert.True(transport.EnqueueRead(request));
+            var offset = 0;
+            while (offset < payload.Length)
+            {
+                var count = Math.Min(997, payload.Length - offset);
+                var sent = await server.SendAsync(
+                    payload.AsMemory(offset, count),
+                    TestContext.Current.CancellationToken);
+                Assert.Equal(count, sent);
+                offset += sent;
+            }
+
+            var received = await request.Completion.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+            Assert.Equal(payload, received);
+        }
+
+        var statistics = Assert.IsType<(
+            long AdoptedPages,
+            long CompletedSegments,
+            long FinalBuffers,
+            long ReplacementPages,
+            long NoBufferCompletions,
+            long PayloadCopies,
+            ushort BufferGroup,
+            long ReceiveStarts)>(
+            transport.MultishotReceiveStatistics);
+        Assert.True(statistics.AdoptedPages > 16);
+        Assert.True(statistics.CompletedSegments > statistics.AdoptedPages);
+        Assert.True(statistics.FinalBuffers > 16);
+        Assert.True(statistics.ReplacementPages > 0);
+        Assert.Equal(0, statistics.PayloadCopies);
+        Assert.True(statistics.ReceiveStarts >= 1);
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task LinuxIoUringMultishot_TinyFragmentsSharePageAndEarlySliceSurvivesCancellation()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        var writer = new ArcBufferWriter();
+        var receiver = new LinuxIoUringSocketMultishotReceiver();
+        ArcBuffer earlySlice = default;
+        ArcBufferPage? page = null;
+        var pageVersion = 0;
+        var earlySliceDisposed = false;
+        var receiverDisposed = false;
+        var writerDisposed = false;
+
+        try
+        {
+            for (var i = 0; i < 64; i++)
+            {
+                var receive = receiver.ReceiveAsync(client, writer);
+                Assert.Equal(1, await server.SendAsync(new byte[] { (byte)i }));
+                await receive.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+                Assert.Equal(1, receiver.BytesTransferred);
+
+                if (i == 0)
+                {
+                    earlySlice = writer.ConsumeSlice(1);
+                    page = earlySlice.First;
+                    pageVersion = page.Version;
+                }
+                else
+                {
+                    using var slice = writer.ConsumeSlice(1);
+                    Assert.Same(page, slice.First);
+                    Assert.Equal(new byte[] { (byte)i }, slice.ToArray());
+                }
+            }
+
+            Assert.NotNull(page);
+            Assert.Equal(new byte[] { 0 }, earlySlice.ToArray());
+            Assert.Equal(1, receiver.AdoptedPageCount);
+            Assert.Equal(64, receiver.CompletedSegmentCount);
+            Assert.Equal(0, receiver.FinalBufferCount);
+            Assert.Equal(1, receiver.ActiveIncrementalPageCount);
+            Assert.Equal(0, receiver.PayloadCopyCount);
+
+            var pendingReceive = receiver.ReceiveAsync(client, writer);
+            await receiver.StopAsync().AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+            await Assert.ThrowsAsync<SocketException>(
+                () => pendingReceive.AsTask().WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+            receiver.Dispose();
+            receiverDisposed = true;
+            writer.Dispose();
+            writerDisposed = true;
+
+            Assert.Equal(1, page.ReferenceCount);
+            Assert.Equal(new byte[] { 0 }, earlySlice.ToArray());
+            earlySlice.Dispose();
+            earlySliceDisposed = true;
+            Assert.Equal(0, page.ReferenceCount);
+            Assert.Equal(pageVersion + 1, page.Version);
+        }
+        finally
+        {
+            if (!receiverDisposed && receiver.IsPending)
+            {
+                await receiver.StopAsync();
+            }
+
+            if (!earlySliceDisposed)
+            {
+                earlySlice.Dispose();
+            }
+
+            if (!receiverDisposed && !receiver.IsPending)
+            {
+                receiver.Dispose();
+            }
+
+            if (!writerDisposed)
+            {
+                writer.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LinuxIoUringMultishot_ExhaustsRingThenDemandRefillsForLargeFrame()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        const int PayloadSize = (17 * 16 * 1024) + 37;
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        using var writer = new ArcBufferWriter();
+        using var receiver = new LinuxIoUringSocketMultishotReceiver();
+        var payload = GC.AllocateUninitializedArray<byte>(PayloadSize);
+        for (var i = 0; i < payload.Length; i++)
+        {
+            payload[i] = (byte)i;
+        }
+
+        var firstReceive = receiver.ReceiveAsync(client, writer);
+        await SendExactly(server, payload).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await firstReceive.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.True(
+            SpinWait.SpinUntil(
+                () => receiver.NoBufferCompletionCount > 0,
+                TimeSpan.FromSeconds(10)),
+            "The multishot receive did not report ENOBUFS after all 16 provided buffers were consumed.");
+
+        while (writer.Length < payload.Length)
+        {
+            await receiver.ReceiveAsync(client, writer).AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+        }
+
+        using var slice = writer.ConsumeSlice(payload.Length);
+        Assert.Equal(payload, slice.ToArray());
+        Assert.True(receiver.AdoptedPageCount > 16);
+        Assert.True(receiver.CompletedSegmentCount >= receiver.AdoptedPageCount);
+        Assert.True(receiver.ReplacementPageCount > 0);
+        Assert.True(receiver.NoBufferCompletionCount > 0);
+        Assert.Equal(0, receiver.PayloadCopyCount);
+        await receiver.StopAsync().AsTask().WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+
+        static async Task SendExactly(Socket socket, ReadOnlyMemory<byte> buffer)
+        {
+            while (!buffer.IsEmpty)
+            {
+                var length = await socket.SendAsync(buffer);
+                Assert.NotEqual(0, length);
+                buffer = buffer[length..];
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LinuxIoUringMultishot_FinalSegmentReleasesReceiverReference()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        const int PayloadSize = 16 * 1024;
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        var writer = new ArcBufferWriter();
+        var receiver = new LinuxIoUringSocketMultishotReceiver();
+        var payload = GC.AllocateUninitializedArray<byte>(PayloadSize);
+        Random.Shared.NextBytes(payload);
+
+        var receive = receiver.ReceiveAsync(client, writer);
+        await SendExactly(server, payload).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await receive.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        while (writer.Length < payload.Length)
+        {
+            await receiver.ReceiveAsync(client, writer).AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+        }
+
+        var page = Assert.IsType<ArcBufferPage>(receiver.FirstAdoptedPage);
+        var pageVersion = page.Version;
+        Assert.Equal(1, receiver.AdoptedPageCount);
+        Assert.Equal(1, receiver.FinalBufferCount);
+        Assert.Equal(0, receiver.ActiveIncrementalPageCount);
+        Assert.Equal(1, page.ReferenceCount);
+        using (var slice = writer.ConsumeSlice(payload.Length))
+        {
+            Assert.Same(page, slice.First);
+            Assert.Equal(payload, slice.ToArray());
+        }
+
+        await receiver.StopAsync().AsTask().WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        receiver.Dispose();
+        writer.Dispose();
+        Assert.Equal(0, page.ReferenceCount);
+        Assert.Equal(pageVersion + 1, page.Version);
+
+        static async Task SendExactly(Socket socket, ReadOnlyMemory<byte> buffer)
+        {
+            while (!buffer.IsEmpty)
+            {
+                var length = await socket.SendAsync(buffer);
+                Assert.NotEqual(0, length);
+                buffer = buffer[length..];
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LinuxIoUringMultishot_AdoptedPagesOutliveReceiver()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        var writer = new ArcBufferWriter();
+        var receiver = new LinuxIoUringSocketMultishotReceiver();
+        var payload = GC.AllocateUninitializedArray<byte>((16 * 16 * 1024) + 29);
+        for (var i = 0; i < payload.Length; i++)
+        {
+            payload[i] = (byte)i;
+        }
+
+        var sendTask = SendExactly(server, payload);
+        while (writer.Length < payload.Length)
+        {
+            await receiver.ReceiveAsync(client, writer).AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+        }
+
+        await sendTask.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var slice = writer.ConsumeSlice(payload.Length);
+        Assert.Same(receiver.FirstAdoptedPage, slice.First);
+        Assert.Equal(0, receiver.PayloadCopyCount);
+        Assert.True(receiver.AdoptedPageCount > 8);
+        Assert.True(receiver.CompletedSegmentCount >= receiver.AdoptedPageCount);
+
+        await receiver.StopAsync().AsTask().WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        receiver.Dispose();
+        writer.Dispose();
+
+        Assert.Equal(payload, slice.ToArray());
+        slice.Dispose();
+
+        static async Task SendExactly(Socket socket, ReadOnlyMemory<byte> buffer)
+        {
+            while (!buffer.IsEmpty)
+            {
+                var length = await socket.SendAsync(buffer);
+                Assert.NotEqual(0, length);
+                buffer = buffer[length..];
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LinuxIoUringMultishot_BufferGroupIsReleasedAfterRingUnregister()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        using var writer = new ArcBufferWriter();
+        LinuxIoUringEngine engine;
+        ushort releasedGroup;
+
+        using (var first = new LinuxIoUringSocketMultishotReceiver())
+        {
+            engine = first.Engine;
+            releasedGroup = first.BufferGroup;
+            var receive = first.ReceiveAsync(client, writer);
+            Assert.Equal(1, await server.SendAsync(new byte[] { 42 }));
+            await receive.AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+            using (var second = new LinuxIoUringSocketMultishotReceiver(engine))
+            {
+                Assert.NotEqual(releasedGroup, second.BufferGroup);
+            }
+
+            await first.StopAsync().AsTask().WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken);
+            using var third = new LinuxIoUringSocketMultishotReceiver(engine);
+            Assert.NotEqual(releasedGroup, third.BufferGroup);
+        }
+
+        using var replacement = new LinuxIoUringSocketMultishotReceiver(engine);
+        Assert.Equal(releasedGroup, replacement.BufferGroup);
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringAdaptive_ConcurrentConnectionsRoundTripData()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        const int ConnectionCount = 8;
+        const int IterationCount = 4;
+        const int PayloadSize = (32 * 1024) + 17;
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(ConnectionCount);
+        var transports = new SocketMessageTransport[ConnectionCount];
+        var serverSockets = new Socket[ConnectionCount];
+
+        try
+        {
+            for (var i = 0; i < ConnectionCount; i++)
+            {
+                var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+                var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+                serverSockets[i] = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+                await connect;
+                transports[i] = new SocketMessageTransport(
+                    client,
+                    NullLogger.Instance,
+                    useLinuxIoUring: true,
+                    linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Adaptive);
+                transports[i].Start();
+            }
+
+            var tasks = new Task[ConnectionCount];
+            for (var i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = RunConnection(transports[i], serverSockets[i], i);
+            }
+
+            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+            foreach (var transport in transports)
+            {
+                Assert.True(transport.IsAdaptiveMultishot);
+                Assert.Equal(1, transport.AdaptivePromotionCount);
+                Assert.True(transport.MultishotReceiveStatistics?.ReceiveStarts >= 1);
+            }
+        }
+        finally
+        {
+            for (var i = 0; i < transports.Length; i++)
+            {
+                if (transports[i] is { } transport)
+                {
+                    await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+                    await transport.DisposeAsync();
+                }
+
+                serverSockets[i]?.Dispose();
+            }
+        }
+
+        static async Task RunConnection(SocketMessageTransport transport, Socket server, int connectionId)
+        {
+            for (var iteration = 0; iteration < IterationCount; iteration++)
+            {
+                var payload = GC.AllocateUninitializedArray<byte>(PayloadSize);
+                for (var i = 0; i < payload.Length; i++)
+                {
+                    payload[i] = (byte)(i + connectionId + iteration);
+                }
+
+                using var writeRequest = new BufferedWriteRequest(payload, useMultipleBuffers: true);
+                using var readRequest = new FramedReadRequest(payload.Length);
+                Assert.True(transport.EnqueueWrite(writeRequest));
+                var receivedByServer = new byte[payload.Length];
+                await ReceiveExactly(server, receivedByServer);
+                await writeRequest.Completion;
+                Assert.Equal(payload, receivedByServer);
+
+                Assert.True(transport.EnqueueRead(readRequest));
+                await SendExactly(server, CreateFrame(payload));
+                var receivedByTransport = await readRequest.Completion;
+                Assert.Equal(payload, receivedByTransport);
+            }
+        }
+
+        static async Task ReceiveExactly(Socket socket, Memory<byte> buffer)
+        {
+            while (!buffer.IsEmpty)
+            {
+                var length = await socket.ReceiveAsync(buffer);
+                Assert.NotEqual(0, length);
+                buffer = buffer[length..];
+            }
+        }
+
+        static async Task SendExactly(Socket socket, ReadOnlyMemory<byte> buffer)
+        {
+            while (!buffer.IsEmpty)
+            {
+                var length = await socket.SendAsync(buffer);
+                Assert.NotEqual(0, length);
+                buffer = buffer[length..];
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LinuxIoUringOperation_DisposeWhilePending_Throws()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await connect;
+        using var receiver = new LinuxIoUringSocketReceiver();
+        var buffer = GC.AllocateUninitializedArray<byte>(32, pinned: true);
+
+        var receive = receiver.ReceiveAsync(client, [new ArraySegment<byte>(buffer)]);
+        Assert.Throws<InvalidOperationException>(receiver.Dispose);
+        Assert.Equal(1, await server.SendAsync(new byte[] { 42 }));
+        await receive;
+
+        Assert.Equal(1, receiver.BytesTransferred);
+        Assert.Equal(42, buffer[0]);
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUring_DisposeBeforeStart_Closes()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await connect;
+        var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+        var closed = transport.Closed;
+
+        await transport.DisposeAsync();
+
+        Assert.True(closed.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringMultishot_DisposeBeforeStart_Closes()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await connect;
+        var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Multishot);
+        var closed = transport.Closed;
+
+        await transport.DisposeAsync();
+
+        Assert.True(closed.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringMultishot_FinCancelsPendingRead()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await using var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Multishot);
+        using var request = new FixedLengthReadRequest(1);
+
+        transport.Start();
+        Assert.True(transport.EnqueueRead(request));
+        server.Shutdown(SocketShutdown.Send);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => request.Completion.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringMultishot_CloseCancelsPendingRead()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await using var transport = new SocketMessageTransport(
+            client,
+            NullLogger.Instance,
+            useLinuxIoUring: true,
+            linuxIoUringReceiveMode: LinuxIoUringReceiveMode.Multishot);
+        using var request = new FixedLengthReadRequest(1);
+
+        transport.Start();
+        Assert.True(transport.EnqueueRead(request));
+        Assert.True(SpinWait.SpinUntil(() => transport.IsSocketReceivePending, TimeSpan.FromSeconds(10)));
+
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken).AsTask().WaitAsync(
+            TimeSpan.FromSeconds(10),
+            TestContext.Current.CancellationToken);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => request.Completion.WaitAsync(
+                TimeSpan.FromSeconds(10),
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUring_NonLoopbackUsesZeroCopy()
+    {
+        if (!OperatingSystem.IsLinux()
+            || !string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var address = (await Dns.GetHostAddressesAsync(Dns.GetHostName(), TestContext.Current.CancellationToken))
+            .FirstOrDefault(static address => address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(address));
+        if (address is null)
+        {
+            return;
+        }
+
+        const int PayloadSize = (64 * 1024) + 7;
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(address, 0));
+        listener.Listen(1);
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        var connect = client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await connect;
+        await using var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+        var payload = GC.AllocateUninitializedArray<byte>(PayloadSize);
+        for (var i = 0; i < payload.Length; i++)
+        {
+            payload[i] = (byte)i;
+        }
+
+        using var writeRequest = new BufferedWriteRequest(payload, useMultipleBuffers: true);
+        var initialStatistics = LinuxIoUringEngine.GetZeroCopyStatistics();
+        transport.Start();
+        Assert.True(transport.EnqueueWrite(writeRequest));
+        var received = new byte[payload.Length];
+        var offset = 0;
+        while (offset < received.Length)
+        {
+            var length = await server.ReceiveAsync(received.AsMemory(offset), TestContext.Current.CancellationToken);
+            Assert.NotEqual(0, length);
+            offset += length;
+        }
+
+        await writeRequest.Completion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var finalStatistics = LinuxIoUringEngine.GetZeroCopyStatistics();
+
+        Assert.Equal(payload, received);
+        Assert.True(finalStatistics.Primary > initialStatistics.Primary);
+        Assert.Equal(
+            finalStatistics.Primary - initialStatistics.Primary,
+            finalStatistics.Notifications - initialStatistics.Notifications);
+        await transport.CloseAsync(null, TestContext.Current.CancellationToken);
+    }
+
     [Fact]
     public async Task StreamMessageTransport_WriteFailure_WakesIdleReadLoop()
     {
@@ -744,6 +2436,84 @@ public class MessageTransportLifecycleTests
         Assert.True(transport.EnqueueWrite(request));
         await Assert.ThrowsAsync<IOException>(() => request.Completion);
         await closed.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task SocketMessageTransport_LinuxIoUringWriteFailure_InterruptsPendingRead()
+    {
+        if (!IsIoUringTestEnabled())
+        {
+            return;
+        }
+
+        using var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await client.ConnectAsync(listener.LocalEndPoint!, TestContext.Current.CancellationToken);
+        using var server = await listener.AcceptAsync(TestContext.Current.CancellationToken);
+        await using var transport = new SocketMessageTransport(client, NullLogger.Instance, useLinuxIoUring: true);
+        typeof(SocketMessageTransport)
+            .GetField("_largeSocketSender", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(transport, new FailingSocketSender());
+        transport.Start();
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = transport.Closed.Register(static state => ((TaskCompletionSource)state!).TrySetResult(), closed);
+
+        using var readRequest = new FixedLengthReadRequest(1);
+        Assert.True(transport.EnqueueRead(readRequest));
+        Assert.True(SpinWait.SpinUntil(() => transport.IsSocketReceivePending, TimeSpan.FromSeconds(10)));
+
+        using var writeRequest = new BufferedWriteRequest(new byte[64 * 1024], useMultipleBuffers: true);
+        Assert.True(transport.EnqueueWrite(writeRequest));
+
+        await Assert.ThrowsAsync<IOException>(() => writeRequest.Completion);
+        await closed.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task TcpMessageTransportListener_ConstructionFailure_DisposesAcceptedSocket()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        const string ListenerName = "test";
+        var tcpOptions = Substitute.For<IOptionsMonitor<TcpMessageTransportOptions>>();
+        tcpOptions.Get(ListenerName).Returns(new TcpMessageTransportOptions
+        {
+            FastPath = false,
+            UseLinuxIoUring = true
+        });
+        var listenerOptions = Substitute.For<IOptionsMonitor<TcpMessageTransportListenerOptions>>();
+        listenerOptions.Get(ListenerName).Returns(new TcpMessageTransportListenerOptions
+        {
+            Endpoint = new IPEndPoint(IPAddress.Loopback, 0)
+        });
+        await using var listener = new TcpMessageTransportListener(
+            ListenerName,
+            tcpOptions,
+            listenerOptions,
+            NullLoggerFactory.Instance);
+        await listener.BindAsync(TestContext.Current.CancellationToken);
+        var listenSocket = (Socket)typeof(TcpMessageTransportListener)
+            .GetField("_listenSocket", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(listener)!;
+        var acceptTask = listener.AcceptAsync(TestContext.Current.CancellationToken).AsTask();
+        using var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+        await client.ConnectAsync(listenSocket.LocalEndPoint!, TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<PlatformNotSupportedException>(() => acceptTask);
+
+        var exception = await Assert.ThrowsAsync<SocketException>(
+            () => client.ReceiveAsync(
+                new byte[1],
+                TestContext.Current.CancellationToken).AsTask().WaitAsync(
+                    TimeSpan.FromSeconds(10),
+                    TestContext.Current.CancellationToken));
+        Assert.Equal(SocketError.ConnectionReset, exception.SocketErrorCode);
     }
 
     [Fact]
@@ -927,6 +2697,63 @@ public class MessageTransportLifecycleTests
         public void Dispose() => _releaseSend.Dispose();
     }
 
+    private static bool IsIoUringTestEnabled()
+        => OperatingSystem.IsLinux()
+            && string.Equals(
+                Environment.GetEnvironmentVariable("ORLEANS_TEST_IO_URING"),
+                "1",
+                StringComparison.Ordinal);
+
+    private static async Task<(Socket Listener, Socket Client, Socket Server)> CreateSocketPair()
+    {
+        var listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        listener.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        listener.Listen(1);
+        var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            await client.ConnectAsync(listener.LocalEndPoint!);
+            var server = await listener.AcceptAsync();
+            return (listener, client, server);
+        }
+        catch
+        {
+            client.Dispose();
+            listener.Dispose();
+            throw;
+        }
+    }
+
+    private static async Task<byte[]> SendFramedAsync(
+        SocketMessageTransport transport,
+        Socket socket,
+        byte[] payload)
+    {
+        using var request = new FramedReadRequest(payload.Length);
+        Assert.True(transport.EnqueueRead(request));
+        await SendExactly(socket, CreateFrame(payload));
+        return await request.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    private static byte[] CreateFrame(ReadOnlySpan<byte> payload)
+    {
+        var result = new byte[sizeof(int) * 2 + payload.Length];
+        BinaryPrimitives.WriteInt32LittleEndian(result, payload.Length);
+        BinaryPrimitives.WriteInt32LittleEndian(result.AsSpan(sizeof(int)), 0);
+        payload.CopyTo(result.AsSpan(sizeof(int) * 2));
+        return result;
+    }
+
+    private static async Task SendExactly(Socket socket, ReadOnlyMemory<byte> buffer)
+    {
+        while (!buffer.IsEmpty)
+        {
+            var length = await socket.SendAsync(buffer);
+            Assert.NotEqual(0, length);
+            buffer = buffer[length..];
+        }
+    }
+
     private sealed class CancelableTransport : MessageTransport
     {
         private ReadRequest? _read;
@@ -1043,17 +2870,157 @@ public class MessageTransportLifecycleTests
     {
         private readonly ArcBufferWriter _buffer = new();
         private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly bool _hasLargeMessages;
 
-        public BufferedWriteRequest(ReadOnlySpan<byte> bytes)
+        public BufferedWriteRequest(ReadOnlySpan<byte> bytes, bool useMultipleBuffers = false)
         {
-            _buffer.Write(bytes);
+            _hasLargeMessages = useMultipleBuffers;
+            if (useMultipleBuffers)
+            {
+                const int SegmentSize = 8 * 1024;
+                while (!bytes.IsEmpty)
+                {
+                    var count = Math.Min(bytes.Length, SegmentSize);
+                    _buffer.Write(bytes[..count]);
+                    bytes = bytes[count..];
+                }
+            }
+            else
+            {
+                _buffer.Write(bytes);
+            }
+
             Buffers = new(_buffer);
         }
+
+        internal override bool HasLargeMessages => _hasLargeMessages;
 
         public Task Completion => _completion.Task;
         public override void SetResult() => _completion.TrySetResult();
         public override void SetException(Exception error) => _completion.TrySetException(error);
         public void Dispose() => _buffer.Dispose();
+    }
+
+    private class FixedLengthReadRequest(int length) : ReadRequest, IDisposable
+    {
+        public TaskCompletionSource<byte[]> CompletionSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<byte[]> Completion => CompletionSource.Task;
+
+        public override bool OnRead(ArcBufferReader buffer)
+        {
+            if (buffer.Length < length)
+            {
+                return false;
+            }
+
+            using var slice = buffer.ConsumeSlice(length);
+            var result = new byte[length];
+            var offset = 0;
+            foreach (var segment in slice)
+            {
+                segment.CopyTo(result.AsSpan(offset));
+                offset += segment.Length;
+            }
+
+            CompletionSource.TrySetResult(result);
+            return true;
+        }
+
+        public override void OnError(Exception error) => CompletionSource.TrySetException(error);
+
+        public override void OnCanceled() => CompletionSource.TrySetCanceled();
+
+        public void Dispose() => CompletionSource.TrySetCanceled();
+    }
+
+    private sealed class UnknownFramedReadRequest(int length) : FixedLengthReadRequest(length), IFramedReadRequest
+    {
+        public bool OnRead(ArcBufferReader bufferReader, out int framedLength)
+        {
+            framedLength = 0;
+            return OnRead(bufferReader);
+        }
+    }
+
+    private sealed class FramedReadRequest(
+        int payloadLength,
+        Action? frameLengthObserved = null,
+        Action? beforeComplete = null) : ReadRequest, IFramedReadRequest, IDisposable
+    {
+        private const int FramingLength = sizeof(int) * 2;
+        private readonly TaskCompletionSource<byte[]> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<byte[]> Completion => _completion.Task;
+
+        public override bool OnRead(ArcBufferReader buffer)
+        {
+            var framedLength = checked(FramingLength + payloadLength);
+            if (buffer.Length < framedLength)
+            {
+                return false;
+            }
+
+            beforeComplete?.Invoke();
+            Span<byte> scratch = stackalloc byte[FramingLength];
+            var lengths = buffer.Peek(in scratch);
+            Assert.Equal(payloadLength, BinaryPrimitives.ReadInt32LittleEndian(lengths));
+            Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(lengths[sizeof(int)..]));
+            using var frame = buffer.ConsumeSlice(framedLength);
+            var result = new byte[payloadLength];
+            var copied = 0;
+            var skipped = 0;
+            foreach (var segment in frame)
+            {
+                var current = segment;
+                if (skipped < FramingLength)
+                {
+                    var skip = Math.Min(FramingLength - skipped, current.Length);
+                    current = current[skip..];
+                    skipped += skip;
+                }
+
+                current.CopyTo(result.AsSpan(copied));
+                copied += current.Length;
+            }
+
+            Assert.Equal(payloadLength, copied);
+            _completion.TrySetResult(result);
+            return true;
+        }
+
+        public override void OnError(Exception error) => _completion.TrySetException(error);
+
+        public override void OnCanceled() => _completion.TrySetCanceled();
+
+        public bool OnRead(ArcBufferReader bufferReader, out int framedLength)
+        {
+            if (bufferReader.Length < FramingLength)
+            {
+                framedLength = 0;
+                return OnRead(bufferReader);
+            }
+
+            Span<byte> scratch = stackalloc byte[FramingLength];
+            var lengths = bufferReader.Peek(in scratch);
+            try
+            {
+                framedLength = checked(
+                    FramingLength
+                    + checked(
+                        BinaryPrimitives.ReadInt32LittleEndian(lengths)
+                        + BinaryPrimitives.ReadInt32LittleEndian(lengths[sizeof(int)..])));
+                frameLengthObserved?.Invoke();
+                return OnRead(bufferReader);
+            }
+            catch (OverflowException)
+            {
+                framedLength = 0;
+                return OnRead(bufferReader);
+            }
+        }
+
+        public void Dispose() => _completion.TrySetCanceled();
     }
 
     private sealed class TestStreamMessageTransport(Stream stream) : StreamMessageTransport(NullLogger.Instance)
@@ -1065,6 +3032,49 @@ public class MessageTransportLifecycleTests
     {
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
             ValueTask.FromException(new IOException("Write failed"));
+    }
+
+    private sealed class FailingSocketSender : ISocketSender
+    {
+        private readonly IOException _error = new("Write failed");
+
+        public int BytesTransferred => 0;
+        public SocketError SocketError => SocketError.SocketError;
+        public Exception Error => _error;
+        public bool HasError => true;
+        public ValueTask SendAsync(Socket socket, List<ArraySegment<byte>> buffers, bool buffersArePinned, bool useZeroCopy)
+            => ValueTask.FromException(_error);
+        public ValueTask SendAsync(Socket socket, ReadOnlyMemory<byte> memory, bool bufferIsPinned, bool useZeroCopy)
+            => ValueTask.FromException(_error);
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class PausedSocketSender : ISocketSender
+    {
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly IOException _error = new("Write failed");
+
+        public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int BytesTransferred => 0;
+        public SocketError SocketError => SocketError.SocketError;
+        public Exception Error => _error;
+        public bool HasError => true;
+        public ValueTask SendAsync(Socket socket, List<ArraySegment<byte>> buffers, bool buffersArePinned, bool useZeroCopy)
+            => SendAsyncCore();
+        public ValueTask SendAsync(Socket socket, ReadOnlyMemory<byte> memory, bool bufferIsPinned, bool useZeroCopy)
+            => SendAsyncCore();
+
+        private async ValueTask SendAsyncCore()
+        {
+            Started.TrySetResult();
+            await _release.Task;
+            throw _error;
+        }
+
+        public void Release() => _release.TrySetResult();
+        public void Dispose() => Release();
     }
 
     private sealed class TrackingTransport : MessageTransport

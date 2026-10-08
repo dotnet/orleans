@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.Model;
 using Orleans.Serialization;
 
 namespace Orleans.CodeGenerator.Tests;
@@ -2241,6 +2242,1368 @@ public class DemoClass
         Assert.Equal(1, CountOccurrences(serializerText, "if (id == 2U)"));
     }
 
+    [Fact]
+    public async Task RpcResponseFactoriesEmitIdenticalSourcesForManagedAndNativePublishing()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey
+            {
+                Task<Payload> Reference();
+                ValueTask<int> Integer();
+                Task<List<Payload>> Collection();
+                Task Done();
+            }
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; set; }
+                [Id(1)] public Payload Next { get; set; }
+            }
+            [GenerateSerializerContext<Payload>]
+            public partial class Context : Orleans.Serialization.SerializerContext { }
+            """);
+        var managed = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "false" });
+        var native = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        var tree = compilation.SyntaxTrees.Single();
+        var frameworkSymbolCompilation = compilation.ReplaceSyntaxTree(tree,
+            tree.WithRootAndOptions(tree.GetRoot(TestContext.Current.CancellationToken),
+                ((CSharpParseOptions)tree.Options).WithPreprocessorSymbols("NET5_0_OR_GREATER")));
+        var frameworkSymbol = RunSourceGenerator(frameworkSymbolCompilation);
+
+        Assert.Empty(managed.Diagnostics);
+        Assert.Empty(native.Diagnostics);
+        Assert.Empty(frameworkSymbol.Diagnostics);
+        Assert.Equal(
+            managed.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
+                .Select(static source => (source.HintName, Source: source.SourceText.ToString())),
+            native.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
+                .Select(static source => (source.HintName, Source: source.SourceText.ToString())));
+        Assert.Equal(
+            managed.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
+                .Select(static source => (source.HintName, Source: source.SourceText.ToString())),
+            frameworkSymbol.GeneratedSources.OrderBy(static source => source.HintName, StringComparer.Ordinal)
+                .Select(static source => (source.HintName, Source: source.SourceText.ToString())));
+        var source = ConcatenateGeneratedSources(managed);
+        Assert.Contains("IResponseInvokable", source);
+        Assert.Contains("IRawResponseWriter", source);
+        Assert.Contains("AddRawResponseReader", source);
+        Assert.DoesNotContain("#if NET5_0_OR_GREATER", source);
+        Assert.DoesNotContain("RuntimeFeature", source);
+        Assert.DoesNotContain("UseGeneratedSerializerContexts", source);
+        Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcResponseFactoriesGenerateForMetadataOnlyCompilation(bool referenceAssembly)
+    {
+        var library = await CreateCompilation("""
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace MetadataContracts;
+            public interface IResponses : IGrainWithIntegerKey
+            {
+                Task<string> Reference(List<int> values);
+                ValueTask<int[]> Array();
+                Task Done();
+            }
+            """, "MetadataContracts");
+        using var image = new System.IO.MemoryStream();
+        var emitted = library.Emit(image,
+            options: new Microsoft.CodeAnalysis.Emit.EmitOptions(metadataOnly: referenceAssembly, includePrivateMembers: !referenceAssembly),
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+
+        var compilation = (await CreateCompilation(string.Empty, "MetadataConsumer"))
+            .AddReferences(
+                MetadataReference.CreateFromImage(image.ToArray()),
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location));
+        var metadataCompilation = compilation.RemoveAllSyntaxTrees();
+        Assert.Empty(metadataCompilation.SyntaxTrees);
+        var interfaceType = metadataCompilation.GetTypeByMetadataName("MetadataContracts.IResponses");
+        Assert.NotNull(interfaceType);
+        var model = ModelExtractor.ExtractProxyInterfaceModel(interfaceType, metadataCompilation, TestContext.Current.CancellationToken);
+        Assert.NotNull(model);
+        var options = SourceGeneratorOptionsParser.ParseOptions(TestCompilationHelper.CreateOptionsProvider(
+            new Dictionary<string, string> { ["build_property.publishaot"] = "true" }).GlobalOptions);
+        var names = RpcResponseHolderGenerator.GetNames(metadataCompilation, [model], options, TestContext.Current.CancellationToken);
+        var preparation = ProxySourceOutputGenerator.CreateProxyOutputPreparation(
+            metadataCompilation, [model], options, names, TestContext.Current.CancellationToken);
+        Assert.Empty(preparation.Diagnostics);
+
+        var responses = RpcResponseGenerator.Generate(
+            metadataCompilation, preparation.ProxyOutputModels, options, names, TestContext.Current.CancellationToken);
+        var baseline = RpcResponseGenerator.Generate(
+            compilation, preparation.ProxyOutputModels, options, names, TestContext.Current.CancellationToken);
+        Assert.Equal(baseline, responses);
+        Assert.NotEmpty(responses);
+        Assert.All(responses, static output => Assert.Null(output.Diagnostic));
+        var responseSource = Assert.Single(responses, static output =>
+            output.SourceEntry is { HintName: var hintName } && hintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal))
+            .SourceEntry!.Value.Source;
+        Assert.Contains("ListCopier<int>", responseSource);
+        Assert.Contains("AddRawResponseReader<string>", responseSource);
+        Assert.Contains("AddRawResponseReader<int[]>", responseSource);
+        Assert.Contains("CompletedResponse", responseSource);
+
+        var sources = preparation.SourceOutputs.Concat(responses);
+        var outputCompilation = metadataCompilation.AddSyntaxTrees(sources.Select(static output =>
+            CSharpSyntaxTree.ParseText(output.SourceEntry!.Value.Source, path: output.SourceEntry.Value.HintName)));
+        Assert.Empty(outputCompilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesGenerateConcreteClosedGraph()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey
+            {
+                Task<bool> Boolean();
+                ValueTask<int> Integer();
+                Task<Payload> Reference();
+                Task<int> Repeated();
+                Task<System.Collections.Generic.KeyValuePair<string, string>> Pair();
+            }
+            [GenerateSerializer, Alias("rpc.payload")]
+            public class Payload
+            {
+                [Id(0)] public int Value { get; set; }
+                [Id(1)] public Payload Next { get; set; }
+                [Id(2)] public Orleans.Serialization.Invocation.Response<Payload> Envelope { get; set; }
+            }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(result.Diagnostics);
+        var source = Assert.Single(result.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("new global::Orleans.Serialization.Invocation.PooledResponseCodec<bool, global::Orleans.Serialization.Codecs.BoolCodec>", source);
+        Assert.Contains("new global::Orleans.Serialization.Invocation.PooledResponseCopier<int, global::Orleans.Serialization.Cloning.ShallowCopier<int>>", source);
+        Assert.Contains("PooledResponseCodec<global::TestProject.Payload, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
+        Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(provider)", source);
+        Assert.Contains("AddDefaultSerializerService<global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.Payload>, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
+        Assert.Contains("AddDefaultSerializerService<global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.Payload>, global::OrleansCodeGen.TestProject.Copier_Payload>", source);
+        Assert.Contains("new global::Orleans.Serialization.Codecs.KeyValuePairCodec<string, string>", source);
+        Assert.Contains("new global::Orleans.Serialization.Codecs.KeyValuePairCopier<string, string>", source);
+        Assert.Contains("caller => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Codec_Payload>(caller, provider)", source);
+        Assert.Contains("caller => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Copier_Payload>(caller, provider)", source);
+        Assert.Equal(1, CountOccurrences(source, "options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<int>,"));
+        Assert.DoesNotContain("RuntimeFeature.IsDynamicCodeSupported", source);
+        Assert.Contains("codecDependencies: new global::System.Type[]", source);
+        Assert.Contains("copierDependencies: new global::System.Type[]", source);
+        var integerResponseRegistration = Assert.Single(source.Split('\n'), static line =>
+            line.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<int>,", StringComparison.Ordinal));
+        Assert.Contains("codecDependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Codecs.Int32Codec) }", integerResponseRegistration);
+        Assert.Contains("copierDependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Cloning.ShallowCopier<int>) }", integerResponseRegistration);
+        Assert.DoesNotContain("GetService<global::Orleans.Serialization.Codecs.IFieldCodec<", source);
+        Assert.DoesNotContain("GetService<global::Orleans.Serialization.Cloning.IDeepCopier<", source);
+        Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
+        Assert.DoesNotContain("MakeGenericType", source);
+        Assert.DoesNotContain("WellKnownTypeAliases", source);
+        Assert.Contains("WellKnownTypeAliases.TryGetValue(\"rpc.payload\"", ConcatenateGeneratedSources(result));
+        Assert.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>", source);
+        Assert.Contains("AbstractTypeSerializer<global::Orleans.Serialization.Invocation.Response>", source);
+        Assert.Contains("global::Orleans.Serialization.Codecs.ObjectCopier.DeepCopy(input, context)", source);
+        Assert.Contains("new global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse(", source);
+        Assert.Contains("Create() => global::Orleans.Serialization.Invocation.CompletedResponse.Instance", source);
+        var outputCompilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: source.HintName)));
+        Assert.Empty(outputCompilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Theory]
+    [InlineData("Task<T> Get<T>();")]
+    [InlineData("Task<System.Collections.Generic.List<T>> Get<T>();")]
+    [InlineData("Task<object> Get();")]
+    public async Task RpcResponseFactoriesDiagnoseUnresolvedNativeResults(string method)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey { {{method}} }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("ORLEANS0116", diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("serializer context", diagnostic.GetMessage());
+        Assert.NotEqual(Location.None, diagnostic.Location);
+    }
+
+    [Theory]
+    [InlineData("void", "System.IO.Stream")]
+    [InlineData("Task", "System.IO.Stream")]
+    [InlineData("void", "System.Collections.Generic.Dictionary<string, int>")]
+    [InlineData("Task", "System.Collections.Generic.Dictionary<string, int>")]
+    public async Task RpcArgumentFactoriesDiagnoseRequiredArgumentConstructionGraph(string returnType, string argumentType)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IArguments : IGrainWithIntegerKey
+            {
+                {{returnType}} Send({{argumentType}} value);
+            }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        var diagnostic = Assert.Single(result.Diagnostics);
+
+        Assert.Equal("ORLEANS0116", diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("argument type", diagnostic.GetMessage());
+        Assert.Contains(argumentType, diagnostic.GetMessage());
+        Assert.Contains("argument's closed codec, copier, and required serialization services", diagnostic.GetMessage());
+        Assert.DoesNotContain("response result", diagnostic.GetMessage());
+        Assert.DoesNotContain("Response<TResult>", diagnostic.GetMessage());
+        Assert.NotEqual(Location.None, diagnostic.Location);
+    }
+
+    [Theory]
+    [InlineData("System.Collections.Generic.Dictionary<string, int>")]
+    [InlineData("System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, int>>")]
+    public async Task RpcResponseFactoriesRequireExplicitDictionaryComparerContract(string resultType)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey { Task<{{resultType}}> Get(); }
+            """);
+        var native = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        var diagnostic = Assert.Single(native.Diagnostics);
+        Assert.Equal("ORLEANS0116", diagnostic.Id);
+        Assert.Contains("comparer contract", diagnostic.GetMessage());
+        Assert.Contains("Dictionary", diagnostic.GetMessage());
+        Assert.DoesNotContain(native.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal));
+        var jit = RunSourceGenerator(compilation);
+        Assert.Empty(jit.Diagnostics);
+        Assert.Contains(jit.GeneratedSources, static source => source.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesRootCanonicalModelsInCommonPipeline()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Collections.Generic;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses : IGrainWithIntegerKey { Task<Payload> Get(); }
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)] public IReadOnlyList<System.Tuple<int, string>> Members { get; private set; }
+                public Payload(IReadOnlyList<System.Tuple<int, string>> members) => Members = members;
+            }
+            """);
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var source = Assert.Single(result.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.DoesNotContain("RequireExplicitTypeRegistration", source);
+        Assert.DoesNotContain("RuntimeFeature.IsDynamicCodeSupported", source);
+        Assert.Contains("new global::OrleansCodeGen.TestProject.Codec_Payload(", source);
+        Assert.Contains("new global::OrleansCodeGen.TestProject.Copier_Payload(", source);
+        Assert.Contains("PooledResponseCodec<global::TestProject.Payload, global::OrleansCodeGen.TestProject.Codec_Payload>", source);
+        Assert.Contains("AddDefaultSerializerService<global::Orleans.Serialization.Activators.IActivator<global::TestProject.Payload>,", source);
+        Assert.Contains("OrleansGeneratedCodeHelper.CreateDefaultReferenceTypeActivator<global::TestProject.Payload>()", source);
+        Assert.DoesNotContain("MakeGenericType", source);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var strict = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Contains(strict.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+    }
+
+    [Theory]
+    [InlineData(510, false)]
+    [InlineData(510, true)]
+    [InlineData(511, false)]
+    [InlineData(511, true)]
+    public async Task RpcCombinedGraphLimitKeepsHolderDeclarations(int membersPerResult, bool validateFactories)
+    {
+        var source = new System.Text.StringBuilder("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace CombinedGraph;
+            [GenerateSerializer] public sealed class Tag<T> { }
+            public interface IContract : IGrainWithIntegerKey
+            {
+                Task<First> ReadFirst();
+                Task<Second> ReadSecond();
+            }
+            """);
+        foreach (var name in new[] { "First", "Second" })
+        {
+            for (var index = 0; index < membersPerResult; index++)
+                source.AppendLine($"public sealed class {name}Marker{index} {{ }}");
+            source.AppendLine($"[GenerateSerializer] public sealed class {name} {{");
+            for (var index = 0; index < membersPerResult; index++)
+                source.AppendLine($"[Id({index})] public Tag<{name}Marker{index}> Member{index} {{ get; set; }}");
+            source.AppendLine("}");
+        }
+        var compilation = await CreateCompilation(source.ToString());
+        var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
+        var response = compilation.GetTypeByMetadataName("Orleans.Serialization.Invocation.Response`1")!;
+        foreach (var name in new[] { "First", "Second" })
+        {
+            var resultType = compilation.GetTypeByMetadataName($"CombinedGraph.{name}")!;
+            Assert.True(SerializerFactoryGenerator.TryCreate(services, [response.Construct(resultType)],
+                TestContext.Current.CancellationToken, out var individual, out var failure, useDefaultFactories: true), failure?.Reason);
+            Assert.Equal(membersPerResult + 2, individual.Registrations.Count);
+        }
+        if (membersPerResult == 510)
+        {
+            Assert.True(SerializerFactoryGenerator.TryCreate(services,
+                new[] { "First", "Second" }.Select(name => response.Construct(compilation.GetTypeByMetadataName($"CombinedGraph.{name}")!)),
+                TestContext.Current.CancellationToken, out var combined, out var failure, useDefaultFactories: true), failure?.Reason);
+            Assert.Equal(1024, combined.Registrations.Count);
+        }
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string>
+        {
+            ["build_property.OrleansValidateRpcResponseFactories"] = validateFactories.ToString()
+        });
+        var errors = result.Diagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error).ToArray();
+        if (membersPerResult == 510)
+        {
+            Assert.Empty(errors);
+        }
+        else
+        {
+            var diagnostic = Assert.Single(errors);
+            Assert.Equal("ORLEANS0116", diagnostic.Id);
+            Assert.Contains("exceeds 1024 closed types", diagnostic.GetMessage());
+        }
+        Assert.Contains(result.GeneratedSources, static entry => entry.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal));
+        compilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static entry => CSharpSyntaxTree.ParseText(entry.SourceText,
+                options: new CSharpParseOptions(preprocessorSymbols: ["NET5_0_OR_GREATER"]), path: entry.HintName)));
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Theory]
+    [InlineData("string", false)]
+    [InlineData("int", false)]
+    [InlineData("string", true)]
+    [InlineData("int", true)]
+    public async Task RpcClosedGenericModelFactoriesUseDefinitionConstructorContracts(string argument, bool generatedActivator)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            namespace GenericConstruction;
+            [GenerateSerializer]
+            public sealed class Payload<T>
+            {
+                [Id(0)] private T _value;
+                {{(generatedActivator ? "[GeneratedActivatorConstructor]" : "")}}
+                public Payload(T value) => _value = value;
+                public T Value => _value;
+            }
+            """);
+        var definition = compilation.GetTypeByMetadataName("GenericConstruction.Payload`1")!;
+        var parameter = compilation.GetSpecialType(argument == "string" ? SpecialType.System_String : SpecialType.System_Int32);
+        var graph = SerializerFactoryGenerator.CreateRpcModelRoot(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            definition.Construct(parameter), TestContext.Current.CancellationToken);
+        Assert.NotNull(graph);
+        Assert.Contains($"IActivator<global::GenericConstruction.Payload<{argument}>>", graph.ConfigurationStatements);
+        Assert.Contains("provider), provider)", graph.ConfigurationStatements);
+        Assert.DoesNotContain("Payload<T>", graph.ConfigurationStatements);
+        if (generatedActivator)
+            Assert.Contains($"new global::OrleansCodeGen.GenericConstruction.Activator_Payload<{argument}>(", graph.ConfigurationStatements);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var exercise = $$"""
+            public sealed class GenericConstructionContext : Orleans.Serialization.SerializerContext
+            {
+                protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            """;
+        compilation = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcReferencedGeneratedActivatorFactoryIsClosed(bool referenceAssembly)
+    {
+        var producer = await CreateCompilation("""
+            using Orleans;
+            [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("ClosureConsumer")]
+            namespace ReferencedClosure;
+            [GenerateSerializer, Immutable]
+            internal sealed class Payload
+            {
+                [Id(0)] private int _value;
+                [System.NonSerialized] internal readonly object _state = new();
+                [GeneratedActivatorConstructor]
+                public Payload(int value) => _value = value;
+            }
+            """, "ClosureProducer");
+        var generated = RunSourceGenerator(producer);
+        Assert.Empty(generated.Diagnostics);
+        producer = producer.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
+        using var image = new System.IO.MemoryStream();
+        var emitted = producer.Emit(image,
+            options: new Microsoft.CodeAnalysis.Emit.EmitOptions(metadataOnly: referenceAssembly, includePrivateMembers: !referenceAssembly),
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        var compilation = (await CreateCompilation("""
+            using Orleans;
+            namespace ClosureProof;
+            [GenerateSerializer, Immutable]
+            internal struct Package
+            {
+                [Id(0)] public ReferencedClosure.Payload Context { get; set; }
+                [Id(1)] public System.Collections.Generic.IList<System.Tuple<ReferencedClosure.Payload[], int>> Nested { get; set; }
+            }
+            """, "ClosureConsumer")).AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+        var type = compilation.GetTypeByMetadataName("ReferencedClosure.Payload");
+        Assert.NotNull(type);
+        var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
+        var graph = SerializerFactoryGenerator.CreateRpcModelRoot(services, type, TestContext.Current.CancellationToken);
+        Assert.NotNull(graph);
+        Assert.Contains("Activator_Payload", graph.ConfigurationStatements);
+        Assert.Contains("Codec_Payload", graph.ConfigurationStatements);
+        var construction = SerializerFactoryGenerator.CreateRpcConstructionRoot(services, type, TestContext.Current.CancellationToken);
+        Assert.Contains("Activator_Payload", construction.ConfigurationStatements);
+        Assert.Contains("Codec_Payload", construction.ConfigurationStatements);
+        var package = compilation.GetTypeByMetadataName("ClosureProof.Package");
+        Assert.NotNull(package);
+        Assert.True(compilation.IsSymbolAccessibleWithin(package, compilation.Assembly));
+        Assert.NotNull(SerializerFactoryGenerator.CreateRpcModelRoot(services, package, TestContext.Current.CancellationToken));
+        var parent = SerializerFactoryGenerator.CreateRpcConstructionRoot(services,
+            compilation.GetTypeByMetadataName("System.Collections.Generic.List`1")!.Construct(package), TestContext.Current.CancellationToken);
+        Assert.True(parent.ConfigurationStatements.Contains("Activator_Payload", StringComparison.Ordinal), parent.ConfigurationStatements);
+        Assert.Contains("ArrayCodec<global::ReferencedClosure.Payload>", parent.ConfigurationStatements);
+        Assert.Contains("TupleCodec<global::ReferencedClosure.Payload[], int>", parent.ConfigurationStatements);
+        Assert.Contains("IFieldCodec<global::System.Collections.Generic.IList<", parent.ConfigurationStatements);
+        Assert.Contains("dependencies: new global::System.Type[] { typeof(global::Orleans.Serialization.Codecs.IFieldCodec<global::System.Tuple<", parent.ConfigurationStatements);
+    }
+
+    [Fact]
+    public async Task RpcImmutableConstructionFactoriesShareCanonicalSurrogateServices()
+    {
+        var compilation = await CreateCompilation("""
+            namespace ClosureProof;
+            public class Root
+            {
+                public System.Collections.Immutable.ImmutableArray<int> Array;
+                public System.Collections.Immutable.ImmutableList<int> List;
+                public System.Collections.Immutable.ImmutableQueue<int> Queue;
+                public System.Collections.Immutable.ImmutableStack<int> Stack;
+                public System.Collections.Immutable.ImmutableHashSet<int> Set;
+                public System.Collections.Immutable.ImmutableSortedSet<int> SortedSet;
+                public System.Collections.Immutable.ImmutableDictionary<string, int> Dictionary;
+                public System.Collections.Immutable.ImmutableSortedDictionary<string, int> SortedDictionary;
+            }
+            """, $"ImmutableClosureProof{Guid.NewGuid():N}");
+        var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
+        var statements = new System.Text.StringBuilder();
+        var assertions = new System.Text.StringBuilder();
+        foreach (var field in compilation.GetTypeByMetadataName("ClosureProof.Root")!.GetMembers().OfType<IFieldSymbol>())
+        {
+            var type = (INamedTypeSymbol)field.Type;
+            var graph = SerializerFactoryGenerator.CreateRpcConstructionRoot(services, type, TestContext.Current.CancellationToken);
+            var codec = services.LibraryTypes.WellKnownCodecs.FindByUnderlyingType(type.OriginalDefinition)!.CodecType.Construct([.. type.TypeArguments]);
+            var surrogate = ((INamedTypeSymbol)codec.InstanceConstructors.Single().Parameters.Single().Type).TypeArguments.Single();
+            var typeName = type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var codecName = codec.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var surrogateName = surrogate.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            Assert.Contains($"IValueSerializer<{surrogateName}>", graph.ConfigurationStatements);
+            Assert.Contains($"new {codecName}(", graph.ConfigurationStatements);
+            statements.AppendLine(graph.ConfigurationStatements);
+            assertions.AppendLine($"""
+                if (!ReferenceEquals(provider.GetCodec<{typeName}>(),
+                    Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<{codecName}>(null, provider))) return false;
+                if (!ReferenceEquals(provider.GetValueSerializer<{surrogateName}>(), provider.GetCodec<{surrogateName}>())) return false;
+                _ = provider.GetDeepCopier<{typeName}>();
+                """);
+        }
+        var exercise = $$"""
+            using System;
+            using System.Collections.Immutable;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Serializers;
+            public static class ImmutableClosureProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+                    {
+                        {{statements}}
+                    })).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    {{assertions}}
+                    var serializer = services.GetRequiredService<Serializer>();
+                    var source = ImmutableDictionary.Create<string, int>(StringComparer.OrdinalIgnoreCase).Add("Key", 47);
+                    var result = serializer.Deserialize<ImmutableDictionary<string, int>>(serializer.SerializeToArray(source));
+                    var sorted = ImmutableSortedDictionary.Create<string, int>(StringComparer.OrdinalIgnoreCase).Add("Key", 59);
+                    var sortedResult = serializer.Deserialize<ImmutableSortedDictionary<string, int>>(serializer.SerializeToArray(sorted));
+                    return result["KEY"] == 47 && sortedResult["KEY"] == 59
+                        && ReferenceEquals(result.KeyComparer, source.KeyComparer)
+                        && ReferenceEquals(sortedResult.KeyComparer, sorted.KeyComparer);
+                }
+            }
+            """;
+        compilation = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions).Assembly.Location))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emitted = compilation.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("ImmutableClosureProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesConstructPartialModelRootsWithinPendingGraphs()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; private set; }
+                [Id(1)] public System.Collections.Generic.IReadOnlyList<System.Tuple<Item, string>> Members { get; private set; }
+                public Payload(int value) { Value = value; Members = new[] { System.Tuple.Create(new Item { Value = value }, "entry") }; }
+            }
+            [GenerateSerializer]
+            public sealed class Item { [Id(0)] public int Value { get; set; } }
+            """, $"RootActivatorProof{Guid.NewGuid():N}");
+        var payload = compilation.GetTypeByMetadataName("TestProject.Payload");
+        Assert.NotNull(payload);
+        var graph = SerializerFactoryGenerator.CreateRpcModelRoot(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            payload, TestContext.Current.CancellationToken);
+        Assert.NotNull(graph);
+        Assert.Contains("provider.GetCodec<global::System.Collections.Generic.IReadOnlyList<", graph.ConfigurationStatements);
+        Assert.DoesNotContain("options.AddDefaultSerializer<global::System.Collections.Generic.IReadOnlyList<", graph.ConfigurationStatements);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var statements = graph.ConfigurationStatements.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        var activationRegistration = string.Join(Environment.NewLine, statements.Where(static statement => statement.Contains("CreateDefaultReferenceTypeActivator", StringComparison.Ordinal)));
+        var modelRegistrations = string.Join(Environment.NewLine, statements.Where(static statement => !statement.Contains("CreateDefaultReferenceTypeActivator", StringComparison.Ordinal)));
+        var exerciseSource = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Invocation;
+            using Orleans.Serialization.Serializers;
+            public sealed class RootContext : TypeManifestProviderBase
+            {
+                private readonly bool includeActivator;
+                private int attempts;
+                public RootContext(bool includeActivator) { this.includeActivator = includeActivator; }
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    if (includeActivator)
+                    {
+                        {{activationRegistration}}
+                    }
+                    {{modelRegistrations}}
+                    options.AddSerializerService<ConstructionProbe>(provider =>
+                    {
+                        var probe = new ConstructionProbe(
+                            provider.GetCodec<Response<TestProject.Payload>>(),
+                            provider.GetDeepCopier<Response<TestProject.Payload>>(),
+                            provider.GetActivator<TestProject.Payload>());
+                        if (++attempts == 1)
+                        {
+                            ConstructionProbe.Failed = probe;
+                            throw new InvalidOperationException("injected root failure");
+                        }
+                        return probe;
+                    });
+                }
+            }
+            public sealed class ConstructionProbe
+            {
+                public static ConstructionProbe Failed;
+                public Orleans.Serialization.Codecs.IFieldCodec<Response<TestProject.Payload>> Codec { get; }
+                public Orleans.Serialization.Cloning.IDeepCopier<Response<TestProject.Payload>> Copier { get; }
+                public Orleans.Serialization.Activators.IActivator<TestProject.Payload> Activator { get; }
+                public ConstructionProbe(
+                    Orleans.Serialization.Codecs.IFieldCodec<Response<TestProject.Payload>> codec,
+                    Orleans.Serialization.Cloning.IDeepCopier<Response<TestProject.Payload>> copier,
+                    Orleans.Serialization.Activators.IActivator<TestProject.Payload> activator)
+                { Codec = codec; Copier = copier; Activator = activator; }
+            }
+            public static class RootProof
+            {
+                public static bool Run(bool includeActivator)
+                {
+                    using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(new RootContext(includeActivator))).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    var committed = provider.GetCodec<int>();
+                    try
+                    {
+                        Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ConstructionProbe>(null, provider);
+                        throw new InvalidOperationException("expected injected root failure");
+                    }
+                    catch (InvalidOperationException error) when (error.Message == "injected root failure") { }
+                    var rebuilt = Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ConstructionProbe>(null, provider);
+                    using var original = Response.FromResult(new TestProject.Payload(47));
+                    using var copied = services.GetRequiredService<DeepCopier>().Copy(original);
+                    var value = copied.GetResult<TestProject.Payload>();
+                    var codec = provider.GetCodec<Response<TestProject.Payload>>();
+                    using var sessions = services.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>().GetSession();
+                    var output = new System.Buffers.ArrayBufferWriter<byte>();
+                    var writer = Orleans.Serialization.Buffers.Writer.Create(output, sessions);
+                    codec.WriteField(ref writer, 0, typeof(Response<TestProject.Payload>), (Response<TestProject.Payload>)original);
+                    writer.Commit();
+                    var activator = provider.GetActivator<TestProject.Payload>();
+                    return value.Value == 47 && !ReferenceEquals(original.Result, value)
+                        && value.Members[0].Item1.Value == 47 && value.Members[0].Item2 == "entry"
+                        && !ReferenceEquals(((TestProject.Payload)original.Result).Members, value.Members)
+                        && !ReferenceEquals(((TestProject.Payload)original.Result).Members[0].Item1, value.Members[0].Item1)
+                        && ReferenceEquals(activator, provider.GetActivator<TestProject.Payload>())
+                        && ReferenceEquals(rebuilt.Activator, activator) && ReferenceEquals(rebuilt.Codec, codec)
+                        && !ReferenceEquals(ConstructionProbe.Failed.Activator, activator)
+                        && !ReferenceEquals(ConstructionProbe.Failed.Copier, rebuilt.Copier)
+                        && ReferenceEquals(committed, provider.GetCodec<int>())
+                        && activator.Create().Value == 0 && output.WrittenCount > 0;
+                }
+            }
+            """;
+        var output = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exerciseSource, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        var run = assembly.GetType("RootProof")!.GetMethod("Run")!;
+        Assert.Equal(true, run.Invoke(null, [false]));
+        Assert.Equal(true, run.Invoke(null, [true]));
+    }
+
+    [Theory]
+    [InlineData("[UseActivator]", "public Payload(int value) => Value = value;")]
+    [InlineData("", "[GeneratedActivatorConstructor] public Payload(int value) => Value = value;")]
+    public async Task RpcResponseFactoriesPreserveCustomActivatorSelection(string attribute, string constructor)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            {{attribute}}
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; private set; }
+                {{constructor}}
+            }
+            """);
+        var payload = compilation.GetTypeByMetadataName("TestProject.Payload");
+        Assert.NotNull(payload);
+        var graph = SerializerFactoryGenerator.CreateRpcModelRoot(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            payload, TestContext.Current.CancellationToken);
+        if (attribute.Contains("UseActivator", StringComparison.Ordinal))
+        {
+            Assert.Null(graph);
+            return;
+        }
+
+        Assert.NotNull(graph);
+        Assert.DoesNotContain("CreateDefaultReferenceTypeActivator", graph.ConfigurationStatements);
+        Assert.DoesNotContain("CreateDefaultValueTypeActivator", graph.ConfigurationStatements);
+        if (constructor.Contains("GeneratedActivatorConstructor", StringComparison.Ordinal))
+        {
+            Assert.Contains("new global::OrleansCodeGen.TestProject.Activator_Payload(", graph.ConfigurationStatements);
+        }
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesRejectInaccessibleReferencedGeneratedActivators()
+    {
+        var library = await CreateCompilation("""
+            using Orleans;
+            namespace ReferencedActivation;
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)] public int Value { get; private set; }
+                [GeneratedActivatorConstructor]
+                public Payload(int value) => Value = value;
+            }
+            """, "ReferencedActivation");
+        var generated = RunSourceGenerator(library);
+        Assert.Empty(generated.Diagnostics);
+        library = library.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)));
+        using var image = new System.IO.MemoryStream();
+        var emitted = library.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+        var consumer = (await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            public interface IContract : IGrainWithIntegerKey
+            {
+                Task<ReferencedActivation.Payload> Get();
+            }
+            """, "ActivationConsumer")).AddReferences(MetadataReference.CreateFromImage(image.ToArray()));
+        var type = consumer.GetTypeByMetadataName("ReferencedActivation.Payload");
+        Assert.NotNull(type);
+        Assert.Null(SerializerFactoryGenerator.CreateRpcModelRoot(new GeneratorServices(consumer, new CodeGeneratorOptions()),
+            type, TestContext.Current.CancellationToken));
+        var strict = RunSourceGenerator(consumer, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Contains(strict.Diagnostics, static diagnostic => diagnostic.Id == "ORLEANS0116");
+    }
+
+    [Theory]
+    [InlineData("Task")]
+    [InlineData("ValueTask")]
+    public async Task RpcResponseFactoriesGenerateCompletionOnlyContracts(string returnType)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface ICompletion : IGrainWithIntegerKey { {{returnType}} Done(); }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(result.Diagnostics);
+        var source = Assert.Single(result.GeneratedSources, static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>", source);
+        Assert.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.CompletedResponse>", source);
+        Assert.Contains("Codec_CompletedResponse", source);
+        Assert.DoesNotContain("PooledResponseCodec<", source);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesLeaveOneWayContractsWithoutResponses()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            public interface IOneWay : IGrainWithIntegerKey { void Send(); }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(result.Diagnostics);
+        Assert.DoesNotContain(result.GeneratedSources, static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesUseReferencedHotReloadConstructorContracts()
+    {
+        var library = await CreateCompilation("""
+            using Orleans;
+            namespace ReferencedResults;
+            [GenerateSerializer]
+            public sealed class Payload { [Id(0)] public int Value { get; set; } }
+            """, "ReferencedResults");
+        var generated = RunSourceGenerator(library, new Dictionary<string, string> { ["build_property.orleanshotreload"] = "true" });
+        Assert.Empty(generated.Diagnostics);
+        library = library.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText, path: item.HintName)));
+        using var image = new System.IO.MemoryStream();
+        var emit = library.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+
+        var consumer = (await CreateCompilation("namespace Consumer { }", "Consumer"))
+            .AddReferences(MetadataReference.CreateFromImage(image.ToArray()))
+            .AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location));
+        var payload = consumer.GetTypeByMetadataName("ReferencedResults.Payload");
+        Assert.NotNull(payload);
+        var services = new GeneratorServices(consumer, new CodeGeneratorOptions { HotReloadSafe = false });
+        Assert.True(SerializerFactoryGenerator.TryCreate(services, [payload], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        Assert.Contains("new global::OrleansCodeGen.ReferencedResults.Codec_Payload(provider)", graph.ConfigurationStatements);
+
+        var contextSource = $$"""
+            public sealed class ConsumerContext : Orleans.Serialization.SerializerContext
+            {
+                protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            """;
+        var output = consumer.AddSyntaxTrees(CSharpSyntaxTree.ParseText(contextSource, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcResponseFactoriesIgnoreStaticInterfaceHelpers(bool hasInstanceMethod)
+    {
+        var instanceMethod = hasInstanceMethod ? "Task<int> Invoke();" : "";
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IHelpers : IGrainWithIntegerKey
+            {
+                static Task<string> SupportedHelper() => Task.FromResult("local");
+                static Task<object> UnsupportedHelper() => Task.FromResult(new object());
+                static Task<T> GenericHelper<T>(T value) => Task.FromResult(value);
+                static Task CompletionHelper() => Task.CompletedTask;
+            }
+            public interface IContract : IHelpers
+            {
+                static ValueTask<bool> LocalHelper() => ValueTask.FromResult(true);
+                {{instanceMethod}}
+            }
+            """);
+        var result = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(result.Diagnostics);
+        var factories = result.GeneratedSources.Where(static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).ToArray();
+        if (!hasInstanceMethod)
+        {
+            Assert.Empty(factories);
+            return;
+        }
+
+        var source = Assert.Single(factories).SourceText.ToString();
+        Assert.Contains("Response<int>", source);
+        Assert.DoesNotContain("Response<string>", source);
+        Assert.DoesNotContain("Response<bool>", source);
+        Assert.DoesNotContain("Response<object>", source);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesPreserveAllAliasesAndMetadataOnlyComponents()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            [CompoundTypeAlias("rpc.marker")]
+            public sealed class Marker { }
+            [GenerateSerializer, CompoundTypeAlias("rpc.multiple", "2"), CompoundTypeAlias("rpc.multiple", "1")]
+            public sealed class Payload { [Id(0)] public int Value { get; set; } }
+            [GenerateSerializer, CompoundTypeAlias(typeof(Marker), "payload")]
+            public sealed class NestedPayload { [Id(0)] public int Value { get; set; } }
+            public interface IAliases : IGrainWithIntegerKey
+            {
+                Task<Payload> Multiple();
+                Task<NestedPayload> Nested();
+            }
+            """);
+        var generated = RunSourceGenerator(compilation, new Dictionary<string, string> { ["build_property.publishaot"] = "true" });
+        Assert.Empty(generated.Diagnostics);
+        var metadata = Assert.Single(generated.GeneratedSources, static item => item.HintName.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("GetOrAdd(\"rpc.multiple\")", metadata);
+        Assert.Contains(".Add(\"1\", typeof(global::TestProject.Payload))", metadata);
+        Assert.Contains(".Add(\"2\", typeof(global::TestProject.Payload))", metadata);
+
+        var services = new GeneratorServices(compilation, new CodeGeneratorOptions());
+        var multiple = compilation.GetTypeByMetadataName("TestProject.Payload");
+        var nested = compilation.GetTypeByMetadataName("TestProject.NestedPayload");
+        Assert.NotNull(multiple);
+        Assert.NotNull(nested);
+        Assert.True(SerializerFactoryGenerator.TryCreate(services, [multiple, nested], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        Assert.Contains("GetOrAdd(\"rpc.multiple\").Add(\"2\", typeof(global::TestProject.Payload))", graph.ConfigurationStatements);
+        Assert.Contains("GetOrAdd(\"rpc.multiple\").Add(\"1\", typeof(global::TestProject.Payload))", graph.ConfigurationStatements);
+        Assert.Contains("options.CompoundTypeAliases.Add(\"rpc.marker\", typeof(global::TestProject.Marker))", graph.ConfigurationStatements);
+        Assert.Contains("options.CompoundTypeAliases.GetOrAdd(typeof(global::TestProject.Marker)).Add(\"payload\"", graph.ConfigurationStatements);
+        Assert.DoesNotContain(graph.Registrations.Keys, static type => type.Name == "Marker");
+        Assert.Equal(1, CountOccurrences(graph.ConfigurationStatements, "options.CompoundTypeAliases.Add(\"rpc.marker\""));
+
+        var contextSource = $$"""
+            public sealed class AliasContext : Orleans.Serialization.SerializerContext
+            {
+                protected override void ConfigureInner(Orleans.Serialization.Configuration.TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            """;
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(contextSource, cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesVisitRecursiveAliasMetadataOnce()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [CompoundTypeAlias(typeof(SecondMarker), "first")]
+            public sealed class FirstMarker { }
+            [CompoundTypeAlias(typeof(FirstMarker), "second")]
+            public sealed class SecondMarker { }
+            [GenerateSerializer, CompoundTypeAlias(typeof(FirstMarker), "payload")]
+            public sealed class Payload { [Id(0)] public int Value { get; set; } }
+            """);
+        var payload = compilation.GetTypeByMetadataName("TestProject.Payload");
+        Assert.NotNull(payload);
+        Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            [payload], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        Assert.Equal(1, CountOccurrences(graph.ConfigurationStatements, ".Add(\"first\", typeof(global::TestProject.FirstMarker))"));
+        Assert.Equal(1, CountOccurrences(graph.ConfigurationStatements, ".Add(\"second\", typeof(global::TestProject.SecondMarker))"));
+        Assert.DoesNotContain(graph.Registrations.Keys, static type => type.Name.EndsWith("Marker", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("TestProject.GeneratedValue<int>", false)]
+    [InlineData("TestProject.Box<byte>", true)]
+    [InlineData("TestProject.Box<int>", true)]
+    public async Task RpcResponseFactoriesCloseCanonicalFullGraphServices(string rootName, bool arrayCase)
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            public struct GeneratedValue<T> { [Id(0)] public T Value { get; set; } }
+            [GenerateSerializer]
+            public sealed class Box<T> { [Id(0)] public T[] Value { get; set; } }
+            """, $"FullGraphProof{Guid.NewGuid():N}");
+        var definition = compilation.GetTypeByMetadataName(arrayCase ? "TestProject.Box`1" : "TestProject.GeneratedValue`1");
+        Assert.NotNull(definition);
+        var element = compilation.GetSpecialType(rootName.Contains("byte", StringComparison.Ordinal) ? SpecialType.System_Byte : SpecialType.System_Int32);
+        var type = definition.Construct(element);
+        Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            [type], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var exercise = arrayCase ? $$"""
+            var provider = services.GetRequiredService<CodecProvider>();
+            var serializer = new Serializer<{{rootName}}>(provider.GetCodec<{{rootName}}>(), sessions);
+            var copier = new DeepCopier<{{rootName}}>(provider.GetDeepCopier<{{rootName}}>(), services.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
+            var original = new {{rootName}} { Value = new[] { ({{(rootName.Contains("byte", StringComparison.Ordinal) ? "byte" : "int")}})7, ({{(rootName.Contains("byte", StringComparison.Ordinal) ? "byte" : "int")}})9 } };
+            var copy = copier.Copy(original);
+            var wire = serializer.SerializeToArray(original);
+            using var legacy = new ServiceCollection().AddSerializer(builder => builder.AddAssembly(typeof({{rootName}}).Assembly)).BuildServiceProvider();
+            var legacySerializer = new Serializer<{{rootName}}>(
+                legacy.GetRequiredService<CodecProvider>().GetCodec<{{rootName}}>(),
+                legacy.GetRequiredService<SerializerSessionPool>());
+            var legacyWire = legacySerializer.SerializeToArray(original);
+            var result = serializer.Deserialize(wire);
+            copy.Value[0] = 3;
+            return original.Value[0] == 7 && result.Value[0] == 7 && result.Value[1] == 9
+                && !ReferenceEquals(original, copy) && !ReferenceEquals(original.Value, copy.Value)
+                && System.MemoryExtensions.SequenceEqual<byte>(wire, legacyWire)
+                && (!typeof({{rootName}}).GenericTypeArguments[0].Equals(typeof(byte))
+                    || provider.GetCodec<byte[]>() is Orleans.Serialization.Codecs.ByteArrayCodec
+                        && provider.GetDeepCopier<byte[]>() is Orleans.Serialization.Codecs.ByteArrayCopier);
+            """ : """
+            var provider = services.GetRequiredService<CodecProvider>();
+            var serializer = new ValueSerializer<TestProject.GeneratedValue<int>>(provider, sessions);
+            var original = new TestProject.GeneratedValue<int> { Value = 47 };
+            var output = new System.Buffers.ArrayBufferWriter<byte>();
+            serializer.Serialize(ref original, output);
+            var result = new TestProject.GeneratedValue<int>();
+            serializer.Deserialize(output.WrittenMemory, ref result);
+            return result.Value == 47 && ReferenceEquals(
+                provider.GetValueSerializer<TestProject.GeneratedValue<int>>(),
+                provider.GetCodec<TestProject.GeneratedValue<int>>());
+            """;
+        var contextSource = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Serializers;
+            using Orleans.Serialization.Session;
+            public sealed class ClosedContext : SerializerContext
+            {
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            public static class FullGraphProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializerContext(new ClosedContext()).BuildServiceProvider();
+                    var sessions = services.GetRequiredService<SerializerSessionPool>();
+                    {{exercise}}
+                }
+            }
+            """;
+        var outputCompilation = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText, path: item.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(contextSource, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = outputCompilation.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("FullGraphProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesPreserveGenericArrayGraphCycles()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            public sealed class Box<T> { [Id(0)] public T[] Value { get; set; } }
+            [GenerateSerializer]
+            public sealed class Node { [Id(0)] public Box<Node> Children { get; set; } }
+            """, $"ArrayCycleProof{Guid.NewGuid():N}");
+        var node = compilation.GetTypeByMetadataName("TestProject.Node");
+        Assert.NotNull(node);
+        Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            [node], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var exercise = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Serializers;
+            public sealed class CycleContext : SerializerContext
+            {
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            public static class ArrayCycleProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializerContext(new CycleContext()).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    var serializer = new Serializer<TestProject.Node>(provider.GetCodec<TestProject.Node>(),
+                        services.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>());
+                    var copier = new DeepCopier<TestProject.Node>(provider.GetDeepCopier<TestProject.Node>(),
+                        services.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
+                    var original = new TestProject.Node();
+                    original.Children = new TestProject.Box<TestProject.Node> { Value = new[] { original, original } };
+                    var copy = copier.Copy(original);
+                    var result = serializer.Deserialize(serializer.SerializeToArray(original));
+                    return !ReferenceEquals(original, copy) && ReferenceEquals(copy, copy.Children.Value[0])
+                        && ReferenceEquals(copy.Children.Value[0], copy.Children.Value[1])
+                        && ReferenceEquals(result, result.Children.Value[0])
+                        && ReferenceEquals(result.Children.Value[0], result.Children.Value[1]);
+                }
+            }
+            """;
+        var output = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("ArrayCycleProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public async Task RpcResponseFactoriesCloseCanonicalTupleConstruction(int arity)
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            namespace TestProject;
+            [GenerateSerializer]
+            public sealed class Item { [Id(0)] public int Value { get; set; } }
+            """, $"TupleConstructionProof{Guid.NewGuid():N}");
+        var item = compilation.GetTypeByMetadataName("TestProject.Item");
+        Assert.NotNull(item);
+        var elementTypes = Enumerable.Repeat<Microsoft.CodeAnalysis.ITypeSymbol>(item, arity).ToArray();
+        var tuple = compilation.GetTypeByMetadataName($"System.Tuple`{arity}")!.Construct(elementTypes);
+        Assert.True(SerializerFactoryGenerator.TryCreate(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            [tuple], TestContext.Current.CancellationToken, out var graph, out var failure), failure?.Reason);
+        Assert.NotNull(graph);
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var tupleName = tuple.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var arguments = string.Join(", ", Enumerable.Repeat("item", arity));
+        var values = string.Join(" && ", Enumerable.Range(1, arity).Select(index => $"copy.Item{index}.Value == 47 && result.Item{index}.Value == 47"));
+        var aliasing = arity > 1 ? "&& ReferenceEquals(copy.Item1, copy.Item2) && ReferenceEquals(result.Item1, result.Item2)" : "";
+        var exercise = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Serializers;
+            public sealed class TupleContext : SerializerContext
+            {
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    {{graph.ConfigurationStatements}}
+                }
+            }
+            public static class TupleProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializerContext(new TupleContext()).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    var serializer = new Serializer<{{tupleName}}>(provider.GetCodec<{{tupleName}}>(),
+                        services.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>());
+                    var copier = new DeepCopier<{{tupleName}}>(provider.GetDeepCopier<{{tupleName}}>(),
+                        services.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>());
+                    var item = new TestProject.Item { Value = 47 };
+                    var original = new {{tupleName}}({{arguments}});
+                    var copy = copier.Copy(original);
+                    var wire = serializer.SerializeToArray(original);
+                    var result = serializer.Deserialize(wire);
+                    using var legacy = new ServiceCollection().AddSerializer(builder => builder.AddAssembly(typeof(TestProject.Item).Assembly)).BuildServiceProvider();
+                    var oldSerializer = new Serializer<{{tupleName}}>(legacy.GetRequiredService<CodecProvider>().GetCodec<{{tupleName}}>(),
+                        legacy.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>());
+                    return !ReferenceEquals(original, copy) && !ReferenceEquals(item, copy.Item1)
+                        && {{values}} {{aliasing}}
+                        && System.MemoryExtensions.SequenceEqual<byte>(wire, oldSerializer.SerializeToArray(original));
+                }
+            }
+            """;
+        var output = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static source => CSharpSyntaxTree.ParseText(source.SourceText, path: source.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("TupleProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Theory]
+    [InlineData("Task<int>", true)]
+    [InlineData("Task", true)]
+    [InlineData("void", false)]
+    public async Task RpcResponseFactoriesConstructActualTupleArgumentProxies(string returnType, bool responseExpected)
+    {
+        var compilation = await CreateCompilation($$"""
+            using System;
+            using System.Threading.Tasks;
+            using Orleans;
+            using Orleans.Runtime;
+            using Orleans.Serialization.Cloning;
+            using Orleans.Serialization.Invocation;
+            using Orleans.Serialization.Serializers;
+            namespace TestProject;
+            [DefaultInvokableBaseType(typeof(Task<>), typeof(TaskRequest<>))]
+            [DefaultInvokableBaseType(typeof(Task), typeof(TaskRequest))]
+            [DefaultInvokableBaseType(typeof(void), typeof(VoidRequest))]
+            public abstract class TupleProxyBase
+            {
+                protected TupleProxyBase(ICodecProvider provider, CopyContextPool pool)
+                {
+                    CodecProvider = provider;
+                    CopyContextPool = pool;
+                }
+                protected ICodecProvider CodecProvider { get; }
+                protected CopyContextPool CopyContextPool { get; }
+                protected T GetInvokable<T>() where T : class, IInvokable, new() => new T();
+                protected ValueTask<T> InvokeAsync<T>(IInvokable body) => default;
+                protected ValueTask InvokeAsync(IInvokable body) => default;
+                protected void Invoke(IInvokable body) { }
+            }
+            [GenerateMethodSerializers(typeof(TupleProxyBase))]
+            public interface IContract
+            {
+                {{returnType}} InvokeTuple(System.Collections.Generic.List<Tuple<SiloAddress, DateTime>> value);
+            }
+            """, $"ProxyConstructionProof{Guid.NewGuid():N}");
+        var generated = RunSourceGenerator(compilation);
+        Assert.Empty(generated.Diagnostics);
+        var source = Assert.Single(generated.GeneratedSources, static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("new global::Orleans.Serialization.Codecs.TupleCopier<global::Orleans.Runtime.SiloAddress, global::System.DateTime>", source);
+        Assert.Equal(responseExpected, source.Contains("options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>", StringComparison.Ordinal));
+        var tuple = compilation.GetTypeByMetadataName("System.Tuple`2")!.Construct(
+            compilation.GetTypeByMetadataName("Orleans.Runtime.SiloAddress")!, compilation.GetTypeByMetadataName("System.DateTime")!);
+        var list = compilation.GetTypeByMetadataName("System.Collections.Generic.List`1")!.Construct(tuple);
+        var construction = SerializerFactoryGenerator.CreateRpcConstructionRoot(new GeneratorServices(compilation, new CodeGeneratorOptions()),
+            list, TestContext.Current.CancellationToken);
+        var exercise = $$"""
+            using System;
+            using Microsoft.Extensions.DependencyInjection;
+            using Orleans.Serialization;
+            using Orleans.Serialization.Configuration;
+            using Orleans.Serialization.Serializers;
+            public sealed class ProxyContext : TypeManifestProviderBase
+            {
+                protected override void ConfigureInner(TypeManifestOptions options)
+                {
+                    {{construction.ConfigurationStatements}}
+                }
+            }
+            public static class ProxyProof
+            {
+                public static bool Run()
+                {
+                    using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(new ProxyContext())).BuildServiceProvider();
+                    var provider = services.GetRequiredService<CodecProvider>();
+                    var pool = services.GetRequiredService<Orleans.Serialization.Cloning.CopyContextPool>();
+                    var proxy = new OrleansCodeGen.TestProject.Proxy_IContract(provider, pool);
+                    var copier = provider.GetDeepCopier<Tuple<Orleans.Runtime.SiloAddress, DateTime>>();
+                    var input = Tuple.Create(Orleans.Runtime.SiloAddress.New(System.Net.IPAddress.Loopback, 1234, 1), new DateTime(638000000000000000L, DateTimeKind.Utc));
+                    var copy = new DeepCopier<Tuple<Orleans.Runtime.SiloAddress, DateTime>>(copier, pool).Copy(input);
+                    return proxy is TestProject.IContract && ReferenceEquals(input, copy)
+                        && ReferenceEquals(copier, provider.GetDeepCopier<Tuple<Orleans.Runtime.SiloAddress, DateTime>>());
+                }
+            }
+            """;
+        var output = compilation.AddReferences(
+                MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(ServiceProvider).Assembly.Location))
+            .AddSyntaxTrees(generated.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText, path: item.HintName)))
+            .AddSyntaxTrees(CSharpSyntaxTree.ParseText(exercise, cancellationToken: TestContext.Current.CancellationToken));
+        using var image = new System.IO.MemoryStream();
+        var emit = output.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emit.Success, string.Join(Environment.NewLine, emit.Diagnostics));
+        var assembly = System.Reflection.Assembly.Load(image.ToArray());
+        Assert.Equal(true, assembly.GetType("ProxyProof")!.GetMethod("Run")!.Invoke(null, null));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesPreserveGenericJitGenerationAndExplicitValidationOverride()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IResponses<T> : IGrainWithIntegerKey
+            {
+                Task<T> Generic();
+                Task<int> Concrete();
+            }
+            """);
+        var jit = RunSourceGenerator(compilation);
+        var overridden = RunSourceGenerator(compilation, new Dictionary<string, string>
+        {
+            ["build_property.publishaot"] = "true",
+            ["build_property.orleansvalidaterpcresponsefactories"] = "false",
+        });
+        Assert.Empty(jit.Diagnostics);
+        Assert.Empty(overridden.Diagnostics);
+        Assert.Contains("Response<int>", ConcatenateGeneratedSources(jit));
+        Assert.DoesNotContain("Response<T>", ConcatenateGeneratedSources(jit));
+        Assert.Equal(ConcatenateGeneratedSources(jit), ConcatenateGeneratedSources(overridden));
+    }
+
+    [Fact]
+    public async Task RpcResponseFactoriesResolveInheritedClosedGenericResultsAndCompletionMethods()
+    {
+        var compilation = await CreateCompilation("""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IParent<T> : IGrainWithIntegerKey { Task<T> Get(); }
+            public interface IChild : IParent<int>
+            {
+                Task Done();
+                ValueTask DoneValueTask();
+                void OneWay();
+            }
+            """);
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var source = Assert.Single(result.GeneratedSources, static source => source.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("Response<int>", source);
+        Assert.DoesNotContain("Response<global::System.Threading.Tasks.Task", source);
+        Assert.DoesNotContain("Response<void>", source);
+    }
+
+    [Theory]
+    [InlineData("Task<int>")]
+    [InlineData("ValueTask<int>")]
+    public async Task RpcResponseHoldersGenerateDirectPrimitiveWritesAndCopiedInvocations(string returnType)
+    {
+        var compilation = await CreateCompilation($$"""
+            using Orleans;
+            using System.Threading.Tasks;
+            namespace TestProject;
+            public interface IWriter : IGrainWithIntegerKey { {{returnType}} Get(); }
+            """);
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var response = Assert.Single(result.GeneratedSources, static item => item.HintName.EndsWith(".orleans.rpcresponses.g.cs", StringComparison.Ordinal)).SourceText.ToString();
+        var proxy = Assert.Single(result.GeneratedSources, static item => item.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.Contains("IRawResponseWriter", response);
+        Assert.Contains("IRawResponseReader", response);
+        Assert.Contains("Int32Codec.WriteField(ref writer, 0, Value)", response);
+        Assert.Contains("ResponsePool.GetGenerated<", response);
+        Assert.Contains("_factory = null", response);
+        Assert.Contains("options.AddRawResponseReader<int>", response);
+        Assert.Contains("IResponseInvokable.InvokeAndCopy", proxy);
+        Assert.Contains("factory.RentCopied(value, contexts)", proxy);
+        Assert.Contains("var original = await Invoke();", proxy);
+        Assert.Contains("return copy = responseCopier.Copy(original);", proxy);
+        Assert.Contains("if (!global::System.Object.ReferenceEquals(original, copy))", proxy);
+        Assert.Contains("original.Dispose();", proxy);
+        Assert.DoesNotContain("MakeGenericType", response);
+        var holders = CSharpSyntaxTree.ParseText(response, cancellationToken: TestContext.Current.CancellationToken)
+            .GetCompilationUnitRoot(TestContext.Current.CancellationToken).DescendantNodes()
+            .OfType<ClassDeclarationSyntax>().Where(static type => type.BaseList?.ToString().Contains("IRawResponseWriter", StringComparison.Ordinal) == true).ToArray();
+        var holder = Assert.Single(holders);
+        Assert.Null(holder.TypeParameterList);
+        var output = compilation.AddReferences(MetadataReference.CreateFromFile(typeof(Microsoft.Extensions.Options.IConfigureOptions<>).Assembly.Location))
+            .AddSyntaxTrees(result.GeneratedSources.Select(static item => CSharpSyntaxTree.ParseText(item.SourceText,
+                options: new CSharpParseOptions().WithPreprocessorSymbols("NET5_0_OR_GREATER"), path: item.HintName)));
+        Assert.Empty(output.GetDiagnostics(TestContext.Current.CancellationToken).Where(static item => item.Severity == DiagnosticSeverity.Error));
+    }
+
+    [Fact]
+    public async Task RpcResponseHoldersKeepCustomAndGenericInvokerContracts()
+    {
+        var compilation = await CreateCompilation("""
+            using System;
+            using System.Threading.Tasks;
+            using Orleans;
+            using Orleans.Runtime;
+            namespace TestProject;
+            [InvokableBaseType(typeof(GrainReference), typeof(Task<>), typeof(CustomRequest<>))]
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class CustomAttribute : Attribute { }
+            public abstract class CustomRequest<T> : TaskRequest<T> { }
+            public interface ICompatibility : IGrainWithIntegerKey
+            {
+                [Custom] Task<int> Custom();
+                Task<int> Generic<T>();
+            }
+            """);
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+        var proxy = Assert.Single(result.GeneratedSources, static item => item.HintName.Contains(".orleans.proxy.", StringComparison.Ordinal)).SourceText.ToString();
+        Assert.DoesNotContain("IResponseInvokable", proxy);
+    }
+
     private static GeneratorRunResult RunSourceGenerator(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string>? globalOptions = null)
@@ -2277,6 +3640,10 @@ public class DemoClass
         {
             var supportsGenericAccessors = SourceGeneratorOptionsParser.ParseOptions(TestCompilationHelper.CreateOptionsProvider().GlobalOptions).SupportsGenericUnsafeAccessors;
             snapshot = snapshot.UseFileName($"{nameof(OrleansSourceGeneratorTests)}.{snapshotName}.{(supportsGenericAccessors ? "UnsafeAccessor" : "FieldAccessor")}");
+        }
+        if (generatedSource.Contains("global::Orleans.Serialization.Invocation.IRawResponseWriter", StringComparison.Ordinal))
+        {
+            snapshot = snapshot.UniqueForRuntimeAndVersion();
         }
 
         await snapshot;

@@ -13,6 +13,7 @@ internal static class ProxySourceOutputGenerator
         TypeSymbolResolver resolver,
         ProxyOutputModel proxyOutputModel,
         SourceGeneratorOptions options,
+        ImmutableArray<(string TypeName, string HolderName)> responseNames,
         CancellationToken cancellationToken)
     {
         try
@@ -20,7 +21,7 @@ internal static class ProxySourceOutputGenerator
             SourceGeneratorOptionsParser.AttachDebuggerIfRequested(options);
             var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options);
             var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions);
-            var proxyContext = new ProxyGenerationContext(compilation, codeGeneratorOptions);
+            var proxyContext = new ProxyGenerationContext(compilation, codeGeneratorOptions, responseNames);
             var model = proxyOutputModel.ProxyInterface;
             PopulateProxyInterfaces(proxyContext, resolver, [model], cancellationToken);
 
@@ -177,6 +178,7 @@ internal static class ProxySourceOutputGenerator
         Compilation compilation,
         ImmutableArray<ProxyInterfaceModel> models,
         SourceGeneratorOptions options,
+        ImmutableArray<(string TypeName, string HolderName)> responseNames,
         CancellationToken cancellationToken)
     {
         try
@@ -191,7 +193,7 @@ internal static class ProxySourceOutputGenerator
             var codeGeneratorOptions = SourceGeneratorOptionsParser.CreateCodeGeneratorOptions(options);
             var libraryTypes = LibraryTypes.FromCompilation(compilation, codeGeneratorOptions);
             var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions, libraryTypes);
-            var proxyContext = new ProxyGenerationContext(compilation, codeGeneratorOptions, libraryTypes);
+            var proxyContext = new ProxyGenerationContext(compilation, codeGeneratorOptions, libraryTypes, responseNames);
             var resolver = new TypeSymbolResolver(compilation);
             PopulateProxyInterfaces(proxyContext, resolver, models, cancellationToken);
 
@@ -212,6 +214,7 @@ internal static class ProxySourceOutputGenerator
                     resolver,
                     proxyOutputModels,
                     options,
+                    responseNames,
                     cancellationToken),
                 diagnostics);
         }
@@ -232,6 +235,7 @@ internal static class ProxySourceOutputGenerator
         TypeSymbolResolver resolver,
         ImmutableArray<ProxyOutputModel> proxyOutputModels,
         SourceGeneratorOptions options,
+        ImmutableArray<(string TypeName, string HolderName)> responseNames,
         CancellationToken cancellationToken)
     {
         if (proxyOutputModels.IsDefaultOrEmpty)
@@ -245,7 +249,7 @@ internal static class ProxySourceOutputGenerator
             foreach (var proxyOutputModel in proxyOutputModels)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                sourceOutputs.Add(CreateProxySourceOutput(compilation, resolver, proxyOutputModel, options, cancellationToken));
+                sourceOutputs.Add(CreateProxySourceOutput(compilation, resolver, proxyOutputModel, options, responseNames, cancellationToken));
             }
         }
         else

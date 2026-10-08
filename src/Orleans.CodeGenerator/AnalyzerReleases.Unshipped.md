@@ -12,3 +12,4 @@ ORLEANS0112 | Usage | Error | Invalid RPC parameter field identifier
 ORLEANS0113 | Usage | Warning | CancellationToken parameter is not last
 ORLEANS0114 | Usage | Error | Invalid serializer context declaration
 ORLEANS0115 | Usage | Error | Unsupported serializer context dependency
+ORLEANS0116 | Usage | Error | RPC response requires a closed serializer factory

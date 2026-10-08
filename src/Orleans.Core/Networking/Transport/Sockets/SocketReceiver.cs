@@ -5,10 +5,26 @@ using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Connections.Transport.Sockets;
 
-internal sealed class SocketReceiver : SocketAwaitableEventArgs
+internal interface ISocketReceiver : IDisposable
+{
+    int BytesTransferred { get; }
+    SocketError SocketError { get; }
+    Exception? Error { get; }
+    bool HasError { get; }
+    ValueTask ReceiveAsync(Socket socket, List<ArraySegment<byte>> buffers);
+    ValueTask StopAsync();
+}
+
+internal interface IOwnedPageSocketReceiver : ISocketReceiver
+{
+    ValueTask ReceiveAsync(Socket socket, ArcBufferWriter writer);
+}
+
+internal sealed class SocketReceiver : SocketAwaitableEventArgs, ISocketReceiver
 {
     public SocketReceiver()
     {
@@ -26,4 +42,6 @@ internal sealed class SocketReceiver : SocketAwaitableEventArgs
         var error = Error;
         return error is not null ? ValueTask.FromException(error) : default;
     }
+
+    public ValueTask StopAsync() => default;
 }
