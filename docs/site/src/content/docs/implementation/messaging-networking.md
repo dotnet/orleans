@@ -15,7 +15,7 @@ For each remote `SiloAddress`, `ConnectionManager` keeps a `ConnectionEntry` con
 
 Connection establishment has a bounded `OpenConnectionTimeout`. A failed attempt clears the pending task, removes defunct connections, records the failure, and applies the configured retry delay before another attempt. A timeout classifies the transport attempt as failed; application processing outcome requires separate reconciliation.
 
-Silo connections become available for message sends after the peer's protocol preamble is validated and the local preamble write completes. This handshake boundary keeps each preamble ahead of framed messages on the transport, including when a peer sends its preamble before the local write is queued.
+Silo connections become available for message sends after the peer's protocol preamble is validated and the local preamble write completes. This handshake boundary keeps each preamble ahead of framed messages on the transport, including when a peer sends its preamble before the local write is queued. TCP, Unix-domain sockets, in-memory connections, and TLS-decorated connections share this publication boundary. TLS authentication completes before the transport processes the Orleans preamble and message requests.
 
 Source: [`ConnectionManager`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Networking/ConnectionManager.cs), [`Connection`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Core/Networking/Connection.cs), and [`SiloConnection`](https://github.com/dotnet/orleans/blob/main/src/Orleans.Runtime/Networking/SiloConnection.cs).
 
