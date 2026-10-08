@@ -29,7 +29,7 @@ namespace Tester.EventSourcingTests
                     .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster")
                     .ConfigureLogging(builder =>
                     {
-                        // Preserve the worker phase, provider dispatch, and storage-grain receipt boundaries for #11398.
+                        // Capture worker phases, storage-provider entry, and storage-grain receipt for #11398.
                         builder.AddFilter("Orleans.Runtime.LogConsistency", LogLevel.Debug);
                         builder.AddFilter(typeof(MemoryGrainStorage).Namespace, LogLevel.Trace);
                     })
