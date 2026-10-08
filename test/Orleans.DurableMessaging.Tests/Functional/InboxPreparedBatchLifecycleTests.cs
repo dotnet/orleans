@@ -18,6 +18,59 @@ public sealed class InboxPreparedBatchLifecycleTests : DurableMessagingBehaviorT
 {
     [Theory]
     [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task AcquiredBatch_BeforeLaterFailureRetainsActualAccountingAck(bool providerFailure, bool caught)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        var firstReady = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var later = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var error = new IOException("Failure after an acquired batch.");
+        handler.Body = async (self, token) =>
+        {
+            _ = await self.Context.Outbox.PrepareSendAsync([self.Output], token);
+            firstReady.TrySetResult();
+            await later.Task.WaitAsync(token);
+            try
+            {
+                if (providerFailure) _ = await self.Context.Outbox.PrepareSendAsync([self.UnusedOutput], token);
+                else throw error;
+            }
+            catch (IOException failure) when (caught)
+            {
+                Assert.Same(error, failure);
+            }
+            self.Mutate();
+            self.Context.Complete();
+        };
+        using var input = await DeliverAsync(rig);
+        var finished = await FinishedAsync(rig);
+        using var storage = Fixture.Storage.BlockAcknowledgement(rig.Journal);
+        handler.Release.TrySetResult();
+        await WaitAsync(firstReady.Task);
+        using var acquisition = providerFailure ? rig.Outbox.BlockNextPreparation() : null;
+        acquisition?.Fail(error);
+        later.TrySetResult();
+        await storage.WaitUntilEnteredAsync();
+        Assert.False(finished.IsCompleted);
+        Assert.Equal(0, Assert.Single(rig.Outbox.PreparedBatches).DisposeCalls);
+        storage.Release();
+        await WaitAsync(finished);
+        AssertDisposed(rig.Outbox, 1);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+        if (caught) AssertSuccess(rig, input.Value, outputCount: 0);
+        else
+        {
+            Assert.Empty(rig.Effects);
+            Assert.Empty(rig.Outbox);
+            Assert.Equal(input.Value.MessageId, Assert.Single(rig.Grain.GetSnapshotForTest().InboxDeadLetters).MessageId);
+        }
+        await AssertHealthyAsync(rig);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
