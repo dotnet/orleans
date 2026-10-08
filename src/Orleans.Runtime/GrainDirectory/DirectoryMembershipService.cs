@@ -114,7 +114,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
                         catch (Exception exception)
                         {
                             throw new OrleansConfigurationException(
-                                $"Failed to construct grain directory membership version '{update.Version}' using the configured partition boundaries.",
+                                $"Failed to construct grain directory membership version '{update.Version}'.",
                                 exception);
                         }
 
