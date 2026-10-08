@@ -150,8 +150,8 @@ public partial class JournaledJobShardManagerTests
         fixture.Storage.MetadataUpdates.Clear();
 
         Assert.Empty(await fixture.DiscoverAsync(maxNewClaims: 0));
-        Assert.Equal(new[] { id, id }, fixture.Storage.MetadataReads);
-        Assert.Equal(deleteEmptyShard ? 0 : 1, fixture.Storage.MetadataUpdates.Count);
+        Assert.Equal(new[] { id, id, id }, fixture.Storage.MetadataReads);
+        Assert.Equal(deleteEmptyShard ? 1 : 2, fixture.Storage.MetadataUpdates.Count);
         var current = await storage.GetMetadataAsync(cancellationToken);
         if (deleteEmptyShard)
         {
