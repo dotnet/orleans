@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net.Security;
+using System.Net.Sockets;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -283,6 +284,11 @@ namespace Orleans.Connections.Security.Tests
         [InlineData(new[] { TestCertificateHelper.ClientAuthenticationOid, TestCertificateHelper.ServerAuthenticationOid }, RemoteCertificateMode.RequireCertificate, ConnectionTransportType.UnixSocket)]
         public async Task TlsEndToEnd(string[]? oids, RemoteCertificateMode certificateMode, ConnectionTransportType connectionTransport)
         {
+            if (connectionTransport == ConnectionTransportType.UnixSocket && !Socket.OSSupportsUnixDomainSockets)
+            {
+                throw Xunit.Sdk.SkipException.ForSkip("Unix domain sockets are not supported.");
+            }
+
             var cancellationToken = TestContext.Current.CancellationToken;
             TestCluster? testCluster = default;
             try
