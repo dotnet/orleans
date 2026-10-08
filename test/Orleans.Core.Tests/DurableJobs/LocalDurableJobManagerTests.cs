@@ -1960,8 +1960,11 @@ public class LocalDurableJobManagerTests
         }
     }
 
-    [Fact]
-    public async Task CancelAsync_WhenRemoveSucceeds_ReportsCancellationRequestAccepted()
+    [Theory]
+    [InlineData(DurableJobMutationResult.Applied, true)]
+    [InlineData(DurableJobMutationResult.JobNotFound, false)]
+    [InlineData(DurableJobMutationResult.OwnershipLost, false)]
+    public async Task CancelAsync_ReportsDurableMutationOutcome(DurableJobMutationResult result, bool expected)
     {
         var timeProvider = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
         var options = CreateOptions();
@@ -1969,7 +1972,7 @@ public class LocalDurableJobManagerTests
         var accessor = new LocalDurableJobManager.TestAccessor(manager);
         var shardKey = timeProvider.GetUtcNow();
         var shard = CreateSubstituteShard("cancellation-shard", shardKey, shardKey.Add(options.ShardDuration));
-        shard.RemoveJobAsync("job-1", Arg.Any<CancellationToken>()).Returns(DurableJobMutationResult.Applied);
+        shard.RemoveJobAsync("job-1", Arg.Any<CancellationToken>()).Returns(result);
         accessor.AddWritableShard(shardKey, shard);
         var job = new DurableJob
         {
@@ -1982,8 +1985,293 @@ public class LocalDurableJobManagerTests
 
         var cancellationRequested = await manager.CancelAsync(job, CancellationToken.None);
 
-        Assert.True(cancellationRequested);
+        Assert.Equal(expected, cancellationRequested);
         await shard.Received(1).RemoveJobAsync(job.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancelAsync_RacingWithNormalJournaledRetirement_ReturnsFalse(bool duringUnregistration)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var storage = new VolatileJournalStorageProvider();
+        await using var services = CreateJournaledServices(storage, time);
+        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var membership = new TestClusterMembershipService();
+        membership.SetSiloStatus(owner, SiloStatus.Active);
+        var shardManager = CreateJournaledShardManager(owner, services, membership, options);
+        var now = time.GetUtcNow();
+        await using var shard = await shardManager.CreateShardAsync(now, now.Add(options.ShardDuration), new Dictionary<string, string>(), token);
+        var job = await shard.TryScheduleJobAsync(CreateScheduleRequest(now, "cancel-race"), token);
+        Assert.NotNull(job);
+        var checkedOwnership = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resumeCancellation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var unregisterStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resumeUnregister = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var unregistered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishUnregister = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var wrapper = new TestJobShardManager
+        {
+            IsShardOwned = async (id, ct) =>
+            {
+                var owned = await shardManager.IsShardOwnedByLocalSiloAsync(id, ct);
+                Assert.True(owned);
+                checkedOwnership.SetResult();
+                await resumeCancellation.Task.WaitAsync(ct);
+                return owned;
+            },
+            GetShardOwner = (id, ct) => shardManager.GetShardOwnerAsync(id, ct),
+            UnregisterShard = async (item, ct) =>
+            {
+                unregisterStarted.SetResult();
+                if (duringUnregistration)
+                {
+                    await resumeUnregister.Task.WaitAsync(ct);
+                }
+
+                await shardManager.UnregisterShardAsync(item, ct);
+                unregistered.SetResult();
+                if (duringUnregistration)
+                {
+                    await finishUnregister.Task.WaitAsync(ct);
+                }
+            }
+        };
+        var logger = new RecordingLogger<LocalDurableJobManager>();
+        var manager = CreateManager(wrapper, time, options, logger: logger);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        accessor.AddWritableShard(now, shard);
+        var cancellation = manager.CancelAsync(job, token);
+        Task? runner = null;
+        try
+        {
+            await checkedOwnership.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.Equal(DurableJobMutationResult.Applied, await shard.RemoveJobAsync(job.Id, token));
+            await shard.MarkAsCompleteAsync(token);
+            accessor.TryActivateShard(shard);
+            Assert.True(accessor.TryGetRunningShardTask(shard.Id, out runner));
+            if (duringUnregistration)
+            {
+                await unregisterStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+                AssertSchedulingCacheEmpty(accessor);
+                var rediscovered = Assert.Single(await shardManager.AssignJobShardsAsync(now.Add(options.ShardDuration), 0, token));
+                Assert.Same(shard, rediscovered);
+                wrapper.AssignedShards.Add(rediscovered);
+                await accessor.ProcessShardCheckCycleAsync(token);
+                AssertSchedulingCacheEmpty(accessor);
+                resumeUnregister.SetResult();
+            }
+
+            await unregistered.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            if (duringUnregistration)
+            {
+                Assert.False(runner!.IsCompleted);
+            }
+            else
+            {
+                await runner!.WaitAsync(TimeSpan.FromSeconds(5), token);
+            }
+
+            AssertSchedulingCacheEmpty(accessor);
+            Assert.Null(await storage.CreateStorage(JobShardId.Parse(shard.Id).ToJournalId()).GetMetadataAsync(token));
+            resumeCancellation.SetResult();
+            Assert.False(await cancellation.WaitAsync(TimeSpan.FromSeconds(5), token));
+            Assert.Same(shard, Assert.Single(wrapper.UnregisteredShards));
+            Assert.DoesNotContain(logger.Entries, entry => entry.Level == LogLevel.Error);
+        }
+        finally
+        {
+            resumeCancellation.TrySetResult();
+            resumeUnregister.TrySetResult();
+            finishUnregister.TrySetResult();
+            if (runner is not null)
+            {
+                await runner.WaitAsync(TimeSpan.FromSeconds(5), token);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, true)]
+    public async Task CancelAsync_RetiredReferencePreservesReplacementAndRequestOutcome(bool localReplacement, bool cancellationRequested, bool unexpectedFailure)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var options = CreateOptions();
+        var now = time.GetUtcNow();
+        var consumer = new CompletingShard("retiring-shard", now, now.Add(options.ShardDuration));
+        var retired = CreateSubstituteShard(consumer.Id, consumer.StartTime, consumer.EndTime);
+        retired.ConsumeDurableJobsAsync().Returns(_ => consumer.ConsumeDurableJobsAsync());
+        var removalStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var removalResult = new TaskCompletionSource<DurableJobMutationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        retired.RemoveJobAsync("job-1", Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            removalStarted.SetResult();
+            return removalResult.Task;
+        });
+        var unregisterStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finishUnregister = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var owner = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, localReplacement ? 5000 : 5001), 0);
+        var shardManager = new TestJobShardManager
+        {
+            ShardOwner = owner,
+            UnregisterShard = async (_, ct) =>
+            {
+                unregisterStarted.SetResult();
+                await finishUnregister.Task.WaitAsync(ct);
+            }
+        };
+        var ownerLookups = 0;
+        shardManager.GetShardOwner = (_, _) =>
+        {
+            ownerLookups++;
+            return ValueTask.FromResult<SiloAddress?>(owner);
+        };
+        var grainFactory = Substitute.For<IInternalGrainFactory>();
+        var remote = Substitute.For<ILocalDurableJobManagerSystemTarget>();
+        remote.CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>()).Returns(cancellationRequested);
+        grainFactory.GetSystemTarget<ILocalDurableJobManagerSystemTarget>(LocalDurableJobManager.JobManagerGrainType, owner).Returns(remote);
+        var manager = CreateManager(shardManager, time, options, grainFactory);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        accessor.AddWritableShard(now, retired);
+        accessor.TryActivateShard(retired);
+        Assert.True(accessor.TryGetRunningShardTask(retired.Id, out var runner));
+        var replacement = CreateSubstituteShard(retired.Id, now, now.Add(options.ShardDuration));
+        replacement.RemoveJobAsync("job-1", Arg.Any<CancellationToken>())
+            .Returns(cancellationRequested ? DurableJobMutationResult.Applied : DurableJobMutationResult.JobNotFound);
+        var job = new DurableJob
+        {
+            Id = "job-1",
+            Name = "job",
+            DueTime = now,
+            TargetGrainId = GrainId.Create("test", "job"),
+            ShardId = retired.Id
+        };
+        var cancellation = manager.CancelAsync(job, token);
+        try
+        {
+            await removalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            await consumer.MarkAsCompleteAsync(token);
+            await unregisterStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            AssertSchedulingCacheEmpty(accessor);
+            shardManager.AssignedShards.Add(replacement);
+            await accessor.ProcessShardCheckCycleAsync(token);
+            Assert.True(accessor.HasCachedShard(replacement.Id));
+            accessor.AddWritableShard(now, replacement);
+            finishUnregister.SetResult();
+            await runner!.WaitAsync(TimeSpan.FromSeconds(5), token);
+            await retired.Received(1).DisposeAsync();
+            Assert.True(accessor.HasCachedShard(replacement.Id));
+            Assert.True(accessor.TryGetWritableShard(now, out var writable));
+            Assert.Same(replacement, writable);
+            Exception failure = unexpectedFailure
+                ? new InvalidOperationException("Cancellation persistence failed.")
+                : new ObjectDisposedException(nameof(IJobShard));
+            removalResult.SetException(failure);
+
+            if (unexpectedFailure)
+            {
+                Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(
+                    () => cancellation.WaitAsync(TimeSpan.FromSeconds(5), token)));
+                Assert.Equal(0, ownerLookups);
+            }
+            else
+            {
+                Assert.Equal(cancellationRequested, await cancellation.WaitAsync(TimeSpan.FromSeconds(5), token));
+                Assert.Equal(1, ownerLookups);
+            }
+
+            Assert.True(accessor.HasCachedShard(replacement.Id));
+            await retired.Received(1).RemoveJobAsync(job.Id, Arg.Any<CancellationToken>());
+            if (unexpectedFailure)
+            {
+                await replacement.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await remote.DidNotReceive().CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>());
+            }
+            else if (localReplacement)
+            {
+                await replacement.Received(1).RemoveJobAsync(job.Id, Arg.Any<CancellationToken>());
+                await remote.DidNotReceive().CancelAsync(Arg.Any<DurableJob>(), Arg.Any<CancellationToken>());
+            }
+            else
+            {
+                await replacement.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+                await remote.Received(1).CancelAsync(job, Arg.Any<CancellationToken>());
+            }
+        }
+        finally
+        {
+            finishUnregister.TrySetResult();
+            removalResult.TrySetResult(DurableJobMutationResult.JobNotFound);
+            await runner!.WaitAsync(TimeSpan.FromSeconds(5), token);
+            await CreateLifecycleObserver(manager).OnStop(token).WaitAsync(TimeSpan.FromSeconds(5), token);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CancelAsync_TrackedShardFailurePropagates(bool ownershipCheck, bool disposedFailure)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var now = time.GetUtcNow();
+        var options = CreateOptions();
+        var shard = CreateSubstituteShard("failing-shard", now, now.Add(options.ShardDuration));
+        Exception failure = disposedFailure
+            ? new ObjectDisposedException("storage")
+            : new InvalidOperationException("Cancellation persistence failed.");
+        var shardManager = new TestJobShardManager();
+        if (ownershipCheck)
+        {
+            shardManager.IsShardOwned = (_, _) => ValueTask.FromException<bool>(failure);
+        }
+        else
+        {
+            shard.RemoveJobAsync("job-1", Arg.Any<CancellationToken>())
+                .Returns(Task.FromException<DurableJobMutationResult>(failure));
+        }
+
+        var ownerLookups = 0;
+        shardManager.GetShardOwner = (_, _) =>
+        {
+            ownerLookups++;
+            return ValueTask.FromResult<SiloAddress?>(null);
+        };
+        var manager = CreateManager(shardManager, time, options);
+        var accessor = new LocalDurableJobManager.TestAccessor(manager);
+        accessor.AddWritableShard(now, shard);
+        var job = new DurableJob
+        {
+            Id = "job-1",
+            Name = "job",
+            DueTime = now,
+            TargetGrainId = GrainId.Create("test", "job"),
+            ShardId = shard.Id
+        };
+
+        var actual = await Record.ExceptionAsync(() => manager.CancelAsync(job, token));
+
+        Assert.Same(failure, actual);
+        Assert.True(accessor.HasCachedShard(shard.Id));
+        Assert.Equal(0, ownerLookups);
+        if (ownershipCheck)
+        {
+            await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        }
+        else
+        {
+            await shard.Received(1).RemoveJobAsync(job.Id, Arg.Any<CancellationToken>());
+        }
     }
 
     [Theory]
@@ -2676,7 +2964,9 @@ public class LocalDurableJobManagerTests
             var cleanupToken = await unregisterStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             Assert.False(cleanupToken.IsCancellationRequested);
             Assert.False(stop.IsCompleted);
-            Assert.True(accessor.HasCachedShard(shard.Id));
+            AssertSchedulingCacheEmpty(accessor);
+            Assert.True(accessor.TryGetRunningShardTask(shard.Id, out var runner));
+            Assert.False(runner!.IsCompleted);
             await trackedShard.DidNotReceive().DisposeAsync();
             accessor.TryActivateShard(trackedShard);
             Assert.Same(trackedShard, Assert.Single(trackingManager.UnregisteredShards));
