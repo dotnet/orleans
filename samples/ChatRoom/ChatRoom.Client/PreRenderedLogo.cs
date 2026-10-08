@@ -23,6 +23,13 @@ internal sealed class PreRenderedLogo : Renderable
         return new Measurement(width, width);
     }
 
-    protected override IEnumerable<Segment> Render(RenderOptions options, int maxWidth) =>
-        ((IRenderable)new Markup(_markup[Math.Min(maxWidth, MaxWidth) / PixelWidth - 1])).Render(options, maxWidth);
+    protected override IEnumerable<Segment> Render(RenderOptions options, int maxWidth)
+    {
+        if (maxWidth < PixelWidth)
+        {
+            return [];
+        }
+
+        return ((IRenderable)new Markup(_markup[Math.Min(maxWidth, MaxWidth) / PixelWidth - 1])).Render(options, maxWidth);
+    }
 }
