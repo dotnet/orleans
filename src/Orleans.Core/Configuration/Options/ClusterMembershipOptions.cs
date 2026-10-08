@@ -61,6 +61,10 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the period between fetching updates from the membership table.
         /// </summary>
+        /// <remarks>
+        /// Use a positive interval for periodic membership refreshes and joining-silo monitoring reevaluation,
+        /// or <see cref="System.Threading.Timeout.InfiniteTimeSpan"/> to rely on membership updates.
+        /// </remarks>
         /// <value>The membership table is refreshed every 60 seconds by default.</value>
         public TimeSpan TableRefreshTimeout { get; set; } = TimeSpan.FromSeconds(60);
 
