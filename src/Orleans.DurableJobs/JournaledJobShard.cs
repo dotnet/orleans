@@ -130,7 +130,7 @@ internal sealed class JournaledJobShard : IJobShard
     /// <summary>
     /// Closes mutation admission and drains accepted operations before ownership cleanup.
     /// </summary>
-    /// <param name="cancellationToken">A token to cancel the completion barrier.</param>
+    /// <param name="cancellationToken">A token to cancel the completion barrier wait.</param>
     internal async Task RetireAsync(CancellationToken cancellationToken)
     {
         using var operation = new MarkAsCompleteOperation(cancellationToken);
@@ -142,7 +142,8 @@ internal sealed class JournaledJobShard : IJobShard
             _pendingOperationSignal.Signal();
         }
 
-        await operation.Task.ConfigureAwait(false);
+        // Canceling the wait lets unregistration dispose the shard and cancel owned closing I/O.
+        await operation.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
         if (!_state.IsAddingCompleted)
         {
             throw new InvalidOperationException($"Cannot retire DurableJobs shard '{Id}' because closing it failed.");
