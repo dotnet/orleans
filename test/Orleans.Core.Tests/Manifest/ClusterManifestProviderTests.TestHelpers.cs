@@ -38,10 +38,12 @@ public partial class ClusterManifestProviderTests
         .GetMethod("ProbePeerForManifests", BindingFlags.Instance | BindingFlags.NonPublic)!;
     private static readonly FieldInfo ManifestCacheField = typeof(ClusterManifestProvider)
         .GetField("_manifestCache", BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly MethodInfo MarkManifestFetchCompleteMethod = typeof(ClusterManifestProvider)
+        .GetMethod("MarkManifestFetchComplete", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
     private static ClusterManifestProvider CreateClusterManifestProvider(
         SiloAddress localSilo,
-        TestClusterMembershipService membership,
+        IClusterMembershipService membership,
         IInternalGrainFactory grainFactory,
         ClusterManifestOptions? options = null,
         ClusterManifestInstruments? instruments = null) =>
@@ -255,9 +257,16 @@ public partial class ClusterManifestProviderTests
     private static ConcurrentDictionary<ManifestHash, GrainManifest> GetCachedManifests(ClusterManifestProvider provider) =>
         (ConcurrentDictionary<ManifestHash, GrainManifest>)ManifestCacheField.GetValue(provider)!;
 
+    private static void MarkManifestFetchComplete(
+        ClusterManifestProvider provider,
+        long attemptId,
+        SiloAddress siloAddress,
+        Exception? exception) =>
+        MarkManifestFetchCompleteMethod.Invoke(provider, [attemptId, siloAddress, exception]);
+
     private static ClusterManifestProvider CreateClusterManifestProvider(
         SiloAddress localSilo,
-        TestClusterMembershipService membership,
+        IClusterMembershipService membership,
         IInternalGrainFactory grainFactory,
         TimeProvider timeProvider,
         ILogger<ClusterManifestProvider> logger,

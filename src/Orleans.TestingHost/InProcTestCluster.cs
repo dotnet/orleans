@@ -27,6 +27,8 @@ using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Metadata;
+using Orleans.Metadata;
 
 namespace Orleans.TestingHost;
 
@@ -442,7 +444,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             .Select(static silo => (ITestHooks)silo.ServiceProvider.GetRequiredService<TestHooksSystemTarget>())
             .ToArray();
         var manifestProviders = activeSilos
-            .Select(static silo => silo.ServiceProvider.GetRequiredService<IClusterManifestProvider>())
+            .Select(static silo => silo.ServiceProvider.GetRequiredService<ClusterManifestProvider>())
             .ToArray();
         var gatewayManager = Client.ServiceProvider.GetRequiredService<GatewayManager>();
         if (!GrainDirectoryObserver.CanObserve(activeSilos))
@@ -470,12 +472,55 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             .WaitAsync(cancellationToken);
         if (!manifestConverged)
         {
-            var observedManifests = activeSilos.Select((silo, index) =>
-                $"{silo.SiloAddress}=[{string.Join(", ", manifestProviders[index].Current.Silos.Keys.Order())}]");
+            var expectedSiloSet = activeSilos.Select(static silo => silo.SiloAddress).ToHashSet();
+
+            var snapshots = activeSilos.Select((silo, index) =>
+            {
+                var (manifest, diagnostics) = manifestProviders[index].GetManifestAndDiagnosticsSnapshot();
+                var observerTime = silo.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
+                return (Silo: silo, Manifest: manifest, Diagnostics: diagnostics, ObserverTime: observerTime);
+            }).ToArray();
+
+            var observedManifests = snapshots.Select(entry =>
+                $"{entry.Silo.SiloAddress}=[{string.Join(", ", entry.Manifest.Silos.Keys.Order())}]");
+            var pendingFetchDiagnostics = snapshots
+                .Where(entry => !expectedSiloSet.SetEquals(entry.Manifest.Silos.Keys))
+                .Select(entry => DescribePendingFetch(entry.Silo.SiloAddress, entry.Manifest, entry.Diagnostics, entry.ObserverTime));
             throw new TimeoutException(
                 $"Cluster manifests did not converge within {manifestTimeout}. Expected active silos: {expectedSilos}. "
-                + $"Observed manifests: {string.Join("; ", observedManifests)}.");
+                + $"Observed manifests: {string.Join("; ", observedManifests)}. "
+                + $"Pending fetch diagnostics: {string.Join("; ", pendingFetchDiagnostics)}.");
         }
+    }
+
+    /// <summary>
+    /// Describes a silo's most recent manifest-update attempt: the membership version it is reconciling
+    /// against, the peers it is still waiting on, how long the attempt has been outstanding, and the most
+    /// recent fetch failure, if any. Used to diagnose a cluster-manifest convergence timeout.
+    /// </summary>
+    /// <remarks><see langword="internal"/> (rather than <see langword="private"/>) solely so its exact output
+    /// format can be unit-tested directly from <c>Orleans.Core.Tests</c> without requiring a full in-process
+    /// cluster convergence timeout.</remarks>
+    internal static string DescribePendingFetch(
+        SiloAddress observer,
+        ClusterManifest manifest,
+        ManifestUpdateAttemptDiagnostics? diagnostics,
+        DateTime observerUtcNow)
+    {
+        if (diagnostics is null)
+        {
+            return $"{observer}: no manifest-update attempt recorded (published version {manifest.Version})";
+        }
+
+        // Use the observer silo's own clock, which may be virtualized in tests, so elapsed time is measured
+        // consistently with AttemptStartedAt (stamped via the same silo's TimeProvider).
+        var elapsed = observerUtcNow - diagnostics.AttemptStartedAt;
+        var pending = string.Join(", ", diagnostics.PendingSilos);
+        var failure = diagnostics.LastFailedSilo is { } failedSilo
+            ? $", last fetch failure for {failedSilo} at {diagnostics.LastFailureAt:O}: {diagnostics.LastFailureMessage}"
+            : string.Empty;
+        return $"{observer}: membership v{diagnostics.MembershipVersion}, published v{manifest.Version}, "
+            + $"pending=[{pending}], attempt started {elapsed.TotalSeconds.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)}s ago{failure}";
     }
 
     /// <summary>
