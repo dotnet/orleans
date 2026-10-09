@@ -1,6 +1,7 @@
 # Microsoft Orleans Durable Messaging
 
-This intermediate project supplies opaque durable message contracts and their owned-payload codecs.
+This intermediate project supplies opaque durable message contracts, owned-payload codecs, and
+journaled inbox processing.
 
 `DurableEnvelope` carries application-supplied `HierarchicalKey MessageId`, `SenderId`, `ReceiverId`,
 ordinal `Subject`, and an owned `ArcBuffer` payload.
@@ -27,6 +28,25 @@ state retains an independent slice. The journal capture hook establishes its sel
 capture; dispatch follows persistence acknowledgement. Inspection returns borrowed envelopes.
 `IDurableInbox`, `IDurableInboxExtension`, `DeliveryResult`, `DeliveryStatus`, and `DurableInboxOptions`
 define handler registration, delivery outcomes, capacity, retry, retention, and batch limits.
+
+The inbox accepts an envelope after DurableJobs confirms its wakeup and the journal commits the
+message with the logical generation and exact returned physical job handle. Retained duplicates
+coalesce by `(SenderId, MessageId)`; capacity is checked before admission. Handler failures during
+local preparation follow bounded retry and dead-letter policy. `Complete()` stages removal and
+deduplication synchronously beside safe business changes and outgoing intents. Errors after
+completion preserve that logical outcome through the owned write and are reported after its ACK.
+
+Admission retains the borrowed envelope before its first suspension and keeps that owner through
+the actual operation independently of caller-wait cancellation. Standard durable dictionaries
+own retained values. Each selected handler envelope has an independent pin through the actual
+method outcome and persistence, so removing the dictionary entry during `Complete()` preserves
+the handler's borrow. Recovery, reset, dead-letter removal, and scope disposal release the owners
+at their respective boundaries.
+
+Reusable, noninterleaving timers carry immutable owner-bound work and a physical registration
+generation. Stop closes admission and drains actual operations; full deletion then awaits the
+advanced journal owner's deletion before disposal or deactivation. Subsequent use creates a
+fresh owner. Actual storage failures retain their first cause and recover the persisted outcome.
 
 `HierarchicalKey` is a readonly ordinal value with one immutable canonical backing path and a
 cached process-local hash. `Create` and `CreateChildKey` accept literal segments; `Parse` reads an
