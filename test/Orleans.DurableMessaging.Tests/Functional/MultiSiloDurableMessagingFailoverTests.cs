@@ -21,7 +21,7 @@ public sealed class MultiSiloDurableMessagingFailoverTests(MultiSiloDurableMessa
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
         using var barrier = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/failover");
         var sender = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
-        var logicalId = Guid.NewGuid();
+        var logicalId = HierarchicalKey.Create("failover", Guid.NewGuid().ToString("N"));
         const string jobName = "orleans.messaging.inbox-drain";
         fixture.JobManagerProbe.DuplicateNext(jobName);
 

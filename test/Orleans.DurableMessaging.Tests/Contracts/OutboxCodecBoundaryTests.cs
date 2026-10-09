@@ -676,7 +676,7 @@ public sealed class OutboxCodecBoundaryTests
             Assert.Equal(fixture.Job.Value!.Id, recovered.Job.Value!.Id);
             Assert.Equal(fixture.Job.Value.ShardId, recovered.Job.Value.ShardId);
         }
-        Assert.Equal(1, fixture.Receiver.ReceivedCalls().Count());
+        Assert.Single(fixture.Receiver.ReceivedCalls());
         Assert.Null(fixture.States.Failure);
     });
 

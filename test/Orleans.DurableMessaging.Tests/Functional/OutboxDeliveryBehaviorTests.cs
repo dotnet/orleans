@@ -172,7 +172,7 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
         var oldContext = Fixture.GetGrainContext(sender);
         var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
         var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
-        await sender.StageEffectAsync(new DurableEffect(Guid.NewGuid(), 1, 53, "failed-write"));
+        await sender.StageEffectAsync(new DurableEffect(HierarchicalKey.Create("outbox", "failed-write"), 1, 53, "failed-write"));
         Fixture.Storage.FailWrite(JournalId.FromGrainId(sender.GetGrainId()));
 
         var failure = await Assert.ThrowsAsync<IOException>(() => sender.SendAsync(
@@ -214,7 +214,7 @@ public sealed class OutboxDeliveryBehaviorTests : DurableMessagingBehaviorTestBa
         Assert.Null(fresh.OutboxJob);
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
 
-        var effect = new DurableEffect(Guid.NewGuid(), 1, 76, "fresh-owner");
+        var effect = new DurableEffect(HierarchicalKey.Create("outbox", "fresh-owner"), 1, 76, "fresh-owner");
         await sender.StageEffectAsync(effect);
         var drained = Fixture.SnapshotProbe.WaitAsync(
             sender.GetGrainId(),

@@ -149,8 +149,9 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     public async Task NotificationHandling_UnexpectedSubjectPreservesBusinessState()
     {
         var attempt = Create(new Notify("prepared"));
-        attempt.Context.Envelope.Returns(Own(Writer(Sender).Create(
-            Type<NotificationReceived>(), Command, Receiver, new NotificationReceived("receipt", Command))));
+        var unexpected = Own(Writer(Sender).Create(
+            Type<NotificationReceived>(), Command, Receiver, new NotificationReceived("receipt", Command)));
+        attempt.Context.Envelope.Returns(unexpected);
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
             await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
@@ -251,7 +252,8 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         var inbox = Substitute.For<IDurableInbox>();
         var outbox = Substitute.For<IDurableOutbox>();
         var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(Own(Writer(Sender).Create(Type<Notify>(), Command, Receiver, new Notify("prepared", Sender))));
+        var input = Own(Writer(Sender).Create(Type<Notify>(), Command, Receiver, new Notify("prepared", Sender)));
+        context.Envelope.Returns(input);
         ArcBuffer borrowedReply = default;
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
@@ -274,7 +276,8 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         var inbox = Substitute.For<IDurableInbox>();
         var outbox = Substitute.For<IDurableOutbox>();
         var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(Own(Writer(Sender).Create(Type<Notify>(), Command, Receiver, message)));
+        var input = Own(Writer(Sender).Create(Type<Notify>(), Command, Receiver, message));
+        context.Envelope.Returns(input);
         var events = new List<string>();
         var output = new List<DurableEnvelope>();
         var count = new TestCount(events);

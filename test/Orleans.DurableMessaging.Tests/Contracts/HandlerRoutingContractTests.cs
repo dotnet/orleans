@@ -252,26 +252,6 @@ public sealed class HandlerRoutingContractTests
         return Assert.IsAssignableFrom<IInboxHandler>(arguments[0]);
     }
 
-    private static IDurableInbox CreateInbox(out IDurableDictionary<HierarchicalKey, DurableEnvelope> storage)
-    {
-        var type = typeof(IDurableInbox).Assembly.GetType("Orleans.DurableMessaging.DurableInbox", throwOnError: true)!;
-        storage = Substitute.For<IDurableDictionary<HierarchicalKey, DurableEnvelope>>();
-        return Assert.IsAssignableFrom<IDurableInbox>(Activator.CreateInstance(type, storage, 1000));
-    }
-
-    private static IInboxHandler? RegisteredHandler(IDurableInbox inbox)
-    {
-        var method = inbox.GetType().GetMethod("TryGetHandler", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        object?[] arguments = [null];
-        var found = Assert.IsType<bool>(method.Invoke(inbox, arguments));
-        if (!found)
-        {
-            Assert.Null(arguments[0]);
-            return null;
-        }
-        return Assert.IsAssignableFrom<IInboxHandler>(arguments[0]);
-    }
-
     private static IInboxHandlerContext CreateContext(DurableEnvelope envelope, Action complete)
     {
         var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
