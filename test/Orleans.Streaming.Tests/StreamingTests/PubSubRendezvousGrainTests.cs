@@ -16,7 +16,7 @@ namespace UnitTests.StreamingTests
     [TestSuite("BVT")]
     [TestProvider("None")]
     [TestArea("Runtime")]
-    public class PubSubRendezvousGrainTests : OrleansTestingBase, IClassFixture<PubSubRendezvousGrainTests.Fixture>
+    public partial class PubSubRendezvousGrainTests : OrleansTestingBase, IClassFixture<PubSubRendezvousGrainTests.Fixture>
     {
         private readonly Fixture fixture;
 
@@ -701,6 +701,32 @@ namespace UnitTests.StreamingTests
             var statuses = validation.Statuses;
             Assert.Equal(SiloStatus.Dead, statuses[staleSilo]);
             Assert.Equal(SiloStatus.Active, statuses[replacementSilo]);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming"), TestCategory("PubSub")]
+        public async Task UnregisterLastConsumerEmitsDiagnosticAfterClearingState()
+        {
+            var streamId = new QualifiedStreamId("ProviderName", StreamId.Create("StreamNamespace", Guid.NewGuid()));
+            var subscriptionId = GuidId.GetGuidId(Guid.NewGuid());
+            var pubSubGrain = this.fixture.GrainFactory.GetGrain<IPubSubRendezvousGrain>(streamId.ToString());
+            using var observer = StreamingDiagnosticObserver.Create(fixture.HostedCluster);
+
+            await pubSubGrain.RegisterConsumer(
+                subscriptionId,
+                streamId,
+                default,
+                null!,
+                TestContext.Current.CancellationToken);
+            await pubSubGrain.UnregisterConsumer(subscriptionId, streamId, TestContext.Current.CancellationToken);
+
+            var unregistered = await observer.WaitForSubscriptionUnregisteredAsync(
+                streamId.StreamId,
+                subscriptionId.Guid,
+                streamId.ProviderName,
+                TestContext.Current.CancellationToken);
+            Assert.Equal(streamId.StreamId, unregistered.StreamId);
+            Assert.Equal(subscriptionId.Guid, unregistered.SubscriptionId);
+            Assert.Equal(0, await pubSubGrain.ConsumerCount(streamId, TestContext.Current.CancellationToken));
         }
 
         /// <summary>

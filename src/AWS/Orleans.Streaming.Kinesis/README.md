@@ -101,6 +101,10 @@ The DynamoDB checkpointer uses on-demand billing and creates its table by defaul
 To provide a different checkpoint implementation, use the configurator overload and call
 `ConfigureCheckpointer<TOptions>` with an `IStreamQueueCheckpointerFactory`.
 
+## Receiver shutdown
+
+Once shutdown is admitted, the receiver releases its Kinesis client and pooled cache before making the shard available for reassignment. An expired shutdown budget or caller cancellation is reported while final resource cleanup proceeds. A replacement receiver resumes from the last durable checkpoint.
+
 ## Documentation
 
 - [Microsoft Orleans documentation](https://dotnet.github.io/orleans/docs/)
