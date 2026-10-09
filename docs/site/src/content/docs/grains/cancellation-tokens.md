@@ -29,6 +29,8 @@ Pass a token from a <xref:System.Threading.CancellationTokenSource>:
 
 Cancellation can cross client-to-grain and grain-to-grain calls. Delivery is best effort under network failure, and cancellation doesn't roll back side effects that completed before the grain observed the token.
 
+Receiver-owned forwarding preserves the original cancellation registration and request identity. Forwarding statuses update the caller's recorded target monotonically, and hosted or grain callers signal that latest known physical destination. External clients resolve cancellation through the grain reference and their grain-location hints. A receiver without the request falls back to ordinary grain routing.
+
 ## Timeouts and cancellation
 
 A response timeout and cancellation answer different questions:
@@ -43,6 +45,8 @@ By default, a timed-out call isn't canceled. <xref:Orleans.Configuration.Messagi
 Even when enabled, the timeout doesn't prove that the operation stopped. The cancellation message can be delayed, the method might not observe its token, or side effects might already have completed.
 
 <xref:Orleans.Configuration.MessagingOptions.WaitForCancellationAcknowledgement> also defaults to `false`. Enabling it makes the caller wait for acknowledgement from the callee rather than completing local cancellation immediately. Use it only when that stronger coordination is worth the added latency and messaging.
+
+Forwarded invocations retain cooperative acknowledgement behavior and the original response timeout.
 
 ## Design cancellable operations
 

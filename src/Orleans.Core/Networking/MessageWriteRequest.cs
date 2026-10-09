@@ -22,6 +22,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     private MessageSerializer? _messageSerializer;
     private bool _hasLargeMessages;
     private bool _disposed;
+    private bool _writeSucceeded;
 
     public MessageWriteRequest(MessageHandlerShared shared)
     {
@@ -40,6 +41,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     {
         var startLength = _buffer.Length;
         var messageSerializer = _messageSerializer ??= _shared.GetMessageSerializer();
+        _connection?.BeginApplicationWrite(message);
         try
         {
             // Reserve space for framing
@@ -60,6 +62,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         catch
         {
             _buffer.Truncate(startLength);
+            _connection?.CompleteApplicationWrite(message, succeeded: false);
             throw;
         }
     }
@@ -75,6 +78,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
     public override void SetResult()
     {
+        _writeSucceeded = true;
         try
         {
             var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
@@ -108,7 +112,16 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
         foreach (var (message, _, _) in _messages)
         {
-            connection.RerouteMessage(message, error);
+            if (message.IsRelocatableRequest)
+            {
+                // An accepted write can have reached the receiver. The original callback awaits its outcome.
+                _shared.MessagingInstruments.OnFailedSentMessage(message);
+                message.Dispose();
+            }
+            else
+            {
+                connection.RerouteMessage(message, error);
+            }
         }
 
         Reset();
@@ -121,6 +134,12 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
                 ? SendPageSize
                 : 0;
         CompleteWriting();
+        foreach (var (message, _, _) in _messages)
+        {
+            _connection?.CompleteApplicationWrite(message, _writeSucceeded);
+        }
+
+        _writeSucceeded = false;
         _messages.Clear();
         _hasLargeMessages = false;
         _buffer.Reset(nextPageSize);
@@ -144,6 +163,6 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     [LoggerMessage(Level = LogLevel.Error, Message = "Error sending messages {Messages}")]
     private static partial void LogErrorSendingMessages(ILogger logger, Exception error, object messages);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Connection closed while sending messages {Messages}; rerouting")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Connection closed while sending messages {Messages}")]
     private static partial void LogInformationConnectionClosedWhileSendingMessages(ILogger logger, Exception error, object messages);
 }

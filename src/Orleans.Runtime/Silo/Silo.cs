@@ -31,7 +31,6 @@ namespace Orleans.Runtime
         private readonly TaskCompletionSource<int> siloTerminatedTask = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly InsideRuntimeClient runtimeClient;
         private readonly Watchdog platformWatchdog;
-        private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
 #if NET9_0_OR_GREATER
         private readonly Lock lockable = new();
@@ -84,7 +83,6 @@ namespace Orleans.Runtime
 
             //set PropagateActivityId flag from node config
             IOptions<SiloMessagingOptions> messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
-            this.waitForMessageToBeQueuedForOutbound = messagingOptions.Value.WaitForMessageToBeQueuedForOutboundTime;
 
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = this.loggerFactory.CreateLogger<Silo>();
@@ -386,6 +384,7 @@ namespace Orleans.Runtime
 
         private async Task OnBecomeActiveStop(CancellationToken ct)
         {
+            messageCenter.BeginRetirement();
             try
             {
                 try
@@ -405,8 +404,7 @@ namespace Orleans.Runtime
                     }
                 }
 
-                // Wait for all queued message sent to OutboundMessageQueue before MessageCenter stop and OutboundMessageQueue stop.
-                await Task.Delay(waitForMessageToBeQueuedForOutbound, ct).SuppressThrowing();
+                await messageCenter.DrainRetirementAsync(ct);
             }
             catch (Exception exc)
             {

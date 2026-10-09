@@ -327,6 +327,7 @@ namespace Orleans.Runtime
                                 }
 
                                 invokable.Dispose();
+                                message.BodyObject = null;
                                 break;
                             }
                         default:
@@ -511,7 +512,7 @@ namespace Orleans.Runtime
                 // Cancel the call since the caller has abandoned it.
                 // Note that the target and sender arguments are swapped because this is a response to the original request.
                 _cancellationManager.SignalCancellation(
-                    message.SendingSilo,
+                    status.ForwardedTo ?? message.SendingSilo,
                     targetGrainId: message.SendingGrain,
                     sendingGrainId: message.TargetGrain,
                     messageId: message.Id);

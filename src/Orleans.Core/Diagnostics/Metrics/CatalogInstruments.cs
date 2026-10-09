@@ -9,6 +9,9 @@ namespace Orleans.Runtime;
 internal sealed class CatalogInstruments(OrleansInstruments instruments)
 {
     private readonly ConcurrentDictionary<GrainType, GrainTypeMetrics> _grainTypes = new();
+    private readonly Counter<long> _retirementDrain = instruments.Meter.CreateCounter<long>("orleans-catalog-retirement-drain");
+
+    internal void OnRetirementDrain(string outcome) => _retirementDrain.Add(1, new KeyValuePair<string, object?>("outcome", outcome));
     private const string MillisecondsUnit = "ms";
     private const string StatusTagName = "status";
     private const string DirectoryTagName = "directory";

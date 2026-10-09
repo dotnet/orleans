@@ -22,6 +22,8 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
     private int _bodyLength;
     internal ArcBuffer _headers;
     private ArcBuffer _body;
+    private bool _ownsIncomingDispatch;
+    private bool _incomingDispatchRejected;
 
     public int PayloadLength => _headerLength + _bodyLength;
 
@@ -39,6 +41,13 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
 
     public void Reset()
     {
+        if (_ownsIncomingDispatch)
+        {
+            _ownsIncomingDispatch = false;
+            _connection!.CompleteIncomingApplicationDispatch();
+        }
+
+        _incomingDispatchRejected = false;
         _headerLength = default;
         _bodyLength = default;
         _originalResponseType = default;
@@ -105,12 +114,21 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
             return false;
         }
 
+        Span<byte> packedHeaderBytes = stackalloc byte[sizeof(uint)];
+        var packedHeaders = (Message.PackedHeaders)BinaryPrimitives.ReadUInt32LittleEndian(bufferReader.Peek(in packedHeaderBytes));
         _headers = bufferReader.ConsumeSlice(_headerLength);
         _body = bufferReader.ConsumeSlice(_bodyLength);
         Debug.Assert(_headers.Length == _headerLength);
         Debug.Assert(_body.Length == _bodyLength);
 
         _connection.EnqueueRead();
+        if (!packedHeaders.HasFlag(Message.MessageFlags.SystemMessage)
+            && packedHeaders.Direction is Message.Directions.Request or Message.Directions.OneWay)
+        {
+            _ownsIncomingDispatch = _connection.TryAdmitIncomingApplicationDispatch();
+            _incomingDispatchRejected = !_ownsIncomingDispatch;
+        }
+
         ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
         return true;
     }
@@ -123,6 +141,9 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
     {
         Message? message = null;
         var connection = _connection ?? throw new InvalidOperationException("Cannot process a message before a connection is set.");
+        var ownsIncomingDispatch = _ownsIncomingDispatch;
+        var incomingDispatchRejected = _incomingDispatchRejected;
+        _ownsIncomingDispatch = false;
         var shouldReset = true;
         MessageSerializer? messageSerializer = null;
         try
@@ -140,7 +161,15 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
                 message.SetMessageReadRequest(this);
                 shouldReset = false;
             }
-            connection.OnReceivedMessage(message);
+            if (incomingDispatchRejected)
+            {
+                Shared.MessagingTrace.OnDropBlockedApplicationMessage(message);
+                message.Dispose();
+            }
+            else
+            {
+                connection.OnReceivedMessage(message);
+            }
         }
         catch (Exception exception)
         {
@@ -160,6 +189,11 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         }
         finally
         {
+            if (ownsIncomingDispatch)
+            {
+                connection.CompleteIncomingApplicationDispatch();
+            }
+
             if (shouldReset)
             {
                 Reset();

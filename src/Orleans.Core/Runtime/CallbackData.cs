@@ -19,6 +19,12 @@ namespace Orleans.Runtime
         private int _state;
         private StatusResponse? lastKnownStatus;
         private CancellationTokenRegistration _cancellationTokenRegistration;
+        private readonly object _transitionLock = new();
+        private readonly TimeSpan _responseTimeout;
+        private readonly long _responseTimeoutTicks;
+        private readonly bool _isCancellable;
+        private int _forwardingGeneration = -1;
+        private bool _cancellationRequested;
 
         public CallbackData(
             SharedCallbackData shared,
@@ -28,9 +34,13 @@ namespace Orleans.Runtime
         {
             this.shared = shared;
             this.context = ctx;
+            _startTimestamp = shared.TimeProvider.GetTimestamp();
+            var invokable = msg.BodyObject as IInvokable;
+            _responseTimeout = invokable?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
+            _responseTimeoutTicks = shared.GetTimestampTicks(_responseTimeout);
+            _isCancellable = invokable?.IsCancellable == true;
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
-            _startTimestamp = shared.TimeProvider.GetTimestamp();
         }
 
         public Message Message { get; } // might hold metadata used by response pipeline
@@ -73,35 +83,53 @@ namespace Orleans.Runtime
             // Only cancel requests which honor cancellation token.
             // Not all targets support IGrainCallCancellationExtension, so sending a cancellation in those cases could result in an error.
             // There are opportunities to cancel requests at the infrastructure layer which this will not exploit if the target method does not support cancellation.
-            if (Message.BodyObject is IInvokable invokable && invokable.IsCancellable)
+            if (_isCancellable)
             {
                 shared.CancellationManager?.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
             }
         }
 
-        public void OnStatusUpdate(StatusResponse status)
+        public bool OnStatusUpdate(StatusResponse status)
         {
-            this.lastKnownStatus = status;
+            lock (_transitionLock)
+            {
+                if (IsCompleted)
+                {
+                    return false;
+                }
+
+                if (status.IsRouteUpdate)
+                {
+                    if (status.ForwardingGeneration <= _forwardingGeneration)
+                    {
+                        _applicationRequestInstruments.OnHandoff("stale-route");
+                        return false;
+                    }
+
+                    _forwardingGeneration = status.ForwardingGeneration;
+                    Message.TargetSilo = status.ForwardedTo;
+                    _applicationRequestInstruments.OnHandoff("route");
+                    if (_cancellationRequested)
+                    {
+                        SignalCancellation();
+                    }
+                }
+                else
+                {
+                    this.lastKnownStatus = status;
+                }
+
+                return true;
+            }
         }
 
         public bool IsExpired(long currentTimestamp)
         {
             var duration = currentTimestamp - _startTimestamp;
-            return duration > GetResponseTimeoutTimestampTicks();
+            return duration > _responseTimeoutTicks;
         }
 
-        private long GetResponseTimeoutTimestampTicks()
-        {
-            var defaultResponseTimeout = (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout();
-            if (defaultResponseTimeout.HasValue)
-            {
-                return shared.GetTimestampTicks(defaultResponseTimeout.Value);
-            }
-
-            return shared.ResponseTimeoutTimestampTicks;
-        }
-
-        private TimeSpan GetResponseTimeout() => (Message.BodyObject as IInvokable)?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
+        private TimeSpan GetResponseTimeout() => _responseTimeout;
 
         private string GetTargetGrainType()
         {
@@ -111,6 +139,10 @@ namespace Orleans.Runtime
 
         private void OnCancellation(CancellationToken cancellationToken)
         {
+            lock (_transitionLock)
+            {
+                _cancellationRequested = true;
+            }
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
             if (shared.WaitForCancellationAcknowledgement)
@@ -166,6 +198,16 @@ namespace Orleans.Runtime
 
         public void OnTargetSiloFail()
         {
+            if (Message.IsRelocatableRequest)
+            {
+                if (!IsCompleted)
+                {
+                    _applicationRequestInstruments.OnHandoff("preserved");
+                }
+
+                return;
+            }
+
             if (!TryComplete())
             {
                 return;
@@ -203,6 +245,7 @@ namespace Orleans.Runtime
         {
             if (!TryComplete())
             {
+                response.Dispose();
                 return;
             }
 
@@ -213,9 +256,16 @@ namespace Orleans.Runtime
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
+            response.Dispose();
         }
 
-        private bool TryComplete() => (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
+        private bool TryComplete()
+        {
+            lock (_transitionLock)
+            {
+                return (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
+            }
+        }
 
         private void RecordElapsedTime()
         {

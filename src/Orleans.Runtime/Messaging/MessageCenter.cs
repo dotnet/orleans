@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -10,6 +11,8 @@ using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Serialization.Invocation;
+using Orleans.Internal;
+using Orleans.Connections.Transport;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -31,6 +34,44 @@ namespace Orleans.Runtime.Messaging
         private bool stopped;
         private HostedClient? hostedClient;
         private Action<Message>? sniffIncomingMessageHandler;
+        private readonly AdmissionGate _incomingApplicationWork = new();
+        private readonly AdmissionGate _addressingWork = new();
+        private readonly AdmissionGate _outboundApplicationWork = new();
+        private int _retirementStarted;
+        private int _retirementSendFailed;
+
+        internal void BeginRetirement() => Volatile.Write(ref _retirementStarted, 1);
+
+        internal void RecordRetirementSendFailure(Message message)
+        {
+            if (Volatile.Read(ref _retirementStarted) != 0 && message.RequiresApplicationDrain)
+            {
+                Volatile.Write(ref _retirementSendFailed, 1);
+            }
+        }
+
+        internal async Task DrainRetirementAsync(CancellationToken cancellationToken)
+        {
+            await connectionManager.DrainIncomingApplicationDispatchAsync(cancellationToken);
+            if (Gateway is { } incomingGateway)
+            {
+                await incomingGateway.DrainIncomingAsync(cancellationToken);
+            }
+
+            await _incomingApplicationWork.CloseAsync().WaitAsync(cancellationToken);
+            await _addressingWork.CloseAsync().WaitAsync(cancellationToken);
+            await _outboundApplicationWork.CloseAsync().WaitAsync(cancellationToken);
+            if (Gateway is { } outgoingGateway)
+            {
+                await outgoingGateway.DrainOutboundAsync(cancellationToken);
+            }
+
+            await connectionManager.DrainAsync(cancellationToken);
+            if (Volatile.Read(ref _retirementSendFailed) != 0)
+            {
+                throw new ConnectionClosedException("Retirement disposition includes unsuccessful outbound work.");
+            }
+        }
 
         public MessageCenter(
             ILocalSiloDetails siloDetails,
@@ -143,6 +184,26 @@ namespace Orleans.Runtime.Messaging
 
         public void SendMessage(Message msg)
         {
+            var admission = msg.RequiresApplicationDrain ? _outboundApplicationWork.TryEnter() : default;
+            if (msg.RequiresApplicationDrain && !admission.Entered)
+            {
+                this.messagingTrace.OnDropBlockedApplicationMessage(msg);
+                msg.Dispose();
+                return;
+            }
+
+            try
+            {
+                SendMessageCore(msg, ref admission);
+            }
+            finally
+            {
+                admission.Dispose();
+            }
+        }
+
+        private void SendMessageCore(Message msg, ref AdmissionGate.Admission admission)
+        {
             Debug.Assert(!msg.IsLocalOnly);
 
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
@@ -242,15 +303,19 @@ namespace Orleans.Runtime.Messaging
                         }
                         else
                         {
-                            _ = SendAsync(this, connectionTask, msg);
+                            var transferredAdmission = admission;
+                            admission = default;
+                            _ = SendAsync(this, connectionTask, msg, transferredAdmission);
 
-                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg)
+                            static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg, AdmissionGate.Admission admission)
                             {
+                                using var _ = admission;
                                 try
                                 {
                                     var sender = await connectionTask;
                                     sender.Send(msg);
                                 }
+
                                 catch (Exception exception)
                                 {
                                     messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
@@ -449,7 +514,11 @@ namespace Orleans.Runtime.Messaging
         /// <param name="message"></param>
         internal void RerouteMessage(Message message)
         {
-            ResendMessageImpl(message);
+            var targetSilo = message.IsRelocatableRequest
+                && message.TargetSilo is { } hint
+                && !siloStatusOracle.IsDeadSilo(hint)
+                    ? hint : null;
+            ResendMessageImpl(message, targetSilo);
         }
 
         private bool TryForwardMessage(Message message, SiloAddress? forwardingAddress)
@@ -475,12 +544,23 @@ namespace Orleans.Runtime.Messaging
             else if (forwardingAddress != null)
             {
                 message.TargetSilo = forwardingAddress;
+                SendForwardingNotice(message);
                 SendMessage(message);
             }
             else
             {
                 message.TargetSilo = null;
-                _ = AddressAndSendMessage(message);
+                _ = AddressAndSendMessage(message, notifyForwarding: true);
+            }
+        }
+
+        private void SendForwardingNotice(Message request)
+        {
+            if (request.IsRelocatableRequest && request.TargetSilo is { } targetSilo)
+            {
+                var response = messageFactory.CreateForwardingResponse(request, targetSilo);
+                response.SendingSilo = _siloAddress;
+                SendMessage(response);
             }
         }
 
@@ -498,14 +578,27 @@ namespace Orleans.Runtime.Messaging
         /// - add ordering info and maintain send order
         ///
         /// </summary>
-        internal Task AddressAndSendMessage(Message message)
+        internal Task AddressAndSendMessage(Message message, bool notifyForwarding = false)
         {
+            var admission = message.RequiresApplicationDrain ? _addressingWork.TryEnter() : default;
+            if (message.RequiresApplicationDrain && !admission.Entered)
+            {
+                messagingTrace.OnDropBlockedApplicationMessage(message);
+                message.Dispose();
+                return Task.CompletedTask;
+            }
+
             try
             {
                 var messageAddressingTask = placementService.AddressMessage(message);
                 if (messageAddressingTask.Status != TaskStatus.RanToCompletion)
                 {
-                    return SendMessageAsync(messageAddressingTask, message);
+                    return SendMessageAsync(messageAddressingTask, message, admission);
+                }
+
+                if (notifyForwarding)
+                {
+                    SendForwardingNotice(message);
                 }
 
                 SendMessage(message);
@@ -515,10 +608,12 @@ namespace Orleans.Runtime.Messaging
                 OnAddressingFailure(message, ex);
             }
 
+            admission.Dispose();
             return Task.CompletedTask;
 
-            async Task SendMessageAsync(Task addressMessageTask, Message m)
+            async Task SendMessageAsync(Task addressMessageTask, Message m, AdmissionGate.Admission admission)
             {
+                using var _ = admission;
                 try
                 {
                     await addressMessageTask;
@@ -529,11 +624,17 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
+                if (notifyForwarding)
+                {
+                    SendForwardingNotice(m);
+                }
+
                 SendMessage(m);
             }
 
             void OnAddressingFailure(Message m, Exception ex)
             {
+                RecordRetirementSendFailure(m);
                 this.messagingTrace.OnDispatcherSelectTargetFailed(m, ex);
                 RejectMessage(m, Message.RejectionTypes.Unrecoverable, ex);
             }
@@ -555,6 +656,16 @@ namespace Orleans.Runtime.Messaging
 
         public void ReceiveMessage(Message msg)
         {
+            var applicationRequest = !msg.IsSystemMessage && msg.Direction is Message.Directions.Request or Message.Directions.OneWay;
+            using var admission = applicationRequest
+                ? _incomingApplicationWork.TryEnter() : default;
+            if (applicationRequest && !admission.Entered)
+            {
+                messagingTrace.OnDropBlockedApplicationMessage(msg);
+                msg.Dispose();
+                return;
+            }
+
             Debug.Assert(!msg.IsLocalOnly);
             try
             {
@@ -631,6 +742,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason, Exception? exception = null)
         {
+            RecordRetirementSendFailure(msg);
             try
             {
                 _messagingInstruments.OnRejectedMessage(msg);

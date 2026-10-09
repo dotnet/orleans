@@ -49,7 +49,7 @@ namespace Orleans.Runtime
             return new CorrelationId(unchecked((long)id));
         }
 
-        public Message CreateResponseMessage(Message request)
+        public Message CreateResponseMessage(Message request, bool includeRequestContext = true)
         {
             var response = new Message
             {
@@ -63,7 +63,7 @@ namespace Orleans.Runtime
                 SendingSilo = request.TargetSilo,
                 SendingGrain = request.TargetGrain,
                 CacheInvalidationHeader = request.CacheInvalidationHeader,
-                RequestContextData = RequestContextExtensions.Export(_deepCopier),
+                RequestContextData = includeRequestContext ? RequestContextExtensions.Export(_deepCopier) : null,
             };
 
             response.SetTimeToLive(request);
@@ -81,6 +81,18 @@ namespace Orleans.Runtime
                 Exception = ex,
             };
             LogCreatingRejectionResponse(_logger, ex, type, info);
+            return response;
+        }
+
+        internal Message CreateForwardingResponse(Message request, SiloAddress forwardedTo)
+        {
+            var response = CreateResponseMessage(request, includeRequestContext: false);
+            response.Result = Message.ResponseTypes.Status;
+            response.BodyObject = new StatusResponse(false, false, [])
+            {
+                ForwardedTo = forwardedTo,
+                ForwardingGeneration = request.ForwardCount,
+            };
             return response;
         }
 

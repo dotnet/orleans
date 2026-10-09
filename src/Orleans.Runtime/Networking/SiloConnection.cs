@@ -57,6 +57,8 @@ namespace Orleans.Runtime.Messaging
 
         protected override MessageCenter MessageCenter => this.messageCenter;
 
+        protected override void OnApplicationWriteFailure(Message message) => messageCenter.RecordRetirementSendFailure(message);
+
         internal protected override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) =>
             MessagingMetrics.OnMessageReceive(message, totalBytes, headerBytes, ConnectionDirection, RemoteSiloAddress);
 
@@ -93,7 +95,7 @@ namespace Orleans.Runtime.Messaging
 
             // Reject application requests with targeted cache invalidation during shutdown.
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (messageCenter.IsBlockingApplicationMessages && !msg.IsSystemMessage)
+            if (messageCenter.IsBlockingApplicationMessages && !msg.IsSystemMessage && msg.Direction != Message.Directions.Response)
             {
                 if (msg.Direction != Message.Directions.Request)
                 {
@@ -216,7 +218,7 @@ namespace Orleans.Runtime.Messaging
                         NodeIdentity = Constants.SiloDirectConnectionId,
                         NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
                         SiloAddress = this.LocalSiloAddress,
-                        ClusterId = this.LocalClusterId
+                        ClusterId = this.LocalClusterId,
                     });
             }
 

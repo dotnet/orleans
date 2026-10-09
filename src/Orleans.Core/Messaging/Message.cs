@@ -119,14 +119,7 @@ namespace Orleans.Runtime
             _bodyObject = request;
         }
 
-        internal void ReleaseBodyBuffer()
-        {
-            if (_bodyObject is MessageReadRequest readRequest)
-            {
-                _bodyObject = null;
-                readRequest.Reset();
-            }
-        }
+        internal void ReleaseBodyBuffer() => Dispose();
 
         public void Dispose()
         {
@@ -151,6 +144,19 @@ namespace Orleans.Runtime
         public List<GrainAddressCacheUpdate>? _cacheInvalidationHeader;
 
         public PackedHeaders Headers { get => _headers; set => _headers = value; }
+
+        // Application replies to system-target callers retain application drain ownership.
+        internal bool RequiresApplicationDrain => !IsSystemMessage
+            || (Direction == Directions.Response
+                && !SendingGrain.IsDefault
+                && !SendingGrain.IsSystemTarget());
+
+        internal bool IsRelocatableRequest => Direction == Directions.Request
+            && !TargetGrain.IsDefault
+            && !TargetGrain.IsSystemTarget()
+            && !TargetGrain.IsClient()
+            && !IsSystemMessage
+            && !IsLocalOnly;
 
         [GenerateSerializer]
         public enum Directions : byte

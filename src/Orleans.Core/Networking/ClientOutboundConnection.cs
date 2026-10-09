@@ -72,7 +72,7 @@ namespace Orleans.Runtime.Messaging
                         NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
                         NodeIdentity = this.messageCenter.ClientId.GrainId,
                         SiloAddress = null,
-                        ClusterId = myClusterId
+                        ClusterId = myClusterId,
                     });
 
                 var preamble = await connectionPreambleHelper.Read(this.Context);
@@ -106,12 +106,15 @@ namespace Orleans.Runtime.Messaging
             if (!this.IsValid)
             {
                 // Recycle the message we've dequeued. Note that this will recycle messages that were queued up to be sent when the gateway connection is declared dead
-                msg.TargetSilo = null;
+                if (!msg.IsRelocatableRequest)
+                {
+                    msg.TargetSilo = null;
+                }
                 this.messageCenter.SendMessage(msg);
                 return false;
             }
 
-            if (msg.TargetSilo != null) return true;
+            if (msg.TargetSilo != null || msg.IsRelocatableRequest) return true;
 
             msg.TargetSilo = this.RemoteSiloAddress;
 
@@ -121,7 +124,6 @@ namespace Orleans.Runtime.Messaging
         protected override void RetryMessage(Message msg, Exception? ex = null)
         {
             if (msg == null) return;
-
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 ++msg.RetryCount;

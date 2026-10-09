@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Deliberate released-version test matrix exception: this assembly is shared
+         verbatim by package peers and current hosts, including its generated code. -->
+    <PackageReference Include="Microsoft.Orleans.Sdk" VersionOverride="10.3.1" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

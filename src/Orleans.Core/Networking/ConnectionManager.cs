@@ -54,6 +54,14 @@ namespace Orleans.Runtime.Messaging
 
         public List<SiloAddress> GetConnectedAddresses() => connections.Select(i => i.Key).ToList();
 
+        internal Task DrainAsync(CancellationToken cancellationToken)
+            => Task.WhenAll(connections.Values.SelectMany(entry => entry.Connections)
+                .Distinct().Select(connection => connection.DrainAsync())).WaitAsync(cancellationToken);
+
+        internal Task DrainIncomingApplicationDispatchAsync(CancellationToken cancellationToken)
+            => Task.WhenAll(connections.Values.SelectMany(entry => entry.Connections)
+                .Distinct().Select(connection => connection.DrainIncomingApplicationDispatchAsync())).WaitAsync(cancellationToken);
+
         public ValueTask<Connection> GetConnection(SiloAddress endpoint)
         {
             if (this.connections.TryGetValue(endpoint, out var entry) && entry.NextConnection() is { } connection)

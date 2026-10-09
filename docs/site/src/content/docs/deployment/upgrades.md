@@ -47,6 +47,16 @@ Replace a bounded number of silos at a time. Pause when error rate, latency, mem
 
 Orleans grain versioning can route calls among compatible grain implementations, but it doesn't make arbitrary application or storage changes compatible. See [Deploy new versions of grains](../grains/grain-versioning/deploying-new-versions-of-grains.md) and [Backward compatibility guidelines](../grains/grain-versioning/backward-compatibility-guidelines.md).
 
+### Invocation retirement compatibility
+
+Retiring receivers forward waiting requests using the established message protocol. Upgraded callers preserve the original callback across physical-target death, so a forwarded invocation can complete from its replacement activation within the original response deadline.
+
+Forwarding status extends the existing diagnostic-status body with optional destination and forwarding-generation fields. Upgraded callers use those fields for target tracking and outside-client location hints. Released peers read the existing diagnostic fields, and legacy relays can omit the new hints when they deserialize and reserialize a status. Callback preservation and receiver-owned forwarding provide invocation continuity through those relays. One-way requests, silo-bound system targets, migrations, and duplicate-activation recovery retain their established routing paths.
+
+Upgrade hosted and grain callers before retiring their targets when invocation continuity is required. Hosted callers running Orleans 10.3.1 or 10.4.0 retain their released behavior: their physical-target death sweep can complete a forwarded call with a silo-unavailable error. Upgraded callers preserve that callback when a released receiver forwards the request. Released outside clients can await the legacy forwarding outcome through a stable gateway.
+
+Qualify rolling upgrades with queued calls, cancellation, held replacement execution, membership views which jump directly to dead, and shutdown-budget expiration. Measure both successful handoffs and the longer failure latency of genuinely lost relocatable calls, which now remain bounded by their original response timeout.
+
 ### Uniform silo hash API compatibility
 
 <xref:Orleans.Runtime.SiloAddress.GetUniformHashCodes*> returns an <xref:System.Collections.Immutable.ImmutableArray`1> which shares the silo's cached hash storage. Rebuild callers compiled against the earlier `uint[]` return type. Use `ToArray()` when a mutable buffer is needed, or `Sort()` to obtain a sorted immutable result while preserving the cached values.

@@ -1,13 +1,16 @@
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Linq;
 using System.Reflection;
 using System.Net;
 using System.Net.Sockets;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
+using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -26,6 +29,8 @@ using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Session;
+using Orleans.Serialization.Invocation;
+using Microsoft.Extensions.Time.Testing;
 using TestExtensions;
 using Xunit;
 using SslApplicationProtocol = System.Net.Security.SslApplicationProtocol;
@@ -40,6 +45,198 @@ namespace Orleans.Core.Tests.Networking;
 [TestCategory("BVT")]
 public class MessageTransportLifecycleTests
 {
+    [Fact]
+    public void ForwardingResponse_TypedRouteSurvivesWireAndPreservesIdentityAndDeadline()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        using var serializer = services.GetRequiredService<MessageSerializer>();
+        var request = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(123),
+            TargetGrain = GrainId.Create("test", "retired"),
+            SendingGrain = GrainId.Create("test", "caller"),
+            SendingSilo = SiloAddress.New(IPAddress.Loopback, 30000, 1),
+            TargetSilo = SiloAddress.New(IPAddress.Loopback, 30001, 1),
+            TimeToLive = TimeSpan.FromMinutes(1),
+            ForwardCount = 4,
+            RequestContextData = new() { ["application-context"] = "must not leak" },
+        };
+        var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        var expiry = request._timeToExpiry.GetRawTimestamp();
+        var response = shared.MessageFactory.CreateForwardingResponse(request, destination);
+        Assert.Equal(expiry, response._timeToExpiry.GetRawTimestamp());
+        Assert.Null(response.RequestContextData);
+        var remaining = response.TimeToLive;
+        using var buffer = new ArcBufferWriter();
+        var (headerLength, bodyLength) = serializer.Write(buffer, response);
+        var read = new MessageReadRequest(shared);
+        read.Headers = buffer.ConsumeSlice(headerLength);
+        read.Body = buffer.ConsumeSlice(bodyLength);
+        serializer.ReadHeaders(read, out var decoded);
+        serializer.ReadBodyObject(decoded, read);
+        var status = Assert.IsType<StatusResponse>(decoded.BodyObject);
+        Assert.True(status.IsRouteUpdate);
+        Assert.Equal(destination, status.ForwardedTo);
+        Assert.Equal(4, status.ForwardingGeneration);
+        Assert.False(status.IsExecuting);
+        Assert.False(status.IsWaiting);
+        Assert.Equal(request.Id, decoded.Id);
+        Assert.Equal(request.SendingGrain, decoded.TargetGrain);
+        Assert.Equal(request.TargetGrain, decoded.SendingGrain);
+        Assert.Equal(request.SendingSilo, decoded.TargetSilo);
+        Assert.Equal(request.TargetSilo, decoded.SendingSilo);
+        Assert.Equal(Message.Directions.Response, decoded.Direction);
+        Assert.Equal(Message.ResponseTypes.Status, decoded.Result);
+        Assert.Null(decoded.RequestContextData);
+        Assert.True(decoded.TimeToLive <= remaining);
+        Assert.True(decoded.TimeToLive > TimeSpan.Zero);
+        read.Reset();
+        decoded.Dispose();
+        request.Dispose();
+        response.Dispose();
+    }
+
+    [Fact]
+    public void ConnectionPreamble_PreservesLegacyPeerFieldsWithoutCapabilityNegotiation()
+    {
+        using var services = CreateServiceProvider();
+        var current = services.GetRequiredService<Serializer<ConnectionPreamble>>();
+        var legacy = services.GetRequiredService<Serializer<LegacyConnectionPreamble>>();
+        var address = SiloAddress.New(IPAddress.Loopback, 30000, 1);
+        var oldPreamble = new LegacyConnectionPreamble
+        {
+            SiloAddress = address,
+            ClusterId = "cluster",
+            NodeIdentity = GrainId.Create("test", "silo"),
+        };
+        var decodedCurrent = current.Deserialize(legacy.SerializeToArray(oldPreamble));
+        Assert.NotNull(decodedCurrent);
+        Assert.Equal(address, decodedCurrent.SiloAddress);
+        Assert.Equal(oldPreamble.NodeIdentity, decodedCurrent.NodeIdentity);
+        var newPreamble = new ConnectionPreamble
+        {
+            SiloAddress = address,
+            ClusterId = "cluster",
+            NodeIdentity = oldPreamble.NodeIdentity,
+        };
+        var decodedLegacy = legacy.Deserialize(current.SerializeToArray(newPreamble));
+        Assert.NotNull(decodedLegacy);
+        Assert.Equal(address, decodedLegacy.SiloAddress);
+        Assert.Equal("cluster", decodedLegacy.ClusterId);
+        Assert.Equal(oldPreamble.NodeIdentity, decodedLegacy.NodeIdentity);
+        var roundTrip = current.Deserialize(current.SerializeToArray(newPreamble));
+        Assert.NotNull(roundTrip);
+        Assert.Equal(address, roundTrip.SiloAddress);
+        Assert.Equal(oldPreamble.NodeIdentity, roundTrip.NodeIdentity);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(255)]
+    public void ForwardingStatus_IsAdditiveAndLegacyPeersMayDropAdvisoryRoute(int generation)
+    {
+        using var services = CreateServiceProvider();
+        var current = services.GetRequiredService<Serializer<StatusResponse>>();
+        var legacy = services.GetRequiredService<Serializer<LegacyStatusResponse>>();
+        var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        var status = new StatusResponse(false, true, ["waiting diagnostic"])
+        {
+            ForwardedTo = destination,
+            ForwardingGeneration = generation,
+        };
+        var decodedLegacy = legacy.Deserialize(current.SerializeToArray(status))!;
+        Assert.Equal(2u, decodedLegacy.Flags);
+        Assert.Equal(new[] { "waiting diagnostic" }, decodedLegacy.Diagnostics);
+        var decodedModern = current.Deserialize(current.SerializeToArray(status))!;
+        Assert.Equal(destination, decodedModern.ForwardedTo);
+        Assert.Equal(generation, decodedModern.ForwardingGeneration);
+        Assert.True(decodedModern.IsRouteUpdate);
+        var legacyRelay = current.Deserialize(legacy.SerializeToArray(decodedLegacy))!;
+        Assert.Null(legacyRelay.ForwardedTo);
+        Assert.False(legacyRelay.IsRouteUpdate);
+        Assert.True(legacyRelay.IsWaiting);
+        Assert.False(legacyRelay.IsExecuting);
+        Assert.Equal(new[] { "waiting diagnostic" }, legacyRelay.Diagnostics);
+    }
+
+    [Fact]
+    public void LegacyStatus_DiagnosticsAreNotRouteUpdates()
+    {
+        using var services = CreateServiceProvider();
+        var current = services.GetRequiredService<Serializer<StatusResponse>>();
+        var legacy = services.GetRequiredService<Serializer<LegacyStatusResponse>>();
+        var original = new StatusResponse(true, false, ["executing diagnostic"]);
+        var decoded = current.Deserialize(legacy.SerializeToArray(new LegacyStatusResponse
+        {
+            Flags = 1,
+            Diagnostics = original.Diagnostics,
+        }))!;
+        Assert.True(decoded.IsExecuting);
+        Assert.False(decoded.IsWaiting);
+        Assert.False(decoded.IsRouteUpdate);
+        Assert.Null(decoded.ForwardedTo);
+        Assert.Equal(new[] { "executing diagnostic" }, decoded.Diagnostics);
+    }
+
+    [Fact]
+    public void RejectionResponse_PreservesOriginalThreeFieldWireSchema()
+    {
+        var fieldIds = typeof(RejectionResponse).GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .SelectMany(member => member.GetCustomAttributesData()
+                .Where(attribute => attribute.AttributeType == typeof(IdAttribute))
+                .Select(attribute => Convert.ToUInt32(attribute.ConstructorArguments[0].Value)))
+            .OrderBy(id => id);
+        Assert.Equal(new uint[] { 0, 1, 2 }, fieldIds);
+        using var services = CreateServiceProvider();
+        var current = services.GetRequiredService<Serializer<RejectionResponse>>();
+        var legacy = services.GetRequiredService<Serializer<LegacyRejectionResponse>>();
+        var response = new RejectionResponse
+        {
+            RejectionInfo = "accepted transport write failed",
+            RejectionType = Message.RejectionTypes.Transient,
+            Exception = new InvalidOperationException("transport sentinel"),
+        };
+        var bytes = current.SerializeToArray(response);
+        var decoded = current.Deserialize(bytes)!;
+        Assert.Equal("accepted transport write failed", decoded.RejectionInfo);
+        Assert.Equal(Message.RejectionTypes.Transient, decoded.RejectionType);
+        Assert.Equal("transport sentinel", Assert.IsType<InvalidOperationException>(decoded.Exception).Message);
+        var decodedLegacy = legacy.Deserialize(bytes)!;
+        Assert.Equal("accepted transport write failed", decodedLegacy.RejectionInfo);
+        Assert.Equal(Message.RejectionTypes.Transient, decodedLegacy.RejectionType);
+        Assert.Equal("transport sentinel", Assert.IsType<InvalidOperationException>(decodedLegacy.Exception).Message);
+        var fromLegacy = current.Deserialize(legacy.SerializeToArray(decodedLegacy))!;
+        Assert.Equal("accepted transport write failed", fromLegacy.RejectionInfo);
+        Assert.Equal(Message.RejectionTypes.Transient, fromLegacy.RejectionType);
+    }
+
+    [GenerateSerializer]
+    internal sealed class LegacyRejectionResponse
+    {
+        [Id(0)] public string RejectionInfo { get; set; } = "";
+        [Id(1)] public Message.RejectionTypes RejectionType { get; set; }
+        [Id(2)] public Exception? Exception { get; set; }
+    }
+
+    [GenerateSerializer]
+    public sealed class LegacyStatusResponse
+    {
+        [Id(0)] public uint Flags { get; set; }
+        [Id(1)] public List<string> Diagnostics { get; set; } = [];
+    }
+
+    [GenerateSerializer]
+    public sealed class LegacyConnectionPreamble
+    {
+        [Id(0)] public NetworkProtocolVersion NetworkProtocolVersion { get; init; }
+        [Id(1)] public GrainId NodeIdentity { get; init; }
+        [Id(2)] public SiloAddress? SiloAddress { get; init; }
+        [Id(3)] public string ClusterId { get; init; } = null!;
+    }
+
     [Fact]
     public void ConnectionOptions_CloseConnectionTimeout_HasCorrectDefault()
     {
@@ -257,6 +454,48 @@ public class MessageTransportLifecycleTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MessageWriteRequest_SuccessClearsBufferedAndLocalBodiesWithoutDoubleReturn(bool buffered)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        var transport = new CapturingTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        using var bodyWriter = new ArcBufferWriter();
+        var read = shared.GetReceiveMessageHandler();
+        read._originalResponseType = Message.ResponseTypes.Success;
+        bodyWriter.Write([1, 2, 3]);
+        read.Body = bodyWriter.ConsumeSlice(3);
+        typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(read, 3);
+        using var message = new Message
+        {
+            Direction = Message.Directions.Response,
+            Result = Message.ResponseTypes.Success,
+            BodyObject = buffered ? read : Response.FromResult(173),
+        };
+        if (!buffered) read.Reset();
+        var write = shared.GetSendMessageHandler(connection);
+        write.WriteMessage(message);
+        write.CompleteWriting();
+        Assert.NotNull(message._bodyObject);
+        Assert.True(write.Length > Message.LENGTH_HEADER_SIZE);
+        write.SetResult();
+        Assert.Null(message._bodyObject);
+        Assert.Equal(0, read.BodyLength);
+        Assert.Equal(0, read.Body.Length);
+        Assert.Equal(1, connection.SentMessageCount);
+        var first = shared.GetReceiveMessageHandler();
+        Assert.Same(read, first);
+        message.ReleaseBodyBuffer();
+        message.Dispose();
+        var second = shared.GetReceiveMessageHandler();
+        Assert.NotSame(first, second);
+        first.Reset();
+        second.Reset();
+    }
+
+    [Theory]
     [InlineData((int)Message.Directions.Request, (int)Message.ResponseTypes.None)]
     [InlineData((int)Message.Directions.Response, (int)Message.ResponseTypes.Success)]
     public void Message_FormattingFailure_PreservesLazyBodyAndResponseType(int directionValue, int responseTypeValue)
@@ -405,11 +644,379 @@ public class MessageTransportLifecycleTests
     }
 
     [Theory]
+    [InlineData("ordinary")]
+    [InlineData("grain-response")]
+    [InlineData("client-response")]
+    public async Task RetirementDrain_WaitsForQueuedSerializationAndAcceptedWriteCompletion(string traffic)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CancelableTransport();
+        using var connection = new BlockingSendConnection(transport, CreateConnectionCommon(services, shared),
+            shared.MessageCenter, TestContext.Current.CancellationToken);
+        var silo = SiloAddress.New(IPAddress.Loopback, 30000, 1);
+        using var message = new Message
+        {
+            Direction = traffic == "ordinary" ? Message.Directions.Request : Message.Directions.Response,
+            BodyObject = "retirement",
+            IsSystemMessage = traffic != "ordinary",
+            SendingGrain = traffic == "client-response" ? GrainId.Create("sys.client", "observer") : GrainId.Create("test", "origin"),
+            TargetGrain = traffic == "ordinary" ? GrainId.Create("test", "target")
+                : SystemTargetGrainId.Create(GrainType.Create("sys.svc.boundary"), silo).GrainId,
+        };
+        Assert.True(message.RequiresApplicationDrain);
+        if (traffic != "ordinary") Assert.True(message.TargetGrain.IsSystemTarget());
+        connection.Send(message);
+        await connection.PrepareEntered.WaitAsync(TestContext.Current.CancellationToken);
+        var drain = connection.DrainAsync();
+        Assert.False(drain.IsCompleted);
+        connection.ReleaseSend();
+        await transport.WriteStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.False(drain.IsCompleted);
+        transport.CompleteWrite();
+        await drain.WaitAsync(TestContext.Current.CancellationToken);
+        using var late = new Message
+        {
+            Direction = message.Direction,
+            IsSystemMessage = message.IsSystemMessage,
+            SendingGrain = message.SendingGrain,
+            TargetGrain = message.TargetGrain,
+            BodyObject = "late",
+        };
+        connection.Send(late);
+        Assert.Null(late.BodyObject);
+        Assert.Equal(1, transport.WriteCount);
+    }
+
+    [Fact]
+    public async Task RetirementDrain_FailedAcceptedGrainWriteDoesNotReplayOrReject()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CancelableTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        using var message = new Message
+        {
+            Direction = Message.Directions.Request,
+            TargetGrain = GrainId.Create("test", "target"),
+            BodyObject = "retirement",
+        };
+        Assert.True(message.IsRelocatableRequest);
+        connection.Send(message);
+        await transport.WriteStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+        var drain = connection.DrainAsync();
+        Assert.False(drain.IsCompleted);
+        await transport.CloseAsync(new ConnectionClosedException(), TestContext.Current.CancellationToken);
+        await Assert.ThrowsAsync<ConnectionClosedException>(() => drain);
+        Assert.Equal(0, connection.SentMessageCount);
+        Assert.False(connection.Retries.Reader.TryRead(out _));
+        shared.MessageCenter.DidNotReceive().DispatchLocalMessage(Arg.Any<Message>());
+        Assert.Null(message.BodyObject);
+        Assert.Equal(0, message.RetryCount);
+        Assert.Equal(1, transport.WriteCount);
+    }
+
+    [Theory]
+    [InlineData((int)Message.Directions.Response, "grain", true, true)]
+    [InlineData((int)Message.Directions.Response, "client", true, true)]
+    [InlineData((int)Message.Directions.Response, "system", true, false)]
+    [InlineData((int)Message.Directions.Response, "default", true, false)]
+    [InlineData((int)Message.Directions.Request, "grain", true, false)]
+    [InlineData((int)Message.Directions.OneWay, "client", true, false)]
+    [InlineData((int)Message.Directions.Response, "system", false, true)]
+    [InlineData((int)Message.Directions.Request, "default", false, true)]
+    public void Message_ApplicationDrainClassificationUsesResponseOrigin(
+        int direction, string origin, bool systemMessage, bool expected)
+    {
+        var silo = SiloAddress.New(IPAddress.Loopback, 30000, 1);
+        using var message = new Message
+        {
+            Direction = (Message.Directions)direction,
+            IsSystemMessage = systemMessage,
+            SendingGrain = origin switch
+            {
+                "grain" => GrainId.Create("test", "origin"),
+                "client" => GrainId.Create("sys.client", "observer"),
+                "system" => SystemTargetGrainId.Create(GrainType.Create("sys.svc.boundary"), silo).GrainId,
+                _ => default,
+            },
+            TargetGrain = SystemTargetGrainId.Create(GrainType.Create("sys.svc.boundary"), silo).GrainId,
+        };
+        Assert.True(message.TargetGrain.IsSystemTarget());
+        Assert.Equal(origin == "client", message.SendingGrain.IsClient());
+        Assert.Equal(origin == "system", message.SendingGrain.IsSystemTarget());
+        Assert.Equal(expected, message.RequiresApplicationDrain);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task MessageWriteRequest_AcceptedGrainFailurePreservesCallbackAndReleasesBodyOnce(
+        bool buffered, bool expireDeadline)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        using var failed = new MetricCollector<int>(services.GetRequiredService<IMeterFactory>(), "Microsoft.Orleans", InstrumentNames.MESSAGING_SENT_FAILED);
+        await using var transport = new CancelableTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        var clock = new FakeTimeProvider();
+        var completion = new BoundaryCompletionSource();
+        var unregisters = 0;
+        using var message = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(173),
+            SendingGrain = GrainId.Create("test", "caller"),
+            TargetGrain = GrainId.Create("test", "target"),
+            TargetSilo = SiloAddress.New(IPAddress.Loopback, 30000, 1),
+            BodyObject = new Tester.CallbackDataTests.CancellableTestInvokable(),
+            TimeToLive = TimeSpan.FromSeconds(7),
+        };
+        var callback = new CallbackData(new SharedCallbackData(_ => unregisters++, NullLogger<CallbackData>.Instance,
+            clock, TimeSpan.FromMinutes(1), false, false, null), completion, message,
+            new ApplicationRequestInstruments(services.GetRequiredService<OrleansInstruments>()));
+        var expiry = message._timeToExpiry.GetRawTimestamp();
+        MessageReadRequest? read = null;
+        using var encoded = new ArcBufferWriter();
+        if (buffered)
+        {
+            using var serializer = services.GetRequiredService<MessageSerializer>();
+            var (headerLength, bodyLength) = serializer.Write(encoded, message);
+            using var headers = encoded.ConsumeSlice(headerLength);
+            read = shared.GetReceiveMessageHandler();
+            read.Body = encoded.ConsumeSlice(bodyLength);
+            typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(read, bodyLength);
+            message.SetMessageReadRequest(read);
+        }
+        var write = shared.GetSendMessageHandler(connection);
+        write.WriteMessage(message);
+        write.CompleteWriting();
+        Assert.True(transport.EnqueueWrite(write));
+        Assert.Same(message, write.GetMessage(0));
+        await transport.CloseAsync(new ConnectionClosedException(), TestContext.Current.CancellationToken);
+        // Failure preceded the local drain: it must not poison a later connection drain.
+        await connection.DrainAsync().WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Same(message, callback.Message);
+        Assert.False(callback.IsCompleted);
+        Assert.Null(completion.Response);
+        Assert.Equal(0, unregisters);
+        Assert.Null(message._bodyObject);
+        Assert.Equal(expiry, message._timeToExpiry.GetRawTimestamp());
+        Assert.Equal(new CorrelationId(173), message.Id);
+        Assert.Equal(GrainId.Create("test", "caller"), message.SendingGrain);
+        Assert.Equal(GrainId.Create("test", "target"), message.TargetGrain);
+        Assert.Equal(0, message.RetryCount);
+        Assert.False(connection.Retries.Reader.TryRead(out _));
+        shared.MessageCenter.DidNotReceive().DispatchLocalMessage(Arg.Any<Message>());
+        Assert.Equal(1, Assert.Single(failed.GetMeasurementSnapshot()).Value);
+        if (read is not null)
+        {
+            Assert.Equal(0, read.BodyLength);
+            Assert.Equal(0, read.Body.Length);
+            var first = shared.GetReceiveMessageHandler();
+            Assert.Same(read, first);
+            message.Dispose();
+            var second = shared.GetReceiveMessageHandler();
+            Assert.NotSame(first, second);
+            first.Reset();
+            second.Reset();
+        }
+        if (expireDeadline)
+        {
+            clock.Advance(TimeSpan.FromSeconds(7));
+            Assert.False(callback.IsExpired(clock.GetTimestamp()));
+            clock.Advance(TimeSpan.FromTicks(1));
+            Assert.True(callback.IsExpired(clock.GetTimestamp()));
+            callback.OnTimeout();
+            Assert.Contains("Response did not arrive on time", Assert.IsType<TimeoutException>(completion.Response!.Exception).Message);
+        }
+        else
+        {
+            callback.DoCallback(new Message { BodyObject = Response.FromResult(174) });
+            Assert.Equal(174, completion.Response!.GetResult<int>());
+        }
+        Assert.True(callback.IsCompleted);
+        Assert.Equal(1, completion.CompletionCount);
+        // Real responses are unregistered by the runtime before DoCallback; timeout
+        // unregisters from CallbackData itself.
+        Assert.Equal(expireDeadline ? 1 : 0, unregisters);
+        Assert.Equal(1, transport.WriteCount);
+    }
+
+    [Theory]
+    [InlineData("response")]
+    [InlineData("system")]
+    [InlineData("pinned")]
+    public async Task MessageWriteRequest_AcceptedNonrelocatableFailurePreservesReroute(string traffic)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CancelableTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        using var message = new Message
+        {
+            Direction = traffic == "response" ? Message.Directions.Response : Message.Directions.Request,
+            TargetGrain = GrainId.Create("test", "target"),
+            IsSystemMessage = traffic == "system",
+            IsLocalOnly = traffic == "pinned",
+            BodyObject = "nonrelocatable",
+        };
+        Assert.False(message.IsRelocatableRequest);
+        var write = shared.GetSendMessageHandler(connection);
+        write.WriteMessage(message);
+        write.CompleteWriting();
+        Assert.True(transport.EnqueueWrite(write));
+        var error = new ConnectionClosedException();
+        await transport.CloseAsync(error, TestContext.Current.CancellationToken);
+        var retry = await connection.Retries.Reader.ReadAsync(TestContext.Current.CancellationToken);
+        await connection.DrainAsync().WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Same(message, retry.Message);
+        Assert.Same(error, retry.Error);
+        Assert.Equal("nonrelocatable", message.BodyObject);
+        Assert.False(connection.Retries.Reader.TryRead(out _));
+        Assert.Equal(1, transport.WriteCount);
+        Assert.Equal(0, connection.SentMessageCount);
+    }
+
+    [Fact]
+    public async Task RetirementDrain_WaitsForDecodedRequestsAcrossConnections()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        using var serializer = services.GetRequiredService<MessageSerializer>();
+        await using var firstTransport = new CancelableTransport();
+        await using var secondTransport = new CancelableTransport();
+        using var first = new BlockingReceiveConnection(firstTransport, CreateConnectionCommon(services, shared),
+            shared.MessageCenter, TestContext.Current.CancellationToken);
+        using var second = new BlockingReceiveConnection(secondTransport, CreateConnectionCommon(services, shared),
+            shared.MessageCenter, TestContext.Current.CancellationToken);
+        ReadFrame(first, new CorrelationId(123));
+        ReadFrame(second, new CorrelationId(456));
+        await Task.WhenAll(first.Decoded, second.Decoded).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var drain = Task.WhenAll(first.DrainIncomingApplicationDispatchAsync(), second.DrainIncomingApplicationDispatchAsync());
+        Assert.False(drain.IsCompleted);
+        first.Release();
+        Assert.False(drain.IsCompleted);
+        second.Release();
+        await drain.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal(new CorrelationId(123), first.ReceivedId);
+        Assert.Equal(new CorrelationId(456), second.ReceivedId);
+        Assert.Equal(1, first.DispatchCount);
+        Assert.Equal(1, second.DispatchCount);
+        await Task.WhenAll(first.CloseAsync(null), second.CloseAsync(null)).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        void ReadFrame(Connection connection, CorrelationId id)
+        {
+            using var frame = new ArcBufferWriter();
+            frame.AdvanceWriter(Message.LENGTH_HEADER_SIZE);
+            using var message = new Message
+            {
+                Direction = Message.Directions.Request,
+                TargetGrain = GrainId.Create("test", "target"),
+                Id = id,
+                BodyObject = "payload",
+            };
+            var (headerLength, bodyLength) = serializer.Write(frame, message);
+            Span<byte> framing = stackalloc byte[Message.LENGTH_HEADER_SIZE];
+            BinaryPrimitives.WriteInt32LittleEndian(framing, headerLength);
+            BinaryPrimitives.WriteInt32LittleEndian(framing[sizeof(int)..], bodyLength);
+            frame.WriteAt(0, framing);
+            var read = shared.GetReceiveMessageHandler();
+            read.SetConnection(connection);
+            Assert.True(read.OnRead(new ArcBufferReader(frame)));
+        }
+    }
+
+    [Fact]
+    public async Task RetirementDrain_WaitsForQueuedRerouteProducer()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CancelableTransport();
+        using var connection = new BlockingRerouteConnection(transport, CreateConnectionCommon(services, shared),
+            shared.MessageCenter, TestContext.Current.CancellationToken);
+        using var message = new Message { BodyObject = "pending disposition" };
+        connection.RerouteMessage(message);
+        await connection.Entered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var drain = connection.DrainAsync();
+        Assert.False(drain.IsCompleted);
+        connection.Release();
+        await drain.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Null(message.BodyObject);
+        Assert.Equal(1, connection.RerouteCount);
+    }
+
+    [Fact]
+    public async Task RetirementDrain_PreservesSystemTrafficAfterApplicationSeal()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CapturingTransport();
+        var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        await connection.DrainAsync();
+        var silo = SiloAddress.New(IPAddress.Loopback, 30000, 1);
+        using var message = new Message
+        {
+            Direction = Message.Directions.Response,
+            IsSystemMessage = true,
+            SendingGrain = SystemTargetGrainId.Create(Constants.CatalogType, silo).GrainId,
+            TargetGrain = SystemTargetGrainId.Create(Constants.CatalogType, silo).GrainId,
+            BodyObject = "membership",
+        };
+        Assert.False(message.RequiresApplicationDrain);
+        connection.Send(message);
+        var bytes = await transport.Writes.Reader.ReadAsync(TestContext.Current.CancellationToken);
+        Assert.True(bytes.Length > Message.LENGTH_HEADER_SIZE);
+        Assert.Equal(1, connection.SentMessageCount);
+        Assert.Null(message.BodyObject);
+    }
+
+    [Fact]
+    public async Task UnacceptedWriteRetryPreservesOriginalRequestAndDeadline()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var rejectedTransport = new RejectingWriteTransport();
+        await using var replacementTransport = new CapturingTransport();
+        using var replacement = new SignalingSendConnection(replacementTransport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        using var source = new HeldRetryConnection(rejectedTransport, CreateConnectionCommon(services, shared),
+            shared.MessageCenter, replacement, TestContext.Current.CancellationToken);
+        using var message = new Message
+        {
+            Direction = Message.Directions.Request,
+            SendingGrain = GrainId.Create("test", "caller"),
+            TargetGrain = GrainId.Create("test", "target"),
+            TargetSilo = SiloAddress.New(IPAddress.Loopback, 30000, 1),
+            Id = new CorrelationId(123),
+            BodyObject = "original payload",
+            TimeToLive = TimeSpan.FromMinutes(1),
+        };
+        var expiry = message._timeToExpiry.GetRawTimestamp();
+        source.Send(message);
+        await source.RetryEntered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal("original payload", message.BodyObject);
+        source.Release();
+        await replacement.PrepareEntered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var bytes = await replacementTransport.Writes.Reader.ReadAsync(TestContext.Current.CancellationToken);
+        await replacement.DrainAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.True(bytes.Length > Message.LENGTH_HEADER_SIZE);
+        Assert.Equal(new CorrelationId(123), message.Id);
+        Assert.Equal(GrainId.Create("test", "target"), message.TargetGrain);
+        Assert.Equal(expiry, message._timeToExpiry.GetRawTimestamp());
+        Assert.Equal(0, message.ForwardCount);
+        Assert.Equal(1, rejectedTransport.Attempts);
+        Assert.Null(message.BodyObject);
+        await source.CloseAsync(null).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+    }
+
+    [Theory]
     [InlineData(nameof(ConnectionClosedException), LogLevel.Information)]
     [InlineData(nameof(ConnectionAbortedException), LogLevel.Error)]
     [InlineData(nameof(OperationCanceledException), LogLevel.Error)]
     [InlineData(nameof(InvalidOperationException), LogLevel.Error)]
-    public async Task MessageWriteRequest_TransportCloseReroutesPendingMessages(string exceptionType, LogLevel expectedLogLevel)
+    public async Task MessageWriteRequest_TransportCloseDropsAcceptedGrainRequestAndReroutesResponse(string exceptionType, LogLevel expectedLogLevel)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var serviceProvider = CreateServiceProvider();
@@ -420,7 +1027,7 @@ public class MessageTransportLifecycleTests
         using var shared = CreateMessageHandlerShared(serviceProvider, loggerFactory);
         await using var transport = new CancelableTransport();
         var connection = new RetryTrackingConnection(transport, CreateConnectionCommon(serviceProvider, shared), shared.MessageCenter);
-        using var first = new Message { Direction = Message.Directions.Request, BodyObject = new byte[] { 1 } };
+        using var first = new Message { Direction = Message.Directions.Request, TargetGrain = GrainId.Create("test", "target"), BodyObject = new byte[] { 1 } };
         using var second = new Message { Direction = Message.Directions.Response, BodyObject = new byte[] { 2 } };
         var request = shared.GetSendMessageHandler(connection);
         request.WriteMessage(first);
@@ -438,20 +1045,16 @@ public class MessageTransportLifecycleTests
 
         await transport.CloseAsync(error, cancellationToken);
 
-        var retries = new[]
-        {
-            await connection.Retries.Reader.ReadAsync(cancellationToken),
-            await connection.Retries.Reader.ReadAsync(cancellationToken)
-        };
-        foreach (var message in new[] { first, second })
-        {
-            var retried = Assert.Single(retries, retry => ReferenceEquals(message, retry.Message));
-            Assert.Same(error, retried.Error);
-        }
+        var retried = await connection.Retries.Reader.ReadAsync(cancellationToken);
+        Assert.Same(second, retried.Message);
+        Assert.Same(error, retried.Error);
+        // Drain the queued reroute producer before asserting there was no request replay.
+        await connection.DrainAsync().WaitAsync(cancellationToken);
 
         Assert.False(connection.Retries.Reader.TryRead(out _));
         Assert.Equal(0, connection.SentMessageCount);
-        Assert.Equal(new byte[] { 1 }, Assert.IsType<byte[]>(first.BodyObject));
+        Assert.Null(first.BodyObject);
+        shared.MessageCenter.DidNotReceive().DispatchLocalMessage(Arg.Any<Message>());
         Assert.Equal(new byte[] { 2 }, Assert.IsType<byte[]>(second.BodyObject));
         var reused = shared.GetSendMessageHandler();
         Assert.Same(request, reused);
@@ -988,6 +1591,122 @@ public class MessageTransportLifecycleTests
         public void Dispose() => _releaseSend.Dispose();
     }
 
+    private sealed class BlockingReceiveConnection(
+        MessageTransport transport,
+        ConnectionCommon shared,
+        IMessageCenter messageCenter,
+        CancellationToken cancellationToken) : Connection(transport, shared), IDisposable
+    {
+        private readonly TaskCompletionSource _decoded = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ManualResetEventSlim _release = new();
+        public Task Decoded => _decoded.Task;
+        public CorrelationId ReceivedId { get; private set; }
+        public int DispatchCount { get; private set; }
+        public void Release() => _release.Set();
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+        protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
+        protected override IMessageCenter MessageCenter => messageCenter;
+        protected override bool PrepareMessageForSend(Message message) => true;
+        protected override void RetryMessage(Message message, Exception? exception = null) => message.Dispose();
+        protected internal override void OnReceivedMessage(Message message)
+        {
+            ReceivedId = message.Id;
+            Assert.Equal("payload", message.BodyObject);
+            _decoded.TrySetResult();
+            _release.Wait(cancellationToken);
+            DispatchCount++;
+            message.Dispose();
+        }
+        protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
+        protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
+        public void Dispose() => _release.Dispose();
+    }
+
+    private sealed class BlockingRerouteConnection(
+        MessageTransport transport,
+        ConnectionCommon shared,
+        IMessageCenter messageCenter,
+        CancellationToken cancellationToken) : Connection(transport, shared), IDisposable
+    {
+        private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ManualResetEventSlim _release = new();
+        public Task Entered => _entered.Task;
+        public int RerouteCount { get; private set; }
+        public void Release() => _release.Set();
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+        protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
+        protected override IMessageCenter MessageCenter => messageCenter;
+        protected override bool PrepareMessageForSend(Message message) => true;
+        protected override void RetryMessage(Message message, Exception? exception = null)
+        {
+            _entered.TrySetResult();
+            _release.Wait(cancellationToken);
+            RerouteCount++;
+            message.Dispose();
+        }
+        protected internal override void OnReceivedMessage(Message message) { }
+        protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
+        protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
+        public void Dispose() => _release.Dispose();
+    }
+
+    private sealed class SignalingSendConnection(MessageTransport transport, ConnectionCommon shared, IMessageCenter messageCenter)
+        : Connection(transport, shared), IDisposable
+    {
+        private readonly TaskCompletionSource _prepareEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task PrepareEntered => _prepareEntered.Task;
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+        protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
+        protected override IMessageCenter MessageCenter => messageCenter;
+        protected override bool PrepareMessageForSend(Message message) { _prepareEntered.TrySetResult(); return true; }
+        protected override void RetryMessage(Message message, Exception? exception = null) => message.Dispose();
+        protected internal override void OnReceivedMessage(Message message) { }
+        protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
+        protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
+        public void Dispose() { }
+    }
+
+    private sealed class HeldRetryConnection(MessageTransport transport, ConnectionCommon shared, IMessageCenter messageCenter,
+        Connection replacement, CancellationToken cancellationToken) : Connection(transport, shared), IDisposable
+    {
+        private readonly TaskCompletionSource _retryEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly ManualResetEventSlim _release = new();
+        public Task RetryEntered => _retryEntered.Task;
+        public void Release() => _release.Set();
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+        protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
+        protected override IMessageCenter MessageCenter => messageCenter;
+        protected override bool PrepareMessageForSend(Message message) => true;
+        protected override void RetryMessage(Message message, Exception? exception = null)
+        {
+            _retryEntered.TrySetResult();
+            _release.Wait(cancellationToken);
+            replacement.Send(message);
+        }
+        protected internal override void OnReceivedMessage(Message message) { }
+        protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
+        protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
+        public void Dispose() => _release.Dispose();
+    }
+
+    private sealed class RejectingWriteTransport : MessageTransport
+    {
+        public int Attempts { get; private set; }
+        public override CancellationToken Closed => default;
+        public override IFeatureCollection Features { get; } = new FeatureCollection();
+        public override bool EnqueueRead(ReadRequest request) => false;
+        public override bool EnqueueWrite(WriteRequest request) { Attempts++; return false; }
+        public override ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default) => default;
+    }
+
+    private sealed class BoundaryCompletionSource : IResponseCompletionSource
+    {
+        public Response? Response { get; private set; }
+        public int CompletionCount { get; private set; }
+        public void Complete(Response response) { Response = response; CompletionCount++; }
+        public void Complete() => Complete(Orleans.Serialization.Invocation.Response.Completed);
+    }
+
     private sealed class CancelableTransport(bool completeWrites = false) : MessageTransport
     {
         private readonly CancellationTokenSource _closed = new();
@@ -998,6 +1717,14 @@ public class MessageTransportLifecycleTests
         public bool CloseCalled => _closed.IsCancellationRequested;
         public TaskCompletionSource ReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource WriteStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int WriteCount { get; private set; }
+
+        public void CompleteWrite()
+        {
+            var write = Interlocked.Exchange(ref _write, null) ?? throw new InvalidOperationException("No accepted write is pending.");
+            using var bytes = write.Buffers.ConsumeSlice(write.Buffers.Length);
+            write.SetResult();
+        }
         public override CancellationToken Closed => _closed.Token;
         public override IFeatureCollection Features { get; } = new FeatureCollection();
 
@@ -1030,6 +1757,7 @@ public class MessageTransportLifecycleTests
                 _write = request;
             }
 
+            WriteCount++;
             WriteStarted.TrySetResult();
             return true;
         }
@@ -1079,6 +1807,7 @@ public class MessageTransportLifecycleTests
     private sealed class CapturingTransport : MessageTransport
     {
         public byte[]? Written { get; private set; }
+        public Channel<byte[]> Writes { get; } = Channel.CreateUnbounded<byte[]>();
         public override CancellationToken Closed => default;
         public override IFeatureCollection Features { get; } = new FeatureCollection();
         public override bool EnqueueRead(ReadRequest request) => false;
@@ -1088,6 +1817,7 @@ public class MessageTransportLifecycleTests
             Written = new byte[request.Buffers.Length];
             request.Buffers.Consume(Written);
             request.SetResult();
+            Writes.Writer.TryWrite(Written);
             return true;
         }
 

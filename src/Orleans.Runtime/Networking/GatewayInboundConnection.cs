@@ -48,6 +48,8 @@ namespace Orleans.Runtime.Messaging
 
         protected override MessageCenter MessageCenter => this.messageCenter;
 
+        protected override void OnApplicationWriteFailure(Message message) => messageCenter.RecordRetirementSendFailure(message);
+
         internal protected override void RecordMessageReceive(Message message, int totalBytes, int headerBytes)
         {
             MessagingMetrics.OnMessageReceive(message, totalBytes, headerBytes, ConnectionDirection);
@@ -62,6 +64,8 @@ namespace Orleans.Runtime.Messaging
 
         protected internal override void OnReceivedMessage(Message msg)
         {
+            this.messageCenter.SniffIncomingMessage?.Invoke(msg);
+
             // Don't process messages that have already timed out
             if (msg.IsExpired)
             {
@@ -108,7 +112,14 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetGrain = systemTargetId.WithSiloAddress(targetAddress).GrainId;
                 }
 
-                this.messageCenter.SendMessage(msg);
+                if (msg.IsRelocatableRequest)
+                {
+                    this.messageCenter.RerouteMessage(msg);
+                }
+                else
+                {
+                    this.messageCenter.SendMessage(msg);
+                }
             }
         }
 
@@ -123,7 +134,7 @@ namespace Orleans.Runtime.Messaging
                     NodeIdentity = Constants.SiloDirectConnectionId,
                     NetworkProtocolVersion = this.connectionOptions.ProtocolVersion,
                     SiloAddress = this.myAddress,
-                    ClusterId = this.myClusterId
+                    ClusterId = this.myClusterId,
                 });
 
             if (!ClientGrainId.TryParse(preamble.NodeIdentity, out var clientId))
@@ -189,7 +200,6 @@ namespace Orleans.Runtime.Messaging
         protected override void RetryMessage(Message msg, Exception? ex = null)
         {
             if (msg == null) return;
-
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 msg.RetryCount++;
