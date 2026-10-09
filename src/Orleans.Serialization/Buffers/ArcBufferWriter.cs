@@ -407,6 +407,11 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
     private void ThrowIfPinnedPages()
     {
+        if (_writePage is null)
+        {
+            throw new ObjectDisposedException(nameof(ArcBufferWriter));
+        }
+
         if (_hasPinnedPages)
         {
             throw new InvalidOperationException("A writer containing pinned pages cannot be mutated.");
@@ -1129,10 +1134,13 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
 }
 
 /// <summary>
-/// Represents a slice of a <see cref="ArcBufferWriter"/>.
+/// Represents a reference-counted slice of raw bytes from an <see cref="ArcBufferWriter"/>.
 /// </summary>
 /// <remarks>
-/// Initializes a new instance of the <see cref="ArcBuffer"/> type.
+/// An owned slice must be disposed when no longer needed. Copying this struct does not acquire another pin:
+/// such copies are borrowed views and must not be disposed independently. Use <see cref="Slice(int)"/>
+/// to obtain an independent owner. Referenced bytes must not be mutated while a slice is in use.
+/// The default value is a valid, owner-free empty buffer.
 /// </remarks>
 /// <param name="first">The first page in the sequence.</param>
 /// <param name="token">The token of the first page in the sequence.</param>
@@ -1159,6 +1167,12 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// Gets the length of this sequence.
     /// </summary>
     public readonly int Length = length;
+
+    /// <summary>Gets an empty buffer which owns no pages.</summary>
+    public static ArcBuffer Empty => default;
+
+    /// <summary>Gets whether this buffer contains no bytes.</summary>
+    public readonly bool IsEmpty => Length == 0;
 
     /// <summary>Copies the contents of this writer to a span.</summary>
     public readonly int CopyTo(Span<byte> output)
@@ -1290,7 +1304,17 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// <summary>
     /// Throws if the buffer it no longer valid.
     /// </summary>
-    private readonly void CheckValidity() => First.CheckValidity(_firstPageToken);
+    internal readonly void CheckValidity()
+    {
+        if (First is not null)
+        {
+            First.CheckValidity(_firstPageToken);
+        }
+        else if (Length != 0 || Offset != 0)
+        {
+            throw new InvalidOperationException("An owner-free buffer must be empty.");
+        }
+    }
 
     /// <summary>
     /// Creates a pinned slice from the specified offset to the end of this buffer.
@@ -1336,6 +1360,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
         Debug.Assert(offset >= 0);
         Debug.Assert(length >= 0);
         Debug.Assert(length <= Length - offset);
+        if (First is null) return Empty;
         ArcBuffer result;
 
         // Navigate to the offset page & calculate the offset into the page.
@@ -1371,6 +1396,13 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     public readonly void Pin()
     {
         CheckValidity();
+        if (First is null) return;
+        if (IsEmpty)
+        {
+            First.Pin(_firstPageToken);
+            return;
+        }
+
         var pageEnumerator = Pages.GetEnumerator();
         if (pageEnumerator.MoveNext())
         {
@@ -1390,6 +1422,15 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// </summary>
     public void Unpin()
     {
+        if (First is null) return;
+        CheckValidity();
+        if (IsEmpty)
+        {
+            First.Unpin(_firstPageToken);
+            _firstPageToken = -1;
+            return;
+        }
+
         var pageEnumerator = Pages.GetEnumerator();
         if (pageEnumerator.MoveNext())
         {
@@ -1425,7 +1466,14 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// Returns an enumerator which can be used to enumerate the pages referenced by this instance.
     /// </summary>
     /// <returns>An enumerator for the data contained in this instance.</returns>
-    internal readonly PageSegmentEnumerator PageSegments => new(this);
+    internal readonly PageSegmentEnumerator PageSegments
+    {
+        get
+        {
+            CheckValidity();
+            return new(this);
+        }
+    }
 
     /// <summary>
     /// Returns an enumerator which can be used to enumerate the span segments referenced by this instance.
@@ -1523,6 +1571,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
         /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
         public bool MoveNext()
         {
+            if (_position == 0 && (Length == 0 || _page == First)) Slice.CheckValidity();
             Debug.Assert(_position <= Length);
             if (_page is null || _position == Length)
             {

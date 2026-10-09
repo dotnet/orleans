@@ -445,6 +445,15 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             isAsync = true;
         }
 
+        if (invokable.Members.OfType<MethodParameterFieldDescription>().Any(InvokableGenerator.IsOwnedArgument))
+        {
+            return (isAsync, Block(
+                statements[0],
+                TryStatement(Block(statements.Skip(1)), SingletonList(CatchClause().WithBlock(Block(
+                    ParseStatement("request.CompleteArgumentResources();"),
+                    ThrowStatement()))), null)));
+        }
+
         return (isAsync, Block(statements));
     }
 

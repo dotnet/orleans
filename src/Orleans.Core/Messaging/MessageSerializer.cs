@@ -62,7 +62,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 // Build message
-                message = new();
+                message = new() { ArgumentResourceLogger = readRequest.Shared.ConnectionTrace };
                 var headersReader = Reader.Create(readRequest._headers, _deserializationSession);
                 DeserializeHeaders(ref headersReader, message);
                 readRequest._originalResponseType = message.Result;
@@ -109,29 +109,42 @@ namespace Orleans.Runtime.Messaging
 
         public (int HeaderLength, int BodyLength) Write(ArcBufferWriter buffer, Message message)
         {
-            var headers = message.Headers;
-            IFieldCodec? bodyCodec = null;
-            ResponseCodec? rawCodec = null;
             var bodyObject = message._bodyObject;
-            var readRequest = bodyObject as MessageReadRequest;
-            if (readRequest is not null)
+            if (message.IsDisposedWithOwnedArguments)
             {
-                headers.ResponseType = readRequest._originalResponseType;
+                throw new OperationCanceledException("The message's owned request arguments have already completed.");
             }
-            else if (bodyObject is not null)
+
+            var owner = bodyObject as IInvokableArgumentOwner;
+            if (owner is not null && !owner.TryRetainArgumentResources())
             {
-                bodyCodec = _codecProvider.GetCodec(bodyObject.GetType());
-                if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
-                {
-                    rawCodec = responseCodec;
-                    headers.ResponseType = ResponseTypes.Success; // indicates a raw simple response (not wrapped in Response<T>)
-                    // The raw encoding changes the type encoded in the field header from Response<T> to T
-                    // and does not encode a null reference value, but otherwise it's identical to normal encoding.
-                }
+                // The connection's serialization-failure path logs and rejects/drops this message.
+                // Never serialize fields which terminal completion might already have cleared.
+                throw new OperationCanceledException("The request's owned arguments have already completed.");
             }
 
             try
             {
+                var headers = message.Headers;
+                IFieldCodec? bodyCodec = null;
+                ResponseCodec? rawCodec = null;
+                var readRequest = bodyObject as MessageReadRequest;
+                if (readRequest is not null)
+                {
+                    headers.ResponseType = readRequest._originalResponseType;
+                }
+                else if (bodyObject is not null)
+                {
+                    bodyCodec = _codecProvider.GetCodec(bodyObject.GetType());
+                    if (headers.ResponseType is ResponseTypes.None && bodyCodec is ResponseCodec responseCodec)
+                    {
+                        rawCodec = responseCodec;
+                        headers.ResponseType = ResponseTypes.Success; // indicates a raw simple response (not wrapped in Response<T>)
+                        // The raw encoding changes the type encoded in the field header from Response<T> to T
+                        // and does not encode a null reference value, but otherwise it's identical to normal encoding.
+                    }
+                }
+
                 var writer = Writer.Create(buffer, _serializationSession);
                 SerializeHeaders(ref writer, message, headers);
                 writer.Commit();
@@ -162,6 +175,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 _serializationSession.Reset();
+                InvokableArgumentResources.Release(owner, message.ArgumentResourceLogger);
             }
         }
 

@@ -21,6 +21,26 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     /// </summary>
     public static class OrleansGeneratedCodeHelper
     {
+        /// <summary>
+        /// Disposes an owned RPC argument and clears its request field.
+        /// </summary>
+        /// <typeparam name="TArgument">The disposable argument type.</typeparam>
+        /// <param name="argument">The independently owned copied or decoded argument.</param>
+        public static void DisposeOwnedArgument<TArgument>(ref TArgument argument) where TArgument : IDisposable
+        {
+            try
+            {
+                if (argument is not null)
+                {
+                    argument.Dispose();
+                }
+            }
+            finally
+            {
+                argument = default!;
+            }
+        }
+
         private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
 
         internal static void EnterServiceResolution(ICodecProvider provider, CodecProvider.ConstructionScope scope)
