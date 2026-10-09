@@ -184,9 +184,9 @@ commits the envelope together with its ownership generation and exact returned j
 handle. Admission counts acknowledged pending work in constant time from inbox and
 provisional-acceptance counts. Recovery restores that pair and repairs an absent owner
 for pending work. Callbacks validate generation and physical job identity before
-processing. Delivery requires a nonempty message ID, a nondefault sender, and a nonnull
-valid Arc payload before duplicate lookup or admission. Empty raw payloads are valid;
-application decoding and null validation belong to the handler. Empty-owner clearing
+processing. Delivery validates the application key, sender, receiver, and subject
+before duplicate lookup or admission. Empty raw payloads are valid;
+application decoding belongs to the handler. Empty-owner clearing
 shares the inbox admission gate with delivery, so direct interleaved delivery proceeds
 after the clear's durable outcome.
 
@@ -276,8 +276,8 @@ changed values at capture. `Count`, `Messages`, and `TryGetMessage` include stag
 acknowledged messages once per ID. Depth accounting uses dictionary counts in constant
 time. Intents remain delivery-fenced until their exact captured cohort is acknowledged.
 Equivalent enqueues preserve their original enqueue time and commit status. Direct
-envelopes require a nonempty message ID, owning sender, nondefault receiver, and nonnull
-valid Arc payload before admission. Raw empty bytes are valid; the application decides
+envelopes require a nondefault application key, owning sender, nondefault receiver, and
+nonempty bounded subject before admission. Raw empty bytes are valid; the application decides
 what payload encoding and content are meaningful.
 
 The outbox uses six standard durable collections resolved by their existing keyed

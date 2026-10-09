@@ -245,10 +245,10 @@ public sealed class HandlerRoutingContractTests
         Assert.False(parameters[1].IsOptional);
     }
 
-    private static IDurableInbox CreateInbox(out IDurableDictionary<(GrainId, Guid), DurableEnvelope> storage)
+    private static IDurableInbox CreateInbox(out IDurableDictionary<HierarchicalKey, DurableEnvelope> storage)
     {
         var type = typeof(IDurableInbox).Assembly.GetType("Orleans.DurableMessaging.DurableInbox", throwOnError: true)!;
-        storage = Substitute.For<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>();
+        storage = Substitute.For<IDurableDictionary<HierarchicalKey, DurableEnvelope>>();
         return Assert.IsAssignableFrom<IDurableInbox>(Activator.CreateInstance(type, storage, 1000));
     }
 
