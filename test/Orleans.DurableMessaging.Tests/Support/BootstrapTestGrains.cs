@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -81,7 +82,8 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public async Task SendValue(int value)
     {
         var context = Observation.Context;
-        using var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value);
+        using var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value,
+            HierarchicalKey.Create("bootstrap", context.GrainId.ToString(), "value", value.ToString(CultureInfo.InvariantCulture)));
         Observation.Value!.Value = value;
         Observation.Outbox!.Send(envelope);
         await Observation.Manager!.WriteStateAsync(CancellationToken.None);
@@ -89,7 +91,8 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public async Task SendSynchronousValue(int value)
     {
         var context = Observation.Context;
-        using var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value);
+        using var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value,
+            HierarchicalKey.Create("bootstrap", context.GrainId.ToString(), "value", value.ToString(CultureInfo.InvariantCulture)));
         Observation.Value!.Value = value;
         Observation.Outbox!.Send(envelope);
         await Observation.Manager!.WriteStateAsync(CancellationToken.None);
@@ -104,20 +107,21 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         return Task.CompletedTask;
     }
 
-    public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+        HandlerOverride is { } handler
+            ? handler.HandleAsync(context, cancellationToken)
+            : HandleCoreAsync(context, cancellationToken);
+
+    private async ValueTask HandleCoreAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        if (HandlerOverride is { } handler)
-        {
-            await handler.HandleAsync(context, cancellationToken);
-            return;
-        }
         if (_handlers.TryGet(Observation.Context.GrainId, Route, out var barrier))
         {
             barrier.Entered.TrySetResult();
             await barrier.Continue.Task.WaitAsync(cancellationToken);
         }
         var value = Observation.Value!.Value + 1;
-        using var outgoing = TestApplicationProtocol.Create(Observation.Context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), Observation.Context.GrainId, OutputTarget, "output", value);
+        using var outgoing = TestApplicationProtocol.Create(Observation.Context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), Observation.Context.GrainId, OutputTarget, "output", value,
+            context.Envelope.MessageId.CreateChildKey("output"));
         Observation.Value.Value = value;
         Observation.Outbox!.Send(outgoing);
         HandlerCalls++;
@@ -276,11 +280,16 @@ public sealed class BootstrapClusterFixture : DurableMessagingClusterFixture
     public const string OrdinaryPlacementAlias = "bootstrap-directory-alias";
 
     public BootstrapProbe Probe { get; } = new();
+    public BootstrapDeliveryProbe Delivery { get; } = new();
     protected override void ConfigureServices(IServiceCollection services)
     {
+        BootstrapOutboxServices.Add(services);
         services.AddKeyedSingleton<PlacementStrategy>(StatelessPlacementAlias, new StatelessWorkerAttribute(1).PlacementStrategy);
         services.AddKeyedSingleton<PlacementStrategy>(OrdinaryPlacementAlias, new RandomPlacement());
         services.AddSingleton(Probe);
+        services.AddSingleton(Delivery);
+        services.AddSingleton<ILoggerProvider>(Delivery);
+        services.AddSingleton<IOutgoingGrainCallFilter>(Delivery);
         services.AddScoped<BootstrapObservation>();
         services.AddScoped<BootstrapState>();
         var extensionType = ReceiverTestServices.GetImplementationType("DurableInboxExtension");

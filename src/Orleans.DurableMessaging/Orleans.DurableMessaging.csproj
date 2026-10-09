@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.DurableMessaging</PackageId>
     <Title>Microsoft Orleans Durable Messaging</Title>
-    <Description>Opaque durable messaging contracts and journaled inbox processing for Microsoft Orleans.</Description>
+    <Description>Opaque durable messaging contracts and journaled inbox and outbox processing for Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Messaging Inbox Outbox Durable</PackageTags>
     <IsPackable>false</IsPackable>
     <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
