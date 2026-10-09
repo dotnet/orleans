@@ -411,8 +411,11 @@ public sealed class MessagingProviderCutoverTests
         Assert.Equal(1, await drain.GetJobCountAsync());
         AssertHandle(handle, owner.AssertOwner(outbox));
         Assert.Null(await fixture.B.CreateStorage(id).GetMetadataAsync(Token));
-        await fixture.DrainAsync();
+        // Reopening each shard commits its ownership fence in the shard's original provider.
         Assert.Equal(writesA + 1, fixture.A.GetSuccessfulWriteCount(id));
+        Assert.Equal(writesB + 1, fixture.B.GetSuccessfulWriteCount(writeId));
+        await fixture.DrainAsync();
+        Assert.Equal(writesA + 2, fixture.A.GetSuccessfulWriteCount(id));
         var receiver = outbox ? sink : owner;
         Assert.Equal(new[] { new KeyValuePair<Guid, int>(message.MessageId, 1) }, receiver.Effects);
         Assert.Equal(DeliveryStatus.Duplicate, (await receiver.InboxExtension.DeliverAsync(message, Token)).Status);
