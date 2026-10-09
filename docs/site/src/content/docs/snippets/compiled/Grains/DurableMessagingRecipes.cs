@@ -369,10 +369,9 @@ public sealed class OrderOutcomesGrain : Grain, IOrderOutcomesGrain
         [FromKeyedServices("order-outcomes")] IDurableDictionary<HierarchicalKey, OrderOutcome> outcomes)
     {
         _outcomes = outcomes;
-        var dispatcher = new DurableInboxDispatcher()
-            .Register(reservation, (result, context, token) => Record(result, context, token))
-            .Register(payment, (result, context, token) => Record(result, context, token));
-        inbox.RegisterHandler(dispatcher);
+        inbox.RegisterHandlers(routes => routes
+            .Register(reservation, Record)
+            .Register(payment, Record));
     }
 
     public ValueTask<int> GetCompletedStepCountAsync() => new(_outcomes.Count);
@@ -380,14 +379,10 @@ public sealed class OrderOutcomesGrain : Grain, IOrderOutcomesGrain
     public ValueTask<OrderOutcome?> GetOutcomeAsync(HierarchicalKey replyId) =>
         new(_outcomes.TryGetValue(replyId, out var outcome) ? outcome : null);
 
-    private ValueTask Record(
-        OrderOutcome outcome, IInboxHandlerContext context, CancellationToken cancellationToken)
+    private void Record(OrderOutcome outcome, IInboxHandlerContext context)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
         _outcomes[context.Envelope.MessageId] = outcome;
         context.Complete();
-        return ValueTask.CompletedTask;
     }
 }
 // </messaging_dispatcher>

@@ -7,7 +7,7 @@ public static class DurableInboxExtensions
 {
     /// <summary>Configures and registers one dispatcher for an inbox's typed subjects.</summary>
     /// <param name="inbox">The inbox receiving the handler registration.</param>
-    /// <param name="configure">The action registering subjects and their task-returning handlers.</param>
+    /// <param name="configure">The action registering subjects and their typed handlers.</param>
     /// <remarks>
     /// Registration freezes when configuration succeeds. Each handler receives a decoded body
     /// and follows the preparation, synchronous final-block, and explicit completion contract

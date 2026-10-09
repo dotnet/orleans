@@ -614,7 +614,8 @@ public sealed class TypedMessageHelperTests
         var messageType = new DurableMessageType<string>(Subject, serializer);
         var dispatcher = new DurableInboxDispatcher();
 
-        var exception = Assert.Throws<ArgumentNullException>(() => dispatcher.Register(messageType, null!));
+        Func<string, IInboxHandlerContext, CancellationToken, ValueTask>? handler = null;
+        var exception = Assert.Throws<ArgumentNullException>(() => dispatcher.Register(messageType, handler!));
 
         Assert.Equal("handler", exception.ParamName);
         Assert.Equal(0, probe.ReadCount);
@@ -1185,6 +1186,156 @@ public sealed class TypedMessageHelperTests
         Assert.Null(serializer.Deserialize(envelope.Payload));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegisterAction_InvokesDecodedBodySynchronouslyWithExplicitCompletion(bool complete)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        using var envelope = DirectEnvelope(serializer, Subject, "synchronous");
+        var context = new CountingInboxHandlerContext(envelope);
+        var dispatcher = new DurableInboxDispatcher();
+        var calls = 0;
+        var registered = dispatcher.Register(type, (body, caller) =>
+        {
+            Assert.Equal("synchronous", body);
+            Assert.Same(context, caller);
+            calls++;
+            if (complete) caller.Complete();
+        });
+
+        var outcome = dispatcher.HandleAsync(context, CancellationToken.None);
+
+        Assert.Same(dispatcher, registered);
+        Assert.True(outcome.IsCompletedSuccessfully);
+        Assert.Equal(1, calls);
+        Assert.Equal(complete ? 1 : 0, context.CompletionCount);
+        await outcome;
+    }
+
+    [Fact]
+    public void RegisterAction_RejectsNullArguments()
+    {
+        using var services = CreateServices();
+        var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+        var dispatcher = new DurableInboxDispatcher();
+        var missingType = Assert.Throws<ArgumentNullException>(() =>
+            dispatcher.Register<string>(null!, (_, _) => { }));
+        Action<string, IInboxHandlerContext>? handler = null;
+        var missingHandler = Assert.Throws<ArgumentNullException>(() => dispatcher.Register(type, handler!));
+
+        Assert.Equal("messageType", missingType.ParamName);
+        Assert.Equal("handler", missingHandler.ParamName);
+        Assert.Same(dispatcher, dispatcher.Register(type, (_, _) => { }));
+    }
+
+    [Fact]
+    public void RegisterAction_PropagatesOriginalDelegateFailure()
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        using var envelope = DirectEnvelope(serializer, Subject, "failure");
+        var context = new CountingInboxHandlerContext(envelope);
+        var sentinel = new IOException("synchronous handler failed");
+        var dispatcher = new DurableInboxDispatcher().Register(
+            new DurableMessageType<string>(Subject, serializer), (_, _) => throw sentinel);
+
+        var exception = Assert.Throws<IOException>(() => dispatcher.HandleAsync(context, CancellationToken.None));
+
+        Assert.Same(sentinel, exception);
+        Assert.Equal(0, context.CompletionCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RegisterAction_CancellationBeforeEntryLeavesHandlerAndCompletionUntouched(bool cancelDuringDecode)
+    {
+        using var services = CreateServices();
+        var direct = services.GetRequiredService<Serializer<string>>();
+        var (serializer, probe) = CreateProbedSerializer<string>(services);
+        using var cancellation = new CancellationTokenSource();
+        if (cancelDuringDecode) probe.OnRead = cancellation.Cancel;
+        else cancellation.Cancel();
+        using var envelope = DirectEnvelope(direct, Subject, "cancellation");
+        var context = new CountingInboxHandlerContext(envelope);
+        var calls = 0;
+        var dispatcher = new DurableInboxDispatcher().Register(
+            new DurableMessageType<string>(Subject, serializer), (_, _) => calls++);
+
+        var exception = Assert.Throws<OperationCanceledException>(() =>
+            dispatcher.HandleAsync(context, cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(cancelDuringDecode ? 1 : 0, probe.ReadCount);
+        Assert.Equal(0, calls);
+        Assert.Equal(0, context.CompletionCount);
+    }
+
+    [Fact]
+    public async Task RegisterAction_CoexistsWithTaskReturningHandlerAndFrozenSubjectRoutes()
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var synchronous = new DurableMessageType<string>(Subject, serializer);
+        var asynchronous = new DurableMessageType<string>("stock.async.v1", serializer);
+        var inbox = Substitute.For<IDurableInbox>();
+        IInboxHandler registered = null!;
+        DurableInboxDispatcher configured = null!;
+        inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => registered = call.Arg<IInboxHandler>());
+        var seen = new List<string>();
+        inbox.RegisterHandlers(routes =>
+        {
+            configured = routes;
+            routes.Register(synchronous, (body, context) =>
+            {
+                seen.Add(body);
+                context.Complete();
+            }).Register(asynchronous, (body, context, _) =>
+            {
+                seen.Add(body);
+                context.Complete();
+                return ValueTask.CompletedTask;
+            });
+        });
+
+        Assert.Throws<InvalidOperationException>(() => configured.Register(
+            new DurableMessageType<string>("stock.late.v1", serializer), (_, _) => { }));
+        using var first = DirectEnvelope(serializer, synchronous.Subject, "sync");
+        using var second = DirectEnvelope(serializer, asynchronous.Subject, "async");
+        var firstContext = new CountingInboxHandlerContext(first);
+        var secondContext = new CountingInboxHandlerContext(second);
+        await registered.HandleAsync(firstContext, CancellationToken.None);
+        await registered.HandleAsync(secondContext, CancellationToken.None);
+
+        Assert.Equal(new[] { "sync", "async" }, seen);
+        Assert.Equal(1, firstContext.CompletionCount);
+        Assert.Equal(1, secondContext.CompletionCount);
+        inbox.Received(1).RegisterHandler(configured);
+    }
+
+    [Fact]
+    public async Task RegisterAction_DuplicateSubjectPreservesOriginalHandler()
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        var originalCalls = 0;
+        var replacementCalls = 0;
+        var dispatcher = new DurableInboxDispatcher().Register(type, (_, _) => originalCalls++);
+        Assert.Throws<InvalidOperationException>(() => dispatcher.Register(type, (_, _) => replacementCalls++));
+        using var envelope = DirectEnvelope(serializer, Subject, "original");
+        var context = new CountingInboxHandlerContext(envelope);
+
+        await dispatcher.HandleAsync(context, CancellationToken.None);
+
+        Assert.Equal(1, originalCalls);
+        Assert.Equal(0, replacementCalls);
+        Assert.Equal(0, context.CompletionCount);
+    }
+
     [Fact]
     public void RegisterHandlers_RejectsNullInboxBeforeConfiguration()
     {
@@ -1477,6 +1628,7 @@ public sealed class TypedMessageHelperTests
         public byte? CommittedFailureByte { get; private set; }
         public Exception? NextWriteFailure { get; set; }
         public Exception? ReadFailure { get; set; }
+        public Action? OnRead { get; set; }
 
         public void WriteField<TBufferWriter>(
             ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType, [AllowNull] T value)
@@ -1501,7 +1653,9 @@ public sealed class TypedMessageHelperTests
         {
             ReadCount++;
             if (ReadFailure is { } failure) throw failure;
-            return inner.ReadValue(ref reader, field);
+            var value = inner.ReadValue(ref reader, field);
+            OnRead?.Invoke();
+            return value;
         }
     }
 

@@ -73,6 +73,12 @@ each successful handler explicitly calls `Complete()` and returns synchronously
 after shared mutation. See [Inventory dispatch](durable-messaging-recipes.md#reserve-inventory-once-per-order-line)
 and [Typed dispatch](durable-messaging-recipes.md#combine-the-recipes-into-an-order-workflow).
 
+`Register` accepts either a synchronous `Action<T, IInboxHandlerContext>` or a
+`Func<T, IInboxHandlerContext, CancellationToken, ValueTask>`. The synchronous
+overload checks the attempt token after decoding and before entering the method.
+Both forms use explicit `Complete()`. Use the task-returning form for asynchronous
+preparation and for cancellation checks within application preparation.
+
 ### Own and borrow payload slices
 
 An envelope is a disposable readonly struct containing an owned

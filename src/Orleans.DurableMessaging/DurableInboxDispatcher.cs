@@ -19,6 +19,32 @@ public sealed class DurableInboxDispatcher : IInboxHandler
     private readonly Dictionary<string, IHandler> _handlers = new(StringComparer.Ordinal);
     private bool _started;
 
+    /// <summary>Adds a subject's synchronous typed handler before handling begins.</summary>
+    /// <typeparam name="T">The payload contract.</typeparam>
+    /// <param name="messageType">The subject and serializer binding.</param>
+    /// <param name="handler">The synchronous delegate receiving the decoded body and context.</param>
+    /// <returns>This dispatcher.</returns>
+    /// <remarks>
+    /// The attempt token is checked after decoding and before entering the delegate. The delegate
+    /// runs synchronously and explicitly calls <see cref="IInboxHandlerContext.Complete"/>.
+    /// Use the task-returning overload for asynchronous preparation or application cancellation checks.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">An argument is null.</exception>
+    /// <exception cref="InvalidOperationException">Registration is frozen or the subject is already registered.</exception>
+    public DurableInboxDispatcher Register<T>(
+        DurableMessageType<T> messageType,
+        Action<T, IInboxHandlerContext> handler)
+    {
+        ArgumentNullException.ThrowIfNull(messageType);
+        ArgumentNullException.ThrowIfNull(handler);
+        return Register(messageType, (body, context, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+            handler(body, context);
+            return ValueTask.CompletedTask;
+        });
+    }
+
     /// <summary>Adds a subject's typed handler before handling begins.</summary>
     /// <typeparam name="T">The payload contract.</typeparam>
     /// <param name="messageType">The subject and serializer binding.</param>
