@@ -182,7 +182,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-capture-cutoff");
-        var turn = receiver.HoldPumpTurnAsync("hold-capture-cutoff", replacement: default, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-capture-cutoff", deactivate: false);
         await hold.WaitUntilEnteredAsync();
         var extension = (IDurableInboxExtension)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         Task<DeliveryResult> initial = null!;

@@ -30,6 +30,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task RequestDeactivationAsync();
     Task SetControlEnvelopeAsync([DisposeOnCompletion] DurableEnvelope envelope);
     Task DeleteStateAndDeactivateAsync();
+    Task HoldPumpTurnAsync(string barrierRoute, bool deactivate);
     Task HoldPumpTurnAsync(string barrierRoute, [DisposeOnCompletion] DurableEnvelope replacement, bool deactivate);
 }
 
@@ -312,7 +313,13 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         }
     }
 
-    public async Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope replacement, bool deactivate)
+    public Task HoldPumpTurnAsync(string barrierRoute, bool deactivate) =>
+        HoldPumpTurnCoreAsync(barrierRoute, null, deactivate);
+
+    public Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope replacement, bool deactivate) =>
+        HoldPumpTurnCoreAsync(barrierRoute, replacement, deactivate);
+
+    private async Task HoldPumpTurnCoreAsync(string barrierRoute, DurableEnvelope? replacement, bool deactivate)
     {
         if (!_handlerProbe.TryGet(this.GetGrainId(), barrierRoute, out var barrier))
         {
@@ -320,10 +327,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         }
         barrier.Entered.TrySetResult();
         await barrier.Continue.Task;
-        if (!replacement.MessageId.IsDefault)
+        if (replacement is { } envelope)
         {
             var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
-            await extension.DeliverAsync(replacement);
+            await extension.DeliverAsync(envelope);
         }
         if (deactivate)
         {
