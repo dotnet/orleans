@@ -252,6 +252,19 @@ public sealed class HandlerRoutingContractTests
         return Assert.IsAssignableFrom<IInboxHandler>(arguments[0]);
     }
 
+    [Fact]
+    public void HandlerContext_Constructor_RequiresCompletionCallback()
+    {
+        using var envelope = Envelope();
+        var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
+        var exception = Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(type, [envelope, null]));
+        Assert.Equal("complete", Assert.IsType<ArgumentNullException>(exception.InnerException).ParamName);
+        var parameters = Assert.Single(type.GetConstructors()).GetParameters();
+        Assert.Equal(2, parameters.Length);
+        Assert.Equal(typeof(Action), parameters[1].ParameterType);
+        Assert.False(parameters[1].IsOptional);
+    }
+
     private static IInboxHandlerContext CreateContext(DurableEnvelope envelope, Action complete)
     {
         var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
