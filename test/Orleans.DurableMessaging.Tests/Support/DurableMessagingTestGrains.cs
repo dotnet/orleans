@@ -19,18 +19,18 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
     Task RetryWriteStateAsync();
     Task StageEffectAsync(DurableEffect effect);
-    Task StageOutputAsync(DurableEnvelope envelope);
-    Task<DeliveryResult> AcceptAndDeactivateAsync(DurableEnvelope envelope);
+    Task StageOutputAsync([DisposeOnCompletion] DurableEnvelope envelope);
+    Task<DeliveryResult> AcceptAndDeactivateAsync([DisposeOnCompletion] DurableEnvelope envelope);
     Task SetInboxOwnershipAsync(string ownershipId, DurableJob job);
-    Task SeedInboxStateAsync(DurableEnvelope envelope, string? ownershipId, DurableJob? job);
+    Task SeedInboxStateAsync([DisposeOnCompletion] DurableEnvelope envelope, string? ownershipId, DurableJob? job);
     Task ConfigureHandlerAsync(bool enabled);
     Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId);
     Task<bool> RemoveOutboxDeadLetterAsync(Guid messageId);
     Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
-    Task SetControlEnvelopeAsync(DurableEnvelope envelope);
+    Task SetControlEnvelopeAsync([DisposeOnCompletion] DurableEnvelope envelope);
     Task DeleteStateAndDeactivateAsync();
-    Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope? replacement, bool deactivate);
+    Task HoldPumpTurnAsync(string barrierRoute, [DisposeOnCompletion] DurableEnvelope replacement, bool deactivate);
 }
 
 [GenerateSerializer, Immutable]
@@ -153,7 +153,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public async Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message)
     {
-        var envelope = CreateEnvelope(target, route, message);
+        using var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
         await WriteStateAsync();
         return envelope.MessageId;
@@ -161,7 +161,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public async Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message)
     {
-        var envelope = CreateEnvelope(target, route, message);
+        using var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
         _outbox.Send(envelope);
         await WriteStateAsync();
@@ -177,7 +177,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message)
     {
-        var envelope = CreateEnvelope(target, route, message);
+        using var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
         return Task.FromResult(envelope.MessageId);
     }
@@ -188,6 +188,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     {
         var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
         var result = await extension.DeliverAsync(envelope);
+        AcceptedSnapshot = CreateSnapshot();
         DeactivateOnIdle();
         return result;
     }
@@ -274,12 +275,16 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         }
     }
 
+    internal DurableEndpointSnapshot? AcceptedSnapshot { get; private set; }
+
     private DurableEnvelope? _controlEnvelope;
     internal TaskCompletionSource ControlDeliveryEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public Task SetControlEnvelopeAsync(DurableEnvelope envelope)
     {
-        _controlEnvelope = envelope;
+        var retained = envelope.Retain();
+        _controlEnvelope?.Dispose();
+        _controlEnvelope = retained;
         return Task.CompletedTask;
     }
 
@@ -307,7 +312,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         }
     }
 
-    public async Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope? replacement, bool deactivate)
+    public async Task HoldPumpTurnAsync(string barrierRoute, DurableEnvelope replacement, bool deactivate)
     {
         if (!_handlerProbe.TryGet(this.GetGrainId(), barrierRoute, out var barrier))
         {
@@ -315,10 +320,10 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         }
         barrier.Entered.TrySetResult();
         await barrier.Continue.Task;
-        if (replacement is { } envelope)
+        if (replacement.MessageId != Guid.Empty)
         {
             var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
-            await extension.DeliverAsync(envelope);
+            await extension.DeliverAsync(replacement);
         }
         if (deactivate)
         {
@@ -339,7 +344,12 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     void IObserver<GrainLifecycleEvents.LifecycleEvent>.OnError(Exception error) => DeactivationFailure.TrySetException(error);
     void IObserver<GrainLifecycleEvents.LifecycleEvent>.OnCompleted() { }
-    public void Dispose() => _lifecycleSubscription.Dispose();
+    public void Dispose()
+    {
+        _controlEnvelope?.Dispose();
+        _controlEnvelope = null;
+        _lifecycleSubscription.Dispose();
+    }
 
     private readonly ConcurrentQueue<DurableEndpointSnapshot> _captures = new();
     private readonly ConcurrentQueue<Guid[]> _outputCaptures = new();
@@ -395,12 +405,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
                 throw new InvalidOperationException($"Injected handler preparation failure for {message.LogicalId}.");
             }
 
-            DurableEnvelope? outgoing = null;
-            if (message.ForwardTo is { } target)
-            {
-                outgoing = CreateEnvelope(target, "messages/forwarded",
-                    message with { ForwardTo = null, ThrowDuringPreparation = false });
-            }
+            using var outgoing = message.ForwardTo is { } destination
+                ? CreateEnvelope(destination, "messages/forwarded", message with { ForwardTo = null, ThrowDuringPreparation = false })
+                : (DurableEnvelope?)null;
             if (NextApplyFailure is { } failure)
             {
                 NextApplyFailure = null;

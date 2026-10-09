@@ -211,6 +211,8 @@ internal sealed class CancellationCleanupProbe : IDisposable
         SetField(Extension, "_metricsActive", 1);
         SetField(Extension, "_reportedDepth", 1);
         SetField(Extension, "_activeDelivery", Task.CompletedTask);
+        SetField(Extension, "_provisionalAcceptances", Activator.CreateInstance(
+            ExtensionType.GetField("_provisionalAcceptances", BindingFlags.NonPublic | BindingFlags.Instance)!.FieldType)!);
         SetField(Extension, "_pendingWrites", Activator.CreateInstance(
             ExtensionType.GetField("_pendingWrites", BindingFlags.NonPublic | BindingFlags.Instance)!.FieldType)!);
         var coordinator = Field<object>(Extension, "_pumpCoordinator");

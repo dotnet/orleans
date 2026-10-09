@@ -7,7 +7,7 @@ namespace Orleans.DurableMessaging.Tests.Support;
 public interface IRawPayloadTestGrain : IGrainWithGuidKey
 {
     Task ConfigureForwardAsync(GrainId target, int copies = 1);
-    Task<DeliveryResult> AcceptAndDeactivateAsync(DurableEnvelope envelope);
+    Task<DeliveryResult> AcceptAndDeactivateAsync([DisposeOnCompletion] DurableEnvelope envelope);
     Task<RawPayloadSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
 }
@@ -74,6 +74,7 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
     {
         var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
         var result = await extension.DeliverAsync(envelope);
+        AcceptedSnapshot = GetSnapshotForTest();
         DeactivateOnIdle();
         return result;
     }
@@ -87,7 +88,7 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
         }
         cancellationToken.ThrowIfCancellationRequested();
         var input = context.Envelope;
-        var bytes = Convert.ToBase64String(input.Payload.Memory.Span);
+        var bytes = Convert.ToBase64String(input.Payload.ToArray());
         _effects.TryGetValue(input.MessageId, out var prior);
         _effects[input.MessageId] = new RawPayloadEffect(input.MessageId, bytes, (prior?.Count ?? 0) + 1);
         if (!_forward.Value.IsDefault)
@@ -105,6 +106,8 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
         }
         context.Complete();
     }
+
+    internal RawPayloadSnapshot? AcceptedSnapshot { get; private set; }
 
     public Task<RawPayloadSnapshot> GetSnapshotAsync() => Task.FromResult(GetSnapshotForTest());
     internal RawPayloadSnapshot GetSnapshotForTest() => new(_activationId, _inbox.Count, _outbox.Count, _processed.Count, _effects.Values.ToArray());

@@ -210,6 +210,8 @@ public sealed class DeliveryAndOptionsContractTests
         var extensionType = assembly.GetType("Orleans.DurableMessaging.DurableInboxExtension", throwOnError: true)!;
         var coordinatorType = assembly.GetType("Orleans.DurableMessaging.DurableMessagingPumpCoordinator", throwOnError: true)!;
         var extension = (IDisposable)RuntimeHelpers.GetUninitializedObject(extensionType);
+        extensionType.GetField("_provisionalAcceptances", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(extension, new HashSet<(Orleans.Runtime.GrainId, Guid)>());
         var coordinator = Activator.CreateInstance(coordinatorType)!;
         var results = Activator.CreateInstance(assembly.GetType("Orleans.DurableMessaging.DurableMessagingPumpResults", throwOnError: true)!, nonPublic: true)!;
         extensionType.GetField("_pumpResults", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(extension, results);

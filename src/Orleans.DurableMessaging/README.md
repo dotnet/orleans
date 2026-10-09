@@ -16,23 +16,34 @@ capacity, batches, retries, deduplication, and dead-letter retention.
 
 The protocol and runtime provide:
 
-- `DurableEnvelope` has `MessageId` (`Guid`), `SenderId` and `ReceiverId`
-  (`GrainId`), and required `Payload` (`ImmutableBuffer` from
-  `Orleans.Serialization.Buffers`). Payload bytes are opaque to the transport.
-- `ImmutableBuffer` is managed immutable raw backing. Its copying constructors take
-  `ReadOnlySpan<byte>`, `ReadOnlySequence<byte>`, or `ArcBuffer`; `Create` accepts a
-  synchronous `Action<IBufferWriter<byte>>`. Construction snapshots borrowed bytes
-  once. Callers can immediately reuse source memory or dispose Arc owners.
-  `Memory`, `Length`, `Empty`, and `AsReadOnlySequence` expose read-only raw bytes.
-  Treat that memory as immutable, including when using memory interop APIs.
-- Staging, RPC copying, and journal values safely share immutable payload references.
-  Tiny messages do not each retain a minimum 16 KiB Arc page. Networking and storage
-  still encode and transfer data using their own operation-owned buffers.
-- `BufferPackage` is an independently reusable immutable value for keyed raw items.
-  `BufferPackageBuilder.Add(key, span)` or `Add(key, writerCallback)` supplies each
-  entry; `Build` freezes the builder and package. `Keys` and `TryGetBytes` inspect
-  independently encoded entries. Encode the package with an ordinary serializer
-  when carrying it as an envelope payload.
+- `DurableEnvelope` is a disposable readonly struct with `MessageId` (`Guid`),
+  `SenderId` and `ReceiverId` (`GrainId`), and required `Payload` (`ArcBuffer` from
+  `Orleans.Serialization.Buffers`, field ID 3). Payload bytes are opaque to transport
+  and treated as read-only. `ArcBuffer.Empty` is a valid owner-free empty payload.
+- The caller owns each constructed slice/envelope. `DurableEnvelope.Retain()` creates
+  an independent payload pin; struct copies borrow the same pin. Dispose each owned
+  envelope exactly once, after staging or actual direct-send completion.
+- `IDurableOutbox.Send` borrows the envelope; durable dictionary state independently
+  retains it. `IInboxHandlerContext.Envelope` is borrowed until the actual handler
+  method ends, including asynchronous preparation. Do not dispose a borrowed context
+  payload. Retain explicitly to store it longer.
+- Generated `IDurableInboxExtension` request copying retains its own payload pin.
+  The extension owns and disposes that request clone on every path, including rejection,
+  cancellation, and exceptions. Ordinary persistence/network serialization borrows
+  payloads without consuming them. Retained operation owners remain alive through the
+  actual operation, not just a caller's canceled wait.
+- Application encoders use one reusable `ArcBufferWriter` per non-reentrant activation
+  or serialized application scope. Ordinary serializers write records into it;
+  `ConsumeSlice` returns owned disjoint payload slices which can share pages. Dispose
+  the encoder through grain `IDisposable` or a DI-owned scoped service at teardown.
+  Arc serializer overloads use `Reader.Create(ArcBuffer, session)`, permitting codecs
+  to retain raw sub-slices during decoding without copying.
+- `BufferPackage` is disposable, owning one Arc buffer and a read-only ordinal index
+  of key offsets and lengths. Its `Buffer` and `TryGetBytes` sequence views are borrowed
+  while the package owner remains live. `Retain()` returns an independent owner.
+  `BufferPackageBuilder` owns a disposable Arc writer; `Add(key, span)` or a writer
+  callback encodes entries, and `Build` transfers the buffer owner to the package.
+  Serialize packages normally and release them after use, including decoded packages.
 - Application-local helpers use ordinary `Serializer<T>` or `Serializer` to encode
   and decode typed records. Those records own business-operation keys, request/response
   destinations, message kinds, and protocol versions. `HierarchicalKey` supplies
@@ -55,7 +66,9 @@ The protocol and runtime provide:
 ## Handler and persistence boundaries
 
 Handlers perform asynchronous I/O, validation, envelope construction, and cancellation
-checks using local values before the first shared business or journaled mutation. From
+checks using local values before the first shared business or journaled mutation. Prepare
+owned replies with `using var reply = ...`; disposal releases local pins after staging,
+including on exceptions, while durable dictionary state retains its own pins. From
 that first shared mutation through method completion, execute synchronously with no
 awaits. Apply complete safe-to-commit changes, stage outgoing envelopes, call
 `context.Complete()`, and return without further awaits. This mutation boundary is the
@@ -149,7 +162,7 @@ handle. Admission counts acknowledged pending work in constant time from inbox a
 provisional-acceptance counts. Recovery restores that pair and repairs an absent owner
 for pending work. Callbacks validate generation and physical job identity before
 processing. Delivery requires a nonempty message ID, a nondefault sender, and a nonnull
-immutable payload before duplicate lookup or admission. Empty raw payloads are valid;
+valid Arc payload before duplicate lookup or admission. Empty raw payloads are valid;
 application decoding and null validation belong to the handler. Empty-owner clearing
 shares the inbox admission gate with delivery, so direct interleaved delivery proceeds
 after the clear's durable outcome.
@@ -241,7 +254,7 @@ acknowledged messages once per ID. Depth accounting uses dictionary counts in co
 time. Intents remain delivery-fenced until their exact captured cohort is acknowledged.
 Equivalent enqueues preserve their original enqueue time and commit status. Direct
 envelopes require a nonempty message ID, owning sender, nondefault receiver, and nonnull
-immutable payload before admission. Raw empty bytes are valid; the application decides
+valid Arc payload before admission. Raw empty bytes are valid; the application decides
 what payload encoding and content are meaningful.
 
 The outbox uses six standard durable collections resolved by their existing keyed

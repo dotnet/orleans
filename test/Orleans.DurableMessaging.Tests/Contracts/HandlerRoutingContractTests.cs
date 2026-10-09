@@ -76,7 +76,7 @@ public sealed class HandlerRoutingContractTests
     public void HandlerContext_Complete_ForwardsToOwnerSynchronously(int calls)
     {
         var count = 0;
-        var envelope = Envelope();
+        using var envelope = Envelope();
         var context = CreateContext(envelope, () => count++);
 
         for (var i = 0; i < calls; i++)
@@ -94,7 +94,7 @@ public sealed class HandlerRoutingContractTests
     {
         var sentinel = new InvalidOperationException("owner failure");
         var count = 0;
-        var envelope = Envelope();
+        using var envelope = Envelope();
         var context = CreateContext(envelope, () =>
         {
             count++;
@@ -112,13 +112,15 @@ public sealed class HandlerRoutingContractTests
     public void HandlerContext_Envelope_PreservesIdentityAndPayload()
     {
         byte[] source = [0x00, 0xff, 0x80];
-        var envelope = Envelope() with { Payload = new ImmutableBuffer(source.AsSpan()) };
+        using var writer = new ArcBufferWriter();
+        writer.Write(source);
+        using var envelope = Envelope(writer.PeekSlice(writer.Length));
         var count = 0;
         var context = CreateContext(envelope, () => count++);
         Array.Fill(source, (byte)0x42);
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
 
-        var decoded = services.GetRequiredService<Serializer<DurableEnvelope>>()
+        using var decoded = services.GetRequiredService<Serializer<DurableEnvelope>>()
             .Deserialize(services.GetRequiredService<Serializer<DurableEnvelope>>().SerializeToArray(context.Envelope));
         context.Complete();
 
@@ -127,15 +129,15 @@ public sealed class HandlerRoutingContractTests
         Assert.Equal(envelope.MessageId, decoded.MessageId);
         Assert.Equal(envelope.SenderId, decoded.SenderId);
         Assert.Equal(envelope.ReceiverId, decoded.ReceiverId);
-        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, decoded.Payload.Memory.ToArray());
-        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, context.Envelope.Payload.Memory.ToArray());
+        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, decoded.Payload.ToArray());
+        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, context.Envelope.Payload.ToArray());
     }
 
     [Fact]
     public async Task HandleAsync_SynchronousHandling_PreservesContextTokenAndExplicitCompletion()
     {
         var count = 0;
-        var envelope = Envelope();
+        using var envelope = Envelope();
         var context = CreateContext(envelope, () => count++);
         using var cancellation = new CancellationTokenSource();
         var handler = Substitute.For<IInboxHandler>();
@@ -162,7 +164,7 @@ public sealed class HandlerRoutingContractTests
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var count = 0;
-        var envelope = Envelope();
+        using var envelope = Envelope();
         var context = CreateContext(envelope, () => count++);
         using var cancellation = new CancellationTokenSource();
         var handler = Substitute.For<IInboxHandler>();
@@ -192,7 +194,7 @@ public sealed class HandlerRoutingContractTests
     public async Task HandleAsync_ReturnWithoutComplete_DoesNotInvokeCompletion()
     {
         var count = 0;
-        var envelope = Envelope();
+        using var envelope = Envelope();
         var context = CreateContext(envelope, () => count++);
         var handler = Substitute.For<IInboxHandler>();
         handler.HandleAsync(context, CancellationToken.None).Returns(ValueTask.CompletedTask);
@@ -255,20 +257,25 @@ public sealed class HandlerRoutingContractTests
         return Assert.IsAssignableFrom<IInboxHandlerContext>(Activator.CreateInstance(type, envelope, complete));
     }
 
-    private static DurableEnvelope Envelope() => new()
+    private static DurableEnvelope Envelope(ArcBuffer? payload = null)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(new byte[] { 0x00, 0xff, 0x80 });
+        return new()
     {
         MessageId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
         SenderId = GrainId.Create("sender", "handler"),
         ReceiverId = GrainId.Create("receiver", "handler"),
-        Payload = new ImmutableBuffer(new byte[] { 0x00, 0xff, 0x80 }.AsSpan())
-    };
+        Payload = payload ?? writer.PeekSlice(writer.Length)
+        };
+    }
 
     private static void AssertEnvelope(DurableEnvelope expected, DurableEnvelope actual)
     {
         Assert.Equal(expected.MessageId, actual.MessageId);
         Assert.Equal(expected.SenderId, actual.SenderId);
         Assert.Equal(expected.ReceiverId, actual.ReceiverId);
-        Assert.Same(expected.Payload, actual.Payload);
-        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, actual.Payload.Memory.ToArray());
+        Assert.Same(expected.Payload.First, actual.Payload.First);
+        Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, actual.Payload.ToArray());
     }
 }

@@ -83,8 +83,12 @@ public abstract class DurableMessagingBehaviorTestBase : IAsyncLifetime
     protected sealed class EnvelopeLease(DurableEnvelope value) : IDisposable
     {
         public DurableEnvelope Value { get; } = value;
+        private bool _disposed;
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+            Value.Dispose();
         }
     }
 }

@@ -23,6 +23,8 @@ public interface IDurableInbox
     /// <summary>
     /// Gets pending messages in unspecified order.
     /// </summary>
+    /// <remarks>Values are borrowed from durable state until removal or scope disposal.
+    /// Do not dispose them; use <see cref="DurableEnvelope.Retain"/> for a longer lifetime.</remarks>
     IEnumerable<DurableEnvelope> Messages { get; }
 
     /// <summary>
@@ -30,7 +32,7 @@ public interface IDurableInbox
     /// </summary>
     /// <param name="senderId">The original sender identity.</param>
     /// <param name="messageId">The message identifier.</param>
-    /// <param name="envelope">The matching envelope when found.</param>
+    /// <param name="envelope">The borrowed matching envelope when found.</param>
     /// <returns>Whether the message is pending.</returns>
     bool TryGetMessage(GrainId senderId, Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope);
 

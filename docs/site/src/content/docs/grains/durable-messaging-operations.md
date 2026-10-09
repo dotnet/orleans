@@ -159,12 +159,20 @@ throughput alongside steady-state handling.
 
 ### Budget allocations and owned memory
 
-Payloads have managed immutable backing: creation snapshots application-writer bytes
-once, and staging/transport/journal values safely share immutable references.
-`new ImmutableBuffer(arcBuffer)` permits the caller to dispose the Arc owner
-immediately. Tiny payloads therefore retain their raw bytes rather than a minimum
-16 KiB Arc page each. Count managed payload length and retained envelope references
-separately from transient serialization and storage buffers.
+Payloads are owned Arc slices. A reusable activation-owned application encoder can
+pack small messages into disjoint regions of shared pages using `ConsumeSlice`.
+Measure retained pages and their occupancy alongside logical payload length: several
+live messages can share a page, and a retained slice can keep that page alive after
+other slices are released. Page retention depends on message sizes, encoder reuse,
+concurrency, and the overlap between durable state, readers, and delivery operations.
+
+Outbox staging independently retains the caller's payload pin. Generated RPC request
+copying retains another pin, while ordinary persistence serialization is non-consuming.
+The handler borrows its context envelope through actual method completion. Release
+application-local envelopes after staging and decoded packages after use; use explicit
+`Retain()` when crossing those lifetimes. Dispose activation encoders at teardown.
+See [Payload ownership](durable-messaging.md#own-and-borrow-payload-slices) for each
+borrow/retain/release boundary.
 
 Track allocation rate and retained memory separately. A processing-rate budget
 expressed as bytes per acknowledged message describes how much garbage the
@@ -215,9 +223,12 @@ The repository's `DurableMessaging.Sequential` benchmark measures a single chain
 through 2, 4, or 8 interacting grains on one silo. It performs 1,024 sequential
 durable deliveries per invocation and awaits actual journal acknowledgement of every
 handler step. Its non-generic handler decodes an ordinary `SequentialMessage`
-record with `Serializer<SequentialMessage>` and stages an encoded immutable payload
+record with `Serializer<SequentialMessage>` and stages an owned Arc payload
 through the directly injected outbox. Normal inbox/outbox pumps and real time drive
-progress; the journal hook observes actual acknowledgements independently of handler
+progress. Each non-reentrant activation owns one reusable Arc encoder, disposes local
+outputs after staging, and disposes its encoder at teardown. The payload codec borrows
+bytes during serialization, so journal capture leaves owners intact. The journal hook
+observes actual acknowledgements independently of handler
 return, and cleanup checks exact total and per-grain business-effect counts.
 
 Run from the repository root:

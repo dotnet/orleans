@@ -79,7 +79,7 @@ public interface IInventoryGrain : IGrainWithStringKey, IDurableMessagingGrain
     ValueTask<int> GetAvailableAsync();
 }
 
-public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler
+public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler, IDisposable
 {
     private readonly IDurableValue<int> _available;
     private readonly IDurableDictionary<HierarchicalKey, ReservationResult> _reservations;
@@ -102,6 +102,8 @@ public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler
         _payload = new ApplicationPayload(serializer);
         inbox.RegisterHandler(this);
     }
+
+    public void Dispose() => _payload.Dispose();
 
     public async Task SetAvailableAsync(int quantity)
     {
@@ -134,7 +136,7 @@ public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler
         var nextAvailable = alreadyRecorded || !result.Reserved
             ? _available.Value
             : checked(_available.Value - request.Quantity);
-        var reply = _payload.Envelope(context.Envelope.ReceiverId, request.ResponseDestination, result);
+        using var reply = _payload.Envelope(context.Envelope.ReceiverId, request.ResponseDestination, result);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (!alreadyRecorded)
@@ -175,7 +177,7 @@ public interface IPaymentGrain : IGrainWithStringKey, IDurableMessagingGrain
     ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey operationKey);
 }
 
-public sealed class PaymentGrain : Grain, IPaymentGrain, IInboxHandler
+public sealed class PaymentGrain : Grain, IPaymentGrain, IInboxHandler, IDisposable
 {
     private readonly IIdempotentPaymentGateway _gateway;
     private readonly IDurableOutbox _outbox;
@@ -195,6 +197,8 @@ public sealed class PaymentGrain : Grain, IPaymentGrain, IInboxHandler
         _results = results;
         inbox.RegisterHandler(this);
     }
+
+    public void Dispose() => _payload.Dispose();
 
     public ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey operationKey) =>
         new(_results.TryGetValue(operationKey, out var result) ? result : null);
@@ -225,7 +229,7 @@ public sealed class PaymentGrain : Grain, IPaymentGrain, IInboxHandler
             throw new InvalidOperationException("The payment provider returned an inconsistent result.");
         }
 
-        var reply = _payload.Envelope(context.Envelope.ReceiverId, request.ResponseDestination, result);
+        using var reply = _payload.Envelope(context.Envelope.ReceiverId, request.ResponseDestination, result);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (!alreadyRecorded)
@@ -249,7 +253,7 @@ public interface IStockProjectionGrain : IGrainWithStringKey, IDurableMessagingG
     ValueTask<StockSnapshot> GetSnapshotAsync();
 }
 
-public sealed class StockProjectionGrain : Grain, IStockProjectionGrain, IInboxHandler
+public sealed class StockProjectionGrain : Grain, IStockProjectionGrain, IInboxHandler, IDisposable
 {
     private readonly IDurableValue<StockSnapshot> _snapshot;
     private readonly ApplicationPayload _payload;
@@ -263,6 +267,8 @@ public sealed class StockProjectionGrain : Grain, IStockProjectionGrain, IInboxH
         _payload = new ApplicationPayload(serializer);
         inbox.RegisterHandler(this);
     }
+
+    public void Dispose() => _payload.Dispose();
 
     public ValueTask<StockSnapshot> GetSnapshotAsync() =>
         new(_snapshot.Value ?? new StockSnapshot(0, 0));
@@ -306,8 +312,11 @@ public sealed class CampaignGrain(
     IDurableStateManager state,
     [FromKeyedServices("campaigns")] IDurableDictionary<Guid, NotificationCampaign> campaigns,
     Serializer serializer,
-    IGrainContext grainContext) : Grain(grainContext), ICampaignGrain
+    IGrainContext grainContext) : Grain(grainContext), ICampaignGrain, IDisposable
 {
+    private readonly ApplicationPayload _payload = new(serializer);
+
+    public void Dispose() => _payload.Dispose();
     public async Task PublishAsync(Guid campaignId, string text, GrainId[] recipients)
     {
         if (campaignId == Guid.Empty)
@@ -334,15 +343,29 @@ public sealed class CampaignGrain(
 
         var campaign = new NotificationCampaign(text, recipients.ToArray());
         var root = HierarchicalKey.Create("campaigns").CreateChildKey(campaignId.ToString("N"));
-        var payload = new ApplicationPayload(serializer);
-        var messages = campaign.Recipients.Select(recipient =>
-            payload.Envelope(this.GetGrainId(), recipient,
-                new Notify(text, root.CreateChildKey(Uri.EscapeDataString(recipient.ToString()))))).ToArray();
-
-        campaigns.Add(campaignId, campaign);
-        foreach (var message in messages)
+        // Prepare every owned output before the first shared mutation. Dispose partial
+        // preparation too: Send borrows each envelope and durable state retains its pin.
+        var messages = new List<DurableEnvelope>(campaign.Recipients.Length);
+        try
         {
-            outbox.Send(message);
+            foreach (var recipient in campaign.Recipients)
+            {
+                messages.Add(_payload.Envelope(this.GetGrainId(), recipient,
+                    new Notify(text, root.CreateChildKey(Uri.EscapeDataString(recipient.ToString())))));
+            }
+
+            campaigns.Add(campaignId, campaign);
+            foreach (var message in messages)
+            {
+                outbox.Send(message);
+            }
+        }
+        finally
+        {
+            foreach (var message in messages)
+            {
+                message.Dispose();
+            }
         }
         await state.WriteStateAsync();
     }
@@ -356,7 +379,7 @@ public interface IOrderOutcomesGrain : IGrainWithStringKey, IDurableMessagingGra
 }
 
 // One registered application dispatcher handles both response kinds.
-public sealed class OrderOutcomesGrain : Grain, IOrderOutcomesGrain, IInboxHandler
+public sealed class OrderOutcomesGrain : Grain, IOrderOutcomesGrain, IInboxHandler, IDisposable
 {
     private readonly ApplicationPayload _payload;
     private readonly IDurableDictionary<HierarchicalKey, OrderOutcome> _outcomes;
@@ -370,6 +393,8 @@ public sealed class OrderOutcomesGrain : Grain, IOrderOutcomesGrain, IInboxHandl
         _outcomes = outcomes;
         inbox.RegisterHandler(this);
     }
+
+    public void Dispose() => _payload.Dispose();
 
     public ValueTask<int> GetCompletedStepCountAsync() => new(_outcomes.Count);
 

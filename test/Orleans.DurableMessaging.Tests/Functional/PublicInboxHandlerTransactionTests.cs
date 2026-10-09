@@ -32,16 +32,18 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         var sinkGrain = Assert.IsType<RawPayloadTestGrain>(sinkContext.GrainInstance);
         sinkGrain.ExpectedAcknowledgedEffects = sends;
         var bytes = System.Text.Encoding.UTF8.GetBytes("raw application bytes\0\u03c0/forward").Concat(new byte[] { 0xff, 0x80, 0x01 }).ToArray();
-        var envelope = new DurableEnvelope
+        using var payloadWriter = new Orleans.Serialization.Buffers.ArcBufferWriter();
+        payloadWriter.Write(bytes);
+        using var envelope = new DurableEnvelope
         {
             MessageId = Guid.NewGuid(),
             SenderId = GrainId.Create("raw-external-sender", "1"),
             ReceiverId = receiver.GetGrainId(),
-            Payload = new Orleans.Serialization.Buffers.ImmutableBuffer(bytes)
+            Payload = payloadWriter.PeekSlice(payloadWriter.Length)
         };
         Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope)).Status);
         await original.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        var accepted = Assert.IsType<RawPayloadTestGrain>(original.GrainInstance).GetSnapshotForTest();
+        var accepted = Assert.IsType<RawPayloadSnapshot>(Assert.IsType<RawPayloadTestGrain>(original.GrainInstance).AcceptedSnapshot);
         Assert.Equal(1, accepted.InboxCount);
         Assert.Empty(accepted.Effects);
 
@@ -55,8 +57,8 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         Assert.True(Fixture.Cluster.TryGetGrainContext(receiver.GetGrainId(), out var current));
         Assert.NotSame(original, current);
         var grain = Assert.IsType<RawPayloadTestGrain>(current.GrainInstance);
-        var pending = Assert.Single(current.ActivationServices.GetRequiredService<IDurableInbox>().Messages);
-        Assert.Equal(bytes, pending.Payload.Memory.ToArray());
+        using var pending = Assert.Single(current.ActivationServices.GetRequiredService<IDurableInbox>().Messages).Retain();
+        Assert.Equal(bytes, pending.Payload.ToArray());
         Assert.Empty(grain.GetSnapshotForTest().Effects);
         using var completion = Fixture.Storage.BlockWrite(journal);
         handler.Release();
@@ -74,8 +76,8 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         {
             Assert.Equal(receiver.GetGrainId(), output.SenderId);
             Assert.Equal(sink.GetGrainId(), output.ReceiverId);
-            Assert.Equal(bytes, output.Payload.Memory.ToArray());
-            Assert.Same(pending.Payload, output.Payload);
+            Assert.Equal(bytes, output.Payload.ToArray());
+            Assert.Same(pending.Payload.First, output.Payload.First);
         });
         Assert.False(grain.Acknowledged.IsCompleted);
         Assert.False(sinkGrain.Acknowledged.IsCompleted);
@@ -295,9 +297,11 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         Assert.IsType<IOException>(await oldGrain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         _ = await receiver.GetSnapshotAsync();
-        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        var completed = await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(),
+            snapshot => snapshot.ActivationId != before.ActivationId && snapshot.Effects.Count == 1);
         var delivered = await Fixture.WaitForEffectCountAsync(sink, 1);
-        completed = await Fixture.WaitForOutboxCountAsync(receiver, 0);
+        completed = await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(),
+            snapshot => snapshot.ActivationId != before.ActivationId && snapshot.Effects.Count == 1 && snapshot.OutboxCount == 0);
 
         Assert.NotEqual(before.ActivationId, completed.ActivationId);
         Assert.Equal(new DurableEffect(message.LogicalId, 1, message.Sequence, message.Value), Assert.Single(completed.Effects));

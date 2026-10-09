@@ -24,18 +24,20 @@ internal static class TestApplicationProtocol
             Payload = Encode(sessions, new TestApplicationMessage(route, body))
         };
 
-    public static ImmutableBuffer Encode<T>(SerializerSessionPool sessions, T value) => ImmutableBuffer.Create(output =>
+    public static ArcBuffer Encode<T>(SerializerSessionPool sessions, T value)
     {
+        using var output = new ArcBufferWriter();
         using var session = sessions.GetSession();
         var writer = Writer.Create(output, session);
         sessions.CodecProvider.GetCodec<T>().WriteField(ref writer, 0, typeof(T), value);
         writer.Commit();
-    });
+        return output.PeekSlice(output.Length);
+    }
 
-    public static T Decode<T>(SerializerSessionPool sessions, ImmutableBuffer payload)
+    public static T Decode<T>(SerializerSessionPool sessions, ArcBuffer payload)
     {
         using var session = sessions.GetSession();
-        var reader = Reader.Create(new System.Buffers.ReadOnlySequence<byte>(payload.Memory), session);
+        var reader = Reader.Create(payload.AsReadOnlySequence(), session);
         var field = reader.ReadFieldHeader();
         return sessions.CodecProvider.GetCodec<T>().ReadValue(ref reader, field)!;
     }

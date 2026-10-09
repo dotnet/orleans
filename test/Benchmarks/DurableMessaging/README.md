@@ -39,17 +39,25 @@ iteration repetition; there is no polling or manually driven pump.
 
 The non-generic inbox handler explicitly decodes `SequentialMessage` with the
 ordinary `Serializer<SequentialMessage>` service. Each outgoing hop encodes the
-record into an `ImmutableBuffer`; the transport only sees sender, receiver, message
-ID, and frozen raw bytes. The benchmark still traverses the production pipeline:
+record into an owned `ArcBuffer` slice; the transport only sees sender, receiver,
+message ID, and read-only raw bytes. The benchmark still traverses the production pipeline:
 it neither invokes the next handler directly nor signals completion before storage
 acknowledgement.
 
-Payload creation snapshots application-writer bytes once into managed immutable
-backing. Staging, transport, and journal values can safely share that immutable
-reference. A tiny hop does not retain a minimum 16 KiB pooled `ArcBuffer` page.
-An application using `new ImmutableBuffer(arcBuffer)` can immediately dispose
-its Arc owner after construction. Journal storage buffers have their own independent
-lifetimes and remain part of the retained-memory budget.
+Each non-reentrant activation owns one reusable `ArcBufferWriter` encoder and
+releases it through `IDisposable` at activation teardown. `ConsumeSlice` returns
+owned, disjoint slices of freshly encoded messages; small messages can occupy shared
+pages. The caller disposes each local envelope after staging, and the durable outbox
+dictionary retains its own pin. Handler context envelopes are borrowed until the
+actual handler method ends; their payloads are never disposed by the application.
+Ordinary payload serialization is non-consuming, so journal capture and repeated
+sends preserve the owning pins. Generated RPC request copying separately retains
+the request clone for the extension to release on every path.
+
+Budget logical payload bytes, retained pages and their occupancy, and overlapping
+state/reader/delivery lifetimes separately. Page retention depends on message sizes,
+encoder reuse, and live slices. Journal storage and transient serialization buffers
+have independent lifetimes and remain part of the retained-memory budget.
 
 This encoding/ownership change warrants new measurements on the same machine;
 no timing result is implied by this README.

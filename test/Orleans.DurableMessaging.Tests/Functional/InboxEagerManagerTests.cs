@@ -91,7 +91,7 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
         using var lifetime = (IDisposable)extension;
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         await ((ILifecycleObserver)extension).OnStart(TestContext.Current.CancellationToken);
-        var envelope = TestApplicationProtocol.Create(stateServices.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "eager"), grainId, "route", 42);
+        using var envelope = TestApplicationProtocol.Create(stateServices.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "eager"), grainId, "route", 42);
         manager.BeforeCapture = () =>
         {
             Assert.Equal(envelope, Assert.Single(messages).Value);

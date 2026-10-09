@@ -211,7 +211,8 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         var error = Assert.IsType<InvalidOperationException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
         Assert.Contains("must call Complete", error.Message, StringComparison.Ordinal);
         Assert.Equal(writes, Writes(rig));
-        Assert.Single(rig.Inbox);
+        await rig.Context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Empty(rig.Inbox);
         Assert.Empty(rig.Processed);
         Assert.Empty(rig.Effects);
         await AssertFailureReplayAsync(rig, input.Value);
@@ -628,6 +629,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             Context = context;
+            Output.Dispose();
             Output = TestApplicationProtocol.Create(grainContext.ActivationServices.GetRequiredService<SerializerSessionPool>(), grainContext.GrainId, grainContext.GrainId, "output", 41);
             Entered.TrySetResult();
             await Release.Task.WaitAsync(cancellationToken);
@@ -639,7 +641,11 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
             effects[Context.Envelope.MessageId] =
                 new DurableEffect(Context.Envelope.MessageId, (previous?.Count ?? 0) + 1, 501, "async-handler");
         }
-        public void Dispose() => Release.TrySetResult();
+        public void Dispose()
+        {
+            Release.TrySetResult();
+            Output.Dispose();
+        }
     }
     private sealed class JobContext(DurableJob job) : IJobRunContext
     {

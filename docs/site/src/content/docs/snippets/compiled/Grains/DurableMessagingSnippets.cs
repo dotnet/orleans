@@ -25,13 +25,28 @@ internal static class MessagingConfiguration
 
 // <messaging_payload>
 // The application codec chooses encoded message kinds using concrete record types.
-public sealed class ApplicationPayload(Serializer serializer)
+public sealed class ApplicationPayload(Serializer serializer) : IDisposable
 {
-    public ImmutableBuffer Encode(object message) =>
-        ImmutableBuffer.Create(writer => serializer.Serialize(message, writer));
+    // One encoder per non-reentrant activation: consumed slices can share pages.
+    private readonly ArcBufferWriter _encoder = new();
 
-    public T Decode<T>(ImmutableBuffer payload) where T : class =>
-        serializer.Deserialize<object>(payload.Memory) as T
+    public ArcBuffer Encode(object message)
+    {
+        try
+        {
+            serializer.Serialize(message, _encoder);
+            return _encoder.ConsumeSlice(_encoder.Length);
+        }
+        catch
+        {
+            _encoder.Reset(); // Discard a partially encoded message before reuse.
+            throw;
+        }
+    }
+
+    // Borrow the input: ordinary serialization/deserialization never consumes it.
+    public T Decode<T>(ArcBuffer payload) where T : class =>
+        serializer.Deserialize<object>(payload) as T
         ?? throw new ArgumentException($"Expected an application message of type {typeof(T).Name}.");
 
     public DurableEnvelope Envelope(GrainId sender, GrainId receiver, object message) => new()
@@ -41,6 +56,8 @@ public sealed class ApplicationPayload(Serializer serializer)
         ReceiverId = receiver,
         Payload = Encode(message)
     };
+
+    public void Dispose() => _encoder.Dispose();
 }
 
 [GenerateSerializer]
@@ -61,7 +78,7 @@ public interface INotificationGrain : IGrainWithStringKey, IDurableMessagingGrai
     ValueTask<int> GetCount();
 }
 
-public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler
+public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler, IDisposable
 {
     private readonly IDurableOutbox _outbox;
     private readonly ApplicationPayload _payload;
@@ -81,6 +98,8 @@ public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler
         _notifications = notifications;
         inbox.RegisterHandler(this);
     }
+
+    public void Dispose() => _payload.Dispose();
 
     public ValueTask<int> GetCount() => new(_count.Value);
 
@@ -104,7 +123,7 @@ public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler
             throw new ArgumentException("An operation key must retain its original notification text.");
         }
         var nextCount = alreadyRecorded ? _count.Value : checked(_count.Value + 1);
-        DurableEnvelope? reply = message.ResponseDestination is { } recipient
+        using DurableEnvelope? reply = message.ResponseDestination is { } recipient
             ? _payload.Envelope(context.Envelope.ReceiverId, recipient,
                 new NotificationReceived(message.Text, message.OperationKey))
             : null;
@@ -139,8 +158,12 @@ public sealed class NotificationSenderGrain(
     IDurableOutbox outbox,
     IDurableStateManager stateManager,
     [FromKeyedServices("sent-count")] IDurableValue<int> sentCount,
-    Serializer serializer) : Grain, INotificationSenderGrain
+    Serializer serializer) : Grain, INotificationSenderGrain, IDisposable
 {
+    private readonly ApplicationPayload _payload = new(serializer);
+
+    public void Dispose() => _payload.Dispose();
+
     public async Task SendAsync(GrainId receiver, string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
@@ -148,11 +171,12 @@ public sealed class NotificationSenderGrain(
         {
             throw new ArgumentException("Specify a nondefault receiver.", nameof(receiver));
         }
-        var envelope = new ApplicationPayload(serializer).Envelope(
-            this.GetGrainId(), receiver, new Notify(message));
-        var nextCount = checked(sentCount.Value + 1);
-        sentCount.Value = nextCount;
-        outbox.Send(envelope);
+        using (var envelope = _payload.Envelope(this.GetGrainId(), receiver, new Notify(message)))
+        {
+            var nextCount = checked(sentCount.Value + 1);
+            sentCount.Value = nextCount;
+            outbox.Send(envelope); // Borrows; durable state retains an independent pin.
+        }
         await stateManager.WriteStateAsync();
     }
 }
@@ -161,43 +185,68 @@ public sealed class NotificationSenderGrain(
 // <messaging_buffer_package>
 internal static class ShipmentPackage
 {
-    internal static ImmutableBuffer Encode(Serializer serializer, ReserveStock request, byte[] manifest)
+    // The caller supplies its reusable activation- or scope-owned encoder.
+    internal static ArcBuffer Encode(
+        Serializer serializer, ArcBufferWriter encoder, ReserveStock request, ReadOnlySpan<byte> manifest)
     {
-        var builder = new BufferPackageBuilder();
+        using var builder = new BufferPackageBuilder();
         builder.Add("reservation", writer => serializer.Serialize(request, writer));
-        builder.Add("manifest", manifest.AsSpan());
-        // The package is an ordinary application value encoded into the opaque payload.
-        return ImmutableBuffer.Create(writer => serializer.Serialize(builder.Build(), writer));
+        builder.Add("manifest", manifest);
+        using var package = builder.Build(); // Transfers the builder's one buffer owner.
+        try
+        {
+            serializer.Serialize(package, encoder); // Borrows package; does not release it.
+            return encoder.ConsumeSlice(encoder.Length); // Caller owns this payload.
+        }
+        catch
+        {
+            encoder.Reset();
+            throw;
+        }
     }
 
-    internal static (ReserveStock Request, ReadOnlyMemory<byte> Manifest) Decode(
-        Serializer serializer, ImmutableBuffer payload)
+    internal static BufferPackage Decode(Serializer serializer, ArcBuffer payload) =>
+        serializer.Deserialize<BufferPackage>(payload)
+        ?? throw new ArgumentException("A shipment requires a package.");
+
+    internal static ReserveStock ReadReservation(Serializer serializer, BufferPackage package)
     {
-        var package = serializer.Deserialize<BufferPackage>(payload.Memory)
-            ?? throw new ArgumentException("A shipment requires a package.");
-        if (!package.TryGetBytes("reservation", out var request)
-            || !package.TryGetBytes("manifest", out var manifest))
+        if (!package.TryGetBytes("reservation", out var request))
         {
-            throw new ArgumentException("A shipment requires reservation and manifest entries.");
+            throw new ArgumentException("A shipment requires a reservation entry.");
         }
-        // Each entry has its own encoding; inspect package.Keys without decoding other entries.
-        var reservation = serializer.Deserialize<ReserveStock>(request)
+        // The entry sequence is borrowed; the caller keeps the package alive.
+        return serializer.Deserialize<ReserveStock>(request)
             ?? throw new ArgumentException("A shipment requires a reservation request.");
-        return (reservation, manifest);
     }
 }
 // </messaging_buffer_package>
 
-// <messaging_arc_snapshot>
-internal static class ArcPayloadSnapshot
+// <messaging_arc_ownership>
+internal static class ArcPayloadEncoder
 {
-    internal static ImmutableBuffer Encode(Serializer<Notify> serializer, Notify message)
+    internal static ArcBuffer Encode(Serializer<Notify> serializer, ArcBufferWriter encoder, Notify message)
     {
-        using var writer = new ArcBufferWriter();
-        serializer.Serialize(message, writer);
-        using var bytes = writer.PeekSlice(writer.Length);
-        // Copy once: both Arc owners are released as this helper returns.
-        return new ImmutableBuffer(bytes);
+        try
+        {
+            serializer.Serialize(message, encoder);
+            return encoder.ConsumeSlice(encoder.Length);
+        }
+        catch
+        {
+            encoder.Reset();
+            throw;
+        }
+    }
+
+    internal static Notify DecodeRetained(Serializer serializer, ArcBuffer borrowedPayload)
+    {
+        using var retained = borrowedPayload.Slice(0, borrowedPayload.Length); // Independent pin.
+        // Reader.Create(ArcBuffer, session) preserves Arc-backed decode, including retained sub-slices.
+        using var session = serializer.SessionPool.GetSession();
+        var reader = Reader.Create(retained, session);
+        return serializer.GetSerializer<Notify>().Deserialize(ref reader)
+            ?? throw new ArgumentException("A notification is required.");
     }
 }
-// </messaging_arc_snapshot>
+// </messaging_arc_ownership>

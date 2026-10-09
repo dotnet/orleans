@@ -81,7 +81,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public async Task SendValue(int value)
     {
         var context = Observation.Context;
-        var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value);
+        using var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value);
         Observation.Value!.Value = value;
         Observation.Outbox!.Send(envelope);
         await Observation.Manager!.WriteStateAsync(CancellationToken.None);
@@ -89,7 +89,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     public async Task SendSynchronousValue(int value)
     {
         var context = Observation.Context;
-        var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value);
+        using var envelope = TestApplicationProtocol.Create(context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), context.GrainId, OutputTarget, "output", value);
         Observation.Value!.Value = value;
         Observation.Outbox!.Send(envelope);
         await Observation.Manager!.WriteStateAsync(CancellationToken.None);
@@ -117,7 +117,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
             await barrier.Continue.Task.WaitAsync(cancellationToken);
         }
         var value = Observation.Value!.Value + 1;
-        var outgoing = TestApplicationProtocol.Create(Observation.Context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), Observation.Context.GrainId, OutputTarget, "output", value);
+        using var outgoing = TestApplicationProtocol.Create(Observation.Context.ActivationServices.GetRequiredService<Orleans.Serialization.Session.SerializerSessionPool>(), Observation.Context.GrainId, OutputTarget, "output", value);
         Observation.Value.Value = value;
         Observation.Outbox!.Send(outgoing);
         HandlerCalls++;

@@ -147,7 +147,7 @@ public sealed record SequentialMessage(
     [property: Id(2)] int MessageCount);
 
 /// <summary>Runs each hop through the production inbox, outbox, journal, and durable-job pumps.</summary>
-public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain, IInboxHandler, IJournaledStateHook
+public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain, IInboxHandler, IJournaledStateHook, IDisposable
 {
     private readonly IDurableOutbox _outbox;
     private readonly IDurableStateManager _state;
@@ -156,6 +156,7 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
     private readonly IDurableValue<SequentialMessage> _progress;
     private readonly CommittedHopProbe _probe;
     private readonly Serializer<SequentialMessage> _serializer;
+    private readonly ArcBufferWriter _encoder = new();
     private SequentialMessage? _captured;
 
     /// <summary>Constructs the ring participant and its acknowledgement observer.</summary>
@@ -191,8 +192,10 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
     /// <inheritdoc/>
     public async Task StartAsync(Guid runId, int messageCount)
     {
-        var envelope = CreateEnvelope(new SequentialMessage(runId, 0, messageCount));
-        _outbox.Send(envelope);
+        using (var envelope = CreateEnvelope(new SequentialMessage(runId, 0, messageCount)))
+        {
+            _outbox.Send(envelope);
+        }
         await _state.WriteStateAsync();
     }
 
@@ -203,14 +206,14 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
     public ValueTask HandleAsync(
         IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        var message = _serializer.Deserialize(context.Envelope.Payload.Memory);
+        var message = _serializer.Deserialize(context.Envelope.Payload);
         ArgumentNullException.ThrowIfNull(message);
         if (message.RunId == Guid.Empty || message.Hop < 0 || message.Hop >= message.MessageCount)
         {
             throw new ArgumentException("The sequential message has an invalid run or hop.");
         }
         var nextCount = checked(_processed.Value + 1);
-        DurableEnvelope? output = message.Hop + 1 < message.MessageCount
+        using DurableEnvelope? output = message.Hop + 1 < message.MessageCount
             ? CreateEnvelope(message with { Hop = message.Hop + 1 })
             : null;
         cancellationToken.ThrowIfCancellationRequested();
@@ -225,13 +228,28 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
         return ValueTask.CompletedTask;
     }
 
-    private DurableEnvelope CreateEnvelope(SequentialMessage message) => new()
+    private DurableEnvelope CreateEnvelope(SequentialMessage message)
     {
-        MessageId = Guid.NewGuid(),
-        SenderId = this.GetGrainId(),
-        ReceiverId = _next.Value,
-        Payload = ImmutableBuffer.Create(writer => _serializer.Serialize(message, writer))
-    };
+        try
+        {
+            _serializer.Serialize(message, _encoder);
+            return new()
+            {
+                MessageId = Guid.NewGuid(),
+                SenderId = this.GetGrainId(),
+                ReceiverId = _next.Value,
+                Payload = _encoder.ConsumeSlice(_encoder.Length)
+            };
+        }
+        catch
+        {
+            _encoder.Reset();
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Dispose() => _encoder.Dispose();
 
     /// <inheritdoc/>
     public ValueTask BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)

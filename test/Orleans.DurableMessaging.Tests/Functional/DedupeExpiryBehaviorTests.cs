@@ -113,8 +113,6 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
     private sealed class EnvelopeLease(DurableEnvelope value) : IDisposable
     {
         public DurableEnvelope Value { get; } = value;
-        public void Dispose()
-        {
-        }
+        public void Dispose() => Value.Dispose();
     }
 }

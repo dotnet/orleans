@@ -23,14 +23,14 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<Guid, DurableEnvelo
     {
         SendCalls++;
         if (_stopped) throw new InvalidOperationException("The test outbox owner is stopped.");
-        if (envelope.MessageId == Guid.Empty || envelope.SenderId.IsDefault || envelope.ReceiverId.IsDefault || envelope.Payload is null)
+        if (envelope.MessageId == Guid.Empty || envelope.SenderId.IsDefault || envelope.ReceiverId.IsDefault)
         {
             throw new ArgumentException("An outgoing envelope requires identities and opaque payload bytes.", nameof(envelope));
         }
         if (TryGetMessage(envelope.MessageId, out var existing))
         {
             if (existing.SenderId != envelope.SenderId || existing.ReceiverId != envelope.ReceiverId
-                || !existing.Payload.Memory.Span.SequenceEqual(envelope.Payload.Memory.Span))
+                || !existing.Payload.ToArray().AsSpan().SequenceEqual(envelope.Payload.ToArray()))
             {
                 throw new InvalidOperationException($"The durable outbox already contains a different envelope with message ID '{envelope.MessageId}'.");
             }

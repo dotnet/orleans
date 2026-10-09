@@ -50,6 +50,9 @@ public static class DurableMessagingExtensions
     public static IServiceCollection AddDurableMessaging(this IServiceCollection services, Action<DurableInboxOptions>? configureOptions = null)
     {
         services.AddDurableJobs();
+        services.TryAddSingleton<IDurableDictionaryValueLifecycle<DurableEnvelope>, DurableEnvelopeLifecycle>();
+        services.TryAddSingleton<IDurableDictionaryValueLifecycle<InboxDeadLetter>, InboxDeadLetterLifecycle>();
+        services.TryAddSingleton<IDurableDictionaryValueLifecycle<OutboxDeadLetter>, OutboxDeadLetterLifecycle>();
         services.TryAddSingleton(TimeProvider.System);
         services.PostConfigure<JournaledStateManagerOptions>(
             options =>

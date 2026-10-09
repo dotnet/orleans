@@ -15,94 +15,102 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 public sealed class DurableEnvelopeContractTests
 {
     [Theory]
-    [InlineData("empty")]
-    [InlineData("span")]
-    [InlineData("sequence")]
-    [InlineData("arc")]
-    public void EnvelopeSerializer_RoundTripsOpaquePayloadAcrossIndependentProviders(string payloadKind)
+    [InlineData(0)]
+    [InlineData(7)]
+    [InlineData(100000)]
+    public void EnvelopeSerializer_RoundTripsOpaquePayloadAcrossIndependentProviders(int length)
     {
-        byte[] expected = payloadKind == "empty" ? [] : [0x00, 0xff, 0x80, 0x13, 0xea, 0x7f, 0x00];
-        var source = expected.ToArray();
-        ImmutableBuffer payload;
-        switch (payloadKind)
-        {
-            case "empty":
-                payload = ImmutableBuffer.Empty;
-                break;
-            case "span":
-                payload = new ImmutableBuffer(source.AsSpan());
-                break;
-            case "sequence":
-                var first = new Segment(source.AsMemory(0, 2));
-                var last = first.Append(source.AsMemory(2, 3)).Append(source.AsMemory(5));
-                payload = new ImmutableBuffer(new ReadOnlySequence<byte>(first, 0, last, last.Memory.Length));
-                break;
-            case "arc":
-                using (var writer = new ArcBufferWriter())
-                {
-                    writer.Write(source);
-                    using var arc = writer.PeekSlice(writer.Length);
-                    payload = new ImmutableBuffer(arc);
-                }
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(payloadKind));
-        }
-
-        var envelope = Envelope(payload);
-        Array.Fill(source, (byte)0x41);
+        var expected = Enumerable.Range(0, length).Select(i => (byte)i).ToArray();
+        using var writer = new ArcBufferWriter();
+        writer.Write(expected);
+        using var envelope = Envelope(writer.PeekSlice(writer.Length));
         using var sendingServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
         using var receivingServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        var wire = sendingServices.GetRequiredService<Serializer<DurableEnvelope>>().SerializeToArray(envelope);
-        var decoded = receivingServices.GetRequiredService<Serializer<DurableEnvelope>>().Deserialize(wire);
-        GC.Collect();
-
+        var serializer = sendingServices.GetRequiredService<Serializer<DurableEnvelope>>();
+        var wire = serializer.SerializeToArray(envelope);
+        using var decoded = receivingServices.GetRequiredService<Serializer<DurableEnvelope>>().Deserialize(wire);
         AssertEnvelope(decoded, expected);
         AssertEnvelope(envelope, expected);
-        Assert.NotSame(payload, decoded.Payload);
+        AssertEnvelope(envelope, expected); // Serialization must not consume the caller owner.
+        Assert.Equal(wire, serializer.SerializeToArray(envelope));
     }
 
     [Fact]
-    public void EnvelopeDeepCopy_SharesImmutablePayloadAndPreservesEnvelopeValues()
+    public void EnvelopeDeepCopy_RetainsIndependentPayloadOwner()
     {
-        byte[] source = [0x00, 0xff, 0x80, 0xea];
-        var envelope = Envelope(new ImmutableBuffer(source.AsSpan()));
+        using var writer = new ArcBufferWriter();
+        writer.Write(new byte[] { 0x00, 0xff, 0x80, 0xea });
+        var envelope = Envelope(writer.PeekSlice(writer.Length));
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
-
-        var copied = services.GetRequiredService<DeepCopier>().Copy(envelope);
-        Array.Fill(source, (byte)0x42);
-        GC.Collect();
-
+        using var copied = services.GetRequiredService<DeepCopier>().Copy(envelope);
+        Assert.Same(envelope.Payload.First, copied.Payload.First);
+        envelope.Dispose();
+        writer.Dispose();
         AssertEnvelope(copied, [0x00, 0xff, 0x80, 0xea]);
-        Assert.Same(envelope.Payload, copied.Payload);
-        AssertEnvelope(envelope, [0x00, 0xff, 0x80, 0xea]);
     }
 
     [Fact]
-    public void EnvelopeSerializer_RepeatedPayloadReferences_PreserveGraphSharing()
+    public void EnvelopeSerializer_RepeatedPayloads_ProduceIndependentOwners()
     {
-        byte[] source = [0xff, 0x00, 0x81];
-        var first = Envelope(new ImmutableBuffer(source.AsSpan()));
-        var second = first with
+        using var writer = new ArcBufferWriter();
+        writer.Write(new byte[] { 0xff, 0x00, 0x81 });
+        using var first = Envelope(writer.PeekSlice(writer.Length));
+        using var second = first.Retain() with
         {
             MessageId = Guid.Parse("32222222-2222-2222-2222-222222222222"),
             ReceiverId = GrainId.Create("receiver", "other")
         };
         using var sendingServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
         using var receivingServices = new ServiceCollection().AddSerializer().BuildServiceProvider();
-
         var wire = sendingServices.GetRequiredService<Serializer<DurableEnvelope[]>>().SerializeToArray([first, second]);
-        Array.Fill(source, (byte)0x43);
         var decoded = receivingServices.GetRequiredService<Serializer<DurableEnvelope[]>>().Deserialize(wire)!;
+        try
+        {
+            Assert.Equal(2, decoded.Length);
+            AssertEnvelope(decoded[0], [0xff, 0x00, 0x81]);
+            Assert.Equal(second.MessageId, decoded[1].MessageId);
+            Assert.Equal(first.SenderId, decoded[1].SenderId);
+            Assert.Equal(second.ReceiverId, decoded[1].ReceiverId);
+            decoded[0].Dispose();
+            Assert.Equal(new byte[] { 0xff, 0x00, 0x81 }, decoded[1].Payload.ToArray());
+        }
+        finally
+        {
+            // decoded[0] was consumed above. Each result has its own lifetime.
+            decoded[1].Dispose();
+        }
+    }
 
-        Assert.Equal(2, decoded.Length);
-        AssertEnvelope(decoded[0], [0xff, 0x00, 0x81]);
-        Assert.Equal(second.MessageId, decoded[1].MessageId);
-        Assert.Equal(first.SenderId, decoded[1].SenderId);
-        Assert.Equal(second.ReceiverId, decoded[1].ReceiverId);
-        Assert.Equal(new byte[] { 0xff, 0x00, 0x81 }, decoded[1].Payload.Memory.ToArray());
-        Assert.Same(decoded[0].Payload, decoded[1].Payload);
-        Assert.NotSame(first.Payload, decoded[0].Payload);
+    [Theory]
+    [InlineData("DurableEnvelope")]
+    [InlineData("InboxDeadLetter")]
+    [InlineData("OutboxDeadLetter")]
+    public void PartialDeserialization_ReleasesPayloadReadBeforeMalformedTail(string contract)
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var payloadWriter = new ArcBufferWriter();
+        payloadWriter.Write(new byte[] { 0x00, 0xff, 0x80 });
+        using var envelope = Envelope(payloadWriter.PeekSlice(payloadWriter.Length));
+        object value = envelope;
+        if (contract != "DurableEnvelope")
+        {
+            var type = typeof(DurableEnvelope).Assembly.GetType($"Orleans.DurableMessaging.{contract}", throwOnError: true)!;
+            value = Activator.CreateInstance(type, nonPublic: true)!;
+            type.GetProperty("Envelope")!.SetValue(value, envelope);
+            type.GetProperty("DeadLetteredAt")!.SetValue(value, DateTimeOffset.UtcNow);
+            type.GetProperty("Reason")!.SetValue(value, "failure");
+            type.GetProperty("AttemptCount")!.SetValue(value, 1);
+        }
+        var serializer = services.GetRequiredService<Serializer>();
+        var encoded = serializer.SerializeToArray(value);
+        using var wireWriter = new ArcBufferWriter();
+        wireWriter.Write(encoded);
+        using var truncated = wireWriter.PeekSlice(wireWriter.Length - 1);
+        var refs = typeof(ArcBufferPage).GetField("_refCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var before = (int)refs.GetValue(truncated.First)!;
+        Assert.ThrowsAny<Exception>(() => serializer.Deserialize<object>(truncated));
+        Assert.Equal(before, (int)refs.GetValue(truncated.First)!);
+        AssertEnvelope(envelope, [0x00, 0xff, 0x80]);
     }
 
     [Fact]
@@ -111,14 +119,15 @@ public sealed class DurableEnvelopeContractTests
         Assert.True(typeof(DurableEnvelope).IsPublic);
         Assert.True(typeof(DurableEnvelope).IsValueType);
         Assert.Single(typeof(DurableEnvelope).GetCustomAttributes<IsReadOnlyAttribute>());
-        Assert.Single(typeof(DurableEnvelope).GetCustomAttributes<GenerateSerializerAttribute>());
+        Assert.Empty(typeof(DurableEnvelope).GetCustomAttributes<GenerateSerializerAttribute>());
         Assert.Equal("Orleans.DurableMessaging.DurableEnvelope", Assert.Single(
             typeof(DurableEnvelope).GetCustomAttributes<AliasAttribute>()).Alias);
         AssertSurface(typeof(DurableEnvelope),
             Property("MessageId", typeof(Guid), true),
             Property("SenderId", typeof(GrainId), true),
             Property("ReceiverId", typeof(GrainId), true),
-            Property("Payload", typeof(ImmutableBuffer), true));
+            Property("Payload", typeof(ArcBuffer), true),
+            Method("Retain", typeof(DurableEnvelope)), Method("Dispose", typeof(void)));
         AssertIds(typeof(DurableEnvelope), ("MessageId", 0u), ("SenderId", 1u), ("ReceiverId", 2u), ("Payload", 3u));
         foreach (var property in typeof(DurableEnvelope).GetProperties())
         {
@@ -151,17 +160,9 @@ public sealed class DurableEnvelopeContractTests
             StaticMethod("Backpressured", typeof(DeliveryResult)), StaticMethod("HandlerNotFound", typeof(DeliveryResult)),
             StaticMethod("DeadLettered", typeof(DeliveryResult), typeof(string)));
 
-        Assert.True(typeof(ImmutableBuffer).IsPublic);
-        Assert.True(typeof(ImmutableBuffer).IsSealed);
-        Assert.Single(typeof(ImmutableBuffer).GetCustomAttributes<ImmutableAttribute>());
-        Assert.Single(typeof(ImmutableBuffer).GetCustomAttributes<GenerateSerializerAttribute>());
-        Assert.Empty(typeof(ImmutableBuffer).GetInterfaces());
-        Assert.Equal(new[] { typeof(ArcBuffer), typeof(ReadOnlySequence<byte>), typeof(ReadOnlySpan<byte>) }.Select(TypeName).Order(StringComparer.Ordinal),
-            typeof(ImmutableBuffer).GetConstructors().Select(c => TypeName(Assert.Single(c.GetParameters()).ParameterType)).Order(StringComparer.Ordinal));
-        AssertSurface(typeof(ImmutableBuffer), Property("Memory", typeof(ReadOnlyMemory<byte>)),
-            Property("Length", typeof(int)), "static " + Property("Empty", typeof(ImmutableBuffer)),
-            Method("AsReadOnlySequence", typeof(ReadOnlySequence<byte>)),
-            StaticMethod("Create", typeof(ImmutableBuffer), typeof(Action<IBufferWriter<byte>>)));
+        Assert.True(typeof(ArcBuffer).IsPublic);
+        Assert.True(typeof(ArcBuffer).IsValueType);
+        Assert.Contains(typeof(IDisposable), typeof(ArcBuffer).GetInterfaces());
 
     }
 
@@ -200,7 +201,7 @@ public sealed class DurableEnvelopeContractTests
     private static string StaticMethod(string name, Type result, params Type[] parameters) => "static " + Method(name, result, parameters);
     private static string TypeName(Type type) => type.FullName!;
 
-    private static DurableEnvelope Envelope(ImmutableBuffer payload) => new()
+    private static DurableEnvelope Envelope(ArcBuffer payload) => new()
     {
         MessageId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
         SenderId = GrainId.Create("sender", "contract"),
@@ -214,19 +215,8 @@ public sealed class DurableEnvelopeContractTests
         Assert.Equal(GrainId.Create("sender", "contract"), envelope.SenderId);
         Assert.Equal(GrainId.Create("receiver", "contract"), envelope.ReceiverId);
         Assert.Equal(expected.Length, envelope.Payload.Length);
-        Assert.Equal(expected, envelope.Payload.Memory.ToArray());
+        Assert.Equal(expected, envelope.Payload.ToArray());
         Assert.Equal(expected, envelope.Payload.AsReadOnlySequence().ToArray());
     }
 
-    private sealed class Segment : ReadOnlySequenceSegment<byte>
-    {
-        public Segment(ReadOnlyMemory<byte> memory) => Memory = memory;
-
-        public Segment Append(ReadOnlyMemory<byte> memory)
-        {
-            var next = new Segment(memory) { RunningIndex = RunningIndex + Memory.Length };
-            Next = next;
-            return next;
-        }
-    }
 }

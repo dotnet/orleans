@@ -74,10 +74,18 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         Assert.Equal(writes + 1, Fixture.Storage.GetSuccessfulWriteCount(journal));
         AssertPendingRetry(context, await receiver.GetSnapshotAsync(), 1, now + TimeSpan.FromMinutes(1));
         Assert.False(grain.DeactivationFailure.Task.IsCompleted);
-        using var retry = ArmHandlerBeforeAdvance(receiver.GetGrainId(), "messages/record", TimeSpan.FromMinutes(1));
+        using var retry = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/record");
+        Fixture.Clock.Advance(TimeSpan.FromMinutes(1));
+        // The grain-facing retry clock is fake while shard-executor scheduling uses
+        // real background time. Request the authoritative callback explicitly so this
+        // test does not depend on whether the original background dequeue happened
+        // before or after the fake-time advance. RunPumpAsync still runs the real
+        // non-interleaving inbox timer and awaits that exact requested run's outcome.
+        var retryPump = RunPumpAsync(receiver, Assert.IsType<DurableJob>(owner));
         await retry.WaitUntilEnteredAsync();
         AssertPendingRetry(context, grain.GetSnapshotForTest(), 1, now + TimeSpan.FromMinutes(1));
         retry.Release();
+        Assert.Equal(DurableJobRunStatus.Completed, (await retryPump).Status);
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Equal(0, completed.InboxCount);
@@ -122,7 +130,7 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         using var envelope = CreateEnvelope(receiver, NewMessage(190, "missing-after-replay"), route);
         Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope.Value)).Status);
         await originalContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
-        var accepted = originalGrain.GetSnapshotForTest();
+        var accepted = Assert.IsType<DurableEndpointSnapshot>(originalGrain.AcceptedSnapshot);
         Assert.Equal(1, accepted.InboxCount);
         Assert.Empty(accepted.Effects);
         var job = Assert.Single(Fixture.JobManagerProbe.GetScheduledJobs(ReceiverTestServices.InboxJobName, receiver.GetGrainId()));

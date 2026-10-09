@@ -17,6 +17,16 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     private static readonly GrainId Sender = GrainId.Create("order", "42");
     private Serializer Serializer => _services.GetRequiredService<Serializer>();
     private static readonly GrainId Receiver = GrainId.Create("inventory", "widget");
+    private readonly ApplicationPayload _payload;
+    private readonly List<DurableEnvelope> _owned = [];
+
+    public DurableMessagingRecipeTests() => _payload = new(Serializer);
+
+    private DurableEnvelope Own(DurableEnvelope envelope)
+    {
+        _owned.Add(envelope);
+        return envelope;
+    }
 
     [Fact]
     public void HierarchicalKeys_IsolateTenantsStepsAndSegmentBoundaries()
@@ -54,7 +64,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     {
         var stock = new TestValue<int> { Value = available };
         var ledger = new TestDictionary<HierarchicalKey, ReservationResult>();
-        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, Substitute.For<IDurableStateManager>(), stock, ledger);
+        using var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, Substitute.For<IDurableStateManager>(), stock, ledger);
         var request = new ReserveStock(HierarchicalKey.Create("orders/42/inventory/widget/reserve"), quantity, Sender);
         var first = CreateContext(request, request.OperationKey);
         var second = CreateContext(request, request.OperationKey);
@@ -83,7 +93,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var original = new ReservationResult(key, 3, true);
         var stock = new TestValue<int> { Value = 7 };
         var ledger = new TestDictionary<HierarchicalKey, ReservationResult> { [key] = original };
-        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, Substitute.For<IDurableStateManager>(), stock, ledger);
+        using var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, Substitute.For<IDurableStateManager>(), stock, ledger);
         var request = new ReserveStock(key, 4, Sender);
         var attempt = CreateContext(request, key);
 
@@ -101,7 +111,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     {
         var stock = new TestValue<int> { Value = 10 };
         var ledger = new TestDictionary<HierarchicalKey, ReservationResult>();
-        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, Substitute.For<IDurableStateManager>(), stock, ledger);
+        using var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, Substitute.For<IDurableStateManager>(), stock, ledger);
         var request = new ReserveStock(HierarchicalKey.Create("orders/42/inventory/widget/reserve"), 3, Sender);
         var attempt = CreateContext(request, request.OperationKey);
         using var cancellation = new CancellationTokenSource();
@@ -128,7 +138,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
             LoseFirstResponse = !cancelAfterProviderSuccess,
             AfterFirstCharge = cancelAfterProviderSuccess ? cancellation.Cancel : null
         };
-        var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, gateway, ledger);
+        using var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, gateway, ledger);
         var request = new ChargePayment(HierarchicalKey.Create("tenants/acme/orders/42/payment/charge"), 12.5m, "USD", Sender);
         var first = CreateContext(request, request.OperationKey);
         if (cancelAfterProviderSuccess)
@@ -165,11 +175,40 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     }
 
     [Fact]
+    public async Task Payment_PreparationAwaitKeepsBorrowedInputAndStagesOwnedReplyBeforeReturn()
+    {
+        var ledger = new TestDictionary<HierarchicalKey, PaymentResult>();
+        var gateway = Substitute.For<IIdempotentPaymentGateway>();
+        var request = new ChargePayment(HierarchicalKey.Create("orders/42/payment/charge"), 12.5m, "USD", Sender);
+        var outcome = new PaymentResult(request, "provider-charge-1", true);
+        var prepared = new TaskCompletionSource<PaymentResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        gateway.ChargeAsync(request.OperationKey.ToString(), request, Arg.Any<CancellationToken>())
+            .Returns(prepared.Task);
+        var attempt = CreateContext(request, request.OperationKey);
+        using (var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, gateway, ledger))
+        {
+            var handling = grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+            Assert.False(handling.IsCompleted);
+            Assert.Empty(ledger);
+            Assert.Empty(attempt.Output);
+            Assert.Empty(attempt.Events);
+            // The inbox-owned input remains borrowed across actual asynchronous preparation.
+            Assert.Equal(request, ReadBody<ChargePayment>(attempt.Context.Envelope));
+            prepared.SetResult(outcome);
+            await handling;
+            Assert.Equal(new[] { "send", "complete" }, attempt.Events);
+        }
+        // The outbox substitute retained its pin; local reply and grain encoder are gone.
+        Assert.Equal(outcome, ReadBody<PaymentResult>(Assert.Single(attempt.Output)));
+        Assert.Equal(outcome, Assert.Single(ledger).Value);
+    }
+
+    [Fact]
     public async Task Payment_ConflictingKeyReusePreservesOriginalProviderOutcome()
     {
         var ledger = new TestDictionary<HierarchicalKey, PaymentResult>();
         var gateway = new IdempotentGateway();
-        var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, gateway, ledger);
+        using var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), Outbox, Serializer, gateway, ledger);
         var original = new ChargePayment(HierarchicalKey.Create("orders/42/payment/charge"), 12.5m, "USD", Sender);
         var first = CreateContext(original, original.OperationKey);
         await grain.HandleAsync(first.Context, TestContext.Current.CancellationToken);
@@ -194,7 +233,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         long incomingVersion, int incomingStock, long expectedVersion, int expectedStock)
     {
         var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
-        var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), Serializer, snapshot);
+        using var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), Serializer, snapshot);
         var update = new StockSnapshot(incomingVersion, incomingStock);
         var attempt = CreateContext(update, HierarchicalKey.Create("stock/widget"));
 
@@ -211,7 +250,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public async Task Projection_ConflictingVersionPreservesOriginalSnapshot()
     {
         var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
-        var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), Serializer, snapshot);
+        using var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), Serializer, snapshot);
         var update = new StockSnapshot(10, 99);
         var attempt = CreateContext(update, HierarchicalKey.Create("stock/widget"));
 
@@ -227,7 +266,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     {
         var ledger = new TestDictionary<HierarchicalKey, OrderOutcome>();
         var inbox = Substitute.For<IDurableInbox>();
-        var grain = new OrderOutcomesGrain(inbox, Serializer, ledger);
+        using var grain = new OrderOutcomesGrain(inbox, Serializer, ledger);
         var reservation = new ReservationResult(HierarchicalKey.Create("orders/42/inventory/reserve"), 3, true);
         var charge = new ChargePayment(HierarchicalKey.Create("orders/42/payment/charge"), 12.5m, "USD", Sender);
         var payment = new PaymentResult(charge, "provider-charge-1", true);
@@ -255,7 +294,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var key = HierarchicalKey.Create("orders/42/inventory/reserve");
         var original = new ReservationResult(key, 3, true);
         var ledger = new TestDictionary<HierarchicalKey, OrderOutcome> { [key] = original };
-        var grain = new OrderOutcomesGrain(Substitute.For<IDurableInbox>(), Serializer, ledger);
+        using var grain = new OrderOutcomesGrain(Substitute.For<IDurableInbox>(), Serializer, ledger);
         var attempt = CreateContext(original with { Reserved = false }, key);
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
@@ -274,7 +313,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var state = Substitute.For<IDurableStateManager>();
         var grainContext = Substitute.For<IGrainContext>();
         grainContext.GrainId.Returns(Sender);
-        var grain = new CampaignGrain(outbox, state, campaigns, Serializer, grainContext);
+        using var grain = new CampaignGrain(outbox, state, campaigns, Serializer, grainContext);
         var id = Guid.Parse("3dd3fbec-0197-47cf-9233-92ecbddcd057");
         GrainId[] original = [GrainId.Create("notification", "alice"), GrainId.Create("notification", "bob")];
         var recipients = original.ToArray();
@@ -283,7 +322,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var acknowledgement = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
-            outputs.Add(call.Arg<DurableEnvelope>());
+            outputs.Add(Own(call.Arg<DurableEnvelope>().Retain()));
             events.Add("send");
         });
         state.WriteStateAsync(Arg.Any<CancellationToken>()).Returns(_ =>
@@ -332,7 +371,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var state = Substitute.For<IDurableStateManager>();
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(Sender);
-        var grain = new CampaignGrain(outbox, state, campaigns, Serializer, context);
+        using var grain = new CampaignGrain(outbox, state, campaigns, Serializer, context);
 
         await Assert.ThrowsAsync<ArgumentException>(() => grain.PublishAsync(id,
             changeRecipients ? "original" : "changed",
@@ -353,7 +392,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     {
         // key is business protocol data, never transport metadata.
         ArgumentNullException.ThrowIfNull(key);
-        var envelope = new ApplicationPayload(Serializer).Envelope(Sender, Receiver, body);
+        var envelope = Own(_payload.Envelope(Sender, Receiver, body));
         var context = Substitute.For<IInboxHandlerContext>();
         context.Envelope.Returns(_ =>
         {
@@ -368,7 +407,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
             Outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
             {
                 var active = _attempts[_activeAttempt];
-                active.Output.Add(call.Arg<DurableEnvelope>());
+                active.Output.Add(Own(call.Arg<DurableEnvelope>().Retain()));
                 active.Events.Add("send");
             });
         }
@@ -377,9 +416,14 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     }
 
     private T ReadBody<T>(DurableEnvelope envelope) where T : class =>
-        new ApplicationPayload(Serializer).Decode<T>(envelope.Payload);
+        _payload.Decode<T>(envelope.Payload);
 
-    public void Dispose() => _services.Dispose();
+    public void Dispose()
+    {
+        foreach (var envelope in _owned) envelope.Dispose();
+        _payload.Dispose();
+        _services.Dispose();
+    }
 
     private sealed class TestDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IDurableDictionary<TKey, TValue>
         where TKey : notnull;

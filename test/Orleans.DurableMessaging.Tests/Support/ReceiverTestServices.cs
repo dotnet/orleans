@@ -28,6 +28,7 @@ internal static class ReceiverTestServices
 
     public static void Add(IServiceCollection services, Action<DurableInboxOptions> configure)
     {
+        AddValueLifecycles(services);
         var inboxType = GetImplementationType("DurableInbox");
         var extensionType = GetImplementationType("DurableInboxExtension");
         var instrumentsType = GetImplementationType("DurableMessagingInstruments");
@@ -95,6 +96,19 @@ internal static class ReceiverTestServices
                 65_536);
         });
         services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IConfigureGrainTypeComponents), configuratorType));
+    }
+
+    public static void AddValueLifecycles(IServiceCollection services)
+    {
+        foreach (var (value, lifecycle) in new[]
+        {
+            (typeof(DurableEnvelope), GetImplementationType("DurableEnvelopeLifecycle")),
+            (GetImplementationType("InboxDeadLetter"), GetImplementationType("InboxDeadLetterLifecycle")),
+            (GetImplementationType("OutboxDeadLetter"), GetImplementationType("OutboxDeadLetterLifecycle"))
+        })
+        {
+            services.TryAddSingleton(typeof(IDurableDictionaryValueLifecycle<>).MakeGenericType(value), lifecycle);
+        }
     }
 
     private static IDurableDictionary<TKey, TValue> GetDictionary<TKey, TValue>(IServiceProvider services, string stateName)

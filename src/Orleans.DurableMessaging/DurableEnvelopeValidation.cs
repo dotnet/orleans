@@ -14,9 +14,5 @@ internal static class DurableEnvelopeValidation
         {
             throw new ArgumentException("The envelope sender must not be the default grain ID.", nameof(envelope));
         }
-        if (envelope.Payload is null)
-        {
-            throw new ArgumentException("The envelope payload must be provided.", nameof(envelope));
-        }
     }
 }

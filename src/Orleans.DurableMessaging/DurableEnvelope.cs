@@ -10,10 +10,10 @@ namespace Orleans.DurableMessaging;
 /// <remarks>
 /// The sender and message identifier form the transport deduplication key.
 /// Applications define their payload format, dispatch, reply routing, and business-operation identity.
-/// The immutable payload remains valid while any envelope or application reference retains it.
+/// Each owning envelope must be disposed. Copies of the struct borrow the same ownership; use Retain to acquire an independent lifetime.
 /// </remarks>
-[GenerateSerializer, Alias("Orleans.DurableMessaging.DurableEnvelope")]
-public readonly struct DurableEnvelope
+[Alias("Orleans.DurableMessaging.DurableEnvelope")]
+public readonly struct DurableEnvelope : IDisposable
 {
     /// <summary>
     /// Gets the nonempty identifier of this delivery, preserved across transport retries.
@@ -41,5 +41,12 @@ public readonly struct DurableEnvelope
     /// before shared mutations. Create the payload locally before staging the envelope.
     /// </remarks>
     [Id(3)]
-    public required ImmutableBuffer Payload { get; init; }
+    public required ArcBuffer Payload { get; init; }
+
+    /// <summary>Acquires an independently owned payload slice.</summary>
+    /// <returns>An envelope which must be disposed by its owner.</returns>
+    public DurableEnvelope Retain() => this with { Payload = Payload.Slice(0) };
+
+    /// <summary>Releases this envelope's owned payload slice.</summary>
+    public void Dispose() => Payload.Dispose();
 }

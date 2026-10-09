@@ -20,7 +20,11 @@ construction before the first shared mutation. Their final shared update, sends,
 `Complete()`, and method return run synchronously. The inbox owns their journal
 write. Ordinary methods explicitly await their application's journal write. Register one
 non-generic handler per inbox and inject the outbox directly; record types identify
-application message kinds.
+application message kinds. Each grain owns one reusable application encoder and
+implements `IDisposable` for activation teardown. Handler context payloads are
+borrowed; each prepared reply is a local `using` envelope. The outbox retains its own
+pin during staging, and local ownership is released even when preparation or staging
+throws.
 
 ## Reserve inventory once per order line
 
@@ -29,7 +33,7 @@ Use one inventory grain per tenant/SKU, with `available-stock` and a durable
 [OrderOperationKeys](durable-messaging-idempotency.md#hierarchical-business-operation-keys),
 includes it and the response destination in the typed `ReserveStock` application
 record. The [application-local codec](durable-messaging.md#encode-ordinary-application-values)
-encodes that record into the envelope's immutable raw payload.
+encodes that record into the envelope's owned, read-only Arc slice.
 
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_inventory" language="csharp":::
 
@@ -92,7 +96,10 @@ recipient set.
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_fanout" language="csharp":::
 
 The campaign record and every outgoing intent are captured in the same sender
-journal write. Each destination commits independently through the
+journal write. Fan-out prepares all envelopes locally before changing shared state,
+then disposes every local owner in `finally`, including partial preparation on failure.
+The outbox keeps its independently retained pins through acknowledgement and delivery.
+Each destination commits independently through the
 [notification handler](durable-messaging.md#deployment-requirements). Operation
 keys in the `Notify` payload identify each recipient under the campaign root. The
 recipient's durable notification ledger prevents a fresh-ID business duplicate
@@ -131,6 +138,26 @@ steps have succeeded, one transition emits `shipment/create`.
 Each transition uses the same prepare-then-synchronous-final-block pattern. Keep
 business rejection in the workflow state and reserve exception retry policy for
 preparation failures. Use the step ledgers to answer status queries during outages.
+
+## Choose an application migration pattern
+
+Move existing application responsibilities into the handler and its typed payload
+records, using the durable inbox/outbox commit boundary for outgoing intent:
+
+| Existing application pattern | Durable messaging pattern |
+| --- | --- |
+| Request/reply grain method | Encode the request kind, business key, and response destination in an application record; the handler stages a typed reply with completion. |
+| Business update followed by a remote call | Stage the outgoing envelope with the business update; acknowledged outbox state drives delivery and retry. |
+| External provider call | Prepare the provider outcome with a stable provider idempotency key, then commit its local ledger entry, reply, and inbox completion together. |
+| Notification loop | Prepare bounded, owned envelopes with one reusable encoder, stage all intents with the campaign record, and release local pins before awaiting the write. |
+| Multiple encoded attachments | Build one disposable keyed package; decode only needed borrowed entries while retaining its owner. |
+
+Preserve domain keys and recorded outcomes when moving application workflows. Payload
+decoding, message-kind dispatch, reply routing, authorization, and business-operation
+identity stay in application helpers. Carry ordinary records directly in raw Arc
+payloads, and choose explicit retain/release at each ownership boundary. See
+[Application payload evolution](durable-messaging-operations.md#evolve-application-payload-records)
+for rolling application-record changes.
 
 ## Verify your handlers
 

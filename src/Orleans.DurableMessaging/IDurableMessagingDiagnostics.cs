@@ -49,8 +49,13 @@ public interface IDurableMessagingDiagnostics
 public sealed class DurableDeadLetter
 {
     /// <summary>
-    /// Gets the message.
+    /// Gets the borrowed message.
     /// </summary>
+    /// <remarks>
+    /// The payload is owned by durable state until dead-letter removal or scope disposal.
+    /// Do not dispose this value. Use <see cref="DurableEnvelope.Retain"/> for an independent
+    /// lifetime, or copy the bytes into a diagnostic DTO before returning them over RPC.
+    /// </remarks>
     public required DurableEnvelope Message { get; init; }
 
     /// <summary>

@@ -151,8 +151,8 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var durable = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output");
         var sessions = Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
-        var first = TestApplicationProtocol.Create(sessions, receiver.GetGrainId(), receiver.GetGrainId(), "messages/output", 1);
-        var late = TestApplicationProtocol.Create(sessions, receiver.GetGrainId(), receiver.GetGrainId(), "messages/output", 2);
+        using var first = TestApplicationProtocol.Create(sessions, receiver.GetGrainId(), receiver.GetGrainId(), "messages/output", 1);
+        using var late = TestApplicationProtocol.Create(sessions, receiver.GetGrainId(), receiver.GetGrainId(), "messages/output", 2);
         await receiver.StageOutputAsync(first);
         var storage = Fixture.Storage.BlockWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         var write = Fixture.WriteStateAsync(receiver).AsTask();
@@ -181,7 +181,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-capture-cutoff");
-        var turn = receiver.HoldPumpTurnAsync("hold-capture-cutoff", replacement: null, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-capture-cutoff", replacement: default, deactivate: false);
         await hold.WaitUntilEnteredAsync();
         var extension = (IDurableInboxExtension)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         Task<DeliveryResult> initial = null!;
@@ -290,9 +290,10 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         using var envelope = CreateEnvelope(receiver, NewMessage(114, "acceptance-write-failure"));
         var failure = await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
         Assert.Contains("Injected journal write failure", failure.Message, StringComparison.Ordinal);
+        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         var rejected = grain.GetSnapshotForTest();
         Assert.Equal(before.ActivationId, rejected.ActivationId);
-        Assert.Equal(1, rejected.InboxCount);
+        Assert.Equal(0, rejected.InboxCount);
         Assert.NotNull(rejected.InboxJobId);
         Assert.NotNull(rejected.InboxJob);
         Assert.Empty(rejected.Effects);
@@ -327,7 +328,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         var preparation = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), route + "/application-preparation");
         handler.Release();
         await preparation.WaitUntilEnteredAsync();
-        return new(receiver, context, outbox, handler, preparation, envelope.Value);
+        return new(receiver, context, outbox, handler, preparation, envelope.Value.Retain());
     }
 
     private static Task OnTurnAsync(IGrainContext context, Action action)
@@ -358,7 +359,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         public DurableMessagingTestGrain Grain { get; } = Assert.IsType<DurableMessagingTestGrain>(Context.GrainInstance);
         public IJournaledStateManager Manager => Context.ActivationServices.GetRequiredService<IJournaledStateManager>();
         public JournalId JournalId => JournalId.FromGrainId(Receiver.GetGrainId());
-        public void Dispose() { Preparation.Dispose(); Handler.Dispose(); }
+        public void Dispose() { Preparation.Dispose(); Handler.Dispose(); Envelope.Dispose(); }
     }
 
     private sealed class CallbackContext(DurableJob job) : IJobRunContext

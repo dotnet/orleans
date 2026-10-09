@@ -25,7 +25,7 @@ Use this page for the payload, commit, execution, and recovery model. Continue w
 Each <xref:Orleans.DurableMessaging.DurableEnvelope> has exactly four transport
 members: `MessageId` (<xref:System.Guid>), `SenderId` and `ReceiverId`
 (<xref:Orleans.Runtime.GrainId>), and required `Payload`
-(<xref:Orleans.Serialization.Buffers.ImmutableBuffer>). The receiving grain verifies
+(<xref:Orleans.Serialization.Buffers.ArcBuffer>). The receiving grain verifies
 that the receiver matches its own identity before deduplication or persistence.
 
 Register one <xref:Orleans.DurableMessaging.IInboxHandler> with
@@ -48,43 +48,73 @@ operation identity and optional response destination in the request:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_payload" language="csharp":::
 
-`ImmutableBuffer` freezes raw managed bytes. Its
-<xref:Orleans.Serialization.Buffers.ImmutableBuffer.Memory> is read-only;
-<xref:Orleans.Serialization.Buffers.ImmutableBuffer.Length> is the raw byte count and
-<xref:Orleans.Serialization.Buffers.ImmutableBuffer.Empty> represents zero bytes.
-Copying constructors snapshot a borrowed
-`ReadOnlySpan<byte>`, `ReadOnlySequence<byte>`, or
-<xref:Orleans.Serialization.Buffers.ArcBuffer>. After copying an Arc input, immediately
-dispose its owner. <xref:Orleans.Serialization.Buffers.ImmutableBuffer.Create*>
-accepts an `Action<IBufferWriter<byte>>` and snapshots the callback's
-written bytes once. Retaining the callback writer or mutating the source cannot
-change the result. Consumers treat exposed read-only memory as immutable, including
-when using memory interop APIs.
+### Own and borrow payload slices
 
-Managed immutable backing avoids retaining a minimum 16 KiB Arc page for every tiny
-message. Outbox staging, RPC serialization/copying, and journal values can share
-immutable references safely; persistence and networking still perform their own
-encoding and I/O. Application record decoding remains explicit at the receiver.
+An envelope is a disposable readonly struct containing an owned
+<xref:Orleans.Serialization.Buffers.ArcBuffer> slice. Treat its bytes as read-only.
+<xref:Orleans.Serialization.Buffers.ArcBuffer.Empty> represents an owner-free empty
+payload. A struct assignment copies the view, not its ownership: use
+<xref:Orleans.DurableMessaging.DurableEnvelope.Retain*> to obtain an independent
+payload pin, and dispose each owning envelope exactly once.
 
-When an existing encoder writes to an Arc writer, snapshot its raw bytes into the
-immutable payload and release both writer and slice owners immediately:
+The application codec writes ordinary records into one reusable
+<xref:Orleans.Serialization.Buffers.ArcBufferWriter> per non-reentrant activation.
+<xref:Orleans.Serialization.Buffers.ArcBufferWriter.ConsumeSlice*> returns an owned
+slice of the newly written bytes; subsequent messages occupy disjoint regions and
+can share backing pages. Consuming a slice advances the writer's readable range;
+the returned slice independently keeps its pages alive. The grain implements
+<xref:System.IDisposable> to dispose its encoder at activation teardown; a scoped
+service registered with dependency injection can own it instead. Serialize encoder
+access when sharing an application scope across concurrent callers.
 
-:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_arc_snapshot" language="csharp":::
+| Boundary | Ownership and release |
+| --- | --- |
+| Application constructs a slice or envelope | The caller owns it. Use `using` and dispose after staging, or after an actual direct send finishes. |
+| `IDurableOutbox.Send(envelope)` | Borrows the envelope during the call. Durable dictionary state retains its own pin, so the caller can dispose its local owner immediately after staging. |
+| `IInboxHandlerContext.Envelope` | Borrowed until the actual handler method ends, including asynchronous preparation. Do not dispose the context envelope or its payload. Retain explicitly when keeping it longer. |
+| `IDurableInboxExtension` RPC request | Generated request copying retains a separate pin. The extension owns the request clone and disposes it on success, rejection, cancellation, and failure; the caller retains its own owner through actual send completion. |
+| Ordinary persistence or networking serialization | Borrows the payload and leaves its pin intact. Repeated serialization is non-consuming. Operation buffers and decoded owners have their own lifetimes. |
+
+Prepare replies as local `using` envelopes before shared mutations. Stage sends and
+call `Complete()` in the same final synchronous block, with no awaits from the first
+mutation through handler return. Scope disposal releases local replies on both
+success and exceptions; staged durable state keeps its independent pin. Never
+release a send owner merely because a caller stopped waiting: an actual in-flight
+operation can still read its bytes.
+
+The Arc overloads of <xref:Orleans.Serialization.Serializer.Deserialize*> and
+<xref:Orleans.Serialization.Serializer`1.Deserialize*> create an Arc-backed reader.
+Codecs can retain raw sub-slices during decode instead of copying them. For explicit
+reader control, use <xref:Orleans.Serialization.Buffers.Reader.Create*> with the
+borrowed Arc buffer and a serializer session, then the generic serializer's public
+`Deserialize(ref reader)` overload:
+
+:::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_arc_ownership" language="csharp":::
 
 ### Carry independently encoded items
 
-<xref:Orleans.Serialization.Buffers.BufferPackage> is a reusable application value
-for keyed raw entries. <xref:Orleans.Serialization.Buffers.BufferPackageBuilder>
-accepts a raw span or a synchronous writer callback with
-<xref:Orleans.Serialization.Buffers.BufferPackageBuilder.Add*>, then
-<xref:Orleans.Serialization.Buffers.BufferPackageBuilder.Build*> freezes the package
-and builder. <xref:Orleans.Serialization.Buffers.BufferPackage.Keys> inspects the
-index; <xref:Orleans.Serialization.Buffers.BufferPackage.TryGetBytes*> returns an
-entry's read-only bytes without decoding other entries.
-<xref:Orleans.Serialization.Buffers.BufferPackage.Count> gives the entry count and
-<xref:Orleans.Serialization.Buffers.BufferPackage.Buffer> exposes the frozen raw backing. Each key has an application-defined
-encoding. Encode the package itself with an ordinary serializer when using it as an
-envelope payload:
+<xref:Orleans.Serialization.Buffers.BufferPackage> owns one Arc buffer and a read-only
+ordinal key index of `(offset, length)` entries. The application chooses each entry's
+encoding. <xref:Orleans.Serialization.Buffers.BufferPackageBuilder> owns its Arc
+writer; dispose the builder even if adding or encoding an entry fails.
+<xref:Orleans.Serialization.Buffers.BufferPackageBuilder.Build*> transfers the
+buffer owner into a disposable package. Encoding that package with an ordinary
+serializer borrows it; release the package after encoding.
+
+<xref:Orleans.Serialization.Buffers.BufferPackage.Keys> inspects the index without
+decoding values. <xref:Orleans.Serialization.Buffers.BufferPackage.TryGetBytes*>
+returns a borrowed <xref:System.Buffers.ReadOnlySequence`1> for an entry, and
+<xref:Orleans.Serialization.Buffers.BufferPackage.Buffer> exposes a borrowed Arc
+view. Keep an owning package alive throughout access to these views; dispose
+neither the borrowed buffer nor its entry views. Use
+<xref:Orleans.Serialization.Buffers.BufferPackage.Retain*> for an independent package
+lifetime. <xref:Orleans.Serialization.Buffers.BufferPackage.Count> includes empty
+entries. The index references the concatenated bytes directly, without an array per
+entry.
+
+Decode through the Arc serializer overload to retain the package's raw sub-slice.
+The decoded package owns its pin independently of the envelope. Use `using` around
+that package while inspecting or decoding entries, and dispose it after use:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_buffer_package" language="csharp":::
 

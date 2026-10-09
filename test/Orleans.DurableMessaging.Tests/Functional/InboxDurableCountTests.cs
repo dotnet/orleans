@@ -31,7 +31,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         var context = Fixture.GetGrainContext(receiver);
         var probe = new CountProbe(context);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-count-burst");
-        var turn = receiver.HoldPumpTurnAsync("hold-count-burst", replacement: null, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-count-burst", replacement: default, deactivate: false);
         await hold.WaitUntilEnteredAsync();
         try
         {
@@ -72,7 +72,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         var context = Fixture.GetGrainContext(receiver);
         var probe = new CountProbe(context);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-count-phases");
-        var turn = receiver.HoldPumpTurnAsync("hold-count-phases", replacement: null, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-count-phases", replacement: default, deactivate: false);
         await hold.WaitUntilEnteredAsync();
         try
         {
@@ -142,7 +142,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         var probe = new CountProbe(context);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-count-fault");
         using var handlers = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/count-replay");
-        var turn = receiver.HoldPumpTurnAsync("hold-count-fault", replacement: null, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-count-fault", replacement: default, deactivate: false);
         await hold.WaitUntilEnteredAsync();
         try
         {
@@ -174,7 +174,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         }
         await turn;
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
-        Assert.Equal(new Counts(2, 1, 1), probe.Read());
+        Assert.Equal(new Counts(0, 0, 0), probe.Read());
         _ = await receiver.GetSnapshotAsync();
         await handlers.WaitUntilEnteredAsync();
         var freshContext = Fixture.GetGrainContext(receiver);
@@ -182,7 +182,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         var fresh = new CountProbe(freshContext);
         var restored = committed ? 2 : 1;
         await AssertCountsAsync(freshContext, fresh, new(restored, 0, restored));
-        Assert.Equal(new Counts(2, 1, 1), probe.Read());
+        Assert.Equal(new Counts(0, 0, 0), probe.Read());
         handlers.Release();
         await Fixture.WaitForEffectCountAsync(receiver, restored);
         _ = await receiver.GetSnapshotAsync();
@@ -211,7 +211,8 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
             var failure = await Assert.ThrowsAsync<IOException>(() => DeliverAsync(receiver, envelope.Value));
             Assert.Contains("Injected journal write failure", failure.Message, StringComparison.Ordinal);
         }
-        Assert.Equal(new Counts(scheduling ? 0 : 1, scheduling ? 0 : 1, 0), probe.Read());
+        if (!scheduling) await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
+        Assert.Equal(new Counts(0, 0, 0), probe.Read());
         Assert.Equal(0, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(receiver.GetGrainId())));
         if (!scheduling)
         {
@@ -222,7 +223,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         _ = await receiver.GetSnapshotAsync();
         var current = Fixture.GetGrainContext(receiver);
         await AssertCountsAsync(current, new CountProbe(current), new(0, 0, 0));
-        if (!scheduling) Assert.Equal(new Counts(1, 1, 0), probe.Read());
+        if (!scheduling) Assert.Equal(new Counts(0, 0, 0), probe.Read());
     }
 
     [Fact]

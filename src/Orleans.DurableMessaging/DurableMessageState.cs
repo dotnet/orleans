@@ -32,7 +32,7 @@ internal sealed class OutboxMessageState
     public DateTimeOffset? EnqueuedAt { get; set; }
 }
 
-[GenerateSerializer, Alias("Orleans.DurableMessaging.InboxDeadLetter")]
+[Alias("Orleans.DurableMessaging.InboxDeadLetter")]
 internal sealed class InboxDeadLetter
 {
     [Id(0)]
@@ -48,7 +48,7 @@ internal sealed class InboxDeadLetter
     public int AttemptCount { get; init; }
 }
 
-[GenerateSerializer, Alias("Orleans.DurableMessaging.OutboxDeadLetter")]
+[Alias("Orleans.DurableMessaging.OutboxDeadLetter")]
 internal sealed class OutboxDeadLetter
 {
     [Id(0)]
