@@ -12,7 +12,7 @@ namespace Orleans.DurableMessaging;
 /// </summary>
 internal sealed class DurableInbox : IDurableInbox
 {
-    private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inbox;
+    private readonly IDurableDictionary<HierarchicalKey, DurableEnvelope> _inbox;
     private IInboxHandler? _handler;
     private readonly int _capacity;
 
@@ -22,7 +22,7 @@ internal sealed class DurableInbox : IDurableInbox
     /// <param name="inbox">Durable dictionary for storing unprocessed messages.</param>
     /// <param name="capacity">Maximum inbox capacity (default: 1000).</param>
     public DurableInbox(
-        IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inbox,
+        IDurableDictionary<HierarchicalKey, DurableEnvelope> inbox,
         int capacity = 1000)
     {
         ArgumentNullException.ThrowIfNull(inbox);
@@ -33,7 +33,7 @@ internal sealed class DurableInbox : IDurableInbox
     }
 
     internal DurableInbox(
-        IDurableDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inbox,
+        IDurableDictionary<HierarchicalKey, DurableEnvelope> inbox,
         IEnumerable<IInboxHandler> handlers,
         int capacity)
         : this(inbox, capacity)
@@ -62,15 +62,11 @@ internal sealed class DurableInbox : IDurableInbox
     /// <summary>
     /// Tries to get a specific message by its key.
     /// </summary>
-    /// <param name="senderId">The sender grain ID.</param>
-    /// <param name="messageId">The message ID.</param>
+    /// <param name="messageId">The receiver-local command identity.</param>
     /// <param name="envelope">The envelope if found.</param>
     /// <returns>True if the message exists in the inbox; otherwise, false.</returns>
-    public bool TryGetMessage(GrainId senderId, Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope)
-    {
-        var key = (senderId, messageId);
-        return _inbox.TryGetValue(key, out envelope);
-    }
+    public bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
+        _inbox.TryGetValue(messageId, out envelope);
 
     /// <summary>
     /// Registers the single handler for this inbox.

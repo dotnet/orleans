@@ -15,12 +15,18 @@ public sealed record TestApplicationMessage(
 
 internal static class TestApplicationProtocol
 {
-    public static DurableEnvelope Create(SerializerSessionPool sessions, GrainId sender, GrainId receiver, string route, object? body) =>
+    public static HierarchicalKey NewMessageId() => HierarchicalKey.Create("tests", Guid.NewGuid().ToString("N"));
+
+    public static DurableEnvelope Create(SerializerSessionPool sessions, GrainId sender, GrainId receiver,
+        string route, object? body, HierarchicalKey messageId = default) =>
         new()
         {
-            MessageId = Guid.NewGuid(),
+            MessageId = messageId.IsDefault
+                ? body is DurableTestMessage message ? message.LogicalId : NewMessageId()
+                : messageId,
             SenderId = sender,
             ReceiverId = receiver,
+            Subject = route,
             Payload = Encode(sessions, new TestApplicationMessage(route, body))
         };
 

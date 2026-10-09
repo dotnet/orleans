@@ -25,7 +25,7 @@ public abstract class DurableMessagingBehaviorTestBase : IAsyncLifetime
         Fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
 
     protected static DurableTestMessage NewMessage(int sequence, string value) =>
-        new(Guid.NewGuid(), sequence, value);
+        new(TestApplicationProtocol.NewMessageId(), sequence, value);
 
     protected async Task RefreshSeededOwnerAsync(IDurableMessagingTestGrain receiver)
     {

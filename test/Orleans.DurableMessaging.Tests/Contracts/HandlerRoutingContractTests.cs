@@ -232,17 +232,24 @@ public sealed class HandlerRoutingContractTests
             attribute => attribute.AssemblyName.Split(',')[0] == consumer);
     }
 
-    [Fact]
-    public void HandlerContext_Constructor_RequiresCompletionCallback()
+    private static IDurableInbox CreateInbox(out IDurableDictionary<(GrainId, Guid), DurableEnvelope> storage)
     {
-        using var envelope = Envelope();
-        var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
-        var exception = Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(type, [envelope, null]));
-        Assert.Equal("complete", Assert.IsType<ArgumentNullException>(exception.InnerException).ParamName);
-        var parameters = Assert.Single(type.GetConstructors()).GetParameters();
-        Assert.Equal(2, parameters.Length);
-        Assert.Equal(typeof(Action), parameters[1].ParameterType);
-        Assert.False(parameters[1].IsOptional);
+        var type = typeof(IDurableInbox).Assembly.GetType("Orleans.DurableMessaging.DurableInbox", throwOnError: true)!;
+        storage = Substitute.For<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>();
+        return Assert.IsAssignableFrom<IDurableInbox>(Activator.CreateInstance(type, storage, 1000));
+    }
+
+    private static IInboxHandler? RegisteredHandler(IDurableInbox inbox)
+    {
+        var method = inbox.GetType().GetMethod("TryGetHandler", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        object?[] arguments = [null];
+        var found = Assert.IsType<bool>(method.Invoke(inbox, arguments));
+        if (!found)
+        {
+            Assert.Null(arguments[0]);
+            return null;
+        }
+        return Assert.IsAssignableFrom<IInboxHandler>(arguments[0]);
     }
 
     private static IDurableInbox CreateInbox(out IDurableDictionary<HierarchicalKey, DurableEnvelope> storage)
