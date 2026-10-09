@@ -193,11 +193,11 @@ public sealed class HandlerRoutingContractTests
         using var writer = new ArcBufferWriter();
         writer.Write(new byte[] { 0x00, 0xff, 0x80 });
         return new()
-    {
-        MessageId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
-        SenderId = GrainId.Create("sender", "handler"),
-        ReceiverId = GrainId.Create("receiver", "handler"),
-        Payload = payload ?? writer.PeekSlice(writer.Length)
+        {
+            MessageId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            SenderId = GrainId.Create("sender", "handler"),
+            ReceiverId = GrainId.Create("receiver", "handler"),
+            Payload = payload ?? writer.PeekSlice(writer.Length)
         };
     }
 
