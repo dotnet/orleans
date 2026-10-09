@@ -231,6 +231,19 @@ public sealed class HandlerRoutingContractTests
             attribute => attribute.AssemblyName.Split(',')[0] == consumer);
     }
 
+    [Fact]
+    public void HandlerContext_Constructor_RequiresCompletionCallback()
+    {
+        using var envelope = Envelope();
+        var type = typeof(IInboxHandlerContext).Assembly.GetType("Orleans.DurableMessaging.InboxHandlerContext", throwOnError: true)!;
+        var exception = Assert.Throws<TargetInvocationException>(() => Activator.CreateInstance(type, [envelope, null]));
+        Assert.Equal("complete", Assert.IsType<ArgumentNullException>(exception.InnerException).ParamName);
+        var parameters = Assert.Single(type.GetConstructors()).GetParameters();
+        Assert.Equal(2, parameters.Length);
+        Assert.Equal(typeof(Action), parameters[1].ParameterType);
+        Assert.False(parameters[1].IsOptional);
+    }
+
     private static IDurableInbox CreateInbox(out IDurableDictionary<(GrainId, Guid), DurableEnvelope> storage)
     {
         var type = typeof(IDurableInbox).Assembly.GetType("Orleans.DurableMessaging.DurableInbox", throwOnError: true)!;

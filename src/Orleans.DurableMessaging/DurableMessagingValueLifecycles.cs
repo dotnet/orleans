@@ -13,8 +13,10 @@ internal sealed class InboxDeadLetterLifecycle : IDurableDictionaryValueLifecycl
     public InboxDeadLetter Retain(InboxDeadLetter value) => RetainValue(value);
     internal static InboxDeadLetter RetainValue(InboxDeadLetter value) => new()
     {
-        Envelope = value.Envelope.Retain(), DeadLetteredAt = value.DeadLetteredAt,
-        Reason = value.Reason, AttemptCount = value.AttemptCount
+        Envelope = value.Envelope.Retain(),
+        DeadLetteredAt = value.DeadLetteredAt,
+        Reason = value.Reason,
+        AttemptCount = value.AttemptCount
     };
     public void Release(InboxDeadLetter value) => value.Envelope.Dispose();
 }
@@ -24,8 +26,10 @@ internal sealed class OutboxDeadLetterLifecycle : IDurableDictionaryValueLifecyc
     public OutboxDeadLetter Retain(OutboxDeadLetter value) => RetainValue(value);
     internal static OutboxDeadLetter RetainValue(OutboxDeadLetter value) => new()
     {
-        Envelope = value.Envelope.Retain(), DeadLetteredAt = value.DeadLetteredAt,
-        Reason = value.Reason, AttemptCount = value.AttemptCount
+        Envelope = value.Envelope.Retain(),
+        DeadLetteredAt = value.DeadLetteredAt,
+        Reason = value.Reason,
+        AttemptCount = value.AttemptCount
     };
     public void Release(OutboxDeadLetter value) => value.Envelope.Dispose();
 }
