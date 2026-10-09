@@ -5,9 +5,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Providers;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Providers;
 using Orleans.Serialization;
+using Orleans.Serialization.Configuration;
 using Orleans.Streaming.JsonConverters;
 using Orleans.Streams;
 using Orleans.Streams.Core;
@@ -32,6 +34,7 @@ namespace Orleans.Hosting
             }
 
             services.TryAddSingleton<StreamInstruments>();
+            services.Configure<TypeManifestOptions>(static options => options.AddAllowedType(typeof(PersistentStreamProvider)));
             services.AddSingleton<PubSubGrainStateStorageFactory>();
             services.AddSingleton<SiloStreamProviderRuntime>();
             services.AddFromExisting<IStreamProviderRuntime, SiloStreamProviderRuntime>();
@@ -68,6 +71,7 @@ namespace Orleans.Hosting
             }
 
             services.AddSingleton<ClientStreamingProviderRuntime>();
+            services.Configure<TypeManifestOptions>(static options => options.AddAllowedType(typeof(PersistentStreamProvider)));
             services.AddFromExisting<IStreamProviderRuntime, ClientStreamingProviderRuntime>();
             services.AddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
             services.AddSingleton<ImplicitStreamSubscriberTable>();

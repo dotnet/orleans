@@ -80,17 +80,19 @@ namespace Orleans.Runtime.Messaging
             {
                 var reader = Reader.Create(readRequest.Body, _deserializationSession);
                 var field = reader.ReadFieldHeader();
+                FieldHeaderCodec.EnsureRequiredType(field);
+                var bodyType = field.FieldType ?? throw new global::Orleans.Serialization.TypeMissingException();
 
                 if (message.Result == ResponseTypes.Success)
                 {
                     message.Result = ResponseTypes.None; // reset raw response indicator
-                    if (!_rawResponseCodecs.TryGetValue(field.FieldType!, out var rawCodec))
-                        rawCodec = GetRawCodec(field.FieldType!);
+                    if (!_rawResponseCodecs.TryGetValue(bodyType, out var rawCodec))
+                        rawCodec = GetRawCodec(bodyType);
                     message._bodyObject = rawCodec.ReadRaw(ref reader, ref field);
                 }
                 else
                 {
-                    var bodyCodec = _codecProvider.GetCodec(field.FieldType!);
+                    var bodyCodec = _codecProvider.GetCodec(bodyType);
                     message._bodyObject = bodyCodec.ReadValue(ref reader, field);
                 }
             }

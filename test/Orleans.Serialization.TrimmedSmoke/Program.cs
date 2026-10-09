@@ -33,6 +33,7 @@ internal static class Program
                 options.AddSerializer(typeof(CustomGenericCodec<>));
                 options.AddCopier(typeof(CustomGenericCopier<>));
                 options.AddActivator(typeof(CustomGenericActivator<>));
+                options.AddAllowedType(typeof(SerializablePayload));
             }))
             .AddSingleton<IGeneralizedCodec, DotNetSerializableCodec>()
             .BuildServiceProvider();

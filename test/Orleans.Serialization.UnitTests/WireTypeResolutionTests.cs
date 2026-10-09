@@ -8,8 +8,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Configuration;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
+using Orleans.Serialization.WireProtocol;
+using Orleans.Hosting;
+using Orleans.Providers.Streams.Common;
 using Xunit;
 
 namespace Orleans.Serialization.UnitTests;
@@ -232,6 +236,44 @@ public sealed class WireTypeResolutionTests
     }
 
     [Fact]
+    public void UnavailableUnknownFieldCanBeSkippedButRequiredRootFailsExplicitly()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var pool = services.GetRequiredService<SerializerSessionPool>();
+        var output = new ArrayBufferWriter<byte>();
+        using (var session = pool.GetSession())
+        {
+            var writer = Writer.Create(output, session);
+            var name = Encoding.UTF8.GetBytes("Unknown.FutureType, Unknown.Assembly");
+            ReferenceCodec.MarkValueField(session);
+            writer.WriteByte((byte)((uint)WireType.TagDelimited | (uint)SchemaType.Encoded));
+            writer.WriteByte(1);
+            writer.WriteInt32(123);
+            writer.WriteVarUInt32((uint)name.Length);
+            writer.Write(name);
+            writer.WriteEndObject();
+            Int32Codec.WriteField(ref writer, 1, 29);
+            writer.Commit();
+        }
+
+        using (var session = pool.GetSession())
+        {
+            var reader = Reader.Create(output.WrittenMemory, session);
+            var unknown = reader.ReadFieldHeader();
+            Assert.Null(unknown.FieldType);
+            Assert.Equal(SchemaType.Encoded, unknown.Tag.SchemaType);
+            reader.ConsumeUnknownField(unknown);
+            Assert.Equal(29, Int32Codec.ReadValue(ref reader, reader.ReadFieldHeader()));
+            Assert.Equal(2u, session.ReferencedObjects.CurrentReferenceId);
+        }
+
+        Assert.Throws<TypeMissingException>(() =>
+            services.GetRequiredService<Serializer>().Deserialize<object>(output.WrittenSpan.ToArray()));
+        Assert.Throws<TypeMissingException>(() =>
+            services.GetRequiredService<Serializer<object>>().Deserialize(output.WrittenSpan.ToArray()));
+    }
+
+    [Fact]
     public void RegisteredClosedContextCollectionsAndManifestAliasesRoundTrip()
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
@@ -257,6 +299,22 @@ public sealed class WireTypeResolutionTests
             contextSerializer.Deserialize<object>(contextSerializer.SerializeToArray<object>(original)));
         Assert.Equal(43, Assert.Single(restored).Value);
         Assert.NotSame(original, restored);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StreamingHostingRegistersProviderControlMarkerIdentity(bool silo)
+    {
+        var registrations = new ServiceCollection().AddSerializer();
+        if (silo) registrations.AddSiloStreaming();
+        else registrations.AddClientStreaming();
+        using var services = registrations.BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var providerType = typeof(PersistentStreamProvider);
+
+        Assert.Same(providerType,
+            serializer.Deserialize<Type>(serializer.SerializeToArray<Type>(providerType)));
     }
 
     [Theory]

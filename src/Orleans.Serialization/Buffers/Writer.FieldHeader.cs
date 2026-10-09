@@ -192,6 +192,21 @@ namespace Orleans.Serialization.Codecs
             }
         }
 
+        internal static Field ReadRequiredFieldHeader<TInput>(this ref Reader<TInput> reader)
+        {
+            var field = reader.ReadFieldHeader();
+            EnsureRequiredType(field);
+            return field;
+        }
+
+        internal static void EnsureRequiredType(Field field)
+        {
+            if (field.FieldType is null && field.Tag.SchemaType != SchemaType.Expected)
+            {
+                throw new TypeMissingException();
+            }
+        }
+
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static (Type? type, string typeName) ReadTypeForAnalysis<TInput>(this ref Reader<TInput> reader, SchemaType schemaType)
         {

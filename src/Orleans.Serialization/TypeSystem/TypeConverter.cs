@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
@@ -552,13 +553,33 @@ public class TypeConverter
                 result = _wireClosedGenericTypes.TryGetValue(definition, out var closedTypes)
                     ? closedTypes.Find(candidate => candidate.GenericTypeArguments.SequenceEqual(arguments))
                     : null;
-                result ??= definition.MakeGenericType(arguments);
+                if (result is null)
+                {
+                    if (!RuntimeFeature.IsDynamicCodeSupported)
+                    {
+                        throw new TypeLoadException($"Register the closed wire type \"{generic.Format()}\" in a serializer context or with {nameof(TypeManifestOptions.AddAllowedType)}.");
+                    }
+
+                    result = ConstructGenericWireType(definition, arguments);
+                }
+
                 break;
             case ArrayTypeSpec array:
                 if (BindWireType(array.ElementType, assembly, allowAllTypes) is not { } element) return null;
-                result = _wireArrayTypes.TryGetValue((element, array.Dimensions), out var registeredArray)
-                    ? registeredArray
-                    : array.Dimensions == 1 ? element.MakeArrayType() : element.MakeArrayType(array.Dimensions);
+                if (_wireArrayTypes.TryGetValue((element, array.Dimensions), out var registeredArray))
+                {
+                    result = registeredArray;
+                }
+                else
+                {
+                    if (!RuntimeFeature.IsDynamicCodeSupported)
+                    {
+                        throw new TypeLoadException($"Register the wire array shape \"{array.Format()}\" in a serializer context or with {nameof(TypeManifestOptions.AddAllowedType)}.");
+                    }
+
+                    result = ConstructArrayWireType(element, array.Dimensions);
+                }
+
                 break;
             case PointerTypeSpec pointer:
                 if (BindWireType(pointer.ElementType, assembly, allowAllTypes) is not { } pointed) return null;
@@ -588,6 +609,19 @@ public class TypeConverter
         if (result is not null) AuthorizeWireType(result, allowAllTypes);
         return result;
     }
+
+#if NET7_0_OR_GREATER
+    [RequiresDynamicCode("Dynamic wire generic shapes require runtime code generation. Native applications register closed shapes.")]
+#endif
+#if NET5_0_OR_GREATER
+    [RequiresUnreferencedCode("Dynamic generic wire shapes require preserving the generic definition's constraints and the argument members required by those constraints. Trimmed applications register closed shapes.")]
+#endif
+    private static Type ConstructGenericWireType(Type definition, Type[] arguments) => definition.MakeGenericType(arguments);
+
+#if NET7_0_OR_GREATER
+    [RequiresDynamicCode("Dynamic wire array shapes require runtime code generation. Native applications register array shapes.")]
+#endif
+    private static Type ConstructArrayWireType(Type element, int rank) => rank == 1 ? element.MakeArrayType() : element.MakeArrayType(rank);
 
     private void AuthorizeWireType(Type type, bool allowAllTypes = false)
     {

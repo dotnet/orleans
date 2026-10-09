@@ -13,6 +13,7 @@ namespace Orleans.Serialization
         internal Dictionary<Type, Func<Exception>> ExceptionFactories { get; } = new()
         {
             [typeof(Exception)] = static () => new Exception(),
+            [typeof(ApplicationException)] = static () => new ApplicationException(),
             [typeof(SystemException)] = static () => new SystemException(),
             [typeof(ArgumentException)] = static () => new ArgumentException(),
             [typeof(ArgumentNullException)] = static () => new ArgumentNullException(),
