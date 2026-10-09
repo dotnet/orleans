@@ -104,9 +104,18 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             // A callback from a previous physical arm can arrive after Change or Dispose. Only the
             // current elapsed deadline is eligible, and changing to zero/infinite invalidates it.
-            if (_disposed || !_scheduled || _firing
-                || _shared.TimeProvider.GetElapsedTime(_scheduledAt) < _scheduledDueTime)
+            if (_disposed || !_scheduled || _firing)
             {
+                return;
+            }
+
+            var elapsed = _shared.TimeProvider.GetElapsedTime(_scheduledAt);
+            if (elapsed < _scheduledDueTime)
+            {
+                // Physical timers can fire before this higher-resolution deadline. Preserve the
+                // one-shot arm, rounding up so a sub-millisecond remainder stays asynchronous.
+                var remaining = _scheduledDueTime - elapsed;
+                _timer!.Change(TimeSpan.FromMilliseconds(Math.Ceiling(remaining.TotalMilliseconds)), Timeout.InfiniteTimeSpan);
                 return;
             }
 

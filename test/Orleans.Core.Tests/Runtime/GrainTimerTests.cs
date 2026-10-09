@@ -254,6 +254,48 @@ public sealed class GrainTimerTests
         Assert.Equal(infinite ? 0 : 1, fixture.Time.TimerCreations);
     }
 
+    [Theory]
+    [InlineData(0.5, false)]
+    [InlineData(0.5, true)]
+    [InlineData(2.5, false)]
+    [InlineData(2.5, true)]
+    public async Task EarlyPhysicalCallback_PreservesDelayedTickAndPeriod(double earlyMilliseconds, bool repeating)
+    {
+        using var fixture = new TimerFixture();
+        using var diagnostics = new TimerDiagnostics(fixture.Grain);
+        var calls = 0;
+        var dueTime = TimeSpan.FromMilliseconds(100);
+        var earlyBy = TimeSpan.FromMilliseconds(earlyMilliseconds);
+        var rearmDelay = TimeSpan.FromMilliseconds(Math.Ceiling(earlyMilliseconds));
+        var expectedTicks = repeating ? 3 : 1;
+        using var timer = fixture.Registry.RegisterGrainTimer(fixture.Grain, (_, _) =>
+        {
+            calls++;
+            return Task.CompletedTask;
+        }, 0, new(dueTime, repeating ? dueTime : Timeout.InfiniteTimeSpan));
+
+        for (var i = 0; i < expectedTicks; i++)
+        {
+            fixture.Time.Advance(dueTime - earlyBy);
+            fixture.Time.FireEarlyCallback();
+            Assert.Equal(i, fixture.Messages.Count);
+            Assert.Equal(i, calls);
+            fixture.Time.Advance(rearmDelay - TimeSpan.FromTicks(1));
+            Assert.Equal(i, fixture.Messages.Count);
+            fixture.Time.Advance(TimeSpan.FromTicks(1));
+            Assert.Equal(i + 1, fixture.Messages.Count);
+            await fixture.InvokeAsync(fixture.Messages[i]);
+            Assert.Equal(i + 1, calls);
+        }
+
+        Assert.Equal(1, fixture.Time.TimerCreations);
+        Assert.Equal(expectedTicks, diagnostics.Events.OfType<GrainTimerEvents.TickStart>().Count());
+        Assert.Equal(expectedTicks, diagnostics.Events.OfType<GrainTimerEvents.TickStop>().Count());
+        timer.Dispose();
+        fixture.Time.Advance(TimeSpan.FromDays(1));
+        Assert.Equal(expectedTicks, fixture.Messages.Count);
+    }
+
     [Fact]
     public async Task DelayedToImmediateRearm_RejectsStalePhysicalCallbacksAndReusesTimer()
     {
@@ -544,13 +586,19 @@ public sealed class GrainTimerTests
         public int TimerCreations { get; private set; }
         private TimerCallback? _callback;
         private object? _state;
+        private ITimer? _timer;
         public void FireStaleCallback() => _callback!(_state);
+        public void FireEarlyCallback()
+        {
+            _timer!.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _callback!(_state);
+        }
         public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
         {
             TimerCreations++;
             _callback = callback;
             _state = state;
-            return base.CreateTimer(callback, state, dueTime, period);
+            return _timer = base.CreateTimer(callback, state, dueTime, period);
         }
     }
 }
