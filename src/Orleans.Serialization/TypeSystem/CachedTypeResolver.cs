@@ -157,9 +157,11 @@ namespace Orleans.Serialization.TypeSystem
                 return result;
             }
 
-            static Type? ResolveType(Assembly? asm, string name, bool ignoreCase)
+            static Type? ResolveType(Assembly? asm, string name, bool _)
             {
-                return asm?.GetType(name, throwOnError: false, ignoreCase: ignoreCase) ?? Type.GetType(name, throwOnError: false, ignoreCase: ignoreCase);
+                return asm is null
+                    ? Type.GetType(name, throwOnError: false, ignoreCase: false)
+                    : asm.GetType(name, throwOnError: false, ignoreCase: false);
             }
         }
     }
