@@ -1,9 +1,10 @@
 # Durable Messaging: stock reservations
 
 A self-contained .NET 10 console host runs one localhost Orleans silo and two
-application grains: an **order** sends a stock reservation and a **stock** grain
-records the outcome and replies. Volatile journals and in-memory jobs keep the
-demonstration self-contained.
+application grains. An **order** submits a typed reservation under an application
+command ID; a **stock** grain updates inventory and sends a deterministic reply.
+Resubmitting that same ID produces `Duplicate` admission and one stock decrement.
+Volatile journals and in-memory jobs keep the demonstration self-contained.
 
 ## Run
 
@@ -14,9 +15,9 @@ The repository build substitutes the current source packages from its local feed
 From the repository root:
 
 ```powershell
-pwsh ./samples/Build-Samples.ps1 -SkipExternalAssets
+pwsh .\samples\Build-Samples.ps1 -SkipExternalAssets
 # Or run Validate-Samples.ps1 to perform policy checks and the complete build.
-dotnet run --project ./samples/DurableMessaging/DurableMessaging.csproj --configuration Release --no-build
+dotnet run --project .\samples\DurableMessaging\DurableMessaging.csproj --configuration Release --no-build
 ```
 
 `Build-Samples.ps1` packs current Orleans sources with a unique version and passes
@@ -31,7 +32,7 @@ application projects.
 package versions to that release and run:
 
 ```powershell
-dotnet run --project ./DurableMessaging.csproj --configuration Release
+dotnet run --project .\DurableMessaging.csproj --configuration Release
 ```
 
 Until then, standalone builds have an explicit unpublished-package exception.
@@ -41,8 +42,8 @@ central Orleans package versions with that local feed's generated version.
 Restore/build with the local feed and the normal public dependency feed:
 
 ```powershell
-dotnet restore ./DurableMessaging.csproj --source <absolute-local-package-feed> --source https://api.nuget.org/v3/index.json
-dotnet run --project ./DurableMessaging.csproj --configuration Release --no-restore
+dotnet restore .\DurableMessaging.csproj --source <absolute-local-package-feed> --source https://api.nuget.org/v3/index.json
+dotnet run --project .\DurableMessaging.csproj --configuration Release --no-restore
 ```
 
 For a feed with separate stable and experimental versions, use the stable version
@@ -54,27 +55,29 @@ will not replace its declared versions.
 
 ## What to review
 
-1. The host initializes ten units of `trail-shoes`, then submits the same
-   `orders/order-1042/reserve-stock/v1` business operation twice for two units.
-   Each submission creates a **fresh transport message ID**. Transport retries
-   preserve their original ID.
-2. `StockMessage`, `ReserveStock`, and `ReservationOutcome` define the application's
-   encoding, message dispatch, and reply destination. The transport envelope
-   carries only sender, receiver, message ID, and opaque `ArcBuffer` payload bytes.
-3. Each grain registers a **non-generic `IInboxHandler`** and decodes using the
-   ordinary `Serializer<StockMessage>.Deserialize(ArcBuffer)` overload. Each
-   activation owns a reusable `ArcBufferWriter`. Locally created envelopes are
-   owned `using` variables; handlers borrow inbox envelopes through method
-   completion. `IDurableOutbox.Send` synchronously retains its own slice.
-4. The stock grain's journaled ledger uses a stable **`HierarchicalKey` business
-   operation**. A duplicate returns the original reservation
-   ID and preserves the current stock count. Reusing that key
-   with a different quantity is invalid. Rejected reservations are also recorded
-   as stable outcomes.
+1. The host initializes ten units of `trail-shoes`, then submits
+   `orders/order-1042/reserve-stock` for two units through the order's outbox.
+   Once the original reply is journal-acknowledged, it reconstructs the same command
+   and calls explicit inbox admission. The second submission returns `Duplicate`.
+2. `ReserveStock` and `ReservationOutcome` have keyed `DurableMessageType<T>`
+   bindings under `inventory.reserve.v1` and `inventory.reservation-result.v1`.
+   Each envelope carries its hierarchical command ID, exact subject, sender,
+   receiver, and owning `ArcBuffer` payload.
+3. Each grain registers a **non-generic `IInboxHandler`** and decodes its expected
+   typed subject. `DurableMessageWriter`, scoped by `AddDurableMessaging`, prepares
+   owned envelopes with one reusable encoder. Local envelopes use `using`; handlers
+   borrow inbox envelopes through actual method completion. `IDurableOutbox.Send`
+   synchronously retains its own slice. Dependency injection disposes the scoped
+   writer at activation teardown.
+4. The stock handler runs once. Its inbox completion fact recognizes the same
+   command ID across senders and subjects during retention. The result reply uses
+   the deterministic child `orders/order-1042/reserve-stock/result`; inventory
+   stores the remaining stock, accepted reservation count, and execution count.
+   One ID binds an immutable command, including quantity, destination, and subject.
 5. Each handler decodes, validates, computes results, constructs any outgoing
    envelope, and checks cancellation **before its first shared mutation**. From
    that mutation through `context.Complete()` and method return, execution is synchronous.
-   Business state, ledger, outgoing intent, and inbox completion share the journal
+   Inventory, outgoing intent, and inbox completion share the journal
    boundary. The runtime owns the subsequent write and acknowledgement.
 6. The order's ordinary submit method awaits `WriteStateAsync` to commit its
    outgoing intent. To observe the completed round trip, the host awaits a
@@ -83,15 +86,16 @@ will not replace its declared versions.
    taken before capture. The observer is host-local demo instrumentation;
    the durable reply is the outcome in the order grain's journaled receipts.
 
-A successful run prints distinct submission IDs and then:
+A successful run prints:
 
 ```text
-ACKNOWLEDGED: two replies, original reservation <reservation-id>
-VERIFIED: remaining stock=8, reservations=1, processed requests=2, ledger entries=1.
+ACKNOWLEDGED: original reply orders/order-1042/reserve-stock/result
+RESUBMITTED: orders/order-1042/reserve-stock, admission=Duplicate
+VERIFIED: remaining stock=8, reservations=1, processed requests=1.
 ```
 
-The assertions verify equal original outcomes, exactly two processed requests,
-and exactly one business effect. A failed assertion or the two-minute deadline
+The assertions verify the original correlated outcome, duplicate admission,
+exactly one handler execution, and exactly one business effect. A failed assertion or the two-minute deadline
 fails the process with a nonzero exit code. The host stops after the verification.
 Only one localhost sample using the default silo/gateway ports should run at a time.
 
@@ -102,9 +106,14 @@ standalone. Their acknowledgements exercise the real journaling, inbox, outbox,
 and job pumps. **Stopping the process discards its state.** Configure persistent
 journal and job providers to recover across process restarts.
 
-Retain business-operation outcomes for the application's deduplication window;
-business idempotency is enforced by the saved outcome. In a production order
-service, authenticate and authorize submitters and reply destinations,
-validate the complete request fingerprint, and define retention and compensation
-policies. Use the external provider's idempotency and reconciliation protocol for
-external effects.
+Retain inbox completion records for the full supported resubmission horizon.
+After expiry, the same command ID can be admitted and executed again. A completed
+duplicate acknowledges the retained ID/time fact; callers obtain business results
+from the original durable reply or query genuine business state. The originally
+committed outbox intent delivers that reply within its configured retry policy.
+
+In a production order service, derive tenant ownership from trusted ingress,
+authorize command IDs, subjects, and reply destinations, and define reservation
+lookup, expiry, release, and compensation policies. Store queryable reservations
+by the original command ID when those operations need them. External effects use
+the same canonical ID with their provider's idempotency and reconciliation protocol.

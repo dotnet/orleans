@@ -1,55 +1,70 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.DurableMessaging;
 using Orleans.Journaling;
 using Orleans.Runtime;
-using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
 
 namespace DurableMessaging;
 
 public interface IOrderGrain : IGrainWithStringKey, IDurableMessagingGrain
 {
-    Task<Guid> ReserveAsync(GrainId stock, HierarchicalKey operation, int quantity);
+    Task<HierarchicalKey> ReserveAsync(GrainId stock, HierarchicalKey commandId, int quantity);
+    Task<DeliveryResult> ResubmitAsync(GrainId stock, HierarchicalKey commandId, int quantity);
 }
 
-public sealed class OrderGrain : Grain, IOrderGrain, IInboxHandler, IJournaledStateHook, IDisposable
+public sealed class OrderGrain : Grain, IOrderGrain, IInboxHandler, IJournaledStateHook
 {
     private readonly IDurableOutbox _outbox;
     private readonly IDurableStateManager _state;
     private readonly IDurableList<ReservationOutcome> _receipts;
-    private readonly Serializer<StockMessage> _serializer;
+    private readonly DurableMessageType<ReserveStock> _reserve;
+    private readonly DurableMessageType<ReservationOutcome> _result;
+    private readonly DurableMessageWriter _writer;
     private readonly CommittedReceiptsProbe _probe;
-    private readonly ArcBufferWriter _encoder = new();
     private ReservationOutcome[] _captured = [];
 
     public OrderGrain(IDurableInbox inbox, IDurableOutbox outbox, IDurableStateManager state,
-        IJournaledStateManager journal, Serializer<StockMessage> serializer, CommittedReceiptsProbe probe)
+        IJournaledStateManager journal, DurableMessageWriter writer,
+        [FromKeyedServices(StockProtocol.Reserve)] DurableMessageType<ReserveStock> reserve,
+        [FromKeyedServices(StockProtocol.Result)] DurableMessageType<ReservationOutcome> result,
+        CommittedReceiptsProbe probe)
     {
         _outbox = outbox;
         _state = state;
-        _serializer = serializer;
+        _writer = writer;
+        _reserve = reserve;
+        _result = result;
         _probe = probe;
         _receipts = state.GetOrAddState<IDurableList<ReservationOutcome>>("receipts");
         inbox.RegisterHandler(this);
         journal.Hooks.Add(this);
     }
 
-    public async Task<Guid> ReserveAsync(GrainId stock, HierarchicalKey operation, int quantity)
+    public async Task<HierarchicalKey> ReserveAsync(GrainId stock, HierarchicalKey commandId, int quantity)
     {
-        ArgumentNullException.ThrowIfNull(operation);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
-        using var request = StockProtocol.Encode(_serializer, _encoder, this.GetGrainId(), stock,
-            new ReserveStock(operation, quantity, this.GetGrainId()));
+        using var request = _writer.Create(_reserve, commandId, stock,
+            new ReserveStock(quantity, this.GetGrainId()));
         _outbox.Send(request); // Send is synchronous and retains its own payload slice.
         await _state.WriteStateAsync(); // Ordinary callers explicitly await intent persistence.
         return request.MessageId;
     }
 
+    public async Task<DeliveryResult> ResubmitAsync(GrainId stock, HierarchicalKey commandId, int quantity)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
+        using var request = _writer.Create(_reserve, commandId, stock,
+            new ReserveStock(quantity, this.GetGrainId()));
+        // Explicit admission exposes the duplicate result after the original reply's ACK.
+        return await GrainFactory.GetGrain<IDurableInboxExtension>(stock).DeliverAsync(request);
+    }
+
     public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        if (_serializer.Deserialize(context.Envelope.Payload) is not ReservationOutcome outcome)
+        var outcome = _result.Decode(context.Envelope);
+        if (context.Envelope.MessageId != outcome.CommandId.CreateChildKey("result"))
         {
-            throw new ArgumentException("The order grain only accepts reservation outcomes.");
+            throw new ArgumentException("The reply must identify the original reservation command.");
         }
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -74,11 +89,9 @@ public sealed class OrderGrain : Grain, IOrderGrain, IInboxHandler, IJournaledSt
         _captured = [];
         return ValueTask.CompletedTask;
     }
-
-    public void Dispose() => _encoder.Dispose();
 }
 
-// The after-ack hook releases the host-local observer once both replies are committed.
+// The after-ack hook releases the host-local observer when the original reply is committed.
 public sealed class CommittedReceiptsProbe
 {
     private readonly TaskCompletionSource<ReservationOutcome[]> _completion =
@@ -88,7 +101,7 @@ public sealed class CommittedReceiptsProbe
 
     public void OnAcknowledged(ReservationOutcome[] receipts)
     {
-        if (receipts.Length >= 2)
+        if (receipts.Length >= 1)
         {
             _completion.TrySetResult(receipts);
         }

@@ -1,7 +1,7 @@
 ---
 title: Durable messaging
 description: Understand the durable inbox and outbox guarantees, recovery model, and operating limits.
-ms.date: 10/08/2026
+ms.date: 10/09/2026
 ms.topic: conceptual
 ---
 
@@ -14,7 +14,7 @@ message effects and outgoing messages across activation loss.
 Use this page for the payload, commit, execution, and recovery model. Continue with:
 
 - [Idempotency and hierarchical operation keys](durable-messaging-idempotency.md)
-  for transport identities, durable business-outcome ledgers, and external effects.
+  for application command identities, retained completion facts, and external effects.
 - [Practical recipes](durable-messaging-recipes.md) for inventory reservation,
   payment-provider reconciliation, out-of-order projections, and notification fan-out.
 - [Operations and throughput](durable-messaging-operations.md) for configuration,
@@ -22,31 +22,52 @@ Use this page for the payload, commit, execution, and recovery model. Continue w
 
 ## Message and routing model
 
-Each <xref:Orleans.DurableMessaging.DurableEnvelope> has exactly four transport
-members: `MessageId` (<xref:System.Guid>), `SenderId` and `ReceiverId`
-(<xref:Orleans.Runtime.GrainId>), and required `Payload`
-(<xref:Orleans.Serialization.Buffers.ArcBuffer>). The receiving grain verifies
-that the receiver matches its own identity before deduplication or persistence.
+Each <xref:Orleans.DurableMessaging.DurableEnvelope> carries an application-supplied
+`MessageId` (<xref:Orleans.DurableMessaging.HierarchicalKey>), `SenderId` and `ReceiverId`
+(<xref:Orleans.Runtime.GrainId>), an exact ordinal `Subject`, and an owning `Payload`
+(<xref:Orleans.Serialization.Buffers.ArcBuffer>). The receiving grain verifies its
+destination before deduplication or persistence. Admission requires a nondefault
+command ID of at most 1,024 UTF-8 bytes and 32 segments and a nonempty subject of at
+most 256 UTF-8 bytes. Both send and admission validate these bounds before durable mutation.
 
 Register one <xref:Orleans.DurableMessaging.IInboxHandler> with
 <xref:Orleans.DurableMessaging.IDurableInbox.RegisterHandler*>. That handler decodes
-and dispatches the application's message kinds. Requests and responses carry their
-business-operation keys, response destinations, and versioning inside ordinary
-application records. The transport only sees opaque bytes and the three identities.
+and dispatches the application's subjects. The envelope's ID identifies the logical
+command; ordinary application records carry response destinations and domain versions.
+The runtime transports the subject and opaque body bytes. Retries and reconstructed
+submissions preserve the same ID, subject, destination, and body.
 A receiver without a registered handler returns
 <xref:Orleans.DurableMessaging.DeliveryStatus.HandlerNotFound>; the result factory
 <xref:Orleans.DurableMessaging.DeliveryResult.HandlerNotFound*> reports
 `No inbox handler is registered.`. An unknown application kind instead fails during
-application decoding/dispatch and follows handler retry/dead-letter policy.
+application subject lookup or decoding and follows handler retry/dead-letter policy.
 
 ### Encode ordinary application values
 
-Use <xref:Orleans.Serialization.Serializer> or
-<xref:Orleans.Serialization.Serializer`1> in an application-local codec. This helper
-encodes concrete record types as the application's message discriminator, with
-operation identity and optional response destination in the request:
+Register <xref:Orleans.DurableMessaging.DurableMessageType`1> using
+<xref:Orleans.Hosting.DurableMessagingExtensions.AddDurableMessageType*>. Each keyed
+singleton binds one explicit subject to the ordinary
+<xref:Orleans.Serialization.Serializer`1>. Inject it using `FromKeyedServices` and
+decode with <xref:Orleans.DurableMessaging.DurableMessageType`1.Decode*>; the binding
+verifies the envelope's subject before reading the borrowed payload.
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_payload" language="csharp":::
+
+Inject <xref:Orleans.DurableMessaging.DurableMessageWriter>, registered scoped by
+`AddDurableMessaging`, to prepare typed envelopes. Its `Create` method takes the
+binding, stable command ID, destination, and body. It assigns the owning grain as
+sender and transfers an independently owned Arc slice to the returned envelope.
+Prepare it before shared mutation, then stage it with the synchronous outbox.
+Serialization failure resets partial encoder output and propagates the error.
+
+Subjects use exact ordinal spelling, for example `inventory.reserve.v1`. Register
+each subject once; separate subjects can bind the same CLR type. Define supported
+polymorphism in the ordinary serialization contract when a subject uses a base
+type. For several subjects, the optional
+<xref:Orleans.DurableMessaging.DurableInboxDispatcher> binds typed handlers and freezes
+registration on its first `HandleAsync`. It returns the actual handler outcome;
+each successful handler explicitly calls `Complete()` and returns synchronously
+after shared mutation. See [Typed dispatch](durable-messaging-recipes.md#combine-the-recipes-into-an-order-workflow).
 
 ### Own and borrow payload slices
 
@@ -57,15 +78,14 @@ payload. A struct assignment copies the view, not its ownership: use
 <xref:Orleans.DurableMessaging.DurableEnvelope.Retain*> to obtain an independent
 payload pin, and dispose each owning envelope exactly once.
 
-The application codec writes ordinary records into one reusable
+The scoped message writer writes ordinary records into one reusable
 <xref:Orleans.Serialization.Buffers.ArcBufferWriter> per non-reentrant activation.
 <xref:Orleans.Serialization.Buffers.ArcBufferWriter.ConsumeSlice*> returns an owned
 slice of the newly written bytes; subsequent messages occupy disjoint regions and
 can share backing pages. Consuming a slice advances the writer's readable range;
-the returned slice independently keeps its pages alive. The grain implements
-<xref:System.IDisposable> to dispose its encoder at activation teardown; a scoped
-service registered with dependency injection can own it instead. Serialize encoder
-access when sharing an application scope across concurrent callers.
+the returned slice independently keeps its pages alive. Dependency injection
+disposes the scoped writer at activation teardown. Raw encoders have the same
+scope-owned lifetime and synchronous usage contract.
 
 | Boundary | Ownership and release |
 | --- | --- |
@@ -129,6 +149,12 @@ that package while inspecting or decoding entries, and dispose it after use:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_buffer_package" language="csharp":::
 
+Raw/package protocols choose an explicit subject and body encoding. The shipment
+example returns an owning envelope under `shipments.manifest.v1`; its decoder
+checks that subject and returns an independently owning package. Keep that package
+in a `using` scope while reading its borrowed entries. Typed DTOs containing owning
+Arc slices or packages have the same explicit application disposal responsibility.
+
 ## Commit and delivery guarantees
 
 Durable Messaging has the following boundaries:
@@ -143,7 +169,7 @@ Durable Messaging has the following boundaries:
   Acknowledgement releases exactly that captured cohort for dispatch; intents staged
   during storage I/O await another write.
 - Equivalent envelopes sharing a live `MessageId` coalesce while the original intent
-  is staged or durable. Reusing that ID with a different sender, receiver, or payload
+  is staged or durable. Reusing that ID with a different sender, receiver, subject, or payload
   throws before intent admission. Preserve the original envelope when retransmitting.
 - Handlers use <xref:Orleans.DurableMessaging.IInboxHandler.HandleAsync*> for
   asynchronous local preparation followed by complete shared updates and
@@ -161,8 +187,12 @@ Durable Messaging has the following boundaries:
   `Accepted` after that commit succeeds.
 - Transport is **at-least-once**. A crash after receiver acceptance but before durable
   outbox removal can send the same envelope again.
-- The receiver deduplicates by `(SenderId, MessageId)`. Duplicate deliveries converge
-  on one set of handler effects while that deduplication record is retained. After
+- The receiver deduplicates by exact `MessageId` across senders and subjects. A pending
+  repeat must retain the original receiver, subject, and body. A completed duplicate
+  acknowledges the retained completion fact. Completion records retain the ID and time;
+  the immutable-command contract keeps parameters stable after completion.
+  Distinct parent and child keys identify independent commands. Duplicate deliveries
+  converge on one set of handler effects while that completion record is retained. After
   <xref:Orleans.DurableMessaging.Configuration.DurableInboxOptions.DeduplicationWindow>
   expires, the same envelope can be accepted and processed again. The expired record and
   replay acceptance are committed atomically.
@@ -334,9 +364,9 @@ so dead-letter storage remains bounded by the application's retention policy.
 Removal is staged in the grain's journaled state and becomes durable with its next
 journal write.
 
-Malformed application payloads follow the retry and dead-letter path when the handler's
-ordinary serializer or validation fails. Later envelopes remain available for recovery
-and processing. Applications validate null results and unknown message kinds explicitly.
+Unknown subjects, malformed application payloads, and validation errors follow the
+processing retry and dead-letter path. Typed decoding precedes business mutation;
+later envelopes remain available for recovery and processing.
 
 Processed-record maintenance begins at the earliest tracked expiry and amortizes
 subsequent maintenance cycles to at most once per quarter of the deduplication window.
@@ -369,7 +399,8 @@ handling before returning. The inbox owns their journal write:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_grain" language="csharp":::
 
-An ordinary grain method stages its sent count and outgoing envelope synchronously,
+An ordinary grain method accepts a stable application command ID, prepares its
+typed envelope, then stages its submission count and outgoing intent synchronously,
 then persists both through the application-facing state manager. The outbox hook
 confirms the wakeup before capture:
 
@@ -426,5 +457,5 @@ identifies terminal cleanup of schedule-before-commit crash remnants. Message ou
 counters group by grain type and status; pending and processed duplicates each record
 one duplicate receipt. Sent-message counters and latency histograms group by grain type,
 orphan metrics retain job name, and depth gauges report aggregate pending work. Envelope
-identities remain available in message diagnostics; decode application operation keys in
-authorized application diagnostics.
+IDs and subjects remain available in authorized message diagnostics. Log canonical
+command IDs to correlate retries, participant effects, and deterministic replies.

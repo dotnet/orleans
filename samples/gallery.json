@@ -167,7 +167,7 @@
   {
     "slug": "durable-messaging",
     "title": "Durable Messaging stock reservations",
-    "description": "A standalone order and stock workflow demonstrating opaque payloads, acknowledged replies, and business-operation deduplication with fresh transport IDs.",
+    "description": "A standalone order and stock workflow demonstrating typed subjects, stable command IDs, inbox deduplication, and journal-acknowledged replies.",
     "path": "DurableMessaging",
     "sourceRepository": "https://github.com/dotnet/orleans",
     "image": null,

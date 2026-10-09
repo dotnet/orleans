@@ -7,7 +7,6 @@ using Orleans;
 using Orleans.DurableMessaging;
 using Orleans.Journaling;
 using Orleans.Runtime;
-using Orleans.Serialization;
 
 #pragma warning disable ORLEANSEXP005
 
@@ -24,20 +23,17 @@ public static class OrderOperationKeys
             throw new ArgumentException("An order ID must be nonempty.", nameof(orderId));
         }
 
-        return HierarchicalKey.Create(
-            "tenants", Uri.EscapeDataString(tenantId), "orders", orderId.ToString("N"));
+        return HierarchicalKey.Create("tenants", tenantId, "orders", orderId.ToString("N"));
     }
 
     public static HierarchicalKey Reservation(HierarchicalKey order, string sku)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sku);
-        return order.CreateChildKey("inventory")
-            .CreateChildKey(Uri.EscapeDataString(sku))
-            .CreateChildKey("reserve");
+        return order.CreateChildKey("inventory").CreateChildKey(sku).CreateChildKey("reserve");
     }
 
     public static HierarchicalKey Charge(HierarchicalKey order) =>
-        order.CreateChildKey("payment/charge");
+        order.CreateChildKey("payment").CreateChildKey("charge");
 }
 // </messaging_operation_keys>
 
@@ -46,9 +42,9 @@ internal static class HierarchyExample
 {
     internal static (HierarchicalKey Order, HierarchicalKey Step) Create()
     {
-        var order = HierarchicalKey.Create("orders/42");
+        var order = HierarchicalKey.Create("orders", "42");
         var step = order.CreateChildKey("inventory")
-            .CreateEscapedChildKey("widget/blue")
+            .CreateChildKey("widget/blue")
             .CreateChildKey("reserve");
 
         // orders/42/inventory/widget\/blue/reserve
@@ -63,13 +59,11 @@ public abstract record OrderOutcome;
 // <messaging_inventory>
 [GenerateSerializer]
 public sealed record ReserveStock(
-    [property: Id(0)] HierarchicalKey OperationKey,
     [property: Id(1)] int Quantity,
     [property: Id(2)] GrainId ResponseDestination);
 
 [GenerateSerializer]
 public sealed record ReservationResult(
-    [property: Id(0)] HierarchicalKey OperationKey,
     [property: Id(1)] int Quantity,
     [property: Id(2)] bool Reserved) : OrderOutcome;
 
@@ -79,31 +73,32 @@ public interface IInventoryGrain : IGrainWithStringKey, IDurableMessagingGrain
     ValueTask<int> GetAvailableAsync();
 }
 
-public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler, IDisposable
+public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler
 {
     private readonly IDurableValue<int> _available;
-    private readonly IDurableDictionary<HierarchicalKey, ReservationResult> _reservations;
     private readonly IDurableStateManager _state;
     private readonly IDurableOutbox _outbox;
-    private readonly ApplicationPayload _payload;
+    private readonly DurableMessageWriter _writer;
+    private readonly DurableMessageType<ReserveStock> _reserve;
+    private readonly DurableMessageType<ReservationResult> _result;
 
     public InventoryGrain(
         IDurableInbox inbox,
         IDurableOutbox outbox,
-        Serializer serializer,
+        DurableMessageWriter writer,
+        [FromKeyedServices(MessagingSubjects.ReserveStock)] DurableMessageType<ReserveStock> reserve,
+        [FromKeyedServices(MessagingSubjects.ReservationResult)] DurableMessageType<ReservationResult> result,
         IDurableStateManager state,
-        [FromKeyedServices("available-stock")] IDurableValue<int> available,
-        [FromKeyedServices("reservations")] IDurableDictionary<HierarchicalKey, ReservationResult> reservations)
+        [FromKeyedServices("available-stock")] IDurableValue<int> available)
     {
         _available = available;
-        _reservations = reservations;
         _state = state;
         _outbox = outbox;
-        _payload = new ApplicationPayload(serializer);
+        _writer = writer;
+        _reserve = reserve;
+        _result = result;
         inbox.RegisterHandler(this);
     }
-
-    public void Dispose() => _payload.Dispose();
 
     public async Task SetAvailableAsync(int quantity)
     {
@@ -114,36 +109,19 @@ public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler, IDis
 
     public ValueTask<int> GetAvailableAsync() => new(_available.Value);
 
-    public ValueTask HandleAsync(
-        IInboxHandlerContext context, CancellationToken cancellationToken)
+    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        var request = _payload.Decode<ReserveStock>(context.Envelope.Payload);
-        ArgumentNullException.ThrowIfNull(request.OperationKey);
+        var request = _reserve.Decode(context.Envelope);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
-        if (request.ResponseDestination.IsDefault)
-        {
-            throw new ArgumentException("A reservation requires a response destination.");
-        }
-
-        var alreadyRecorded = _reservations.TryGetValue(request.OperationKey, out var result);
-        if (alreadyRecorded && result!.Quantity != request.Quantity)
-        {
-            throw new ArgumentException("An operation key must retain its original quantity.");
-        }
-
-        result ??= new ReservationResult(
-            request.OperationKey, request.Quantity, _available.Value >= request.Quantity);
-        var nextAvailable = alreadyRecorded || !result.Reserved
-            ? _available.Value
-            : checked(_available.Value - request.Quantity);
-        using var reply = _payload.Envelope(context.Envelope.ReceiverId, request.ResponseDestination, result);
+        var result = new ReservationResult(request.Quantity, _available.Value >= request.Quantity);
+        var nextAvailable = result.Reserved
+            ? checked(_available.Value - request.Quantity)
+            : _available.Value;
+        using var reply = _writer.Create(_result, context.Envelope.MessageId.CreateChildKey("result"),
+            request.ResponseDestination, result);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!alreadyRecorded)
-        {
-            _available.Value = nextAvailable;
-            _reservations.Add(request.OperationKey, result);
-        }
+        _available.Value = nextAvailable;
         _outbox.Send(reply);
         context.Complete();
         return ValueTask.CompletedTask;
@@ -154,7 +132,6 @@ public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler, IDis
 // <messaging_payment>
 [GenerateSerializer]
 public sealed record ChargePayment(
-    [property: Id(0)] HierarchicalKey OperationKey,
     [property: Id(1)] decimal Amount,
     [property: Id(2)] string Currency,
     [property: Id(3)] GrainId ResponseDestination);
@@ -167,75 +144,68 @@ public sealed record PaymentResult(
 
 public interface IIdempotentPaymentGateway
 {
-    // The provider binds the key to the exact request and returns its original result on retries.
+    // The provider binds the canonical command key to its original request and result.
     Task<PaymentResult> ChargeAsync(
         string idempotencyKey, ChargePayment request, CancellationToken cancellationToken);
 }
 
 public interface IPaymentGrain : IGrainWithStringKey, IDurableMessagingGrain
 {
-    ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey operationKey);
+    ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey commandId);
 }
 
-public sealed class PaymentGrain : Grain, IPaymentGrain, IInboxHandler, IDisposable
+public sealed class PaymentGrain : Grain, IPaymentGrain, IInboxHandler
 {
     private readonly IIdempotentPaymentGateway _gateway;
     private readonly IDurableOutbox _outbox;
-    private readonly ApplicationPayload _payload;
+    private readonly DurableMessageWriter _writer;
+    private readonly DurableMessageType<ChargePayment> _charge;
+    private readonly DurableMessageType<PaymentResult> _result;
     private readonly IDurableDictionary<HierarchicalKey, PaymentResult> _results;
 
     public PaymentGrain(
         IDurableInbox inbox,
         IDurableOutbox outbox,
-        Serializer serializer,
+        DurableMessageWriter writer,
+        [FromKeyedServices(MessagingSubjects.ChargePayment)] DurableMessageType<ChargePayment> charge,
+        [FromKeyedServices(MessagingSubjects.PaymentResult)] DurableMessageType<PaymentResult> result,
         IIdempotentPaymentGateway gateway,
         [FromKeyedServices("payment-results")] IDurableDictionary<HierarchicalKey, PaymentResult> results)
     {
         _gateway = gateway;
         _outbox = outbox;
-        _payload = new ApplicationPayload(serializer);
+        _writer = writer;
+        _charge = charge;
+        _result = result;
         _results = results;
         inbox.RegisterHandler(this);
     }
 
-    public void Dispose() => _payload.Dispose();
+    public ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey commandId) =>
+        new(_results.TryGetValue(commandId, out var result) ? result : null);
 
-    public ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey operationKey) =>
-        new(_results.TryGetValue(operationKey, out var result) ? result : null);
-
-    public async ValueTask HandleAsync(
-        IInboxHandlerContext context, CancellationToken cancellationToken)
+    public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        var request = _payload.Decode<ChargePayment>(context.Envelope.Payload);
-        ArgumentNullException.ThrowIfNull(request.OperationKey);
+        var request = _charge.Decode(context.Envelope);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Amount);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Currency);
         if (request.ResponseDestination.IsDefault)
         {
             throw new ArgumentException("A payment requires a response destination.");
         }
-
         cancellationToken.ThrowIfCancellationRequested();
-        var alreadyRecorded = _results.TryGetValue(request.OperationKey, out var result);
-        if (alreadyRecorded && result!.Request != request)
-        {
-            throw new ArgumentException("An operation key must retain its original payment request.");
-        }
-
-        result ??= await _gateway.ChargeAsync(
-            request.OperationKey.ToString(), request, cancellationToken);
+        var commandId = context.Envelope.MessageId;
+        var result = await _gateway.ChargeAsync(commandId.ToString(), request, cancellationToken);
         if (result.Request != request || string.IsNullOrWhiteSpace(result.ProviderReference))
         {
             throw new InvalidOperationException("The payment provider returned an inconsistent result.");
         }
 
-        using var reply = _payload.Envelope(context.Envelope.ReceiverId, request.ResponseDestination, result);
+        using var reply = _writer.Create(_result, commandId.CreateChildKey("result"),
+            request.ResponseDestination, result);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!alreadyRecorded)
-        {
-            _results.Add(request.OperationKey, result);
-        }
+        _results[commandId] = result;
         _outbox.Send(reply);
         context.Complete();
     }
@@ -253,30 +223,27 @@ public interface IStockProjectionGrain : IGrainWithStringKey, IDurableMessagingG
     ValueTask<StockSnapshot> GetSnapshotAsync();
 }
 
-public sealed class StockProjectionGrain : Grain, IStockProjectionGrain, IInboxHandler, IDisposable
+public sealed class StockProjectionGrain : Grain, IStockProjectionGrain, IInboxHandler
 {
     private readonly IDurableValue<StockSnapshot> _snapshot;
-    private readonly ApplicationPayload _payload;
+    private readonly DurableMessageType<StockSnapshot> _type;
 
     public StockProjectionGrain(
         IDurableInbox inbox,
-        Serializer serializer,
+        [FromKeyedServices(MessagingSubjects.StockSnapshot)] DurableMessageType<StockSnapshot> type,
         [FromKeyedServices("stock-snapshot")] IDurableValue<StockSnapshot> snapshot)
     {
         _snapshot = snapshot;
-        _payload = new ApplicationPayload(serializer);
+        _type = type;
         inbox.RegisterHandler(this);
     }
-
-    public void Dispose() => _payload.Dispose();
 
     public ValueTask<StockSnapshot> GetSnapshotAsync() =>
         new(_snapshot.Value ?? new StockSnapshot(0, 0));
 
-    public ValueTask HandleAsync(
-        IInboxHandlerContext context, CancellationToken cancellationToken)
+    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        var update = _payload.Decode<StockSnapshot>(context.Envelope.Payload);
+        var update = _type.Decode(context.Envelope);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(update.Version);
         ArgumentOutOfRangeException.ThrowIfNegative(update.Available);
         var current = _snapshot.Value;
@@ -305,18 +272,20 @@ public sealed record NotificationCampaign(
 public interface ICampaignGrain : IGrainWithStringKey, IDurableMessagingGrain
 {
     Task PublishAsync(Guid campaignId, string text, GrainId[] recipients);
+    ValueTask<NotificationCampaign?> GetCampaignAsync(Guid campaignId);
 }
 
 public sealed class CampaignGrain(
     IDurableOutbox outbox,
     IDurableStateManager state,
     [FromKeyedServices("campaigns")] IDurableDictionary<Guid, NotificationCampaign> campaigns,
-    Serializer serializer,
-    IGrainContext grainContext) : Grain(grainContext), ICampaignGrain, IDisposable
+    [FromKeyedServices(MessagingSubjects.Notify)] DurableMessageType<Notify> notification,
+    DurableMessageWriter writer,
+    IGrainContext grainContext) : Grain(grainContext), ICampaignGrain
 {
-    private readonly ApplicationPayload _payload = new(serializer);
+    public ValueTask<NotificationCampaign?> GetCampaignAsync(Guid campaignId) =>
+        new(campaigns.TryGetValue(campaignId, out var campaign) ? campaign : null);
 
-    public void Dispose() => _payload.Dispose();
     public async Task PublishAsync(Guid campaignId, string text, GrainId[] recipients)
     {
         if (campaignId == Guid.Empty)
@@ -342,16 +311,14 @@ public sealed class CampaignGrain(
         }
 
         var campaign = new NotificationCampaign(text, recipients.ToArray());
-        var root = HierarchicalKey.Create("campaigns").CreateChildKey(campaignId.ToString("N"));
-        // Prepare every owned output before the first shared mutation. Dispose partial
-        // preparation too: Send borrows each envelope and durable state retains its pin.
+        var root = HierarchicalKey.Create("campaigns", campaignId.ToString("N"));
         var messages = new List<DurableEnvelope>(campaign.Recipients.Length);
         try
         {
             foreach (var recipient in campaign.Recipients)
             {
-                messages.Add(_payload.Envelope(this.GetGrainId(), recipient,
-                    new Notify(text, root.CreateChildKey(Uri.EscapeDataString(recipient.ToString())))));
+                messages.Add(writer.Create(notification, root.CreateChildKey(recipient.ToString()),
+                    recipient, new Notify(text)));
             }
 
             campaigns.Add(campaignId, campaign);
@@ -376,49 +343,37 @@ public sealed class CampaignGrain(
 public interface IOrderOutcomesGrain : IGrainWithStringKey, IDurableMessagingGrain
 {
     ValueTask<int> GetCompletedStepCountAsync();
+    ValueTask<OrderOutcome?> GetOutcomeAsync(HierarchicalKey replyId);
 }
 
-// One registered application dispatcher handles both response kinds.
-public sealed class OrderOutcomesGrain : Grain, IOrderOutcomesGrain, IInboxHandler, IDisposable
+public sealed class OrderOutcomesGrain : Grain, IOrderOutcomesGrain
 {
-    private readonly ApplicationPayload _payload;
     private readonly IDurableDictionary<HierarchicalKey, OrderOutcome> _outcomes;
 
     public OrderOutcomesGrain(
         IDurableInbox inbox,
-        Serializer serializer,
+        [FromKeyedServices(MessagingSubjects.ReservationResult)] DurableMessageType<ReservationResult> reservation,
+        [FromKeyedServices(MessagingSubjects.PaymentResult)] DurableMessageType<PaymentResult> payment,
         [FromKeyedServices("order-outcomes")] IDurableDictionary<HierarchicalKey, OrderOutcome> outcomes)
     {
-        _payload = new ApplicationPayload(serializer);
         _outcomes = outcomes;
-        inbox.RegisterHandler(this);
+        var dispatcher = new DurableInboxDispatcher()
+            .Register(reservation, (result, context, token) => Record(result, context, token))
+            .Register(payment, (result, context, token) => Record(result, context, token));
+        inbox.RegisterHandler(dispatcher);
     }
-
-    public void Dispose() => _payload.Dispose();
 
     public ValueTask<int> GetCompletedStepCountAsync() => new(_outcomes.Count);
 
-    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public ValueTask<OrderOutcome?> GetOutcomeAsync(HierarchicalKey replyId) =>
+        new(_outcomes.TryGetValue(replyId, out var outcome) ? outcome : null);
+
+    private ValueTask Record(
+        OrderOutcome outcome, IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        var outcome = _payload.Decode<OrderOutcome>(context.Envelope.Payload);
-        var key = outcome switch
-        {
-            ReservationResult reservation => reservation.OperationKey,
-            PaymentResult payment => payment.Request.OperationKey,
-            _ => throw new ArgumentException("Unknown order response kind.")
-        };
-        ArgumentNullException.ThrowIfNull(key);
-        var recorded = _outcomes.TryGetValue(key, out var original);
-        if (recorded && original != outcome)
-        {
-            throw new ArgumentException("An operation key must retain its original outcome.");
-        }
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!recorded)
-        {
-            _outcomes.Add(key, outcome);
-        }
+        _outcomes[context.Envelope.MessageId] = outcome;
         context.Complete();
         return ValueTask.CompletedTask;
     }
