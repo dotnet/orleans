@@ -317,6 +317,18 @@ public sealed class WireTypeResolutionTests
             serializer.Deserialize<Type>(serializer.SerializeToArray<Type>(providerType)));
     }
 
+    [Fact]
+    public void StreamingManifestRegistersProviderControlMarkerForManagementOnlyClients()
+    {
+        var registrations = new ServiceCollection();
+        registrations.AddSerializer(builder => builder.AddAssembly(typeof(PersistentStreamProvider).Assembly));
+        using var services = registrations.BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+
+        Assert.Same(typeof(PersistentStreamProvider),
+            serializer.Deserialize<Type>(serializer.SerializeToArray<Type>(typeof(PersistentStreamProvider))));
+    }
+
     [Theory]
     [InlineData("string]trailing")]
     [InlineData("string[")]

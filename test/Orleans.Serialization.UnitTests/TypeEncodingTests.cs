@@ -47,6 +47,11 @@ namespace Orleans.Serialization.UnitTests
         {
             var services = new ServiceCollection();
             _ = services.AddSerializer();
+            services.Configure<TypeManifestOptions>(options =>
+            {
+                options.AddAllowedType(typeof(MyTypeAliasClass));
+                options.AddAllowedType(typeof(MyInvokableProxyBase));
+            });
             _serviceProvider = services.BuildServiceProvider();
             _sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
             _serializer = _serviceProvider.GetRequiredService<Serializer>();

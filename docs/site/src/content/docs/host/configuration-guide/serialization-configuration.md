@@ -35,6 +35,8 @@ Consider the following example when interacting with the <xref:Orleans.Hosting.I
 
 Registering an external serializer selects which codec handles a value. Wire type-name resolution binds host-established CLR identities, then authorizes the complete type graph. <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`.
 
+The JSON integrations register the concrete JSON document and node identities provided by their libraries. Register application payload identities separately, including concrete MessagePack union variants and persisted-state types, on each reader and writer.
+
 This distinction is especially visible for polymorphic signatures such as `IReadOnlyList<TriggerRule>`, where `TriggerRule` is abstract and values are handled by `System.Text.Json`. Register the JSON serializer and explicitly trust the application type:
 
 :::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="allow_type":::

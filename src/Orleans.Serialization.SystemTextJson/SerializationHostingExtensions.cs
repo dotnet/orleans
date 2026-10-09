@@ -5,6 +5,7 @@ using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities.Internal;
 using System;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Orleans.Serialization;
 
@@ -81,7 +82,18 @@ public static class SerializationHostingExtensions
             services.AddFromExisting<IGeneralizedCodec, JsonCodec>();
             services.AddFromExisting<IGeneralizedCopier, JsonCodec>();
             services.AddFromExisting<ITypeFilter, JsonCodec>();
-            serializerBuilder.Configure(options => options.WellKnownTypeAliases[JsonCodec.WellKnownAlias] = typeof(JsonCodec));
+            serializerBuilder.Configure(options =>
+            {
+                options.WellKnownTypeAliases[JsonCodec.WellKnownAlias] = typeof(JsonCodec);
+                options.AddAllowedType(typeof(JsonNode));
+                options.AddAllowedType(typeof(JsonObject));
+                options.AddAllowedType(typeof(JsonArray));
+                options.AddAllowedType(typeof(JsonValue));
+                options.AddAllowedType(typeof(JsonElement));
+                options.AddAllowedType(typeof(JsonDocument));
+                options.AddAllowedType(JsonValue.Create(0)!.GetType());
+                options.AddAllowedType(JsonValue.Create(default(JsonElement))!.GetType());
+            });
         }
 
         return serializerBuilder;
