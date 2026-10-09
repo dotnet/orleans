@@ -136,10 +136,11 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     public async Task NotificationHandling_InvalidBodyLeavesBusinessAndCompletionUnchanged(string? body)
     {
         var attempt = Create(new Notify(body));
-        var exception = await Assert.ThrowsAsync<ArgumentException>(async () =>
+        var exception = await Assert.ThrowsAnyAsync<ArgumentException>(async () =>
             await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
-        Assert.Contains("nonempty string", exception.Message, StringComparison.Ordinal);
+        Assert.IsType(body is null ? typeof(ArgumentNullException) : typeof(ArgumentException), exception);
+        Assert.Equal("message.Text", exception.ParamName);
         Assert.Equal(7, attempt.Count.Value);
         Assert.Empty(attempt.Output);
         Assert.Empty(attempt.Events);
