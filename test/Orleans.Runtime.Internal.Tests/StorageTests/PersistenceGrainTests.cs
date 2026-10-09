@@ -1,12 +1,14 @@
 //#define REREAD_STATE_AFTER_WRITE_FAILED
 
 using System.Diagnostics;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using TesterInternal;
@@ -33,12 +35,14 @@ namespace UnitTests.StorageTests
             {
                 builder.Options.InitialSilosCount = 1;
                 builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+                builder.AddClientBuilderConfigurator<SiloConfigurator>();
             }
 
-            private class SiloConfigurator : ISiloConfigurator
+            private class SiloConfigurator : ISiloConfigurator, IClientBuilderConfigurator
             {
                 public void Configure(ISiloBuilder hostBuilder)
                 {
+                    ConfigureSerialization(hostBuilder.Services);
                     hostBuilder.AddMemoryGrainStorage("MemoryStore");
                     hostBuilder.AddTestStorageProvider(MockStorageProviderName1, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
                     hostBuilder.AddTestStorageProvider(MockStorageProviderName2, (sp, name) => ActivatorUtilities.CreateInstance<MockStorageProvider>(sp, name));
@@ -48,6 +52,17 @@ namespace UnitTests.StorageTests
                     hostBuilder.Services.AddSingleton<OrleansGrainStorageSerializer>();
                     hostBuilder.AddMemoryGrainStorage("OrleansSerializerMemoryStore", (OptionsBuilder<MemoryGrainStorageOptions> optionsBuilder) =>
                         optionsBuilder.Configure<OrleansGrainStorageSerializer>((options, serializer) => options.GrainStorageSerializer = serializer));
+                }
+
+                public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
+                {
+                    ConfigureSerialization(clientBuilder.Services);
+                }
+
+                private static void ConfigureSerialization(IServiceCollection services)
+                {
+                    services.AddSerializer(builder => builder.Configure(options =>
+                        options.AddAllowedType(typeof(ErrorInjectionStorageProvider))));
                 }
             }
         }
