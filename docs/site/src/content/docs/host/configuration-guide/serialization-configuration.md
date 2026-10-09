@@ -57,7 +57,7 @@ Register the filter with dependency injection:
 
 A filter returns `true` to allow, `false` to deny, or `null` when it has no opinion. Explicit individual type registrations are authoritative. On the wire path, name-filter denials take precedence over metadata grants, aliases, and assembly trust; resolved-type denials apply to the bound definition, arguments, and final construction. Wire readers cache filter opinions for bound host identities for the configuration's lifetime. Aliases supply identities, while serializer metadata and configured grants supply permission.
 
-Ordinary <xref:Orleans.Serialization.TypeSystem.TypeConverter.Parse*> retains application lookup semantics, including an explicit resolved-type filter grant for a closed generic construction with no-opinion arguments. Wire deserialization independently requires authorization of the definition and every argument.
+Ordinary <xref:Orleans.Serialization.TypeSystem.TypeConverter.Parse*> retains application lookup semantics, including an explicit resolved-type filter grant for a closed generic construction with no-opinion arguments. It inspects every argument for denials, including arguments after an unknown argument. Wire deserialization independently requires authorization of the definition and every argument.
 
 For fully trusted inputs, `AllowAllTypes` grants permission to all host-known identities:
 

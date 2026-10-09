@@ -46,6 +46,12 @@ Reflection-based activation uses constructors preserved by generated manifests, 
 
 ## Diagnose unsupported input
 
+### Serializer initialization and interface collections
+
+For strict NativeAOT publication, initialize the serializer using `AddSerializerContext` with the supported closed type graph described above. <xref:Orleans.Serialization.ServiceCollectionExtensions.AddSerializer*> enables automatic assembly discovery and generalized codecs; native publication analyzes those additional paths, including their runtime activation and metadata requirements. Calling both registration methods combines those paths with the context's closed factories.
+
+The interface collection resolver maps a recognized codec type to the closed collection interface already present in its base-type metadata. NativeAOT can resolve this metadata for rooted codec types while preserving the existing collection aliases and wire representation. A context root or model member declared as an interface collection produces `ORLEANS0115`, identifying that dependency and listing the supported concrete collection shapes. Declare supported concrete collections in the context graph and register every concrete type used at runtime.
+
 `ORLEANS0114` identifies an invalid context declaration. `ORLEANS0115` identifies the unsupported closed type and the required change. Declare every concrete type which can occur in the supported runtime graph, including types introduced through additional roots.
 
 <xref:Orleans.Serialization.CodecNotFoundException> identifies an unregistered runtime type or serialization service. Register its closed graph before requesting serialization or copying.
@@ -60,4 +66,4 @@ For a NativeAOT executable, enable native publication:
 
 Import these properties into the executable project and register a context using `AddSerializerContext`. JIT and NativeAOT applications use the same generated-first resolution pipeline. Register the complete graph used by the application so each required codec, copier, and native generic implementation is available.
 
-Keep trim and AOT warnings as errors. The repository's centralized native smoke matrix exercises the strict `Contexts` and `Factories` scenarios on .NET 10, including closed metadata activation, rooted generic materialization, and reflection type lookup alongside generated registrations.
+Keep trim and AOT warnings as errors. The repository's centralized native smoke matrix exercises the strict `Contexts`, `Factories`, and `InterfaceCollections` scenarios on .NET 10, including closed metadata activation, rooted generic materialization, interface collection codec metadata, and reflection type lookup alongside generated registrations.
