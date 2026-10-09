@@ -1,4 +1,5 @@
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using Orleans.Transactions.TestKit;
@@ -28,6 +29,8 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
+                hostBuilder.Services.AddSerializer(builder => builder.Configure(options =>
+                    options.AddAllowedType(typeof(Azure.Tests.TestState))));
                 hostBuilder
                     .ConfigureServices(services => services.AddKeyedSingleton<IRemoteCommitService, RemoteCommitService>(TransactionTestConstants.RemoteCommitService))
                     .AddAzureTableTransactionalStateStorage(TransactionTestConstants.TransactionStore, options =>
@@ -42,6 +45,8 @@ namespace Orleans.Transactions.AzureStorage.Tests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
+                clientBuilder.Services.AddSerializer(builder => builder.Configure(options =>
+                    options.AddAllowedType(typeof(Azure.Tests.TestState))));
                 clientBuilder
                     .UseTransactions();
             }
