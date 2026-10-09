@@ -36,9 +36,10 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         payloadWriter.Write(bytes);
         using var envelope = new DurableEnvelope
         {
-            MessageId = Guid.NewGuid(),
+            MessageId = HierarchicalKey.Create("raw", Guid.NewGuid().ToString("N")),
             SenderId = GrainId.Create("raw-external-sender", "1"),
             ReceiverId = receiver.GetGrainId(),
+            Subject = "raw.forward.v1",
             Payload = payloadWriter.PeekSlice(payloadWriter.Length)
         };
         Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope)).Status);

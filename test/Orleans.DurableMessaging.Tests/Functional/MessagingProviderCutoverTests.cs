@@ -158,21 +158,14 @@ public sealed class MessagingProviderCutoverTests
         Assert.NotNull(await fixture.A.CreateStorage(id).GetMetadataAsync(Token));
         Assert.NotNull(await fixture.B.CreateStorage(id).GetMetadataAsync(Token));
         Assert.Null(await fixture.Services.GetRequiredService<IJournalStorageProvider>().CreateStorage(id).GetMetadataAsync(Token));
-        foreach (var (name, isOutboxState) in new[]
+        foreach (var name in new[]
         {
-            ("__orleans.durable-messaging.outbox", true),
-            ("__orleans.durable-messaging.inbox", false)
+            "__orleans.durable-messaging.outbox",
+            "__orleans.durable-messaging.inbox"
         })
         {
             Assert.True(a.Manager.TryGetStateMachine(name, out var messagingState));
-            if (isOutboxState)
-            {
-                Assert.IsAssignableFrom<IDurableDictionary<Guid, DurableEnvelope>>(messagingState);
-            }
-            else
-            {
-                Assert.IsAssignableFrom<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(messagingState);
-            }
+            Assert.IsAssignableFrom<IDurableDictionary<HierarchicalKey, DurableEnvelope>>(messagingState);
         }
     }
 
@@ -369,7 +362,7 @@ public sealed class MessagingProviderCutoverTests
 
         await fixture.DrainAsync();
         var receiver = outbox ? sink : owner;
-        Assert.Equal(new[] { new KeyValuePair<Guid, int>(message.MessageId, 1) }, receiver.Effects);
+        Assert.Equal(new[] { new KeyValuePair<HierarchicalKey, int>(message.MessageId, 1) }, receiver.Effects);
         Assert.Equal(DeliveryStatus.Duplicate, (await receiver.InboxExtension.DeliverAsync(message, Token)).Status);
         Assert.Null(owner.Generation(outbox).Value);
         Assert.Null(owner.Handle(outbox).Value);
@@ -417,7 +410,7 @@ public sealed class MessagingProviderCutoverTests
         await fixture.DrainAsync();
         Assert.Equal(writesA + 2, fixture.A.GetSuccessfulWriteCount(id));
         var receiver = outbox ? sink : owner;
-        Assert.Equal(new[] { new KeyValuePair<Guid, int>(message.MessageId, 1) }, receiver.Effects);
+        Assert.Equal(new[] { new KeyValuePair<HierarchicalKey, int>(message.MessageId, 1) }, receiver.Effects);
         Assert.Equal(DeliveryStatus.Duplicate, (await receiver.InboxExtension.DeliverAsync(message, Token)).Status);
         await fixture.AssertRetiredAsync();
     }
@@ -724,7 +717,7 @@ public sealed class MessagingProviderCutoverTests
             Id = id;
             var services = scope.ServiceProvider;
             Manager = services.GetRequiredService<IJournaledStateManager>();
-            var effects = services.GetRequiredKeyedService<IDurableDictionary<Guid, int>>("effects");
+            var effects = services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, int>>("effects");
             Inbox = services.GetRequiredService<IDurableInbox>();
             Outbox = services.GetRequiredService<IDurableOutbox>();
             InboxExtension = (IDurableInboxExtension)services.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
@@ -742,7 +735,7 @@ public sealed class MessagingProviderCutoverTests
         public IDurableInboxExtension InboxExtension { get; }
         public IGrainExtension ResolvePublicInboxExtension() => _scope.ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
         public ManualTimers Timers { get; }
-        public IDurableDictionary<Guid, int> Effects { get; }
+        public IDurableDictionary<HierarchicalKey, int> Effects { get; }
         public IDurableValue<DurableJob> Handle(bool outbox) => _scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<DurableJob>>(
             outbox ? "__orleans.durable-messaging.outbox-job-handle" : "__orleans.durable-messaging.inbox-job-handle");
         public IDurableValue<string> Generation(bool outbox) => _scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<string>>(
@@ -790,7 +783,7 @@ public sealed class MessagingProviderCutoverTests
         }
     }
 
-    private sealed class RecordHandler(IDurableDictionary<Guid, int> effects) : IInboxHandler
+    private sealed class RecordHandler(IDurableDictionary<HierarchicalKey, int> effects) : IInboxHandler
     {
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)

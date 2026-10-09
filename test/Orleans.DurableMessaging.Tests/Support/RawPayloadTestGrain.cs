@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -13,7 +14,7 @@ public interface IRawPayloadTestGrain : IGrainWithGuidKey
 }
 
 [GenerateSerializer]
-public sealed record RawPayloadEffect([property: Id(0)] Guid MessageId, [property: Id(1)] string Bytes, [property: Id(2)] int Count);
+public sealed record RawPayloadEffect([property: Id(0)] HierarchicalKey MessageId, [property: Id(1)] string Bytes, [property: Id(2)] int Count);
 
 [GenerateSerializer]
 public sealed record RawPayloadSnapshot([property: Id(0)] Guid ActivationId, [property: Id(1)] int InboxCount,
@@ -26,8 +27,8 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
     public const string HandlerBarrier = "raw-payload";
     private readonly IDurableInbox _inbox;
     private readonly IDurableOutbox _outbox;
-    private readonly IDurableDictionary<Guid, RawPayloadEffect> _effects;
-    private readonly IDurableDictionary<(GrainId, Guid), DateTimeOffset> _processed;
+    private readonly IDurableDictionary<HierarchicalKey, RawPayloadEffect> _effects;
+    private readonly IDurableDictionary<HierarchicalKey, DateTimeOffset> _processed;
     private readonly IDurableValue<GrainId> _forward;
     private readonly IDurableValue<int> _forwardCopies;
     internal int ExpectedAcknowledgedEffects { get; set; } = 1;
@@ -37,10 +38,10 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
     internal Task<RawPayloadSnapshot> Acknowledged => _acknowledged.Task;
 
     public RawPayloadTestGrain(IDurableInbox inbox, IDurableOutbox outbox, IJournaledStateManager manager,
-        [FromKeyedServices("raw-effects")] IDurableDictionary<Guid, RawPayloadEffect> effects,
+        [FromKeyedServices("raw-effects")] IDurableDictionary<HierarchicalKey, RawPayloadEffect> effects,
         [FromKeyedServices("raw-forward")] IDurableValue<GrainId> forward,
         [FromKeyedServices("raw-forward-copies")] IDurableValue<int> forwardCopies,
-        [FromKeyedServices("__orleans.durable-messaging.inbox-processed")] IDurableDictionary<(GrainId, Guid), DateTimeOffset> processed,
+        [FromKeyedServices("__orleans.durable-messaging.inbox-processed")] IDurableDictionary<HierarchicalKey, DateTimeOffset> processed,
         HandlerProbe handlers)
     {
         _inbox = inbox;
@@ -89,20 +90,21 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
         cancellationToken.ThrowIfCancellationRequested();
         var input = context.Envelope;
         var bytes = Convert.ToBase64String(input.Payload.ToArray());
+        var outgoing = _forward.Value.IsDefault
+            ? []
+            : Enumerable.Range(0, _forwardCopies.Value).Select(index => new DurableEnvelope
+            {
+                MessageId = index == 0 ? input.MessageId : input.MessageId.CreateChildKey(index.ToString(CultureInfo.InvariantCulture)),
+                SenderId = this.GetGrainId(),
+                ReceiverId = _forward.Value,
+                Subject = input.Subject,
+                Payload = input.Payload
+            }).ToArray();
         _effects.TryGetValue(input.MessageId, out var prior);
         _effects[input.MessageId] = new RawPayloadEffect(input.MessageId, bytes, (prior?.Count ?? 0) + 1);
-        if (!_forward.Value.IsDefault)
+        foreach (var envelope in outgoing)
         {
-            for (var index = 0; index < _forwardCopies.Value; index++)
-            {
-                _outbox.Send(new DurableEnvelope
-                {
-                    MessageId = index == 0 ? input.MessageId : Guid.NewGuid(),
-                    SenderId = this.GetGrainId(),
-                    ReceiverId = _forward.Value,
-                    Payload = input.Payload
-                });
-            }
+            _outbox.Send(envelope);
         }
         context.Complete();
     }

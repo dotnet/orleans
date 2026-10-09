@@ -161,6 +161,7 @@ public static class DurableMessagingExtensions
         });
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IConfigureGrainTypeComponents, DurableMessagingGrainTypeConfigurator>());
+        services.TryAddScoped<DurableMessageWriter>();
         return services;
     }
 }

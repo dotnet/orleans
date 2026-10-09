@@ -18,12 +18,21 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     private readonly ServiceProvider _services = new ServiceCollection().AddSerializer().BuildServiceProvider();
     private static readonly GrainId Sender = GrainId.Create("sender", "snippet");
     private static readonly GrainId Receiver = GrainId.Create("notification", "snippet");
+    private static readonly HierarchicalKey Command = HierarchicalKey.Create("notifications", "42");
     private Serializer Serializer => _services.GetRequiredService<Serializer>();
-    private readonly ApplicationPayload _payload;
     private readonly List<DurableEnvelope> _owned = [];
-    private readonly List<NotificationGrain> _grains = [];
+    private readonly List<DurableMessageWriter> _writers = [];
 
-    public DurableMessagingSnippetTests() => _payload = new(Serializer);
+    private DurableMessageType<T> Type<T>() => new(typeof(T).Name, _services.GetRequiredService<Serializer<T>>());
+
+    private DurableMessageWriter Writer(GrainId sender)
+    {
+        var context = Substitute.For<IGrainContext>();
+        context.GrainId.Returns(sender);
+        var writer = new DurableMessageWriter(context);
+        _writers.Add(writer);
+        return writer;
+    }
 
     private DurableEnvelope Own(DurableEnvelope envelope)
     {
@@ -31,13 +40,10 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         return envelope;
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("orders/2026/42")]
-    public async Task NotificationReply_PreservesOptionalApplicationOperationKey(string? operationKey)
+    [Fact]
+    public async Task NotificationReply_DerivesResultIdentityFromApplicationCommand()
     {
-        var key = operationKey is null ? null : HierarchicalKey.Create(operationKey);
-        var attempt = Create(new Notify("received message", key, Sender));
+        var attempt = Create(new Notify("received message", Sender));
         var handling = attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
         Assert.True(handling.IsCompletedSuccessfully);
@@ -46,14 +52,10 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         var reply = Assert.Single(attempt.Output);
         Assert.Equal(Sender, reply.ReceiverId);
         Assert.Equal(Receiver, reply.SenderId);
-        Assert.NotEqual(attempt.Context.Envelope.MessageId, reply.MessageId);
-        Assert.Equal(new NotificationReceived("received message", key),
-            _payload.Decode<NotificationReceived>(reply.Payload));
+        Assert.Equal(Command.CreateChildKey("result"), reply.MessageId);
+        Assert.Equal(Type<NotificationReceived>().Subject, reply.Subject);
+        Assert.Equal(new NotificationReceived("received message", Command), Type<NotificationReceived>().Decode(reply));
         Assert.Equal(8, attempt.Count.Value);
-        if (key is not null)
-        {
-            Assert.Equal("received message", Assert.Single(attempt.Ledger).Value);
-        }
         attempt.Inbox.Received(1).RegisterHandler(attempt.Grain);
         attempt.Outbox.Received(1).Send(reply);
         attempt.Context.Received(1).Complete();
@@ -62,7 +64,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     [Fact]
     public async Task NotificationHandling_PreMutationCancellationPreservesBusinessState()
     {
-        var attempt = Create(new Notify("received message", ResponseDestination: Sender));
+        var attempt = Create(new Notify("received message", Sender));
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
@@ -70,7 +72,6 @@ public sealed class DurableMessagingSnippetTests : IDisposable
             await attempt.Grain.HandleAsync(attempt.Context, cancellation.Token));
 
         Assert.Equal(7, attempt.Count.Value);
-        Assert.Empty(attempt.Ledger);
         Assert.Empty(attempt.Output);
         Assert.Empty(attempt.Events);
     }
@@ -78,10 +79,8 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     [Fact]
     public async Task NotificationHandling_CancellationDuringLocalPreparationPreservesBusinessState()
     {
-        var attempt = Create(new Notify("prepared message", ResponseDestination: Sender));
+        var attempt = Create(new Notify("prepared message", Sender));
         using var cancellation = new CancellationTokenSource();
-        // Reading the prior business value is still local preparation. Cancellation
-        // at that boundary must be observed after the reply has been encoded.
         attempt.Count.OnRead = cancellation.Cancel;
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
@@ -90,7 +89,6 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         attempt.Count.OnRead = null;
         Assert.Equal(7, attempt.Count.Value);
         Assert.Empty(attempt.Output);
-        Assert.Empty(attempt.Ledger);
         Assert.Empty(attempt.Events);
     }
 
@@ -99,8 +97,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     [InlineData(true)]
     public async Task NotificationHandling_CancellationAfterFirstMutationCompletesBeforeMethodReturns(bool replyRequested)
     {
-        var key = HierarchicalKey.Create("notifications/late-cancellation");
-        var attempt = Create(new Notify("prepared message", key, replyRequested ? Sender : null));
+        var attempt = Create(new Notify("prepared message", replyRequested ? Sender : null));
         using var cancellation = new CancellationTokenSource();
         attempt.Count.OnWrite = () =>
         {
@@ -113,7 +110,6 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         Assert.True(handling.IsCompletedSuccessfully);
         Assert.True(cancellation.IsCancellationRequested);
         Assert.Equal(replyRequested ? new[] { "count", "send", "complete" } : new[] { "count", "complete" }, attempt.Events);
-        Assert.Equal("prepared message", Assert.Single(attempt.Ledger).Value);
         await handling;
         Assert.Equal(8, attempt.Count.Value);
         attempt.Context.Received(1).Complete();
@@ -145,53 +141,17 @@ public sealed class DurableMessagingSnippetTests : IDisposable
 
         Assert.Contains("nonempty string", exception.Message, StringComparison.Ordinal);
         Assert.Equal(7, attempt.Count.Value);
-        Assert.Empty(attempt.Ledger);
         Assert.Empty(attempt.Output);
         Assert.Empty(attempt.Events);
     }
 
     [Fact]
-    public async Task NotificationHandling_FreshTransportIdentityReusesBusinessOperation()
+    public async Task NotificationHandling_UnexpectedSubjectPreservesBusinessState()
     {
-        var key = HierarchicalKey.Create("campaigns/42/recipients/alice");
-        var attempt = Create(new Notify("campaign text", key, Sender));
-        await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
-        var duplicate = Own(_payload.Envelope(Sender, Receiver, new Notify("campaign text", key, Sender)));
-        Assert.NotEqual(attempt.Context.Envelope.MessageId, duplicate.MessageId);
-        attempt.Context.Envelope.Returns(duplicate);
-        await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+        var attempt = Create(new Notify("prepared"));
+        attempt.Context.Envelope.Returns(Own(Writer(Sender).Create(
+            Type<NotificationReceived>(), Command, Receiver, new NotificationReceived("receipt", Command))));
 
-        Assert.Equal(8, attempt.Count.Value);
-        Assert.Single(attempt.Ledger);
-        Assert.Equal(new[] { "count", "send", "complete", "send", "complete" }, attempt.Events);
-        Assert.Equal(2, attempt.Output.Count);
-        var codec = _payload;
-        Assert.Equal(codec.Decode<NotificationReceived>(attempt.Output[0].Payload),
-            codec.Decode<NotificationReceived>(attempt.Output[1].Payload));
-    }
-
-    [Fact]
-    public async Task NotificationHandling_ConflictingOperationKeyPreservesOriginalText()
-    {
-        var key = HierarchicalKey.Create("campaigns/42/recipients/alice");
-        var attempt = Create(new Notify("original", key));
-        await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
-        attempt.Context.Envelope.Returns(Own(_payload.Envelope(Sender, Receiver, new Notify("conflict", key))));
-        attempt.Events.Clear();
-
-        await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
-
-        Assert.Equal(8, attempt.Count.Value);
-        Assert.Equal("original", Assert.Single(attempt.Ledger).Value);
-        Assert.Empty(attempt.Output);
-        Assert.Empty(attempt.Events);
-    }
-
-    [Fact]
-    public async Task NotificationHandling_UnexpectedApplicationKindPreservesBusinessState()
-    {
-        var attempt = Create(new NotificationReceived("receipt", null));
         await Assert.ThrowsAsync<ArgumentException>(async () =>
             await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
@@ -203,7 +163,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     [Fact]
     public void ShipmentPackage_EntriesRemainValidWhileDecodedOwnerIsRetained()
     {
-        var request = new ReserveStock(HierarchicalKey.Create("orders/42/inventory/reserve"), 3, Sender);
+        var request = new ReserveStock(3, Sender);
         byte[] manifest = [1, 2, 3];
         BufferPackage retained;
         using (var encoder = new ArcBufferWriter())
@@ -214,7 +174,6 @@ public sealed class DurableMessagingSnippetTests : IDisposable
             Assert.Equal(request, ShipmentPackage.ReadReservation(Serializer, package));
             Assert.Equal(new[] { "manifest", "reservation" }, package.Keys.Order().ToArray());
             Assert.False(package.TryGetBytes("missing", out _));
-            // Arc-backed decode retains the raw sub-slice instead of copying its page.
             Assert.Same(encoded.First, package.Buffer.First);
             retained = package.Retain();
         }
@@ -232,7 +191,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     public void ArcPayload_ConsumedSlicesSharePagesAndSurviveEncoderDisposal()
     {
         var serializer = _services.GetRequiredService<Serializer<Notify>>();
-        var message = new Notify("retained", HierarchicalKey.Create("campaigns/42/alice"), Sender);
+        var message = new Notify("retained", Sender);
         ArcBuffer first;
         ArcBuffer second;
         using (var encoder = new ArcBufferWriter())
@@ -256,7 +215,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
             Assert.True(second.Offset >= first.Offset + first.Length);
             Assert.Equal(message, ArcPayloadEncoder.DecodeRetained(Serializer, first));
             Assert.Equal("different bytes", serializer.Deserialize(second)!.Text);
-            Assert.Equal(message, serializer.Deserialize(first)); // Decode borrowed input twice.
+            Assert.Equal(message, serializer.Deserialize(first));
         }
     }
 
@@ -264,8 +223,8 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     public void Envelope_RetainOwnsIndependentPinAndSerializationDoesNotConsumePayload()
     {
         DurableEnvelope retained;
-        using (var codec = new ApplicationPayload(Serializer))
-        using (var envelope = codec.Envelope(Sender, Receiver, new Notify("owned")))
+        using (var writer = Writer(Sender))
+        using (var envelope = writer.Create(Type<Notify>(), Command, Receiver, new Notify("owned")))
         {
             retained = envelope.Retain();
         }
@@ -280,8 +239,9 @@ public sealed class DurableMessagingSnippetTests : IDisposable
             Assert.Equal(first.ToArray(), second.ToArray());
             using var decoded = Serializer.Deserialize<DurableEnvelope>(first);
             Assert.Equal(retained.MessageId, decoded.MessageId);
-            Assert.Equal(new Notify("owned"), _payload.Decode<Notify>(decoded.Payload));
-            Assert.Equal(new Notify("owned"), _payload.Decode<Notify>(retained.Payload));
+            Assert.Equal(retained.Subject, decoded.Subject);
+            Assert.Equal(new Notify("owned"), Type<Notify>().Decode(decoded));
+            Assert.Equal(new Notify("owned"), Type<Notify>().Decode(retained));
         }
     }
 
@@ -291,59 +251,53 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         var inbox = Substitute.For<IDurableInbox>();
         var outbox = Substitute.For<IDurableOutbox>();
         var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(Own(_payload.Envelope(Sender, Receiver,
-            new Notify("prepared", ResponseDestination: Sender))));
+        context.Envelope.Returns(Own(Writer(Sender).Create(Type<Notify>(), Command, Receiver, new Notify("prepared", Sender))));
         ArcBuffer borrowedReply = default;
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
             borrowedReply = call.Arg<DurableEnvelope>().Payload;
             throw new IOException("staging failed");
         });
-        using (var grain = new NotificationGrain(inbox, outbox, Serializer, new TestCount([]), new TestLedger()))
+        using (var writer = Writer(Receiver))
         {
+            var grain = new NotificationGrain(inbox, outbox, writer, Type<Notify>(), Type<NotificationReceived>(), new TestCount([]));
             await Assert.ThrowsAsync<IOException>(async () =>
                 await grain.HandleAsync(context, TestContext.Current.CancellationToken));
             context.DidNotReceive().Complete();
             Assert.NotEqual(0, borrowedReply.Length);
         }
-        // No state pin was admitted, and encoder teardown releases its own page pin.
-        // A leaked local reply would keep this borrowed view valid.
         Assert.Throws<InvalidOperationException>(() => borrowedReply.ToArray());
     }
 
-    private Attempt Create(object message)
+    private Attempt Create(Notify message)
     {
         var inbox = Substitute.For<IDurableInbox>();
         var outbox = Substitute.For<IDurableOutbox>();
         var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(Own(_payload.Envelope(Sender, Receiver, message)));
+        context.Envelope.Returns(Own(Writer(Sender).Create(Type<Notify>(), Command, Receiver, message)));
         var events = new List<string>();
         var output = new List<DurableEnvelope>();
         var count = new TestCount(events);
-        var ledger = new TestLedger();
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
             output.Add(Own(call.Arg<DurableEnvelope>().Retain()));
             events.Add("send");
         });
         context.When(value => value.Complete()).Do(_ => events.Add("complete"));
-        var grain = new NotificationGrain(inbox, outbox, Serializer, count, ledger);
-        _grains.Add(grain);
-        return new(grain, inbox, outbox, context, count, ledger, output, events);
+        var writer = Writer(Receiver);
+        var grain = new NotificationGrain(inbox, outbox, writer, Type<Notify>(), Type<NotificationReceived>(), count);
+        return new(grain, inbox, outbox, context, count, writer, output, events);
     }
 
     public void Dispose()
     {
-        foreach (var grain in _grains) grain.Dispose();
         foreach (var envelope in _owned) envelope.Dispose();
-        _payload.Dispose();
+        foreach (var writer in _writers) writer.Dispose();
         _services.Dispose();
     }
 
     private sealed record Attempt(NotificationGrain Grain, IDurableInbox Inbox, IDurableOutbox Outbox,
-        IInboxHandlerContext Context, TestCount Count, TestLedger Ledger, List<DurableEnvelope> Output, List<string> Events);
-
-    private sealed class TestLedger : Dictionary<HierarchicalKey, string>, IDurableDictionary<HierarchicalKey, string>;
+        IInboxHandlerContext Context, TestCount Count, DurableMessageWriter Writer, List<DurableEnvelope> Output, List<string> Events);
 
     private sealed class TestCount(List<string> events) : IDurableValue<int>
     {
