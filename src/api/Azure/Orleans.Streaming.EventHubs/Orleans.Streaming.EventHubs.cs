@@ -414,6 +414,8 @@ namespace Orleans.Streaming.EventHubs
 
         public virtual Streams.StreamPosition GetStreamPosition(string partition, Azure.Messaging.EventHubs.EventData queueMessage) { throw null; }
 
+        int Providers.Streams.Common.ICacheDataAdapter.Compare(ref Providers.Streams.Common.CachedMessage cachedMessage, Streams.StreamSequenceToken token) { throw null; }
+
         public virtual Azure.Messaging.EventHubs.EventData ToQueueMessage<T>(Runtime.StreamId streamId, System.Collections.Generic.IEnumerable<T> events, Streams.StreamSequenceToken? token, System.Collections.Generic.Dictionary<string, object>? requestContext) { throw null; }
     }
 

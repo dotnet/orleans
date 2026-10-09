@@ -4,8 +4,11 @@ using Azure.Messaging.EventHubs.Primitives;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Streams;
 
 namespace Orleans.Streaming.EventHubs
 {
@@ -58,9 +61,17 @@ namespace Orleans.Streaming.EventHubs
     /// <summary>
     /// pass through decorator class for EventHubReceiver
     /// </summary>
-    internal partial class EventHubReceiverProxy : IEventHubReceiver
+    internal partial class EventHubReceiverProxy : IEventHubReceiver, IQueueAdapterReceiverReadRecovery
     {
-        private readonly PartitionReceiver client;
+        private readonly Func<EventPosition, PartitionReceiver> clientFactory;
+        private readonly EventHubConnection? connection;
+        private PartitionReceiver client;
+        private EventPosition readPosition;
+        private bool captureLatestPosition;
+        private bool captureBeginningPosition;
+        private long? firstSequenceNumber;
+        private bool recreateRequired;
+        private bool recoveryEnabled;
 
         public EventHubReceiverProxy(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
         {
@@ -72,8 +83,13 @@ namespace Orleans.Streaming.EventHubs
 
             var options = partitionSettings.Hub;
             receiverOptions.ConnectionOptions = options.ConnectionOptions;
-            var connection = options.CreateConnection(options.ConnectionOptions);
-            this.client = new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, GetEventPosition(), connection, receiverOptions);
+            var receiverConnection = options.CreateConnection(options.ConnectionOptions);
+            connection = receiverConnection;
+            clientFactory = position => new PartitionReceiver(options.ConsumerGroup, partitionSettings.Partition, position, receiverConnection, receiverOptions);
+            readPosition = GetEventPosition();
+            captureLatestPosition = offset == EventHubConstants.StartOfStream && partitionSettings.ReceiverOptions.StartFromNow;
+            captureBeginningPosition = offset == EventHubConstants.StartOfStream && !partitionSettings.ReceiverOptions.StartFromNow;
+            client = clientFactory(readPosition);
 
             EventPosition GetEventPosition()
             {
@@ -102,6 +118,61 @@ namespace Orleans.Streaming.EventHubs
             }
         }
 
+        internal EventHubReceiverProxy(
+            Func<EventPosition, PartitionReceiver> clientFactory,
+            EventPosition readPosition,
+            bool captureLatestPosition,
+            EventHubConnection? connection = null)
+        {
+            this.clientFactory = clientFactory;
+            this.connection = connection;
+            this.readPosition = readPosition;
+            this.captureLatestPosition = captureLatestPosition;
+            recoveryEnabled = true;
+            captureBeginningPosition = !captureLatestPosition && readPosition.Equals(EventPosition.Earliest);
+            client = clientFactory(readPosition);
+        }
+
+        internal async Task InitializeAsync(CancellationToken cancellationToken)
+        {
+            recoveryEnabled = true;
+            if (captureLatestPosition || captureBeginningPosition)
+            {
+                var properties = await client.GetPartitionPropertiesAsync(cancellationToken);
+                if (properties.IsEmpty)
+                {
+                    readPosition = EventPosition.Earliest;
+                    firstSequenceNumber = null;
+                }
+                else if (captureLatestPosition)
+                {
+                    readPosition = EventPosition.FromOffset(properties.LastEnqueuedOffsetString, false);
+                }
+                else
+                {
+                    readPosition = EventPosition.FromSequenceNumber(properties.BeginningSequenceNumber, true);
+                    firstSequenceNumber = properties.BeginningSequenceNumber;
+                }
+                captureLatestPosition = false;
+                captureBeginningPosition = false;
+                recreateRequired = true;
+            }
+
+            if (recreateRequired)
+            {
+                await client.CloseAsync(cancellationToken);
+                client = clientFactory(readPosition);
+                recreateRequired = false;
+            }
+        }
+
+        public Task RecoverReadAsync(CancellationToken cancellationToken)
+        {
+            if (!recoveryEnabled) throw new InvalidOperationException("Read recovery has not been selected for this receiver.");
+            recreateRequired = true;
+            return InitializeAsync(cancellationToken);
+        }
+
         public async Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
             => await ReceiveAsync(maxCount, waitTime, CancellationToken.None);
 
@@ -110,14 +181,61 @@ namespace Orleans.Streaming.EventHubs
             TimeSpan waitTime,
             CancellationToken cancellationToken)
         {
-            return await client.ReceiveBatchAsync(maxCount, waitTime, cancellationToken);
+            if (!recoveryEnabled) return await client.ReceiveBatchAsync(maxCount, waitTime, cancellationToken);
+            await InitializeAsync(cancellationToken);
+            try
+            {
+                var messages = (await client.ReceiveBatchAsync(maxCount, waitTime, cancellationToken)).ToArray();
+                if (messages.Length > 0)
+                {
+                    if (firstSequenceNumber is { } expected && messages[0].SequenceNumber != expected)
+                    {
+                        throw new InvalidOperationException($"The Event Hubs read started at sequence {messages[0].SequenceNumber} instead of the captured partition boundary {expected}.");
+                    }
+
+                    readPosition = EventPosition.FromOffset(messages[^1].OffsetString, false);
+                    firstSequenceNumber = null;
+                }
+                return messages;
+            }
+            catch
+            {
+                recreateRequired = true;
+                throw;
+            }
         }
 
         public Task CloseAsync() => CloseAsync(CancellationToken.None);
 
         public async Task CloseAsync(CancellationToken cancellationToken)
         {
-            await client.CloseAsync(cancellationToken);
+            ExceptionDispatchInfo? clientFailure = null;
+            try
+            {
+                await client.CloseAsync(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                clientFailure = ExceptionDispatchInfo.Capture(exception);
+            }
+
+            try
+            {
+                if (connection is not null) await connection.CloseAsync(cancellationToken);
+            }
+            catch (Exception exception) when (clientFailure is not null)
+            {
+                if (cancellationToken.IsCancellationRequested
+                    && clientFailure.SourceException is OperationCanceledException
+                    && exception is OperationCanceledException)
+                {
+                    clientFailure.Throw();
+                }
+
+                throw new AggregateException("Closing the Event Hubs receiver and its connection failed.", clientFailure.SourceException, exception);
+            }
+
+            clientFailure?.Throw();
         }
 
         [LoggerMessage(
