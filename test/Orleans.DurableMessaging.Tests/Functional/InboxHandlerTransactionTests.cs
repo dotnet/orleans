@@ -104,20 +104,23 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
     public async Task HandlerCompletionWriteFailure_FencesOldManagerAndFreshActivationRetries()
     {
         var receiver = NewGrain();
-        var before = await receiver.GetSnapshotAsync();
+        _ = await receiver.GetSnapshotAsync();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/completion-failure");
         using var envelope = CreateEnvelope(receiver, NewMessage(78, "completion-failure"), "messages/completion-failure");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();
         var oldContext = Fixture.GetGrainContext(receiver);
+        var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
         var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
         Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         handler.Release();
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         await Assert.ThrowsAnyAsync<Exception>(() => oldManager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         _ = await receiver.GetSnapshotAsync();
-        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.NotEqual(before.ActivationId, completed.ActivationId);
+        var completed = await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(),
+            snapshot => snapshot.ActivationId != oldGrain.GetSnapshotForTest().ActivationId
+                && snapshot.Effects.Sum(static effect => effect.Count) == 1);
+        Assert.NotEqual(oldGrain.GetSnapshotForTest().ActivationId, completed.ActivationId);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Empty(completed.InboxDeadLetters);
         Assert.Equal(0, completed.InboxCount);
