@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Concurrency;
@@ -379,7 +380,7 @@ public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehavi
             cancellationToken.ThrowIfCancellationRequested();
             Context = context;
             Output.Dispose();
-            Output = TestApplicationProtocol.Create(observation.Context.ActivationServices.GetRequiredService<SerializerSessionPool>(), observation.Context.GrainId, BootstrapState.OutputTarget, "output", 42);
+            Output = TestApplicationProtocol.Create(observation.Context.ActivationServices.GetRequiredService<SerializerSessionPool>(), observation.Context.GrainId, BootstrapState.OutputTarget, "output", 42, context.Envelope.MessageId.CreateChildKey("output"));
             Applied++;
             observation.Value!.Value = 42;
             observation.Outbox!.Send(Output);
@@ -757,9 +758,11 @@ public class DurableMessagingGrainTypeConfiguratorTests : DurableMessagingBehavi
         ? Fixture.Client.GetGrain<IGenericBootstrapTestGrain<int>>(Guid.NewGuid())
         : Fixture.Client.GetGrain<IBootstrapTestGrain>(Guid.NewGuid(), grainClass.FullName!);
     private IBootstrapControlGrain Control<T>() => Fixture.Client.GetGrain<IBootstrapControlGrain>(Guid.NewGuid(), typeof(T).FullName!);
+    private int _commandSequence;
     private DurableEnvelope CreateEnvelope(IBootstrapTestGrain grain) =>
         TestApplicationProtocol.Create(Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>(),
-            GrainId.Create("bootstrap-sender", "external"), grain.GetGrainId(), BootstrapState.Route, 1);
+            GrainId.Create("bootstrap-sender", "external"), grain.GetGrainId(), BootstrapState.Route, 1,
+            HierarchicalKey.Create("test", grain.GetGrainId().ToString(), "command", (++_commandSequence).ToString(CultureInfo.InvariantCulture)));
     private static IDurableDictionary<HierarchicalKey, DateTimeOffset> GetProcessed(IGrainContext context) =>
         context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
     private static Delegate GetSetup(IGrainContext context) => Assert.IsAssignableFrom<Delegate>(GetSetupOrDefault(context));

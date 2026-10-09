@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -196,7 +197,7 @@ public sealed class OutboxCodecBoundaryTests
         if (existingIntent) { await fixture.SendAsync(valid); }
         var invalid = field switch
         {
-            "message" => valid with { MessageId = Guid.Empty },
+            "message" => valid with { MessageId = default },
             "sender" => valid with { SenderId = default },
             "receiver" => valid with { ReceiverId = default },
             "payload" => valid with { Payload = default },
@@ -232,7 +233,7 @@ public sealed class OutboxCodecBoundaryTests
         using var template = fixture.CreateNullBodyEnvelope();
         using var message = template with
         {
-            MessageId = Guid.Parse("89cabd50-d5c6-4bed-a94e-d7c312ed5139"),
+            MessageId = HierarchicalKey.Create("test", "codec-boundary", "nullable-body", "0"),
             Payload = fixture.EncodeApplication(route!, null)
         };
         Assert.Null(fixture.ReadApplication(message).Body);
@@ -267,7 +268,7 @@ public sealed class OutboxCodecBoundaryTests
     {
         await using var fixture = await CodecFixture.CreateAsync(stateOrder: rotation, snapshot: snapshot);
         Assert.Equal(7, fixture.States.StateCount);
-        Assert.IsAssignableFrom<IDurableDictionary<Guid, DurableEnvelope>>(
+        Assert.IsAssignableFrom<IDurableDictionary<HierarchicalKey, DurableEnvelope>>(
             fixture.States.GetState<IStateMachine>("__orleans.durable-messaging.outbox"));
         using var first = fixture.CreateEnvelope();
         await fixture.SendAsync(first);
@@ -499,6 +500,215 @@ public sealed class OutboxCodecBoundaryTests
         Assert.Equal(0, fixture.Outbox.Count);
     }
 
+    [Fact]
+    public Task ApplicationIdentity_EquivalentReconstructionPreservesOriginalRetainedIntent() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var command = HierarchicalKey.Create("tenant/acme", "orders", "1042", "reserve-stock");
+        var reconstructed = HierarchicalKey.Parse(command.ToString(), provider: null);
+        Assert.Equal(command, reconstructed);
+        using var envelope = fixture.CreateEnvelope(command, "inventory.reserve.v1");
+        using var repeat = fixture.CreateEnvelope(reconstructed, "inventory.reserve.v1");
+        fixture.Outbox.Send(envelope);
+        fixture.Outbox.Send(repeat);
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(1, fixture.Probe.Count(nameof(DurableEnvelope)));
+        Assert.True(fixture.Outbox.TryGetMessage(reconstructed, out var stored));
+        Assert.Same(envelope.Payload.First, stored.Payload.First);
+        Assert.NotSame(repeat.Payload.First, stored.Payload.First);
+        Assert.Equal("inventory.reserve.v1", stored.Subject);
+        Assert.Equal(envelope.Payload.ToArray(), stored.Payload.ToArray());
+        using var storage = fixture.Storage.BlockWrite(fixture.JournalId);
+        var writing = fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        await storage.WaitUntilEnteredAsync();
+        fixture.Outbox.Send(repeat);
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Receiver.ReceivedCalls());
+        storage.Release();
+        await writing;
+        await using (var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId))
+        {
+            Assert.True(recovered.Outbox.TryGetMessage(reconstructed, out var restored));
+            Assert.Equal(command, restored.MessageId);
+            Assert.Equal("inventory.reserve.v1", restored.Subject);
+            Assert.Equal(envelope.Payload.ToArray(), restored.Payload.ToArray());
+            Assert.Equal(fixture.Job.Value!.Id, recovered.Job.Value!.Id);
+            Assert.Equal(fixture.Job.Value.ShardId, recovered.Job.Value.ShardId);
+        }
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Messages);
+        var delivery = Assert.Single(fixture.Receiver.ReceivedCalls());
+        Assert.Equal(command, ((DurableEnvelope)delivery.GetArguments()[0]!).MessageId);
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+        Assert.Equal(envelope.Payload.ToArray(), repeat.Payload.ToArray());
+    });
+
+    [Theory]
+    [InlineData("destination", false)]
+    [InlineData("subject", false)]
+    [InlineData("body", false)]
+    [InlineData("destination", true)]
+    [InlineData("subject", true)]
+    [InlineData("body", true)]
+    public Task ApplicationIdentity_ConflictingIntentPreservesOwnerPayloadAndAttempts(string conflict, bool committed) => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var command = HierarchicalKey.Create("tenant", "orders", "1042", "reserve-stock");
+        using var original = fixture.CreateEnvelope(command, "inventory.reserve.v1");
+        var page = original.Payload.First;
+        var references = typeof(ArcBufferPage).GetField("_refCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        int Pins() => (int)references.GetValue(page)!;
+        Assert.Equal(1, Pins());
+        fixture.Outbox.Send(original);
+        if (committed) await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var owner = fixture.Job.Value;
+        var writes = fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId);
+        var commandEncodes = fixture.Probe.Count(nameof(DurableEnvelope));
+        Assert.Equal(2, Pins());
+        using (var conflicting = conflict == "body"
+            ? original with { Payload = fixture.EncodeApplication("changed-body", 99) }
+            : original.Retain() with
+            {
+                ReceiverId = conflict == "destination" ? GrainId.Create("receiver", "other") : original.ReceiverId,
+                Subject = conflict == "subject" ? "inventory.reserve.V1" : original.Subject
+            })
+        {
+            var error = Assert.Throws<InvalidOperationException>(() => fixture.Outbox.Send(conflicting));
+            Assert.Contains(command.ToString(), error.Message, StringComparison.Ordinal);
+        }
+        Assert.Equal(2, Pins());
+        Assert.Equal(1, fixture.Outbox.Count);
+        Assert.Equal(commandEncodes, fixture.Probe.Count(nameof(DurableEnvelope)));
+        Assert.Equal(writes, fixture.Storage.GetSuccessfulWriteCount(fixture.JournalId));
+        Assert.Same(owner, fixture.Job.Value);
+        Assert.True(fixture.Outbox.TryGetMessage(HierarchicalKey.Parse(command.ToString(), provider: null), out var stored));
+        Assert.Same(page, stored.Payload.First);
+        Assert.Equal(original.ReceiverId, stored.ReceiverId);
+        Assert.Equal(original.Subject, stored.Subject);
+        Assert.Equal(original.Payload.ToArray(), stored.Payload.ToArray());
+        Assert.Null(fixture.States.Failure);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await fixture.DeliverAsync();
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(1, Pins());
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+        Assert.Single(fixture.Receiver.ReceivedCalls());
+    });
+
+    [Fact]
+    public Task ApplicationIdentity_ParentAndRecipientChildrenRemainIndependentAcrossReplay() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var command = HierarchicalKey.Create("tenant", "campaign", "1042", "notify");
+        var firstId = command.CreateChildKey("recipient/a");
+        var secondId = command.CreateChildKey("recipient/b");
+        Assert.NotEqual(command, firstId);
+        Assert.NotEqual(firstId, secondId);
+        Assert.Equal(firstId, HierarchicalKey.Parse(command.ToString(), provider: null).CreateChildKey("recipient/a"));
+        using var parent = fixture.CreateEnvelope(command, "campaign.notify.v1");
+        using var first = fixture.CreateEnvelope(firstId, "campaign.notify.v1");
+        using var second = fixture.CreateEnvelope(secondId, "campaign.notify.v1") with { ReceiverId = GrainId.Create("receiver", "other") };
+        using var retry = fixture.CreateEnvelope(HierarchicalKey.Parse(firstId.ToString(), provider: null), "campaign.notify.v1");
+        fixture.Outbox.Send(parent);
+        fixture.Outbox.Send(first);
+        fixture.Outbox.Send(second);
+        fixture.Outbox.Send(retry);
+        Assert.Equal(3, fixture.Outbox.Count);
+        Assert.Equal(3, fixture.Probe.Count(nameof(DurableEnvelope)));
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await using (var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId))
+        {
+            Assert.Equal(3, recovered.Outbox.Count);
+            foreach (var id in new[] { command, firstId, secondId }) Assert.True(recovered.Outbox.TryGetMessage(id, out _));
+            Assert.Equal(fixture.Job.Value!.Id, recovered.Job.Value!.Id);
+            Assert.Equal(fixture.Job.Value.ShardId, recovered.Job.Value.ShardId);
+        }
+        using var storage = fixture.Storage.BlockWrite(fixture.JournalId);
+        var delivering = fixture.DeliverAsync();
+        await storage.WaitUntilEnteredAsync();
+        Assert.Empty(fixture.Messages);
+        Assert.Equal(3, fixture.Receiver.ReceivedCalls().Count());
+        storage.Release();
+        await delivering;
+        await using var drained = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
+        Assert.Empty(drained.Messages);
+        Assert.Single(fixture.Jobs.ReceivedCalls());
+    });
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public Task ApplicationIdentity_AttemptsDeadLettersAndRemovalRetainExactKeyAcrossReplay(bool deadLetter) => OnOwnerAsync(async () =>
+    {
+        var outcome = deadLetter ? DeliveryResult.HandlerNotFound() : DeliveryResult.Backpressured();
+        await using var fixture = await CodecFixture.CreateAsync(delivery: outcome, maxAttempts: deadLetter ? 1 : 3);
+        var command = HierarchicalKey.Create("tenant", "orders", "1042", "reserve-stock");
+        using var message = fixture.CreateEnvelope(command, "inventory.reserve.v1");
+        fixture.Outbox.Send(message);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await fixture.DeliverAsync();
+        var recoveredKey = HierarchicalKey.Parse(command.ToString(), provider: null);
+        await using var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId, delivery: outcome, maxAttempts: deadLetter ? 1 : 3);
+        Assert.Empty(recovered.Jobs.ReceivedCalls());
+        if (deadLetter)
+        {
+            Assert.Equal(command, Assert.Single(recovered.DeadLetterKeys));
+            Assert.Empty(recovered.AttemptKeys);
+            Assert.False(recovered.Outbox.TryGetMessage(recoveredKey, out _));
+            var dead = recovered.ReadDeadLetterEnvelope(recoveredKey);
+            Assert.Equal(command, dead.MessageId);
+            Assert.Equal(message.Subject, dead.Subject);
+            Assert.Equal(message.Payload.ToArray(), dead.Payload.ToArray());
+            Assert.True(recovered.RemoveDeadLetter(recoveredKey));
+            await recovered.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            await using var removed = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
+            Assert.Empty(removed.DeadLetterKeys);
+            Assert.Empty(removed.Messages);
+        }
+        else
+        {
+            Assert.Equal(command, Assert.Single(recovered.AttemptKeys));
+            Assert.Empty(recovered.DeadLetterKeys);
+            Assert.True(recovered.Outbox.TryGetMessage(recoveredKey, out var pending));
+            Assert.Equal(command, pending.MessageId);
+            Assert.Equal(message.Subject, pending.Subject);
+            Assert.Equal(message.Payload.ToArray(), pending.Payload.ToArray());
+            Assert.Equal(fixture.Job.Value!.Id, recovered.Job.Value!.Id);
+            Assert.Equal(fixture.Job.Value.ShardId, recovered.Job.Value.ShardId);
+        }
+        Assert.Equal(1, fixture.Receiver.ReceivedCalls().Count());
+        Assert.Null(fixture.States.Failure);
+    });
+
+    [Fact]
+    public Task ApplicationIdentity_RetryAfterOwnerRetirementPreservesTheOriginalCommandKey() => OnOwnerAsync(async () =>
+    {
+        await using var fixture = await CodecFixture.CreateAsync();
+        var command = HierarchicalKey.Create("tenant", "orders", "1042", "reserve-stock");
+        using var first = fixture.CreateEnvelope(command, "inventory.reserve.v1");
+        fixture.Outbox.Send(first);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await fixture.DeliverAsync();
+        var retiredJob = fixture.Job.Value!;
+        await fixture.PumpAsync(retiredJob);
+        Assert.Null(fixture.Job.Value);
+        using var retry = fixture.CreateEnvelope(HierarchicalKey.Parse(command.ToString(), provider: null), "inventory.reserve.v1");
+        fixture.Outbox.Send(retry);
+        Assert.Equal(command, Assert.Single(fixture.Messages).Key);
+        await fixture.Manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var replacement = fixture.Job.Value!;
+        Assert.NotEqual(retiredJob.Id, replacement.Id);
+        Assert.Equal(2, fixture.Jobs.ReceivedCalls().Count());
+        await using var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId);
+        Assert.True(recovered.Outbox.TryGetMessage(command, out var stored));
+        Assert.Equal(retry.Subject, stored.Subject);
+        Assert.Equal(retry.Payload.ToArray(), stored.Payload.ToArray());
+        Assert.Equal(replacement.Id, recovered.Job.Value!.Id);
+        Assert.Equal(replacement.ShardId, recovered.Job.Value.ShardId);
+        await recovered.DeliverAsync();
+        Assert.Empty(recovered.Messages);
+    });
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -560,7 +770,7 @@ public sealed class OutboxCodecBoundaryTests
         await using (var recovered = await CodecFixture.CreateAsync(fixture.Storage, fixture.JournalId, businessState: true))
         {
             Assert.Equal(42, recovered.Business!.Value);
-            Assert.Equal(new[] { first.MessageId, second.MessageId }.Order(), recovered.Messages.Keys.Order());
+            Assert.Equal(new[] { first.MessageId, second.MessageId }.OrderBy(static key => key.ToString(), StringComparer.Ordinal), recovered.Messages.Keys.OrderBy(static key => key.ToString(), StringComparer.Ordinal));
             Assert.Equal(scheduling.Job!.Id, recovered.Job.Value!.Id);
             Assert.Equal(scheduling.Job.ShardId, recovered.Job.Value.ShardId);
         }
@@ -1013,7 +1223,7 @@ public sealed class OutboxCodecBoundaryTests
         public IDurableOutbox Outbox { get; }
         public IDurableValue<int>? Business { get; }
         public IDurableInboxExtension Receiver { get; }
-        public IDurableDictionary<Guid, DurableEnvelope> Messages { get; }
+        public IDurableDictionary<HierarchicalKey, DurableEnvelope> Messages { get; }
         public IDurableValue<DurableJob> Job { get; }
         public StateTrackingManager States { get; }
         public IGrainContext Context { get; }
@@ -1027,6 +1237,20 @@ public sealed class OutboxCodecBoundaryTests
                 return (int)entries.GetType().GetProperty("Count")!.GetValue(entries)!;
             }
         }
+
+        public IEnumerable<HierarchicalKey> AttemptKeys => (IEnumerable<HierarchicalKey>)States
+            .GetState<IStateMachine>("__orleans.durable-messaging.outbox-message-state")
+            .GetType().GetProperty("Keys")!.GetValue(States.GetState<IStateMachine>("__orleans.durable-messaging.outbox-message-state"))!;
+        public IEnumerable<HierarchicalKey> DeadLetterKeys => (IEnumerable<HierarchicalKey>)DeadLetterState.GetType()
+            .GetProperty("Keys")!.GetValue(DeadLetterState)!;
+        private IStateMachine DeadLetterState => States.GetState<IStateMachine>("__orleans.durable-messaging.outbox-dead-letters");
+        public DurableEnvelope ReadDeadLetterEnvelope(HierarchicalKey messageId)
+        {
+            var value = DeadLetterState.GetType().GetProperty("Item")!.GetValue(DeadLetterState, [messageId])!;
+            return (DurableEnvelope)value.GetType().GetProperty("Envelope")!.GetValue(value)!;
+        }
+        public bool RemoveDeadLetter(HierarchicalKey messageId) =>
+            (bool)DeadLetterState.GetType().GetMethod("Remove", [typeof(HierarchicalKey)])!.Invoke(DeadLetterState, [messageId])!;
 
         private CodecFixture(ControlledJournalStorageProvider? storage, JournalId? journalId, DeliveryResult delivery, int maxAttempts, int stateOrder, bool snapshot, bool businessState)
         {
@@ -1102,7 +1326,7 @@ public sealed class OutboxCodecBoundaryTests
             States = _scope.ServiceProvider.GetRequiredService<StateTrackingManager>();
             if (businessState) Business = dependencies.GetRequiredKeyedService<IDurableValue<int>>("business");
             States.RegisterStates(stateOrder);
-            Messages = States.GetState<IDurableDictionary<Guid, DurableEnvelope>>("__orleans.durable-messaging.outbox");
+            Messages = States.GetState<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.outbox");
             Job = States.GetState<IDurableValue<DurableJob>>("__orleans.durable-messaging.outbox-job-handle");
             _deliver = Outbox.GetType().GetMethod("DeliverPendingMessagesAsync")!.CreateDelegate<Func<CancellationToken, Task>>(Outbox);
         }
@@ -1118,8 +1342,17 @@ public sealed class OutboxCodecBoundaryTests
             }
             return result;
         }
-        public DurableEnvelope CreateEnvelope() => TestApplicationProtocol.Create(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "codec-boundary"), GrainId.Create("receiver", "codec-boundary"), "codec", new Payload(new byte[4096]));
-        public DurableEnvelope CreateNullBodyEnvelope() => TestApplicationProtocol.Create(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "codec-boundary"), GrainId.Create("receiver", "codec-boundary"), "codec", null);
+        private int _messageSequence;
+        private HierarchicalKey NextMessageId() => HierarchicalKey.Create(
+            "test", "codec-boundary", "command", (++_messageSequence).ToString(CultureInfo.InvariantCulture));
+        public DurableEnvelope CreateEnvelope() => CreateEnvelope(NextMessageId());
+        public DurableEnvelope CreateEnvelope(HierarchicalKey messageId, string subject = "codec") =>
+            TestApplicationProtocol.Create(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(),
+                GrainId.Create("sender", "codec-boundary"), GrainId.Create("receiver", "codec-boundary"),
+                subject, new Payload(new byte[4096]), messageId);
+        public DurableEnvelope CreateNullBodyEnvelope() => TestApplicationProtocol.Create(
+            _scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), GrainId.Create("sender", "codec-boundary"),
+            GrainId.Create("receiver", "codec-boundary"), "codec", null, NextMessageId());
 
         public ArcBuffer EncodeApplication(string route, object? body) =>
             TestApplicationProtocol.Encode(_scope.ServiceProvider.GetRequiredService<SerializerSessionPool>(), new TestApplicationMessage(route, body));
@@ -1130,9 +1363,9 @@ public sealed class OutboxCodecBoundaryTests
         {
             Type contract = name switch
             {
-                "__orleans.durable-messaging.outbox" => typeof(IDurableDictionary<Guid, DurableEnvelope>),
-                "__orleans.durable-messaging.outbox-message-state" => typeof(IDurableDictionary<,>).MakeGenericType(typeof(Guid), Implementation("OutboxMessageState")),
-                "__orleans.durable-messaging.outbox-dead-letters" => typeof(IDurableDictionary<,>).MakeGenericType(typeof(Guid), Implementation("OutboxDeadLetter")),
+                "__orleans.durable-messaging.outbox" => typeof(IDurableDictionary<HierarchicalKey, DurableEnvelope>),
+                "__orleans.durable-messaging.outbox-message-state" => typeof(IDurableDictionary<,>).MakeGenericType(typeof(HierarchicalKey), Implementation("OutboxMessageState")),
+                "__orleans.durable-messaging.outbox-dead-letters" => typeof(IDurableDictionary<,>).MakeGenericType(typeof(HierarchicalKey), Implementation("OutboxDeadLetter")),
                 "__orleans.durable-messaging.outbox-job-id" or "__orleans.durable-messaging.outbox-completed-job-id" => typeof(IDurableValue<string>),
                 "__orleans.durable-messaging.outbox-job-handle" => typeof(IDurableValue<DurableJob>),
                 _ => throw new ArgumentOutOfRangeException(nameof(name))
@@ -1177,7 +1410,7 @@ public sealed class OutboxCodecBoundaryTests
             ReceiverTestServices.AddValueLifecycles(services);
             services.AddSingleton<IJournaledStateManager>(manager);
             await using var dependencies = services.BuildServiceProvider();
-            var messages = dependencies.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("__orleans.durable-messaging.outbox");
+            var messages = dependencies.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.outbox");
             await manager.InitializeAsync(TestContext.Current.CancellationToken);
             messages.Add(envelope.MessageId, envelope);
             await manager.WriteStateAsync(TestContext.Current.CancellationToken);

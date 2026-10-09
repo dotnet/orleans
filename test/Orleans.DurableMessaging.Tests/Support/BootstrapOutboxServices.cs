@@ -29,7 +29,7 @@ internal static class BootstrapOutboxServices
         var outboxType = ReceiverTestServices.GetImplementationType("DurableOutbox");
         services.RemoveAll<IDurableOutbox>();
         services.RemoveAllKeyed<IDurableOutbox>(KeyedService.AnyKey);
-        services.RemoveAllKeyed<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output");
+        services.RemoveAllKeyed<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("test-handler-output");
         foreach (var descriptor in services.Where(descriptor => descriptor.IsKeyedService
             && StateNames.Take(6).Any(name => Equals(descriptor.ServiceKey, name))).ToArray())
         {
@@ -37,7 +37,7 @@ internal static class BootstrapOutboxServices
         }
         services.TryAddScoped(outboxType, provider => ActivatorUtilities.CreateInstance(provider, outboxType,
             provider.GetRequiredKeyedService<IDurableValueCommandCodec<long>>("orleans-binary")));
-        services.TryAddScoped(provider => provider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<Guid, int>>("orleans-binary"));
+        services.TryAddScoped(provider => provider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<HierarchicalKey, int>>("orleans-binary"));
         services.AddScoped<IDurableOutbox>(provider => (IDurableOutbox)provider.GetRequiredService(outboxType));
         AddAlias(typeof(IDurableValue<long>), StateNames[6], "JobSequenceState");
 
@@ -55,7 +55,7 @@ internal static class BootstrapOutboxServices
 public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, ILoggerProvider
 {
     private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly ConcurrentDictionary<GrainId, TaskCompletionSource<(Guid MessageId, int Value)>> _outputs = new();
+    private readonly ConcurrentDictionary<GrainId, TaskCompletionSource<(HierarchicalKey MessageId, int Value)>> _outputs = new();
 
     private readonly ConcurrentDictionary<GrainId, TaskCompletionSource> _drains = new();
 
@@ -91,10 +91,10 @@ public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, ILoggerPr
     }
 
     public void Release() => _release.TrySetResult();
-    public Task<(Guid MessageId, int Value)> WaitForOutputAsync(GrainId sender) =>
+    public Task<(HierarchicalKey MessageId, int Value)> WaitForOutputAsync(GrainId sender) =>
         GetOutput(sender).Task.WaitAsync(TimeSpan.FromSeconds(30));
-    public void OnOutput(GrainId sender, Guid messageId, int value) => GetOutput(sender).TrySetResult((messageId, value));
-    private TaskCompletionSource<(Guid MessageId, int Value)> GetOutput(GrainId sender) =>
+    public void OnOutput(GrainId sender, HierarchicalKey messageId, int value) => GetOutput(sender).TrySetResult((messageId, value));
+    private TaskCompletionSource<(HierarchicalKey MessageId, int Value)> GetOutput(GrainId sender) =>
         _outputs.GetOrAdd(sender, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
 }
 
@@ -105,17 +105,17 @@ public interface IBootstrapOutputGrain : IGrainWithStringKey
 
 [GrainType("bootstrap-output")]
 public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurableMessagingGrain, IInboxHandler,
-    IStateMachine, IDurableDictionaryCommandHandler<Guid, int>
+    IStateMachine, IDurableDictionaryCommandHandler<HierarchicalKey, int>
 {
-    private readonly Dictionary<Guid, int> _values = [];
-    private readonly List<(GrainId Sender, Guid MessageId, int Value)> _pending = [];
-    private (GrainId Sender, Guid MessageId, int Value)[] _captured = [];
+    private readonly Dictionary<HierarchicalKey, int> _values = [];
+    private readonly List<(GrainId Sender, HierarchicalKey MessageId, int Value)> _pending = [];
+    private (GrainId Sender, HierarchicalKey MessageId, int Value)[] _captured = [];
     private readonly BootstrapDeliveryProbe _probe;
     private readonly Orleans.Serialization.Session.SerializerSessionPool _sessions;
-    private readonly IDurableDictionaryCommandCodec<Guid, int> _codec;
+    private readonly IDurableDictionaryCommandCodec<HierarchicalKey, int> _codec;
 
     public BootstrapOutputGrain(IJournaledStateManager manager, IDurableInbox inbox, BootstrapDeliveryProbe probe,
-        IDurableDictionaryCommandCodec<Guid, int> codec, Orleans.Serialization.Session.SerializerSessionPool sessions)
+        IDurableDictionaryCommandCodec<HierarchicalKey, int> codec, Orleans.Serialization.Session.SerializerSessionPool sessions)
     {
         _sessions = sessions;
         _probe = probe;
@@ -162,8 +162,8 @@ public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IDurabl
     public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
-    public void ApplySet(Guid key, int value) => _values[key] = value;
-    public void ApplyRemove(Guid key) => _values.Remove(key);
+    public void ApplySet(HierarchicalKey key, int value) => _values[key] = value;
+    public void ApplyRemove(HierarchicalKey key) => _values.Remove(key);
     public void ApplyClear() => _values.Clear();
     public void Reset(int capacityHint) => _values.Clear();
 }

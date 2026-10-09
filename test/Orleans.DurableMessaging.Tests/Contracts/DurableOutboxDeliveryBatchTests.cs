@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,7 +65,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         await fixture.SendAsync(fixture.Envelope);
         await fixture.CommitAsync();
         await fixture.RunRegisteredTimerAtAsync(0);
-        using (var newEnvelope = fixture.CreateEnvelope(Guid.NewGuid())) await fixture.SendAsync(newEnvelope);
+        using (var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId())) await fixture.SendAsync(newEnvelope);
         await fixture.CommitAsync();
         Assert.Same(fixture.ArmState(0), fixture.ArmState(1));
         Assert.Equal(["LocalPumpTimerState"], fixture.TimerRegistrationNames);
@@ -227,7 +228,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             (await fixture.ExecuteJobAsync(job, "first", TestContext.Current.CancellationToken)).RescheduleTime);
         Assert.Same(job, fixture.Job.Value);
         clock.Advance(TimeSpan.FromMilliseconds(99));
-        using (var newEnvelope = fixture.CreateEnvelope(Guid.NewGuid())) await fixture.SendAsync(newEnvelope);
+        using (var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId())) await fixture.SendAsync(newEnvelope);
         await fixture.CommitAsync();
         await fixture.RunRegisteredTimerAtAsync(1);
         Assert.Equal(2, fixture.DeliveryCount);
@@ -252,7 +253,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture(durableJobId: "hook:1");
         var job = fixture.Job.Value!;
-        using var late = fixture.CreateEnvelope(Guid.NewGuid());
+        using var late = fixture.CreateEnvelope(fixture.NextMessageId());
         var hook = Substitute.For<IJournaledStateHook>();
         hook.BeforeOperationAsync(JournaledStateOperation.Write, Arg.Any<CancellationToken>()).Returns(_ =>
         {
@@ -277,13 +278,13 @@ public sealed class DurableOutboxDeliveryBatchTests
         await fixture.SendAsync(fixture.Envelope);
         await fixture.CommitAsync();
         await fixture.DeliverAsync();
-        using (var newEnvelope = fixture.CreateEnvelope(Guid.NewGuid())) await fixture.SendAsync(newEnvelope);
+        using (var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId())) await fixture.SendAsync(newEnvelope);
         await fixture.CommitAsync();
         await fixture.DeliverAsync();
         Assert.Equal(2, fixture.ProxyAcquisitionCount);
         for (var index = 0; index < 65; index++)
         {
-            using (var newEnvelope = fixture.CreateEnvelope(Guid.NewGuid()) with { ReceiverId = GrainId.Create("destination", index.ToString()) }) await fixture.SendAsync(newEnvelope);
+            using (var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId()) with { ReceiverId = GrainId.Create("destination", index.ToString()) }) await fixture.SendAsync(newEnvelope);
         }
         await fixture.CommitAsync();
         await fixture.DeliverAsync();
@@ -784,7 +785,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         var callbacks = 0;
         var callbackFailure = new InvalidOperationException("Remote callback during loopback retirement.");
         using var fixture = new OutboxFixture(token => new(DeliverControlledAsync(token)), durableJobId: "owner:1");
-        using (var newEnvelope = fixture.CreateEnvelope(Guid.NewGuid()) with { ReceiverId = fixture.SenderId }) await fixture.SendAsync(newEnvelope);
+        using (var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId()) with { ReceiverId = fixture.SenderId }) await fixture.SendAsync(newEnvelope);
         await fixture.CommitAsync();
         using var timer = new CancellationTokenSource();
         await fixture.ExecuteJobAsync("owner:1");
@@ -1461,7 +1462,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
         using var envelope = fixture.CreateEnvelope(
-            Guid.NewGuid(),
+            fixture.NextMessageId(),
             senderId: GrainId.Create("sender", "spoofed"));
 
         var exception = Assert.Throws<InvalidOperationException>(() => fixture.Outbox.Send(envelope));
@@ -1545,7 +1546,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
         await fixture.SendAsync(fixture.Envelope);
-        using var late = fixture.CreateEnvelope(Guid.NewGuid());
+        using var late = fixture.CreateEnvelope(fixture.NextMessageId());
         fixture.Manager.AfterCapture = () => fixture.SendAsync(late);
         await fixture.CommitAsync();
         Assert.False(fixture.IsPending(fixture.MessageId));
@@ -1744,7 +1745,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         var jobs = new BlockingJobManager();
         using var fixture = new OutboxFixture(jobManager: jobs);
         await fixture.StartAsync();
-        using var outgoing = fixture.CreateEnvelope(Guid.NewGuid());
+        using var outgoing = fixture.CreateEnvelope(fixture.NextMessageId());
         fixture.Outbox.Send(outgoing);
         var preparation = fixture.CommitAsync().AsTask();
         await jobs.WaitUntilScheduledAsync();
@@ -1795,7 +1796,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         fixture.Outbox.Send(fixture.Envelope);
         var first = fixture.CommitAsync().AsTask();
         await jobs.WaitUntilScheduledAsync();
-        using var late = fixture.CreateEnvelope(Guid.NewGuid());
+        using var late = fixture.CreateEnvelope(fixture.NextMessageId());
         fixture.Outbox.Send(late);
         using (var newEnvelope = fixture.CreateEquivalentEnvelope()) fixture.Outbox.Send(newEnvelope);
         var second = fixture.CommitAsync().AsTask();
@@ -1872,7 +1873,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         var jobs = new RecordingJobManager();
         using var fixture = new OutboxFixture(jobManager: jobs, durableJobId: "owner:1");
         var handle = fixture.Job.Value;
-        using (var newEnvelope = fixture.CreateEnvelope(Guid.NewGuid())) await fixture.SendAsync(newEnvelope);
+        using (var newEnvelope = fixture.CreateEnvelope(fixture.NextMessageId())) await fixture.SendAsync(newEnvelope);
         await fixture.CommitAsync();
         Assert.Equal(2, fixture.Messages.Count);
         Assert.Same(handle, fixture.Job.Value);
@@ -1893,7 +1894,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             entered.TrySetResult();
             return await release.Task;
         }, durableJobId: "owner:1");
-        using var second = fixture.CreateEnvelope(Guid.NewGuid());
+        using var second = fixture.CreateEnvelope(fixture.NextMessageId());
         await fixture.SendAsync(second);
         await fixture.CommitAsync();
         var delivery = fixture.DeliverWithCancellationAsync(cancellation.Token);
@@ -1916,7 +1917,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         Assert.Equal(7, fixture.Manager.RegistrationCount);
         Assert.Null(fixture.Outbox.GetType().GetMethod("OnWriteFinalizingAsync"));
         Assert.Null(fixture.Outbox.GetType().GetMethod("OnWritePreparingAsync"));
-        Assert.IsAssignableFrom<IDurableDictionary<Guid, DurableEnvelope>>(fixture.PrimaryState);
+        Assert.IsAssignableFrom<IDurableDictionary<HierarchicalKey, DurableEnvelope>>(fixture.PrimaryState);
     }
 
     [Theory]
@@ -1931,7 +1932,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         var lookupCalls = fixture.Messages.TryGetValueCalls;
         for (var i = 0; i < batchSize; i++)
         {
-            await fixture.SendAsync(fixture.Envelope with { MessageId = Guid.NewGuid() });
+            await fixture.SendAsync(fixture.Envelope with { MessageId = fixture.NextMessageId() });
             Assert.Equal(i + 2, fixture.Outbox.Count);
         }
 
@@ -1951,8 +1952,8 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
         fixture.Outbox.Send(fixture.Envelope);
-        var duringPreparation = fixture.Envelope with { MessageId = Guid.NewGuid() };
-        var afterCapture = fixture.Envelope with { MessageId = Guid.NewGuid() };
+        var duringPreparation = fixture.Envelope with { MessageId = fixture.NextMessageId() };
+        var afterCapture = fixture.Envelope with { MessageId = fixture.NextMessageId() };
         fixture.Manager.AfterCapture = async () =>
         {
             Assert.Equal(2, fixture.Outbox.Count);
@@ -1998,7 +1999,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
         await fixture.SendAsync(fixture.Envelope);
-        var late = fixture.Envelope with { MessageId = Guid.NewGuid() };
+        var late = fixture.Envelope with { MessageId = fixture.NextMessageId() };
         var failure = new IOException("Outbox depth append failure.");
         if (committed)
         {
@@ -2049,7 +2050,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         };
         using var fixture = new OutboxFixture(_ => ValueTask.FromResult(result),
             maxDeliveryAttempts: status == DeliveryStatus.HandlerNotFound ? 1 : 3, durableJobId: "owner:1");
-        var outgoing = fixture.Envelope with { MessageId = Guid.NewGuid() };
+        var outgoing = fixture.Envelope with { MessageId = fixture.NextMessageId() };
         await fixture.SendAsync(outgoing);
         Assert.Equal(2, fixture.GetOutboxDepth());
         var expected = status == DeliveryStatus.Backpressured ? 2 : 1;
@@ -2079,7 +2080,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
         await fixture.SendAsync(fixture.Envelope);
-        await fixture.SendAsync(fixture.Envelope with { MessageId = Guid.NewGuid() });
+        await fixture.SendAsync(fixture.Envelope with { MessageId = fixture.NextMessageId() });
         var epoch = fixture.GetOwnershipEpoch();
         Assert.Equal(2, fixture.GetOutboxDepth());
         await fixture.DeleteAsync(TestContext.Current.CancellationToken);
@@ -2103,7 +2104,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         await fixture.StartAsync();
         Assert.Equal(1, fixture.Outbox.Count);
         Assert.Equal(1, fixture.GetOutboxDepth());
-        await fixture.SendAsync(fixture.Envelope with { MessageId = Guid.NewGuid() });
+        await fixture.SendAsync(fixture.Envelope with { MessageId = fixture.NextMessageId() });
         Assert.Equal(2, fixture.GetOutboxDepth());
         await fixture.StopAsync();
         Assert.Equal(2, fixture.Outbox.Count);
@@ -2400,7 +2401,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         {
             _services = CreateServices(writeException, eagerCapture);
             Manager = (TestStateManager)_services.GetRequiredService<IJournaledStateManager>();
-            MessageId = envelope?.MessageId ?? Guid.NewGuid();
+            MessageId = envelope?.MessageId ?? HierarchicalKey.Create("test", "outbox", "command", "0");
             SenderId = GrainId.Create("sender", "1");
             ReceiverId = loopback ? SenderId : GrainId.Create("receiver", "1");
             Envelope = envelope?.Retain() ?? CreateEnvelope(MessageId);
@@ -2456,9 +2457,9 @@ public sealed class DurableOutboxDeliveryBatchTests
 
             object?[] states =
             [
-                _services.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>(BootstrapOutboxServices.StateNames[0]),
-                _services.GetRequiredKeyedService(typeof(IDurableDictionary<,>).MakeGenericType(typeof(Guid), GetInternalType("Orleans.DurableMessaging.OutboxMessageState")), BootstrapOutboxServices.StateNames[1]),
-                _services.GetRequiredKeyedService(typeof(IDurableDictionary<,>).MakeGenericType(typeof(Guid), GetInternalType("Orleans.DurableMessaging.OutboxDeadLetter")), BootstrapOutboxServices.StateNames[2]),
+                _services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>(BootstrapOutboxServices.StateNames[0]),
+                _services.GetRequiredKeyedService(typeof(IDurableDictionary<,>).MakeGenericType(typeof(HierarchicalKey), GetInternalType("Orleans.DurableMessaging.OutboxMessageState")), BootstrapOutboxServices.StateNames[1]),
+                _services.GetRequiredKeyedService(typeof(IDurableDictionary<,>).MakeGenericType(typeof(HierarchicalKey), GetInternalType("Orleans.DurableMessaging.OutboxDeadLetter")), BootstrapOutboxServices.StateNames[2]),
                 _services.GetRequiredKeyedService<IDurableValue<string>>(BootstrapOutboxServices.StateNames[3]),
                 _services.GetRequiredKeyedService<IDurableValue<DurableJob>>(BootstrapOutboxServices.StateNames[4]),
                 _services.GetRequiredKeyedService<IDurableValue<string>>(BootstrapOutboxServices.StateNames[5]),
@@ -2501,7 +2502,7 @@ public sealed class DurableOutboxDeliveryBatchTests
                 ExceptionDispatchInfo.Capture(exception.InnerException).Throw();
                 throw;
             }
-            Messages = new TestDurableDictionary<Guid, DurableEnvelope>(Manager.GetState<IDurableDictionary<Guid, DurableEnvelope>>("__orleans.durable-messaging.outbox"), _services.GetRequiredService<Serializer<Dictionary<Guid, DurableEnvelope>>>());
+            Messages = new TestDurableDictionary<HierarchicalKey, DurableEnvelope>(Manager.GetState<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.outbox"), _services.GetRequiredService<Serializer<Dictionary<HierarchicalKey, DurableEnvelope>>>());
             MessageStates = WrapInternalDictionary("__orleans.durable-messaging.outbox-message-state", "Orleans.DurableMessaging.OutboxMessageState");
             DeadLetters = WrapInternalDictionary("__orleans.durable-messaging.outbox-dead-letters", "Orleans.DurableMessaging.OutboxDeadLetter");
             JobId = new(Manager.GetState<IDurableValue<string>>("__orleans.durable-messaging.outbox-job-id"));
@@ -2564,8 +2565,8 @@ public sealed class DurableOutboxDeliveryBatchTests
 
         private UntypedDurableDictionary WrapInternalDictionary(string name, string valueType)
         {
-            var type = typeof(TestDurableDictionary<,>).MakeGenericType(typeof(Guid), GetInternalType(valueType));
-            var values = typeof(Dictionary<,>).MakeGenericType(typeof(Guid), GetInternalType(valueType));
+            var type = typeof(TestDurableDictionary<,>).MakeGenericType(typeof(HierarchicalKey), GetInternalType(valueType));
+            var values = typeof(Dictionary<,>).MakeGenericType(typeof(HierarchicalKey), GetInternalType(valueType));
             return new(Activator.CreateInstance(type, Manager.GetState<IStateMachine>(name), _services.GetRequiredService(typeof(Serializer<>).MakeGenericType(values)))!);
         }
         public IDurableOutbox Outbox => _outbox;
@@ -2604,7 +2605,7 @@ public sealed class DurableOutboxDeliveryBatchTests
             return new(storage: Manager.Storage, envelope: template);
         }
 
-        public Guid MessageId { get; }
+        public HierarchicalKey MessageId { get; }
         public GrainId SenderId { get; }
         public GrainId ReceiverId { get; }
         public DurableEnvelope Envelope { get; }
@@ -2612,7 +2613,7 @@ public sealed class DurableOutboxDeliveryBatchTests
         public int ProxyAcquisitionCount { get; private set; }
         public object? LocalField(string name) => _outbox.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(_outbox);
         public List<Exception> LoggedExceptions { get; } = [];
-        public TestDurableDictionary<Guid, DurableEnvelope> Messages { get; }
+        public TestDurableDictionary<HierarchicalKey, DurableEnvelope> Messages { get; }
         public UntypedDurableDictionary MessageStates { get; }
         public UntypedDurableDictionary DeadLetters { get; }
         public TestStateManager Manager { get; }
@@ -2828,20 +2829,25 @@ public sealed class DurableOutboxDeliveryBatchTests
                 .CreateDelegate<Action<Exception>>(_outbox)(exception);
         }
 
-        public bool IsPending(Guid messageId) => GetPendingMessageIds().Contains(messageId);
+        private int _nextMessageId;
+        public HierarchicalKey NextMessageId() => HierarchicalKey.Create(
+            "test", "outbox", "command", (++_nextMessageId).ToString(CultureInfo.InvariantCulture));
+
+        public bool IsPending(HierarchicalKey messageId) => GetPendingMessageIds().Contains(messageId);
 
         public DurableEnvelope CreateEquivalentEnvelope() => CreateEnvelope(MessageId);
 
         public DurableEnvelope CreateConflictingEnvelope() => CreateEnvelope(MessageId, routeKey: "conflict");
 
         public DurableEnvelope CreateEnvelope(
-            Guid messageId,
+            HierarchicalKey messageId,
             string routeKey = "test",
             GrainId? senderId = null) => new()
             {
                 MessageId = messageId,
                 SenderId = senderId ?? SenderId,
                 ReceiverId = ReceiverId,
+                Subject = routeKey,
                 Payload = TestApplicationProtocol.Encode(_services.GetRequiredService<SerializerSessionPool>(), new TestApplicationMessage(routeKey, 1))
             };
 
@@ -2871,16 +2877,16 @@ public sealed class DurableOutboxDeliveryBatchTests
         public long Version => ((ITestDurableState)Instance).Version;
 
 
-        public void Add(Guid key, object value) =>
-            _type.GetMethod("Add", [typeof(Guid), value.GetType()])!.Invoke(Instance, [key, value]);
+        public void Add(HierarchicalKey key, object value) =>
+            _type.GetMethod("Add", [typeof(HierarchicalKey), value.GetType()])!.Invoke(Instance, [key, value]);
 
-        public bool ContainsKey(Guid key) =>
+        public bool ContainsKey(HierarchicalKey key) =>
             (bool)_type.GetMethod("ContainsKey")!.Invoke(Instance, [key])!;
 
-        public bool Remove(Guid key) =>
-            (bool)_type.GetMethod("Remove", [typeof(Guid)])!.Invoke(Instance, [key])!;
+        public bool Remove(HierarchicalKey key) =>
+            (bool)_type.GetMethod("Remove", [typeof(HierarchicalKey)])!.Invoke(Instance, [key])!;
 
-        public T GetProperty<T>(Guid key, string propertyName)
+        public T GetProperty<T>(HierarchicalKey key, string propertyName)
         {
             var value = _type.GetProperty("Item")!.GetValue(Instance, [key])!;
             return (T)value.GetType().GetProperty(propertyName)!.GetValue(value)!;

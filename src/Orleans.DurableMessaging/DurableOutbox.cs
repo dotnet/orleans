@@ -28,7 +28,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
 
     private readonly IJournaledStateManager _stateManager;
-    private readonly IDurableDictionary<Guid, DurableEnvelope> _messages;
+    private readonly IDurableDictionary<HierarchicalKey, DurableEnvelope> _messages;
     private readonly IGrainFactory _grainFactory;
     private readonly IGrainContext _grainContext;
     private readonly string _grainType;
@@ -45,8 +45,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private string? _previousCompletedOwner;
     private readonly TimeSpan _deadLetterRetentionPeriod;
     private readonly int _maxRetainedDeadLetters;
-    private readonly IDurableDictionary<Guid, OutboxMessageState> _messageStates;
-    private readonly IDurableDictionary<Guid, OutboxDeadLetter> _deadLetters;
+    private readonly IDurableDictionary<HierarchicalKey, OutboxMessageState> _messageStates;
+    private readonly IDurableDictionary<HierarchicalKey, OutboxDeadLetter> _deadLetters;
     private readonly IDurableValue<string> _jobId;
     private readonly IDurableValue<DurableJob> _job;
     private readonly IDurableValue<string> _completedJobId;
@@ -58,7 +58,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly SemaphoreSlim _deliveryGate = new(1, 1);
     private readonly CancellationTokenSource _shutdown = new();
-    private readonly Dictionary<Guid, PendingMessage> _pendingMessages = [];
+    private readonly Dictionary<HierarchicalKey, PendingMessage> _pendingMessages = [];
     private int _unacknowledgedMessageCount;
     private PendingMessage[] _capturedMessages = [];
     private bool _captureStarted;
@@ -103,9 +103,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         DurableMessagingPumpResults pumpResults,
         [FromKeyedServices(DurableJobTimeProviderNames.DurableJobs)] TimeProvider jobTimeProvider,
         IOptions<DurableInboxOptions> options,
-        [FromKeyedServices(DurableMessagingStateNames.Outbox)] IDurableDictionary<Guid, DurableEnvelope> messages,
-        [FromKeyedServices(DurableMessagingStateNames.OutboxMessageState)] IDurableDictionary<Guid, OutboxMessageState> messageStates,
-        [FromKeyedServices(DurableMessagingStateNames.OutboxDeadLetters)] IDurableDictionary<Guid, OutboxDeadLetter> deadLetters,
+        [FromKeyedServices(DurableMessagingStateNames.Outbox)] IDurableDictionary<HierarchicalKey, DurableEnvelope> messages,
+        [FromKeyedServices(DurableMessagingStateNames.OutboxMessageState)] IDurableDictionary<HierarchicalKey, OutboxMessageState> messageStates,
+        [FromKeyedServices(DurableMessagingStateNames.OutboxDeadLetters)] IDurableDictionary<HierarchicalKey, OutboxDeadLetter> deadLetters,
         [FromKeyedServices(DurableMessagingStateNames.OutboxJobId)] IDurableValue<string> jobId,
         [FromKeyedServices(DurableMessagingStateNames.OutboxJobHandle)] IDurableValue<DurableJob> job,
         [FromKeyedServices(DurableMessagingStateNames.OutboxCompletedJobId)] IDurableValue<string> completedJobId,
@@ -162,9 +162,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         lifecycle.Subscribe(RuntimeTypeNameFormatter.Format(GetType()), GrainLifecycleStage.Activate, this);
     }
 
-    internal IDurableDictionary<Guid, DurableEnvelope> MessageState => _messages;
-    internal IDurableDictionary<Guid, OutboxMessageState> AttemptState => _messageStates;
-    internal IDurableDictionary<Guid, OutboxDeadLetter> DeadLetterState => _deadLetters;
+    internal IDurableDictionary<HierarchicalKey, DurableEnvelope> MessageState => _messages;
+    internal IDurableDictionary<HierarchicalKey, OutboxMessageState> AttemptState => _messageStates;
+    internal IDurableDictionary<HierarchicalKey, OutboxDeadLetter> DeadLetterState => _deadLetters;
     internal IDurableValue<string> JobIdState => _jobId;
     internal IDurableValue<DurableJob> JobState => _job;
     internal IDurableValue<string> CompletedJobIdState => _completedJobId;
@@ -174,7 +174,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     public IEnumerable<DurableEnvelope> Messages => _messages.Values;
 
-    public bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
+    public bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>
         _messages.TryGetValue(messageId, out envelope);
 
     private async ValueTask PrepareOwnershipAsync(bool replaceExisting, CancellationToken cancellationToken = default)
@@ -365,7 +365,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     {
         ValidateGeneration(operation.Generation);
         Items<PreparedDelivery> deliveries = default;
-        Dictionary<Guid, OutboxDeadLetter>? deadLetters = null;
+        Dictionary<HierarchicalKey, OutboxDeadLetter>? deadLetters = null;
         switch (operation)
         {
             case DeliveryWrite delivery:
@@ -733,7 +733,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         || !string.Equals(_durableOwnershipId, _jobId.Value, StringComparison.Ordinal)
         || (_job.Value is not null && !DurableMessagingJobOwnership.IsSamePhysicalJob(_durableJob, _job.Value));
 
-    private bool IsPendingAcknowledgement(Guid id) =>
+    private bool IsPendingAcknowledgement(HierarchicalKey id) =>
         _pendingMessages.ContainsKey(id);
 
     private Items<DeliveryCandidate> SelectMessages()
@@ -974,7 +974,7 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
         }
     }
 
-    private PreparedDelivery PrepareDelivery(DeliveryOutcome outcome, ref Dictionary<Guid, OutboxDeadLetter>? deadLetters)
+    private PreparedDelivery PrepareDelivery(DeliveryOutcome outcome, ref Dictionary<HierarchicalKey, OutboxDeadLetter>? deadLetters)
     {
         var status = outcome.Result?.Status;
         if (status is DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.DeadLettered)
@@ -1518,27 +1518,27 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "Delivered message {MessageId} from {SenderId} to {ReceiverId} (Status: {Status})")]
-    private static partial void LogMessageDelivered(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, DeliveryStatus status);
+    private static partial void LogMessageDelivered(ILogger logger, HierarchicalKey messageId, GrainId senderId, GrainId receiverId, DeliveryStatus status);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
         Message = "No inbox handler for message {MessageId} from {SenderId} to {ReceiverId}: {Message}")]
-    private static partial void LogDeliveryHandlerNotFound(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId, string? message);
+    private static partial void LogDeliveryHandlerNotFound(ILogger logger, HierarchicalKey messageId, GrainId senderId, GrainId receiverId, string? message);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "Backpressured delivering message {MessageId} to {ReceiverId}, will retry later")]
-    private static partial void LogDeliveryBackpressured(ILogger logger, Guid messageId, GrainId receiverId);
+    private static partial void LogDeliveryBackpressured(ILogger logger, HierarchicalKey messageId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
         Message = "Unexpected delivery status {Status} for message {MessageId} from {SenderId} to {ReceiverId}")]
-    private static partial void LogUnexpectedDeliveryStatus(ILogger logger, DeliveryStatus status, Guid messageId, GrainId senderId, GrainId receiverId);
+    private static partial void LogUnexpectedDeliveryStatus(ILogger logger, DeliveryStatus status, HierarchicalKey messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Error delivering message {MessageId} from {SenderId} to {ReceiverId}")]
-    private static partial void LogDeliveryError(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId receiverId);
+    private static partial void LogDeliveryError(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Information,
