@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -12,6 +12,7 @@ import {
   isPublicInternetAddress,
   probeExternalTargets,
 } from '../scripts/lib/link-audit.mjs';
+import externalLinkAllowlist from '../src/data/external-link-allowlist.json' with { type: 'json' };
 
 const temporaryDirectories = [];
 
@@ -810,7 +811,7 @@ describe('external link audit', () => {
     ]);
   });
 
-  test('fails permanent DNS or TLS-style network errors', async () => {
+  test.each([false, true])('fails permanent DNS or TLS-style network errors with allowlisting=%s', async (allowlisted) => {
     const error = new TypeError('fetch failed', {
       cause: Object.assign(new Error('not found'), { code: 'ENOTFOUND' }),
     });
@@ -821,6 +822,14 @@ describe('external link audit', () => {
           [{ relativeFile: 'guide.md', line: 1 }],
         ],
       ]),
+      allowlist: {
+        urls: allowlisted
+          ? {
+            'https://definitely-missing-link-audit.invalid/':
+              'This endpoint intermittently rejects automated probes.',
+          }
+          : {},
+      },
       lookupImpl: async () => [{ address: '8.8.8.8', family: 4 }],
       requestImpl: async () => {
         throw error;
@@ -834,7 +843,7 @@ describe('external link audit', () => {
     ]);
   });
 
-  test('rejects private, special-use, mapped, credentialed, and arbitrary-port targets', async () => {
+  test.each([false, true])('rejects private, special-use, mapped, credentialed, and arbitrary-port targets with allowlisting=%s', async (allowlisted) => {
     expect(isPublicInternetAddress('8.8.8.8')).toBe(true);
     expect(isPublicInternetAddress('2606:4700:4700::1111')).toBe(true);
     expect(isPublicInternetAddress('127.0.0.1')).toBe(false);
@@ -864,6 +873,13 @@ describe('external link audit', () => {
       externalTargets: new Map(
         urls.map((url) => [url, [{ relativeFile: 'guide.md', line: 1 }]]),
       ),
+      allowlist: {
+        urls: allowlisted
+          ? Object.fromEntries(
+            urls.map((url) => [url, 'This reason cannot bypass destination safety checks.']),
+          )
+          : {},
+      },
       lookupImpl: async (hostname) => [
         {
           address: hostname === 'localhost' ? '127.0.0.1' : '8.8.8.8',
@@ -888,12 +904,20 @@ describe('external link audit', () => {
     );
   });
 
-  test('validates every redirect and rejects mixed public-private DNS answers', async () => {
+  test.each([false, true])('validates every redirect and rejects mixed public-private DNS answers with allowlisting=%s', async (allowlisted) => {
     let requests = 0;
     const redirectResult = await probeExternalTargets({
       externalTargets: new Map([
         ['https://public.example/redirect', [{ relativeFile: 'guide.md', line: 2 }]],
       ]),
+      allowlist: {
+        urls: allowlisted
+          ? {
+            'https://public.example/redirect':
+              'This endpoint intermittently rejects automated probes.',
+          }
+          : {},
+      },
       lookupImpl: async () => [{ address: '8.8.8.8', family: 4 }],
       requestImpl: async () => {
         requests += 1;
@@ -918,6 +942,13 @@ describe('external link audit', () => {
       externalTargets: new Map([
         ['https://mixed.example/', [{ relativeFile: 'guide.md', line: 3 }]],
       ]),
+      allowlist: {
+        urls: allowlisted
+          ? {
+            'https://mixed.example/': 'This endpoint intermittently rejects automated probes.',
+          }
+          : {},
+      },
       lookupImpl: async () => [
         { address: '8.8.8.8', family: 4 },
         { address: '10.0.0.1', family: 4 },
@@ -1024,7 +1055,134 @@ describe('external link audit', () => {
     ]);
   });
 
-  test('requires exact, reasoned, non-stale allowlist entries', async () => {
+  describe('Orleans Twitter follow link', () => {
+    const followUrl = 'https://twitter.com/intent/follow?screen_name=msftorleans';
+    const allowlist = {
+      urls: { [followUrl]: externalLinkAllowlist.urls[followUrl] },
+    };
+
+    test.each(['HEAD', 'GET'])(
+      'keeps the configured Twitter exception across 403, successful %s, and 403 probes',
+      async (successfulMethod) => {
+        const sourceRoot = path.resolve('src', 'content', 'docs');
+        const file = path.join(sourceRoot, 'index.yml');
+        const references = collectYamlLinkReferences({
+          source: await readFile(file, 'utf8'),
+          file,
+          sourceRoot,
+        }).filter((reference) => reference.url === followUrl);
+
+        expect(references).toHaveLength(1);
+        for (const status of [403, 200, 403]) {
+          const requests = [];
+          const result = await probeExternalTargets({
+            externalTargets: new Map([[followUrl, references]]),
+            allowlist,
+            lookupImpl: publicLookup,
+            requestImpl: async (url, options) => {
+              requests.push(`${options.method} ${url.href}`);
+              return response(
+                status === 200 && options.method !== successfulMethod ? 403 : status,
+              );
+            },
+            retries: 0,
+          });
+
+          expect(result).toEqual({
+            failures: [],
+            warnings: [
+              `Allowlisted '${followUrl}' returned ${status}: ${allowlist.urls[followUrl]}`,
+            ],
+            probed: 1,
+          });
+          expect(requests).toEqual(
+            status === 200 && successfulMethod === 'HEAD'
+              ? [`HEAD ${followUrl}`]
+              : [`HEAD ${followUrl}`, `GET ${followUrl}`],
+          );
+        }
+      },
+    );
+
+    test('limits the Twitter exception to the exact authored URL', async () => {
+      const otherUrls = [
+        'https://twitter.com/msftorleans',
+        'https://twitter.com/intent/follow?screen_name=dotnet',
+        `${followUrl}&lang=en`,
+      ];
+      const requests = [];
+      const result = await probeExternalTargets({
+        externalTargets: new Map(
+          [followUrl, ...otherUrls].map((url) => [
+            url,
+            [{ relativeFile: 'index.yml', line: 224 }],
+          ]),
+        ),
+        allowlist,
+        lookupImpl: publicLookup,
+        requestImpl: async (url, options) => {
+          requests.push(`${options.method} ${url.href}`);
+          return response(403);
+        },
+        concurrency: 1,
+        retries: 0,
+      });
+
+      expect(result).toEqual({
+        probed: 4,
+        failures: otherUrls.map(
+          (url) =>
+            `${url} (index.yml:224): returned 403; add a reasoned exact-URL allowlist entry only if the target cannot be probed reliably.`,
+        ),
+        warnings: [
+          `Allowlisted '${followUrl}' returned 403: ${allowlist.urls[followUrl]}`,
+        ],
+      });
+      expect(requests).toEqual(
+        [followUrl, ...otherUrls].flatMap((url) => [`HEAD ${url}`, `GET ${url}`]),
+      );
+    });
+
+    test('reports the Twitter 403 failure when the exception is removed', async () => {
+      const result = await probeExternalTargets({
+        externalTargets: new Map([
+          [followUrl, [{ relativeFile: 'index.yml', line: 224 }]],
+        ]),
+        lookupImpl: publicLookup,
+        requestImpl: async () => response(403),
+        retries: 0,
+      });
+
+      expect(result).toEqual({
+        probed: 1,
+        warnings: [],
+        failures: [
+          `${followUrl} (index.yml:224): returned 403; add a reasoned exact-URL allowlist entry only if the target cannot be probed reliably.`,
+        ],
+      });
+    });
+  });
+
+  test.each(['', '                    ', 'too short', 42])(
+    'requires a meaningful reason even when an allowlisted probe succeeds: %s',
+    async (reason) => {
+      const url = 'https://example.com/unreliable';
+      const result = await probeExternalTargets({
+        externalTargets: new Map([[url, [{ relativeFile: 'guide.md', line: 1 }]]]),
+        allowlist: { urls: { [url]: reason } },
+        lookupImpl: publicLookup,
+        requestImpl: async () => response(200),
+        retries: 0,
+      });
+
+      expect(result.probed).toBe(1);
+      expect(result.failures).toEqual([
+        `External link allowlist entry '${url}' lacks a meaningful reason.`,
+      ]);
+    },
+  );
+
+  test('requires valid, public, referenced allowlist entries while reporting successful probes', async () => {
     const url = 'https://example.com/unprobeable';
     const reachableUrl = 'https://example.com/reachable';
     const privateUrl = 'http://127.0.0.1/internal';
@@ -1038,7 +1196,7 @@ describe('external link audit', () => {
       allowlist: {
         urls: {
           [url]: 'This endpoint blocks automated probes but is reviewed manually.',
-          [reachableUrl]: 'This endpoint was unavailable but should now fail stale.',
+          [reachableUrl]: 'This endpoint intermittently rejects automated probes.',
           [privateUrl]: 'This reason is deliberately long but cannot bypass destination safety.',
           [xmlDocumentationUrl]: 'This target is referenced by generated API documentation.',
           'not a URL': 'This reason is long enough but the URL is malformed.',
@@ -1054,19 +1212,20 @@ describe('external link audit', () => {
       lookupImpl: async () => [{ address: '8.8.8.8', family: 4 }],
       requestImpl: async (target) =>
         response(target.pathname === '/reachable' ? 200 : 403),
+      concurrency: 1,
       retries: 0,
     });
 
     expect(result.probed).toBe(3);
-    expect(result.warnings).toContainEqual(expect.stringContaining('Allowlisted'));
-    expect(result.failures).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('malformed URL'),
-        expect.stringContaining('stale'),
-        expect.stringContaining('target now returns 200'),
-        expect.stringContaining('unsafe or unresolved destination'),
-        expect.stringContaining("non-public address '127.0.0.1'"),
-      ]),
-    );
+    expect(result.warnings).toEqual([
+      `Allowlisted '${url}' returned 403: This endpoint blocks automated probes but is reviewed manually.`,
+      `Allowlisted '${reachableUrl}' returned 200: This endpoint intermittently rejects automated probes.`,
+      `Allowlisted '${xmlDocumentationUrl}' returned 403: This target is referenced by generated API documentation.`,
+    ]);
+    expect(result.failures).toEqual([
+      `External link allowlist entry '${privateUrl}' has an unsafe or unresolved destination: External host '127.0.0.1' resolves to non-public address '127.0.0.1'.`,
+      "External link allowlist contains malformed URL 'not a URL'.",
+      "External link allowlist entry 'https://example.com/stale' is stale and no longer referenced.",
+    ]);
   });
 });

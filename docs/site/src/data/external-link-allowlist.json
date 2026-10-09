@@ -12,7 +12,7 @@
     "https://docs.aws.amazon.com/sdkfornet/v4/apidocs/items/Util/TLoggingConfig.html": "AWS serves this public .NET SDK logging configuration reference to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://docs.aws.amazon.com/streams/latest/dev/introduction.html": "AWS serves this public Kinesis overview to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
     "https://en.wikipedia.org/wiki/Kalman_filter": "Wikipedia serves this public article to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
-    "https://twitter.com/intent/follow?screen_name=msftorleans": "Twitter serves this public Orleans follow intent to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403.",
+    "https://twitter.com/intent/follow?screen_name=msftorleans": "Twitter serves this public Orleans follow intent to browsers and intermittently returns HTTP 403 to the bounded automated HEAD/GET probe; successful responses also occur.",
     "https://www.f5.com/company/blog/nginx/nginx-power-of-two-choices-load-balancing-algorithm": "The F5 site serves this canonical NGINX article to browsers but rejects the bounded automated HEAD/GET probe with HTTP 403."
   }
 }
