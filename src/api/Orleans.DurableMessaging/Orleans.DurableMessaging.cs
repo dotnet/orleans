@@ -80,6 +80,8 @@ namespace Orleans.DurableMessaging
     {
         public System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        public DurableInboxDispatcher Register<T>(DurableMessageType<T> messageType, System.Action<T, IInboxHandlerContext> handler) { throw null; }
+
         public DurableInboxDispatcher Register<T>(DurableMessageType<T> messageType, System.Func<T, IInboxHandlerContext, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> handler) { throw null; }
     }
 
