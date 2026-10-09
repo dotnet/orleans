@@ -13,7 +13,8 @@ namespace Orleans.DurableMessaging;
 // owned payload to the result and release it if a subsequent field cannot be read.
 [RegisterSerializer]
 internal sealed class DurableEnvelopeCodec(
-    IFieldCodec<Guid> ids,
+    IFieldCodec<HierarchicalKey> ids,
+    IFieldCodec<string> subjects,
     IFieldCodec<GrainId> grains,
     IFieldCodec<ArcBuffer> buffers) : IFieldCodec<DurableEnvelope>
 {
@@ -22,10 +23,11 @@ internal sealed class DurableEnvelopeCodec(
     {
         ReferenceCodec.MarkValueField(writer.Session);
         writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(DurableEnvelope), WireType.TagDelimited);
-        ids.WriteField(ref writer, 0, typeof(Guid), value.MessageId);
+        ids.WriteField(ref writer, 0, typeof(HierarchicalKey), value.MessageId);
         grains.WriteField(ref writer, 1, typeof(GrainId), value.SenderId);
         grains.WriteField(ref writer, 1, typeof(GrainId), value.ReceiverId);
         buffers.WriteField(ref writer, 1, typeof(ArcBuffer), value.Payload);
+        subjects.WriteField(ref writer, 1, typeof(string), value.Subject);
         writer.WriteEndObject();
     }
 
@@ -33,7 +35,8 @@ internal sealed class DurableEnvelopeCodec(
     {
         field.EnsureWireTypeTagDelimited();
         ReferenceCodec.MarkValueField(reader.Session);
-        Guid messageId = default;
+        HierarchicalKey messageId = default;
+        string? subject = null;
         GrainId sender = default, receiver = default;
         ArcBuffer payload = default;
         uint fieldId = 0;
@@ -54,10 +57,11 @@ internal sealed class DurableEnvelopeCodec(
                         payload.Dispose();
                         payload = next;
                         break;
+                    case 4: subject = subjects.ReadValue(ref reader, header); break;
                     default: reader.ConsumeUnknownField(header); break;
                 }
             }
-            return new DurableEnvelope { MessageId = messageId, SenderId = sender, ReceiverId = receiver, Payload = payload };
+            return new DurableEnvelope { MessageId = messageId, SenderId = sender, ReceiverId = receiver, Payload = payload, Subject = subject ?? throw new FormatException("The envelope subject field is missing or null.") };
         }
         catch
         {

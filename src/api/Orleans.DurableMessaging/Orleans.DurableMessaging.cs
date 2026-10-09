@@ -46,7 +46,7 @@ namespace Orleans.DurableMessaging
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
         [Id(0)]
-        public required System.Guid MessageId { get { throw null; } init { } }
+        public required HierarchicalKey MessageId { get { throw null; } init { } }
 
         [Id(3)]
         public required Serialization.Buffers.ArcBuffer Payload { get { throw null; } init { } }
@@ -57,61 +57,65 @@ namespace Orleans.DurableMessaging
         [Id(1)]
         public required Runtime.GrainId SenderId { get { throw null; } init { } }
 
+        [Id(4)]
+        public required string Subject { get { throw null; } init { } }
+
         public readonly void Dispose() { }
 
         public readonly DurableEnvelope Retain() { throw null; }
     }
 
-    [GenerateSerializer]
     [Immutable]
     [Alias("Orleans.DurableMessaging.HierarchicalKey")]
-    public sealed partial class HierarchicalKey : System.ISpanFormattable, System.IFormattable, System.IEquatable<HierarchicalKey>, System.IParsable<HierarchicalKey>, System.ISpanParsable<HierarchicalKey>
+    public readonly partial struct HierarchicalKey : System.ISpanFormattable, System.IFormattable, System.IEquatable<HierarchicalKey>, System.IParsable<HierarchicalKey>, System.ISpanParsable<HierarchicalKey>
     {
-        internal HierarchicalKey() { }
-
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
         public const char EscapeCharacter = '\\';
         public const char SegmentSeparator = '/';
+        public bool IsDefault { get { throw null; } }
+
         public int Length { get { throw null; } }
 
-        public static HierarchicalKey Create(HierarchicalKey? parent, string value) { throw null; }
+        public int SegmentCount { get { throw null; } }
+
+        public readonly HierarchicalKey Append(HierarchicalKey suffix) { throw null; }
 
         public static HierarchicalKey Create(scoped params System.ReadOnlySpan<string> values) { throw null; }
 
         public static HierarchicalKey Create(string value) { throw null; }
 
-        public HierarchicalKey CreateChildKey(string value) { throw null; }
+        public readonly HierarchicalKey CreateChildKey(string value) { throw null; }
 
-        public static HierarchicalKey CreateEscaped(HierarchicalKey? parent, System.ReadOnlyMemory<char> value) { throw null; }
+        public readonly bool Equals(HierarchicalKey other) { throw null; }
 
-        public static HierarchicalKey CreateEscaped(string value) { throw null; }
+        public override readonly bool Equals(object? obj) { throw null; }
 
-        public HierarchicalKey CreateEscapedChildKey(string value) { throw null; }
+        public readonly SegmentEnumerator GetEnumerator() { throw null; }
 
-        public bool Equals(HierarchicalKey? other) { throw null; }
+        public override readonly int GetHashCode() { throw null; }
 
-        public override bool Equals(object? obj) { throw null; }
+        public readonly HierarchicalKey? GetParent() { throw null; }
 
-        public SegmentEnumerator GetEnumerator() { throw null; }
+        public readonly bool IsAncestorOf(HierarchicalKey other) { throw null; }
 
-        public override int GetHashCode() { throw null; }
+        public readonly bool IsChildOf(HierarchicalKey other) { throw null; }
 
-        public HierarchicalKey? GetParent() { throw null; }
+        public readonly bool IsParentOf(HierarchicalKey other) { throw null; }
 
-        public bool IsAncestorOf(HierarchicalKey? other) { throw null; }
+        public static bool operator ==(HierarchicalKey left, HierarchicalKey right) { throw null; }
 
-        public bool IsChildOf(HierarchicalKey? other) { throw null; }
-
-        public bool IsParentOf(HierarchicalKey? other) { throw null; }
+        public static bool operator !=(HierarchicalKey left, HierarchicalKey right) { throw null; }
 
         static HierarchicalKey System.ISpanParsable<HierarchicalKey>.Parse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider) { throw null; }
 
         static HierarchicalKey System.IParsable<HierarchicalKey>.Parse(string s, System.IFormatProvider? provider) { throw null; }
 
-        public override string ToString() { throw null; }
+        public override readonly string ToString() { throw null; }
 
-        public string ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
+        public readonly string ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
 
-        public bool TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
+        public readonly bool TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
 
         static bool System.ISpanParsable<HierarchicalKey>.TryParse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider, out HierarchicalKey result) { throw null; }
 
@@ -121,8 +125,6 @@ namespace Orleans.DurableMessaging
         {
             private object _dummy;
             private int _dummyPrimitive;
-            public SegmentEnumerator(HierarchicalKey id) { }
-
             public System.ReadOnlySpan<char> Current { get { throw null; } }
 
             public bool MoveNext() { throw null; }
@@ -138,7 +140,7 @@ namespace Orleans.DurableMessaging
         System.Collections.Generic.IEnumerable<DurableEnvelope> Messages { get; }
 
         void RegisterHandler(IInboxHandler handler);
-        bool TryGetMessage(Runtime.GrainId senderId, System.Guid messageId, out DurableEnvelope envelope);
+        bool TryGetMessage(HierarchicalKey messageId, out DurableEnvelope envelope);
     }
 
     [Alias("IDurableInboxExtension")]
@@ -155,7 +157,7 @@ namespace Orleans.DurableMessaging
         System.Collections.Generic.IEnumerable<DurableEnvelope> Messages { get; }
 
         void Send(DurableEnvelope envelope);
-        bool TryGetMessage(System.Guid messageId, out DurableEnvelope envelope);
+        bool TryGetMessage(HierarchicalKey messageId, out DurableEnvelope envelope);
     }
 
     public partial interface IInboxHandler
@@ -218,24 +220,6 @@ namespace OrleansCodeGen.Orleans.DurableMessaging
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableMessaging.DeliveryResult value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_HierarchicalKey : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableMessaging.HierarchicalKey>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_HierarchicalKey(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableMessaging.HierarchicalKey> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableMessaging.HierarchicalKey instance) { }
-
-        public global::Orleans.DurableMessaging.HierarchicalKey ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableMessaging.HierarchicalKey instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableMessaging.HierarchicalKey value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 

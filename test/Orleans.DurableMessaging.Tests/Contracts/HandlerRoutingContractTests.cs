@@ -71,6 +71,7 @@ public sealed class HandlerRoutingContractTests
         Assert.Equal(1, count);
         AssertEnvelope(envelope, context.Envelope);
         Assert.Equal(envelope.MessageId, decoded.MessageId);
+        Assert.Equal(envelope.Subject, decoded.Subject);
         Assert.Equal(envelope.SenderId, decoded.SenderId);
         Assert.Equal(envelope.ReceiverId, decoded.ReceiverId);
         Assert.Equal(new byte[] { 0x00, 0xff, 0x80 }, decoded.Payload.ToArray());
@@ -194,9 +195,10 @@ public sealed class HandlerRoutingContractTests
         writer.Write(new byte[] { 0x00, 0xff, 0x80 });
         return new()
         {
-            MessageId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            MessageId = HierarchicalKey.Create("44444444-4444-4444-4444-444444444444"),
             SenderId = GrainId.Create("sender", "handler"),
             ReceiverId = GrainId.Create("receiver", "handler"),
+            Subject = "handler.v1",
             Payload = payload ?? writer.PeekSlice(writer.Length)
         };
     }
@@ -204,6 +206,7 @@ public sealed class HandlerRoutingContractTests
     private static void AssertEnvelope(DurableEnvelope expected, DurableEnvelope actual)
     {
         Assert.Equal(expected.MessageId, actual.MessageId);
+        Assert.Equal(expected.Subject, actual.Subject);
         Assert.Equal(expected.SenderId, actual.SenderId);
         Assert.Equal(expected.ReceiverId, actual.ReceiverId);
         Assert.Same(expected.Payload.First, actual.Payload.First);

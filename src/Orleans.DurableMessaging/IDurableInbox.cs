@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using Orleans.Runtime;
 
 namespace Orleans.DurableMessaging;
 
@@ -28,13 +27,12 @@ public interface IDurableInbox
     IEnumerable<DurableEnvelope> Messages { get; }
 
     /// <summary>
-    /// Looks up a pending message by its transport identity.
+    /// Looks up a pending command by its application identity within this inbox.
     /// </summary>
-    /// <param name="senderId">The original sender identity.</param>
-    /// <param name="messageId">The message identifier.</param>
+    /// <param name="messageId">The exact command identity, independent of its immediate sender and subject.</param>
     /// <param name="envelope">The borrowed matching envelope when found.</param>
     /// <returns>Whether the message is pending.</returns>
-    bool TryGetMessage(GrainId senderId, Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope);
+    bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope);
 
     /// <summary>
     /// Registers the handler for this inbox.

@@ -1,711 +1,288 @@
 using System;
-using System.Buffers;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Orleans.DurableMessaging;
 
 /// <summary>
-/// Represents a hierarchical correlation key with support for parent-child relationships and segment-based navigation.
+/// An immutable, ordinal application identity formed from nonempty hierarchical segments.
 /// </summary>
 /// <remarks>
-/// <see cref="HierarchicalKey"/> provides a durable correlation identifier using slash-separated segments.
-/// Segments can be escaped to allow literal slash characters.
+/// Create constructs literal segments and escapes slash and backslash characters exactly once.
+/// Parse reads the canonical escaped path. Assignment shares immutable backing data; equality and
+/// hashing use the full canonical identity. Applications preserve the identity across retries.
 /// </remarks>
-[GenerateSerializer, Immutable]
-[Alias("Orleans.DurableMessaging.HierarchicalKey")]
-public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
+[Immutable, Alias("Orleans.DurableMessaging.HierarchicalKey")]
+public readonly struct HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
 {
-    /// <summary>
-    /// The character used to escape special characters in segments.
-    /// </summary>
+    /// <summary>The escape character used within canonical segments.</summary>
     public const char EscapeCharacter = '\\';
 
-    /// <summary>
-    /// The character used to separate segments in the hierarchical key.
-    /// </summary>
+    /// <summary>The separator between canonical segments.</summary>
     public const char SegmentSeparator = '/';
-    private static ReadOnlySpan<char> SegmentSeparatorSpan => "/";
 
-    [Id(0)]
-    private readonly HierarchicalKey? _parent;
+    private readonly KeyData? _data;
 
-    [Id(1)]
-    private readonly ReadOnlyMemory<char> _value;
+    private HierarchicalKey(string canonical, int segmentCount) => _data = new(canonical, segmentCount);
 
-    private HierarchicalKey(ReadOnlyMemory<char> value)
-    {
-        _value = value;
-    }
+    /// <summary>Gets whether this value is unset.</summary>
+    public bool IsDefault => _data is null;
 
-    private HierarchicalKey(HierarchicalKey? parent, ReadOnlyMemory<char> value) : this(value)
-    {
-        _parent = parent;
-    }
+    /// <summary>Gets the canonical path length in UTF-16 characters.</summary>
+    public int Length => _data?.Canonical.Length ?? 0;
 
-    /// <summary>
-    /// Creates a new hierarchical key from the specified string value.
-    /// </summary>
-    /// <param name="value">The string value representing the key.</param>
-    /// <returns>A new hierarchical key.</returns>
-    /// <exception cref="ArgumentException">Thrown when the value contains empty segments.</exception>
+    /// <summary>Gets the number of segments, or zero for an unset key.</summary>
+    public int SegmentCount => _data?.SegmentCount ?? 0;
+
+    /// <summary>Creates one literal segment, escaping slash and backslash characters.</summary>
+    /// <param name="value">The nonempty literal segment.</param>
+    /// <returns>The segment identity.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is empty.</exception>
     public static HierarchicalKey Create(string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(value);
-        if (!IsSegmentationValid(value))
-        {
-            throw new ArgumentException("Value must not contain empty segments.", nameof(value));
-        }
-
-        return new(value.AsMemory());
+        return new(Escape(value), 1);
     }
 
-    /// <summary>
-    /// Creates a new hierarchical key from the specified hierarchy fragments.
-    /// </summary>
-    /// <param name="values">The ordered hierarchy fragments, each containing one or more slash-separated, optionally escaped segments.</param>
-    /// <returns>A new hierarchical key composed by creating a root from the first fragment and appending each subsequent fragment as a child.</returns>
-    /// <remarks>
-    /// Existing escape sequences are preserved. Use <see cref="CreateEscaped(string)"/> to escape literal segment separators.
-    /// </remarks>
-    /// <exception cref="ArgumentNullException">Thrown when a fragment is null.</exception>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty or a fragment is empty, contains empty segments, or contains an invalid escape sequence.</exception>
+    /// <summary>Creates a hierarchy from literal segments in root-first order.</summary>
+    /// <param name="values">The nonempty literal segments.</param>
+    /// <returns>A flat canonical identity which owns its immutable backing string.</returns>
+    /// <exception cref="ArgumentNullException">A segment is null.</exception>
+    /// <exception cref="ArgumentException">The input or a segment is empty.</exception>
     public static HierarchicalKey Create(params ReadOnlySpan<string> values)
     {
         if (values.IsEmpty)
         {
             throw new ArgumentException("Values must not be empty.", nameof(values));
         }
-
-        var result = Create(values[0]);
-        for (var i = 1; i < values.Length; i++)
+        var builder = new StringBuilder();
+        foreach (var value in values)
         {
-            result = result.CreateChildKey(values[i]);
+            ArgumentException.ThrowIfNullOrEmpty(value);
+            if (builder.Length > 0) builder.Append(SegmentSeparator);
+            AppendEscaped(builder, value);
         }
-
-        return result;
+        return new(builder.ToString(), values.Length);
     }
 
-    /// <summary>
-    /// Creates a new hierarchical key as a child of the specified parent.
-    /// </summary>
-    /// <param name="parent">The parent key.</param>
-    /// <param name="value">The value for the child key.</param>
-    /// <returns>A new hierarchical key.</returns>
-    public static HierarchicalKey Create(HierarchicalKey? parent, string value)
+    /// <summary>Appends one literal child segment.</summary>
+    /// <param name="value">The nonempty literal child segment.</param>
+    /// <returns>The child identity.</returns>
+    /// <exception cref="InvalidOperationException">This key is unset.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="value"/> is empty.</exception>
+    public HierarchicalKey CreateChildKey(string value)
     {
+        EnsureSet();
         ArgumentException.ThrowIfNullOrEmpty(value);
-        if (!IsSegmentationValid(value))
-        {
-            throw new ArgumentException("Value must not contain empty segments.", nameof(value));
-        }
-
-        return new(parent, value.AsMemory());
+        return new(string.Concat(_data!.Canonical, "/", Escape(value)), checked(SegmentCount + 1));
     }
 
-    /// <summary>
-    /// Gets the parent key of this hierarchical key.
-    /// </summary>
-    /// <returns>The parent key, or null if this is a root key.</returns>
-    public HierarchicalKey? GetParent() => WithoutLastSegment(_value) switch
+    /// <summary>Composes this hierarchy with an already constructed suffix hierarchy.</summary>
+    /// <param name="suffix">The constructed suffix.</param>
+    /// <returns>A flat concatenated identity preserving both paths' segment boundaries.</returns>
+    /// <exception cref="InvalidOperationException">This key is unset.</exception>
+    /// <exception cref="ArgumentException"><paramref name="suffix"/> is unset.</exception>
+    public HierarchicalKey Append(HierarchicalKey suffix)
     {
-        { Length: > 0 } value => new(_parent, value),
-        _ => _parent,
-    };
+        EnsureSet();
+        if (suffix.IsDefault) throw new ArgumentException("The suffix must not be unset.", nameof(suffix));
+        return new(string.Concat(_data!.Canonical, "/", suffix._data!.Canonical), checked(SegmentCount + suffix.SegmentCount));
+    }
+
+    /// <summary>Gets the immediate parent, or null for a root or unset key.</summary>
+    /// <returns>The parent identity when this key has more than one segment.</returns>
+    public HierarchicalKey? GetParent()
+    {
+        if (SegmentCount < 2) return null;
+        var lastSeparator = 0;
+        var path = _data!.Canonical.AsSpan();
+        for (var i = 0; i < path.Length; i++)
+        {
+            if (path[i] == EscapeCharacter) i++;
+            else if (path[i] == SegmentSeparator) lastSeparator = i;
+        }
+        return new HierarchicalKey(_data.Canonical[..lastSeparator], SegmentCount - 1);
+    }
+
+    /// <summary>Tests whether this key is the other's immediate child.</summary>
+    /// <param name="other">The potential parent.</param>
+    /// <returns>Whether there is exactly one additional segment.</returns>
+    public bool IsChildOf(HierarchicalKey other) => other.IsParentOf(this);
+
+    /// <summary>Tests whether this key is the other's immediate parent.</summary>
+    /// <param name="other">The potential child.</param>
+    /// <returns>Whether the other key extends this key by exactly one segment.</returns>
+    public bool IsParentOf(HierarchicalKey other) => !IsDefault && other.SegmentCount == SegmentCount + 1 && IsAncestorOf(other);
+
+    /// <summary>Tests whether this key is equal to or an ancestor of the other key.</summary>
+    /// <param name="other">The identity to inspect.</param>
+    /// <returns>Whether the full prefix consists of equal ordinal segments. Unset keys return false.</returns>
+    public bool IsAncestorOf(HierarchicalKey other) => !IsDefault && !other.IsDefault
+        && (Equals(other) || (other.Length > Length && other._data!.Canonical[Length] == SegmentSeparator
+            && other._data.Canonical.StartsWith(_data!.Canonical, StringComparison.Ordinal)));
 
     /// <inheritdoc/>
-    public static HierarchicalKey Parse(string s, IFormatProvider? provider)
+    public static HierarchicalKey Parse(string s, IFormatProvider? provider = null)
     {
         ArgumentNullException.ThrowIfNull(s);
-        return TryParse(s, provider, out var result)
-            ? result
-            : throw new FormatException("The value is not a valid hierarchical key.");
+        return TryParse(s, provider, out var result) ? result : throw new FormatException("The value is not a valid canonical hierarchical key.");
     }
 
     /// <inheritdoc/>
-    public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, [MaybeNullWhen(false)] out HierarchicalKey result)
+    public static HierarchicalKey Parse(ReadOnlySpan<char> s, IFormatProvider? provider = null) =>
+        TryParse(s, provider, out var result) ? result : throw new FormatException("The value is not a valid canonical hierarchical key.");
+
+    /// <inheritdoc/>
+    public static bool TryParse([NotNullWhen(true)] string? s, IFormatProvider? provider, out HierarchicalKey result)
     {
-        if (s is { Length: > 0 } && IsSegmentationValid(s))
+        if (s is not null && TryCountSegments(s, out var count))
         {
-            // Avoid re-validating the key.
-            result = new HierarchicalKey(s.AsMemory());
+            result = new(s, count);
             return true;
         }
-
-        result = null;
+        result = default;
         return false;
     }
 
     /// <inheritdoc/>
-    public static HierarchicalKey Parse(ReadOnlySpan<char> s, IFormatProvider? provider)
+    public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, out HierarchicalKey result)
     {
-        return TryParse(s, provider, out var result)
-            ? result
-            : throw new FormatException("The value is not a valid hierarchical key.");
-    }
-
-    /// <inheritdoc/>
-    public static bool TryParse(ReadOnlySpan<char> s, IFormatProvider? provider, [MaybeNullWhen(false)] out HierarchicalKey result)
-    {
-        if (s is { Length: > 0 } && IsSegmentationValid(s))
+        if (TryCountSegments(s, out var count))
         {
-            // Avoid re-validating the key.
-            result = new HierarchicalKey(new string(s).AsMemory());
+            result = new(new string(s), count);
             return true;
         }
-
-        result = null;
+        result = default;
         return false;
     }
 
-    /// <summary>
-    /// Creates a new hierarchical key with escaped segment separators.
-    /// </summary>
-    /// <param name="parent">The parent key.</param>
-    /// <param name="value">The value to escape.</param>
-    /// <returns>A new hierarchical key with escaped segment separators.</returns>
-    public static HierarchicalKey CreateEscaped(HierarchicalKey? parent, ReadOnlyMemory<char> value)
-    {
-        if (value.IsEmpty)
-        {
-            throw new ArgumentException("Value must not be empty.", nameof(value));
-        }
-
-        var unescapedChars = UnescapedCharCount(value.Span);
-        var escapedValue = unescapedChars == 0
-            ? new string(value.Span).AsMemory()
-            : Escape(value.Span, unescapedChars).AsMemory();
-        if (!IsSegmentationValid(escapedValue.Span))
-        {
-            throw new ArgumentException("Value contains an incomplete or invalid escape sequence.", nameof(value));
-        }
-
-        return new HierarchicalKey(parent, escapedValue);
-    }
-
-    private static string Escape(ReadOnlySpan<char> value, int unescapedChars)
-    {
-        var resultArray = ArrayPool<char>.Shared.Rent(value.Length + unescapedChars);
-        try
-        {
-            var isEscaped = false;
-            var insertions = 0;
-            for (var i = 0; i < value.Length; i++)
-            {
-                var c = value[i];
-                if (!isEscaped && c == SegmentSeparator)
-                {
-                    resultArray[i + insertions] = EscapeCharacter;
-                    ++insertions;
-                }
-
-                resultArray[i + insertions] = c;
-                isEscaped = c == EscapeCharacter && !isEscaped;
-            }
-
-            return new string(resultArray.AsSpan(0, value.Length + unescapedChars));
-        }
-        finally
-        {
-            ArrayPool<char>.Shared.Return(resultArray);
-        }
-    }
-
-    private static int UnescapedCharCount(ReadOnlySpan<char> value)
-    {
-        var isEscaped = false;
-        var result = 0;
-        foreach (var c in value)
-        {
-            if (isEscaped)
-            {
-                isEscaped = false;
-                continue;
-            }
-
-            if (!isEscaped && c == SegmentSeparator)
-            {
-                ++result;
-            }
-
-            if (c == EscapeCharacter)
-            {
-                isEscaped = true;
-            }
-        }
-
-        return result;
-    }
-
-    private static ReadOnlyMemory<char> WithoutLastSegment(ReadOnlyMemory<char> value)
-    {
-        // Find the last segment in the value string by searching for the last unescaped segment separator
-        var isEscaped = false;
-        var lastSegmentStart = 0;
-        var valueSpan = value.Span;
-        for (var i = 0; i < valueSpan.Length; i++)
-        {
-            var c = valueSpan[i];
-            if (c == SegmentSeparator)
-            {
-                if (!isEscaped)
-                {
-                    lastSegmentStart = i + 1;
-                }
-
-                isEscaped = false;
-            }
-
-            if (c == EscapeCharacter)
-            {
-                isEscaped = !isEscaped;
-            }
-        }
-
-        return lastSegmentStart == 0 ? ReadOnlyMemory<char>.Empty : value[..(lastSegmentStart - 1)];
-    }
-
-    private static ReadOnlySpan<char> GetLastSegment(ReadOnlySpan<char> value)
-    {
-        // Find the last segment in the value string by searching for the last unescaped segment separator
-        var isEscaped = false;
-        var lastSegmentStart = 0;
-        for (var i = 0; i < value.Length; i++)
-        {
-            var c = value[i];
-            if (!isEscaped && c == SegmentSeparator)
-            {
-                lastSegmentStart = i + 1;
-            }
-
-            if (c == EscapeCharacter)
-            {
-                isEscaped = !isEscaped;
-            }
-        }
-
-        return value[lastSegmentStart..];
-    }
-
-    private static bool IsSegmentationValid(ReadOnlySpan<char> value)
-    {
-        var isEscaped = false;
-        var segmentLength = 0;
-        foreach (var c in value)
-        {
-            ++segmentLength;
-
-            if (isEscaped && c != SegmentSeparator && c != EscapeCharacter)
-            {
-                // The only characters which can be escaped are the escape character itself and the segment separator.
-                return false;
-            }
-
-            if (c == EscapeCharacter)
-            {
-                // The escape character is allowed and can be used to escape itself.
-                isEscaped = !isEscaped;
-            }
-            else if (c == SegmentSeparator)
-            {
-                // Check if this is the start of a new segment.
-                if (!isEscaped)
-                {
-                    if (segmentLength <= 1)
-                    {
-                        // Empty segments are not allowed (the segment contains only a segment separator)
-                        return false;
-                    }
-
-                    segmentLength = 0;
-                }
-
-                isEscaped = false;
-            }
-        }
-
-        // The sequence must not end with an incomplete escape sequence.
-        if (isEscaped)
-        {
-            return false;
-        }
-
-        // Empty segments are not valid
-        if (segmentLength == 0)
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// Returns <value>true</value> if this key is direct descendant of the provided key, <value>false</value> otherwise.
-    /// </summary>
-    /// <param name="other">The key to check this key against.</param>
-    /// <returns><value>true</value> if this key is a direct descendant of <paramref name="other"/>, <value>false</value> otherwise.</returns>
-    public bool IsChildOf(HierarchicalKey? other) => other is not null && other.IsParentOf(this);
-
-    /// <summary>
-    /// Returns <value>true</value> if this key is a direct ancestor of provided key, <value>false</value> otherwise.
-    /// </summary>
-    /// <param name="other">The key to check this key against.</param>
-    /// <returns><value>true</value> if this key is a direct ancestor of <paramref name="other"/>, <value>false</value> otherwise.</returns>
-    public bool IsParentOf(HierarchicalKey? other)
-    {
-        if (other is null) return false;
-        var left = GetEnumerator();
-        var right = other.GetEnumerator();
-        while (true)
-        {
-            var leftValid = left.MoveNext();
-            var rightValid = right.MoveNext();
-            if (!leftValid && !rightValid)
-            {
-                // Completed enumeration, both keys are equal and there is no parent/child relationship between them.
-                return false;
-            }
-            else if (leftValid && !rightValid)
-            {
-                // The left key is longer than the right key, so it is not a prefix of it.
-                return false;
-            }
-            else if (!leftValid && rightValid)
-            {
-                // The right key is longer than the left key, and all common components are equal,
-                // so the left is the parent of the right if the right has one more segment.
-                return !right.MoveNext();
-            }
-            else if (!left.Current.SequenceEqual(right.Current))
-            {
-                // Some segment is not equal and therefore neither is a prefix of the other.
-                return false;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Returns <value>true</value> if this key is an ancestor (parent or earlier) of the provided key, <value>false</value> otherwise.
-    /// </summary>
-    /// <param name="other">The key to check this key against.</param>
-    /// <returns><value>true</value> if this key is a prefix of <paramref name="other"/>, <value>false</value> otherwise.</returns>
-    public bool IsAncestorOf(HierarchicalKey? other)
-    {
-        if (other is null) return false;
-        var left = GetEnumerator();
-        var right = other.GetEnumerator();
-        while (true)
-        {
-            var leftValid = left.MoveNext();
-            var rightValid = right.MoveNext();
-            if (!leftValid && !rightValid)
-            {
-                // Completed enumeration, both keys are equal and therefore prefixes of each other.
-                return true;
-            }
-            else if (leftValid && !rightValid)
-            {
-                // The left key is longer than the right key, so it is not a prefix of it.
-                return false;
-            }
-            else if (!leftValid && rightValid)
-            {
-                // The right key is longer than the left key, and all common components are equal,
-                // so the left is a prefix of the right.
-                return true;
-            }
-            else if (!left.Current.SequenceEqual(right.Current))
-            {
-                // Some segment is not equal and therefore neither is a prefix of the other.
-                return false;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Creates a new key, escaping any unescaped segment separators in <paramref name="value"/>, and returns it.
-    /// </summary>
-    /// <param name="value">The value.</param>
-    public static HierarchicalKey CreateEscaped(string value) => CreateEscaped(null, value.AsMemory());
-
-    /// <summary>
-    /// Creates a key which is a child of this key, escaping any unescaped segment separators in <paramref name="value"/>, and returns it.
-    /// </summary>
-    /// <param name="value">The value for the child segments.</param>
-    public HierarchicalKey CreateEscapedChildKey(string value) => CreateEscaped(this, value.AsMemory());
-
-    /// <summary>
-    /// Creates a key which is a child of this key and returns it.
-    /// </summary>
-    /// <param name="value">The value for the child segments.</param>
-    /// <returns></returns>
-    public HierarchicalKey CreateChildKey(string value) => Create(this, value);
+    /// <inheritdoc/>
+    public bool Equals(HierarchicalKey other) => ReferenceEquals(_data, other._data)
+        || string.Equals(_data?.Canonical, other._data?.Canonical, StringComparison.Ordinal);
 
     /// <inheritdoc/>
-    public override string ToString() => $"{this}";
-
-    /// <summary>
-    /// Gets the number of characters which comprise the key.
-    /// </summary>
-    public int Length
-    {
-        get
-        {
-            var length = 0;
-            foreach (var segment in this)
-            {
-                // Account for segment separators.
-                if (length > 0)
-                {
-                    ++length;
-                }
-
-                length += segment.Length;
-            }
-
-            return length;
-        }
-    }
+    public override bool Equals(object? obj) => obj is HierarchicalKey other && Equals(other);
 
     /// <inheritdoc/>
-    public override bool Equals(object? obj)
-    {
-        if (obj is not HierarchicalKey other) return false;
-        return Equals(other);
-    }
+    public override int GetHashCode() => _data?.Hash ?? 0;
+
+    /// <summary>Compares complete ordinal key values.</summary>
+    /// <param name="left">The first identity.</param>
+    /// <param name="right">The second identity.</param>
+    /// <returns>Whether the identities are equal.</returns>
+    public static bool operator ==(HierarchicalKey left, HierarchicalKey right) => left.Equals(right);
+
+    /// <summary>Compares complete ordinal key values for inequality.</summary>
+    /// <param name="left">The first identity.</param>
+    /// <param name="right">The second identity.</param>
+    /// <returns>Whether the identities differ.</returns>
+    public static bool operator !=(HierarchicalKey left, HierarchicalKey right) => !left.Equals(right);
 
     /// <inheritdoc/>
-    public override int GetHashCode()
-    {
-        // Note that we want to ensure that GetHashCode returns equal values for semantically equivalent
-        // instances. To achieve this, we treat the instances as a sequence of bytes, independent of
-        // where in the chain of instances the various segments sit.
-        // This allows for one instance with a value "foo/bar" and a child with "baz" to have the same
-        // hash code as an instance with the value "foo/bar/baz".
-        var length = Length;
-        var array = length <= 256 ? null : ArrayPool<char>.Shared.Rent(length);
-        Span<char> buffer = array ?? stackalloc char[256];
-
-        // Write the value into the buffer.
-        var didFormat = TryFormat(buffer, out var len, ReadOnlySpan<char>.Empty, null);
-        buffer = buffer[..len];
-        Debug.Assert(didFormat);
-
-        HashCode hashCode = new();
-        hashCode.AddBytes(MemoryMarshal.AsBytes(buffer));
-
-        if (array is not null)
-        {
-            ArrayPool<char>.Shared.Return(array);
-        }
-
-        return hashCode.ToHashCode();
-    }
-
-    /// <inheritdoc/>
-    public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
-    {
-        if (_parent is not null)
-        {
-            if (_parent.TryFormat(destination, out charsWritten, format, provider))
-            {
-                destination = destination[charsWritten..];
-                if (destination.Length > 0)
-                {
-                    destination[0] = SegmentSeparator;
-                    destination = destination[1..];
-                    ++charsWritten;
-                }
-            }
-            else
-            {
-                return false;
-            }
-        }
-        else
-        {
-            charsWritten = 0;
-        }
-
-        if (_value.Span.TryCopyTo(destination))
-        {
-            charsWritten += _value.Length;
-            return true;
-        }
-
-        return false;
-    }
+    public override string ToString() => _data?.Canonical ?? string.Empty;
 
     /// <inheritdoc/>
     public string ToString(string? format, IFormatProvider? formatProvider) => ToString();
 
-    /// <summary>
-    /// Returns an enumerator that iterates through the segments of the hierarchical key.
-    /// </summary>
-    public SegmentEnumerator GetEnumerator() => new(this);
-
     /// <inheritdoc/>
-    public bool Equals(HierarchicalKey? other)
+    public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
     {
-        if (other is null) return false;
-
-        var left = GetEnumerator();
-        var right = other.GetEnumerator();
-        while (true)
+        if (ToString().AsSpan().TryCopyTo(destination))
         {
-            var leftValid = left.MoveNext();
-            var rightValid = right.MoveNext();
-            if (!leftValid && !rightValid)
-            {
-                // Completed enumeration.
-                return true;
-            }
-            else if (leftValid ^ rightValid)
-            {
-                // One side is complete and the other is not.
-                return false;
-            }
-            else if (!left.Current.SequenceEqual(right.Current))
-            {
-                // Some segment is not equal.
-                return false;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Enumerator for iterating through the segments of a hierarchical key.
-    /// </summary>
-    public ref struct SegmentEnumerator(HierarchicalKey id)
-    {
-        private StructureEnumerator _enumerator = new StructureEnumerator(id);
-        private ReadOnlySpan<char> _buffer = ReadOnlySpan<char>.Empty;
-
-        /// <summary>
-        /// Gets the current segment.
-        /// </summary>
-        public ReadOnlySpan<char> Current { get; private set; }
-
-        /// <summary>
-        /// Advances the enumerator to the next segment.
-        /// </summary>
-        public bool MoveNext()
-        {
-            if (_buffer.Length == 0)
-            {
-                if (!_enumerator.MoveNext())
-                {
-                    return false;
-                }
-
-                _buffer = _enumerator.Current;
-            }
-
-            Current = GetNextSegment();
-            _buffer = _buffer[Current.Length..];
-
-            if (_buffer.Length > 0 && _buffer[0] == SegmentSeparator)
-            {
-                _buffer = _buffer[1..];
-            }
-
-            while (Current.Length == 0)
-            {
-                // Advance
-                if (!MoveNext())
-                {
-                    return false;
-                }
-            }
-
+            charsWritten = Length;
             return true;
         }
+        charsWritten = 0;
+        return false;
+    }
 
-        private readonly ReadOnlySpan<char> GetNextSegment()
+    /// <summary>Enumerates escaped canonical segment spans in root-first order.</summary>
+    /// <returns>An allocation-free segment enumerator.</returns>
+    public SegmentEnumerator GetEnumerator() => new(ToString().AsSpan());
+
+    private void EnsureSet()
+    {
+        if (IsDefault) throw new InvalidOperationException("The key must not be unset.");
+    }
+
+    private static string Escape(string value)
+    {
+        if (value.AsSpan().IndexOfAny(EscapeCharacter, SegmentSeparator) < 0) return value;
+        var builder = new StringBuilder(value.Length);
+        AppendEscaped(builder, value);
+        return builder.ToString();
+    }
+
+    private static void AppendEscaped(StringBuilder builder, string value)
+    {
+        foreach (var character in value)
         {
-            var buffer = _buffer;
-            var isEscaped = false;
-            var length = 0;
-            foreach (var c in buffer)
-            {
-                ++length;
-                if (c == EscapeCharacter)
-                {
-                    isEscaped = !isEscaped;
-                    continue;
-                }
-                else if (c == SegmentSeparator && !isEscaped)
-                {
-                    --length;
-                    break;
-                }
-
-                isEscaped = false;
-            }
-
-            return buffer[..length];
+            if (character is EscapeCharacter or SegmentSeparator) builder.Append(EscapeCharacter);
+            builder.Append(character);
         }
     }
 
-    private struct StructureEnumerator(HierarchicalKey value)
+    private static bool TryCountSegments(ReadOnlySpan<char> path, out int count)
     {
-        private readonly HierarchicalKey? _current = value;
-        private int _remaining = -2;
-
-        public ReadOnlySpan<char> Current => _remaining switch
+        count = 0;
+        var segmentLength = 0;
+        for (var i = 0; i < path.Length; i++)
         {
-            -2 => throw new InvalidOperationException($"'{nameof(MoveNext)}' must be called before accessing '{nameof(Current)}'."),
-            -1 => throw new InvalidOperationException("No remaining elements."),
-            int depth => GetElement(_current, depth),
-        };
-
-        private static int GetElementCount(HierarchicalKey? current)
-        {
-            var elements = 0;
-            while (current is not null)
+            if (path[i] == EscapeCharacter)
             {
-                ++elements;
-                current = current._parent;
+                if (++i == path.Length || path[i] is not (EscapeCharacter or SegmentSeparator)) return false;
             }
-
-            // If there is more than one segment, insert a separator segment between each.
-            if (elements > 1)
+            else if (path[i] == SegmentSeparator)
             {
-                elements += elements - 1;
+                if (segmentLength == 0) return false;
+                count++;
+                segmentLength = 0;
+                continue;
             }
-
-            return elements;
+            segmentLength++;
         }
+        if (segmentLength == 0) return false;
+        count++;
+        return true;
+    }
 
-        private static ReadOnlySpan<char> GetElement(HierarchicalKey? current, int depth)
-        {
-            // Add a separator between each segment
-            if (depth % 2 == 1) return SegmentSeparatorSpan;
-            depth /= 2;
-            while (depth-- > 0)
-            {
-                current = current!._parent;
-            }
+    private sealed class KeyData(string canonical, int segmentCount)
+    {
+        public string Canonical { get; } = canonical;
+        public int Hash { get; } = canonical.GetHashCode(StringComparison.Ordinal);
+        public int SegmentCount { get; } = segmentCount;
+    }
 
-            return current!._value.Span;
-        }
+    /// <summary>Enumerates borrowed spans of the immutable canonical key.</summary>
+    public ref struct SegmentEnumerator
+    {
+        private readonly ReadOnlySpan<char> _path;
+        private int _next;
 
+        internal SegmentEnumerator(ReadOnlySpan<char> path) => _path = path;
+
+        /// <summary>Gets the current escaped canonical segment.</summary>
+        public ReadOnlySpan<char> Current { get; private set; }
+
+        /// <summary>Advances to the next segment.</summary>
+        /// <returns>Whether a segment is available.</returns>
         public bool MoveNext()
         {
-            // Start: calculate the number of elements
-            if (_remaining == -2)
+            if (_next >= _path.Length)
             {
-                _remaining = GetElementCount(_current);
-            }
-
-            // If there are no elements remaining
-            if (_remaining == 0)
-            {
+                Current = default;
                 return false;
             }
-
-            --_remaining;
+            var start = _next;
+            for (; _next < _path.Length; _next++)
+            {
+                if (_path[_next] == EscapeCharacter) _next++;
+                else if (_path[_next] == SegmentSeparator) break;
+            }
+            Current = _path[start.._next];
+            _next++;
             return true;
         }
     }
