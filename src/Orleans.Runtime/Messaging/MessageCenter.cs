@@ -518,6 +518,13 @@ namespace Orleans.Runtime.Messaging
                 && message.TargetSilo is { } hint
                 && !siloStatusOracle.IsDeadSilo(hint)
                     ? hint : null;
+            // Preserve gateway placement updates when the client still carries an older hint.
+            if (targetSilo is not null && _grainLocator.TryLookupInCache(message.TargetGrain, out var cached)
+                && cached.SiloAddress is { } cachedTarget && !siloStatusOracle.IsDeadSilo(cachedTarget))
+            {
+                targetSilo = cachedTarget;
+            }
+
             ResendMessageImpl(message, targetSilo);
         }
 

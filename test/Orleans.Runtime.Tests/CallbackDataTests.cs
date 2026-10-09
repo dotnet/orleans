@@ -79,10 +79,10 @@ public class CallbackDataTests
         var original = callback.Message;
         var expiry = original._timeToExpiry.GetRawTimestamp();
         var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
-        var status = new StatusResponse(false, false, []) { ForwardedTo = destination, ForwardingGeneration = 0 };
+        var status = new StatusResponse(false, false, []) { ForwardedTo = destination };
 
-        Assert.True(callback.OnStatusUpdate(status));
-        Assert.False(callback.OnStatusUpdate(status));
+        Assert.True(callback.OnStatusUpdate(status, 0));
+        Assert.False(callback.OnStatusUpdate(status, 0));
 
         Assert.Same(request, original);
         Assert.Same(original, callback.Message);
@@ -123,9 +123,9 @@ public class CallbackDataTests
         Assert.False(callback.OnStatusUpdate(new(false, false, [])
         {
             ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30002, 1),
-            ForwardingGeneration = 0,
-        }));
+        }, 1));
         Assert.Equal(initialTarget, callback.Message.TargetSilo);
+        Assert.Equal(0, callback.Message.ForwardCount);
         Assert.Equal(1, completion.CompletionCount);
         if (terminal == "response") Assert.Equal(42, completion.Response.GetResult<int>());
         else Assert.IsType(terminal switch
@@ -149,8 +149,8 @@ public class CallbackDataTests
             Assert.True(callback.OnStatusUpdate(new(false, false, [])
             {
                 ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30002 + generation, 1),
-                ForwardingGeneration = generation,
-            }));
+            }, generation));
+            Assert.Equal(generation, callback.Message.ForwardCount);
             clock.Advance(TimeSpan.FromSeconds(20));
             Assert.False(callback.IsExpired(clock.GetTimestamp()));
             Assert.Equal(expiry, callback.Message._timeToExpiry.GetRawTimestamp());
@@ -161,7 +161,7 @@ public class CallbackDataTests
         callback.OnTimeout();
         Assert.IsType<TimeoutException>(completion.Response!.Exception);
         Assert.Equal(1, completion.CompletionCount);
-        Assert.Equal(0, callback.Message.ForwardCount);
+        Assert.Equal(2, callback.Message.ForwardCount);
     }
 
     [Fact, TestCategory("BVT")]
@@ -172,20 +172,24 @@ public class CallbackDataTests
         var message = callback.Message;
         var originalTarget = message.TargetSilo;
         var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
-        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = destination, ForwardingGeneration = 2 }));
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = destination }, 2));
         Assert.Same(message, callback.Message);
         Assert.Equal(destination, message.TargetSilo);
-        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = originalTarget, ForwardingGeneration = 1 }));
+        Assert.Equal(2, message.ForwardCount);
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = originalTarget }, 1));
         Assert.Equal(destination, message.TargetSilo);
-        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = originalTarget, ForwardingGeneration = 2 }));
+        Assert.Equal(2, message.ForwardCount);
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = originalTarget }, 2));
         Assert.Equal(destination, message.TargetSilo);
-        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = originalTarget, ForwardingGeneration = 3 }));
+        Assert.Equal(2, message.ForwardCount);
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = originalTarget }, 3));
         Assert.Equal(originalTarget, message.TargetSilo);
         Assert.False(callback.IsCompleted);
-        Assert.Equal(0, message.ForwardCount);
+        Assert.Equal(3, message.ForwardCount);
         callback.OnHostShutdown();
-        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = destination, ForwardingGeneration = 4 }));
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = destination }, 4));
         Assert.Equal(originalTarget, message.TargetSilo);
+        Assert.Equal(3, message.ForwardCount);
     }
 
     [Fact, TestCategory("BVT")]
@@ -195,11 +199,15 @@ public class CallbackDataTests
         var completion = new TestResponseCompletionSource();
         var callback = CreateRouteCallback(services, completion);
         var originalTarget = callback.Message.TargetSilo;
-        Assert.True(callback.OnStatusUpdate(new(false, true, ["held below admission"])));
+        Assert.True(callback.OnStatusUpdate(new(false, true, ["held below admission"]), 255));
         Assert.Equal(originalTarget, callback.Message.TargetSilo);
+        Assert.Equal(0, callback.Message.ForwardCount);
         var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
-        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = destination, ForwardingGeneration = 0 }));
+        var route = new StatusResponse(false, false, []) { ForwardedTo = destination };
+        Assert.True(callback.OnStatusUpdate(route, 0));
+        Assert.False(callback.OnStatusUpdate(route, 0));
         Assert.Equal(destination, callback.Message.TargetSilo);
+        Assert.Equal(0, callback.Message.ForwardCount);
         callback.OnTimeout();
         Assert.Contains("held below admission", Assert.IsType<TimeoutException>(completion.Response.Exception).Message);
         Assert.Equal(1, completion.CompletionCount);
@@ -248,7 +256,7 @@ public class CallbackDataTests
         var accepted = 0;
         var callback = CreateRouteCallback(services, new());
         var target = SiloAddress.New(IPAddress.Loopback, 30002, 1);
-        var status = new StatusResponse(false, false, []) { ForwardedTo = target, ForwardingGeneration = 0 };
+        var status = new StatusResponse(false, false, []) { ForwardedTo = target };
         using var start = new Barrier(2);
         await Task.WhenAll(Task.Run(Receive, TestContext.Current.CancellationToken), Task.Run(Receive, TestContext.Current.CancellationToken));
         Assert.Equal(1, accepted);
@@ -260,7 +268,7 @@ public class CallbackDataTests
         void Receive()
         {
             Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-            if (callback.OnStatusUpdate(status)) Interlocked.Increment(ref accepted);
+            if (callback.OnStatusUpdate(status, 0)) Interlocked.Increment(ref accepted);
         }
     }
 
@@ -287,15 +295,23 @@ public class CallbackDataTests
         message.ReleaseBodyBuffer();
         Assert.Null(message.BodyObject);
         Assert.Equal(0, body.Disposals);
+        var initialRoute = new StatusResponse(false, false, [])
+        {
+            ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30002, 1),
+        };
+        Assert.True(callback.OnStatusUpdate(initialRoute, 0));
         callback.SubscribeForCancellation(cancellation.Token);
+        Assert.False(callback.OnStatusUpdate(initialRoute, 0));
+        Assert.Equal(initialRoute.ForwardedTo, message.TargetSilo);
+        Assert.Equal(0, message.ForwardCount);
         var newest = SiloAddress.New(IPAddress.Loopback, 30003, 1);
-        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = newest, ForwardingGeneration = 3 }));
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = newest }, 3));
         Assert.False(callback.OnStatusUpdate(new(false, false, [])
         {
             ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30002, 1),
-            ForwardingGeneration = 2,
-        }));
+        }, 2));
         Assert.Equal(newest, callback.Message.TargetSilo);
+        Assert.Equal(3, callback.Message.ForwardCount);
         cancellation.Cancel();
         var signal = Assert.Single(manager.Signals);
         Assert.Equal(newest, signal.Silo);
@@ -377,14 +393,14 @@ public class CallbackDataTests
         var callback = CreateRouteCallback(services, completion);
         var originalTarget = callback.Message.TargetSilo;
         var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
-        var status = new StatusResponse(false, false, []) { ForwardedTo = destination, ForwardingGeneration = 0 };
+        var status = new StatusResponse(false, false, []) { ForwardedTo = destination };
         foreach (var step in ordering.Split('-'))
         {
             switch (step)
             {
                 case "death": callback.OnTargetSiloFail(); break;
                 case "route":
-                    Assert.Equal(!callback.IsCompleted, callback.OnStatusUpdate(status));
+                    Assert.Equal(!callback.IsCompleted, callback.OnStatusUpdate(status, 1));
                     break;
                 case "response": callback.DoCallback(new Message { BodyObject = Response.FromResult(174) }); break;
             }
@@ -393,7 +409,7 @@ public class CallbackDataTests
         Assert.Equal(1, completion.CompletionCount);
         Assert.Equal(174, completion.Response.GetResult<int>());
         Assert.Equal(ordering.StartsWith("response", StringComparison.Ordinal) ? originalTarget : destination, callback.Message.TargetSilo);
-        Assert.Equal(0, callback.Message.ForwardCount);
+        Assert.Equal(ordering.StartsWith("response", StringComparison.Ordinal) ? 0 : 1, callback.Message.ForwardCount);
     }
 
     [Theory, TestCategory("BVT")]
@@ -409,14 +425,14 @@ public class CallbackDataTests
         var callback = CreateRouteCallback(services, completion);
         callback.SubscribeForCancellation(cancellation.Token);
         var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
-        var status = new StatusResponse(false, false, []) { ForwardedTo = destination, ForwardingGeneration = 0 };
+        var status = new StatusResponse(false, false, []) { ForwardedTo = destination };
         var accepted = false;
         using var barrier = new Barrier(2);
         await Task.WhenAll(
             Task.Run(() =>
             {
                 Assert.True(barrier.SignalAndWait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-                accepted = callback.OnStatusUpdate(status);
+                accepted = callback.OnStatusUpdate(status, 2);
             }, TestContext.Current.CancellationToken),
             Task.Run(() =>
             {
@@ -433,13 +449,14 @@ public class CallbackDataTests
         Assert.True(callback.IsCompleted);
         Assert.Equal(1, completion.CompletionCount);
         Assert.Equal(accepted ? destination : SiloAddress.New(IPAddress.Loopback, 30000, 1), callback.Message.TargetSilo);
+        Assert.Equal(accepted ? 2 : 0, callback.Message.ForwardCount);
         var terminalRoute = callback.Message.TargetSilo;
         Assert.False(callback.OnStatusUpdate(new(false, false, [])
         {
             ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30003, 1),
-            ForwardingGeneration = 1,
-        }));
+        }, 3));
         Assert.Equal(terminalRoute, callback.Message.TargetSilo);
+        Assert.Equal(accepted ? 2 : 0, callback.Message.ForwardCount);
         if (terminal == "response") Assert.Equal(174, completion.Response.GetResult<int>());
     }
 
@@ -463,8 +480,9 @@ public class CallbackDataTests
         var initialSignal = Assert.Single(manager.Signals);
         Assert.Equal(request.TargetSilo, initialSignal.Silo);
         var next = SiloAddress.New(IPAddress.Loopback, 30002, 1);
-        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = next, ForwardingGeneration = 0 }));
-        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = next, ForwardingGeneration = 0 }));
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = next }, 0));
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = next }, 0));
+        Assert.Equal(0, callback.Message.ForwardCount);
         Assert.Equal(2, manager.Signals.Count);
         Assert.Equal(next, manager.Signals[1].Silo);
         Assert.Equal(request.Id, manager.Signals[1].Id);
@@ -483,15 +501,17 @@ public class CallbackDataTests
         var callback = CreateRouteCallback(services, completion);
         var c = SiloAddress.New(IPAddress.Loopback, 30002, 1);
         var d = SiloAddress.New(IPAddress.Loopback, 30003, 1);
-        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = d, ForwardingGeneration = 2 }));
-        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = c, ForwardingGeneration = 1 }));
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = d }, 2));
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = c }, 1));
         Assert.Equal(d, callback.Message.TargetSilo);
+        Assert.Equal(2, callback.Message.ForwardCount);
         Assert.False(callback.IsCompleted);
         callback.OnTargetSiloFail();
         Assert.False(callback.IsCompleted);
         callback.DoCallback(new Message { BodyObject = Response.FromResult(174) });
-        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = c, ForwardingGeneration = 3 }));
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = c }, 3));
         Assert.Equal(d, callback.Message.TargetSilo);
+        Assert.Equal(2, callback.Message.ForwardCount);
         Assert.Equal(174, completion.Response.GetResult<int>());
         Assert.Equal(1, completion.CompletionCount);
     }

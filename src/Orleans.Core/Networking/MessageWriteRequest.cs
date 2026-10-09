@@ -22,7 +22,6 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     private MessageSerializer? _messageSerializer;
     private bool _hasLargeMessages;
     private bool _disposed;
-    private bool _writeSucceeded;
 
     public MessageWriteRequest(MessageHandlerShared shared)
     {
@@ -78,7 +77,6 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
     public override void SetResult()
     {
-        _writeSucceeded = true;
         try
         {
             var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
@@ -94,7 +92,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
                 message.ReleaseBodyBuffer();
             }
 
-            Reset();
+            Reset(succeeded: true);
         }
     }
 
@@ -127,7 +125,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         Reset();
     }
 
-    public void Reset()
+    public void Reset(bool succeeded = false)
     {
         var nextPageSize = _messages.Count == 1
             && _messages[0].TotalLength is >= LargeMessageSize and < SendPageSize
@@ -136,10 +134,9 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         CompleteWriting();
         foreach (var (message, _, _) in _messages)
         {
-            _connection?.CompleteApplicationWrite(message, _writeSucceeded);
+            _connection?.CompleteApplicationWrite(message, succeeded);
         }
 
-        _writeSucceeded = false;
         _messages.Clear();
         _hasLargeMessages = false;
         _buffer.Reset(nextPageSize);

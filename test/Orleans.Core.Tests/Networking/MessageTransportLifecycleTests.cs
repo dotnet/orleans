@@ -66,6 +66,7 @@ public class MessageTransportLifecycleTests
         var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
         var expiry = request._timeToExpiry.GetRawTimestamp();
         var response = shared.MessageFactory.CreateForwardingResponse(request, destination);
+        Assert.Equal(4, response.ForwardCount);
         Assert.Equal(expiry, response._timeToExpiry.GetRawTimestamp());
         Assert.Null(response.RequestContextData);
         var remaining = response.TimeToLive;
@@ -79,7 +80,7 @@ public class MessageTransportLifecycleTests
         var status = Assert.IsType<StatusResponse>(decoded.BodyObject);
         Assert.True(status.IsRouteUpdate);
         Assert.Equal(destination, status.ForwardedTo);
-        Assert.Equal(4, status.ForwardingGeneration);
+        Assert.Equal(4, decoded.ForwardCount);
         Assert.False(status.IsExecuting);
         Assert.False(status.IsWaiting);
         Assert.Equal(request.Id, decoded.Id);
@@ -138,28 +139,85 @@ public class MessageTransportLifecycleTests
     [InlineData(255)]
     public void ForwardingStatus_IsAdditiveAndLegacyPeersMayDropAdvisoryRoute(int generation)
     {
+        var fieldIds = typeof(StatusResponse).GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .SelectMany(member => member.GetCustomAttributesData()
+                .Where(attribute => attribute.AttributeType == typeof(IdAttribute))
+                .Select(attribute => Convert.ToUInt32(attribute.ConstructorArguments[0].Value)))
+            .OrderBy(id => id);
+        Assert.Equal(new uint[] { 0, 1, 2 }, fieldIds);
         using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        using var messageSerializer = services.GetRequiredService<MessageSerializer>();
         var current = services.GetRequiredService<Serializer<StatusResponse>>();
         var legacy = services.GetRequiredService<Serializer<LegacyStatusResponse>>();
         var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
         var status = new StatusResponse(false, true, ["waiting diagnostic"])
         {
             ForwardedTo = destination,
-            ForwardingGeneration = generation,
         };
         var decodedLegacy = legacy.Deserialize(current.SerializeToArray(status))!;
         Assert.Equal(2u, decodedLegacy.Flags);
         Assert.Equal(new[] { "waiting diagnostic" }, decodedLegacy.Diagnostics);
         var decodedModern = current.Deserialize(current.SerializeToArray(status))!;
         Assert.Equal(destination, decodedModern.ForwardedTo);
-        Assert.Equal(generation, decodedModern.ForwardingGeneration);
         Assert.True(decodedModern.IsRouteUpdate);
+        Assert.True(decodedModern.IsWaiting);
+        Assert.False(decodedModern.IsExecuting);
+        Assert.Equal(new[] { "waiting diagnostic" }, decodedModern.Diagnostics);
         var legacyRelay = current.Deserialize(legacy.SerializeToArray(decodedLegacy))!;
         Assert.Null(legacyRelay.ForwardedTo);
         Assert.False(legacyRelay.IsRouteUpdate);
         Assert.True(legacyRelay.IsWaiting);
         Assert.False(legacyRelay.IsExecuting);
         Assert.Equal(new[] { "waiting diagnostic" }, legacyRelay.Diagnostics);
+
+        // A released peer can relay only the original status body fields. Generation
+        // stays in the existing packed header, not an additional serialized body field.
+        using var response = new Message
+        {
+            Direction = Message.Directions.Response,
+            Result = Message.ResponseTypes.Status,
+            Id = new CorrelationId(123),
+            SendingGrain = GrainId.Create("test", "retired"),
+            TargetGrain = GrainId.Create("test", "caller"),
+            ForwardCount = generation,
+            BodyObject = decodedModern,
+        };
+        using (var decoded = RoundTrip(response))
+        {
+            Assert.Equal(destination, Assert.IsType<StatusResponse>(decoded.BodyObject).ForwardedTo);
+        }
+
+        response.BodyObject = legacyRelay;
+        using (var decoded = RoundTrip(response))
+        {
+            var relayedStatus = Assert.IsType<StatusResponse>(decoded.BodyObject);
+            Assert.False(relayedStatus.IsRouteUpdate);
+            Assert.Null(relayedStatus.ForwardedTo);
+            Assert.True(relayedStatus.IsWaiting);
+            Assert.Equal(new[] { "waiting diagnostic" }, relayedStatus.Diagnostics);
+        }
+
+        Message RoundTrip(Message original)
+        {
+            using var buffer = new ArcBufferWriter();
+            var (headerLength, bodyLength) = messageSerializer.Write(buffer, original);
+            var read = new MessageReadRequest(shared)
+            {
+                Headers = buffer.ConsumeSlice(headerLength),
+                Body = buffer.ConsumeSlice(bodyLength),
+            };
+            messageSerializer.ReadHeaders(read, out var decoded);
+            messageSerializer.ReadBodyObject(decoded, read);
+            read.Reset();
+            Assert.Equal(generation, decoded.ForwardCount);
+            Assert.Equal(original.Id, decoded.Id);
+            Assert.Equal(original.SendingGrain, decoded.SendingGrain);
+            Assert.Equal(original.TargetGrain, decoded.TargetGrain);
+            Assert.Equal(Message.Directions.Response, decoded.Direction);
+            Assert.Equal(Message.ResponseTypes.Status, decoded.Result);
+            return decoded;
+        }
     }
 
     [Fact]
@@ -396,6 +454,8 @@ public class MessageTransportLifecycleTests
             shared.MessagingTrace);
         var request = new Message { TimeToLive = TimeSpan.FromMinutes(1) };
         var response = factory.CreateResponseMessage(request);
+        Assert.Equal(request._timeToExpiry.GetRawTimestamp(), response._timeToExpiry.GetRawTimestamp());
+        var remaining = response.TimeToLive;
         using var buffer = new ArcBufferWriter();
         var (headerLength, _) = serializer.Write(buffer, response);
         var readRequest = new MessageReadRequest(shared);
@@ -405,6 +465,8 @@ public class MessageTransportLifecycleTests
         serializer.ReadHeaders(readRequest, out var deserialized);
 
         Assert.NotNull(deserialized.TimeToLive);
+        Assert.True(deserialized.TimeToLive > TimeSpan.Zero);
+        Assert.True(deserialized.TimeToLive <= remaining);
         readRequest.Reset();
     }
 
@@ -926,6 +988,55 @@ public class MessageTransportLifecycleTests
             var read = shared.GetReceiveMessageHandler();
             read.SetConnection(connection);
             Assert.True(read.OnRead(new ArcBufferReader(frame)));
+        }
+    }
+
+    [Fact]
+    public async Task MessageReadRequest_UnownedDecodedHeadersDropOnlyOrdinaryRequests()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        using var serializer = services.GetRequiredService<MessageSerializer>();
+        await using var transport = new TrackingTransport();
+        var connection = new RecordingReceiveConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        await connection.DrainIncomingApplicationDispatchAsync();
+
+        foreach (var direction in new[] { Message.Directions.Request, Message.Directions.OneWay, Message.Directions.Response })
+        foreach (var systemMessage in new[] { false, true })
+        {
+            using var message = new Message
+            {
+                Direction = direction,
+                IsSystemMessage = systemMessage,
+                Id = new CorrelationId(123),
+                TargetGrain = GrainId.Create("test", "target"),
+                SendingGrain = GrainId.Create("test", "caller"),
+            };
+            using var buffer = new ArcBufferWriter();
+            var (headerLength, bodyLength) = serializer.Write(buffer, message);
+            Assert.Equal(0, bodyLength);
+            var read = shared.GetReceiveMessageHandler();
+            read.SetConnection(connection);
+            read.Headers = buffer.ConsumeSlice(headerLength);
+            var receivedBefore = connection.DispatchCount;
+            var recordedBefore = connection.RecordCount;
+
+            // Exercise the decoded-header branch synchronously, without pretending
+            // to own an ingress lease. Actual OnRead accounting is covered separately.
+            ((IThreadPoolWorkItem)read).Execute();
+
+            Assert.Equal(recordedBefore + 1, connection.RecordCount);
+            Assert.Equal(message.Id, connection.RecordedId);
+            Assert.Equal(direction, connection.RecordedDirection);
+            Assert.Equal(systemMessage, connection.RecordedSystemMessage);
+            var dispatched = systemMessage || direction == Message.Directions.Response;
+            Assert.Equal(receivedBefore + (dispatched ? 1 : 0), connection.DispatchCount);
+            if (dispatched) Assert.Equal(message.Id, connection.ReceivedId);
+            var reused = shared.GetReceiveMessageHandler();
+            Assert.Same(read, reused);
+            Assert.Equal(0, reused.Headers.Length);
+            Assert.Equal(0, reused.Body.Length);
+            reused.Reset();
         }
     }
 
@@ -1620,6 +1731,38 @@ public class MessageTransportLifecycleTests
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
         protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
         public void Dispose() => _release.Dispose();
+    }
+
+    private sealed class RecordingReceiveConnection(
+        MessageTransport transport,
+        ConnectionCommon shared,
+        IMessageCenter messageCenter) : Connection(transport, shared)
+    {
+        public int DispatchCount { get; private set; }
+        public int RecordCount { get; private set; }
+        public CorrelationId RecordedId { get; private set; }
+        public CorrelationId ReceivedId { get; private set; }
+        public Message.Directions RecordedDirection { get; private set; }
+        public bool RecordedSystemMessage { get; private set; }
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+        protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
+        protected override IMessageCenter MessageCenter => messageCenter;
+        protected override bool PrepareMessageForSend(Message message) => true;
+        protected override void RetryMessage(Message message, Exception? exception = null) => message.Dispose();
+        protected internal override void OnReceivedMessage(Message message)
+        {
+            DispatchCount++;
+            ReceivedId = message.Id;
+            message.Dispose();
+        }
+        protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes)
+        {
+            RecordCount++;
+            RecordedId = message.Id;
+            RecordedDirection = message.Direction;
+            RecordedSystemMessage = message.IsSystemMessage;
+        }
+        protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
     }
 
     private sealed class BlockingRerouteConnection(

@@ -341,7 +341,7 @@ namespace Orleans.Runtime
 
                     var activation = kv.Value;
                     activation.Deactivate(reason, cancellationToken);
-                    return new(AwaitRetirement(activation));
+                    return activation is ActivationData ? ValueTask.CompletedTask : new(AwaitRetirement(activation));
                 }).WaitAsync(cancellationToken);
             }
             finally
@@ -355,21 +355,10 @@ namespace Orleans.Runtime
 
             static async Task AwaitRetirement(IGrainContext activation)
             {
-                if (activation is ActivationData data)
+                await activation.Deactivated;
+                if (activation is StatelessWorkerGrainContext workers)
                 {
-                    var result = await data.RetirementDrained;
-                    if (result != RetirementDrainResult.Succeeded)
-                    {
-                        throw new InvalidOperationException($"Activation retirement drain for {data.Address} completed with {result}.");
-                    }
-                }
-                else
-                {
-                    await activation.Deactivated;
-                    if (activation is StatelessWorkerGrainContext workers)
-                    {
-                        await workers.DrainRequestsAsync();
-                    }
+                    await workers.DrainRequestsAsync();
                 }
             }
         }

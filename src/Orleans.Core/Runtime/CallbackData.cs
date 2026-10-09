@@ -11,6 +11,8 @@ namespace Orleans.Runtime
         private const int StateCompleted = 1;
         private const int StateCancellationRegistrationPending = 2;
         private const int StateCancellationRegistrationPublished = 4;
+        private const int StateRouteUpdateReceived = 8;
+        private const int StateCancellationRequested = 16;
 
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
@@ -19,12 +21,9 @@ namespace Orleans.Runtime
         private int _state;
         private StatusResponse? lastKnownStatus;
         private CancellationTokenRegistration _cancellationTokenRegistration;
-        private readonly object _transitionLock = new();
         private readonly TimeSpan _responseTimeout;
         private readonly long _responseTimeoutTicks;
         private readonly bool _isCancellable;
-        private int _forwardingGeneration = -1;
-        private bool _cancellationRequested;
 
         public CallbackData(
             SharedCallbackData shared,
@@ -54,12 +53,14 @@ namespace Orleans.Runtime
                 return;
             }
 
-            if (Interlocked.CompareExchange(
-                ref _state,
-                StateCancellationRegistrationPending,
-                StateNone) != StateNone)
+            lock (Message)
             {
-                return;
+                if ((_state & (StateCompleted | StateCancellationRegistrationPending | StateCancellationRegistrationPublished)) != StateNone)
+                {
+                    return;
+                }
+
+                Interlocked.Or(ref _state, StateCancellationRegistrationPending);
             }
 
             var registration = cancellationToken.UnsafeRegister(static (arg, token) =>
@@ -69,13 +70,16 @@ namespace Orleans.Runtime
             }, this);
 
             _cancellationTokenRegistration = registration;
-            if (Interlocked.CompareExchange(
-                ref _state,
-                StateCancellationRegistrationPublished,
-                StateCancellationRegistrationPending) != StateCancellationRegistrationPending)
+            lock (Message)
             {
-                registration.Dispose();
+                if (!IsCompleted)
+                {
+                    Interlocked.Exchange(ref _state, (_state & ~StateCancellationRegistrationPending) | StateCancellationRegistrationPublished);
+                    return;
+                }
             }
+
+            registration.Dispose();
         }
 
         private void SignalCancellation()
@@ -89,9 +93,9 @@ namespace Orleans.Runtime
             }
         }
 
-        public bool OnStatusUpdate(StatusResponse status)
+        public bool OnStatusUpdate(StatusResponse status, int forwardingGeneration)
         {
-            lock (_transitionLock)
+            lock (Message)
             {
                 if (IsCompleted)
                 {
@@ -100,16 +104,15 @@ namespace Orleans.Runtime
 
                 if (status.IsRouteUpdate)
                 {
-                    if (status.ForwardingGeneration <= _forwardingGeneration)
+                    if ((_state & StateRouteUpdateReceived) != 0 && forwardingGeneration <= Message.ForwardCount)
                     {
-                        _applicationRequestInstruments.OnHandoff("stale-route");
                         return false;
                     }
 
-                    _forwardingGeneration = status.ForwardingGeneration;
+                    Message.ForwardCount = forwardingGeneration;
                     Message.TargetSilo = status.ForwardedTo;
-                    _applicationRequestInstruments.OnHandoff("route");
-                    if (_cancellationRequested)
+                    Interlocked.Or(ref _state, StateRouteUpdateReceived);
+                    if ((_state & StateCancellationRequested) != 0)
                     {
                         SignalCancellation();
                     }
@@ -139,9 +142,9 @@ namespace Orleans.Runtime
 
         private void OnCancellation(CancellationToken cancellationToken)
         {
-            lock (_transitionLock)
+            lock (Message)
             {
-                _cancellationRequested = true;
+                Interlocked.Or(ref _state, StateCancellationRequested);
             }
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
@@ -200,11 +203,6 @@ namespace Orleans.Runtime
         {
             if (Message.IsRelocatableRequest)
             {
-                if (!IsCompleted)
-                {
-                    _applicationRequestInstruments.OnHandoff("preserved");
-                }
-
                 return;
             }
 
@@ -261,7 +259,7 @@ namespace Orleans.Runtime
 
         private bool TryComplete()
         {
-            lock (_transitionLock)
+            lock (Message)
             {
                 return (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
             }

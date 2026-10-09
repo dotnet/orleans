@@ -23,7 +23,6 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
     internal ArcBuffer _headers;
     private ArcBuffer _body;
     private bool _ownsIncomingDispatch;
-    private bool _incomingDispatchRejected;
 
     public int PayloadLength => _headerLength + _bodyLength;
 
@@ -47,7 +46,6 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
             _connection!.CompleteIncomingApplicationDispatch();
         }
 
-        _incomingDispatchRejected = false;
         _headerLength = default;
         _bodyLength = default;
         _originalResponseType = default;
@@ -126,7 +124,6 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
             && packedHeaders.Direction is Message.Directions.Request or Message.Directions.OneWay)
         {
             _ownsIncomingDispatch = _connection.TryAdmitIncomingApplicationDispatch();
-            _incomingDispatchRejected = !_ownsIncomingDispatch;
         }
 
         ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
@@ -142,7 +139,6 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         Message? message = null;
         var connection = _connection ?? throw new InvalidOperationException("Cannot process a message before a connection is set.");
         var ownsIncomingDispatch = _ownsIncomingDispatch;
-        var incomingDispatchRejected = _incomingDispatchRejected;
         _ownsIncomingDispatch = false;
         var shouldReset = true;
         MessageSerializer? messageSerializer = null;
@@ -161,7 +157,8 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
                 message.SetMessageReadRequest(this);
                 shouldReset = false;
             }
-            if (incomingDispatchRejected)
+            if (!ownsIncomingDispatch && !message.IsSystemMessage
+                && message.Direction is Message.Directions.Request or Message.Directions.OneWay)
             {
                 Shared.MessagingTrace.OnDropBlockedApplicationMessage(message);
                 message.Dispose();

@@ -81,9 +81,6 @@ namespace Orleans.Runtime
 
             var localEndpoint = this.siloDetails.SiloAddress.Endpoint;
 
-            //set PropagateActivityId flag from node config
-            IOptions<SiloMessagingOptions> messagingOptions = services.GetRequiredService<IOptions<SiloMessagingOptions>>();
-
             this.loggerFactory = this.Services.GetRequiredService<ILoggerFactory>();
             logger = this.loggerFactory.CreateLogger<Silo>();
 

@@ -327,7 +327,6 @@ namespace Orleans.Runtime
                                 }
 
                                 invokable.Dispose();
-                                message.BodyObject = null;
                                 break;
                             }
                         default:
@@ -493,7 +492,7 @@ namespace Orleans.Runtime
             var request = callback?.Message;
             if (request is not null)
             {
-                callback!.OnStatusUpdate(status);
+                callback!.OnStatusUpdate(status, message.ForwardCount);
                 if (status.Diagnostics is { Count: > 0 })
                 {
                     LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);

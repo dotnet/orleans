@@ -390,7 +390,7 @@ namespace Orleans
                     lock (_grainLocations)
                     {
                         var previousTarget = request.TargetSilo;
-                        if (callback!.OnStatusUpdate(status) && request.IsRelocatableRequest
+                        if (callback!.OnStatusUpdate(status, response.ForwardCount) && request.IsRelocatableRequest
                             && status.ForwardedTo is { } forwardedTo
                             && (!_grainLocations.TryGet(request.TargetGrain, out var cached) || cached.Equals(previousTarget)))
                         {

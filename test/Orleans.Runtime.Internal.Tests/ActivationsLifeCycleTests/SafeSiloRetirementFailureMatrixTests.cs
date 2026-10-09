@@ -312,7 +312,7 @@ public sealed partial class SafeSiloRetirementTests
                 r.Observer.Equals(fixture.C.SiloAddress) && r.Request.Id == interleaved.Id);
         }
 
-        Assert.Equal(RetirementDrainResult.Succeeded, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
         fixture.BreakOutstandingToA();
         Assert.False(queuedTask.IsCompleted);
@@ -351,7 +351,8 @@ public sealed partial class SafeSiloRetirementTests
         var received = await MatrixReceivedAsync(control, fixture.A.SiloAddress, "host-budget");
         Assert.Equal(sent.Id, received.Id);
         Assert.Equal(1, activation.WaitingCount);
-        Assert.False(activation.RetirementDrained.IsCompleted);
+        Assert.False(activation.Deactivated.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
         Assert.Empty(control.Executions);
         Assert.Empty(control.Admissions);
         if (holdDirectory)
@@ -365,7 +366,7 @@ public sealed partial class SafeSiloRetirementTests
         budget.Cancel();
         await AwaitHostStoppedAsync(fixture.Retirement!, fixture.A, budget.Token);
         Assert.True(control.MatrixHookToken.IsCancellationRequested);
-        Assert.Equal(RetirementDrainResult.Canceled, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await fixture.AssertCatalogRetirementFailedAsync();
         Assert.Equal(activation.Address, control.Directory.Registration);
         Assert.Empty(control.RouteUpdates);
         Assert.False(control.ReplacementActivationEntered.Task.IsCompleted);
@@ -377,6 +378,84 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Equal(0, fixture.RunningTargetRequests);
         Assert.DoesNotContain(control.MatrixRequests, r =>
             r.Observer.Equals(fixture.C.SiloAddress) && r.Request.Id == sent.Id);
+    }
+
+    [Fact]
+    public async Task FailureMatrix_DisposalCaptureAndRemovedActivationHoldCatalogRetirement()
+    {
+        var options = new FailureMatrixOptions();
+        await using var fixture = await Fixture.CreateAsync(failureMatrix: options);
+        var control = fixture.Control;
+        control.HoldDisposal = true;
+        fixture.StartRetirement();
+        var activation = await control.DeactivationEntered.Task.WaitAsync(Timeout, TestCancellation);
+        var queuedTask = fixture.InvokeMatrixAsync(Argument, "queued-through-disposal", TestCancellation);
+        var queued = await MatrixSentAsync(control, "queued-through-disposal");
+        await MatrixReceivedAsync(control, fixture.A.SiloAddress, "queued-through-disposal");
+        Assert.Equal(1, activation.WaitingCount);
+
+        control.ReleaseDeactivation.TrySetResult();
+        await control.UnregisterEntered.Task.WaitAsync(Timeout, TestCancellation);
+        control.ReleaseUnregister.TrySetResult();
+        await control.DisposalEntered.Task.WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(ActivationState.Invalid, activation.State);
+        Assert.Null(fixture.A.ServiceProvider.GetRequiredService<ActivationDirectory>().FindTarget(control.GrainId));
+        Assert.Equal(1, activation.WaitingCount);
+        Assert.False(activation.Deactivated.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
+
+        // The retired activation still owns its old queue while disposal is held.
+        // A new catalog arrival uses the ordinary invalid-activation path instead.
+        var lateTask = fixture.InvokeMatrixAsync(273, "late-through-disposal", TestCancellation);
+        var late = await MatrixSentAsync(control, "late-through-disposal");
+        Assert.Equal(fixture.A.SiloAddress, late.TargetSilo);
+        ReceivedRequest forwardedLate;
+        try
+        {
+            forwardedLate = await MatrixReceivedAsync(control, fixture.C.SiloAddress, "late-through-disposal");
+        }
+        catch (TimeoutException error)
+        {
+            throw new TimeoutException(
+                $"Late request did not reach C during disposal: late={lateTask.Status}, queued={queuedTask.Status}, "
+                + $"activation={activation.State}, waiting={activation.WaitingCount}, registration={control.Directory.Registration}, "
+                + $"routes=[{string.Join(", ", control.RouteUpdates)}], "
+                + $"requests=[{string.Join(", ", control.MatrixRequests.Select(request => $"{request.Observer}:{request.Request.TargetSilo}/{request.Request.ForwardCount}/{request.Request.Operation}"))}].",
+                error);
+        }
+        Assert.Equal(1, activation.WaitingCount);
+        Assert.Equal(late.Id, Assert.Single(control.RouteUpdates).Id);
+        Assert.Equal(fixture.A.SiloAddress, Assert.Single(control.RouteUpdates).SendingSilo);
+        Assert.Empty(control.Executions);
+        Assert.Empty(control.Admissions);
+        Assert.False(fixture.Retirement!.IsCompleted);
+
+        control.ReleaseDisposal.TrySetResult();
+        await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(0, activation.WaitingCount);
+        Assert.False(queuedTask.IsCompleted);
+        Assert.False(lateTask.IsCompleted);
+        var forwardedQueued = await MatrixReceivedAsync(control, fixture.C.SiloAddress, "queued-through-disposal");
+        foreach (var (original, forwarded) in new[] { (queued, forwardedQueued), (late, forwardedLate) })
+        {
+            Assert.Equal(original.Id, forwarded.Id);
+            Assert.Equal(original.SendingGrain, forwarded.SendingGrain);
+            Assert.Equal(original.TargetGrain, forwarded.TargetGrain);
+            Assert.Equal(original.Operation, forwarded.Operation);
+            Assert.Equal(fixture.C.SiloAddress, forwarded.TargetSilo);
+            Assert.Equal(1, forwarded.ForwardCount);
+        }
+        await fixture.Retirement.WaitAsync(Timeout, TestCancellation);
+        fixture.BreakOutstandingToA();
+        control.ReleaseReplacementActivation.TrySetResult();
+        Assert.Equal(Result, await queuedTask.WaitAsync(Timeout, TestCancellation));
+        Assert.Equal(274, await lateTask.WaitAsync(Timeout, TestCancellation));
+        Assert.Equal(2, control.Executions.Count);
+        Assert.All(control.Executions, execution => Assert.Equal(fixture.C.SiloAddress, execution.Silo));
+        Assert.Equal(0, fixture.RunningTargetRequests);
+        AssertNoCallerReplay(control, "queued-through-disposal", queued.Id, maxForwardCount: 1);
+        AssertNoCallerReplay(control, "late-through-disposal", late.Id, maxForwardCount: 1);
     }
 
     [Fact]
@@ -397,7 +476,8 @@ public sealed partial class SafeSiloRetirementTests
         control.ReleaseUnregister.TrySetResult();
         await control.DisposalEntered.Task.WaitAsync(Timeout, TestCancellation);
         Assert.Null(control.Directory.Registration);
-        Assert.False(activation.RetirementDrained.IsCompleted);
+        Assert.False(activation.Deactivated.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
         Assert.Empty(control.Executions);
         Assert.Empty(control.Admissions);
 
@@ -405,11 +485,12 @@ public sealed partial class SafeSiloRetirementTests
         // host budget now is a separate event which must not be lost in an earlier snapshot.
         budget.Cancel();
         Assert.True(budget.IsCancellationRequested);
-        Assert.False(activation.RetirementDrained.IsCompleted);
+        Assert.False(activation.Deactivated.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
         control.ReleaseDisposal.TrySetResult();
-        var result = await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation);
+        await fixture.AssertCatalogRetirementFailedAsync();
         await AwaitHostStoppedAsync(fixture.Retirement!, fixture.A, budget.Token);
-        Assert.Equal(RetirementDrainResult.Canceled, result);
+        Assert.True(activation.Deactivated.IsCompletedSuccessfully);
         Assert.Empty(control.Executions);
         Assert.Empty(control.Admissions);
         Assert.NotEqual(default, original.Id);
@@ -439,13 +520,15 @@ public sealed partial class SafeSiloRetirementTests
         activation.Deactivate(new(DeactivationReasonCode.ShuttingDown, "Failure matrix stuck retirement."), TestCancellation);
         Assert.Equal(ActivationState.Deactivating, activation.State);
         Assert.False(control.DeactivationEntered.Task.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
 
         var maxProcessing = fixture.A.ServiceProvider.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.MaxRequestProcessingTime;
         options.ActivationClock.Advance(maxProcessing + TimeSpan.FromSeconds(1));
         var waitingTask = fixture.InvokeMatrixAsync(Argument, "stuck-waiting", TestCancellation);
         var waiting = await MatrixSentAsync(control, "stuck-waiting");
         Assert.NotEqual(running.Id, waiting.Id);
-        Assert.Equal(RetirementDrainResult.Incomplete, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await fixture.AssertCatalogRetirementFailedAsync();
+        Assert.True(activation.Deactivated.IsCompletedSuccessfully);
         Assert.Equal(ActivationState.Deactivating, activation.State);
         Assert.True(activation.IsCurrentlyExecuting);
         Assert.False(control.DeactivationEntered.Task.IsCompleted);
@@ -510,7 +593,7 @@ public sealed partial class SafeSiloRetirementTests
         await control.UnregisterEntered.Task.WaitAsync(Timeout, TestCancellation);
         control.ReleaseUnregister.TrySetResult();
         Assert.Equal(control.GrainId, await control.MatrixEmptyLookupEntered.Task.WaitAsync(Timeout, TestCancellation));
-        Assert.Equal(RetirementDrainResult.Succeeded, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         Assert.Empty(control.RouteUpdates); // No advisory notice before placement has selected a target.
         Assert.False(originalTask.IsCompleted);
         Assert.Equal(1, fixture.RunningTargetRequests);
@@ -584,11 +667,12 @@ public sealed partial class SafeSiloRetirementTests
             await control.UnregisterEntered.Task.WaitAsync(Timeout, TestCancellation);
         }
 
-        Assert.False(activation.RetirementDrained.IsCompleted);
+        Assert.False(activation.Deactivated.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
         await fixture.CrashSiloAsync(fixture.A).WaitAsync(Timeout, TestCancellation);
         Assert.False(fixture.A.IsActive);
         Assert.True(owner.IsCancellationRequested);
-        Assert.Equal(RetirementDrainResult.Canceled, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await fixture.AssertCatalogRetirementFailedAsync();
         Assert.Equal(activation.Address, control.Directory.Registration);
         Assert.Empty(control.RouteUpdates);
         Assert.Empty(control.Executions);
@@ -619,7 +703,7 @@ public sealed partial class SafeSiloRetirementTests
         control.ReleaseUnregister.TrySetResult();
         var replacement = await control.ReplacementActivationEntered.Task.WaitAsync(Timeout, TestCancellation);
         var accepted = await MatrixReceivedAsync(control, fixture.C.SiloAddress, "owner-crash-after-proof");
-        Assert.Equal(RetirementDrainResult.Succeeded, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(original.Id, Assert.Single(control.RouteUpdates).Id);
         Assert.Equal(original.Id, accepted.Id);
         Assert.Equal(1, accepted.ForwardCount);
@@ -734,7 +818,7 @@ public sealed partial class SafeSiloRetirementTests
         await control.UnregisterEntered.Task.WaitAsync(Timeout, TestCancellation);
         control.ReleaseUnregister.TrySetResult();
         await control.MatrixEmptyLookupEntered.Task.WaitAsync(Timeout, TestCancellation);
-        Assert.Equal(RetirementDrainResult.Succeeded, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         Assert.False(control.ReplacementActivationEntered.Task.IsCompleted);
         if (partition)
         {
@@ -799,7 +883,7 @@ public sealed partial class SafeSiloRetirementTests
         {
             budget.Cancel();
             await AwaitHostStoppedAsync(fixture.Retirement!, fixture.A, budget.Token);
-            Assert.Equal(RetirementDrainResult.Canceled, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+            await fixture.AssertCatalogRetirementFailedAsync();
             Assert.False(control.ReplacementActivationEntered.Task.IsCompleted);
             Assert.Empty(control.Executions);
             Assert.Empty(control.Admissions);
@@ -814,7 +898,7 @@ public sealed partial class SafeSiloRetirementTests
             Assert.Equal(original.Id, onC.Id);
             Assert.Equal(Message.Directions.OneWay, onC.Direction);
             Assert.Equal(1, onC.ForwardCount);
-            Assert.Equal(RetirementDrainResult.Succeeded, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+            await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
             await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
             fixture.BreakOutstandingToA();
             Assert.Equal(0, fixture.RunningTargetRequests);
@@ -876,7 +960,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Equal(fixture.C.SiloAddress, destination.Address.SiloAddress);
         Assert.Single(control.Executions);
 
-        Assert.Equal(RetirementDrainResult.Succeeded, await worker.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         await parent.Deactivated.WaitAsync(Timeout, TestCancellation);
         await parent.DrainRequestsAsync().WaitAsync(Timeout, TestCancellation);
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
@@ -944,7 +1028,7 @@ public sealed partial class SafeSiloRetirementTests
         control.ReleaseDeactivation.TrySetResult();
         await control.UnregisterEntered.Task.WaitAsync(Timeout, TestCancellation);
         control.ReleaseUnregister.TrySetResult();
-        Assert.Equal(RetirementDrainResult.Succeeded, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         return (invocation, original);
     }
 

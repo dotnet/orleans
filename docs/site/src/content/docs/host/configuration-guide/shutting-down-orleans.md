@@ -48,7 +48,7 @@ If the external grace period expires first, the process is killed and graceful s
 - Make recovery safe after abrupt termination, because crashes and node loss remain possible.
 - Avoid synchronous blocking and unbounded retries in shutdown callbacks.
 
-Grains can move or reactivate elsewhere after a silo leaves. Orleans waits for activation retirement disposition as a separate internal boundary from application deactivation completion. The retiring receiver forwards waiting requests after registration retirement, preserving their original identities and deadlines. Already-running invocations finish through their established execution and cancellation paths.
+Grains can move or reactivate elsewhere after a silo leaves. The catalog waits for admitted deactivation work, including disposition of waiting-request queues, before draining transport work. The retiring receiver forwards waiting requests after registration retirement, preserving their original identities and deadlines. Already-running invocations finish through their established execution and cancellation paths.
 
 Retirement failure accounting starts before activation deactivation, so application send failures during that phase contribute to the drain outcome. Application replies to system-target callers participate in draining according to their application origin. System-target protocol traffic remains eligible after application admission closes.
 

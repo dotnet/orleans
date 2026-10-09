@@ -27,11 +27,8 @@ namespace Orleans.Runtime
         [Id(2)]
         public SiloAddress? ForwardedTo { get; init; }
 
-        [Id(3)]
-        public int ForwardingGeneration { get; init; }
-
         public bool IsRouteUpdate => ForwardedTo is not null;
 
-        public override string ToString() => $"IsExecuting: {IsExecuting}, IsWaiting: {IsWaiting}, ForwardedTo: {ForwardedTo}, ForwardingGeneration: {ForwardingGeneration}, Diagnostics: [{string.Join(", ", this.Diagnostics)}]";
+        public override string ToString() => $"IsExecuting: {IsExecuting}, IsWaiting: {IsWaiting}, ForwardedTo: {ForwardedTo}, Diagnostics: [{string.Join(", ", this.Diagnostics)}]";
     }
 }

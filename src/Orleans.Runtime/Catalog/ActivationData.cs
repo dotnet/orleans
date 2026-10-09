@@ -71,11 +71,8 @@ internal sealed partial class ActivationData :
 #pragma warning restore IDE0052 // Remove unread private members
 
     private Activity? _activationActivity;
-    private bool _retirementAdmissionClosed;
     private bool _registrationRetired;
     private bool _ownsRetirementAdmission;
-
-    internal Task<RetirementDrainResult> RetirementDrained => GetRetirementCompletionSource().Task;
 
     /// <summary>
     /// Constants for activity error event names used during activation lifecycle.
@@ -800,7 +797,6 @@ internal sealed partial class ActivationData :
         UnregisterMessageTarget();
         _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).Ignore();
         CompleteRetirementDrain(RetirementDrainResult.Incomplete);
-        CompleteRetirementAdmission();
     }
 
     void IGrainTimerRegistry.OnTimerCreated(IGrainTimer timer)
@@ -1323,7 +1319,6 @@ internal sealed partial class ActivationData :
             _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).Ignore();
             CompleteRetirementDrain(RetirementDrainResult.Incomplete);
             GetDeactivationCompletionSource().TrySetResult(true);
-            CompleteRetirementAdmission();
         }
 
         bool MayInvokeRequest(Message incoming)
@@ -1698,7 +1693,7 @@ internal sealed partial class ActivationData :
 
         lock (_lock)
         {
-            if (_retirementAdmissionClosed)
+            if (State == ActivationState.Invalid)
             {
                 DispositionRetirementRequest(message);
                 return;
@@ -2207,16 +2202,13 @@ internal sealed partial class ActivationData :
                 _shared.CatalogInstruments.ActivationShutdownViaCollection(_shared.GrainTypeMetricName);
             }
 
-            List<Message> retirementRequests;
             var canceledAtRetirement = cancellationToken.IsCancellationRequested;
             lock (_lock)
             {
-                _retirementAdmissionClosed = true;
                 _registrationRetired = registrationRetired && !migrating
                     && DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown
                     && !canceledAtRetirement
                     && !IsStuckDeactivating && !IsStuckProcessingMessage;
-                retirementRequests = DequeueAllWaitingRequests();
             }
 
             UnregisterMessageTarget();
@@ -2239,7 +2231,12 @@ internal sealed partial class ActivationData :
 
             deactivationMetrics = deactivationMetrics.Record();
 
-            // Signal deactivation
+            List<Message> retirementRequests;
+            lock (_lock)
+            {
+                retirementRequests = DequeueAllWaitingRequests();
+            }
+
             GetDeactivationCompletionSource().TrySetResult(true);
             foreach (var request in retirementRequests)
             {
@@ -2259,7 +2256,6 @@ internal sealed partial class ActivationData :
         finally
         {
             CompleteRetirementDrain(RetirementDrainResult.Incomplete);
-            CompleteRetirementAdmission();
             deactivationMetrics.RecordIfNeeded();
         }
 
@@ -2301,32 +2297,15 @@ internal sealed partial class ActivationData :
 
     private void CompleteRetirementDrain(RetirementDrainResult result)
     {
-        if (GetRetirementCompletionSource().TrySetResult(result))
-        {
-            _shared.CatalogInstruments.OnRetirementDrain(result.ToString());
-        }
-    }
-
-    private void CompleteRetirementAdmission()
-    {
         lock (_lock)
         {
             if (_ownsRetirementAdmission)
             {
                 _ownsRetirementAdmission = false;
                 _shared.InternalRuntime.Catalog.CompleteRetirement(
-                    RetirementDrained.Result,
+                    result,
                     DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown);
             }
-        }
-    }
-
-    private TaskCompletionSource<RetirementDrainResult> GetRetirementCompletionSource()
-    {
-        lock (_lock)
-        {
-            _extras ??= new();
-            return _extras.RetirementTask ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
     }
 
@@ -2578,8 +2557,6 @@ internal sealed partial class ActivationData :
         /// </summary>
         public TaskCompletionSource<bool>? DeactivationTask { get => GetDeactivationInfoOrDefault()?.DeactivationTask; set => EnsureDeactivationInfo().DeactivationTask = value; }
 
-        public TaskCompletionSource<RetirementDrainResult>? RetirementTask { get => GetDeactivationInfoOrDefault()?.RetirementTask; set => EnsureDeactivationInfo().RetirementTask = value; }
-
         public TaskCompletionSource? ActivationReady { get => GetValueOrDefault<TaskCompletionSource>(nameof(ActivationReady)); set => SetOrRemoveValue(nameof(ActivationReady), value); }
 
         public DateTime? DeactivationStartTime { get => GetDeactivationInfoOrDefault()?.DeactivationStartTime; set => EnsureDeactivationInfo().DeactivationStartTime = value; }
@@ -2639,7 +2616,6 @@ internal sealed partial class ActivationData :
             public DateTime? DeactivationStartTime;
             public DeactivationReason DeactivationReason;
             public TaskCompletionSource<bool>? DeactivationTask;
-            public TaskCompletionSource<RetirementDrainResult>? RetirementTask;
         }
     }
 

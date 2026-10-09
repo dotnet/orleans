@@ -88,10 +88,10 @@ namespace Orleans.Runtime
         {
             var response = CreateResponseMessage(request, includeRequestContext: false);
             response.Result = Message.ResponseTypes.Status;
+            response.ForwardCount = request.ForwardCount;
             response.BodyObject = new StatusResponse(false, false, [])
             {
                 ForwardedTo = forwardedTo,
-                ForwardingGeneration = request.ForwardCount,
             };
             return response;
         }

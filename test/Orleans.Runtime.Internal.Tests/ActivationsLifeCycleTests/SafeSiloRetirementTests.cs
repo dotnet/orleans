@@ -76,7 +76,8 @@ public sealed partial class SafeSiloRetirementTests
         var forwarded = await control.RequestOnC.Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(first.Id, forwarded.Id);
         Assert.Equal(1, forwarded.ForwardCount);
-        Assert.Equal(RetirementDrainResult.Succeeded, await activation.RetirementDrained.WaitAsync(Timeout, TestCancellation));
+        await activation.Deactivated.WaitAsync(Timeout, TestCancellation);
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
         fixture.BreakOutstandingToA();
         Assert.False(invocation.IsCompleted);
@@ -124,7 +125,8 @@ public sealed partial class SafeSiloRetirementTests
             SendingGrain = control.GrainId,
             TargetGrain = fixture.ExpectedSendingGrain,
             SendingSilo = fixture.A.SiloAddress,
-            BodyObject = new StatusResponse(false, false, []) { ForwardedTo = fixture.B.SiloAddress, ForwardingGeneration = 1 },
+            ForwardCount = 1,
+            BodyObject = new StatusResponse(false, false, []) { ForwardedTo = fixture.B.SiloAddress },
             CacheInvalidationHeader = [new GrainAddressCacheUpdate(
                 new GrainAddress { GrainId = control.GrainId, SiloAddress = fixture.A.SiloAddress },
                 new GrainAddress { GrainId = control.GrainId, SiloAddress = fixture.B.SiloAddress })],
@@ -153,11 +155,11 @@ public sealed partial class SafeSiloRetirementTests
         var probeWire = await control.GatewayRequest("preserved-route").Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(fixture.C.SiloAddress, probeWire.TargetSilo);
         Assert.Equal(fixture.ExpectedSendingGrain, probeWire.SendingGrain);
-        // The injected packet intentionally does not change the real directory lease.
-        // C's ordinary invalid-activation path may therefore forward the probe back to A.
+        // The injected C hint does not change the actual host: the gateway's live
+        // placement cache still knows A and delivers directly, without a C->A hop.
         var probeOnA = await control.ReceiverRequest(fixture.A.SiloAddress, "preserved-route").Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(probeWire.Id, probeOnA.Id);
-        Assert.Equal(1, probeOnA.ForwardCount);
+        Assert.Equal(0, probeOnA.ForwardCount);
         Assert.Empty(control.Executions);
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => current.WaitAsync(Timeout, TestCancellation));
@@ -187,7 +189,8 @@ public sealed partial class SafeSiloRetirementTests
             SendingGrain = control.GrainId,
             TargetGrain = request.SendingGrain,
             SendingSilo = fixture.A.SiloAddress,
-            BodyObject = new StatusResponse(false, false, []) { ForwardedTo = destination, ForwardingGeneration = generation },
+            ForwardCount = generation,
+            BodyObject = new StatusResponse(false, false, []) { ForwardedTo = destination },
         };
     }
 
@@ -233,7 +236,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Equal(retiring.Address, unregistered);
         Assert.Equal(retiring.Address, control.Directory.Registration);
         Assert.False(retiring.Deactivated.IsCompleted);
-        Assert.False(retiring.RetirementDrained.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
         Assert.False(control.ReplacementActivationEntered.Task.IsCompleted);
         Assert.Empty(control.Executions);
 
@@ -296,7 +299,7 @@ public sealed partial class SafeSiloRetirementTests
         }
 
         // Wait until A really stops, but keep C below invocation admission.
-        var drainResult = await retiring.RetirementDrained.WaitAsync(Timeout, TestCancellation);
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
         fixture.BreakOutstandingToA();
         Assert.False(originalTask.IsCompleted);
@@ -320,7 +323,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Equal(fixture.C.SiloAddress, disposition.ForwardedTo);
         Assert.Equal(fixture.A.SiloAddress, disposition.SendingSilo);
 
-        Assert.Equal(RetirementDrainResult.Succeeded, drainResult);
+        Assert.True(retiring.Deactivated.IsCompletedSuccessfully);
     }
 
     [Theory]
@@ -341,7 +344,8 @@ public sealed partial class SafeSiloRetirementTests
         var original = await control.RequestOnA.Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(activation, retiring);
         Assert.Equal(1, retiring.WaitingCount);
-        Assert.False(retiring.RetirementDrained.IsCompleted);
+        Assert.False(retiring.Deactivated.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
         Assert.Empty(control.Executions);
         Assert.Empty(control.Admissions);
 
@@ -356,11 +360,11 @@ public sealed partial class SafeSiloRetirementTests
             retirementCancellation.Cancel();
         }
 
-        var drainResult = await retiring.RetirementDrained.WaitAsync(Timeout, TestCancellation);
+        await fixture.AssertCatalogRetirementFailedAsync();
         var exception = await Assert.ThrowsAsync<OrleansMessageRejectionException>(
             () => originalTask.WaitAsync(Timeout, TestCancellation));
         Assert.Contains("Canceled shutdown deactivation boundary.", exception.Message);
-        Assert.Equal(RetirementDrainResult.Canceled, drainResult);
+        Assert.True(retiring.Deactivated.IsCompletedSuccessfully);
         Assert.Equal(retiring.Address, control.Directory.Registration);
         Assert.False(control.UnregisterEntered.Task.IsCompleted);
         Assert.Empty(control.RouteUpdates);
@@ -405,7 +409,7 @@ public sealed partial class SafeSiloRetirementTests
         // Cooperatively cancel at the new receiver before admitting this held invocation.
         await ((IGrainCallCancellationExtension)replacement).CancelRequestAsync(
             original.SendingGrain, original.Id, TestCancellation).AsTask().WaitAsync(Timeout, TestCancellation);
-        var drainResult = await retiring.RetirementDrained.WaitAsync(Timeout, TestCancellation);
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(original.Id, disposition.Id);
         Assert.Equal(fixture.C.SiloAddress, disposition.ForwardedTo);
@@ -417,7 +421,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Equal(0, retiring.WaitingCount);
         fixture.Caller.BreakOutstandingMessagesToSilo(fixture.A.SiloAddress);
         Assert.Equal(0, fixture.Caller.GetRunningRequestsCount(fixture.InterfaceType));
-        Assert.Equal(RetirementDrainResult.Succeeded, drainResult);
+        Assert.True(retiring.Deactivated.IsCompletedSuccessfully);
     }
 
     [Fact]
@@ -433,10 +437,11 @@ public sealed partial class SafeSiloRetirementTests
         control.ReleaseDeactivation.TrySetResult();
         var registration = await control.UnregisterEntered.Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(1, retiring.WaitingCount);
-        Assert.False(retiring.RetirementDrained.IsCompleted);
+        Assert.False(retiring.Deactivated.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
 
         control.ReleaseUnregister.TrySetResult();
-        var drainResult = await retiring.RetirementDrained.WaitAsync(Timeout, TestCancellation);
+        await fixture.AssertCatalogRetirementFailedAsync();
         var exception = await Assert.ThrowsAsync<OrleansMessageRejectionException>(() => originalTask.WaitAsync(Timeout, TestCancellation));
         Assert.Contains("This process is terminating.", exception.Message);
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
@@ -448,17 +453,28 @@ public sealed partial class SafeSiloRetirementTests
         Assert.False(control.RequestOnC.Task.IsCompleted);
         Assert.Equal(0, retiring.WaitingCount);
         Assert.Equal(0, fixture.Caller.GetRunningRequestsCount(fixture.InterfaceType));
-        Assert.Equal(RetirementDrainResult.Failed, drainResult);
+        Assert.True(retiring.Deactivated.IsCompletedSuccessfully);
     }
 
-    [Fact]
-    public async Task LateArrival_AfterCatalogRemoval_UsesInvalidActivationForwardingAndExecutesOnce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LateArrival_AfterCatalogRemoval_UsesInvalidActivationForwardingAndExecutesOnce(bool deliverThroughCapturedActivation)
     {
         await using var fixture = await Fixture.CreateAsync();
         var control = fixture.Control;
         control.HoldDisposal = true;
         fixture.StartRetirement();
         var retiring = await control.DeactivationEntered.Task.WaitAsync(Timeout, TestCancellation);
+        Task<int>? originalTask = null;
+        if (deliverThroughCapturedActivation)
+        {
+            // Model decoded ingress which already captured this activation before
+            // its catalog removal, then resumes dispatch during held disposal.
+            originalTask = fixture.InvokeAsync(TestCancellation);
+            await control.RequestOnA.Task.WaitAsync(Timeout, TestCancellation);
+            Assert.Equal(1, retiring.WaitingCount);
+        }
         control.ReleaseDeactivation.TrySetResult();
         await control.UnregisterEntered.Task.WaitAsync(Timeout, TestCancellation);
         control.ReleaseUnregister.TrySetResult();
@@ -469,11 +485,22 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Null(fixture.A.ServiceProvider.GetRequiredService<ActivationDirectory>().FindTarget(control.GrainId));
         Assert.Null(control.Directory.Registration);
         Assert.False(retiring.Deactivated.IsCompleted);
-        Assert.False(retiring.RetirementDrained.IsCompleted);
+        Assert.False(fixture.CatalogRetirement.IsCompleted);
         Assert.Empty(control.Executions);
 
-        // B still caches A: no earlier Execute has invalidated that cache.
-        var originalTask = fixture.InvokeAsync(TestCancellation);
+        if (deliverThroughCapturedActivation)
+        {
+            var capturedRequest = Assert.Single(retiring.DequeueAllWaitingRequests());
+            Assert.Equal(ActivationState.Invalid, retiring.State);
+            retiring.ReceiveMessage(capturedRequest);
+            Assert.Equal(0, retiring.WaitingCount);
+        }
+        else
+        {
+            // B still caches A: no earlier Execute has invalidated that cache.
+            originalTask = fixture.InvokeAsync(TestCancellation);
+        }
+        Assert.NotNull(originalTask);
         var disposition = await control.RouteUpdateObserved.Task.WaitAsync(Timeout, TestCancellation);
         var replacement = await control.ReplacementActivationEntered.Task.WaitAsync(Timeout, TestCancellation);
         var request = await control.RequestOnC.Task.WaitAsync(Timeout, TestCancellation);
@@ -493,7 +520,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Empty(control.Admissions);
 
         control.ReleaseDisposal.TrySetResult();
-        var drainResult = await retiring.RetirementDrained.WaitAsync(Timeout, TestCancellation);
+        await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
         fixture.Caller.BreakOutstandingMessagesToSilo(fixture.A.SiloAddress);
         Assert.False(originalTask.IsCompleted);
@@ -508,7 +535,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Equal(fixture.C.SiloAddress, Assert.Single(control.Admissions));
         Assert.Single(control.RouteUpdates);
         Assert.Equal(0, fixture.Caller.GetRunningRequestsCount(fixture.InterfaceType));
-        Assert.Equal(RetirementDrainResult.Succeeded, drainResult);
+        Assert.True(retiring.Deactivated.IsCompletedSuccessfully);
     }
 
     private enum CallerKind
@@ -524,6 +551,8 @@ public sealed partial class SafeSiloRetirementTests
         private readonly CallerKind _callerKind;
         private readonly OutsideRuntimeClient? _outsideCaller;
         private readonly ISafeSiloRetirementCallerGrain? _grainCaller;
+        private readonly Catalog _catalog;
+        private Task? _catalogRetirement;
 
         private Fixture(InProcessTestCluster cluster, Control control, CallerKind callerKind)
         {
@@ -531,6 +560,7 @@ public sealed partial class SafeSiloRetirementTests
             _callerKind = callerKind;
             Control = control;
             A = cluster.Silos[0];
+            _catalog = A.ServiceProvider.GetRequiredService<Catalog>();
             B = cluster.Silos[1];
             C = cluster.Silos[2];
             control.A = A.SiloAddress;
@@ -589,6 +619,14 @@ public sealed partial class SafeSiloRetirementTests
         public int RunningTargetRequests => _outsideCaller?.GetRunningRequestsCount(InterfaceType) ?? Caller.GetRunningRequestsCount(InterfaceType);
         public OutsideRuntimeClient OutsideCaller => _outsideCaller!;
         public Task? Retirement { get; private set; }
+        public Task CatalogRetirement => _catalogRetirement ??= _catalog.DeactivateAllActivations(TestCancellation);
+
+        public async Task AssertCatalogRetirementFailedAsync()
+        {
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => CatalogRetirement.WaitAsync(Timeout, TestCancellation));
+            Assert.Contains("retirement drains were unsuccessful", error.Message);
+        }
 
         public static async Task<Fixture> CreateAsync(
             bool holdCancellationDelivery = false,
@@ -935,16 +973,16 @@ public sealed partial class SafeSiloRetirementTests
         internal static void ObserveRoute(Control control, SiloAddress observer, Message message)
         {
             if (message.Direction != Message.Directions.Response || message.Result != Message.ResponseTypes.Status
-                || message.SendingGrain != control.GrainId || message.BodyObject is not StatusResponse { ForwardedTo: { } destination } status)
+                || message.SendingGrain != control.GrainId || message.BodyObject is not StatusResponse { ForwardedTo: { } destination })
                 return;
-            var snapshot = new RouteUpdate(message.Id, status.ForwardingGeneration, destination, message.SendingSilo);
+            var snapshot = new RouteUpdate(message.Id, message.ForwardCount, destination, message.SendingSilo);
             if (observer.Equals(message.SendingSilo) && control.RecordedRouteMessages.TryAdd(message, 0))
             {
-                if (status.ForwardingGeneration == 0) control.InitialRouteUpdates.Enqueue(snapshot);
+                if (message.ForwardCount == 0) control.InitialRouteUpdates.Enqueue(snapshot);
                 else control.RouteUpdates.Enqueue(snapshot);
             }
             // Initial outside-client placement is generation0; observe the subsequent hop.
-            if (status.ForwardingGeneration > 0) control.RouteUpdateObserved.TrySetResult(snapshot);
+            if (message.ForwardCount > 0) control.RouteUpdateObserved.TrySetResult(snapshot);
         }
     }
 
