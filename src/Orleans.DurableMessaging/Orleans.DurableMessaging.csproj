@@ -2,7 +2,7 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.DurableMessaging</PackageId>
     <Title>Microsoft Orleans Durable Messaging</Title>
-    <Description>Durable messaging envelope, delivery, and handler-routing contracts for Microsoft Orleans.</Description>
+    <Description>Opaque durable messaging contracts and journaled inbox processing for Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Messaging Inbox Outbox Durable</PackageTags>
     <IsPackable>false</IsPackable>
     <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
@@ -20,6 +20,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization\Orleans.Serialization.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableJobs\Orleans.DurableJobs.csproj" />
   </ItemGroup>
 
   <ItemGroup>
