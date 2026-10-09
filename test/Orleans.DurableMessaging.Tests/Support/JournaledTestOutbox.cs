@@ -24,7 +24,7 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, Du
         SendCalls++;
         if (_stopped) throw new InvalidOperationException("The test outbox owner is stopped.");
         if (envelope.MessageId.IsDefault || envelope.SenderId.IsDefault || envelope.ReceiverId.IsDefault
-            || string.IsNullOrWhiteSpace(envelope.Subject))
+            || string.IsNullOrEmpty(envelope.Subject))
         {
             throw new ArgumentException("An outgoing envelope requires identities and opaque payload bytes.", nameof(envelope));
         }
