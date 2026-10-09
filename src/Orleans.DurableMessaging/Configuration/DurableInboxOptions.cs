@@ -58,7 +58,7 @@ public class DurableInboxOptions
     /// allow duplicate processing if retries are delayed.
     /// </para>
     /// <para>
-    /// Processed message tracking uses composite key (SenderId, MessageId) with timestamps.
+    /// Processed message tracking uses the exact receiver-local MessageId with timestamps.
     /// Expired entries are removed atomically when a replay is accepted and are also eligible for
     /// compaction during inbox pump maintenance.
     /// </para>
