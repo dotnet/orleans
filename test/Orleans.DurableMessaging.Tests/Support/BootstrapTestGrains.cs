@@ -104,13 +104,13 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         return Task.CompletedTask;
     }
 
-    public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
+        HandlerOverride is { } handler
+            ? handler.HandleAsync(context, cancellationToken)
+            : HandleCoreAsync(context, cancellationToken);
+
+    private async ValueTask HandleCoreAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        if (HandlerOverride is { } handler)
-        {
-            await handler.HandleAsync(context, cancellationToken);
-            return;
-        }
         if (_handlers.TryGet(Observation.Context.GrainId, Route, out var barrier))
         {
             barrier.Entered.TrySetResult();
@@ -276,11 +276,16 @@ public sealed class BootstrapClusterFixture : DurableMessagingClusterFixture
     public const string OrdinaryPlacementAlias = "bootstrap-directory-alias";
 
     public BootstrapProbe Probe { get; } = new();
+    public BootstrapDeliveryProbe Delivery { get; } = new();
     protected override void ConfigureServices(IServiceCollection services)
     {
+        BootstrapOutboxServices.Add(services);
         services.AddKeyedSingleton<PlacementStrategy>(StatelessPlacementAlias, new StatelessWorkerAttribute(1).PlacementStrategy);
         services.AddKeyedSingleton<PlacementStrategy>(OrdinaryPlacementAlias, new RandomPlacement());
         services.AddSingleton(Probe);
+        services.AddSingleton(Delivery);
+        services.AddSingleton<ILoggerProvider>(Delivery);
+        services.AddSingleton<IOutgoingGrainCallFilter>(Delivery);
         services.AddScoped<BootstrapObservation>();
         services.AddScoped<BootstrapState>();
         var extensionType = ReceiverTestServices.GetImplementationType("DurableInboxExtension");

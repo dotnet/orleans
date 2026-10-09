@@ -1,7 +1,7 @@
 # Microsoft Orleans Durable Messaging
 
 This intermediate project supplies opaque durable message contracts, owned-payload codecs, and
-journaled inbox processing.
+journaled inbox and outbox processing.
 
 `DurableEnvelope` carries `MessageId`, `SenderId`, `ReceiverId`, and an owned `ArcBuffer` payload.
 The sender and message identifier form the transport deduplication key. Applications define payload
@@ -49,3 +49,21 @@ Owned RPC arguments remain retained through their actual serialization and invoc
 
 This project remains non-packable while runtime and hosting layers assemble the eventual
 `Microsoft.Orleans.DurableMessaging` package.
+
+The outbox uses six owner-bound standard durable collections and the existing sequence state.
+The final journal capture hook confirms the provider-returned physical wakeup before capture;
+the sequence state associates each message cohort with that exact generation and job handle.
+Storage acknowledgement releases only the captured cohort for delivery. Messages staged during
+storage await remain pending for a later write. Healthy ownership is reused across bursts and
+retires at the configured idle deadline.
+
+Outgoing delivery candidates retain independent payload slices before RPC or loopback delivery.
+Those slices stay alive through actual transport outcomes and the owned accounting write, then
+release. Durable dictionary ownership independently covers staging, encoding, replay, removal,
+reset, deletion, and dependency-scope disposal. Remote batches retain their durable-attempt token
+across timer turns; shutdown drains actual delivery and write outcomes before releasing resources.
+
+Specialized test-only composition exercises this outbox with actual Journaling and DurableJobs.
+Ordinary receiver fixtures retain their isolated journaled collaborator. Public hosting, provider
+cutover examples, package publishing, documentation-site integration and samples belong to the
+final consumer layer. This intermediate project remains non-packable.
