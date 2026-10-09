@@ -47,10 +47,10 @@ public sealed class MessagingActivationBehaviorTests : DurableMessagingBehaviorT
         Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.outbox", out var outboxState));
         Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inboxState));
         Assert.Same(
-            services.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("__orleans.durable-messaging.outbox"),
+            services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.outbox"),
             outboxState);
         Assert.Same(
-            services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"),
+            services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.inbox"),
             inboxState);
         Assert.NotSame(inboxState, outboxState);
         Assert.Equal(typeof(IJournaledStateManager).Assembly, inboxState.GetType().Assembly);
