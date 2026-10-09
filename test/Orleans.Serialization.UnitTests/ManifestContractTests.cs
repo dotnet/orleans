@@ -431,6 +431,20 @@ public class ManifestContractTests
     }
 
     [Fact]
+    public void LegacyOpenConverterDiscoveryPreservesItsParameterizedArraySurrogate()
+    {
+        var options = new TypeManifestOptions();
+        options.AddConverter(typeof(GenericConverter<,>));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        object?[] arguments = [typeof(GenericTarget<string, int>), typeof(GenericTarget<,>), null, null];
+
+        Assert.Equal(true, typeof(CodecProvider).GetMethod("TryGetSurrogateCodec", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(provider, arguments));
+        Assert.Equal(typeof(GenericSurrogate<(int, string)[]>), Assert.IsAssignableFrom<Type>(arguments[2]).GetGenericArguments()[1]);
+        Assert.IsType<GenericConverter<string, int>>(Assert.Single(Assert.IsType<object[]>(arguments[3])));
+    }
+
+    [Fact]
     public void LegacyClosedConverterDiscoveryPreservesItsArraySurrogate()
     {
         var options = new TypeManifestOptions();
@@ -1123,13 +1137,9 @@ public class ManifestContractTests
     [InlineData(typeof(ReferenceConstrainedCopier<>), typeof(int), false)]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PublicConstructorTarget), true)]
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PrivateConstructorTarget), false)]
-    // MakeGenericType permits an abstract new()-constrained argument on .NET 8 and rejects it on .NET 10.
-#if NET10_0_OR_GREATER
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), false)]
-#else
-    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), true)]
-#endif
     [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(int), true)]
+    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(int?), true)]
     [InlineData(typeof(ComparableConstrainedCopier<>), typeof(string), true)]
     [InlineData(typeof(ComparableConstrainedCopier<>), typeof(int), true)]
     [InlineData(typeof(ComparableConstrainedCopier<>), typeof(FirstTarget), false)]
@@ -1171,6 +1181,37 @@ public class ManifestContractTests
         var input = "preserved";
         Assert.Same(input, root.ReferenceCopier.DeepCopy(input, null!));
         Assert.Equal(17, root.ValueCopier.DeepCopy(17, null!));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AbstractConstructorConstraintRejectionPreservesPendingConstruction(bool captureMetadata)
+    {
+        var attempts = 0;
+        var implementation = new CountingGenericImplementation(typeof(ConstructorConstrainedCopier<>));
+        using var services = new ServiceCollection().AddSerializer(builder => builder.Configure(options =>
+        {
+            if (captureMetadata) options.AddGenericArgumentMetadata(typeof(AbstractConstructorTarget));
+            options.AddSerializationContract(typeof(ParameterCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+            options.AddSerializationContract(implementation, typeof(IDeepCopier<>), SerializationType.Parameter(0));
+            options.AddSerializerService<IDeepCopier<AbstractConstructorTarget>>(provider =>
+            {
+                attempts++;
+                Assert.True(((CodecProvider)provider).IsConstructionPending);
+                return provider.GetDeepCopier<AbstractConstructorTarget>();
+            });
+        })).BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+
+        var copier = GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<AbstractConstructorTarget>>(null!, provider);
+
+        Assert.IsType<ParameterCopier<AbstractConstructorTarget>>(copier);
+        Assert.Same(copier, provider.GetDeepCopier<AbstractConstructorTarget>());
+        Assert.Same(copier, GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<AbstractConstructorTarget>>(null!, provider));
+        Assert.Equal(0, implementation.ClosureAttempts);
+        Assert.Equal(1, attempts);
+        Assert.False(provider.IsConstructionPending);
     }
 
     private sealed class ConstraintSelection(IDeepCopier<string> referenceCopier, IDeepCopier<int> valueCopier)
@@ -1332,6 +1373,254 @@ public class ManifestContractTests
     }
 
     [Fact]
+    public void GenericArgumentMetadataCapturesAnnotatedClosedTypesAndIsIdempotent()
+    {
+        var parameter = typeof(TypeManifestOptions).GetMethod(nameof(TypeManifestOptions.AddGenericArgumentMetadata))!.GetParameters()[0];
+        Assert.Equal(DynamicallyAccessedMemberTypes.Interfaces | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor,
+            parameter.GetCustomAttribute<DynamicallyAccessedMembersAttribute>()!.MemberTypes);
+        var options = new TypeManifestOptions();
+        options.AddGenericArgumentMetadata(typeof(PublicConstructorTarget));
+        options.AddGenericArgumentMetadata(typeof(PrivateConstructorTarget));
+        options.AddGenericArgumentMetadata(typeof(List<string>));
+        var metadata = options.GenericArgumentMetadata[typeof(List<string>)];
+        options.AddGenericArgumentMetadata(typeof(List<string>));
+
+        Assert.Same(metadata, options.GenericArgumentMetadata[typeof(List<string>)]);
+        Assert.True(options.GenericArgumentMetadata[typeof(PublicConstructorTarget)].HasPublicParameterlessConstructor);
+        Assert.False(options.GenericArgumentMetadata[typeof(PrivateConstructorTarget)].HasPublicParameterlessConstructor);
+        Assert.Contains(typeof(IEnumerable<string>), metadata.Interfaces);
+        var readOnlyList = options.GenericArgumentMetadata[typeof(IReadOnlyList<string>)];
+        Assert.False(readOnlyList.HasPublicParameterlessConstructor);
+        Assert.Contains(typeof(IEnumerable<string>), readOnlyList.Interfaces);
+        Assert.Contains(typeof(IReadOnlyCollection<string>), readOnlyList.Interfaces);
+        Assert.DoesNotContain(typeof(IList<string>), readOnlyList.Interfaces);
+        options.AddGenericArgumentMetadata(typeof(IReadOnlyList<string>));
+        Assert.Same(readOnlyList, options.GenericArgumentMetadata[typeof(IReadOnlyList<string>)]);
+        Assert.Equal("type", Assert.Throws<ArgumentNullException>(() => options.AddGenericArgumentMetadata(null!)).ParamName);
+        Assert.Equal("type", Assert.Throws<ArgumentException>(() => options.AddGenericArgumentMetadata(typeof(List<>))).ParamName);
+        Assert.Equal(3 + metadata.Interfaces.Length, options.GenericArgumentMetadata.Count);
+    }
+
+    [Theory]
+    [InlineData(typeof(StructConstrainedCopier<>), typeof(int), true)]
+    [InlineData(typeof(StructConstrainedCopier<>), typeof(int?), false)]
+    [InlineData(typeof(StructConstrainedCopier<>), typeof(string), false)]
+    [InlineData(typeof(ReferenceConstrainedCopier<>), typeof(string), true)]
+    [InlineData(typeof(ReferenceConstrainedCopier<>), typeof(int), false)]
+    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(int), true)]
+    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), false)]
+    [InlineData(typeof(BaseConstrainedCopier<>), typeof(ConstraintDerived), true)]
+    [InlineData(typeof(BaseConstrainedCopier<>), typeof(string), false)]
+    [InlineData(typeof(DisposableConstrainedCopier<>), typeof(System.IO.MemoryStream), true)]
+    [InlineData(typeof(DisposableConstrainedCopier<>), typeof(string), false)]
+    [InlineData(typeof(NewDisposableConstrainedCopier<>), typeof(string), false)]
+    public void SpecialAndClosedConstraintsAreDecidableWithoutArgumentMetadata(Type definition, Type target, bool accepted)
+    {
+        var options = new TypeManifestOptions();
+        var implementation = new CountingGenericImplementation(definition);
+        options.AddSerializationContract(typeof(ParameterCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        options.AddSerializationContract(implementation, typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.Equal(accepted ? GenericConstraintValidationResult.Valid : GenericConstraintValidationResult.Invalid,
+            GenericConstraintValidator.Validate(definition, [target], options.GenericArgumentMetadata));
+        Assert.Equal(accepted ? implementation : typeof(ParameterCopier<>),
+            SelectImplementation(provider, typeof(IDeepCopier<>), target, materialize: false));
+        Assert.Equal(0, implementation.ClosureAttempts);
+    }
+
+    [Theory]
+    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PublicConstructorTarget), true)]
+    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(PrivateConstructorTarget), false)]
+    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(AbstractConstructorTarget), false)]
+    [InlineData(typeof(ConstructorConstrainedCopier<>), typeof(string), false)]
+    [InlineData(typeof(ComparableConstrainedCopier<>), typeof(string), true)]
+    [InlineData(typeof(ComparableConstrainedCopier<>), typeof(int), true)]
+    [InlineData(typeof(ComparableConstrainedCopier<>), typeof(FirstTarget), false)]
+    public void CapturedMetadataValidatesConstructorsAndInterfacesInBothSelectionModes(Type definition, Type target, bool accepted)
+    {
+        var options = new TypeManifestOptions();
+        options.AddGenericArgumentMetadata(target);
+        var implementation = new CountingGenericImplementation(definition);
+        options.AddSerializationContract(typeof(ParameterCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        options.AddSerializationContract(implementation, typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.Equal(accepted ? GenericConstraintValidationResult.Valid : GenericConstraintValidationResult.Invalid,
+            GenericConstraintValidator.Validate(definition, [target], options.GenericArgumentMetadata));
+        Assert.Equal(accepted ? implementation : typeof(ParameterCopier<>),
+            SelectImplementation(provider, typeof(IDeepCopier<>), target, materialize: false));
+        Assert.Equal(0, implementation.ClosureAttempts);
+        Assert.Equal((accepted ? definition : typeof(ParameterCopier<>)).MakeGenericType(target),
+            SelectImplementation(provider, typeof(IDeepCopier<>), target));
+        Assert.Equal(accepted ? 1 : 0, implementation.ClosureAttempts);
+    }
+
+    [Theory]
+    [InlineData(typeof(PublicConstructorTarget), true)]
+    [InlineData(typeof(PrivateConstructorTarget), false)]
+    public void UnknownJitArgumentsRetainPrecedenceAndNonmaterializedSelectionRequiresMetadata(Type target, bool accepted)
+    {
+        var options = new TypeManifestOptions();
+        var implementation = new CountingGenericImplementation(typeof(ConstructorConstrainedCopier<>));
+        options.AddSerializationContract(typeof(ParameterCopier<>), typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        options.AddSerializationContract(implementation, typeof(IDeepCopier<>), SerializationType.Parameter(0));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.Equal(GenericConstraintValidationResult.Unknown,
+            GenericConstraintValidator.Validate(implementation, [target], options.GenericArgumentMetadata));
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            SelectImplementation(provider, typeof(IDeepCopier<>), target, materialize: false));
+        Assert.Contains(nameof(TypeManifestOptions.AddGenericArgumentMetadata),
+            Assert.IsType<NotSupportedException>(exception.InnerException).Message);
+        Assert.Equal(0, implementation.ClosureAttempts);
+        Assert.Equal((accepted ? typeof(ConstructorConstrainedCopier<>) : typeof(ParameterCopier<>)).MakeGenericType(target),
+            SelectImplementation(provider, typeof(IDeepCopier<>), target));
+        Assert.Equal(1, implementation.ClosureAttempts);
+    }
+
+    [Theory]
+    [InlineData(typeof(EnumerableConstrainedCopier<,>), typeof(List<string>), typeof(object), true)]
+    [InlineData(typeof(EnumerableConstrainedCopier<,>), typeof(string[]), typeof(object), true)]
+    [InlineData(typeof(EnumerableConstrainedCopier<,>), typeof(List<int>), typeof(object), false)]
+    [InlineData(typeof(EnumerableConstrainedCopier<,>), typeof(List<object>), typeof(string), false)]
+    [InlineData(typeof(EnumerableConstrainedCopier<,>), typeof(FirstTarget), typeof(string), false)]
+    [InlineData(typeof(ConsumerConstrainedCopier<,>), typeof(Consumer<object>), typeof(string), true)]
+    [InlineData(typeof(ConsumerConstrainedCopier<,>), typeof(Consumer<string>), typeof(object), false)]
+    [InlineData(typeof(ConsumerConstrainedCopier<,>), typeof(Consumer<object>), typeof(int), false)]
+    [InlineData(typeof(InvariantConstrainedCopier<,>), typeof(Invariant<string>), typeof(string), true)]
+    [InlineData(typeof(InvariantConstrainedCopier<,>), typeof(Invariant<string>), typeof(object), false)]
+    [InlineData(typeof(NestedConsumerConstrainedCopier<,>), typeof(Consumer<object>), typeof(string), true)]
+    [InlineData(typeof(NestedConsumerConstrainedCopier<,>), typeof(Consumer<IEnumerable<object>>), typeof(string), true)]
+    [InlineData(typeof(NestedConsumerConstrainedCopier<,>), typeof(Consumer<IEnumerable<object>>), typeof(int), false)]
+    [InlineData(typeof(GenericBaseConstrainedCopier<,>), typeof(GenericDerived<string>), typeof(string), true)]
+    [InlineData(typeof(GenericBaseConstrainedCopier<,>), typeof(GenericDerived<string>), typeof(object), false)]
+    public void StructuralConstraintsRespectGenericVarianceAndBaseTypes(Type definition, Type argument, Type item, bool accepted)
+    {
+        var options = new TypeManifestOptions();
+        options.AddGenericArgumentMetadata(argument);
+        options.AddGenericArgumentMetadata(item);
+        var implementation = new CountingGenericImplementation(definition);
+        var description = SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Parameter(1));
+        options.AddSerializationContract(typeof(PairFallbackCopier<,>), typeof(IDeepCopier<>), description);
+        options.AddSerializationContract(implementation, typeof(IDeepCopier<>), description);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var target = typeof(GenericTarget<,>).MakeGenericType(argument, item);
+
+        Assert.Equal(accepted ? GenericConstraintValidationResult.Valid : GenericConstraintValidationResult.Invalid,
+            GenericConstraintValidator.Validate(definition, [argument, item], options.GenericArgumentMetadata));
+        Assert.Equal(accepted ? implementation : typeof(PairFallbackCopier<,>),
+            SelectImplementation(provider, typeof(IDeepCopier<>), target, materialize: false));
+        Assert.Equal(0, implementation.ClosureAttempts);
+        Assert.Equal((accepted ? definition : typeof(PairFallbackCopier<,>)).MakeGenericType(argument, item),
+            SelectImplementation(provider, typeof(IDeepCopier<>), target));
+        Assert.Equal(accepted ? 1 : 0, implementation.ClosureAttempts);
+    }
+
+    [Fact]
+    public void BoundParameterRelationshipsRespectReorderedBindingsWithoutMaterialization()
+    {
+        var options = new TypeManifestOptions();
+        options.AddSerializationContract(typeof(PairFallbackCopier<,>), typeof(IDeepCopier<>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Parameter(1)));
+        var implementation = new CountingGenericImplementation(typeof(DependentConstrainedCopier<,>));
+        options.AddSerializationContract(implementation, typeof(IDeepCopier<>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(1), SerializationType.Parameter(0)));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IDeepCopier<>),
+            typeof(GenericTarget<ConstraintDerived, ConstraintBase>), materialize: false));
+        Assert.Equal(typeof(PairFallbackCopier<,>), SelectImplementation(provider, typeof(IDeepCopier<>),
+            typeof(GenericTarget<ConstraintBase, ConstraintDerived>), materialize: false));
+        Assert.Equal(0, implementation.ClosureAttempts);
+    }
+
+    [Fact]
+    public void VariantConstraintInterfaceTraversalReusesAnAdmittedRootsCapturedInterfaces()
+    {
+        var options = new TypeManifestOptions();
+        options.AddGenericArgumentMetadata(typeof(Consumer<IEnumerable<object>>));
+        options.AddGenericArgumentMetadata(typeof(IEnumerable<object>));
+        options.AddGenericArgumentMetadata(typeof(string));
+        var implementation = new CountingGenericImplementation(typeof(ListConsumerConstrainedCopier<,>));
+        options.AddSerializationContract(implementation, typeof(IDeepCopier<>),
+            SerializationType.Create(typeof(GenericTarget<,>), SerializationType.Parameter(0), SerializationType.Parameter(1)));
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var target = typeof(GenericTarget<Consumer<IEnumerable<object>>, string>);
+
+        Assert.Equal(GenericConstraintValidationResult.Unknown, GenericConstraintValidator.Validate(implementation,
+            [typeof(Consumer<IEnumerable<object>>), typeof(string)], options.GenericArgumentMetadata));
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            SelectImplementation(provider, typeof(IDeepCopier<>), target, materialize: false));
+        Assert.Contains("closed argument and constraint types", Assert.IsType<NotSupportedException>(exception.InnerException).Message);
+        Assert.Equal(0, implementation.ClosureAttempts);
+        options.AddGenericArgumentMetadata(typeof(List<string>));
+        Assert.Contains(typeof(IEnumerable<string>), options.GenericArgumentMetadata[typeof(IReadOnlyList<string>)].Interfaces);
+        Assert.Equal(GenericConstraintValidationResult.Valid, GenericConstraintValidator.Validate(implementation,
+            [typeof(Consumer<IEnumerable<object>>), typeof(string)], options.GenericArgumentMetadata));
+        Assert.Equal(implementation, SelectImplementation(provider, typeof(IDeepCopier<>), target, materialize: false));
+        Assert.Equal(0, implementation.ClosureAttempts);
+        Assert.Equal(typeof(ListConsumerConstrainedCopier<Consumer<IEnumerable<object>>, string>),
+            SelectImplementation(provider, typeof(IDeepCopier<>), target));
+        Assert.Equal(1, implementation.ClosureAttempts);
+    }
+
+    [Fact]
+    public void SpecialConstraintsRejectInvalidAndDisallowedByRefLikeArguments()
+    {
+        var options = new TypeManifestOptions();
+        foreach (var argument in new[] { typeof(void), typeof(int).MakePointerType(), typeof(int).MakeByRefType(), typeof(Span<int>),
+            typeof(TypedReference), typeof(ArgIterator), typeof(RuntimeArgumentHandle) })
+        {
+            Assert.Equal(GenericConstraintValidationResult.Invalid,
+                GenericConstraintValidator.Validate(typeof(ParameterCopier<>), [argument], options.GenericArgumentMetadata));
+        }
+#if NET10_0_OR_GREATER
+        Assert.Equal(GenericConstraintValidationResult.Valid,
+            GenericConstraintValidator.Validate(typeof(AllowsByRefLikeCandidate<>), [typeof(Span<int>)], options.GenericArgumentMetadata));
+        Assert.Equal(GenericConstraintValidationResult.Invalid,
+            GenericConstraintValidator.Validate(typeof(AllowsByRefLikeCandidate<>), [typeof(TypedReference)], options.GenericArgumentMetadata));
+#endif
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void InvalidListCandidatesPreserveInferredDefaultsAndValidCandidatesOverrideThem(bool converter)
+    {
+        var options = new TypeManifestOptions();
+        options.AddDefaultSerializer<List<string>, ListCodec<string>, ListCopier<string>>(
+            _ => throw new InvalidOperationException("Eligibility checks must not invoke factories."),
+            _ => throw new InvalidOperationException("Eligibility checks must not invoke factories."));
+        var implementation = new CountingGenericImplementation(converter ? typeof(StructListConverter<>) : typeof(StructListCodec<>));
+        if (converter)
+        {
+            options.AddConverter(implementation, typeof(List<>), typeof(GenericSurrogate<>));
+        }
+        else
+        {
+            options.AddSerializer(implementation, typeof(List<>));
+        }
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var provider = new CodecProvider(services, Options.Create(options));
+        var eligibility = typeof(CodecProvider).GetMethod("IsDefaultContractImplementationEligible", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        Assert.Equal(true, eligibility.Invoke(provider, [options.DefaultSerializerContracts[typeof(IFieldCodec<List<string>>)]]));
+        Assert.Equal(0, implementation.ClosureAttempts);
+        options.AddDefaultSerializer<List<int>, ListCodec<int>, ListCopier<int>>(
+            _ => throw new InvalidOperationException("Eligibility checks must not invoke factories."),
+            _ => throw new InvalidOperationException("Eligibility checks must not invoke factories."));
+        Assert.Equal(false, eligibility.Invoke(provider, [options.DefaultSerializerContracts[typeof(IFieldCodec<List<int>>)]]));
+        Assert.Equal(0, implementation.ClosureAttempts);
+    }
+
+    [Fact]
     public void InvalidContractArgumentsThrowBeforeMutatingOptions()
     {
         var options = new TypeManifestOptions();
@@ -1347,12 +1636,12 @@ public class ManifestContractTests
         => new(Array.Empty<ITypeConverter>(), Array.Empty<ITypeNameFilter>(), Array.Empty<ITypeFilter>(),
             Options.Create(options), new CachedTypeResolver());
 
-    private static Type SelectImplementation(CodecProvider provider, Type contract, Type target)
+    private static Type SelectImplementation(CodecProvider provider, Type contract, Type target, bool materialize = true)
     {
         var searchType = target.IsConstructedGenericType ? target.GetGenericTypeDefinition() : target;
-        object?[] arguments = [contract, target, searchType, null];
+        object?[] arguments = [contract, target, searchType, null, null, materialize];
         Assert.Equal(true, typeof(CodecProvider).GetMethod("TrySelectImplementation", BindingFlags.Instance | BindingFlags.NonPublic,
-            [typeof(Type), typeof(Type), typeof(Type), typeof(Type).MakeByRefType()])!.Invoke(provider, arguments));
+            [typeof(Type), typeof(Type), typeof(Type), typeof(Type).MakeByRefType(), typeof(SerializationContract).MakeByRefType(), typeof(bool)])!.Invoke(provider, arguments));
         return Assert.IsAssignableFrom<Type>(arguments[3]);
     }
 
@@ -1480,6 +1769,35 @@ public class ManifestContractTests
     public sealed class ReferenceConstrainedCopier<T> : ShallowCopier<T> where T : class;
     public sealed class ConstructorConstrainedCopier<T> : ShallowCopier<T> where T : new();
     public sealed class ComparableConstrainedCopier<T> : ShallowCopier<T> where T : IComparable<T>;
+    public sealed class BaseConstrainedCopier<T> : ShallowCopier<T> where T : ConstraintBase;
+    public sealed class DisposableConstrainedCopier<T> : ShallowCopier<T> where T : IDisposable;
+    public sealed class NewDisposableConstrainedCopier<T> : ShallowCopier<T> where T : IDisposable, new();
+    public sealed class EnumerableConstrainedCopier<T, TItem> : ShallowCopier<GenericTarget<T, TItem>> where T : IEnumerable<TItem>;
+    public interface IConsumer<in T>;
+    public sealed class Consumer<T> : IConsumer<T>;
+    public interface IInvariant<T>;
+    public sealed class Invariant<T> : IInvariant<T>;
+    public sealed class ConsumerConstrainedCopier<T, TItem> : ShallowCopier<GenericTarget<T, TItem>> where T : IConsumer<TItem>;
+    public sealed class InvariantConstrainedCopier<T, TItem> : ShallowCopier<GenericTarget<T, TItem>> where T : IInvariant<TItem>;
+    public sealed class NestedConsumerConstrainedCopier<T, TItem> : ShallowCopier<GenericTarget<T, TItem>> where T : IConsumer<IEnumerable<TItem>>;
+    public sealed class ListConsumerConstrainedCopier<T, TItem> : ShallowCopier<GenericTarget<T, TItem>> where T : IConsumer<IReadOnlyList<TItem>>;
+    public class GenericBase<T>;
+    public sealed class GenericDerived<T> : GenericBase<T>;
+    public sealed class GenericBaseConstrainedCopier<T, TItem> : ShallowCopier<GenericTarget<T, TItem>> where T : GenericBase<TItem>;
+#if NET10_0_OR_GREATER
+    public sealed class AllowsByRefLikeCandidate<T> where T : allows ref struct;
+#endif
+    public sealed class StructListCodec<T> : IFieldCodec<List<T>> where T : struct
+    {
+        public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint id, [AllowNull] Type expected, [AllowNull] List<T> value)
+            where TBufferWriter : IBufferWriter<byte> => throw new NotSupportedException();
+        public List<T> ReadValue<TInput>(ref Reader<TInput> reader, Field field) => throw new NotSupportedException();
+    }
+    public sealed class StructListConverter<T> : IConverter<List<T>, GenericSurrogate<T>> where T : struct
+    {
+        public List<T> ConvertFromSurrogate(in GenericSurrogate<T> surrogate) => throw new NotSupportedException();
+        public GenericSurrogate<T> ConvertToSurrogate(in List<T> value) => throw new NotSupportedException();
+    }
     public sealed class PairFallbackCopier<TFirst, TSecond> : ShallowCopier<GenericTarget<TFirst, TSecond>>;
     public sealed class PairArrayFallbackCopier<TFirst, TSecond> : ShallowCopier<GenericTarget<TFirst, TSecond>[]>;
     public sealed class DependentConstrainedCopier<TBase, TDerived> : ShallowCopier<GenericTarget<TDerived, TBase>> where TDerived : TBase;

@@ -10,7 +10,10 @@ using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans
 {
@@ -23,7 +26,7 @@ namespace Orleans
         private readonly IRuntimeClient runtimeClient;
         private readonly ILogger logger;
         private readonly DeepCopier deepCopier;
-        private readonly DeepCopier<Response> _responseCopier;
+        private readonly InvocationContext _invocationContext;
         private readonly MessagingTrace messagingTrace;
         private readonly AdmissionGate _invocations = new();
         private readonly AdmissionGate _cancellations = new();
@@ -45,7 +48,10 @@ namespace Orleans
             this.runtimeClient = runtimeClient;
             this.deepCopier = deepCopier;
             this.messagingTrace = messagingTrace;
-            _responseCopier = responseCopier;
+            _invocationContext = new(
+                runtimeClient.ServiceProvider.GetRequiredService<ICodecProvider>(),
+                runtimeClient.ServiceProvider.GetRequiredService<CopyContextPool>(),
+                responseCopier);
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
             this.logger = logger;
         }
@@ -373,6 +379,7 @@ namespace Orleans
                         return;
                     }
 
+                    Response? response = null;
                     try
                     {
                         request.SetTarget(this);
@@ -382,28 +389,36 @@ namespace Orleans
                         }
 
                         var filters = _manager.GrainCallFilters;
-                        Response response;
+                        bool isCopied;
                         if (filters is { Count: > 0 } || LocalObject is IIncomingGrainCallFilter)
                         {
-                            var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._responseCopier);
+                            using var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping,
+                                _manager._invocationContext);
                             await invoker.Invoke();
-                            response = invoker.Response!;
+                            response = invoker.TakeResponse();
+                            // Filters can introduce grain-owned references anywhere in the result graph.
+                            isCopied = false;
                         }
                         else
                         {
-                            response = await request.Invoke();
-                            // The copier preserves the null state of its input.
-                            response = _manager._responseCopier.Copy(response)!;
+                            response = await request.Invoke(_manager._invocationContext);
+                            isCopied = response.Exception is null;
                         }
 
                         if (message.Direction != Message.Directions.OneWay)
                         {
-                            this.SendResponseAsync(message, response);
+                            var outgoing = response;
+                            response = null;
+                            this.SendResponseAsync(message, outgoing, isCopied);
                         }
                     }
                     catch (Exception exc)
                     {
                         this.ReportException(message, exc);
+                    }
+                    finally
+                    {
+                        response?.Dispose();
                     }
                 }
                 catch (Exception outerException)
@@ -456,31 +471,39 @@ namespace Orleans
             private void SendCanceledResponse(Message message) =>
                 _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
 
-            private void SendResponseAsync(Message message, Response resultObject)
+            private void SendResponseAsync(Message message, Response resultObject, bool isCopied)
             {
-                if (message.IsExpired)
-                {
-                    _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Respond);
-                    return;
-                }
-
-                Response deepCopy;
+                Response? response = resultObject;
                 try
                 {
-                    // we're expected to notify the caller if the deep copy failed.
-                    // The copier preserves the null state of its input.
-                    deepCopy = _manager.deepCopier.Copy(resultObject)!;
-                }
-                catch (Exception exc2)
-                {
-                    _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
-                    LogErrorSendingResponse(_manager.logger, exc2);
-                    return;
-                }
+                    if (message.IsExpired)
+                    {
+                        _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Respond);
+                        return;
+                    }
 
-                // the deep-copy succeeded.
-                _manager.runtimeClient.SendResponse(message, deepCopy);
-                return;
+                    if (!isCopied)
+                    {
+                        try
+                        {
+                            response = null;
+                            response = OrleansGeneratedCodeHelper.CopyResponseAndDispose(resultObject, _manager.deepCopier);
+                        }
+                        catch (Exception exc2)
+                        {
+                            _manager.runtimeClient.SendResponse(message, Response.FromException(exc2));
+                            LogErrorSendingResponse(_manager.logger, exc2);
+                            return;
+                        }
+                    }
+
+                    _manager.runtimeClient.SendResponse(message, response);
+                    response = null;
+                }
+                finally
+                {
+                    response?.Dispose();
+                }
             }
 
             private void ReportException(Message message, Exception exception)

@@ -1,4 +1,5 @@
-﻿#pragma warning disable
+﻿[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.RpcResponseFactories))]
+#pragma warning disable
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
@@ -12,14 +13,14 @@ namespace OrleansCodeGen.TestProject
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IComplexGrain), "67FE5808")]
-    public sealed class Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Runtime.TaskRequest<global::TestProject.ComplexData>
+    public sealed class Invokable_IComplexGrain_GrainReference_67FE5808 : global::Orleans.Runtime.TaskRequest<global::TestProject.ComplexData>, global::Orleans.Serialization.Invocation.IInvokable
     {
         public int arg0;
         public string arg1;
         public global::TestProject.ComplexData arg2;
         public global::System.Threading.CancellationToken arg3;
         global::TestProject.IComplexGrain _target;
-        private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IComplexGrain), "ProcessData", null, new[] { typeof(int), typeof(string), typeof(global::TestProject.ComplexData), typeof(global::System.Threading.CancellationToken) });
+        private static readonly global::System.Reflection.MethodInfo MethodBackingField = typeof(global::TestProject.IComplexGrain).GetMethod("ProcessData", 0, global::System.Reflection.BindingFlags.Public | global::System.Reflection.BindingFlags.NonPublic | global::System.Reflection.BindingFlags.Instance, null, new[] { typeof(int), typeof(string), typeof(global::TestProject.ComplexData), typeof(global::System.Threading.CancellationToken) }, null);
         global::System.Threading.CancellationTokenSource _cts;
         public override int GetArgumentCount() => 4;
         public override string GetMethodName() => "ProcessData";
@@ -99,6 +100,36 @@ namespace OrleansCodeGen.TestProject
         }
 
         public override bool IsCancellable => true;
+        global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context)
+        {
+            try
+            {
+                var factory = global::OrleansCodeGen.TestProject.RpcResponse_FC7DD5BDFactory.Resolve(context.CodecProvider);
+                if (!factory.IsSupported)
+                    return context.InvokeCompatibility(this);
+                var resultTask = InvokeInner();
+                if (resultTask.IsCompleted)
+                    return new(factory.RentCopied(resultTask.GetAwaiter().GetResult(), context.CopyContextPool));
+                return CompleteInvokeAsync(resultTask, factory, context.CopyContextPool);
+            }
+            catch (global::System.Exception exception)
+            {
+                return new(global::Orleans.Serialization.Invocation.Response.FromException(exception));
+            }
+        }
+
+        private static async global::System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> CompleteInvokeAsync(global::System.Threading.Tasks.Task<global::TestProject.ComplexData> resultTask, global::OrleansCodeGen.TestProject.RpcResponse_FC7DD5BDFactory factory, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            try
+            {
+                global::TestProject.ComplexData value = await resultTask;
+                return factory.RentCopied(value, contexts);
+            }
+            catch (global::System.Exception exception)
+            {
+                return global::Orleans.Serialization.Invocation.Response.FromException(exception);
+            }
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -435,6 +466,219 @@ namespace OrleansCodeGen.TestProject
     internal sealed class Activator_ComplexGrain : global::Orleans.Serialization.Activators.IActivator<global::TestProject.ComplexGrain>
     {
         public global::TestProject.ComplexGrain Create() => new global::TestProject.ComplexGrain();
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class RpcResponseFactories : global::Orleans.Serialization.SerializerContext
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions options)
+        {
+            options.AddDefaultSerializerService<RpcResponse_FC7DD5BDFactory>(static provider => new RpcResponse_FC7DD5BDFactory(provider));
+            options.AddDefaultSerializer<RpcResponse_FC7DD5BD>(static provider => RpcResponse_FC7DD5BDFactory.Resolve(provider), static provider => RpcResponse_FC7DD5BDFactory.Resolve(provider));
+            options.AddRawResponseReader<global::TestProject.ComplexData>(static provider => RpcResponse_FC7DD5BDFactory.Resolve(provider));
+            options.AddGenericArgumentMetadata(typeof(global::Orleans.Serialization.Invocation.Response<global::TestProject.ComplexData>));
+            options.AddGenericArgumentMetadata(typeof(global::TestProject.ComplexData));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCodec<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Codec_ComplexData>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCodec<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Codec_ComplexData>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Codec_ComplexData>(null !, provider)), dependencies: new global::System.Type[] { typeof(global::OrleansCodeGen.TestProject.Codec_ComplexData) });
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Invocation.PooledResponseCopier<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Copier_ComplexData>>(static provider => new global::Orleans.Serialization.Invocation.PooledResponseCopier<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Copier_ComplexData>(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Copier_ComplexData>(null !, provider)), dependencies: new global::System.Type[] { typeof(global::OrleansCodeGen.TestProject.Copier_ComplexData) });
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response<global::TestProject.ComplexData>, global::Orleans.Serialization.Invocation.PooledResponseCodec<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Codec_ComplexData>, global::Orleans.Serialization.Invocation.PooledResponseCopier<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Copier_ComplexData>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCodec<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Codec_ComplexData>>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Invocation.PooledResponseCopier<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Copier_ComplexData>>(null !, provider), codecDependencies: new global::System.Type[] { typeof(global::OrleansCodeGen.TestProject.Codec_ComplexData) }, copierDependencies: new global::System.Type[] { typeof(global::OrleansCodeGen.TestProject.Copier_ComplexData) });
+            options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.Response<global::TestProject.ComplexData>));
+            options.AddDefaultSerializerService<global::OrleansCodeGen.TestProject.Codec_ComplexData>(static provider => new global::OrleansCodeGen.TestProject.Codec_ComplexData());
+            options.AddDefaultSerializerService<global::OrleansCodeGen.TestProject.Copier_ComplexData>(static provider => new global::OrleansCodeGen.TestProject.Copier_ComplexData());
+            options.AddDefaultSerializer<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Codec_ComplexData, global::OrleansCodeGen.TestProject.Copier_ComplexData>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Codec_ComplexData>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Copier_ComplexData>(null !, provider));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ComplexData>, global::OrleansCodeGen.TestProject.Codec_ComplexData>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Codec_ComplexData>(null !, provider), dependencies: new global::System.Type[] { });
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ComplexData>, global::OrleansCodeGen.TestProject.Copier_ComplexData>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.TestProject.Copier_ComplexData>(null !, provider), dependencies: new global::System.Type[] { });
+            options.AddAllowedType(typeof(global::TestProject.ComplexData));
+            options.AddGenericArgumentMetadata(typeof(int));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.Int32Codec>(static provider => new global::Orleans.Serialization.Codecs.Int32Codec());
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<int>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<int>());
+            options.AddDefaultSerializer<int, global::Orleans.Serialization.Codecs.Int32Codec, global::Orleans.Serialization.Cloning.ShallowCopier<int>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.Int32Codec>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<int>>(null !, provider));
+            options.AddAllowedType(typeof(int));
+            options.AddGenericArgumentMetadata(typeof(string));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Codecs.StringCodec>(static provider => new global::Orleans.Serialization.Codecs.StringCodec());
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<string>());
+            options.AddDefaultSerializer<string, global::Orleans.Serialization.Codecs.StringCodec, global::Orleans.Serialization.Cloning.ShallowCopier<string>>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.StringCodec>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<string>>(null !, provider));
+            options.AddAllowedType(typeof(string));
+            options.AddDefaultSerializerService<ResponseFieldCodec>(static provider => new ResponseFieldCodec());
+            options.AddDefaultSerializerService<ResponseFieldCopier>(static provider => new ResponseFieldCopier());
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.Response>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCodec>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<ResponseFieldCopier>(null !, provider));
+            options.AddDefaultSerializerService<CompletedResponseActivator>(static provider => new CompletedResponseActivator());
+            options.AddDefaultSerializerService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(static provider => new global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse(global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<CompletedResponseActivator>(null !, provider)));
+            options.AddDefaultSerializerService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(static provider => new global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>());
+            options.AddDefaultSerializer<global::Orleans.Serialization.Invocation.CompletedResponse>(static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::OrleansCodeGen.Orleans.Serialization.Invocation.Codec_CompletedResponse>(null !, provider), static provider => global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Cloning.ShallowCopier<global::Orleans.Serialization.Invocation.CompletedResponse>>(null !, provider));
+            options.AddAllowedType(typeof(global::Orleans.Serialization.Invocation.CompletedResponse));
+        }
+
+        private sealed class CompletedResponseActivator : global::Orleans.Serialization.Activators.IActivator<global::Orleans.Serialization.Invocation.CompletedResponse>
+        {
+            public CompletedResponseActivator()
+            {
+            }
+
+            public global::Orleans.Serialization.Invocation.CompletedResponse Create() => global::Orleans.Serialization.Invocation.CompletedResponse.Instance;
+        }
+
+        private sealed class ResponseFieldCodec : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::Orleans.Serialization.Invocation.Response>
+        {
+            public ResponseFieldCodec()
+            {
+            }
+        }
+
+        private sealed class ResponseFieldCopier : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.Invocation.Response>
+        {
+            public ResponseFieldCopier()
+            {
+            }
+
+            [return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
+            public global::Orleans.Serialization.Invocation.Response DeepCopy(global::Orleans.Serialization.Invocation.Response input, global::Orleans.Serialization.Cloning.CopyContext context)
+            {
+                if (context is null)
+                    throw new global::System.ArgumentNullException(nameof(context));
+                if (input is global::Orleans.Serialization.Invocation.CompletedResponse or global::Orleans.Serialization.Invocation.ExceptionResponse)
+                    return input;
+                return (global::Orleans.Serialization.Invocation.Response)global::Orleans.Serialization.Codecs.ObjectCopier.DeepCopy(input, context);
+            }
+        }
+    }
+
+    internal sealed class RpcResponse_FC7DD5BD : global::Orleans.Serialization.Invocation.Response, global::Orleans.Serialization.Invocation.IRawResponseWriter
+    {
+        internal global::TestProject.ComplexData Value;
+        private RpcResponse_FC7DD5BDFactory _factory;
+        public RpcResponse_FC7DD5BD()
+        {
+        }
+
+        internal static RpcResponse_FC7DD5BD Rent(global::TestProject.ComplexData value, RpcResponse_FC7DD5BDFactory factory)
+        {
+            var result = global::Orleans.Serialization.Invocation.ResponsePool.GetGenerated<RpcResponse_FC7DD5BD>();
+            result.Value = value;
+            result._factory = factory;
+            return result;
+        }
+
+        public override object Result { get => Value; set => Value = (global::TestProject.ComplexData)value; }
+
+        public override global::System.Exception Exception { get => null; set => throw new global::System.InvalidOperationException("Successful response holders contain result values."); }
+
+        public override global::System.Type GetSimpleResultType() => typeof(global::TestProject.ComplexData);
+        public override T GetResult<T>()
+        {
+            if (typeof(T) == typeof(global::TestProject.ComplexData))
+                return global::System.Runtime.CompilerServices.Unsafe.As<global::TestProject.ComplexData, T>(ref Value);
+            return (T)(object)Value;
+        }
+
+        public void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (_factory is null)
+                throw new global::System.ObjectDisposedException(GetType().Name);
+            _factory.WriteResult(ref writer, Value);
+        }
+
+        public override void Dispose()
+        {
+            if (_factory is null)
+                return;
+            Value = default;
+            _factory = null;
+            global::Orleans.Serialization.Invocation.ResponsePool.ReturnGenerated(this);
+        }
+    }
+
+    internal sealed class RpcResponse_FC7DD5BDFactory : global::Orleans.Serialization.Invocation.ResponseCodec, global::Orleans.Serialization.Codecs.IFieldCodec<RpcResponse_FC7DD5BD>, global::Orleans.Serialization.Cloning.IDeepCopier<RpcResponse_FC7DD5BD>
+    {
+        private readonly global::OrleansCodeGen.TestProject.Codec_ComplexData _codec;
+        private readonly global::OrleansCodeGen.TestProject.Copier_ComplexData _copier;
+        public override bool IsSupported { get; }
+
+        internal static RpcResponse_FC7DD5BDFactory Resolve(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            return global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<RpcResponse_FC7DD5BDFactory>(null, provider);
+        }
+
+        public RpcResponse_FC7DD5BDFactory(global::Orleans.Serialization.Serializers.ICodecProvider provider)
+        {
+            _codec = provider.GetCodec<global::TestProject.ComplexData>() as global::OrleansCodeGen.TestProject.Codec_ComplexData;
+            _copier = provider.GetDeepCopier<global::TestProject.ComplexData>() as global::OrleansCodeGen.TestProject.Copier_ComplexData;
+            var responseCodec = provider.GetCodec<global::Orleans.Serialization.Invocation.Response<global::TestProject.ComplexData>>();
+            var responseCopier = provider.GetDeepCopier<global::Orleans.Serialization.Invocation.Response<global::TestProject.ComplexData>>();
+            IsSupported = _codec is not null && _copier is not null && (responseCodec.GetType() == typeof(global::Orleans.Serialization.Invocation.PooledResponseCodec<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Codec_ComplexData>) || responseCodec.GetType() == typeof(global::Orleans.Serialization.Invocation.PooledResponseCodec<global::TestProject.ComplexData, global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ComplexData>>)) && (responseCopier.GetType() == typeof(global::Orleans.Serialization.Invocation.PooledResponseCopier<global::TestProject.ComplexData, global::OrleansCodeGen.TestProject.Copier_ComplexData>) || responseCopier.GetType() == typeof(global::Orleans.Serialization.Invocation.PooledResponseCopier<global::TestProject.ComplexData, global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ComplexData>>));
+        }
+
+        internal global::Orleans.Serialization.Invocation.Response RentCopied(global::TestProject.ComplexData value, global::Orleans.Serialization.Cloning.CopyContextPool contexts)
+        {
+            using var context = contexts.GetContext();
+            return RpcResponse_FC7DD5BD.Rent(_copier.DeepCopy(value, context), this);
+        }
+
+        [return: global::System.Diagnostics.CodeAnalysis.NotNullIfNotNull("input")]
+        public RpcResponse_FC7DD5BD DeepCopy(RpcResponse_FC7DD5BD input, global::Orleans.Serialization.Cloning.CopyContext context) => input is null ? null : RpcResponse_FC7DD5BD.Rent(_copier.DeepCopy(input.Value, context), this);
+        internal void WriteResult<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.ComplexData value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            writer.WriteStartObject(0, null, typeof(global::TestProject.ComplexData));
+            if (value is not null)
+            {
+                _codec.WriteField(ref writer, 0, typeof(global::TestProject.ComplexData), value);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        public override void WriteRaw<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, object value) => WriteResult(ref writer, ((RpcResponse_FC7DD5BD)value).Value);
+        public override object ReadRaw<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field) => ReadResult(ref reader, ref field);
+        private RpcResponse_FC7DD5BD ReadResult<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, scoped ref global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            field.EnsureWireTypeTagDelimited();
+            var result = RpcResponse_FC7DD5BD.Rent(default, this);
+            try
+            {
+                reader.ReadFieldHeader(ref field);
+                if (!field.IsEndBaseOrEndObject)
+                {
+                    result.Value = _codec.ReadValue(ref reader, field);
+                    reader.ReadFieldHeader(ref field);
+                    reader.ConsumeEndBaseOrEndObject(ref field);
+                }
+
+                return result;
+            }
+            catch
+            {
+                result.Dispose();
+                throw;
+            }
+        }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, RpcResponse_FC7DD5BD value)
+            where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
+        {
+            if (value is null)
+            {
+                global::Orleans.Serialization.Codecs.ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);
+                return;
+            }
+
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(writer.Session);
+            writer.WriteStartObject(fieldIdDelta, expectedType, typeof(global::Orleans.Serialization.Invocation.Response<global::TestProject.ComplexData>));
+            if (value.Value is not null)
+            {
+                _codec.WriteField(ref writer, 0, typeof(global::TestProject.ComplexData), value.Value);
+            }
+
+            writer.WriteEndObject();
+        }
+
+        public RpcResponse_FC7DD5BD ReadValue<TInput>(ref global::Orleans.Serialization.Buffers.Reader<TInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
+        {
+            if (field.IsReference)
+                return global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<RpcResponse_FC7DD5BD, TInput>(ref reader, field);
+            global::Orleans.Serialization.Codecs.ReferenceCodec.MarkValueField(reader.Session);
+            return ReadResult(ref reader, ref field);
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]

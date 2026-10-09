@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
 using Orleans.Serialization.Invocation;
@@ -9,16 +8,14 @@ namespace Orleans.Runtime
     /// <summary>
     /// Invokes a request on a grain reference.
     /// </summary>
-    internal sealed class OutgoingCallInvoker<TResult> : IOutgoingGrainCallContext
+    internal sealed class OutgoingCallInvoker<TResult> : GrainCallInvoker, IOutgoingGrainCallContext
     {
-        private readonly IInvokable request;
         private readonly InvokeMethodOptions options;
         private readonly Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest;
         private readonly IOutgoingGrainCallFilter[] filters;
         private readonly int stages;
         private readonly GrainReference grainReference;
         private readonly IOutgoingGrainCallFilter? requestFilter;
-        private int stage;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="OutgoingCallInvoker{TResult}"/> class.
@@ -33,9 +30,8 @@ namespace Orleans.Runtime
             IInvokable request,
             InvokeMethodOptions options,
             Action<GrainReference, IResponseCompletionSource, IInvokable, InvokeMethodOptions> sendRequest,
-            IOutgoingGrainCallFilter[] filters)
+            IOutgoingGrainCallFilter[] filters) : base(request)
         {
-            this.request = request;
             this.options = options;
             this.sendRequest = sendRequest;
             this.grainReference = grain;
@@ -50,92 +46,33 @@ namespace Orleans.Runtime
             }
         }
 
-        public IInvokable Request => this.request;
+        public override object Grain => this.grainReference;
 
-        public object Grain => this.grainReference;
-
-        public MethodInfo InterfaceMethod => request.GetMethod();
-
-        public object? Result { get => TypedResult; set => TypedResult = (TResult?)value; }
-
-        public Response? Response { get; set; }
+        public override object? Result { get => TypedResult; set => TypedResult = (TResult?)value; }
 
         public TResult? TypedResult { get => Response!.GetResult<TResult>(); set => Response = Response.FromResult(value); }
 
         public IGrainContext? SourceContext { get; }
 
-        public GrainId? SourceId => SourceContext?.GrainId;
+        public override GrainId? SourceId => SourceContext?.GrainId;
 
-        public GrainId TargetId => grainReference.GrainId;
+        public override GrainId TargetId => grainReference.GrainId;
 
-        public GrainInterfaceType InterfaceType => grainReference.InterfaceType;
+        public override GrainInterfaceType InterfaceType => grainReference.InterfaceType;
 
-        public string InterfaceName => request.GetInterfaceName();
+        protected override int FilterCount => stages;
 
-        public string MethodName => request.GetMethodName();
+        protected override Task InvokeFilter(int index) => index < filters.Length
+            ? filters[index].Invoke(this) : requestFilter!.Invoke(this);
 
-        public async Task Invoke()
+        protected override string GetFilterName(int index) => index < filters.Length
+            ? filters[index].GetType().Name : requestFilter!.GetType().Name;
+
+        protected override async Task InvokeInner()
         {
-            try
-            {
-                // Execute each stage in the pipeline. Each successive call to this method will invoke the next stage.
-                // Stages which are not implemented (eg, because the user has not specified an interceptor) are skipped.
-                if (stage < this.filters.Length)
-                {
-                    // Call each of the specified interceptors.
-                    var systemWideFilter = this.filters[stage];
-                    stage++;
-                    await systemWideFilter.Invoke(this);
-
-                    // If Response is null some filter did not continue the call chain
-                    if (this.Response is null)
-                    {
-                        ThrowBrokenCallFilterChain(systemWideFilter.GetType().Name);
-                    }
-
-                    return;
-                }
-                else if (stage < this.stages)
-                {
-                    stage++;
-                    await this.requestFilter!.Invoke(this);
-
-                    // If Response is null some filter did not continue the call chain
-                    if (this.Response is null)
-                    {
-                        ThrowBrokenCallFilterChain(this.requestFilter.GetType().Name);
-                    }
-
-                    return;
-                }
-                else if (stage == this.stages)
-                {
-                    // Finally call the root-level invoker.
-                    stage++;
-                    var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                    this.sendRequest(this.grainReference, responseCompletionSource, this.request, this.options);
-                    this.Response = await responseCompletionSource.AsValueTask().ConfigureAwait(false);
-
-                    return;
-                }
-            }
-            finally
-            {
-                stage--;
-            }
-
-            // If this method has been called more than the expected number of times, that is invalid.
-            ThrowInvalidCall();
-        }
-
-        private void ThrowInvalidCall()
-        {
-            throw new InvalidOperationException($"{typeof(OutgoingCallInvoker<TResult>)}.{nameof(Invoke)}() received an invalid call.");
-        }
-
-        private void ThrowBrokenCallFilterChain(string filterName)
-        {
-            throw new InvalidOperationException($"{typeof(OutgoingCallInvoker<TResult>)}.{nameof(Invoke)}() invoked a broken filter: {filterName}.");
+            var completion = ResponseCompletionSourcePool.Get();
+            sendRequest(grainReference, completion, Request, options);
+            Response = await completion.AsValueTask().ConfigureAwait(false);
         }
     }
 }

@@ -11,6 +11,7 @@ using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
@@ -21,6 +22,75 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     /// </summary>
     public static class OrleansGeneratedCodeHelper
     {
+        /// <summary>
+        /// Copies an invocation response and releases its original envelope when the copier returns a different response.
+        /// </summary>
+        /// <param name="response">The owned response to copy.</param>
+        /// <param name="copier">The selected response copier.</param>
+        /// <returns>The response whose ownership is transferred to the caller.</returns>
+        public static Response CopyResponseAndDispose(Response response, DeepCopier<Response> copier)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(copier);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(response);
+            Response? copy = null;
+            try
+            {
+                return copy = copier.Copy(response)!;
+            }
+            finally
+            {
+                ReleaseSupersededResponse(response, copy);
+            }
+        }
+
+        /// <summary>
+        /// Copies an invocation response using runtime-type dispatch and releases a superseded envelope.
+        /// </summary>
+        /// <param name="response">The owned response to copy.</param>
+        /// <param name="copier">The selected runtime-dispatch copier.</param>
+        /// <returns>The response whose ownership is transferred to the caller.</returns>
+        public static Response CopyResponseAndDispose(Response response, DeepCopier copier)
+        {
+            ArgumentNullExceptionPolyfill.ThrowIfNull(copier);
+            ArgumentNullExceptionPolyfill.ThrowIfNull(response);
+            Response? copy = null;
+            try
+            {
+                return copy = copier.Copy(response)!;
+            }
+            finally
+            {
+                ReleaseSupersededResponse(response, copy);
+            }
+        }
+
+        private static void ReleaseSupersededResponse(Response response, Response? copy)
+        {
+            if (!ReferenceEquals(response, copy)) response.Dispose();
+        }
+
+        /// <summary>
+        /// Creates the default activator for a statically specified reference type.
+        /// </summary>
+        /// <typeparam name="T">The reference type to activate.</typeparam>
+        /// <returns>The default reference-type activator.</returns>
+        public static IActivator<T> CreateDefaultReferenceTypeActivator<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+        T>() where T : class => new DefaultReferenceTypeActivator<T>();
+
+        /// <summary>
+        /// Creates the default activator for a statically specified value type.
+        /// </summary>
+        /// <typeparam name="T">The value type to activate.</typeparam>
+        /// <returns>The default value-type activator.</returns>
+        public static IActivator<T> CreateDefaultValueTypeActivator<
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+#endif
+        T>() where T : struct => new DefaultValueTypeActivator<T>();
+
         private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
 
         internal static void EnterServiceResolution(ICodecProvider provider, CodecProvider.ConstructionScope scope)

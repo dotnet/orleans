@@ -28,6 +28,14 @@ namespace Orleans.Serialization.Invocation
         ValueTask<Response> Invoke();
 
         /// <summary>
+        /// Invokes the method and isolates its successful result before returning to incoming filters.
+        /// </summary>
+        /// <param name="context">The provider-owned services used to isolate the result.</param>
+        /// <returns>An owned response whose successful result is isolated.</returns>
+        /// <remarks>Exception envelopes retain the original exception for filters and are copied at delivery.</remarks>
+        ValueTask<Response> Invoke(InvocationContext context) => context.Invoke(this);
+
+        /// <summary>
         /// Gets the number of arguments.
         /// </summary>
         int GetArgumentCount();

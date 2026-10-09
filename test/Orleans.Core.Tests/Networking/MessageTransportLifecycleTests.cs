@@ -25,6 +25,8 @@ using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 using TestExtensions;
 using Xunit;
@@ -556,6 +558,195 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task MessageWriteRequest_Success_ReleasesResponseBodiesOnce()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CapturingTransport();
+        var holder = new TrackedRawResponse("generated payload");
+        var legacy = Response.FromResult("legacy payload");
+        var sent = 0;
+        var connection = new ResponseSendConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter,
+            message =>
+            {
+                Assert.NotNull(message._bodyObject);
+                Assert.Equal(0, holder.DisposeCount);
+                Assert.Equal("legacy payload", legacy.GetResult<string>());
+                sent++;
+            });
+        var request = shared.GetSendMessageHandler(connection);
+        var generatedMessage = new Message { Direction = Message.Directions.Response, BodyObject = holder };
+        var legacyMessage = new Message { Direction = Message.Directions.Response, BodyObject = legacy };
+        byte[] payload = [1, 2, 3];
+        var ordinaryMessage = new Message { Direction = Message.Directions.Request, BodyObject = payload };
+        request.WriteMessage(generatedMessage);
+        request.WriteMessage(legacyMessage);
+        request.WriteMessage(ordinaryMessage);
+        Assert.Equal(0, holder.DisposeCount);
+        Assert.Equal("generated payload", holder.GetResult<string>());
+
+        Assert.True(transport.EnqueueWrite(request));
+
+        Assert.Equal(3, sent);
+        Assert.Equal(1, holder.DisposeCount);
+        Assert.Null(holder.Result);
+        Assert.Null(legacy.GetResult<string>());
+        Assert.Null(generatedMessage._bodyObject);
+        Assert.Null(legacyMessage._bodyObject);
+        Assert.Same(payload, ordinaryMessage._bodyObject);
+        Assert.Equal(0, request.MessageCount);
+        Assert.Equal(0, request.Length);
+        generatedMessage.Dispose();
+        legacyMessage.Dispose();
+        Assert.Equal(1, holder.DisposeCount);
+        await connection.CloseAsync(null);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MessageWriteRequest_WriteFailure_PreservesResponseForSuccessfulRetry(bool direct)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CapturingTransport();
+        var connection = new ResponseSendConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        var response = direct ? (Response)new TrackedRawResponse("retry payload") : Response.FromResult("retry payload");
+        var message = new Message { Direction = Message.Directions.Response, BodyObject = response };
+        var request = shared.GetSendMessageHandler(connection);
+        request.WriteMessage(message);
+        var firstFrame = new byte[request.Length];
+        request.Buffers.Consume(firstFrame);
+        var failure = new IOException("write failed");
+
+        request.SetException(failure);
+        var rerouted = await connection.Retried.WaitAsync(TestContext.Current.CancellationToken);
+
+        Assert.Same(message, rerouted.Message);
+        Assert.Same(failure, rerouted.Error);
+        Assert.Same(response, message._bodyObject);
+        Assert.Equal("retry payload", response.GetResult<string>());
+        if (response is TrackedRawResponse holder) Assert.Equal(0, holder.DisposeCount);
+        Assert.Equal(0, request.MessageCount);
+        request = shared.GetSendMessageHandler(connection);
+        request.WriteMessage(message);
+        Assert.True(transport.EnqueueWrite(request));
+        Assert.Equal(firstFrame, transport.Written);
+        Assert.Null(message._bodyObject);
+        Assert.Null(response.Result);
+        if (response is TrackedRawResponse returned) Assert.Equal(1, returned.DisposeCount);
+        await connection.CloseAsync(null);
+    }
+
+    [Fact]
+    public async Task MessageWriteRequest_SerializationFailure_RetainsResponseAndValidPrefix()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CapturingTransport();
+        var connection = new ResponseSendConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        var request = shared.GetSendMessageHandler(connection);
+        request.WriteMessage(new Message());
+        var validLength = request.Length;
+        var response = new TrackedRawResponse("serialization retry") { FailWriting = true };
+        var message = new Message { Direction = Message.Directions.Response, BodyObject = response };
+
+        Assert.Throws<InvalidOperationException>(() => request.WriteMessage(message));
+
+        Assert.Equal(validLength, request.Length);
+        Assert.Equal(1, request.MessageCount);
+        Assert.Same(response, message._bodyObject);
+        Assert.Equal("serialization retry", response.Result);
+        Assert.Equal(0, response.DisposeCount);
+        response.FailWriting = false;
+        request.WriteMessage(message);
+        Assert.True(transport.EnqueueWrite(request));
+        Assert.Null(message._bodyObject);
+        Assert.Null(response.Result);
+        Assert.Equal(1, response.DisposeCount);
+        await connection.CloseAsync(null);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Message_TerminalDisposeOrReplacement_ReleasesResponseOnce(bool replace)
+    {
+        var response = new TrackedRawResponse("owned payload");
+        var message = new Message { Direction = Message.Directions.Response, BodyObject = response };
+        message.BodyObject = response;
+        Assert.Equal(0, response.DisposeCount);
+
+        if (replace) message.BodyObject = Response.FromException(new IOException("replacement"));
+        else message.Dispose();
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        message.Dispose();
+        message.Dispose();
+        Assert.Null(message._bodyObject);
+        Assert.Equal(1, response.DisposeCount);
+    }
+
+    [Fact]
+    public async Task MessageWriteRequest_FailedWriteThenTerminalDrop_ReleasesRetainedResponse()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CapturingTransport();
+        var connection = new ResponseSendConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        var response = new TrackedRawResponse("failed write");
+        var message = new Message { Direction = Message.Directions.Response, BodyObject = response };
+        var request = shared.GetSendMessageHandler(connection);
+        request.WriteMessage(message);
+
+        request.SetException(new IOException("reroute"));
+        var retry = await connection.Retried.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Same(response, retry.Message._bodyObject);
+        Assert.Equal(0, response.DisposeCount);
+        retry.Message.Dispose();
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        Assert.Null(message._bodyObject);
+        await connection.CloseAsync(null);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Connection_SerializationFailure_ReleasesReplacedOrDroppedResponse(bool exhaustedRetries)
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        await using var transport = new CapturingTransport();
+        var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connection = new ResponseSendConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter,
+            message =>
+            {
+                Assert.IsType<ExceptionResponse>(message._bodyObject);
+                sent.TrySetResult();
+            });
+        var response = new TrackedRawResponse("bad serialization") { FailWriting = true };
+        var message = new Message
+        {
+            Direction = Message.Directions.Response,
+            BodyObject = response,
+            RetryCount = (short)(exhaustedRetries ? MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES : 0),
+        };
+
+        connection.Send(message);
+        if (!exhaustedRetries) await sent.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await response.Disposed.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await connection.CloseAsync(null);
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        Assert.Null(message._bodyObject);
+        Assert.Equal(exhaustedRetries ? MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES : 1, message.RetryCount);
+    }
+
+    [Fact]
     public void MessageWriteRequest_LargeMessageState_TracksFramesAndAdaptsPageSize()
     {
         using var serviceProvider = CreateServiceProvider();
@@ -986,6 +1177,50 @@ public class MessageTransportLifecycleTests
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
         protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
         public void Dispose() => _releaseSend.Dispose();
+    }
+
+    private sealed class ResponseSendConnection(
+        MessageTransport transport,
+        ConnectionCommon shared,
+        IMessageCenter messageCenter,
+        Action<Message>? recordSend = null) : Connection(transport, shared)
+    {
+        private readonly TaskCompletionSource<(Message Message, Exception? Error)> _retried = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<(Message Message, Exception? Error)> Retried => _retried.Task;
+        protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
+        protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
+        protected override IMessageCenter MessageCenter => messageCenter;
+        protected override bool PrepareMessageForSend(Message msg) => true;
+        protected override void RetryMessage(Message msg, Exception? ex = null) => _retried.SetResult((msg, ex));
+        protected internal override void OnReceivedMessage(Message message) { }
+        protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
+        protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) => recordSend?.Invoke(message);
+    }
+
+    private sealed class TrackedRawResponse(string payload) : Response, IRawResponseWriter
+    {
+        private readonly TaskCompletionSource _disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int DisposeCount { get; private set; }
+        public Task Disposed => _disposed.Task;
+        public bool FailWriting { get; set; }
+        public override object? Result { get; set; } = payload;
+        public override Exception? Exception { get; set; }
+        public override Type GetSimpleResultType() => typeof(string);
+        public override T GetResult<T>() => (T)Result!;
+        public override void Dispose()
+        {
+            DisposeCount++;
+            Result = null;
+            _disposed.TrySetResult();
+        }
+
+        public void WriteRaw<TBufferWriter>(ref Writer<TBufferWriter> writer) where TBufferWriter : IBufferWriter<byte>
+        {
+            writer.WriteStartObject(0, null!, typeof(string));
+            if (Result is string value) StringCodec.WriteField(ref writer, 0, value);
+            if (FailWriting) throw new InvalidOperationException("response serialization failed");
+            writer.WriteEndObject();
+        }
     }
 
     private sealed class CancelableTransport(bool completeWrites = false) : MessageTransport

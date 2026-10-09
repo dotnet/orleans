@@ -3407,7 +3407,7 @@ namespace OrleansCodeGen.Orleans.Streams
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Streams.IStreamCheckpointerGrain), "7AB50A87" })]
-    public sealed partial class Invokable_IStreamCheckpointerGrain_GrainReference_7AB50A87 : global::Orleans.Runtime.Request<string>
+    public sealed partial class Invokable_IStreamCheckpointerGrain_GrainReference_7AB50A87 : global::Orleans.Runtime.Request<string>, global::Orleans.Serialization.Invocation.IInvokable, System.IDisposable
     {
         public string arg0;
         public string arg1;
@@ -3436,6 +3436,8 @@ namespace OrleansCodeGen.Orleans.Streams
 
         protected override System.Threading.Tasks.ValueTask<string> InvokeInner() { throw null; }
 
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
+
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
@@ -3447,7 +3449,7 @@ namespace OrleansCodeGen.Orleans.Streams
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Streams.IStreamCheckpointerGrain), "DE3727A1" })]
-    public sealed partial class Invokable_IStreamCheckpointerGrain_GrainReference_DE3727A1 : global::Orleans.Runtime.Request<string>
+    public sealed partial class Invokable_IStreamCheckpointerGrain_GrainReference_DE3727A1 : global::Orleans.Runtime.Request<string>, global::Orleans.Serialization.Invocation.IInvokable, System.IDisposable
     {
         public System.Threading.CancellationToken arg0;
         public override bool IsCancellable { get { throw null; } }
@@ -3473,6 +3475,8 @@ namespace OrleansCodeGen.Orleans.Streams
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.ValueTask<string> InvokeInner() { throw null; }
+
+        System.Threading.Tasks.ValueTask<global::Orleans.Serialization.Invocation.Response> global::Orleans.Serialization.Invocation.IInvokable.Invoke(global::Orleans.Serialization.Invocation.InvocationContext context) { throw null; }
 
         public override void SetArgument(int index, object value) { }
 

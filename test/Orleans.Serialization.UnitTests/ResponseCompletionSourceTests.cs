@@ -23,7 +23,7 @@ public class ResponseCompletionSourceTests
         var awaiter = source.AsValueTask().GetAwaiter();
         var continuation = RegisterContinuation(awaiter);
 
-        using var response = Response.FromResult(42);
+        var response = Response.FromResult(42);
         continuation.CompletionThreadId = Thread.CurrentThread.ManagedThreadId;
         source.Complete(response);
 
@@ -57,6 +57,155 @@ public class ResponseCompletionSourceTests
         finally
         {
             (result ?? response).Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task TypedCompletionConsumesEnvelopeAndPreservesPayload()
+    {
+        var payload = new[] { 17, 25, 42 };
+        var response = new TrackedResponse(payload);
+        var source = ResponseCompletionSourcePool.Get<int[]>();
+
+        source.Complete(response);
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        Assert.Null(response.Binding);
+        Assert.Same(payload, await source.AsValueTask());
+        Assert.Equal(new[] { 17, 25, 42 }, payload);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TypedCompletionConsumesBothResponseOverloads(bool typedOverload)
+    {
+        var payload = new[] { 17, 25, 42 };
+        var response = ResponsePool.Get<int[]>();
+        response.TypedResult = payload;
+        var source = ResponseCompletionSourcePool.Get<int[]>();
+
+        if (typedOverload) source.Complete(response);
+        else source.Complete((Response)response);
+
+        Assert.Null(response.TypedResult);
+        Assert.Same(payload, await source.AsValueTask());
+    }
+
+    [Fact]
+    public async Task TypedCompletionInvalidCastReleasesEnvelope()
+    {
+        var response = new TrackedResponse("wrong result type");
+        var source = ResponseCompletionSourcePool.Get<int>();
+
+        source.Complete(response);
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        Assert.Null(response.Binding);
+        var exception = await Assert.ThrowsAsync<InvalidCastException>(() => source.AsValueTask().AsTask());
+        Assert.Contains(typeof(int).ToString(), exception.Message);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TypedCompletionPreservesDefaultResults(bool completed)
+    {
+        var source = ResponseCompletionSourcePool.Get<int>();
+        source.Complete(completed ? Response.Completed : new TrackedResponse(null));
+        Assert.Equal(0, await source.AsValueTask());
+    }
+
+    [Fact]
+    public void FailedResultExtractionReleasesEnvelope()
+    {
+        var failure = new InvalidOperationException("result extraction failed");
+        var response = new TrackedResponse(new[] { 17, 25, 42 }) { Failure = failure };
+        var source = new ResponseCompletionSource<int[]>();
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => source.Complete(response)));
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Binding);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExceptionCompletionConsumesEnvelopeAndPreservesException(bool typed)
+    {
+        var failure = new InvalidOperationException("remote failure");
+        var response = new TrackedResponse(null) { Exception = failure };
+        Task completion;
+        if (typed)
+        {
+            var source = ResponseCompletionSourcePool.Get<int>();
+            source.Complete(response);
+            completion = source.AsValueTask().AsTask();
+        }
+        else
+        {
+            var source = ResponseCompletionSourcePool.Get();
+            source.Complete(response);
+            completion = source.AsValueTask().AsTask();
+        }
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Binding);
+        Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(() => completion));
+    }
+
+    [Fact]
+    public async Task UntypedCompletionTransfersEnvelopeToConsumer()
+    {
+        var payload = new[] { 17, 25, 42 };
+        var response = new TrackedResponse(payload);
+        var source = ResponseCompletionSourcePool.Get();
+
+        source.Complete(response);
+        var received = await source.AsValueTask();
+
+        Assert.Same(response, received);
+        Assert.Equal(0, response.DisposeCount);
+        Assert.Same(payload, received.GetResult<int[]>());
+        received.Dispose();
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        Assert.Null(response.Binding);
+    }
+
+    [Fact]
+    public async Task UntypedVoidConsumptionReleasesEnvelope()
+    {
+        var response = new TrackedResponse(new[] { 17, 25, 42 });
+        var source = ResponseCompletionSourcePool.Get();
+        var completion = source.AsVoidValueTask();
+
+        source.Complete(response);
+        Assert.Equal(0, response.DisposeCount);
+        await completion;
+
+        Assert.Equal(1, response.DisposeCount);
+        Assert.Null(response.Result);
+        Assert.Null(response.Binding);
+    }
+
+    private sealed class TrackedResponse(object? payload) : Response
+    {
+        private object? _result = payload;
+        public int DisposeCount { get; private set; }
+        public object? Binding { get; private set; } = new();
+        public Exception? Failure { get; init; }
+        public override object? Result { get => Failure is { } failure ? throw failure : _result; set => _result = value; }
+        public override Exception? Exception { get; set; }
+        public override T GetResult<T>() => (T)Result!;
+        public override void Dispose()
+        {
+            DisposeCount++;
+            Result = null;
+            Binding = null;
         }
     }
 

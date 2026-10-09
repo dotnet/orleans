@@ -87,7 +87,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         {
             foreach (var (message, _, _) in _messages)
             {
-                message.ReleaseBodyBuffer();
+                message.ReleaseBody();
             }
 
             Reset();

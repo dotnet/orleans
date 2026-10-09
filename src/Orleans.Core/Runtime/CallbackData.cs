@@ -239,7 +239,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                var body = message.BodyObject;
+                var body = message.TakeBodyObject();
                 if (body is Response response)
                 {
                     context.Complete(response);

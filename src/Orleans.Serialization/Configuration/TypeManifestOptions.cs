@@ -7,6 +7,7 @@ using System.Reflection;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 
@@ -43,10 +44,69 @@ namespace Orleans.Serialization.Configuration
         internal Dictionary<Type, List<SerializationContract>> CopierContracts { get; } = new();
         internal Dictionary<Type, List<SerializationContract>> ActivatorContracts { get; } = new();
         internal Dictionary<Type, List<SerializationContract>> ConverterContracts { get; } = new();
+        internal Dictionary<Type, ClosedTypeMetadata> GenericArgumentMetadata { get; } = new();
+        internal sealed record ClosedTypeMetadata(bool HasPublicParameterlessConstructor, Type[] Interfaces);
 
-        internal Dictionary<Type, Func<ICodecProvider, IFieldCodec>> CodecFactories { get; } = new();
-        internal Dictionary<Type, Func<ICodecProvider, IDeepCopier>> CopierFactories { get; } = new();
+        /// <summary>
+        /// Captures the metadata needed to validate a closed type used as a serialization implementation's generic argument.
+        /// </summary>
+        /// <param name="type">The source-known closed type.</param>
+        /// <remarks>
+        /// Register every closed argument, including nested generic arguments and array elements, which can participate
+        /// in a constrained implementation. This permits constraint validation without constructing a generic type.
+        /// Implemented interfaces and their ancestors are captured from this type's interface metadata and do not
+        /// require separate registrations.
+        /// Variant comparisons which traverse a constructed constraint's inherited interfaces also require metadata
+        /// for that closed constraint type, either captured from a registered type's interfaces or explicitly registered.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="type"/> is null.</exception>
+        /// <exception cref="ArgumentException"><paramref name="type"/> contains unbound generic parameters.</exception>
+        public void AddGenericArgumentMetadata(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.Interfaces | DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)]
+#endif
+            Type type)
+        {
+            if (type is null) throw new ArgumentNullException(nameof(type));
+            if (type.ContainsGenericParameters) throw new ArgumentException("Generic argument metadata requires a closed type.", nameof(type));
+            if (GenericArgumentMetadata.ContainsKey(type)) return;
+            var interfaces = type.GetInterfaces();
+            GenericArgumentMetadata.Add(type, new(
+                type.IsValueType || type.GetConstructor(Type.EmptyTypes) is not null,
+                interfaces));
+            foreach (var implemented in interfaces)
+            {
+                if (GenericArgumentMetadata.ContainsKey(implemented)) continue;
+                var ancestors = new List<Type>();
+                foreach (var candidate in interfaces)
+                {
+                    if (candidate != implemented && candidate.IsAssignableFrom(implemented)) ancestors.Add(candidate);
+                }
+
+                GenericArgumentMetadata.Add(implemented, new(false, ancestors.ToArray()));
+            }
+        }
+
+        internal Dictionary<Type, ClosedSerializerFactory<IFieldCodec>> CodecFactories { get; } = new();
+        internal Dictionary<Type, ClosedSerializerFactory<IDeepCopier>> CopierFactories { get; } = new();
         internal Dictionary<Type, Func<ICodecProvider, object>> SerializerServiceFactories { get; } = new();
+        internal Dictionary<Type, DefaultSerializerContract> DefaultSerializerContracts { get; } = new();
+        internal Dictionary<Type, HashSet<Type>> DefaultSerializerImplementationServices { get; } = new();
+        internal sealed record ClosedSerializerFactory<TService>(Type ServiceType, Func<ICodecProvider, TService> Factory);
+        internal Dictionary<Type, Func<ICodecProvider, IRawResponseReader>> RawResponseReaderFactories { get; } = new();
+
+        /// <summary>
+        /// Registers a statically constructed raw response reader for a closed invocation result type.
+        /// </summary>
+        /// <typeparam name="TResult">The invocation result type encoded in the wire header.</typeparam>
+        /// <param name="factory">The reader factory.</param>
+        /// <remarks>The first reader registration for a result type is used.</remarks>
+        public void AddRawResponseReader<TResult>(Func<ICodecProvider, IRawResponseReader> factory)
+        {
+            if (factory is null) throw new ArgumentNullException(nameof(factory));
+            RawResponseReaderFactories.TryAdd(typeof(TResult), factory);
+        }
+        private readonly HashSet<Type> _defaultSerializerServices = new();
         internal HashSet<Type> ContextTypes { get; } = new();
 
         /// <summary>
@@ -55,18 +115,80 @@ namespace Orleans.Serialization.Configuration
         /// <typeparam name="T">The serialized type.</typeparam>
         /// <param name="codecFactory">The factory for the field codec.</param>
         /// <param name="copierFactory">The factory for the deep copier.</param>
+        /// <remarks>Explicit registrations replace defaults. The first explicit registration for each service is used.</remarks>
         public void AddSerializer<T>(
             Func<ICodecProvider, IFieldCodec<T>> codecFactory,
             Func<ICodecProvider, IDeepCopier<T>> copierFactory)
+            => RegisterSerializerFactories(codecFactory, copierFactory, isDefault: false);
+
+        /// <summary>
+        /// Registers default closed serialization factories which yield to explicit registrations.
+        /// </summary>
+        /// <typeparam name="T">The serialized type.</typeparam>
+        /// <param name="codecFactory">The default field codec factory.</param>
+        /// <param name="copierFactory">The default deep copier factory.</param>
+        /// <remarks>
+        /// The first default registration is used until an explicit <see cref="AddSerializer{T}"/>
+        /// registration supplies the implementation, in either registration order.
+        /// </remarks>
+        public void AddDefaultSerializer<T>(
+            Func<ICodecProvider, IFieldCodec<T>> codecFactory,
+            Func<ICodecProvider, IDeepCopier<T>> copierFactory)
+            => RegisterSerializerFactories(codecFactory, copierFactory, isDefault: true);
+
+        /// <summary>
+        /// Registers inferred closed factories with their canonical implementations and construction dependencies.
+        /// </summary>
+        /// <typeparam name="T">The serialized type.</typeparam>
+        /// <typeparam name="TCodec">The canonical field codec.</typeparam>
+        /// <typeparam name="TCopier">The canonical deep copier.</typeparam>
+        /// <param name="codecFactory">The field codec factory.</param>
+        /// <param name="copierFactory">The deep copier factory.</param>
+        /// <param name="compatibleCodecType">An equivalent metadata codec implementation.</param>
+        /// <param name="compatibleCopierType">An equivalent metadata copier implementation.</param>
+        /// <param name="codecDependencies">The canonical codec's serialization service dependencies.</param>
+        /// <param name="copierDependencies">The canonical copier's serialization service dependencies.</param>
+        /// <remarks>Inferred factories yield to the selected custom metadata implementation and explicit factories.</remarks>
+        public void AddDefaultSerializer<T, TCodec, TCopier>(
+            Func<ICodecProvider, IFieldCodec<T>> codecFactory,
+            Func<ICodecProvider, IDeepCopier<T>> copierFactory,
+            Type? compatibleCodecType = null,
+            Type? compatibleCopierType = null,
+            Type[]? codecDependencies = null,
+            Type[]? copierDependencies = null)
+            where TCodec : class, IFieldCodec<T>
+            where TCopier : class, IDeepCopier<T>
+        {
+            codecDependencies = CopyDefaultDependencies(codecDependencies);
+            copierDependencies = CopyDefaultDependencies(copierDependencies);
+            var registerCodec = !SerializerServiceFactories.ContainsKey(typeof(IFieldCodec<T>));
+            var registerCopier = !SerializerServiceFactories.ContainsKey(typeof(IDeepCopier<T>));
+            RegisterSerializerFactories(codecFactory, copierFactory, isDefault: true);
+            RegisterDefaultImplementationService(typeof(IFieldCodec<T>), typeof(TCodec));
+            RegisterDefaultImplementationService(typeof(IDeepCopier<T>), typeof(TCopier));
+            if (registerCodec)
+            {
+                RegisterDefaultContract(typeof(IFieldCodec<T>), typeof(TCodec), compatibleCodecType, codecDependencies);
+            }
+            if (registerCopier)
+            {
+                RegisterDefaultContract(typeof(IDeepCopier<T>), typeof(TCopier), compatibleCopierType, copierDependencies);
+            }
+        }
+
+        private void RegisterSerializerFactories<T>(
+            Func<ICodecProvider, IFieldCodec<T>> codecFactory,
+            Func<ICodecProvider, IDeepCopier<T>> copierFactory,
+            bool isDefault)
         {
             if (codecFactory is null) throw new ArgumentNullException(nameof(codecFactory));
             if (copierFactory is null) throw new ArgumentNullException(nameof(copierFactory));
-            CodecFactories.TryAdd(typeof(T), static provider =>
-                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IFieldCodec<T>>(null!, provider));
-            CopierFactories.TryAdd(typeof(T), static provider =>
-                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<T>>(null!, provider));
-            SerializerServiceFactories.TryAdd(typeof(IFieldCodec<T>), codecFactory);
-            SerializerServiceFactories.TryAdd(typeof(IDeepCopier<T>), copierFactory);
+            CodecFactories.TryAdd(typeof(T), new(typeof(IFieldCodec<T>), static provider =>
+                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IFieldCodec<T>>(null!, provider)));
+            CopierFactories.TryAdd(typeof(T), new(typeof(IDeepCopier<T>), static provider =>
+                Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.GetService<IDeepCopier<T>>(null!, provider)));
+            AddSerializerServiceFactory(typeof(IFieldCodec<T>), codecFactory, isDefault);
+            AddSerializerServiceFactory(typeof(IDeepCopier<T>), copierFactory, isDefault);
             ContextTypes.Add(typeof(T));
         }
 
@@ -78,7 +200,7 @@ namespace Orleans.Serialization.Configuration
         /// <remarks>
         /// The codec provider constructs and caches one instance per service type. Recursive generated
         /// constructors retain references to in-progress dependencies through the generated-code helper.
-        /// The first registration for a service type is used.
+        /// Explicit registrations replace defaults. The first explicit registration for a service type is used.
         /// During graph construction, dependencies resolve through provider-owned services and these closed
         /// factories. Supply external dependencies through explicit constructor arguments or factories which
         /// return captured instances. Ordinary dependency injection resumes after the graph is published.
@@ -86,7 +208,109 @@ namespace Orleans.Serialization.Configuration
         public void AddSerializerService<TService>(Func<ICodecProvider, TService> factory) where TService : class
         {
             if (factory is null) throw new ArgumentNullException(nameof(factory));
-            SerializerServiceFactories.TryAdd(typeof(TService), factory);
+            AddSerializerServiceFactory(typeof(TService), factory, isDefault: false);
+        }
+
+        /// <summary>
+        /// Registers a default closed service factory which yields to an explicit service registration.
+        /// </summary>
+        /// <typeparam name="TService">The closed service type.</typeparam>
+        /// <param name="factory">The default service factory.</param>
+        /// <remarks>
+        /// The first default registration is used until <see cref="AddSerializerService{TService}"/>
+        /// supplies an explicit factory, in either registration order.
+        /// </remarks>
+        public void AddDefaultSerializerService<TService>(Func<ICodecProvider, TService> factory) where TService : class
+        {
+            if (factory is null) throw new ArgumentNullException(nameof(factory));
+            AddSerializerServiceFactory(typeof(TService), factory, isDefault: true);
+        }
+
+        /// <summary>
+        /// Registers a default service factory with its construction dependencies.
+        /// </summary>
+        /// <typeparam name="TService">The closed service type.</typeparam>
+        /// <param name="factory">The default service factory.</param>
+        /// <param name="dependencies">Services required to construct the default graph.</param>
+        /// <remarks>
+        /// The factory participates when its dependencies are supplied by closed service factories
+        /// and provider-owned services. Explicit registrations take precedence.
+        /// </remarks>
+        /// <exception cref="ArgumentNullException"><paramref name="factory"/> or <paramref name="dependencies"/> is null.</exception>
+        public void AddDefaultSerializerService<TService>(Func<ICodecProvider, TService> factory, Type[] dependencies) where TService : class
+        {
+            if (dependencies is null) throw new ArgumentNullException(nameof(dependencies));
+            dependencies = CopyDefaultDependencies(dependencies);
+            var register = !SerializerServiceFactories.ContainsKey(typeof(TService));
+            AddDefaultSerializerService(factory);
+            if (register) RegisterDefaultContract(typeof(TService), null, null, dependencies);
+        }
+
+        /// <summary>
+        /// Registers an inferred service factory with its canonical implementation identity.
+        /// </summary>
+        /// <typeparam name="TService">The serialization service contract.</typeparam>
+        /// <typeparam name="TImplementation">The canonical implementation.</typeparam>
+        /// <param name="factory">The service factory.</param>
+        /// <param name="compatibleImplementationType">An equivalent metadata implementation.</param>
+        /// <param name="dependencies">The canonical implementation's construction dependencies.</param>
+        public void AddDefaultSerializerService<TService, TImplementation>(
+            Func<ICodecProvider, TService> factory,
+            Type? compatibleImplementationType = null,
+            Type[]? dependencies = null)
+            where TService : class
+            where TImplementation : class, TService
+        {
+            dependencies = CopyDefaultDependencies(dependencies);
+            var register = !SerializerServiceFactories.ContainsKey(typeof(TService));
+            AddDefaultSerializerService(factory);
+            RegisterDefaultImplementationService(typeof(TService), typeof(TImplementation));
+            if (register) RegisterDefaultContract(typeof(TService), typeof(TImplementation), compatibleImplementationType, dependencies);
+        }
+
+        internal bool IsDefaultSerializerService(Type type) => _defaultSerializerServices.Contains(type);
+
+        private void RegisterDefaultImplementationService(Type service, Type implementation)
+        {
+            if (service == implementation) return;
+            if (!DefaultSerializerImplementationServices.TryGetValue(implementation, out var services))
+            {
+                DefaultSerializerImplementationServices.Add(implementation, services = new());
+            }
+            services.Add(service);
+        }
+
+        private void RegisterDefaultContract(Type service, Type? implementation, Type? compatible, Type[]? dependencies)
+        {
+            if (!_defaultSerializerServices.Contains(service) || DefaultSerializerContracts.ContainsKey(service)) return;
+            var copiedDependencies = dependencies ?? Type.EmptyTypes;
+            DefaultSerializerContracts.Add(service, new(service, implementation, compatible, copiedDependencies));
+            if (implementation is not null)
+                DefaultSerializerContracts.TryAdd(implementation, new(service, implementation, compatible, copiedDependencies));
+        }
+
+        private static Type[] CopyDefaultDependencies(Type[]? dependencies)
+        {
+            var result = dependencies is null ? Type.EmptyTypes : (Type[])dependencies.Clone();
+            foreach (var dependency in result)
+            {
+                if (dependency is null) throw new ArgumentException("Serialization service dependencies must be non-null.", nameof(dependencies));
+            }
+            return result;
+        }
+
+        internal sealed record DefaultSerializerContract(Type Service, Type? Implementation, Type? CompatibleImplementation, Type[] Dependencies);
+
+        private void AddSerializerServiceFactory(Type type, Func<ICodecProvider, object> factory, bool isDefault)
+        {
+            if (!isDefault && _defaultSerializerServices.Remove(type))
+            {
+                SerializerServiceFactories[type] = factory;
+            }
+            else if (SerializerServiceFactories.TryAdd(type, factory) && isDefault)
+            {
+                _defaultSerializerServices.Add(type);
+            }
         }
 
         /// <summary>

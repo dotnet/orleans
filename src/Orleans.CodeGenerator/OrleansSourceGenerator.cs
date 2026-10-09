@@ -151,10 +151,19 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => ModelExtractor.MergeProxyInterfaces(input.Left, input.Right.ReferencedProxyInterfaces))
             .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance);
 
+        var responsePlan = allProxyInterfaces
+            .Combine(compilationProvider)
+            .Combine(generatorOptions)
+            .Select(static (input, ct) => RpcResponsePlan.Create(input.Left.Right, input.Left.Left, input.Right, ct));
+        var responseNames = responsePlan.Select(static (plan, _) => plan.Names)
+            .WithComparer(ImmutableArrayComparer<(string TypeName, string HolderName)>.Instance);
+
         var preparedProxyOutputs = allProxyInterfaces
             .Combine(compilationProvider)
             .Combine(generatorOptions)
-            .Select(static (input, ct) => ProxySourceOutputGenerator.CreateProxyOutputPreparation(input.Left.Right, input.Left.Left, input.Right, ct))
+            .Combine(responseNames)
+            .Select(static (input, ct) => ProxySourceOutputGenerator.CreateProxyOutputPreparation(
+                input.Left.Left.Right, input.Left.Left.Left, input.Left.Right, input.Right, ct))
             .WithTrackingName(PreparedProxyOutputsTrackingName);
 
         context.RegisterSourceOutput(preparedProxyOutputs, static (productionContext, input) =>
@@ -217,6 +226,18 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             .WithTrackingName(ProxyOutputsTrackingName);
 
         context.RegisterSourceOutput(proxyOutputs, static (productionContext, input) =>
+        {
+            GeneratedSourceOutput.EmitSourceOutputResult(productionContext, input);
+        });
+
+        var responseOutputs = preparedProxyOutputs
+            .Combine(compilationProvider)
+            .Combine(generatorOptions)
+            .Combine(responsePlan)
+            .SelectMany(static (input, ct) => RpcResponseGenerator.Generate(
+                input.Left.Left.Right, input.Left.Left.Left, input.Left.Right, input.Right, ct));
+
+        context.RegisterSourceOutput(responseOutputs, static (productionContext, input) =>
         {
             GeneratedSourceOutput.EmitSourceOutputResult(productionContext, input);
         });

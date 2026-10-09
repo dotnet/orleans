@@ -18,12 +18,14 @@ namespace Orleans.Serialization.Invocation
         /// Returns this instance as a <see cref="ValueTask{Response}"/>.
         /// </summary>
         /// <returns>This instance, as a <see cref="ValueTask{Response}"/>.</returns>
+        /// <remarks>The consumer owns the returned response and disposes it after use.</remarks>
         public ValueTask<Response> AsValueTask() => new(this, _core.Version);
 
         /// <summary>
         /// Returns this instance as a <see cref="ValueTask"/>.
         /// </summary>
         /// <returns>This instance, as a <see cref="ValueTask"/>.</returns>
+        /// <remarks>Consuming the task disposes the response envelope.</remarks>
         public ValueTask AsVoidValueTask() => new(this, _core.Version);
 
         /// <inheritdoc/>
@@ -50,23 +52,37 @@ namespace Orleans.Serialization.Invocation
         /// <summary>
         /// Completes this instance with a result.
         /// </summary>
-        /// <param name="result">The result.</param>
+        /// <param name="result">The response whose ownership is transferred to this instance.</param>
+        /// <remarks>
+        /// Successful responses are transferred to the result consumer. Exception responses are disposed after
+        /// their exception is extracted.
+        /// </remarks>
         public void SetResult(Response result)
         {
-            if (result.Exception is not { } exception)
+            var transferred = false;
+            try
             {
-                _core.SetResult(result);
+                if (result.Exception is not { } exception)
+                {
+                    _core.SetResult(result);
+                    transferred = true;
+                }
+                else
+                {
+                    _core.SetException(exception);
+                }
             }
-            else
+            finally
             {
-                _core.SetException(exception);
+                if (!transferred) result.Dispose();
             }
         }
 
         /// <summary>
         /// Completes this instance with a result.
         /// </summary>
-        /// <param name="value">The result value.</param>
+        /// <param name="value">The response whose ownership is transferred to this instance.</param>
+        /// <remarks>Successful envelopes remain owned by the result consumer until it finishes using them.</remarks>
         public void Complete(Response value) => SetResult(value);
 
         /// <summary>
@@ -97,7 +113,7 @@ namespace Orleans.Serialization.Invocation
             bool isValid = token == _core.Version;
             try
             {
-                _ = _core.GetResult(token);
+                _core.GetResult(token).Dispose();
             }
             finally
             {
@@ -162,33 +178,40 @@ namespace Orleans.Serialization.Invocation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Complete(Response value)
         {
-            // Check exception first since it's a simple null check
-            if (value.Exception is { } exception)
+            try
             {
-                SetException(exception);
-                return;
-            }
+                // Check exception first since it's a simple null check
+                if (value.Exception is { } exception)
+                {
+                    SetException(exception);
+                    return;
+                }
 
-            // Check for typed response (common for void returns)
-            if (value is Response<TResult> typed)
-            {
-                SetResult(typed.TypedResult);
-                return;
-            }
+                // Check for typed response (common for void returns)
+                if (value is Response<TResult> typed)
+                {
+                    SetResult(typed.TypedResult);
+                    return;
+                }
 
-            // Handle untyped successful response
-            var result = value.Result;
-            if (result is null)
-            {
-                SetResult(default);
+                // Handle untyped successful response
+                var result = value.Result;
+                if (result is null)
+                {
+                    SetResult(default);
+                }
+                else if (result is TResult typedResult)
+                {
+                    SetResult(typedResult);
+                }
+                else
+                {
+                    SetInvalidCastException(result);
+                }
             }
-            else if (result is TResult typedResult)
+            finally
             {
-                SetResult(typedResult);
-            }
-            else
-            {
-                SetInvalidCastException(result);
+                value.Dispose();
             }
         }
 
@@ -214,16 +237,17 @@ namespace Orleans.Serialization.Invocation
         /// <summary>
         /// Completes this instance with a result.
         /// </summary>
-        /// <param name="value">The result value.</param>
+        /// <param name="value">The response whose ownership is transferred to this instance.</param>
+        /// <remarks>The envelope is disposed after extracting its result. The result payload remains available to the consumer.</remarks>
         public void Complete(Response<TResult> value)
         {
-            if (value.Exception is { } exception)
-            {
-                SetException(exception);
-            }
-            else
+            try
             {
                 SetResult(value.TypedResult);
+            }
+            finally
+            {
+                value.Dispose();
             }
         }
 
