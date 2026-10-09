@@ -31,7 +31,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         var context = Fixture.GetGrainContext(receiver);
         var probe = new CountProbe(context);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-count-burst");
-        var turn = receiver.HoldPumpTurnAsync("hold-count-burst", replacement: default, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-count-burst", deactivate: false);
         await hold.WaitUntilEnteredAsync();
         try
         {
@@ -72,7 +72,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         var context = Fixture.GetGrainContext(receiver);
         var probe = new CountProbe(context);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-count-phases");
-        var turn = receiver.HoldPumpTurnAsync("hold-count-phases", replacement: default, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-count-phases", deactivate: false);
         await hold.WaitUntilEnteredAsync();
         try
         {
@@ -142,7 +142,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         var probe = new CountProbe(context);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-count-fault");
         using var handlers = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/count-replay");
-        var turn = receiver.HoldPumpTurnAsync("hold-count-fault", replacement: default, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-count-fault", deactivate: false);
         await hold.WaitUntilEnteredAsync();
         try
         {

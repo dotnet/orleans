@@ -93,7 +93,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var entries = GetEntries(context);
         var feature = (IDurableJobFeatureHandler)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-stop");
-        var turn = receiver.HoldPumpTurnAsync("hold-stop", replacement: default, deactivate: true);
+        var turn = receiver.HoldPumpTurnAsync("hold-stop", deactivate: true);
         await hold.WaitUntilEnteredAsync();
         var run = CreateRun(job);
         Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeAsync(receiver, run)).Status);
@@ -134,7 +134,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var entries = GetEntries(context);
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-fault");
-        var turn = receiver.HoldPumpTurnAsync("hold-fault", replacement: default, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-fault", deactivate: false);
         await hold.WaitUntilEnteredAsync();
         var run = CreateRun(job);
         Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeAsync(receiver, run)).Status);
@@ -174,7 +174,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var entries = GetEntries(context);
         var feature = (IDurableJobFeatureHandler)context.ActivationServices.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-attempt");
-        var turn = receiver.HoldPumpTurnAsync("hold-attempt", replacement: default, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-attempt", deactivate: false);
         await hold.WaitUntilEnteredAsync();
         using var cancellation = new CancellationTokenSource();
         var canceledRun = CreateRun(job);

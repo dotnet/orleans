@@ -3,8 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Functional;
@@ -34,6 +36,8 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         await WaitAsync(handler.Entered.Task);
         var writes = Writes(rig);
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId);
+        ArcBufferPage storedPage = null!;
+        await OnTurnAsync(rig.Context, () => storedPage = Assert.Single(rig.Pending).Value.Payload.First);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverOnTurnAsync(rig, repeated)).Status);
         await OnTurnAsync(rig.Context, () =>
         {
@@ -41,7 +45,8 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
             Assert.True(inbox.TryGetMessage(key, out var stored));
             Assert.Equal(original.SenderId, stored.SenderId);
             Assert.Equal(original.Subject, stored.Subject);
-            Assert.Same(original.Payload.First, stored.Payload.First);
+            Assert.Same(storedPage, stored.Payload.First);
+            Assert.Equal(original.Payload.ToArray(), stored.Payload.ToArray());
             Assert.Single(rig.Pending);
             Assert.Empty(rig.Processed);
         });
@@ -84,6 +89,8 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         var job = rig.Grain.GetSnapshotForTest().InboxJob;
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId);
         var pins = Pins(conflict.Payload.First);
+        ArcBufferPage storedPage = null!;
+        await OnTurnAsync(rig.Context, () => storedPage = Assert.Single(rig.Pending).Value.Payload.First);
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverOnTurnAsync(rig, conflict));
         Assert.Contains(key.ToString(), failure.Message, StringComparison.Ordinal);
         Assert.Contains("different command", failure.Message, StringComparison.Ordinal);
@@ -91,7 +98,8 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         {
             Assert.Equal(original.SenderId, Assert.Single(rig.Pending).Value.SenderId);
             Assert.Equal(original.Subject, Assert.Single(rig.Pending).Value.Subject);
-            Assert.Same(original.Payload.First, Assert.Single(rig.Pending).Value.Payload.First);
+            Assert.Same(storedPage, Assert.Single(rig.Pending).Value.Payload.First);
+            Assert.Equal(original.Payload.ToArray(), Assert.Single(rig.Pending).Value.Payload.ToArray());
             Assert.Empty(rig.Processed);
             Assert.Empty(rig.Grain.GetSnapshotForTest().Effects);
             Assert.Same(job, rig.Grain.GetSnapshotForTest().InboxJob);
@@ -203,12 +211,23 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
+        using var timers = new DiagnosticEventCollector(GrainTimerEvents.ListenerName);
         var key = HierarchicalKey.Create("tenant", "orders", "1046", "reserve");
         using var original = Create(rig, key, "inventory.reserve.v1", "original");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await WaitAsync(handler.Entered.Task);
-        rig.Context.Deactivate(new DeactivationReason(
-            DeactivationReasonCode.ApplicationRequested, "Verify pending command identity replay."));
+        var timer = Assert.Single(timers.Events.Select(static item => item.Payload).OfType<GrainTimerEvents.Created>(),
+            item => ReferenceEquals(item.GrainContext, rig.Context)
+                && item.Timer.GetType().GenericTypeArguments is [var type]
+                && type.DeclaringType == ReceiverTestServices.GetImplementationType("DurableInboxExtension")
+                && type.Name == "LocalDrainTimerState").Timer;
+        await OnTurnAsync(rig.Context, () =>
+        {
+            timer.Dispose();
+            rig.Context.Deactivate(new DeactivationReason(
+                DeactivationReasonCode.ApplicationRequested, "Verify pending command identity replay."),
+                TestContext.Current.CancellationToken);
+        });
         await WaitAsync(rig.Context.Deactivated);
         using var recoveredHandler = new IdentityHandler();
         using var read = Fixture.Storage.BlockRead(JournalId.FromGrainId(rig.Context.GrainId));

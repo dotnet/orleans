@@ -23,7 +23,7 @@ public sealed class DurableMessagingMetricCardinalityTests : DurableMessagingBeh
         var services = context.ActivationServices;
         var extension = (IDurableInboxExtension)services.GetRequiredService(ReceiverTestServices.GetImplementationType("DurableInboxExtension"));
         using var hold = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "hold-metric-pending");
-        var turn = receiver.HoldPumpTurnAsync("hold-metric-pending", replacement: default, deactivate: false);
+        var turn = receiver.HoldPumpTurnAsync("hold-metric-pending", deactivate: false);
         await hold.WaitUntilEnteredAsync();
         using var envelope = CreateEnvelope(receiver, NewMessage(451, "duplicate-receipts"));
         Assert.Equal(DeliveryStatus.Accepted, (await StartDelivery()).Status);
