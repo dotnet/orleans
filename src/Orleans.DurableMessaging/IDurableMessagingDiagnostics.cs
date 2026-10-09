@@ -24,13 +24,12 @@ public interface IDurableMessagingDiagnostics
     /// <summary>
     /// Stages removal of an inbox dead letter.
     /// </summary>
-    /// <param name="senderId">The original sender grain identifier.</param>
-    /// <param name="messageId">The message identifier.</param>
+    /// <param name="messageId">The receiver-local command identity.</param>
     /// <returns><see langword="true"/> when the dead letter existed and was removed.</returns>
     /// <remarks>
     /// The removal becomes durable with the grain's next journal write.
     /// </remarks>
-    bool RemoveInboxDeadLetter(GrainId senderId, Guid messageId);
+    bool RemoveInboxDeadLetter(HierarchicalKey messageId);
 
     /// <summary>
     /// Stages removal of an outbox dead letter.
@@ -40,7 +39,7 @@ public interface IDurableMessagingDiagnostics
     /// <remarks>
     /// The removal becomes durable with the grain's next journal write.
     /// </remarks>
-    bool RemoveOutboxDeadLetter(Guid messageId);
+    bool RemoveOutboxDeadLetter(HierarchicalKey messageId);
 }
 
 /// <summary>
@@ -76,9 +75,9 @@ public sealed class DurableDeadLetter
 
 internal sealed class DurableMessagingDiagnostics(
     [Microsoft.Extensions.DependencyInjection.FromKeyedServices(DurableMessagingStateNames.InboxDeadLetters)]
-    IDurableDictionary<(Orleans.Runtime.GrainId, Guid), InboxDeadLetter> inbox,
+    IDurableDictionary<HierarchicalKey, InboxDeadLetter> inbox,
     [Microsoft.Extensions.DependencyInjection.FromKeyedServices(DurableMessagingStateNames.OutboxDeadLetters)]
-    IDurableDictionary<Guid, OutboxDeadLetter> outbox) : IDurableMessagingDiagnostics
+    IDurableDictionary<HierarchicalKey, OutboxDeadLetter> outbox) : IDurableMessagingDiagnostics
 {
     public IReadOnlyList<DurableDeadLetter> InboxDeadLetters =>
         inbox.Values.Select(static entry => new DurableDeadLetter
@@ -98,8 +97,8 @@ internal sealed class DurableMessagingDiagnostics(
             AttemptCount = entry.AttemptCount
         }).ToList();
 
-    public bool RemoveInboxDeadLetter(GrainId senderId, Guid messageId) =>
-        inbox.Remove((senderId, messageId));
+    public bool RemoveInboxDeadLetter(HierarchicalKey messageId) =>
+        inbox.Remove(messageId);
 
-    public bool RemoveOutboxDeadLetter(Guid messageId) => outbox.Remove(messageId);
+    public bool RemoveOutboxDeadLetter(HierarchicalKey messageId) => outbox.Remove(messageId);
 }

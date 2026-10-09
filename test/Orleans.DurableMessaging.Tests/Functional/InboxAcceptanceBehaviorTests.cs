@@ -96,7 +96,7 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
     public async Task ConcurrentWriteDuringLocalAcceptancePreparation_PreservesSafeStagingOnly()
     {
         var receiver = NewGrain();
-        var effect = new DurableEffect(Guid.NewGuid(), 1, 74, "prior-safe-state");
+        var effect = new DurableEffect(TestApplicationProtocol.NewMessageId(), 1, 74, "prior-safe-state");
         await receiver.StageEffectAsync(effect);
         using var schedule = Fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
         using var envelope = CreateEnvelope(receiver, NewMessage(75, "schedule-barrier"));
@@ -154,7 +154,7 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
     }
 
     [Fact]
-    public async Task SameMessageIdFromDistinctSenders_DeduplicatesEachSenderIndependently()
+    public async Task SameMessageIdFromDistinctSenders_DeduplicatesOneReceiverCommand()
     {
         var receiver = NewGrain();
         using var original = CreateEnvelope(receiver, NewMessage(14, "sender-scoped"));
@@ -163,22 +163,25 @@ public sealed class InboxAcceptanceBehaviorTests : DurableMessagingBehaviorTestB
             MessageId = original.Value.MessageId,
             SenderId = GrainId.Create("other-sender", "same-message-id"),
             ReceiverId = original.Value.ReceiverId,
+            Subject = original.Value.Subject,
             Payload = original.Value.Payload,
         };
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original.Value)).Status);
-        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, other)).Status);
-        var completed = await Fixture.WaitForEffectCountAsync(receiver, 2);
-        Assert.Equal(2, Assert.Single(completed.Effects).Count);
-        Assert.Equal(2, completed.ProcessedMessageCount);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, other)).Status);
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(1, Assert.Single(completed.Effects).Count);
+        Assert.Equal(1, completed.ProcessedMessageCount);
 
+        var previous = Fixture.GetGrainContext(receiver);
         await receiver.RequestDeactivationAsync();
+        await previous.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, original.Value)).Status);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, other)).Status);
         var recovered = await receiver.GetSnapshotAsync();
         Assert.NotEqual(completed.ActivationId, recovered.ActivationId);
-        Assert.Equal(2, Assert.Single(recovered.Effects).Count);
-        Assert.Equal(2, recovered.ProcessedMessageCount);
+        Assert.Equal(1, Assert.Single(recovered.Effects).Count);
+        Assert.Equal(1, recovered.ProcessedMessageCount);
     }
 
     [Fact]

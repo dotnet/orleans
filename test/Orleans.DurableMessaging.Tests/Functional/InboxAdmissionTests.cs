@@ -149,7 +149,7 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         var context = Fixture.GetGrainContext(receiver);
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IDurableOutbox>();
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
-        var durable = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output");
+        var durable = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("test-handler-output");
         var sessions = Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         using var first = TestApplicationProtocol.Create(sessions, receiver.GetGrainId(), receiver.GetGrainId(), "messages/output", 1);
         using var late = TestApplicationProtocol.Create(sessions, receiver.GetGrainId(), receiver.GetGrainId(), "messages/output", 2);
@@ -167,7 +167,8 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         await write;
         Assert.Equal(new[] { first.MessageId }, grain.OutputCaptures[^1]);
         await receiver.RetryWriteStateAsync();
-        Assert.Equal(new[] { first.MessageId, late.MessageId }.Order(), grain.OutputCaptures[^1].Order());
+        Assert.Equal(new[] { first.MessageId, late.MessageId }.OrderBy(static key => key.ToString(), StringComparer.Ordinal),
+            grain.OutputCaptures[^1].OrderBy(static key => key.ToString(), StringComparer.Ordinal));
         Assert.Equal(2, durable.Count);
         await receiver.RequestDeactivationAsync();
         Assert.Equal(2, (await receiver.GetSnapshotAsync()).OutboxCount);
@@ -271,10 +272,10 @@ public sealed class InboxAdmissionTests : DurableMessagingBehaviorTestBase
         var services = Fixture.GetGrainContext(receiver).ActivationServices;
         var manager = services.GetRequiredService<IJournaledStateManager>();
         Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox));
-        Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"), inbox);
+        Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.inbox"), inbox);
         Assert.True(manager.TryGetStateMachine("test-handler-output", out var output));
         Assert.Same(((JournaledTestOutbox)services.GetRequiredService<IDurableOutbox>()).StoredMessages, output);
-        Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output"), output);
+        Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("test-handler-output"), output);
     }
 
     [Fact]

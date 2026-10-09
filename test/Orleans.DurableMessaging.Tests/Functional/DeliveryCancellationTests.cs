@@ -205,7 +205,7 @@ public sealed class DeliveryCancellationTests : DurableMessagingBehaviorTestBase
         public void Dispose() => Release();
     }
 
-    private sealed class DeliveryLogProbe(Guid messageId) : ILoggerProvider
+    private sealed class DeliveryLogProbe(HierarchicalKey messageId) : ILoggerProvider
     {
         public TaskCompletionSource<Exception> Failure { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public ILogger CreateLogger(string categoryName) => new Logger(this, categoryName, messageId.ToString());

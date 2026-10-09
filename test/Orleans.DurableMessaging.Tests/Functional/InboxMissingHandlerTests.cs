@@ -157,8 +157,8 @@ public sealed class InboxMissingHandlerTests() : DurableMessagingBehaviorTestBas
         var retained = Assert.Single(context.ActivationServices.GetRequiredService<IDurableMessagingDiagnostics>().InboxDeadLetters);
         Assert.Equal(envelope.Value.SenderId, retained.Message.SenderId);
         Assert.Empty(GetAttemptStates(context));
-        var processed = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
-        Assert.Equal(now, processed[(envelope.Value.SenderId, envelope.Value.MessageId)]);
+        var processed = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
+        Assert.Equal(now, processed[envelope.Value.MessageId]);
         Assert.Equal(job.Id, completed.InboxJob!.Id);
         Assert.Equal(job.ShardId, completed.InboxJob.ShardId);
         Assert.Equal(accepted.InboxJobId, completed.InboxJobId);

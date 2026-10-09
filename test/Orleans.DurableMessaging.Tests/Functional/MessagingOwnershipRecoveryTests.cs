@@ -22,7 +22,7 @@ public sealed class MessagingOwnershipRecoveryTests : DurableMessagingBehaviorTe
         var oldContext = Fixture.GetGrainContext(receiver);
         var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
         var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
-        await receiver.StageEffectAsync(new DurableEffect(Guid.NewGuid(), 1, 77, "uncommitted"));
+        await receiver.StageEffectAsync(new DurableEffect(TestApplicationProtocol.NewMessageId(), 1, 77, "uncommitted"));
         using var schedule = Fixture.JobManagerProbe.BlockNext("orleans.messaging.inbox-drain");
         using var envelope = CreateEnvelope(receiver, NewMessage(77, "failed-during-schedule"));
         var delivery = DeliverAsync(receiver, envelope.Value);

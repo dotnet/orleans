@@ -18,13 +18,12 @@ public sealed class MessagingRoutingAndDeadLetterTests : DurableMessagingBehavio
     public async Task InboxDeadLettersRetainNewestEntriesWithinConfiguredCapacity()
     {
         var receiver = NewGrain();
-        var messageIds = new List<Guid>();
+        var messageIds = new List<HierarchicalKey>();
         for (var sequence = 0; sequence < 3; sequence++)
         {
             using var envelope = CreateEnvelope(
                 receiver,
-                new DurableTestMessage(
-                    Guid.NewGuid(),
+                new DurableTestMessage(TestApplicationProtocol.NewMessageId(),
                     20 + sequence,
                     $"dead-letter-{sequence}",
                     ThrowDuringPreparation: true));
@@ -48,8 +47,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : DurableMessagingBehavio
         var receiver = NewGrain();
         using var envelope = CreateEnvelope(
             receiver,
-            new DurableTestMessage(
-                Guid.NewGuid(),
+            new DurableTestMessage(TestApplicationProtocol.NewMessageId(),
                 30,
                 "expired-dead-letter",
                 ThrowDuringPreparation: true));
@@ -96,11 +94,9 @@ public sealed class MessagingRoutingAndDeadLetterTests : DurableMessagingBehavio
         _ = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Assert.True(await receiver.RemoveInboxDeadLetterAsync(
-            malformed.Value.SenderId,
             malformed.Value.MessageId));
         Assert.Empty((await receiver.GetSnapshotAsync()).InboxDeadLetters);
         Assert.False(await receiver.RemoveInboxDeadLetterAsync(
-            malformed.Value.SenderId,
             malformed.Value.MessageId));
 
         await receiver.RequestDeactivationAsync();
