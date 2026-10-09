@@ -13,6 +13,7 @@ using Orleans.Configuration;
 using Orleans.Connections;
 using Orleans.Connections.Transport;
 using Orleans.Metadata;
+using Orleans.Messaging;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;

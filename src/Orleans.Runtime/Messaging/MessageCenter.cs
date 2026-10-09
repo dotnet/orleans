@@ -287,7 +287,6 @@ namespace Orleans.Runtime.Messaging
 
             // Connection acquisition and cached placement can outlive the target silo.
             // Re-address before the first transport attempt; failed writes can have uncertain outcomes.
-            messagingTrace.OnRejectSendMessageToDeadSilo(_siloAddress, message);
             ProcessRequestToInvalidActivation(
                 message,
                 new GrainAddress { GrainId = message.TargetGrain, SiloAddress = targetSilo },
