@@ -1,7 +1,9 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableMessaging.Tests.Support;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 using Xunit;
 
@@ -13,6 +15,9 @@ namespace Orleans.DurableMessaging.Tests.Functional;
 [TestArea("DurableMessaging")]
 public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
 {
+    private static readonly FieldInfo References = typeof(ArcBufferPage)
+        .GetField("_refCount", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
     [Fact]
     public async Task PendingCommand_NewSenderCoalescesAndPreservesOriginalEnvelope()
     {
@@ -78,6 +83,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         var writes = Writes(rig);
         var job = rig.Grain.GetSnapshotForTest().InboxJob;
         var scheduled = Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId);
+        var pins = Pins(conflict.Payload.First);
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => DeliverOnTurnAsync(rig, conflict));
         Assert.Contains(key.ToString(), failure.Message, StringComparison.Ordinal);
         Assert.Contains("different command", failure.Message, StringComparison.Ordinal);
@@ -92,6 +98,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
             Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
         });
         Assert.Equal(writes, Writes(rig));
+        Assert.Equal(pins, Pins(conflict.Payload.First));
         Assert.Equal(scheduled, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
         using var retainedConflict = conflict.Retain();
         Assert.Equal(conflict.Payload.ToArray(), retainedConflict.Payload.ToArray());
@@ -290,6 +297,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         using var envelope = Create(rig, key, subject, "oversized");
         var writes = Writes(rig);
         var bytes = envelope.Payload.ToArray();
+        var pins = Pins(envelope.Payload.First);
         await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, envelope));
         Assert.Equal(writes, Writes(rig));
         Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
@@ -297,6 +305,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         Assert.Empty(rig.Processed);
         Assert.Empty(rig.Grain.GetSnapshotForTest().Effects);
         Assert.Equal(bytes, envelope.Payload.ToArray());
+        Assert.Equal(pins, Pins(envelope.Payload.First));
         Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
         Assert.False(handler.Entered.Task.IsCompleted);
     }
@@ -379,6 +388,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
             subject, new DurableTestMessage(key, 610, value), key);
 
     private int Writes(Rig rig) => Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(rig.Context.GrainId));
+    private static int Pins(ArcBufferPage page) => (int)References.GetValue(page)!;
 
     private static Task<DeliveryResult> DeliverOnTurnAsync(Rig rig, DurableEnvelope envelope)
     {
