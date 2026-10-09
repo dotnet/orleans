@@ -50,6 +50,7 @@ namespace Orleans.Serialization.Configuration
         internal HashSet<Type> ContextTypes { get; } = new();
         internal HashSet<Type> AllowedTypeIdentities { get; } = new();
         internal HashSet<Assembly> AllowedAssemblyIdentities { get; } = new();
+        internal HashSet<Type> AdmittedExceptionTypes { get; } = new();
 
         /// <summary>
         /// Registers statically constructed serialization and copying implementations for a closed type.

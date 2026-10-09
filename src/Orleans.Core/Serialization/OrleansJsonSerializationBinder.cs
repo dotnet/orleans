@@ -69,7 +69,7 @@ namespace Orleans.Serialization
             // configuration.
             try
             {
-                if (_typeConverter.TryParse(fullName, out var type))
+                if (_typeConverter.TryParseForDeserialization(fullName, out var type))
                 {
                     return type;
                 }

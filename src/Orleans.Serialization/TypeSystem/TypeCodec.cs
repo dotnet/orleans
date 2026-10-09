@@ -110,7 +110,7 @@ namespace Orleans.Serialization.TypeSystem
             }
 
             Type? type = null;
-            if (_typeConverter.TryParse(typeNameString, out var parsedType))
+            if (_typeConverter.TryParseForDeserialization(typeNameString, out var parsedType))
             {
                 type = parsedType;
                 var key = new TypeKey(hashCode, typeName.ToArray());
@@ -145,7 +145,7 @@ namespace Orleans.Serialization.TypeSystem
                 typeNameString = Encoding.UTF8.GetString(typeNameBytes, typeName.Length);
             }
 
-            var type = _typeConverter.Parse(typeNameString);
+            var type = _typeConverter.ParseForDeserialization(typeNameString);
             return type;
         }
 
@@ -175,7 +175,7 @@ namespace Orleans.Serialization.TypeSystem
                 typeNameString = Encoding.UTF8.GetString(typeNameBytes, count);
             }
 
-            _ = _typeConverter.TryParse(typeNameString, out type);
+            _ = _typeConverter.TryParseForDeserialization(typeNameString, out type);
             var key = new TypeKey(hashCode, typeName.ToArray());
             typeString = key.ToString();
             return type is not null;

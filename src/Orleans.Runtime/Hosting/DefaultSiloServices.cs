@@ -416,7 +416,6 @@ namespace Orleans.Hosting
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
 
             services.AddSerializer();
-            services.AddSingleton<ITypeNameFilter, AllowOrleansTypes>();
             services.AddSingleton<ISpecializableCodec, GrainReferenceCodecProvider>();
             services.AddSingleton<ISpecializableCopier, GrainReferenceCopierProvider>();
             services.AddSingleton<OnDeserializedCallbacks>();
@@ -559,19 +558,6 @@ namespace Orleans.Hosting
                         ConfigureProvider(builder, knownProviderTypes, sectionName, name: child.Key, child);
                     }
                 }
-            }
-        }
-
-        private class AllowOrleansTypes : ITypeNameFilter
-        {
-            public bool? IsTypeNameAllowed(string typeName, string assemblyName)
-            {
-                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
-                {
-                    return true;
-                }
-
-                return null;
             }
         }
 

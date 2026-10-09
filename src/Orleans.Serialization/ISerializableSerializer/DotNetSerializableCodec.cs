@@ -110,7 +110,17 @@ namespace Orleans.Serialization
             {
                 // This is an exception type, so deserialize it as an exception.
                 var typeName = StringCodec.ReadValue(ref reader, header);
-                if (!_typeConverter.TryParse(typeName!, out type))
+                if (!_typeConverter.TryParseForDeserialization(typeName!, out type))
+                {
+                    return ReadFallbackException(ref reader, typeName!, placeholderReferenceId);
+                }
+
+                if (!typeof(Exception).IsAssignableFrom(type) || type.IsAbstract || type.ContainsGenericParameters)
+                {
+                    throw new SerializationException($"Type \"{type}\" is not a concrete, closed exception type.");
+                }
+
+                if (!_typeConverter.IsExceptionTypeAdmitted(type))
                 {
                     return ReadFallbackException(ref reader, typeName!, placeholderReferenceId);
                 }

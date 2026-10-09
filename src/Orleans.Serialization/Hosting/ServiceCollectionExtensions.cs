@@ -87,6 +87,7 @@ namespace Orleans.Serialization
                         foreach (var type in options.Value.ExceptionFactories.Keys)
                         {
                             manifest.AddAllowedType(type);
+                            manifest.AdmittedExceptionTypes.Add(type);
                         }
                     });
                 services.AddSingleton<TypeResolver>(sp =>
