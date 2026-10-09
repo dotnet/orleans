@@ -8,21 +8,23 @@ namespace Orleans.DurableMessaging;
 /// Carries immutable, opaque bytes between durable grain inboxes and outboxes.
 /// </summary>
 /// <remarks>
-/// The sender and message identifier form the transport deduplication key.
-/// Applications define their payload format, dispatch, reply routing, and business-operation identity.
+/// The application-supplied message identifier is the deduplication key within the receiving inbox.
+/// Applications define their payload format, dispatch, and reply routing. Message identities are exact ordinal keys,
+/// scoped to the receiving inbox across immediate senders and subjects. Admission permits up to 1,024 UTF-8
+/// bytes and 32 segments per canonical identity, and 256 UTF-8 bytes per nonempty subject.
 /// Each owning envelope must be disposed. Copies of the struct borrow the same ownership; use Retain to acquire an independent lifetime.
 /// </remarks>
 [Alias("Orleans.DurableMessaging.DurableEnvelope")]
 public readonly struct DurableEnvelope : IDisposable
 {
     /// <summary>
-    /// Gets the nonempty identifier of this delivery, preserved across transport retries.
+    /// Gets the application-defined command identity, preserved across retries and resubmissions.
     /// </summary>
     [Id(0)]
-    public required Guid MessageId { get; init; }
+    public required HierarchicalKey MessageId { get; init; }
 
     /// <summary>
-    /// Gets the nondefault sending grain identity, paired with <see cref="MessageId"/> for deduplication.
+    /// Gets the nondefault sending grain identity, which records the immediate sender for provenance.
     /// </summary>
     [Id(1)]
     public required GrainId SenderId { get; init; }
@@ -42,6 +44,11 @@ public readonly struct DurableEnvelope : IDisposable
     /// </remarks>
     [Id(3)]
     public required ArcBuffer Payload { get; init; }
+
+    /// <summary>Gets the exact ordinal application protocol subject.</summary>
+    /// <remarks>Applications select decoding and handling using this nonempty subject and keep it stable for a command identity.</remarks>
+    [Id(4)]
+    public required string Subject { get; init; }
 
     /// <summary>Acquires an independently owned payload slice.</summary>
     /// <returns>An envelope which must be disposed by its owner.</returns>

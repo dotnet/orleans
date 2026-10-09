@@ -16,7 +16,7 @@ public interface IDurableInboxExtension : IGrainExtension
     /// <summary>
     /// Delivers a message to this grain's durable inbox.
     /// </summary>
-    /// <param name="envelope">The message envelope.</param>
+    /// <param name="envelope">The command envelope with an application identity and ordinal subject.</param>
     /// <param name="cancellationToken">Cancels the caller's wait for delivery.</param>
     /// <remarks>
     /// Direct calls borrow the envelope and retain admission ownership before their first wait.
@@ -28,7 +28,8 @@ public interface IDurableInboxExtension : IGrainExtension
     /// </remarks>
     /// <returns>Result indicating delivery/processing status.</returns>
     /// <exception cref="ArgumentException">
-    /// <paramref name="envelope"/> has an empty message ID, a default sender,
+    /// <paramref name="envelope"/> has an unset message ID, an invalid subject, a default sender,
+    /// exceeds identity or subject admission limits,
     /// or identifies a receiver other than the grain handling the call.
     /// </exception>
     [Alias("DeliverAsync")]

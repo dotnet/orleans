@@ -14,10 +14,21 @@ default JSON format and preserves an explicit binary configuration. Another
 and required formats. Its optional `DurableInboxOptions` callback configures
 capacity, batches, retries, deduplication, and dead-letter retention.
 
+`DurableEnvelope` carries application-supplied `HierarchicalKey MessageId`, `SenderId`, `ReceiverId`,
+ordinal `Subject`, and an owned `ArcBuffer` payload.
+The exact message identity supplies receiver-local deduplication across senders and subjects.
+Applications namespace independent commands and preserve each command's destination, subject, and
+body across resubmissions. Exact-key completion affects that command independently of parents
+and children. Admission validates up to 1,024 UTF-8 bytes/32 segments per canonical key and
+256 UTF-8 bytes per nonempty subject. Applications define payload formats, dispatch, and replies.
+Dispose each owned envelope;
+`Retain()` acquires an independent payload lifetime. Serialization borrows its input, deserialization
+transfers ownership to its result, and deep copying acquires an independent retained slice.
+
 The protocol and runtime provide:
 
-- `DurableEnvelope` is a disposable readonly struct with `MessageId` (`Guid`),
-  `SenderId` and `ReceiverId` (`GrainId`), and required `Payload` (`ArcBuffer` from
+- `DurableEnvelope` is a disposable readonly struct with `MessageId` (`HierarchicalKey`),
+  `SenderId` and `ReceiverId` (`GrainId`), required ordinal `Subject`, and `Payload` (`ArcBuffer` from
   `Orleans.Serialization.Buffers`, field ID 3). Payload bytes are opaque to transport
   and treated as read-only. `ArcBuffer.Empty` is a valid owner-free empty payload.
 - The caller owns each constructed slice/envelope. `DurableEnvelope.Retain()` creates
@@ -44,10 +55,11 @@ The protocol and runtime provide:
   `BufferPackageBuilder` owns a disposable Arc writer; `Add(key, span)` or a writer
   callback encodes entries, and `Build` transfers the buffer owner to the package.
   Serialize packages normally and release them after use, including decoded packages.
-- Application-local helpers use ordinary `Serializer<T>` or `Serializer` to encode
-  and decode typed records. Those records own business-operation keys, request/response
-  destinations, message kinds, and protocol versions. `HierarchicalKey` supplies
-  segment-aware equality and ancestry for application business ledgers.
+- `DurableMessageType<T>` binds an exact subject to ordinary `Serializer<T>` and verifies
+  the subject before decoding. `AddDurableMessageType<T>` registers a keyed singleton binding.
+  The scoped `DurableMessageWriter` prepares an owned envelope before shared mutation.
+  `DurableInboxDispatcher` optionally selects typed delegates by exact subject.
+  Application records carry request/response destinations and business data.
 - `IDurableInbox`, `IDurableOutbox`, and `IDurableInboxExtension` define handler
   registration, inspection, enqueue, and delivery operations. `DeliveryResult` and
   `DeliveryStatus` describe delivery outcomes. An absent registered handler returns
@@ -62,6 +74,13 @@ The protocol and runtime provide:
   `Envelope` and `Complete()`; inject `IDurableOutbox` directly to stage messages.
 - `DurableInboxOptions` supplies defaults and validates capacity, retry, retention,
   and batch limits, including an outbox retry age shorter than the deduplication window.
+
+`HierarchicalKey` is a readonly ordinal value with one immutable canonical backing path and a
+cached process-local hash. `Create` and `CreateChildKey` accept literal segments; `Parse` reads an
+escaped canonical path. `Append` composes built hierarchies. `default` is an unset identity.
+Serialization stores canonical paths and reconstructs hash/navigation state. Shared journal value
+lifecycles retain and release pending-message and dead-letter payloads at actual ownership boundaries.
+Owned RPC arguments remain retained through their actual serialization and invocation outcomes.
 
 ## Handler and persistence boundaries
 
@@ -109,12 +128,16 @@ retained by feature-owned writes through acknowledgement. Owner retirement and
 subsequent sends preserve exact physical job identity and generation boundaries.
 
 Equivalent enqueues with a live `MessageId` coalesce across staged and durable
-intents. The ID binds to its original sender, receiver, and raw payload bytes.
-Conflicting content fails before admission. Preserve the original envelope for
-retransmission. Application business deduplication is separate: decode a stable
-operation key, verify its original immutable request, and reuse the journaled outcome
-across fresh IDs or different producers. `(SenderId, MessageId)` transport deduplication
-continues to identify envelope retries within the configured retention window.
+intents. The ID binds to its original sender, receiver, subject, and raw payload bytes.
+Conflicting pending content fails before admission. Preserve the original command
+identity for retransmission and application resubmission. The receiving inbox compares
+pending subject/body bytes while permitting a changed immediate sender.
+
+Completion records supply command deduplication during their configured retained lifetime.
+A completed duplicate acknowledges the existing outcome; business results remain in
+application state or the original reply intent. After retention expiry the same identity
+can be accepted again. Retain completion records for the supported resubmission horizon.
+Use deterministic child identities for distinct workflow steps and replies.
 
 `IDurableMessagingGrain` is a local capability which selects durable messaging activation
 setup. Implement it on a grain class, an application base class, or an application grain
@@ -245,7 +268,7 @@ records. Delivery still evaluates each duplicate against the exact retention bou
 
 Single handler registration retains the original instance. Operational diagnostics
 expose retained dead letters and stage their removal for the next journal write.
-Application-authorized diagnostics decode business keys from payload records.
+Application-authorized diagnostics inspect message identities and decode payload records.
 
 Synchronous `Send(envelope)` validates and stages one message for the next journal
 capture. Standard dictionaries encode commands during staging; standard values encode

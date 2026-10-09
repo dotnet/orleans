@@ -11,7 +11,7 @@ namespace Orleans.DurableMessaging;
 /// The journal capture hook establishes a durable self-wakeup before capturing pending state.
 /// Dispatch begins after persistence acknowledgement. Messages remain pending until the destination
 /// acknowledges durable acceptance, recognizes a duplicate, or reports a terminal delivery outcome.
-/// Applications define ordering and business-operation idempotency in their protocols.
+/// Applications namespace command identities and define ordering in their protocols.
 /// </remarks>
 public interface IDurableOutbox
 {
@@ -34,12 +34,13 @@ public interface IDurableOutbox
     /// <remarks>
     /// Send does not consume the caller's ownership. Durable state retains an independent slice.
     /// The sender identity must match this outbox's grain. Equivalent repeated identities retain
-    /// the original intent; conflicting identities fail explicitly. Inbox handlers stage outgoing
+    /// the original intent; subject, destination, sender, and body must match that intent. Conflicts fail explicitly.
+    /// Inbox handlers stage outgoing
     /// messages in their synchronous final block before calling <see cref="IInboxHandlerContext.Complete"/>.
     /// Ordinary callers persist staged messages using their journaled state manager.
     /// An explicit write retry retains pending business changes and messages after a scheduling failure.
     /// </remarks>
-    /// <exception cref="ArgumentException">The envelope has an empty identity.</exception>
+    /// <exception cref="ArgumentException">The envelope has an unset identity, invalid subject or destination, or exceeds identity/subject limits.</exception>
     /// <exception cref="InvalidOperationException">
     /// The sender differs from the owning grain, the identity conflicts, or the outbox is unavailable.
     /// </exception>
@@ -51,5 +52,5 @@ public interface IDurableOutbox
     /// <param name="messageId">The message identifier.</param>
     /// <param name="envelope">The borrowed matching envelope when found.</param>
     /// <returns>Whether the message is pending.</returns>
-    bool TryGetMessage(Guid messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope);
+    bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope);
 }
