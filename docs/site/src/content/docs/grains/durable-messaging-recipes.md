@@ -26,6 +26,26 @@ borrowed; each prepared reply is a local `using` envelope. The outbox retains it
 pin during staging, and local ownership is released even when preparation or staging
 throws.
 
+## Run the stock-reservation sample
+
+The [Durable Messaging sample](https://github.com/dotnet/orleans/tree/main/samples/DurableMessaging)
+runs an order grain and a stock grain in one localhost silo. Two submissions use
+fresh transport message IDs and the same business-operation key. The host observes
+both journal-acknowledged replies and verifies the original reservation outcome,
+one stock decrement, and one ledger entry.
+
+From the repository root:
+
+```powershell
+pwsh .\samples\Build-Samples.ps1 -SkipExternalAssets
+dotnet run --project .\samples\DurableMessaging\DurableMessaging.csproj --configuration Release --no-build
+```
+
+The sample uses locally packed Orleans packages while these APIs await publication.
+Its README also describes the self-contained copy-out workflow. Volatile journals
+and in-memory jobs support local execution; configure persistent shared providers
+for restart recovery.
+
 ## Reserve inventory once per order line
 
 Use one inventory grain per tenant/SKU, with `available-stock` and a durable

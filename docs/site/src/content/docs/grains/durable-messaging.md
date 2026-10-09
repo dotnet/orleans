@@ -69,18 +69,29 @@ access when sharing an application scope across concurrent callers.
 
 | Boundary | Ownership and release |
 | --- | --- |
-| Application constructs a slice or envelope | The caller owns it. Use `using` and dispose after staging, or after an actual direct send finishes. |
+| Application constructs a slice or envelope | The caller owns it. Use `using` and dispose after staging or handing it to a delivery call which acquires independent ownership. |
 | `IDurableOutbox.Send(envelope)` | Borrows the envelope during the call. Durable dictionary state retains its own pin, so the caller can dispose its local owner immediately after staging. |
 | `IInboxHandlerContext.Envelope` | Borrowed until the actual handler method ends, including asynchronous preparation. Do not dispose the context envelope or its payload. Retain explicitly when keeping it longer. |
-| `IDurableInboxExtension` RPC request | Generated request copying retains a separate pin. The extension owns the request clone and disposes it on success, rejection, cancellation, and failure; the caller retains its own owner through actual send completion. |
+| Direct `IDurableInboxExtension.DeliverAsync` call | Borrows the caller's envelope and retains an admission pin before its first asynchronous wait. The caller can dispose its local owner after initiating the call. Admission retains its pin until the actual acceptance operation finishes, including when the caller cancels its wait. |
+| `IDurableInboxExtension` RPC request | The generated proxy synchronously copies the envelope with an independent pin; the receiving request owns its decoded slice. The caller can dispose its local owner after initiating the call. Serialization and invocation retain active uses; terminal responses, rejection, cancellation, and shutdown release request ownership after those uses finish. |
 | Ordinary persistence or networking serialization | Borrows the payload and leaves its pin intact. Repeated serialization is non-consuming. Operation buffers and decoded owners have their own lifetimes. |
 
 Prepare replies as local `using` envelopes before shared mutations. Stage sends and
 call `Complete()` in the same final synchronous block, with no awaits from the first
 mutation through handler return. Scope disposal releases local replies on both
 success and exceptions; staged durable state keeps its independent pin. Never
-release a send owner merely because a caller stopped waiting: an actual in-flight
-operation can still read its bytes.
+release an operation's retained owner merely because a caller stopped waiting: an
+actual in-flight operation can still read its bytes. The caller's local owner and
+the operation's retained owner have independent lifetimes.
+
+Messaging registers
+<xref:Orleans.Journaling.IDurableDictionaryValueLifecycle`1> for envelopes and
+dead letters. Live dictionary mutations retain values before encoding them.
+Replay transfers already-owned decoded values into state. Replacement, removal,
+reset, journal deletion, and scoped dictionary disposal release the corresponding
+state owners. Handler and delivery-batch pins keep borrowed payloads readable
+through their actual outcomes even when a preceding writer captures completion
+and removes a state owner earlier.
 
 The Arc overloads of <xref:Orleans.Serialization.Serializer.Deserialize*> and
 <xref:Orleans.Serialization.Serializer`1.Deserialize*> create an Arc-backed reader.

@@ -168,6 +168,10 @@ concurrency, and the overlap between durable state, readers, and delivery operat
 
 Outbox staging independently retains the caller's payload pin. Generated RPC request
 copying retains another pin, while ordinary persistence serialization is non-consuming.
+Serialization and invocation hold active uses of that request owner; terminal
+callbacks release it after the final active use finishes. Caller cancellation
+ends the wait while actual admission, serialization, and invocation retain their
+own pins.
 The handler borrows its context envelope through actual method completion. Release
 application-local envelopes after staging and decoded packages after use; use explicit
 `Retain()` when crossing those lifetimes. Dispose activation encoders at teardown.

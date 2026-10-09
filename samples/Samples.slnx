@@ -43,6 +43,9 @@
     <Project Path="DurableJobsMigration/DurableJobsMigration.AppHost/DurableJobsMigration.AppHost.csproj" />
     <Project Path="DurableJobsMigration/DurableJobsMigration/DurableJobsMigration.csproj" />
   </Folder>
+  <Folder Name="/DurableMessaging/">
+    <Project Path="DurableMessaging/DurableMessaging.csproj" />
+  </Folder>
   <Folder Name="/Deployment/" />
   <Folder Name="/Deployment/AzureAppService/" />
   <Folder Name="/Deployment/AzureAppService/Abstractions/">
