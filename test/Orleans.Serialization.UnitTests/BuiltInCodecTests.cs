@@ -40,6 +40,12 @@ using System.Threading.Tasks;
 
 namespace Orleans.Serialization.UnitTests
 {
+    [AttributeUsage(AttributeTargets.Class)]
+    internal sealed class OwnershipCodecTestsAttribute(Type valueType) : Attribute
+    {
+        public Type ValueType { get; } = valueType;
+    }
+
     internal static class CsCheckAdaptor
     {
         public static Action<Action<TValue>> ToValueProvider<TValue>(this Gen<TValue> gen) => value => gen.Sample(value);
@@ -122,6 +128,12 @@ namespace Orleans.Serialization.UnitTests
             var typesWithCopierTests = new HashSet<Type>();
             foreach (var type in typeof(CodecTestTests).Assembly.GetTypes())
             {
+                if (type.GetCustomAttribute<OwnershipCodecTestsAttribute>() is { } ownershipTests)
+                {
+                    typesWithCodecTests.Add(ownershipTests.ValueType);
+                    typesWithCopierTests.Add(ownershipTests.ValueType);
+                }
+
                 if (type.BaseType is not { IsGenericType: true } baseType)
                 {
                     continue;

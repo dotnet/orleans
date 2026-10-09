@@ -25,6 +25,8 @@ During <xref:Orleans.Runtime.GrainLifecycleStage.SetupState>, the manager:
 1. Resets and replays each registered durable state.
 1. Completes activation setup after replay finishes.
 
+Nonempty journals require stored format metadata. A missing format key fails recovery and leaves the journal unchanged. New empty journals use the configured write format.
+
 <xref:Orleans.Grain.OnActivateAsync*> and requests observe recovered durable state after setup succeeds, whether the grain derives directly from <xref:Orleans.Grain>, from an application-owned base, or from <xref:Orleans.Journaling.DurableGrain>. A storage read, format, codec, or malformed-data failure fails activation and preserves the stored journal for diagnosis and recovery.
 
 Provider registration makes Journaling services available. Per-grain journal I/O begins only for activations which resolve the manager, directly or through durable-state dependencies. Grains which use other persistence models keep their existing activation behavior.
@@ -55,6 +57,27 @@ Durable collections encode their operation before applying it to the in-memory c
 - **Snapshot replacement** writes the current state of every registered stream and atomically publishes it as the new journal generation.
 
 Concurrent calls made while the same kind of write is queued can share that queued operation. Each caller observes its completion or failure. Calls made after a storage operation starts are processed by a later operation.
+
+### Serialized buffer ownership
+
+The journal owner pins each captured serialized batch through the storage
+operation's actual completion. A successful acknowledgement consumes the captured
+prefix; entries staged during I/O remain pending for a later capture.
+
+The <xref:Orleans.Journaling.IJournalStorage.AppendAsync*> and
+<xref:Orleans.Journaling.IJournalStorage.ReplaceAsync*> contracts lend their
+serialized input until the returned operation completes. Storage implementations
+finish consuming or copying that input within this lifetime. The built-in volatile
+provider additionally supports an internal retained-buffer contract: it acquires
+independent page references before publication. Stored bytes and active reader
+snapshots retain their own references after the manager releases its capture.
+
+Ownership follows the actual provider outcome. If a provider commits and then
+reports an error, its stored references still represent that committed outcome,
+which a fresh owner replays. Caller cancellation ends the caller's wait while
+the capture and actual I/O remain owned. Snapshot replacement or deletion releases
+the storage generation's references, and overlapping readers release their
+captured references when their reads finish.
 
 > [!IMPORTANT]
 > In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.

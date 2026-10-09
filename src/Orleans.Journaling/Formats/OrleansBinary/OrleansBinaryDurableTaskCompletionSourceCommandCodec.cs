@@ -5,7 +5,7 @@ using Orleans.Serialization.Session;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for durable task completion source journal entries, preserving the legacy Orleans binary wire format.
+/// Binary codec for durable task completion source journal entries using Orleans binary serialization.
 /// </summary>
 /// <remarks>
 /// Unlike other durable type codecs, the TCS format uses a status byte instead of a

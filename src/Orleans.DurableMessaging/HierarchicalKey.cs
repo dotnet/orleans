@@ -14,7 +14,7 @@ namespace Orleans.DurableMessaging;
 /// Segments can be escaped to allow literal slash characters.
 /// </remarks>
 [GenerateSerializer, Immutable]
-[Alias("Orleans.HierarchicalKey")]
+[Alias("Orleans.DurableMessaging.HierarchicalKey")]
 public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalKey>, IParsable<HierarchicalKey>, ISpanParsable<HierarchicalKey>
 {
     /// <summary>
@@ -59,6 +59,32 @@ public sealed class HierarchicalKey : ISpanFormattable, IEquatable<HierarchicalK
         }
 
         return new(value.AsMemory());
+    }
+
+    /// <summary>
+    /// Creates a new hierarchical key from the specified hierarchy fragments.
+    /// </summary>
+    /// <param name="values">The ordered hierarchy fragments, each containing one or more slash-separated, optionally escaped segments.</param>
+    /// <returns>A new hierarchical key composed by creating a root from the first fragment and appending each subsequent fragment as a child.</returns>
+    /// <remarks>
+    /// Existing escape sequences are preserved. Use <see cref="CreateEscaped(string)"/> to escape literal segment separators.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when a fragment is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="values"/> is empty or a fragment is empty, contains empty segments, or contains an invalid escape sequence.</exception>
+    public static HierarchicalKey Create(params ReadOnlySpan<string> values)
+    {
+        if (values.IsEmpty)
+        {
+            throw new ArgumentException("Values must not be empty.", nameof(values));
+        }
+
+        var result = Create(values[0]);
+        for (var i = 1; i < values.Length; i++)
+        {
+            result = result.CreateChildKey(values[i]);
+        }
+
+        return result;
     }
 
     /// <summary>

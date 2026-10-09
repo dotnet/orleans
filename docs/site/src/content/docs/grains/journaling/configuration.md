@@ -150,7 +150,7 @@ Serializer naming policies affect application payload values. Journal command na
 
 ## Migrate a journal format
 
-Providers expose the persisted format key as <xref:Orleans.Journaling.IJournalMetadata.FormatKey> and <xref:Orleans.Journaling.JournalMetadata.FormatKey>. Recovery selects the stored reader independently of the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata. <xref:Orleans.Journaling.Json.JsonLinesJournalFormat.JournalFormatKey> supplies the JSON Lines format key.
+Providers expose the persisted format key as <xref:Orleans.Journaling.IJournalMetadata.FormatKey> and <xref:Orleans.Journaling.JournalMetadata.FormatKey>. Recovery selects the stored reader independently of the configured write format. Nonempty journals require a stored format key; recovery fails explicitly when it is absent. New empty journals use the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata. <xref:Orleans.Journaling.Json.JsonLinesJournalFormat.JournalFormatKey> supplies the JSON Lines format key.
 
 Use this deployment sequence:
 
@@ -177,5 +177,52 @@ The default minimum is seven days. Removal is persisted by a compaction after th
 ## Development storage
 
 <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournaling*> registers the core services, formats, durable-state factories, and lifecycle integration. Register storage through a provider-specific method or the generic <xref:Orleans.Journaling.JournalingHostingExtensions.AddJournalStorage*> method. Runtime tests and disposable development hosts can use <xref:Orleans.Journaling.JournalingHostingExtensions.AddVolatileJournalStorage*> with a provider name. Its contents live in process memory, so use persistent emulator storage to validate restart recovery and provider migration.
+
+<xref:Orleans.Journaling.VolatileJournalStorageOptions> controls the retained append
+history. The defaults request a snapshot after **100 successful appends or 1 MiB
+(1,048,576 bytes)** of appended data, whichever limit is reached first:
+
+:::code language="csharp" source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="volatile_journal_thresholds":::
+
+The state manager observes that request before its next write. That write replaces
+the history with a snapshot of current state; successful replacement resets both
+counters. Snapshot bytes are excluded from the appended-byte count. Deletion and
+recreation begin with empty history. Each limit must be positive; a single append
+can exceed the byte threshold.
+
+Use the overload accepting a provider name and options delegate to configure
+independent named thresholds. Larger limits reduce snapshot frequency and allocate
+fewer full-state copies; smaller limits bound retained append history and replay
+work more tightly. Size both limits alongside the current snapshot and application
+deduplication retention.
+
+Volatile storage retains immutable, reference-counted journal pages. The journal
+writer, stored history, and each active reader have independent ownership.
+Snapshot replacement and deletion release retired storage references while
+existing readers finish against their captured bytes and metadata. Borrowed
+writes copy into provider-owned pages; the built-in journal manager can share
+its owned pages through the storage implementation's explicit retained-buffer
+capability.
+
+The existing process-wide Arc buffer pool retains up to **4 MiB** of free pages
+by default and caches individual pages up to **1 MiB**. Set
+<xref:Orleans.Serialization.Buffers.ArcBufferWriter.MaxRetainedPoolBytes> during
+process startup to choose the aggregate free-page budget:
+
+:::code language="csharp" source="../../snippets/compiled/Grains/JournalingSnippets.cs" id="arc_buffer_pool_budget":::
+
+The setting applies to every Arc buffer writer in the process, including writers
+used by volatile storage and serialization. It accepts zero to release cached
+pages and disable free-page retention; negative values raise an argument error.
+Lowering the budget releases excess free pages immediately. Rented pages, stored
+journal data, and reader-pinned snapshots keep their reference-counted ownership
+until their owners release them. Large arrays also participate in the BCL array
+pool's independent retention policy.
+
+A drained inactive manager writer and a borrowed-write tail retain at most one
+**16 KiB** page. Capacity planning includes the complete retained journal and
+overlapping readers as well as free pooled buffers.
+Closing an individual manager or storage handle preserves shared history;
+replacement, deletion, or the shared store's end of lifetime releases its pages.
 
 Use the same durable provider category in staging that production uses so recovery, compaction, concurrency, and backup procedures receive realistic validation.

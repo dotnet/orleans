@@ -151,33 +151,34 @@ public sealed class StorageStreamingTests
     }
 
     [Fact]
-    public void BinaryFormatRead_RejectsTruncatedVarUIntFrame()
+    public void BinaryFormatRead_RejectsTruncatedFrame()
     {
-        using var writer = CreateWriter([0x15, 1, 2]);
+        using var writer = CreateWriter([OrleansBinaryJournalReader.FramingVersion, 10, 0, 0, 0, 1, 2]);
+        var reader = new JournalBufferReader(writer.Reader, isCompleted: true);
         var consumer = new CapturingJournalEntrySink();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
-            var reader = new JournalBufferReader(writer.Reader, isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
             ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         });
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(7, reader.Length);
         Assert.Empty(consumer.Entries);
     }
 
     [Fact]
     public void BinaryFormatRead_WaitsForIncompleteFrameWhenInputIsNotCompleted()
     {
-        using var writer = CreateWriter([0x15, 1, 2]);
+        using var writer = CreateWriter([OrleansBinaryJournalReader.FramingVersion, 10, 0, 0, 0, 1, 2]);
         var reader = new JournalBufferReader(writer.Reader, isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
         ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
 
-        Assert.Equal(3, reader.Length);
+        Assert.Equal(7, reader.Length);
         Assert.Empty(consumer.Entries);
     }
 
@@ -188,7 +189,7 @@ public sealed class StorageStreamingTests
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(8)), [1, 2, 3]);
         using var committed = buffer.GetBuffer();
         var entryBytes = committed.ToArray();
-        using var data = CreateWriter([.. entryBytes, 10, 0]);
+        using var data = CreateWriter([.. entryBytes, OrleansBinaryJournalReader.FramingVersion, 10]);
         var reader = new JournalBufferReader(data.Reader, isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 

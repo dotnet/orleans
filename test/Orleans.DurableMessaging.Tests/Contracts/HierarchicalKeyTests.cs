@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.DurableMessaging.Tests.Contracts;
@@ -11,11 +13,11 @@ namespace Orleans.DurableMessaging.Tests.Contracts;
 public class HierarchicalKeyTests
 {
     [Fact]
-    public void SerializationContract_PreservesDraftTypeAlias()
+    public void SerializationContract_IdentifiesCurrentType()
     {
         var alias = Assert.Single(typeof(HierarchicalKey).GetCustomAttributes(inherit: false).OfType<AliasAttribute>());
 
-        Assert.Equal("Orleans.HierarchicalKey", alias.Alias);
+        Assert.Equal("Orleans.DurableMessaging.HierarchicalKey", alias.Alias);
     }
 
     [Fact]
@@ -43,7 +45,7 @@ public class HierarchicalKeyTests
     [Fact]
     public void Create_WithNullString_ThrowsArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create(null!));
+        Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create((string)null!));
     }
 
     [Fact]
@@ -62,6 +64,236 @@ public class HierarchicalKeyTests
     public void Create_WithLeadingSeparator_ThrowsArgumentException()
     {
         Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("/foo"));
+    }
+
+    [Fact]
+    public void Create_WithValues_CreatesRootFirstHierarchy()
+    {
+        var key = HierarchicalKey.Create("orders", "42", "payment");
+        var root = HierarchicalKey.Create("orders");
+        var parent = root.CreateChildKey("42");
+        var chained = parent.CreateChildKey("payment");
+        var flat = HierarchicalKey.Create("orders/42/payment");
+        var segments = new List<string>();
+        foreach (var segment in key)
+        {
+            segments.Add(segment.ToString());
+        }
+
+        Assert.Equal(["orders", "42", "payment"], segments);
+        Assert.Equal("orders/42/payment", key.ToString());
+        Assert.Equal(17, key.Length);
+        Span<char> formatted = stackalloc char[key.Length];
+        Assert.True(key.TryFormat(formatted, out var written, default, null));
+        Assert.Equal(key.Length, written);
+        Assert.Equal("orders/42/payment", new string(formatted));
+        Assert.Equal(chained, key);
+        Assert.Equal(flat, key);
+        Assert.Equal(key, flat);
+        Assert.Equal(flat.GetHashCode(), key.GetHashCode());
+        Assert.Equal(parent, key.GetParent());
+        Assert.Equal(root, key.GetParent()!.GetParent());
+        Assert.Null(key.GetParent()!.GetParent()!.GetParent());
+        Assert.True(parent.IsParentOf(key));
+        Assert.True(key.IsChildOf(parent));
+        Assert.True(root.IsAncestorOf(key));
+        Assert.False(root.IsParentOf(key));
+    }
+
+    [Fact]
+    public void Create_WithValues_TwoFragmentsCreatesChildKey()
+    {
+        var key = HierarchicalKey.Create("orders", "42");
+
+        Assert.Equal(HierarchicalKey.Create("orders").CreateChildKey("42"), key);
+        Assert.Equal("orders/42", key.ToString());
+    }
+
+    [Fact]
+    public void Create_WithValues_SingleFragmentMatchesStringOverload()
+    {
+        ReadOnlySpan<string> values = ["orders/42"];
+
+        var key = HierarchicalKey.Create(values);
+
+        Assert.Equal(HierarchicalKey.Create("orders/42"), key);
+        Assert.Equal("orders/42", key.ToString());
+        Assert.Equal(HierarchicalKey.Create("orders"), key.GetParent());
+        Assert.Null(key.GetParent()!.GetParent());
+    }
+
+    [Theory]
+    [InlineData(@"ba\/r/baz", @"ba\/r", @"root/fo\/o/ba\/r/baz/end/leaf")]
+    [InlineData(@"ba\\r/baz", @"ba\\r", @"root/fo\/o/ba\\r/baz/end/leaf")]
+    public void Create_WithValues_EscapedMultiSegmentFragmentsPreserveHierarchy(
+        string childValue, string escapedSegment, string expected)
+    {
+        var key = HierarchicalKey.Create(@"root/fo\/o", childValue, "end/leaf");
+        var chained = HierarchicalKey.Create(@"root/fo\/o").CreateChildKey(childValue).CreateChildKey("end/leaf");
+        var flat = HierarchicalKey.Create(expected);
+        var parent = HierarchicalKey.Create(@"root/fo\/o", childValue, "end");
+        var root = HierarchicalKey.Create(@"root/fo\/o");
+        var segments = new List<string>();
+        foreach (var segment in key)
+        {
+            segments.Add(segment.ToString());
+        }
+
+        Assert.Equal(["root", @"fo\/o", escapedSegment, "baz", "end", "leaf"], segments);
+        Assert.Equal(expected, key.ToString());
+        Assert.Equal(expected.Length, key.Length);
+        Assert.Equal(chained, key);
+        Assert.Equal(flat, key);
+        Assert.Equal(key, flat);
+        Assert.Equal(flat.GetHashCode(), key.GetHashCode());
+        Assert.Equal(parent, key.GetParent());
+        Assert.Equal(chained.GetParent()!.GetParent(), key.GetParent()!.GetParent());
+        Assert.True(parent.IsParentOf(key));
+        Assert.True(key.IsChildOf(parent));
+        Assert.True(root.IsAncestorOf(key));
+        Assert.False(root.IsParentOf(key));
+    }
+
+    [Fact]
+    public void Create_WithValues_ArrayAndSpanSlicesUseOnlyProvidedFragments()
+    {
+        string[] values = ["/invalid", "orders", "42", "payment", @"invalid\"];
+        ReadOnlySpan<string> readOnlySlice = values.AsSpan(1, 3);
+        Span<string> slice = values.AsSpan(1, 3);
+        string[] array = ["orders", "42", "payment"];
+        var expected = HierarchicalKey.Create("orders/42/payment");
+
+        Assert.Equal(expected, HierarchicalKey.Create(array));
+        Assert.Equal(expected, HierarchicalKey.Create(readOnlySlice));
+        Assert.Equal(expected, HierarchicalKey.Create(slice));
+    }
+
+    [Fact]
+    public void Create_WithValues_ArrayMutationDoesNotChangeKey()
+    {
+        string[] values = ["orders", "42", "payment"];
+        var key = HierarchicalKey.Create(values);
+        var hashCode = key.GetHashCode();
+
+        values[0] = "changed";
+        values[1] = null!;
+        values[2] = "/invalid";
+
+        Assert.Equal("orders/42/payment", key.ToString());
+        Assert.Equal(HierarchicalKey.Create("orders/42/payment"), key);
+        Assert.Equal(HierarchicalKey.Create("orders/42"), key.GetParent());
+        Assert.Equal(hashCode, key.GetHashCode());
+    }
+
+    [Fact]
+    public void Create_WithValues_EmptyInputThrowsArgumentException()
+    {
+        var noArguments = Assert.Throws<ArgumentException>(() => HierarchicalKey.Create());
+        var empty = Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(ReadOnlySpan<string>.Empty));
+        var defaultSpan = Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(default(ReadOnlySpan<string>)));
+        var emptyArray = Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(Array.Empty<string>()));
+
+        Assert.Equal("values", noArguments.ParamName);
+        Assert.Equal("values", empty.ParamName);
+        Assert.Equal("values", defaultSpan.ParamName);
+        Assert.Equal("values", emptyArray.ParamName);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Create_WithValues_NullFragmentThrowsArgumentNullException(int position)
+    {
+        string[] values = ["orders", "42", "payment"];
+        values[position] = null!;
+
+        var exception = Assert.Throws<ArgumentNullException>(() => HierarchicalKey.Create(values));
+
+        Assert.Equal("value", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData("", 0)]
+    [InlineData("", 1)]
+    [InlineData("", 2)]
+    [InlineData("/invalid", 0)]
+    [InlineData("/invalid", 1)]
+    [InlineData("/invalid", 2)]
+    [InlineData("invalid/", 0)]
+    [InlineData("invalid/", 1)]
+    [InlineData("invalid/", 2)]
+    [InlineData("invalid//fragment", 0)]
+    [InlineData("invalid//fragment", 1)]
+    [InlineData("invalid//fragment", 2)]
+    [InlineData(@"invalid\", 0)]
+    [InlineData(@"invalid\", 1)]
+    [InlineData(@"invalid\", 2)]
+    [InlineData(@"invalid\q", 0)]
+    [InlineData(@"invalid\q", 1)]
+    [InlineData(@"invalid\q", 2)]
+    public void Create_WithValues_InvalidFragmentThrowsArgumentException(string value, int position)
+    {
+        string[] values = ["orders", "42", "payment"];
+        values[position] = value;
+        var expected = Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(value));
+
+        var exception = Assert.Throws<ArgumentException>(() => HierarchicalKey.Create(values));
+
+        Assert.Equal(expected.ParamName, exception.ParamName);
+        Assert.Equal(expected.Message, exception.Message);
+    }
+
+    [Fact]
+    public void Create_WithValues_IncompleteEscapeIsNotRepairedByNextFragment()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => HierarchicalKey.Create("orders", @"bad\", "valid"));
+
+        Assert.Equal("value", exception.ParamName);
+    }
+
+    [Fact]
+    public void Create_WithValues_PreservesCaseSensitiveSegmentIdentity()
+    {
+        var key = HierarchicalKey.Create("orders", "42", "payment");
+
+        Assert.NotEqual(HierarchicalKey.Create("Orders", "42", "payment"), key);
+        Assert.NotEqual(HierarchicalKey.Create(@"orders\/42", "payment"), key);
+        Assert.False(HierarchicalKey.Create("order").IsAncestorOf(key));
+        Assert.False(HierarchicalKey.Create("Orders").IsAncestorOf(key));
+    }
+
+    [Fact]
+    public void Create_WithValues_RoundTripsThroughOrleansSerializer()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<HierarchicalKey>>();
+        var key = HierarchicalKey.Create(@"orders/fo\/o", @"ba\\r/baz", "payment");
+        var flat = HierarchicalKey.Create(@"orders/fo\/o/ba\\r/baz/payment");
+
+        var copy = serializer.Deserialize(serializer.SerializeToArray(key));
+
+        Assert.NotSame(key, copy);
+        Assert.NotNull(copy);
+        Assert.Equal(flat, copy);
+        Assert.Equal(copy, flat);
+        Assert.Equal(flat.ToString(), copy.ToString());
+        Assert.Equal(flat.Length, copy.Length);
+        Assert.Equal(flat.GetHashCode(), copy.GetHashCode());
+        HierarchicalKey? expectedParent = key;
+        HierarchicalKey? actualParent = copy;
+        while (expectedParent is not null)
+        {
+            Assert.Equal(expectedParent, actualParent);
+            Assert.NotNull(actualParent);
+            expectedParent = expectedParent.GetParent();
+            actualParent = actualParent.GetParent();
+        }
+
+        Assert.Null(actualParent);
+
+        Assert.True(HierarchicalKey.Create(@"orders/fo\/o").IsAncestorOf(copy));
+        Assert.True(flat.GetParent()!.IsParentOf(copy));
     }
 
     [Fact]
@@ -514,7 +746,7 @@ public class HierarchicalKeyTests
     [Fact]
     public void CreateWithNullParent_CreatesKeyWithoutParent()
     {
-        var key = HierarchicalKey.Create(null, "bar");
+        var key = HierarchicalKey.Create((HierarchicalKey?)null, "bar");
         Assert.Equal("bar", key.ToString());
     }
 }

@@ -131,6 +131,19 @@ public class DurableInboxOptions
     public int OutboxBatchSize { get; set; } = 32;
 
     /// <summary>
+    /// Gets or sets how long an empty outbox retains its acknowledged physical recovery job.
+    /// </summary>
+    /// <remarks>
+    /// The default is 100 milliseconds. Zero selects immediate retirement. Ready local work
+    /// wakes its pump immediately, while delivery, acceptance, and acknowledgement keep their
+    /// normal durability boundaries. Once idle, the job is rescheduled at the idle deadline;
+    /// provider polling and activation latency also contribute to recovery timing.
+    /// A durable wakeup is scheduled before outbound work can be acknowledged.
+    /// </remarks>
+    /// <value>A non-negative interval within the supported timer range.</value>
+    public TimeSpan OutboxIdleRetirementGracePeriod { get; set; } = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
     /// Validates the configuration values and throws if any are invalid.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">
@@ -144,6 +157,13 @@ public class DurableInboxOptions
     /// </remarks>
     public void Validate()
     {
+        if (OutboxIdleRetirementGracePeriod < TimeSpan.Zero
+            || OutboxIdleRetirementGracePeriod > TimeSpan.FromMilliseconds(uint.MaxValue - 1))
+        {
+            throw new ArgumentOutOfRangeException(nameof(OutboxIdleRetirementGracePeriod), OutboxIdleRetirementGracePeriod,
+                "OutboxIdleRetirementGracePeriod must be non-negative and within the supported timer range.");
+        }
+
         if (MaxCapacity <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(MaxCapacity), MaxCapacity, "MaxCapacity must be greater than zero.");

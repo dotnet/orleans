@@ -11,31 +11,31 @@ public sealed class DeliveryAndOptionsContractTests
     [Fact]
     public void DeliveryResult_EachFactory_PreservesStatusAndPayload()
     {
-        var routeMissing = DeliveryResult.RouteNotFound("orders/missing");
+        var handlerMissing = DeliveryResult.HandlerNotFound();
         var deadLettered = DeliveryResult.DeadLettered("poison body");
 
         Assert.Equal(DeliveryStatus.Accepted, DeliveryResult.Accepted().Status);
         Assert.Equal(DeliveryStatus.Duplicate, DeliveryResult.Duplicate().Status);
         Assert.Equal(DeliveryStatus.Backpressured, DeliveryResult.Backpressured().Status);
-        Assert.Equal(DeliveryStatus.RouteNotFound, routeMissing.Status);
-        Assert.Equal("No handler for route 'orders/missing'", routeMissing.Message);
+        Assert.Equal(DeliveryStatus.HandlerNotFound, handlerMissing.Status);
+        Assert.Equal("No inbox handler is registered.", handlerMissing.Message);
         Assert.Equal(DeliveryStatus.DeadLettered, deadLettered.Status);
         Assert.Equal("poison body", deadLettered.Message);
     }
 
     [Fact]
-    public void DeliveryStatus_AllValues_HaveStableDistinctValues()
+    public void DeliveryStatus_AllValues_HaveContiguousDistinctValues()
     {
         Assert.Equal(
             [
                 DeliveryStatus.Accepted,
                 DeliveryStatus.Duplicate,
                 DeliveryStatus.Backpressured,
-                DeliveryStatus.RouteNotFound,
+                DeliveryStatus.HandlerNotFound,
                 DeliveryStatus.DeadLettered
             ],
             Enum.GetValues<DeliveryStatus>());
-        Assert.Equal([0, 1, 2, 3, 6], Enum.GetValues<DeliveryStatus>().Select(static value => (int)value));
+        Assert.Equal([0, 1, 2, 3, 4], Enum.GetValues<DeliveryStatus>().Select(static value => (int)value));
     }
 
     [Fact]
@@ -54,6 +54,7 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal(1000, options.MaxRetainedDeadLetters);
         Assert.Equal(32, options.InboxBatchSize);
         Assert.Equal(32, options.OutboxBatchSize);
+        Assert.Equal(TimeSpan.FromMilliseconds(100), options.OutboxIdleRetirementGracePeriod);
     }
 
     [Fact]
@@ -72,6 +73,8 @@ public sealed class DeliveryAndOptionsContractTests
             (nameof(DurableInboxOptions.MaxRetainedDeadLetters), options => options.MaxRetainedDeadLetters = 0),
             (nameof(DurableInboxOptions.InboxBatchSize), options => options.InboxBatchSize = 0),
             (nameof(DurableInboxOptions.OutboxBatchSize), options => options.OutboxBatchSize = 0),
+            (nameof(DurableInboxOptions.OutboxIdleRetirementGracePeriod), options => options.OutboxIdleRetirementGracePeriod = TimeSpan.FromTicks(-1)),
+            (nameof(DurableInboxOptions.OutboxIdleRetirementGracePeriod), options => options.OutboxIdleRetirementGracePeriod = TimeSpan.MaxValue),
         };
 
         foreach (var (parameter, mutate) in invalidCases)
@@ -99,5 +102,4 @@ public sealed class DeliveryAndOptionsContractTests
             Assert.Contains("less than DeduplicationWindow", exception.Message, StringComparison.Ordinal);
         }
     }
-
 }

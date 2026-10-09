@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NSubstitute" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.DurableMessaging\Orleans.DurableMessaging.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>

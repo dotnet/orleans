@@ -8,25 +8,13 @@
 //------------------------------------------------------------------------------
 namespace Orleans.DurableMessaging
 {
-    public abstract partial class CorrelationHandler : IInboxHandler
-    {
-        protected CorrelationHandler(HierarchicalKey correlationKey) { }
-
-        protected HierarchicalKey CorrelationKey { get { throw null; } }
-
-        public bool CanHandle(IInboxHandlerContext context) { throw null; }
-
-        protected abstract System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
-    }
-
     [GenerateSerializer]
     [Alias("Orleans.DurableMessaging.DeliveryResult")]
     public readonly partial struct DeliveryResult
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        [Id(2)]
+        [Id(1)]
         public string? Message { get { throw null; } init { } }
 
         [Id(0)]
@@ -40,7 +28,7 @@ namespace Orleans.DurableMessaging
 
         public static DeliveryResult Duplicate() { throw null; }
 
-        public static DeliveryResult RouteNotFound(string routeKey) { throw null; }
+        public static DeliveryResult HandlerNotFound() { throw null; }
     }
 
     public enum DeliveryStatus
@@ -48,88 +36,35 @@ namespace Orleans.DurableMessaging
         Accepted = 0,
         Duplicate = 1,
         Backpressured = 2,
-        RouteNotFound = 3,
-        DeadLettered = 6
+        HandlerNotFound = 3,
+        DeadLettered = 4
     }
 
-    [GenerateSerializer]
     [Alias("Orleans.DurableMessaging.DurableEnvelope")]
-    public readonly partial struct DurableEnvelope
+    public readonly partial struct DurableEnvelope : System.IDisposable
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        [Id(4)]
-        public HierarchicalKey? CorrelationKey { get { throw null; } init { } }
-
-        [Id(7)]
-        public System.DateTimeOffset CreatedAt { get { throw null; } init { } }
-
-        [Id(6)]
-        public required DurableEnvelopeData Data { get { throw null; } init { } }
-
         [Id(0)]
         public required System.Guid MessageId { get { throw null; } init { } }
+
+        [Id(3)]
+        public required Serialization.Buffers.ArcBuffer Payload { get { throw null; } init { } }
 
         [Id(2)]
         public required Runtime.GrainId ReceiverId { get { throw null; } init { } }
 
-        [Id(5)]
-        public Runtime.GrainId? ReplyTo { get { throw null; } init { } }
-
-        [Id(3)]
-        public required string RouteKey { get { throw null; } init { } }
-
         [Id(1)]
         public required Runtime.GrainId SenderId { get { throw null; } init { } }
-    }
 
-    public sealed partial class DurableEnvelopeBuilder : System.Buffers.IBufferWriter<byte>
-    {
-        public DurableEnvelopeBuilder(Serialization.Session.SerializerSessionPool sessionPool, Runtime.GrainId senderId) { }
+        public readonly void Dispose() { }
 
-        public DurableEnvelope Build() { throw null; }
-
-        void System.Buffers.IBufferWriter<byte>.Advance(int count) { }
-
-        System.Memory<byte> System.Buffers.IBufferWriter<byte>.GetMemory(int sizeHint) { throw null; }
-
-        System.Span<byte> System.Buffers.IBufferWriter<byte>.GetSpan(int sizeHint) { throw null; }
-
-        public DurableEnvelopeBuilder To(Runtime.GrainId target, string routeKey) { throw null; }
-
-        public DurableEnvelopeBuilder WithBody<T>(T body) { throw null; }
-
-        public DurableEnvelopeBuilder WithContextValue<T>(string key, T value) { throw null; }
-
-        public DurableEnvelopeBuilder WithCorrelationKey(HierarchicalKey correlationKey) { throw null; }
-
-        public DurableEnvelopeBuilder WithCorrelationKey(string correlationKey) { throw null; }
-
-        public DurableEnvelopeBuilder WithReplyTo(Runtime.GrainId replyTo) { throw null; }
-    }
-
-    [GenerateSerializer]
-    [Alias("Orleans.DurableMessaging.DurableEnvelopeData")]
-    public sealed partial class DurableEnvelopeData
-    {
-        internal DurableEnvelopeData() { }
-
-        public System.Collections.Generic.IEnumerable<string> ContextKeys { get { throw null; } }
-
-        public System.Buffers.ReadOnlySequence<byte> GetBodyBytes() { throw null; }
-
-        public bool HasContextKey(string key) { throw null; }
-
-        public bool TryGetBody<T>(out T value) { throw null; }
-
-        public bool TryGetContextBytes(string key, out System.Buffers.ReadOnlySequence<byte> value) { throw null; }
-
-        public bool TryGetContextValue<T>(string key, out T value) { throw null; }
+        public readonly DurableEnvelope Retain() { throw null; }
     }
 
     [GenerateSerializer]
     [Immutable]
-    [Alias("Orleans.HierarchicalKey")]
+    [Alias("Orleans.DurableMessaging.HierarchicalKey")]
     public sealed partial class HierarchicalKey : System.ISpanFormattable, System.IFormattable, System.IEquatable<HierarchicalKey>, System.IParsable<HierarchicalKey>, System.ISpanParsable<HierarchicalKey>
     {
         internal HierarchicalKey() { }
@@ -139,6 +74,8 @@ namespace Orleans.DurableMessaging
         public int Length { get { throw null; } }
 
         public static HierarchicalKey Create(HierarchicalKey? parent, string value) { throw null; }
+
+        public static HierarchicalKey Create(scoped params System.ReadOnlySpan<string> values) { throw null; }
 
         public static HierarchicalKey Create(string value) { throw null; }
 
@@ -200,10 +137,7 @@ namespace Orleans.DurableMessaging
 
         System.Collections.Generic.IEnumerable<DurableEnvelope> Messages { get; }
 
-        bool HasHandler(string routeKey);
         void RegisterHandler(IInboxHandler handler);
-        void RegisterHandler(string routeKey, IInboxHandler handler);
-        bool TryGetHandler(string routeKey, out IInboxHandler handler);
         bool TryGetMessage(Runtime.GrainId senderId, System.Guid messageId, out DurableEnvelope envelope);
     }
 
@@ -220,15 +154,12 @@ namespace Orleans.DurableMessaging
 
         System.Collections.Generic.IEnumerable<DurableEnvelope> Messages { get; }
 
-        System.Threading.Tasks.ValueTask<IPreparedOutboxBatch> PrepareSendAsync(System.Collections.Generic.IReadOnlyList<DurableEnvelope> messages, System.Threading.CancellationToken cancellationToken = default);
         void Send(DurableEnvelope envelope);
-        void Send(IPreparedOutboxBatch batch);
         bool TryGetMessage(System.Guid messageId, out DurableEnvelope envelope);
     }
 
     public partial interface IInboxHandler
     {
-        bool CanHandle(IInboxHandlerContext context);
         System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
     }
 
@@ -236,51 +167,7 @@ namespace Orleans.DurableMessaging
     {
         DurableEnvelope Envelope { get; }
 
-        Runtime.GrainId GrainId { get; }
-
-        IDurableOutbox Outbox { get; }
-
         void Complete();
-        DurableEnvelopeBuilder CreateEnvelope();
-        void Send(DurableEnvelope envelope);
-        void Send(IPreparedOutboxBatch batch);
-    }
-
-    public partial interface IInboxHandler<TMessage> : IInboxHandler
-    {
-        System.Threading.Tasks.ValueTask HandleAsync(TMessage message, IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
-        bool IInboxHandler.CanHandle(IInboxHandlerContext context);
-        System.Threading.Tasks.ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
-    }
-
-    public partial interface IPreparedOutboxBatch : System.IDisposable
-    {
-    }
-
-    public abstract partial class RouteKeyHandler : IInboxHandler
-    {
-        protected RouteKeyHandler(string routeKey) { }
-
-        protected string RouteKey { get { throw null; } }
-
-        public bool CanHandle(IInboxHandlerContext context) { throw null; }
-
-        protected abstract System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
-    }
-
-    public abstract partial class RoutePrefixHandler : IInboxHandler
-    {
-        protected RoutePrefixHandler(string prefix) { }
-
-        protected string Prefix { get { throw null; } }
-
-        public bool CanHandle(IInboxHandlerContext context) { throw null; }
-
-        protected string? GetRouteSuffix(string? routeKey) { throw null; }
-
-        protected abstract System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask IInboxHandler.HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 }
 
@@ -308,6 +195,8 @@ namespace Orleans.DurableMessaging.Configuration
 
         public int OutboxBatchSize { get { throw null; } set { } }
 
+        public System.TimeSpan OutboxIdleRetirementGracePeriod { get { throw null; } set { } }
+
         public void Validate() { }
     }
 }
@@ -329,42 +218,6 @@ namespace OrleansCodeGen.Orleans.DurableMessaging
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableMessaging.DeliveryResult value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_DurableEnvelope : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableMessaging.DurableEnvelope>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.DurableMessaging.DurableEnvelope>, global::Orleans.Serialization.Serializers.IValueSerializer
-    {
-        public Codec_DurableEnvelope(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableMessaging.DurableEnvelope> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.DurableMessaging.DurableEnvelope instance) { }
-
-        public global::Orleans.DurableMessaging.DurableEnvelope ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.DurableMessaging.DurableEnvelope instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableMessaging.DurableEnvelope value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_DurableEnvelopeData : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableMessaging.DurableEnvelopeData>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_DurableEnvelopeData(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableMessaging.DurableEnvelopeData> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableMessaging.DurableEnvelopeData instance) { }
-
-        public global::Orleans.DurableMessaging.DurableEnvelopeData ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableMessaging.DurableEnvelopeData instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableMessaging.DurableEnvelopeData value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -407,26 +260,6 @@ namespace OrleansCodeGen.Orleans.DurableMessaging
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_DurableEnvelope : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.DurableMessaging.DurableEnvelope>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_DurableEnvelope(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableMessaging.DurableEnvelope> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public global::Orleans.DurableMessaging.DurableEnvelope DeepCopy(global::Orleans.DurableMessaging.DurableEnvelope original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_DurableEnvelopeData : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.DurableMessaging.DurableEnvelopeData>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_DurableEnvelopeData(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableMessaging.DurableEnvelopeData> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public global::Orleans.DurableMessaging.DurableEnvelopeData DeepCopy(global::Orleans.DurableMessaging.DurableEnvelopeData original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -438,11 +271,13 @@ namespace OrleansCodeGen.Orleans.DurableMessaging
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), typeof(global::Orleans.DurableMessaging.IDurableInboxExtension), "DeliverAsync" })]
-    public sealed partial class Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B : global::Orleans.Runtime.Request<global::Orleans.DurableMessaging.DeliveryResult>
+    public sealed partial class Invokable_IDurableInboxExtension_GrainReference_Ext_03DB806B : global::Orleans.Runtime.Request<global::Orleans.DurableMessaging.DeliveryResult>, global::Orleans.Serialization.Invocation.IInvokableArgumentOwner
     {
         public global::Orleans.DurableMessaging.DurableEnvelope arg0;
         public System.Threading.CancellationToken arg1;
         public override bool IsCancellable { get { throw null; } }
+
+        public void CompleteArgumentResources() { }
 
         public override void Dispose() { }
 
@@ -466,10 +301,14 @@ namespace OrleansCodeGen.Orleans.DurableMessaging
 
         protected override System.Threading.Tasks.ValueTask<global::Orleans.DurableMessaging.DeliveryResult> InvokeInner() { throw null; }
 
+        public void ReleaseArgumentResources() { }
+
         public override void SetArgument(int index, object value) { }
 
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
 
         public override bool TryCancel() { throw null; }
+
+        public bool TryRetainArgumentResources() { throw null; }
     }
 }

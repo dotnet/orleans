@@ -4,8 +4,6 @@ namespace Orleans.DurableMessaging;
 
 /// <summary>
 /// Result of attempting to deliver a message to an inbox.
-/// Orleans field IDs permit version-tolerant serialization as members evolve.
-/// Normal .NET binary compatibility rules still apply to this public struct.
 /// </summary>
 [GenerateSerializer, Alias("Orleans.DurableMessaging.DeliveryResult")]
 public readonly struct DeliveryResult
@@ -19,7 +17,7 @@ public readonly struct DeliveryResult
     /// <summary>
     /// Optional diagnostic message (e.g., reason for rejection).
     /// </summary>
-    [Id(2)]
+    [Id(1)]
     public string? Message { get; init; }
 
     /// <summary>
@@ -38,12 +36,12 @@ public readonly struct DeliveryResult
     public static DeliveryResult Backpressured() => new() { Status = DeliveryStatus.Backpressured };
 
     /// <summary>
-    /// Creates a result indicating no handler was found for the route key.
+    /// Creates a result indicating the receiving inbox has no registered handler.
     /// </summary>
-    public static DeliveryResult RouteNotFound(string routeKey) => new()
+    public static DeliveryResult HandlerNotFound() => new()
     {
-        Status = DeliveryStatus.RouteNotFound,
-        Message = $"No handler for route '{routeKey}'"
+        Status = DeliveryStatus.HandlerNotFound,
+        Message = "No inbox handler is registered."
     };
 
     /// <summary>

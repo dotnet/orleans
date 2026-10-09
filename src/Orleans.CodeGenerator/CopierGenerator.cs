@@ -464,7 +464,18 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
         if (!membersCopied)
         {
-            GenerateMemberwiseCopy(type, copierFields, members, originalParam, contextParam, resultVar, body, onlyDeepFields);
+            if (type.Members.OfType<MethodParameterFieldDescription>().Any(InvokableGenerator.IsOwnedArgument))
+            {
+                var copyBody = new List<StatementSyntax>();
+                GenerateMemberwiseCopy(type, copierFields, members, originalParam, contextParam, resultVar, copyBody, onlyDeepFields);
+                body.Add(TryStatement(Block(copyBody), SingletonList(CatchClause().WithBlock(Block(
+                    ParseStatement("result.CompleteArgumentResources();"),
+                    ThrowStatement()))), null));
+            }
+            else
+            {
+                GenerateMemberwiseCopy(type, copierFields, members, originalParam, contextParam, resultVar, body, onlyDeepFields);
+            }
             body.Add(ReturnStatement(resultVar));
         }
 
