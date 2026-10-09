@@ -622,6 +622,15 @@ public class TypeConverter
         }
 
         result = Combine(result, IsTypeAllowedByConfiguration(type));
+        if (!type.IsConstructedGenericType && type.FullName is not null)
+        {
+            var typeSpec = RuntimeTypeNameParser.Parse(RuntimeTypeNameFormatter.Format(type));
+            var qualifiedType = typeSpec is AssemblyQualifiedTypeSpec qualified
+                ? new QualifiedType(qualified.Assembly, qualified.Type.Format())
+                : new QualifiedType(null, typeSpec.Format());
+            result = Combine(result, IsNamedTypeAllowed(qualifiedType));
+        }
+
         var isAllowedByTypeFilter = false;
 
         foreach (var filter in _typeFilters)
@@ -663,7 +672,7 @@ public class TypeConverter
                 return genericArgumentsResult;
             }
 
-            result = Combine(result, genericArgumentsResult);
+            result = Combine(result, InspectTypeCore(type.GetGenericTypeDefinition()));
         }
 
         return result;
@@ -671,16 +680,22 @@ public class TypeConverter
 
     private bool? InspectGenericArguments(Type type)
     {
+        bool? result = true;
         foreach (var parameter in type.GenericTypeArguments)
         {
-            var result = InspectTypeCore(parameter);
-            if (result != true)
+            var parameterResult = InspectTypeCore(parameter);
+            if (parameterResult == false)
             {
-                return result;
+                return false;
+            }
+
+            if (parameterResult is null)
+            {
+                result = null;
             }
         }
 
-        return true;
+        return result;
     }
 
     private bool? IsTypeAllowedByConfiguration(Type type)

@@ -188,7 +188,9 @@ namespace Orleans.Serialization.TypeSystem
                 Justification = "Runtime names resolve only when their reflection metadata is preserved. This callback is the metadata lookup boundary, not a mechanism for preserving arbitrary named types.")]
             static Type? ResolveType(Assembly? asm, string name, bool _)
             {
-                return asm?.GetType(name, throwOnError: false, ignoreCase: false) ?? Type.GetType(name, throwOnError: false, ignoreCase: false);
+                return asm is null
+                    ? Type.GetType(name, throwOnError: false, ignoreCase: false)
+                    : asm.GetType(name, throwOnError: false, ignoreCase: false);
             }
         }
     }
