@@ -38,12 +38,12 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
         await using var scope = provider.CreateAsyncScope();
         var stateServices = scope.ServiceProvider;
         var manager = Assert.IsType<EagerManager>(stateServices.GetRequiredService<IJournaledStateManager>());
-        var messages = stateServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox");
-        var processed = stateServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
+        var messages = stateServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.inbox");
+        var processed = stateServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
         var attempts = stateServices.GetRequiredKeyedService(typeof(IDurableDictionary<,>)
-            .MakeGenericType(typeof((GrainId, Guid)), ReceiverTestServices.GetImplementationType("InboxMessageState")), "__orleans.durable-messaging.inbox-message-state");
+            .MakeGenericType(typeof(HierarchicalKey), ReceiverTestServices.GetImplementationType("InboxMessageState")), "__orleans.durable-messaging.inbox-message-state");
         var deadLetters = stateServices.GetRequiredKeyedService(typeof(IDurableDictionary<,>)
-            .MakeGenericType(typeof((GrainId, Guid)), ReceiverTestServices.GetImplementationType("InboxDeadLetter")), "__orleans.durable-messaging.inbox-dead-letters");
+            .MakeGenericType(typeof(HierarchicalKey), ReceiverTestServices.GetImplementationType("InboxDeadLetter")), "__orleans.durable-messaging.inbox-dead-letters");
         var ownerId = stateServices.GetRequiredKeyedService<IDurableValue<string>>("__orleans.durable-messaging.inbox-job-id");
         var ownerJob = stateServices.GetRequiredKeyedService<IDurableValue<DurableJob>>("__orleans.durable-messaging.inbox-job-handle");
         var completed = stateServices.GetRequiredKeyedService<IDurableValue<string>>("__orleans.durable-messaging.inbox-completed-job-id");
@@ -121,7 +121,7 @@ public sealed class InboxEagerManagerTests : DurableMessagingBehaviorTestBase
             Assert.Equal(DeliveryStatus.Accepted, (await delivery).Status);
             Assert.Equal(1, manager.Writes);
             Assert.NotEmpty(Assert.Single(manager.Batches));
-            Assert.Empty((IEnumerable<(GrainId, Guid)>)type.GetField("_provisionalAcceptances", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(extension)!);
+            Assert.Empty((IEnumerable<HierarchicalKey>)type.GetField("_provisionalAcceptances", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(extension)!);
         }
         await jobs.Received(1).ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>());
     }

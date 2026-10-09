@@ -99,13 +99,13 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         Assert.Equal(DurableJobRunStatus.InProgress, (await InvokeAsync(receiver, run)).Status);
         var entry = Assert.Single(entries.Values.Cast<object>());
         Assert.NotEqual(default, GetRegistration(entry));
-        var messages = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(
+        var messages = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>(
             "__orleans.durable-messaging.inbox");
         var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
         Task persisted = null!;
         await OnTurnAsync(context, () =>
         {
-            messages.Add((envelope.Value.SenderId, envelope.Value.MessageId), envelope.Value);
+            messages.Add(envelope.Value.MessageId, envelope.Value);
             persisted = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         });
         await persisted;
@@ -129,7 +129,7 @@ public sealed class InboxPumpResultLifetimeTests : DurableMessagingBehaviorTestB
         var job = CreateJob(receiver, "fault:1");
         await receiver.SetInboxOwnershipAsync("fault:1", job);
         await RefreshSeededOwnerAsync(receiver);
-        await receiver.StageEffectAsync(new DurableEffect(Guid.NewGuid(), 1, 172, "uncommitted"));
+        await receiver.StageEffectAsync(new DurableEffect(TestApplicationProtocol.NewMessageId(), 1, 172, "uncommitted"));
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);
         var entries = GetEntries(context);

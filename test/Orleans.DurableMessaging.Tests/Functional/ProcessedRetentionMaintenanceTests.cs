@@ -49,9 +49,9 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
         Assert.Equal(owner, maintained.InboxJobId);
         Assert.Empty(maintained.InboxDeadLetters);
         Assert.Equal(2, processed.Count);
-        Assert.False(processed.ContainsKey((old.Value.SenderId, old.Value.MessageId)));
-        Assert.True(processed.ContainsKey((current.Value.SenderId, current.Value.MessageId)));
-        Assert.True(processed.ContainsKey((fresh.Value.SenderId, fresh.Value.MessageId)));
+        Assert.False(processed.ContainsKey(old.Value.MessageId));
+        Assert.True(processed.ContainsKey(current.Value.MessageId));
+        Assert.True(processed.ContainsKey(fresh.Value.MessageId));
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, current.Value)).Status);
     }
 
@@ -99,8 +99,8 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
         await Fixture.WaitForEffectCountAsync(receiver, 3);
         _ = await receiver.GetSnapshotAsync();
         Assert.Equal(1, counted.Enumerations);
-        Assert.False(counted.ContainsKey((oldest.Value.SenderId, oldest.Value.MessageId)));
-        Assert.True(counted.ContainsKey((next.Value.SenderId, next.Value.MessageId)));
+        Assert.False(counted.ContainsKey(oldest.Value.MessageId));
+        Assert.True(counted.ContainsKey(next.Value.MessageId));
         Fixture.Clock.Advance(TimeSpan.FromTicks(1));
         for (var i = 0; i < 8; i++)
         {
@@ -110,15 +110,15 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
             _ = await receiver.GetSnapshotAsync();
         }
         Assert.Equal(1, counted.Enumerations);
-        Assert.True(counted.ContainsKey((next.Value.SenderId, next.Value.MessageId)));
+        Assert.True(counted.ContainsKey(next.Value.MessageId));
         Fixture.Clock.Advance(TimeSpan.FromMinutes(2.5) - TimeSpan.FromTicks(1));
         using var following = CreateEnvelope(receiver, NewMessage(140, "following-sweep"));
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, following.Value)).Status);
         var after = await Fixture.WaitForEffectCountAsync(receiver, 12);
         _ = await receiver.GetSnapshotAsync();
         Assert.Equal(2, counted.Enumerations);
-        Assert.False(counted.ContainsKey((next.Value.SenderId, next.Value.MessageId)));
-        Assert.True(counted.ContainsKey((trigger.Value.SenderId, trigger.Value.MessageId)));
+        Assert.False(counted.ContainsKey(next.Value.MessageId));
+        Assert.True(counted.ContainsKey(trigger.Value.MessageId));
         Assert.Equal(1, after.InboxCount);
     }
 
@@ -216,24 +216,24 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
         public int DequeueCount => 1;
     }
 
-    private sealed class CountingProcessedDictionary(IDictionary<(GrainId, Guid), DateTimeOffset> inner) : IDictionary<(GrainId, Guid), DateTimeOffset>
+    private sealed class CountingProcessedDictionary(IDictionary<HierarchicalKey, DateTimeOffset> inner) : IDictionary<HierarchicalKey, DateTimeOffset>
     {
         public int Enumerations { get; private set; }
-        public DateTimeOffset this[(GrainId, Guid) key] { get => inner[key]; set => inner[key] = value; }
-        public ICollection<(GrainId, Guid)> Keys => inner.Keys;
+        public DateTimeOffset this[HierarchicalKey key] { get => inner[key]; set => inner[key] = value; }
+        public ICollection<HierarchicalKey> Keys => inner.Keys;
         public ICollection<DateTimeOffset> Values { get { Enumerations++; return inner.Values; } }
         public int Count => inner.Count;
         public bool IsReadOnly => inner.IsReadOnly;
-        public void Add((GrainId, Guid) key, DateTimeOffset value) => inner.Add(key, value);
-        public void Add(KeyValuePair<(GrainId, Guid), DateTimeOffset> item) => inner.Add(item);
+        public void Add(HierarchicalKey key, DateTimeOffset value) => inner.Add(key, value);
+        public void Add(KeyValuePair<HierarchicalKey, DateTimeOffset> item) => inner.Add(item);
         public void Clear() => inner.Clear();
-        public bool Contains(KeyValuePair<(GrainId, Guid), DateTimeOffset> item) => inner.Contains(item);
-        public bool ContainsKey((GrainId, Guid) key) => inner.ContainsKey(key);
-        public void CopyTo(KeyValuePair<(GrainId, Guid), DateTimeOffset>[] array, int index) => inner.CopyTo(array, index);
-        public bool Remove((GrainId, Guid) key) => inner.Remove(key);
-        public bool Remove(KeyValuePair<(GrainId, Guid), DateTimeOffset> item) => inner.Remove(item);
-        public bool TryGetValue((GrainId, Guid) key, out DateTimeOffset value) => inner.TryGetValue(key, out value);
-        public IEnumerator<KeyValuePair<(GrainId, Guid), DateTimeOffset>> GetEnumerator() { Enumerations++; return inner.GetEnumerator(); }
+        public bool Contains(KeyValuePair<HierarchicalKey, DateTimeOffset> item) => inner.Contains(item);
+        public bool ContainsKey(HierarchicalKey key) => inner.ContainsKey(key);
+        public void CopyTo(KeyValuePair<HierarchicalKey, DateTimeOffset>[] array, int index) => inner.CopyTo(array, index);
+        public bool Remove(HierarchicalKey key) => inner.Remove(key);
+        public bool Remove(KeyValuePair<HierarchicalKey, DateTimeOffset> item) => inner.Remove(item);
+        public bool TryGetValue(HierarchicalKey key, out DateTimeOffset value) => inner.TryGetValue(key, out value);
+        public IEnumerator<KeyValuePair<HierarchicalKey, DateTimeOffset>> GetEnumerator() { Enumerations++; return inner.GetEnumerator(); }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
@@ -254,8 +254,8 @@ public sealed class ProcessedRetentionMaintenanceTests : DurableMessagingBehavio
         return receiver;
     }
 
-    private IDurableDictionary<(GrainId, Guid), DateTimeOffset> GetProcessed(IDurableMessagingTestGrain receiver) =>
-        Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>(
+    private IDurableDictionary<HierarchicalKey, DateTimeOffset> GetProcessed(IDurableMessagingTestGrain receiver) =>
+        Fixture.GetGrainContext(receiver).ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DateTimeOffset>>(
             "__orleans.durable-messaging.inbox-processed");
 
     private sealed class RetentionFixture : DurableMessagingClusterFixture

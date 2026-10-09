@@ -24,7 +24,7 @@ public sealed class InboxEnvelopeValidationTests : DurableMessagingBehaviorTestB
         using var template = CreateEnvelope(receiver, NewMessage(180, field));
         var malformed = field switch
         {
-            "message" => template.Value with { MessageId = Guid.Empty },
+            "message" => template.Value with { MessageId = default },
             "sender" => template.Value with { SenderId = default },
             "payload" => template.Value with { Payload = default },
             _ => throw new ArgumentOutOfRangeException(nameof(field))
@@ -32,8 +32,8 @@ public sealed class InboxEnvelopeValidationTests : DurableMessagingBehaviorTestB
         var context = Fixture.GetGrainContext(receiver);
         if (existingKey)
         {
-            var processed = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
-            await OnTurnAsync(context, () => processed.Add((malformed.SenderId, malformed.MessageId), Fixture.Clock.GetUtcNow()));
+            var processed = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
+            await OnTurnAsync(context, () => processed.Add(malformed.MessageId, Fixture.Clock.GetUtcNow()));
             await receiver.RetryWriteStateAsync();
         }
         var journal = JournalId.FromGrainId(receiver.GetGrainId());
@@ -64,7 +64,7 @@ public sealed class InboxEnvelopeValidationTests : DurableMessagingBehaviorTestB
     {
         var receiver = NewGrain();
         using var template = CreateEnvelope(receiver, NewMessage(187, "explicit-identity"));
-        var envelope = template.Value with { MessageId = Guid.Parse("6ab5d1ea-c028-4dd0-8d84-c169c109569e") };
+        var envelope = template.Value with { MessageId = HierarchicalKey.Parse("tenant/test/command/explicit", null) };
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);

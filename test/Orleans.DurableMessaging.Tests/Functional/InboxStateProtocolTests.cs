@@ -89,7 +89,7 @@ public sealed class InboxStateProtocolTests : DurableMessagingBehaviorTestBase
     public async Task CanceledOwnerDeleteWait_RetainsStoppedWorkflowThroughResetAndDeactivation()
     {
         var receiver = NewGrain();
-        await receiver.StageEffectAsync(new DurableEffect(Guid.NewGuid(), 1, 204, "before-delete"));
+        await receiver.StageEffectAsync(new DurableEffect(TestApplicationProtocol.NewMessageId(), 1, 204, "before-delete"));
         await receiver.RetryWriteStateAsync();
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance);

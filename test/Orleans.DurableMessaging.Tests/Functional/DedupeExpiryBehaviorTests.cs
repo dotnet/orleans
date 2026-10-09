@@ -23,7 +23,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
     public async Task IdleReplay_AtDeduplicationBoundary_IsAcceptedWithoutCompactionTrigger()
     {
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
-        var original = new DurableTestMessage(Guid.NewGuid(), 15, "expires");
+        var original = new DurableTestMessage(TestApplicationProtocol.NewMessageId(), 15, "expires");
         using var first = CreateEnvelope(receiver, original);
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, first.Value)).Status);
@@ -47,7 +47,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
         var receiver = fixture.Client.GetGrain<IDurableMessagingTestGrain>(Guid.NewGuid());
         using var envelope = CreateEnvelope(
             receiver,
-            new DurableTestMessage(Guid.NewGuid(), 16, "failed-expiry-replacement"));
+            new DurableTestMessage(TestApplicationProtocol.NewMessageId(), 16, "failed-expiry-replacement"));
 
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await fixture.WaitForEffectCountAsync(receiver, 1);
@@ -91,7 +91,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
     private EnvelopeLease CreateEnvelope(
         IDurableMessagingTestGrain receiver,
         DurableTestMessage message,
-        Guid? messageId = null)
+        HierarchicalKey? messageId = null)
     {
         var sessions = fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("expiry-test-sender", "stable");
@@ -103,6 +103,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
                 MessageId = id,
                 SenderId = built.SenderId,
                 ReceiverId = built.ReceiverId,
+                Subject = built.Subject,
                 Payload = built.Payload,
             };
         }

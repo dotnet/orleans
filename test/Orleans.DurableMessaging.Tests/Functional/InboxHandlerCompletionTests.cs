@@ -489,13 +489,13 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
         await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var services = context.ActivationServices;
-        var effects = services.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEffect>>("test-effects");
+        var effects = services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEffect>>("test-effects");
         var handler = new TestHandler(effects, context);
         var rig = new Rig(receiver, context, Assert.IsType<DurableMessagingTestGrain>(context.GrainInstance),
             services.GetRequiredService<IJournaledStateManager>(), (JournaledTestOutbox)services.GetRequiredService<IDurableOutbox>(),
             effects, handler,
-            services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"),
-            services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("__orleans.durable-messaging.inbox-processed"));
+            services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.inbox"),
+            services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DateTimeOffset>>("__orleans.durable-messaging.inbox-processed"));
         await OnTurnAsync(context, () => rig.Grain.HandlerOverride = handler);
         return rig;
     }
@@ -520,7 +520,7 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
     private static void AssertCompletedState(Rig rig, DurableEnvelope input)
     {
         Assert.Empty(rig.Inbox);
-        Assert.Equal((input.SenderId, input.MessageId), Assert.Single(rig.Processed).Key);
+        Assert.Equal(input.MessageId, Assert.Single(rig.Processed).Key);
     }
 
     private static void AssertSuccess(Rig rig, DurableEnvelope input, int outputCount)
@@ -611,14 +611,14 @@ public sealed class InboxHandlerCompletionTests : DurableMessagingBehaviorTestBa
     private static Task WaitAsync(Task task) => task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
     private static Task<T> WaitAsync<T>(Task<T> task) => task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
     private sealed record Rig(IDurableMessagingTestGrain Receiver, IGrainContext Context, DurableMessagingTestGrain Grain,
-        IJournaledStateManager Manager, JournaledTestOutbox Outbox, IDurableDictionary<Guid, DurableEffect> Effects,
-        TestHandler Handler, IDurableDictionary<(GrainId, Guid), DurableEnvelope> Inbox,
-        IDurableDictionary<(GrainId, Guid), DateTimeOffset> Processed)
+        IJournaledStateManager Manager, JournaledTestOutbox Outbox, IDurableDictionary<HierarchicalKey, DurableEffect> Effects,
+        TestHandler Handler, IDurableDictionary<HierarchicalKey, DurableEnvelope> Inbox,
+        IDurableDictionary<HierarchicalKey, DateTimeOffset> Processed)
     {
         public JournalId Journal => JournalId.FromGrainId(Receiver.GetGrainId());
     }
 
-    private sealed class TestHandler(IDurableDictionary<Guid, DurableEffect> effects, IGrainContext grainContext) : IInboxHandler, IDisposable
+    private sealed class TestHandler(IDurableDictionary<HierarchicalKey, DurableEffect> effects, IGrainContext grainContext) : IInboxHandler, IDisposable
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

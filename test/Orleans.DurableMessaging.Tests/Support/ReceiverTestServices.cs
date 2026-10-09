@@ -45,10 +45,10 @@ internal static class ReceiverTestServices
             sp.GetRequiredService(typeof(ILogger<>).MakeGenericType(extensionType)),
             sp.GetRequiredService(instrumentsType),
             sp.GetRequiredService(inboxType),
-            GetDictionary<(GrainId, Guid), DurableEnvelope>(sp, "inbox"),
-            GetDictionary<(GrainId, Guid), DateTimeOffset>(sp, "inbox-processed"),
-            GetInternalDictionary<(GrainId, Guid)>(sp, "InboxMessageState", "inbox-message-state"),
-            GetInternalDictionary<(GrainId, Guid)>(sp, "InboxDeadLetter", "inbox-dead-letters"),
+            GetDictionary<HierarchicalKey, DurableEnvelope>(sp, "inbox"),
+            GetDictionary<HierarchicalKey, DateTimeOffset>(sp, "inbox-processed"),
+            GetInternalDictionary<HierarchicalKey>(sp, "InboxMessageState", "inbox-message-state"),
+            GetInternalDictionary<HierarchicalKey>(sp, "InboxDeadLetter", "inbox-dead-letters"),
             GetValue<string>(sp, "inbox-job-id"),
             GetValue<DurableJob>(sp, "inbox-job-handle"),
             GetValue<string>(sp, "inbox-completed-job-id"),
@@ -66,21 +66,21 @@ internal static class ReceiverTestServices
         services.TryAddScoped(inboxType, sp =>
         {
             var options = sp.GetRequiredService<IOptions<DurableInboxOptions>>().Value;
-            _ = GetDictionary<(GrainId, Guid), DateTimeOffset>(sp, "inbox-processed");
-            _ = GetInternalDictionary<(GrainId, Guid)>(sp, "InboxMessageState", "inbox-message-state");
-            _ = GetInternalDictionary<(GrainId, Guid)>(sp, "InboxDeadLetter", "inbox-dead-letters");
+            _ = GetDictionary<HierarchicalKey, DateTimeOffset>(sp, "inbox-processed");
+            _ = GetInternalDictionary<HierarchicalKey>(sp, "InboxMessageState", "inbox-message-state");
+            _ = GetInternalDictionary<HierarchicalKey>(sp, "InboxDeadLetter", "inbox-dead-letters");
             _ = GetValue<string>(sp, "inbox-job-id");
             _ = GetValue<DurableJob>(sp, "inbox-job-handle");
             _ = GetValue<string>(sp, "inbox-completed-job-id");
             _ = GetValue<long>(sp, "inbox-job-sequence");
             return CreateInstance(inboxType,
-                GetDictionary<(GrainId, Guid), DurableEnvelope>(sp, "inbox"),
+                GetDictionary<HierarchicalKey, DurableEnvelope>(sp, "inbox"),
                 sp.GetServices<IInboxHandler>(), options.MaxCapacity);
         });
         services.TryAddScoped<IDurableInbox>(sp => (IDurableInbox)sp.GetRequiredService(inboxType));
 
         services.AddScoped<IDurableOutbox>(static sp =>
-            new JournaledTestOutbox(sp.GetRequiredKeyedService<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output")));
+            new JournaledTestOutbox(sp.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("test-handler-output")));
         services.TryAddScoped(typeof(IDurableMessagingDiagnostics), GetImplementationType("DurableMessagingDiagnostics"));
         services.TryAddScoped(pumpResultsType, sp =>
         {

@@ -308,15 +308,15 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
     private sealed record Counts(int Stored, int Provisional, int Durable, bool ProvisionalSubset = true);
     private sealed class CountProbe
     {
-        private readonly HashSet<(GrainId, Guid)> _provisional;
+        private readonly HashSet<HierarchicalKey> _provisional;
         public CountProbe(IGrainContext context)
         {
             var type = ReceiverTestServices.GetImplementationType("DurableInboxExtension");
             Extension = (IDurableInboxExtension)context.ActivationServices.GetRequiredService(type);
             var field = type.GetField("_inboxDict", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            Dictionary = new CountingDictionary((IDictionary<(GrainId, Guid), DurableEnvelope>)field.GetValue(Extension)!);
+            Dictionary = new CountingDictionary((IDictionary<HierarchicalKey, DurableEnvelope>)field.GetValue(Extension)!);
             field.SetValue(Extension, Dictionary);
-            _provisional = (HashSet<(GrainId, Guid)>)type.GetField("_provisionalAcceptances", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Extension)!;
+            _provisional = (HashSet<HierarchicalKey>)type.GetField("_provisionalAcceptances", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Extension)!;
             DurableCount = type.GetMethod("GetDurableInboxCount", BindingFlags.Instance | BindingFlags.NonPublic)!.CreateDelegate<Func<int>>(Extension);
         }
         public IDurableInboxExtension Extension { get; }
@@ -324,43 +324,43 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         public Func<int> DurableCount { get; }
         public Counts Read() => new(Dictionary.Inner.Count, _provisional.Count, DurableCount(), _provisional.All(Dictionary.Inner.ContainsKey));
     }
-    private sealed class CountingDictionary(IDictionary<(GrainId, Guid), DurableEnvelope> inner) : IDictionary<(GrainId, Guid), DurableEnvelope>
+    private sealed class CountingDictionary(IDictionary<HierarchicalKey, DurableEnvelope> inner) : IDictionary<HierarchicalKey, DurableEnvelope>
     {
-        public IDictionary<(GrainId, Guid), DurableEnvelope> Inner => inner;
+        public IDictionary<HierarchicalKey, DurableEnvelope> Inner => inner;
         public int CountReads { get; private set; }
         public int KeyCollections { get; private set; }
         public int KeyVisits { get; private set; }
         public int EntryEnumerations { get; private set; }
         public int Count { get { CountReads++; return inner.Count; } }
-        public ICollection<(GrainId, Guid)> Keys { get { KeyCollections++; return new CountingKeys(this); } }
+        public ICollection<HierarchicalKey> Keys { get { KeyCollections++; return new CountingKeys(this); } }
         public ICollection<DurableEnvelope> Values => inner.Values;
-        public DurableEnvelope this[(GrainId, Guid) key] { get => inner[key]; set => inner[key] = value; }
+        public DurableEnvelope this[HierarchicalKey key] { get => inner[key]; set => inner[key] = value; }
         public bool IsReadOnly => inner.IsReadOnly;
-        public void Add((GrainId, Guid) key, DurableEnvelope value) => inner.Add(key, value);
-        public void Add(KeyValuePair<(GrainId, Guid), DurableEnvelope> item) => inner.Add(item);
+        public void Add(HierarchicalKey key, DurableEnvelope value) => inner.Add(key, value);
+        public void Add(KeyValuePair<HierarchicalKey, DurableEnvelope> item) => inner.Add(item);
         public void Clear() => inner.Clear();
-        public bool Contains(KeyValuePair<(GrainId, Guid), DurableEnvelope> item) => inner.Contains(item);
-        public bool ContainsKey((GrainId, Guid) key) => inner.ContainsKey(key);
-        public void CopyTo(KeyValuePair<(GrainId, Guid), DurableEnvelope>[] array, int index) => inner.CopyTo(array, index);
-        public bool Remove((GrainId, Guid) key) => inner.Remove(key);
-        public bool Remove(KeyValuePair<(GrainId, Guid), DurableEnvelope> item) => inner.Remove(item);
-        public bool TryGetValue((GrainId, Guid) key, out DurableEnvelope value) => inner.TryGetValue(key, out value);
-        public IEnumerator<KeyValuePair<(GrainId, Guid), DurableEnvelope>> GetEnumerator() { EntryEnumerations++; return inner.GetEnumerator(); }
+        public bool Contains(KeyValuePair<HierarchicalKey, DurableEnvelope> item) => inner.Contains(item);
+        public bool ContainsKey(HierarchicalKey key) => inner.ContainsKey(key);
+        public void CopyTo(KeyValuePair<HierarchicalKey, DurableEnvelope>[] array, int index) => inner.CopyTo(array, index);
+        public bool Remove(HierarchicalKey key) => inner.Remove(key);
+        public bool Remove(KeyValuePair<HierarchicalKey, DurableEnvelope> item) => inner.Remove(item);
+        public bool TryGetValue(HierarchicalKey key, out DurableEnvelope value) => inner.TryGetValue(key, out value);
+        public IEnumerator<KeyValuePair<HierarchicalKey, DurableEnvelope>> GetEnumerator() { EntryEnumerations++; return inner.GetEnumerator(); }
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-        private sealed class CountingKeys(CountingDictionary owner) : ICollection<(GrainId, Guid)>
+        private sealed class CountingKeys(CountingDictionary owner) : ICollection<HierarchicalKey>
         {
             public int Count => owner.Inner.Keys.Count;
             public bool IsReadOnly => true;
-            public bool Contains((GrainId, Guid) item) => owner.Inner.Keys.Contains(item);
-            public void CopyTo((GrainId, Guid)[] array, int index) => owner.Inner.Keys.CopyTo(array, index);
-            public IEnumerator<(GrainId, Guid)> GetEnumerator()
+            public bool Contains(HierarchicalKey item) => owner.Inner.Keys.Contains(item);
+            public void CopyTo(HierarchicalKey[] array, int index) => owner.Inner.Keys.CopyTo(array, index);
+            public IEnumerator<HierarchicalKey> GetEnumerator()
             {
                 foreach (var key in owner.Inner.Keys) { owner.KeyVisits++; yield return key; }
             }
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-            public void Add((GrainId, Guid) item) => throw new NotSupportedException();
+            public void Add(HierarchicalKey item) => throw new NotSupportedException();
             public void Clear() => throw new NotSupportedException();
-            public bool Remove((GrainId, Guid) item) => throw new NotSupportedException();
+            public bool Remove(HierarchicalKey item) => throw new NotSupportedException();
         }
     }
     private sealed class PumpContext(DurableJob job) : IJobRunContext

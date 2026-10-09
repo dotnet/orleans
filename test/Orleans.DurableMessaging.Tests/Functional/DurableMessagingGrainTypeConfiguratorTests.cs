@@ -251,7 +251,7 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
             var manager = observation.Context.ActivationServices.GetRequiredService<IJournaledStateManager>();
             Assert.True(manager.TryGetStateMachine("__orleans.durable-messaging.inbox", out var inbox));
             Assert.Same(observation.Context.ActivationServices.GetRequiredKeyedService<
-                IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"), inbox);
+                IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.inbox"), inbox);
             Assert.True(manager.TryGetStateMachine("test-handler-output", out var outbox));
             Assert.Same(((JournaledTestOutbox)observation.Context.ActivationServices.GetRequiredService<IDurableOutbox>()).StoredMessages, outbox);
             Assert.Single(GetSetup(observation.Context).GetInvocationList());
@@ -333,9 +333,9 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         var applicationManager = services.GetRequiredService<IDurableStateManager>();
         Assert.Same(observation.Manager, applicationManager);
         Assert.Same(observation.Value, applicationManager.GetOrAddState<IDurableValue<int>>("bootstrap-value"));
-        Assert.True(applicationManager.TryGetState<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output", out var applicationOutbox));
+        Assert.True(applicationManager.TryGetState<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("test-handler-output", out var applicationOutbox));
         Assert.Same(((JournaledTestOutbox)observation.Outbox!).StoredMessages, applicationOutbox);
-        Assert.Same(applicationOutbox, applicationManager.GetOrAddState<IDurableDictionary<Guid, DurableEnvelope>>("test-handler-output"));
+        Assert.Same(applicationOutbox, applicationManager.GetOrAddState<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("test-handler-output"));
         Assert.Same(observation.Value, services.GetRequiredKeyedService<IDurableValue<int>>("bootstrap-value"));
         Assert.Same(observation.Inbox, services.GetRequiredService<IDurableInbox>());
         Assert.Same(observation.Outbox, services.GetRequiredService<IDurableOutbox>());
@@ -345,8 +345,8 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
         var handler = arguments[0];
         Assert.Same(state, handler);
         Assert.Equal(8, BootstrapState.ReadMessagingStates(observation.Manager!).Count());
-        var primary = services.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox");
-        Assert.Same(primary, applicationManager.GetOrAddState<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>("__orleans.durable-messaging.inbox"));
+        var primary = services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.inbox");
+        Assert.Same(primary, applicationManager.GetOrAddState<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("__orleans.durable-messaging.inbox"));
         Assert.True(observation.Manager!.TryGetStateMachine("test-handler-output", out var output));
         Assert.Same(applicationOutbox, output);
     }
@@ -357,8 +357,8 @@ public sealed class DurableMessagingGrainTypeConfiguratorTests() : DurableMessag
     private DurableEnvelope CreateEnvelope(IBootstrapTestGrain grain) =>
         TestApplicationProtocol.Create(Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>(),
             GrainId.Create("bootstrap-sender", "external"), grain.GetGrainId(), BootstrapState.Route, 1);
-    private static IDurableDictionary<(GrainId, Guid), DateTimeOffset> GetProcessed(IGrainContext context) =>
-        context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
+    private static IDurableDictionary<HierarchicalKey, DateTimeOffset> GetProcessed(IGrainContext context) =>
+        context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DateTimeOffset>>("__orleans.durable-messaging.inbox-processed");
     private static Delegate GetSetup(IGrainContext context) => Assert.IsAssignableFrom<Delegate>(GetSetupOrDefault(context));
     private static object? GetSetupOrDefault(IGrainContext context)
     {

@@ -30,8 +30,12 @@ capture; dispatch follows persistence acknowledgement. Inspection returns borrow
 define handler registration, delivery outcomes, capacity, retry, retention, and batch limits.
 
 The inbox accepts an envelope after DurableJobs confirms its wakeup and the journal commits the
-message with the logical generation and exact returned physical job handle. Retained duplicates
-coalesce by `(SenderId, MessageId)`; capacity is checked before admission. Handler failures during
+message with the logical generation and exact returned physical job handle. A pending duplicate
+compares ordinal subject and payload bytes while permitting a changed immediate sender; conflicting
+commands fail before scheduling or mutation and preserve the original pending envelope.
+A retained completion acknowledges the existing outcome without retaining or comparing its original
+body. Parent and child identifiers complete independently; hierarchy supplies deterministic identity
+construction rather than prefix deduplication. Capacity is checked before admission. Handler failures during
 local preparation follow bounded retry and dead-letter policy. `Complete()` stages removal and
 deduplication synchronously beside safe business changes and outgoing intents. Errors after
 completion preserve that logical outcome through the owned write and are reported after its ACK.
@@ -42,6 +46,11 @@ own retained values. Each selected handler envelope has an independent pin throu
 method outcome and persistence, so removing the dictionary entry during `Complete()` preserves
 the handler's borrow. Recovery, reset, dead-letter removal, and scope disposal release the owners
 at their respective boundaries.
+
+Applications preserve the same deterministic command key, subject, and parameters across retries and
+forwarding. Independent commands use distinct keys, and recipient-specific child keys identify fan-out
+messages. Completion records cover the configured resubmission horizon; expiry permits the same key to
+be accepted again. Typed decoding and subject dispatch remain application/composition concerns.
 
 Reusable, noninterleaving timers carry immutable owner-bound work and a physical registration
 generation. Stop closes admission and drains actual operations; full deletion then awaits the

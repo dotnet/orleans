@@ -295,7 +295,7 @@ public sealed class DeliveryAndOptionsContractTests
             Assert.Equal(0, gate.CurrentCount);
             Assert.Empty(jobs.ReceivedCalls());
             Assert.Empty(timers.ReceivedCalls());
-            Assert.Empty(scope.ServiceProvider.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(
+            Assert.Empty(scope.ServiceProvider.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>(
                 "__orleans.durable-messaging.inbox"));
         }
         finally

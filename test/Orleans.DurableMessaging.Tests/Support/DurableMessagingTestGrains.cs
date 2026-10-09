@@ -13,10 +13,10 @@ namespace Orleans.DurableMessaging.Tests.Support;
 
 public interface IDurableMessagingTestGrain : IGrainWithGuidKey
 {
-    Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message);
-    Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message);
-    Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message);
-    Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
+    Task<HierarchicalKey> SendAsync(GrainId target, string route, DurableTestMessage message);
+    Task<HierarchicalKey> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message);
+    Task<HierarchicalKey> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message);
+    Task<HierarchicalKey> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message);
     Task RetryWriteStateAsync();
     Task StageEffectAsync(DurableEffect effect);
     Task StageOutputAsync([DisposeOnCompletion] DurableEnvelope envelope);
@@ -24,8 +24,8 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
     Task SetInboxOwnershipAsync(string ownershipId, DurableJob job);
     Task SeedInboxStateAsync([DisposeOnCompletion] DurableEnvelope envelope, string? ownershipId, DurableJob? job);
     Task ConfigureHandlerAsync(bool enabled);
-    Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId);
-    Task<bool> RemoveOutboxDeadLetterAsync(Guid messageId);
+    Task<bool> RemoveInboxDeadLetterAsync(HierarchicalKey messageId);
+    Task<bool> RemoveOutboxDeadLetterAsync(HierarchicalKey messageId);
     Task<DurableEndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
     Task SetControlEnvelopeAsync([DisposeOnCompletion] DurableEnvelope envelope);
@@ -35,7 +35,7 @@ public interface IDurableMessagingTestGrain : IGrainWithGuidKey
 
 [GenerateSerializer, Immutable]
 public sealed record DurableTestMessage(
-    [property: Id(0)] Guid LogicalId,
+    [property: Id(0)] HierarchicalKey LogicalId,
     [property: Id(1)] int Sequence,
     [property: Id(2)] string Value,
     [property: Id(3)] GrainId? ForwardTo = null,
@@ -46,7 +46,7 @@ public sealed record DurableTestMessage(
 
 [GenerateSerializer, Immutable]
 public sealed record DurableEffect(
-    [property: Id(0)] Guid LogicalId,
+    [property: Id(0)] HierarchicalKey LogicalId,
     [property: Id(1)] int Count,
     [property: Id(2)] int Sequence,
     [property: Id(3)] string Value);
@@ -69,7 +69,7 @@ public sealed record DurableEndpointSnapshot(
 
 [GenerateSerializer, Immutable]
 public sealed record DurableDeadLetterSnapshot(
-    [property: Id(0)] Guid MessageId,
+    [property: Id(0)] HierarchicalKey MessageId,
     [property: Id(1)] string Route,
     [property: Id(2)] string Reason,
     [property: Id(3)] int AttemptCount,
@@ -85,8 +85,8 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private readonly IDurableInbox _inbox;
     private readonly IDurableOutbox _outbox;
     private readonly IDurableMessagingDiagnostics _diagnostics;
-    private readonly IDurableDictionary<Guid, DurableEffect> _effects;
-    private readonly IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processedMessages;
+    private readonly IDurableDictionary<HierarchicalKey, DurableEffect> _effects;
+    private readonly IDurableDictionary<HierarchicalKey, DateTimeOffset> _processedMessages;
     private readonly SerializerSessionPool _sessions;
     private readonly TestHandlerConfiguration _handlerConfiguration;
     internal IInboxHandler? HandlerOverride { get; set; }
@@ -100,7 +100,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     private readonly Guid _activationId = Guid.NewGuid();
     private int _activeHandlers;
     private int _maxConcurrentHandlers;
-    private readonly HashSet<Guid> _failedOnce = [];
+    private readonly HashSet<HierarchicalKey> _failedOnce = [];
 
     public DurableMessagingTestGrain(
         IGrainContext grainContext,
@@ -108,9 +108,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         IDurableInbox inbox,
         IDurableOutbox outbox,
         IDurableMessagingDiagnostics diagnostics,
-        [FromKeyedServices("test-effects")] IDurableDictionary<Guid, DurableEffect> effects,
+        [FromKeyedServices("test-effects")] IDurableDictionary<HierarchicalKey, DurableEffect> effects,
         [FromKeyedServices("inbox")] IDurableValue<string> applicationInboxState,
-        [FromKeyedServices("__orleans.durable-messaging.inbox-processed")] IDurableDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processedMessages,
+        [FromKeyedServices("__orleans.durable-messaging.inbox-processed")] IDurableDictionary<HierarchicalKey, DateTimeOffset> processedMessages,
         [FromKeyedServices("__orleans.durable-messaging.inbox-job-id")] IDurableValue<string> inboxJobId,
         [FromKeyedServices("__orleans.durable-messaging.inbox-job-handle")] IDurableValue<DurableJob> inboxJob,
         [FromKeyedServices("__orleans.durable-messaging.outbox-job-id")] IDurableValue<string> outboxJobId,
@@ -151,7 +151,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         _snapshotProbe.Publish(this.GetGrainId(), CreateSnapshot());
     }
 
-    public async Task<Guid> SendAsync(GrainId target, string route, DurableTestMessage message)
+    public async Task<HierarchicalKey> SendAsync(GrainId target, string route, DurableTestMessage message)
     {
         using var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
@@ -159,7 +159,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return envelope.MessageId;
     }
 
-    public async Task<Guid> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message)
+    public async Task<HierarchicalKey> SendDuplicateAsync(GrainId target, string route, DurableTestMessage message)
     {
         using var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
@@ -168,14 +168,14 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return envelope.MessageId;
     }
 
-    public async Task<Guid> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message)
+    public async Task<HierarchicalKey> SendAndDeactivateAsync(GrainId target, string route, DurableTestMessage message)
     {
         var messageId = await SendAsync(target, route, message);
         DeactivateOnIdle();
         return messageId;
     }
 
-    public Task<Guid> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message)
+    public Task<HierarchicalKey> StageWithoutCommitAsync(GrainId target, string route, DurableTestMessage message)
     {
         using var envelope = CreateEnvelope(target, route, message);
         _outbox.Send(envelope);
@@ -214,9 +214,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
 
     public async Task SeedInboxStateAsync(DurableEnvelope envelope, string? ownershipId, DurableJob? job)
     {
-        var messages = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<(GrainId, Guid), DurableEnvelope>>(
+        var messages = ServiceProvider.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>(
             "__orleans.durable-messaging.inbox");
-        messages.Add((envelope.SenderId, envelope.MessageId), envelope);
+        messages.Add(envelope.MessageId, envelope);
         _inboxJobId.Value = ownershipId;
         _inboxJob.Value = job;
         await WriteStateAsync();
@@ -228,9 +228,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return Task.CompletedTask;
     }
 
-    public async Task<bool> RemoveInboxDeadLetterAsync(GrainId senderId, Guid messageId)
+    public async Task<bool> RemoveInboxDeadLetterAsync(HierarchicalKey messageId)
     {
-        if (!_diagnostics.RemoveInboxDeadLetter(senderId, messageId))
+        if (!_diagnostics.RemoveInboxDeadLetter(messageId))
         {
             return false;
         }
@@ -239,7 +239,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         return true;
     }
 
-    public async Task<bool> RemoveOutboxDeadLetterAsync(Guid messageId)
+    public async Task<bool> RemoveOutboxDeadLetterAsync(HierarchicalKey messageId)
     {
         if (!_diagnostics.RemoveOutboxDeadLetter(messageId))
         {
@@ -320,7 +320,7 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
         }
         barrier.Entered.TrySetResult();
         await barrier.Continue.Task;
-        if (replacement.MessageId != Guid.Empty)
+        if (!replacement.MessageId.IsDefault)
         {
             var extension = (IDurableInboxExtension)ServiceProvider.GetRequiredKeyedService<IGrainExtension>(typeof(IDurableInboxExtension));
             await extension.DeliverAsync(replacement);
@@ -352,9 +352,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
     }
 
     private readonly ConcurrentQueue<DurableEndpointSnapshot> _captures = new();
-    private readonly ConcurrentQueue<Guid[]> _outputCaptures = new();
+    private readonly ConcurrentQueue<HierarchicalKey[]> _outputCaptures = new();
     internal IReadOnlyList<DurableEndpointSnapshot> Captures => _captures.ToArray();
-    internal IReadOnlyList<Guid[]> OutputCaptures => _outputCaptures.ToArray();
+    internal IReadOnlyList<HierarchicalKey[]> OutputCaptures => _outputCaptures.ToArray();
     internal Exception? NextApplyFailure { get; set; }
     internal TaskCompletionSource ApplyAttempted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -406,7 +406,9 @@ public sealed class DurableMessagingTestGrain : DurableGrain, IDurableMessagingT
             }
 
             using var outgoing = message.ForwardTo is { } destination
-                ? CreateEnvelope(destination, "messages/forwarded", message with { ForwardTo = null, ThrowDuringPreparation = false })
+                ? TestApplicationProtocol.Create(_sessions, this.GetGrainId(), destination, "messages/forwarded",
+                    message with { ForwardTo = null, ThrowDuringPreparation = false },
+                    context.Envelope.MessageId.CreateChildKey("forwarded"))
                 : (DurableEnvelope?)null;
             if (NextApplyFailure is { } failure)
             {

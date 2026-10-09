@@ -19,7 +19,7 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
     {
         var receiver = NewGrain();
         var sink = NewGrain();
-        var logicalId = Guid.NewGuid();
+        var logicalId = TestApplicationProtocol.NewMessageId();
         using var envelope = CreateEnvelope(
             receiver,
             new DurableTestMessage(logicalId, 7, "atomic", sink.GetGrainId()));
@@ -59,7 +59,7 @@ public sealed class InboxHandlerTransactionTests : DurableMessagingBehaviorTestB
         var sink = NewGrain();
         using var envelope = CreateEnvelope(
             receiver,
-            new DurableTestMessage(Guid.NewGuid(), 9, "preparation-failure", sink.GetGrainId(), ThrowDuringPreparation: true));
+            new DurableTestMessage(TestApplicationProtocol.NewMessageId(), 9, "preparation-failure", sink.GetGrainId(), ThrowDuringPreparation: true));
 
         var accepted = await DeliverAsync(receiver, envelope.Value);
         var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);

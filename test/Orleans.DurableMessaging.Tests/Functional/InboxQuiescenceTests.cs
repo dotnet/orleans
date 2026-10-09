@@ -208,7 +208,7 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
     public async Task OwnerDeleteFailure_DeactivatesAndFreshOwnerObservesActualStorageOutcome(bool committed)
     {
         var receiver = NewGrain();
-        var seed = new DurableEffect(Guid.NewGuid(), 1, 188, "preserved-before-delete");
+        var seed = new DurableEffect(TestApplicationProtocol.NewMessageId(), 1, 188, "preserved-before-delete");
         await receiver.StageEffectAsync(seed);
         await receiver.RetryWriteStateAsync();
         var before = await receiver.GetSnapshotAsync();
@@ -250,7 +250,7 @@ public sealed class InboxQuiescenceTests : DurableMessagingBehaviorTestBase
     public async Task OwnerDelete_DiscardsStagedOutputAndLaterDeliveryUsesFreshOwner()
     {
         var receiver = NewGrain();
-        await receiver.StageEffectAsync(new DurableEffect(Guid.NewGuid(), 1, 190, "delete-this"));
+        await receiver.StageEffectAsync(new DurableEffect(TestApplicationProtocol.NewMessageId(), 1, 190, "delete-this"));
         await receiver.RetryWriteStateAsync();
         var before = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);

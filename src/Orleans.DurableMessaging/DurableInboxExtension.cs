@@ -40,10 +40,10 @@ internal sealed partial class DurableInboxExtension :
     private readonly ILogger<DurableInboxExtension> _logger;
     private readonly DurableMessagingInstruments _instruments;
     private readonly DurableInbox _durableInbox;
-    private readonly IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> _inboxDict;
-    private readonly IDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> _processed;
-    private readonly IDictionary<(GrainId SenderId, Guid MessageId), InboxMessageState> _messageStates;
-    private readonly IDictionary<(GrainId SenderId, Guid MessageId), InboxDeadLetter> _deadLetters;
+    private readonly IDictionary<HierarchicalKey, DurableEnvelope> _inboxDict;
+    private readonly IDictionary<HierarchicalKey, DateTimeOffset> _processed;
+    private readonly IDictionary<HierarchicalKey, InboxMessageState> _messageStates;
+    private readonly IDictionary<HierarchicalKey, InboxDeadLetter> _deadLetters;
     private readonly IDurableValue<string> _jobId;
     private readonly IDurableValue<DurableJob> _job;
     private readonly IDurableValue<string> _completedJobId;
@@ -51,7 +51,7 @@ internal sealed partial class DurableInboxExtension :
     private readonly ILocalDurableJobManager _jobManager;
     private readonly TimeProvider _timeProvider;
     private readonly TimeProvider _jobTimeProvider;
-    private readonly HashSet<(GrainId SenderId, Guid MessageId)> _provisionalAcceptances = [];
+    private readonly HashSet<HierarchicalKey> _provisionalAcceptances = [];
     private readonly DurableMessagingPumpResults _pumpResults;
     private readonly DurableMessagingPumpCoordinator _pumpCoordinator = new();
     private readonly int _maxCapacity;
@@ -104,10 +104,10 @@ internal sealed partial class DurableInboxExtension :
         ILogger<DurableInboxExtension> logger,
         DurableMessagingInstruments instruments,
         DurableInbox durableInbox,
-        IDictionary<(GrainId SenderId, Guid MessageId), DurableEnvelope> inboxDict,
-        IDictionary<(GrainId SenderId, Guid MessageId), DateTimeOffset> processed,
-        IDictionary<(GrainId SenderId, Guid MessageId), InboxMessageState> messageStates,
-        IDictionary<(GrainId SenderId, Guid MessageId), InboxDeadLetter> deadLetters,
+        IDictionary<HierarchicalKey, DurableEnvelope> inboxDict,
+        IDictionary<HierarchicalKey, DateTimeOffset> processed,
+        IDictionary<HierarchicalKey, InboxMessageState> messageStates,
+        IDictionary<HierarchicalKey, InboxDeadLetter> deadLetters,
         IDurableValue<string> jobId,
         IDurableValue<DurableJob> job,
         IDurableValue<string> completedJobId,
@@ -214,7 +214,7 @@ internal sealed partial class DurableInboxExtension :
         try
         {
             ValidateReady();
-            var key = (envelope.SenderId, envelope.MessageId);
+            var key = envelope.MessageId;
             if (_processed.TryGetValue(key, out var processedAt)
                 && !DurableMessagingTime.IsExpired(_timeProvider.GetUtcNow(), processedAt, _deduplicationWindow))
             {
@@ -222,8 +222,13 @@ internal sealed partial class DurableInboxExtension :
                 return DeliveryResult.Duplicate();
             }
 
-            if (_inboxDict.ContainsKey(key))
+            if (_inboxDict.TryGetValue(key, out var pending))
             {
+                if (!DurableEnvelopeEquivalence.AreSameCommand(pending, envelope))
+                {
+                    throw new InvalidOperationException(
+                        $"The durable inbox already contains a different command with message ID '{key}'.");
+                }
                 await EnsureJobScheduledUnderGateAsync(CancellationToken.None).ConfigureAwait(true);
                 ScheduleLocalDrain();
                 _instruments.OnInboxMessageReceived(_grainType, "duplicate");
@@ -888,7 +893,7 @@ internal sealed partial class DurableInboxExtension :
     private sealed class AcceptanceWrite(long generation, DurableEnvelope envelope, OwnershipProposal? owner) : InboxWrite(generation)
     {
         public DurableEnvelope Envelope { get; } = envelope;
-        public (GrainId, Guid) Key => (Envelope.SenderId, Envelope.MessageId);
+        public HierarchicalKey Key => Envelope.MessageId;
         public OwnershipProposal? Owner { get; } = owner;
     }
 
@@ -901,7 +906,7 @@ internal sealed partial class DurableInboxExtension :
     {
         public PumpOwner Owner { get; } = owner;
         public DurableEnvelope Envelope { get; } = envelope;
-        public (GrainId, Guid) Key => (Envelope.SenderId, Envelope.MessageId);
+        public HierarchicalKey Key => Envelope.MessageId;
         public CancellationToken Cancellation { get; } = cancellation;
         public HandlerExecution? Execution { get; set; }
         public bool Completed { get; set; }
@@ -1229,7 +1234,7 @@ internal sealed partial class DurableInboxExtension :
     private void CompactProcessedMessages(DateTimeOffset now)
     {
         // Amortize dictionary scans over retention time; ordinary completion and owner-clear writes only check the deadline.
-        List<(GrainId, Guid)>? expired = null;
+        List<HierarchicalKey>? expired = null;
         _nextProcessedExpiry = null;
         foreach (var entry in _processed)
         {
@@ -1285,7 +1290,7 @@ internal sealed partial class DurableInboxExtension :
         }
     }
 
-    private bool RemoveMessage((GrainId SenderId, Guid MessageId) key)
+    private bool RemoveMessage(HierarchicalKey key)
     {
         if (!_inboxDict.Remove(key))
         {
@@ -1301,22 +1306,22 @@ internal sealed partial class DurableInboxExtension :
 
     [LoggerMessage(Level = LogLevel.Error, EventName = "DeliveryOperationFailed",
         Message = "Durable inbox delivery of message {MessageId} from {SenderId} to {GrainId} failed")]
-    private static partial void LogDeliveryOperationFailed(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId grainId);
+    private static partial void LogDeliveryOperationFailed(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId senderId, GrainId grainId);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
         Message = "No inbox handler registered for message {MessageId} from {SenderId} to {ReceiverId}")]
-    private static partial void LogHandlerNotFound(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId);
+    private static partial void LogHandlerNotFound(ILogger logger, HierarchicalKey messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Information,
         Message = "Accepted message {MessageId} from {SenderId} to {ReceiverId}")]
-    private static partial void LogMessageAccepted(ILogger logger, Guid messageId, GrainId senderId, GrainId receiverId);
+    private static partial void LogMessageAccepted(ILogger logger, HierarchicalKey messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Handler threw exception for message {MessageId} from {SenderId} to {ReceiverId}")]
-    private static partial void LogHandlerException(ILogger logger, Exception exception, Guid messageId, GrainId senderId, GrainId receiverId);
+    private static partial void LogHandlerException(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId senderId, GrainId receiverId);
 
     [LoggerMessage(
         Level = LogLevel.Information,
