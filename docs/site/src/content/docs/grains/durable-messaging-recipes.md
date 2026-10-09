@@ -57,6 +57,13 @@ and places the quantity and response destination in `ReserveStock`. The
 [typed writer](durable-messaging.md#encode-ordinary-application-values) encodes the
 record under `inventory.reserve.v1` into an owning, read-only Arc slice.
 
+The inventory registers typed methods through
+<xref:Orleans.DurableMessaging.DurableInboxExtensions.RegisterHandlers*>.
+`inventory.reserve.v1` selects `ReserveStock` and its reservation method;
+`inventory.restock.v1` selects `Restock` and its stock-increment method. One
+dispatcher performs exact subject lookup and typed decoding, so each method
+receives its application record directly.
+
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_inventory" language="csharp":::
 
 The first command commits a stock decrement, its deterministic `result` reply,
@@ -66,7 +73,10 @@ sends `Reserved = false` and completes with unchanged stock. That rejection is a
 normal completed business outcome. The original outbox intent delivers the reply
 within its configured delivery policy.
 
-The example's `SetAvailableAsync` is an administrative absolute-stock update. In
+`Restock` validates a positive increment and computes the checked new stock value
+before mutation, then commits that update with inbox completion. Give each distinct
+restocking operation its own stable command ID. The example's `SetAvailableAsync`
+is an administrative absolute-stock update. In
 an order workflow, add explicit confirmation, expiry, and release policies for held
 reservations and keep a record indexed by the reservation command ID when those
 operations need lookup. Give release its own leaf, for example

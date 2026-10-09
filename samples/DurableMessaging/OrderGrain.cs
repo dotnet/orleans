@@ -12,13 +12,12 @@ public interface IOrderGrain : IGrainWithStringKey, IDurableMessagingGrain
     Task<DeliveryResult> ResubmitAsync(GrainId stock, HierarchicalKey commandId, int quantity);
 }
 
-public sealed class OrderGrain : Grain, IOrderGrain, IInboxHandler, IJournaledStateHook
+public sealed class OrderGrain : Grain, IOrderGrain, IJournaledStateHook
 {
     private readonly IDurableOutbox _outbox;
     private readonly IDurableStateManager _state;
     private readonly IDurableList<ReservationOutcome> _receipts;
     private readonly DurableMessageType<ReserveStock> _reserve;
-    private readonly DurableMessageType<ReservationOutcome> _result;
     private readonly DurableMessageWriter _writer;
     private readonly CommittedReceiptsProbe _probe;
     private ReservationOutcome[] _captured = [];
@@ -33,10 +32,9 @@ public sealed class OrderGrain : Grain, IOrderGrain, IInboxHandler, IJournaledSt
         _state = state;
         _writer = writer;
         _reserve = reserve;
-        _result = result;
         _probe = probe;
         _receipts = state.GetOrAddState<IDurableList<ReservationOutcome>>("receipts");
-        inbox.RegisterHandler(this);
+        inbox.RegisterHandlers(routes => routes.Register(result, HandleResult));
         journal.Hooks.Add(this);
     }
 
@@ -59,9 +57,8 @@ public sealed class OrderGrain : Grain, IOrderGrain, IInboxHandler, IJournaledSt
         return await GrainFactory.GetGrain<IDurableInboxExtension>(stock).DeliverAsync(request);
     }
 
-    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    private ValueTask HandleResult(ReservationOutcome outcome, IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        var outcome = _result.Decode(context.Envelope);
         if (context.Envelope.MessageId != outcome.CommandId.CreateChildKey("result"))
         {
             throw new ArgumentException("The reply must identify the original reservation command.");

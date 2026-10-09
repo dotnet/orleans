@@ -10,7 +10,8 @@ namespace Orleans.DurableMessaging;
 /// </summary>
 /// <remarks>
 /// Configure once per activation and register as the inbox's single handler. Registration freezes
-/// when handling begins. Each delegate follows <see cref="IInboxHandler.HandleAsync"/>'s preparation,
+/// when installed using <see cref="DurableInboxExtensions.RegisterHandlers"/> or handling begins.
+/// Each delegate follows <see cref="IInboxHandler.HandleAsync"/>'s preparation,
 /// synchronous final-block, and explicit completion contract.
 /// </remarks>
 public sealed class DurableInboxDispatcher : IInboxHandler
@@ -23,7 +24,7 @@ public sealed class DurableInboxDispatcher : IInboxHandler
     /// <param name="messageType">The subject and serializer binding.</param>
     /// <param name="handler">The delegate receiving the decoded body, context, and attempt token.</param>
     /// <returns>This dispatcher.</returns>
-    /// <exception cref="InvalidOperationException">Handling has begun or the subject is already registered.</exception>
+    /// <exception cref="InvalidOperationException">Registration is frozen or the subject is already registered.</exception>
     public DurableInboxDispatcher Register<T>(
         DurableMessageType<T> messageType,
         Func<T, IInboxHandlerContext, CancellationToken, ValueTask> handler)
@@ -32,7 +33,7 @@ public sealed class DurableInboxDispatcher : IInboxHandler
         ArgumentNullException.ThrowIfNull(handler);
         if (_started)
         {
-            throw new InvalidOperationException("Durable inbox dispatcher registration is frozen after handling begins.");
+            throw new InvalidOperationException("Durable inbox dispatcher registration is frozen.");
         }
 
         if (!_handlers.TryAdd(messageType.Subject, new Handler<T>(messageType, handler)))
@@ -41,6 +42,16 @@ public sealed class DurableInboxDispatcher : IInboxHandler
         }
 
         return this;
+    }
+
+    internal void FreezeRegistration()
+    {
+        if (_handlers.Count == 0)
+        {
+            throw new InvalidOperationException("Register at least one durable message subject.");
+        }
+
+        _started = true;
     }
 
     /// <inheritdoc/>

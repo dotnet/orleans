@@ -11,6 +11,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.SetMinimumLevel(LogLevel.Warning);
 builder.Services.AddSingleton<CommittedReceiptsProbe>();
 builder.Services.AddDurableMessageType<ReserveStock>(StockProtocol.Reserve);
+builder.Services.AddDurableMessageType<Restock>(StockProtocol.Restock);
 builder.Services.AddDurableMessageType<ReservationOutcome>(StockProtocol.Result);
 builder.UseOrleans(silo => silo
     .UseLocalhostClustering()

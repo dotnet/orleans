@@ -59,12 +59,18 @@ will not replace its declared versions.
    `orders/order-1042/reserve-stock` for two units through the order's outbox.
    Once the original reply is journal-acknowledged, it reconstructs the same command
    and calls explicit inbox admission. The second submission returns `Duplicate`.
-2. `ReserveStock` and `ReservationOutcome` have keyed `DurableMessageType<T>`
-   bindings under `inventory.reserve.v1` and `inventory.reservation-result.v1`.
+2. `ReserveStock`, `Restock`, and `ReservationOutcome` have keyed `DurableMessageType<T>`
+   bindings under `inventory.reserve.v1`, `inventory.restock.v1`, and
+   `inventory.reservation-result.v1`.
    Each envelope carries its hierarchical command ID, exact subject, sender,
    receiver, and owning `ArcBuffer` payload.
-3. Each grain registers a **non-generic `IInboxHandler`** and decodes its expected
-   typed subject. `DurableMessageWriter`, scoped by `AddDurableMessaging`, prepares
+3. `inbox.RegisterHandlers` installs one subject dispatcher per grain. Stock
+   registers separate typed reservation and restocking methods; the order registers
+   its typed outcome method. Each method receives the decoded record, inbox context,
+   and cancellation token. Configuration freezes the routes before processing.
+   The console run exercises reservation and outcome subjects; `Restock` supplies
+   the additional positive-stock-increment protocol for the same stock inbox.
+   `DurableMessageWriter`, scoped by `AddDurableMessaging`, prepares
    owned envelopes with one reusable encoder. Local envelopes use `using`; handlers
    borrow inbox envelopes through actual method completion. `IDurableOutbox.Send`
    synchronously retains its own slice. Dependency injection disposes the scoped
@@ -74,7 +80,7 @@ will not replace its declared versions.
    the deterministic child `orders/order-1042/reserve-stock/result`; inventory
    stores the remaining stock, accepted reservation count, and execution count.
    One ID binds an immutable command, including quantity, destination, and subject.
-5. Each handler decodes, validates, computes results, constructs any outgoing
+5. The dispatcher decodes; each typed handler validates, computes results, constructs any outgoing
    envelope, and checks cancellation **before its first shared mutation**. From
    that mutation through `context.Complete()` and method return, execution is synchronous.
    Inventory, outgoing intent, and inbox completion share the journal

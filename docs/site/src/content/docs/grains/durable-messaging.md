@@ -45,7 +45,7 @@ application subject lookup or decoding and follows handler retry/dead-letter pol
 ### Encode ordinary application values
 
 Register <xref:Orleans.DurableMessaging.DurableMessageType`1> using
-<xref:Orleans.Hosting.DurableMessagingExtensions.AddDurableMessageType*>. Each keyed
+<xref:Orleans.Hosting.DurableMessageTypeExtensions.AddDurableMessageType*>. Each keyed
 singleton binds one explicit subject to the ordinary
 <xref:Orleans.Serialization.Serializer`1>. Inject it using `FromKeyedServices` and
 decode with <xref:Orleans.DurableMessaging.DurableMessageType`1.Decode*>; the binding
@@ -63,11 +63,15 @@ Serialization failure resets partial encoder output and propagates the error.
 Subjects use exact ordinal spelling, for example `inventory.reserve.v1`. Register
 each subject once; separate subjects can bind the same CLR type. Define supported
 polymorphism in the ordinary serialization contract when a subject uses a base
-type. For several subjects, the optional
-<xref:Orleans.DurableMessaging.DurableInboxDispatcher> binds typed handlers and freezes
-registration on its first `HandleAsync`. It returns the actual handler outcome;
+type. Use <xref:Orleans.DurableMessaging.DurableInboxExtensions.RegisterHandlers*>
+to register typed methods for one or several subjects. It installs one
+<xref:Orleans.DurableMessaging.DurableInboxDispatcher>, freezes the configured routes,
+and decodes each body with its subject's binding before invoking the selected method.
+Configuration requires at least one route and rejects duplicate subjects before
+installing the handler. The dispatcher returns the actual handler outcome;
 each successful handler explicitly calls `Complete()` and returns synchronously
-after shared mutation. See [Typed dispatch](durable-messaging-recipes.md#combine-the-recipes-into-an-order-workflow).
+after shared mutation. See [Inventory dispatch](durable-messaging-recipes.md#reserve-inventory-once-per-order-line)
+and [Typed dispatch](durable-messaging-recipes.md#combine-the-recipes-into-an-order-workflow).
 
 ### Own and borrow payload slices
 

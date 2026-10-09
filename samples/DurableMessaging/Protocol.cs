@@ -10,6 +10,9 @@ public sealed record ReserveStock(
     [property: Id(2)] GrainId ReplyDestination);
 
 [GenerateSerializer]
+public sealed record Restock([property: Id(0)] int Quantity);
+
+[GenerateSerializer]
 public sealed record ReservationOutcome(
     [property: Id(0)] HierarchicalKey CommandId,
     [property: Id(1)] int Quantity,
@@ -29,5 +32,6 @@ public sealed record StockSnapshot(
 internal static class StockProtocol
 {
     public const string Reserve = "inventory.reserve.v1";
+    public const string Restock = "inventory.restock.v1";
     public const string Result = "inventory.reservation-result.v1";
 }

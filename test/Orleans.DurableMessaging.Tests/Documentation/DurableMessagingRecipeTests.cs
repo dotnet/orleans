@@ -76,12 +76,11 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         int available, int quantity, bool reserved, int expectedStock)
     {
         var stock = new TestValue<int> { Value = available };
-        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), _outbox, Writer(Receiver),
-            Type<ReserveStock>(), Type<ReservationResult>(), Substitute.For<IDurableStateManager>(), stock);
+        var (_, handler) = CreateInventory(stock);
         var request = new ReserveStock(quantity, Sender);
         var attempt = CreateContext(request, Command);
 
-        var handling = grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+        var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
         Assert.True(handling.IsCompletedSuccessfully);
         await handling;
@@ -97,18 +96,92 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public async Task Reservation_LocalCancellationPreservesStockAndCompletion()
     {
         var stock = new TestValue<int> { Value = 10 };
-        var grain = new InventoryGrain(Substitute.For<IDurableInbox>(), _outbox, Writer(Receiver),
-            Type<ReserveStock>(), Type<ReservationResult>(), Substitute.For<IDurableStateManager>(), stock);
+        var (_, handler) = CreateInventory(stock);
         var attempt = CreateContext(new ReserveStock(3, Sender), Command);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await grain.HandleAsync(attempt.Context, cancellation.Token));
+            await handler.HandleAsync(attempt.Context, cancellation.Token));
 
         Assert.Equal(10, stock.Value);
         Assert.Empty(attempt.Output);
         Assert.Empty(attempt.Events);
+    }
+
+    [Fact]
+    public async Task InventorySubjects_RestockAndReservationSelectTheirTypedMethods()
+    {
+        var stock = new TestValue<int> { Value = 2 };
+        var (grain, handler) = CreateInventory(stock);
+        var restock = CreateContext(new Restock(5), HierarchicalKey.Create("stock", "restock"));
+        await handler.HandleAsync(restock.Context, TestContext.Current.CancellationToken);
+        Assert.Equal(7, await grain.GetAvailableAsync());
+        Assert.Equal(new[] { "complete" }, restock.Events);
+        Assert.Empty(restock.Output);
+
+        var reserve = CreateContext(new ReserveStock(3, Sender), Command);
+        await handler.HandleAsync(reserve.Context, TestContext.Current.CancellationToken);
+
+        Assert.Equal(4, await grain.GetAvailableAsync());
+        Assert.Equal(new ReservationResult(3, true), ReadBody<ReservationResult>(Assert.Single(reserve.Output)));
+        Assert.Equal(new[] { "send", "complete" }, reserve.Events);
+        Assert.IsType<DurableInboxDispatcher>(handler);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(int.MaxValue)]
+    public async Task Restock_InvalidOrOverflowingQuantityLeavesStockAndCompletionUnchanged(int quantity)
+    {
+        var stock = new TestValue<int> { Value = 10 };
+        var (_, handler) = CreateInventory(stock);
+        var attempt = CreateContext(new Restock(quantity), Command);
+
+        if (quantity <= 0)
+        {
+            var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+                await handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+            Assert.Equal("request.Quantity", exception.ParamName);
+        }
+        else
+        {
+            await Assert.ThrowsAsync<OverflowException>(async () =>
+                await handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+        }
+
+        Assert.Equal(10, stock.Value);
+        Assert.Empty(attempt.Output);
+        Assert.Empty(attempt.Events);
+    }
+
+    [Fact]
+    public async Task Restock_PreMutationCancellationLeavesStockAndCompletionUnchanged()
+    {
+        var stock = new TestValue<int> { Value = 10 };
+        var (_, handler) = CreateInventory(stock);
+        var attempt = CreateContext(new Restock(5), Command);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await handler.HandleAsync(attempt.Context, cancellation.Token));
+
+        Assert.Equal(10, stock.Value);
+        Assert.Empty(attempt.Output);
+        Assert.Empty(attempt.Events);
+    }
+
+    private (InventoryGrain Grain, IInboxHandler Handler) CreateInventory(TestValue<int> stock)
+    {
+        var inbox = Substitute.For<IDurableInbox>();
+        IInboxHandler handler = null!;
+        inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => handler = call.Arg<IInboxHandler>());
+        var grain = new InventoryGrain(inbox, _outbox, Writer(Receiver), Type<ReserveStock>(),
+            Type<Restock>(), Type<ReservationResult>(), Substitute.For<IDurableStateManager>(), stock);
+        inbox.Received(1).RegisterHandler(handler);
+        return (grain, handler);
     }
 
     [Theory]

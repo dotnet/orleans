@@ -30,6 +30,7 @@ public static class MessagingSubjects
     public const string Notify = "notifications.notify.v1";
     public const string NotificationReceived = "notifications.received.v1";
     public const string ReserveStock = "inventory.reserve.v1";
+    public const string Restock = "inventory.restock.v1";
     public const string ReservationResult = "inventory.reservation-result.v1";
     public const string ChargePayment = "payments.charge.v1";
     public const string PaymentResult = "payments.result.v1";
@@ -43,6 +44,7 @@ public static class MessagingProtocol
         services.AddDurableMessageType<Notify>(MessagingSubjects.Notify);
         services.AddDurableMessageType<NotificationReceived>(MessagingSubjects.NotificationReceived);
         services.AddDurableMessageType<ReserveStock>(MessagingSubjects.ReserveStock);
+        services.AddDurableMessageType<Restock>(MessagingSubjects.Restock);
         services.AddDurableMessageType<ReservationResult>(MessagingSubjects.ReservationResult);
         services.AddDurableMessageType<ChargePayment>(MessagingSubjects.ChargePayment);
         services.AddDurableMessageType<PaymentResult>(MessagingSubjects.PaymentResult);

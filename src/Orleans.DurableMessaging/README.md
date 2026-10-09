@@ -59,6 +59,8 @@ The protocol and runtime provide:
   the subject before decoding. `AddDurableMessageType<T>` registers a keyed singleton binding.
   The scoped `DurableMessageWriter` prepares an owned envelope before shared mutation.
   `DurableInboxDispatcher` optionally selects typed delegates by exact subject.
+  `inbox.RegisterHandlers` configures and installs that dispatcher once, freezes
+  its subject routes, and delivers decoded bodies to task-returning methods.
   Application records carry request/response destinations and business data.
 - `IDurableInbox`, `IDurableOutbox`, and `IDurableInboxExtension` define handler
   registration, inspection, enqueue, and delivery operations. `DeliveryResult` and

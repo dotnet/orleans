@@ -1185,6 +1185,176 @@ public sealed class TypedMessageHelperTests
         Assert.Null(serializer.Deserialize(envelope.Payload));
     }
 
+    [Fact]
+    public void RegisterHandlers_RejectsNullInboxBeforeConfiguration()
+    {
+        var configured = false;
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            DurableInboxExtensions.RegisterHandlers(null!, _ => configured = true));
+
+        Assert.Equal("inbox", exception.ParamName);
+        Assert.False(configured);
+    }
+
+    [Fact]
+    public void RegisterHandlers_RejectsNullConfigurationWithoutInstallingHandler()
+    {
+        var inbox = Substitute.For<IDurableInbox>();
+
+        var exception = Assert.Throws<ArgumentNullException>(() => inbox.RegisterHandlers(null!));
+
+        Assert.Equal("configure", exception.ParamName);
+        inbox.DidNotReceive().RegisterHandler(Arg.Any<IInboxHandler>());
+    }
+
+    [Fact]
+    public void RegisterHandlers_RejectsEmptyConfigurationWithoutInstallingHandler()
+    {
+        var inbox = Substitute.For<IDurableInbox>();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => inbox.RegisterHandlers(_ => { }));
+
+        Assert.Contains("at least one", exception.Message, StringComparison.Ordinal);
+        inbox.DidNotReceive().RegisterHandler(Arg.Any<IInboxHandler>());
+    }
+
+    [Fact]
+    public void RegisterHandlers_ConfigurationFailurePreservesOriginalErrorAndInbox()
+    {
+        using var services = CreateServices();
+        var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+        var inbox = Substitute.For<IDurableInbox>();
+        var sentinel = new InvalidDataException("configuration failed");
+
+        var exception = Assert.Throws<InvalidDataException>(() => inbox.RegisterHandlers(routes =>
+        {
+            routes.Register(type, (_, _, _) => ValueTask.CompletedTask);
+            throw sentinel;
+        }));
+
+        Assert.Same(sentinel, exception);
+        inbox.DidNotReceive().RegisterHandler(Arg.Any<IInboxHandler>());
+    }
+
+    [Fact]
+    public void RegisterHandlers_DuplicateSubjectFailsBeforeInstallingHandler()
+    {
+        using var services = CreateServices();
+        var first = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+        var second = new DurableMessageType<int>(Subject, services.GetRequiredService<Serializer<int>>());
+        var inbox = Substitute.For<IDurableInbox>();
+
+        Assert.Throws<InvalidOperationException>(() => inbox.RegisterHandlers(routes => routes
+            .Register(first, (_, _, _) => ValueTask.CompletedTask)
+            .Register(second, (_, _, _) => ValueTask.CompletedTask)));
+
+        inbox.DidNotReceive().RegisterHandler(Arg.Any<IInboxHandler>());
+    }
+
+    [Fact]
+    public async Task RegisterHandlers_InstallsOneFrozenDispatcherAndRoutesDifferentBodyTypes()
+    {
+        using var services = CreateServices();
+        var text = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+        var number = new DurableMessageType<int>("stock.restock.v1", services.GetRequiredService<Serializer<int>>());
+        var inbox = Substitute.For<IDurableInbox>();
+        IInboxHandler handler = null!;
+        DurableInboxDispatcher configured = null!;
+        inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => handler = call.Arg<IInboxHandler>());
+        var values = new List<object>();
+        inbox.RegisterHandlers(routes =>
+        {
+            configured = routes;
+            routes.Register(text, (body, context, _) =>
+            {
+                values.Add(body);
+                context.Complete();
+                return ValueTask.CompletedTask;
+            }).Register(number, (body, context, _) =>
+            {
+                values.Add(body);
+                context.Complete();
+                return ValueTask.CompletedTask;
+            });
+        });
+
+        Assert.Same(configured, handler);
+        Assert.Throws<InvalidOperationException>(() => configured.Register(
+            new DurableMessageType<string>("stock.late.v1", services.GetRequiredService<Serializer<string>>()),
+            (_, _, _) => ValueTask.CompletedTask));
+        using var reservation = DirectEnvelope(services.GetRequiredService<Serializer<string>>(), Subject, "reserve");
+        using var restock = DirectEnvelope(services.GetRequiredService<Serializer<int>>(), number.Subject, 5);
+        var reservationContext = new CountingInboxHandlerContext(reservation);
+        var restockContext = new CountingInboxHandlerContext(restock);
+        await handler.HandleAsync(reservationContext, CancellationToken.None);
+        await handler.HandleAsync(restockContext, CancellationToken.None);
+
+        Assert.Equal(new object[] { "reserve", 5 }, values);
+        Assert.Equal(1, reservationContext.CompletionCount);
+        Assert.Equal(1, restockContext.CompletionCount);
+        inbox.Received(1).RegisterHandler(configured);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegisterHandlers_PreservesDeferredOutcomeAndExplicitCompletion(bool fail)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        using var envelope = DirectEnvelope(serializer, Subject, "prepare");
+        var context = new CountingInboxHandlerContext(envelope);
+        using var cancellation = new CancellationTokenSource();
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sentinel = new IOException("preparation failed");
+        var inbox = Substitute.For<IDurableInbox>();
+        IInboxHandler registered = null!;
+        inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => registered = call.Arg<IInboxHandler>());
+        inbox.RegisterHandlers(routes => routes.Register(type, async (body, caller, token) =>
+        {
+            Assert.Equal("prepare", body);
+            Assert.Same(context, caller);
+            Assert.Equal(cancellation.Token, token);
+            await release.Task;
+            caller.Complete();
+        }));
+
+        var pending = registered.HandleAsync(context, cancellation.Token);
+        Assert.False(pending.IsCompleted);
+        Assert.Equal(0, context.CompletionCount);
+        if (fail)
+        {
+            release.SetException(sentinel);
+            var exception = await Assert.ThrowsAsync<IOException>(async () => await pending);
+            Assert.Same(sentinel, exception);
+            Assert.Equal(0, context.CompletionCount);
+        }
+        else
+        {
+            release.SetResult();
+            await pending;
+            Assert.Equal(1, context.CompletionCount);
+        }
+    }
+
+    [Fact]
+    public void RegisterHandlers_PropagatesCoreRegistrationRejection()
+    {
+        using var services = CreateServices();
+        var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+        var inbox = Substitute.For<IDurableInbox>();
+        var sentinel = new InvalidOperationException("A handler is already registered.");
+        inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(_ => throw sentinel);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            inbox.RegisterHandlers(routes => routes.Register(type, (_, _, _) => ValueTask.CompletedTask)));
+
+        Assert.Same(sentinel, exception);
+        inbox.Received(1).RegisterHandler(Arg.Any<DurableInboxDispatcher>());
+    }
+
     private static ServiceProvider CreateServices() =>
         new ServiceCollection().AddSerializer().BuildServiceProvider();
 

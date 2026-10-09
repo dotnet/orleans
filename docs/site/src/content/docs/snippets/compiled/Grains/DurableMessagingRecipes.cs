@@ -63,6 +63,9 @@ public sealed record ReserveStock(
     [property: Id(2)] GrainId ResponseDestination);
 
 [GenerateSerializer]
+public sealed record Restock([property: Id(0)] int Quantity);
+
+[GenerateSerializer]
 public sealed record ReservationResult(
     [property: Id(1)] int Quantity,
     [property: Id(2)] bool Reserved) : OrderOutcome;
@@ -73,13 +76,12 @@ public interface IInventoryGrain : IGrainWithStringKey, IDurableMessagingGrain
     ValueTask<int> GetAvailableAsync();
 }
 
-public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler
+public sealed class InventoryGrain : Grain, IInventoryGrain
 {
     private readonly IDurableValue<int> _available;
     private readonly IDurableStateManager _state;
     private readonly IDurableOutbox _outbox;
     private readonly DurableMessageWriter _writer;
-    private readonly DurableMessageType<ReserveStock> _reserve;
     private readonly DurableMessageType<ReservationResult> _result;
 
     public InventoryGrain(
@@ -87,6 +89,7 @@ public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler
         IDurableOutbox outbox,
         DurableMessageWriter writer,
         [FromKeyedServices(MessagingSubjects.ReserveStock)] DurableMessageType<ReserveStock> reserve,
+        [FromKeyedServices(MessagingSubjects.Restock)] DurableMessageType<Restock> restock,
         [FromKeyedServices(MessagingSubjects.ReservationResult)] DurableMessageType<ReservationResult> result,
         IDurableStateManager state,
         [FromKeyedServices("available-stock")] IDurableValue<int> available)
@@ -95,9 +98,10 @@ public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler
         _state = state;
         _outbox = outbox;
         _writer = writer;
-        _reserve = reserve;
         _result = result;
-        inbox.RegisterHandler(this);
+        inbox.RegisterHandlers(routes => routes
+            .Register(reserve, HandleReserveStock)
+            .Register(restock, HandleRestock));
     }
 
     public async Task SetAvailableAsync(int quantity)
@@ -109,20 +113,28 @@ public sealed class InventoryGrain : Grain, IInventoryGrain, IInboxHandler
 
     public ValueTask<int> GetAvailableAsync() => new(_available.Value);
 
-    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    private ValueTask HandleReserveStock(ReserveStock request, IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        var request = _reserve.Decode(context.Envelope);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
-        var result = new ReservationResult(request.Quantity, _available.Value >= request.Quantity);
-        var nextAvailable = result.Reserved
-            ? checked(_available.Value - request.Quantity)
-            : _available.Value;
+        var available = _available.Value;
+        var reserved = available >= request.Quantity;
         using var reply = _writer.Create(_result, context.Envelope.MessageId.CreateChildKey("result"),
-            request.ResponseDestination, result);
+            request.ResponseDestination, new ReservationResult(request.Quantity, reserved));
         cancellationToken.ThrowIfCancellationRequested();
 
-        _available.Value = nextAvailable;
+        if (reserved) _available.Value = available - request.Quantity;
         _outbox.Send(reply);
+        context.Complete();
+        return ValueTask.CompletedTask;
+    }
+
+    private ValueTask HandleRestock(Restock request, IInboxHandlerContext context, CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
+        var available = checked(_available.Value + request.Quantity);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _available.Value = available;
         context.Complete();
         return ValueTask.CompletedTask;
     }
