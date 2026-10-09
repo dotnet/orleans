@@ -41,6 +41,23 @@ public static class RuntimeTypeNameParser
     /// <returns>A parsed type specification.</returns>
     public static TypeSpec Parse(ReadOnlySpan<char> input) => ParseInternal(ref input);
 
+    internal static TypeSpec ParseForDeserialization(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            throw new ArgumentException("A wire type name must be non-empty.", nameof(input));
+        }
+
+        var remaining = input.AsSpan();
+        var result = ParseInternal(ref remaining);
+        if (!remaining.Trim().IsEmpty)
+        {
+            throw new FormatException($"Unexpected trailing content in type name \"{input}\".");
+        }
+
+        return result;
+    }
+
     private static TypeSpec ParseInternal(ref ReadOnlySpan<char> input)
     {
         BufferReader s = default;

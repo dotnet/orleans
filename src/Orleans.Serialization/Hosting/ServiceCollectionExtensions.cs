@@ -81,6 +81,14 @@ namespace Orleans.Serialization
                 services.AddOptions();
                 services.AddSingleton<IConfigureOptions<TypeManifestOptions>, DefaultTypeManifestProvider>();
                 services.AddSingleton<IPostConfigureOptions<TypeManifestOptions>, DefaultTypeManifestProvider>();
+                services.AddOptions<TypeManifestOptions>().Configure<IOptions<ExceptionSerializationOptions>>(
+                    static (manifest, options) =>
+                    {
+                        foreach (var type in options.Value.ExceptionFactories.Keys)
+                        {
+                            manifest.AddAllowedType(type);
+                        }
+                    });
                 services.AddSingleton<TypeResolver>(sp =>
                 {
                     var options = sp.GetRequiredService<IOptions<TypeManifestOptions>>();

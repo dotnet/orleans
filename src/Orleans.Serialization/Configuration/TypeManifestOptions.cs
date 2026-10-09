@@ -48,6 +48,8 @@ namespace Orleans.Serialization.Configuration
         internal Dictionary<Type, Func<ICodecProvider, IDeepCopier>> CopierFactories { get; } = new();
         internal Dictionary<Type, Func<ICodecProvider, object>> SerializerServiceFactories { get; } = new();
         internal HashSet<Type> ContextTypes { get; } = new();
+        internal HashSet<Type> AllowedTypeIdentities { get; } = new();
+        internal HashSet<Assembly> AllowedAssemblyIdentities { get; } = new();
 
         /// <summary>
         /// Registers statically constructed serialization and copying implementations for a closed type.
@@ -683,12 +685,16 @@ namespace Orleans.Serialization.Configuration
             }
 
             AllowedTypes.Add(RuntimeTypeNameFormatter.FormatInternalNoCache(type, allowAliases: false));
+            AllowedTypeIdentities.Add(type);
         }
 
         /// <summary>
         /// Adds the assembly name for <paramref name="assembly"/> to <see cref="AllowedAssemblies"/>.
         /// </summary>
         /// <param name="assembly">The assembly to allow.</param>
+#if NET5_0_OR_GREATER
+        [RequiresUnreferencedCode("Assembly-wide wire registration requires preserving the assembly's type metadata. Prefer AddAllowedType for trimmed applications.")]
+#endif
         public void AddAllowedAssembly(Assembly assembly)
         {
             if (assembly is null)
@@ -697,6 +703,11 @@ namespace Orleans.Serialization.Configuration
             }
 
             AllowedAssemblies.Add(CachedTypeResolver.GetName(assembly));
+            AllowedAssemblyIdentities.Add(assembly);
+            foreach (var type in assembly.GetTypes())
+            {
+                AllowedTypeIdentities.Add(type);
+            }
         }
 
         [Flags]

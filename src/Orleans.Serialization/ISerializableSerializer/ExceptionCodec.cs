@@ -4,7 +4,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.Serialization;
 using Microsoft.Extensions.Options;
@@ -370,6 +369,8 @@ namespace Orleans.Serialization
 
             uint fieldId = 0;
             string? typeName = null;
+            Func<Exception>? factory = null;
+            var hasTypeName = false;
             string? message = null;
             string? stackTrace = null;
             Exception? innerException = null;
@@ -384,10 +385,37 @@ namespace Orleans.Serialization
                 }
 
                 fieldId += header.FieldIdDelta;
+                if (!hasTypeName && fieldId != 0)
+                {
+                    throw new SerializationException("An exception payload must begin with its type name.");
+                }
+
                 switch (fieldId)
                 {
                     case 0:
+                        if (hasTypeName)
+                        {
+                            throw new SerializationException("An exception payload must contain exactly one type name.");
+                        }
+
                         typeName = StringCodec.ReadValue(ref reader, header);
+                        if (string.IsNullOrWhiteSpace(typeName))
+                        {
+                            throw new SerializationException("An exception payload must contain a non-empty type name.");
+                        }
+
+                        hasTypeName = true;
+                        if (_typeConverter.TryParseForDeserialization(typeName, out var type))
+                        {
+                            if (!typeof(Exception).IsAssignableFrom(type) || type.IsAbstract
+                                || type.ContainsGenericParameters || type == typeof(AggregateException))
+                            {
+                                throw new SerializationException($"Type \"{type}\" is not supported by the exception codec.");
+                            }
+
+                            _options.ExceptionFactories.TryGetValue(type, out factory);
+                        }
+
                         break;
                     case 1:
                         message = StringCodec.ReadValue(ref reader, header);
@@ -396,13 +424,29 @@ namespace Orleans.Serialization
                         stackTrace = StringCodec.ReadValue(ref reader, header);
                         break;
                     case 3:
-                        innerException = ReadValue(ref reader, header);
+                        if (factory is not null)
+                        {
+                            innerException = ReadValue(ref reader, header);
+                        }
+                        else
+                        {
+                            reader.ConsumeUnknownField(header);
+                        }
+
                         break;
                     case 4:
                         hResult = Int32Codec.ReadValue(ref reader, header);
                         break;
                     case 5:
-                        data = _dictionaryCodec.ReadValue(ref reader, header);
+                        if (factory is not null)
+                        {
+                            data = _dictionaryCodec.ReadValue(ref reader, header);
+                        }
+                        else
+                        {
+                            reader.ConsumeUnknownField(header);
+                        }
+
                         break;
                     default:
                         reader.ConsumeUnknownField(header);
@@ -410,39 +454,12 @@ namespace Orleans.Serialization
                 }
             }
 
-            Exception result;
-            if (!_typeConverter.TryParse(typeName!, out var type))
+            if (!hasTypeName)
             {
-                result = new UnavailableExceptionFallbackException
-                {
-                    ExceptionType = typeName
-                };
+                throw new SerializationException("An exception payload must contain a type name.");
             }
-            else if (typeof(Exception).IsAssignableFrom(type))
-            {
-                try
-                {
-                    if (type.GetConstructor(Array.Empty<Type>()) is not null)
-                    {
-                        result = (Exception)Activator.CreateInstance(type)!;
-                    }
-                    else
-                    {
-                        result = (Exception)RuntimeHelpers.GetUninitializedObject(type);
-                    }
-                }
-                catch (Exception constructorException)
-                {
-                    result = new UnavailableExceptionFallbackException($"Failed to construct exception of type \"{type}\"", constructorException)
-                    {
-                        ExceptionType = typeName
-                    };
-                }
-            }
-            else
-            {
-                throw new NotSupportedException($"Type {type} is not supported");
-            }
+
+            var result = factory is not null ? factory() : new UnavailableExceptionFallbackException { ExceptionType = typeName };
 
             SetBasePropertiesCore(result, message, stackTrace, innerException, hResult, data);
             return result;
