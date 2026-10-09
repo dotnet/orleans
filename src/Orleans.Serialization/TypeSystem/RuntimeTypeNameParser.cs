@@ -1,5 +1,7 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 
 namespace Orleans.Serialization.TypeSystem;
@@ -9,6 +11,11 @@ namespace Orleans.Serialization.TypeSystem;
 /// </summary>
 public static class RuntimeTypeNameParser
 {
+#if NET8_0_OR_GREATER
+    private static readonly SearchValues<char> InvalidWireNameCharacters = SearchValues.Create("[]*&(),\"");
+#else
+    private static readonly char[] InvalidWireNameCharacters = "[]*&(),\"".ToCharArray();
+#endif
     internal const int MaxAllowedGenericArity = 64;
     internal const char CompoundAliasStartIndicator = '(';
     internal const char CompoundAliasEndIndicator = ')';
@@ -48,6 +55,11 @@ public static class RuntimeTypeNameParser
             throw new ArgumentException("A wire type name must be non-empty.", nameof(input));
         }
 
+        if (input.AsSpan().IndexOf('\uFFFD') >= 0)
+        {
+            throw new FormatException("A wire type name must contain valid Unicode characters.");
+        }
+
         var remaining = input.AsSpan();
         var result = ParseInternal(ref remaining);
         if (!remaining.Trim().IsEmpty)
@@ -55,8 +67,51 @@ public static class RuntimeTypeNameParser
             throw new FormatException($"Unexpected trailing content in type name \"{input}\".");
         }
 
+        Validate(result);
         return result;
+
+        static void Validate(TypeSpec type)
+        {
+            switch (type)
+            {
+                case NamedTypeSpec named:
+                    if (string.IsNullOrWhiteSpace(named.Name) || HasInvalidWireNameCharacters(named.Name))
+                    {
+                        throw new FormatException("A wire type name must contain a valid named type.");
+                    }
+
+                    if (named.ContainingType is { } containing) Validate(containing);
+                    break;
+                case AssemblyQualifiedTypeSpec qualified:
+                    _ = new AssemblyName(qualified.Assembly!);
+                    Validate(qualified.Type);
+                    break;
+                case ConstructedGenericTypeSpec generic:
+                    Validate(generic.UnconstructedType);
+                    foreach (var argument in generic.Arguments) Validate(argument);
+                    break;
+                case ArrayTypeSpec array:
+                    Validate(array.ElementType);
+                    break;
+                case PointerTypeSpec pointer:
+                    Validate(pointer.ElementType);
+                    break;
+                case ReferenceTypeSpec reference:
+                    Validate(reference.ElementType);
+                    break;
+                case TupleTypeSpec tuple:
+                    foreach (var element in tuple.Elements) Validate(element);
+                    break;
+            }
+        }
     }
+
+    private static bool HasInvalidWireNameCharacters(string name) =>
+#if NET8_0_OR_GREATER
+        name.AsSpan().IndexOfAny(InvalidWireNameCharacters) >= 0;
+#else
+        name.IndexOfAny(InvalidWireNameCharacters) >= 0;
+#endif
 
     private static TypeSpec ParseInternal(ref ReadOnlySpan<char> input)
     {

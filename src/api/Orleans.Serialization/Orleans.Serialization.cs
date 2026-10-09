@@ -105,6 +105,9 @@ namespace Orleans.Serialization
         public System.Func<System.Type, bool> SupportedExceptionTypeFilter { get { throw null; } set { } }
 
         public System.Collections.Generic.HashSet<string> SupportedNamespacePrefixes { get { throw null; } }
+
+        public void AddExceptionType<TException>(System.Func<TException> factory)
+            where TException : System.Exception { }
     }
 
     [GenerateSerializer]
@@ -3417,6 +3420,7 @@ namespace Orleans.Serialization.Configuration
 
         public void AddActivator(System.Type type) { }
 
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("Assembly-wide wire registration requires preserving the assembly's type metadata. Prefer AddAllowedType for trimmed applications.")]
         public void AddAllowedAssembly(System.Reflection.Assembly assembly) { }
 
         public void AddAllowedType(System.Type type) { }

@@ -148,9 +148,14 @@ namespace Orleans.Serialization
         }
 
         internal void SetBasePropertiesCore(Exception value, string? message, string? stackTrace, Exception? innerException, int hResult, Dictionary<object, object?>? data)
-        {
+            => RestoreBaseProperties(value, message, stackTrace, innerException, hResult, data, _baseExceptionConstructor, _streamingContext, _formatterConverter);
+
 #pragma warning disable SYSLIB0050 // Type or member is obsolete
-            var info = new SerializationInfo(typeof(Exception), _formatterConverter);
+        internal static void RestoreBaseProperties(Exception value, string? message, string? stackTrace, Exception? innerException, int hResult,
+            Dictionary<object, object?>? data, Action<object, SerializationInfo, StreamingContext> constructor,
+            StreamingContext streamingContext, IFormatterConverter formatterConverter)
+        {
+            var info = new SerializationInfo(typeof(Exception), formatterConverter);
 #pragma warning restore SYSLIB0050 // Type or member is obsolete
             info.AddValue("Message", message, typeof(string));
             info.AddValue("StackTraceString", null, typeof(string));
@@ -169,7 +174,7 @@ namespace Orleans.Serialization
             info.AddValue("Source", null, typeof(string));
             info.AddValue("WatsonBuckets", null, typeof(byte[]));
 
-            _baseExceptionConstructor(value, info, _streamingContext);
+            constructor(value, info, streamingContext);
             if (data is { })
             {
                 foreach (var pair in data)
@@ -279,6 +284,11 @@ namespace Orleans.Serialization
             if (type == typeof(AggregateException))
             {
                 return false;
+            }
+
+            if (_options.ExceptionFactories.ContainsKey(type))
+            {
+                return true;
             }
 
             if (typeof(Exception).IsAssignableFrom(type) && type.Namespace is { } ns)
@@ -398,7 +408,7 @@ namespace Orleans.Serialization
                             throw new SerializationException("An exception payload must contain exactly one type name.");
                         }
 
-                        typeName = StringCodec.ReadValue(ref reader, header);
+                        typeName = StringCodec.ReadTypeName(ref reader, header);
                         if (string.IsNullOrWhiteSpace(typeName))
                         {
                             throw new SerializationException("An exception payload must contain a non-empty type name.");
@@ -430,7 +440,7 @@ namespace Orleans.Serialization
                         }
                         else
                         {
-                            reader.ConsumeUnknownField(header);
+                            reader.ConsumeDiscardedField(header);
                         }
 
                         break;
@@ -444,12 +454,20 @@ namespace Orleans.Serialization
                         }
                         else
                         {
-                            reader.ConsumeUnknownField(header);
+                            reader.ConsumeDiscardedField(header);
                         }
 
                         break;
                     default:
-                        reader.ConsumeUnknownField(header);
+                        if (factory is not null)
+                        {
+                            reader.ConsumeUnknownField(header);
+                        }
+                        else
+                        {
+                            reader.ConsumeDiscardedField(header);
+                        }
+
                         break;
                 }
             }

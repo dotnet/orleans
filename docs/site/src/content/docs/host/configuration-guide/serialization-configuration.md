@@ -33,21 +33,21 @@ Consider the following example when interacting with the <xref:Orleans.Hosting.I
 
 ## Authorize type-name resolution
 
-Registering an external serializer selects which codec can handle a value. It doesn't, by itself, authorize Orleans to resolve every CLR type name accepted by that serializer. Type-name resolution is a separate security boundary, and <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`.
+Registering an external serializer selects which codec handles a value. Wire type-name resolution binds host-established CLR identities, then authorizes the complete type graph. <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`.
 
 This distinction is especially visible for polymorphic signatures such as `IReadOnlyList<TriggerRule>`, where `TriggerRule` is abstract and values are handled by `System.Text.Json`. Register the JSON serializer and explicitly trust the application type:
 
 :::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="allow_type":::
 
-<xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddAllowedType*> uses Orleans' runtime type-name formatter, including for constructed and nested generic types. The <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowedTypes> string set remains supported for compatibility and contains Orleans-formatted runtime type names. Prefer `AddAllowedType` instead of constructing those names manually.
+<xref:Orleans.Serialization.Configuration.TypeManifestOptions.AddAllowedType*> preserves the actual CLR identity and its constructed and nested generic components. The <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowedTypes> string set remains supported for trusted host configuration: Orleans resolves those registrations during initialization and preserves the resulting identities. Prefer `AddAllowedType` when the type is available.
 
 If every type in an application assembly is trusted, allow the assembly instead:
 
 :::code language="csharp" source="../../snippets/compiled/Host/HostSnippets.cs" id="allow_assembly":::
 
-Assembly trust applies component by component. Constructed generic types require an authorized generic definition and approved arguments. Orleans uses manifest registrations, configured names, assembly trust, and filters to authorize the definition independently of its arguments. Assembly-qualified lookup resolves through the specified assembly, including CLR type forwarding.
+Assembly registration captures the assembly's available type identities during host configuration. Trust applies component by component: the generic definition and each argument require permission. For trimming and NativeAOT, use individual type registrations and generated serializer contexts to preserve the required closed type graph. Ordinary application lookup resolves assembly-qualified names through the specified assembly, including CLR type forwarding.
 
-For policy-based trust, register <xref:Orleans.Serialization.ITypeNameFilter> to evaluate names before Orleans loads the corresponding type:
+For policy-based trust, register <xref:Orleans.Serialization.ITypeNameFilter> to evaluate complete wire names before binding them to registered identities:
 
 :::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="application_type_name_filter":::
 
@@ -55,15 +55,23 @@ Register the filter with dependency injection:
 
 :::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="register_type_name_filter":::
 
-A filter returns `true` to allow, `false` to deny, or `null` when it has no opinion. Types explicitly added to `AllowedTypes` are authoritative. For other names, a denial from any `ITypeNameFilter` takes precedence over other type-name filters and assembly trust. <xref:Orleans.Serialization.ITypeFilter> provides a resolved-`Type` fallback when name-based checks have no affirmative result; a denial wins within that fallback. Both formatting and parsing apply these checks, including to constructed generic components and array element types.
+A filter returns `true` to allow, `false` to deny, or `null` when it has no opinion. Explicit individual type registrations are authoritative. On the wire path, name-filter denials take precedence over metadata grants, aliases, and assembly trust; resolved-type denials apply to the bound definition, arguments, and final construction. Wire readers cache filter opinions for bound host identities for the configuration's lifetime. Aliases supply identities, while serializer metadata and configured grants supply permission.
 
-An `ITypeFilter` can explicitly grant a particular closed generic type as a complete construction, including arguments for which filters have no opinion. Orleans still inspects every argument for denials, including arguments after an unknown argument.
+Ordinary <xref:Orleans.Serialization.TypeSystem.TypeConverter.Parse*> retains application lookup semantics, including an explicit resolved-type filter grant for a closed generic construction with no-opinion arguments. Wire deserialization independently requires authorization of the definition and every argument.
 
-As a compatibility escape hatch, you can disable the boundary:
+For fully trusted inputs, `AllowAllTypes` grants permission to all host-known identities:
 
 :::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="allow_all_types":::
 
 > [!WARNING]
-> `AllowAllTypes` bypasses type-name validation, including custom filters, and permits any resolvable type. Use it only when serialized input is fully trusted. Prefer allowing individual types or trusted assemblies.
+> `AllowAllTypes` bypasses authorization, including custom filters. Keep individual type or trusted assembly registrations for less-trusted inputs.
+
+### Migrate runtime-name contracts
+
+Before upgrading a client or silo, register the concrete polymorphic types which its payloads name. Use `AddAllowedType` for each reviewed type, `AddAllowedAssembly` for a reviewed assembly, or a generated serializer context for a closed type graph. Keep compatible registrations on every process which reads the contract, including persisted state and queues.
+
+Custom type converters and resolvers continue to support ordinary application lookup. For their wire contracts, register custom names in <xref:Orleans.Serialization.Configuration.TypeManifestOptions.WellKnownTypeAliases> with actual `Type` values and establish permission for those targets. Wire readers use these registrations directly. Treat missing identities as registration or version-skew errors, and deploy the receiving registrations before sending the new contracts.
+
+Register reviewed custom exception factories using <xref:Orleans.Serialization.ExceptionSerializationOptions.AddExceptionType*>. The exception codec restores base exception properties using those factories. A well-formed unavailable exception preserves its scalar diagnostic state in <xref:Orleans.Serialization.UnavailableExceptionFallbackException> and discards its nested exception and data graphs. See [exception admission](../../security/serialization.md#admit-exception-reconstruction) for the reconstruction and fallback policy.
 
 For the full trust-boundary and data-validation guidance, see [serialization security](../../security/serialization.md).

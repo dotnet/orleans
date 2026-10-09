@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
@@ -31,31 +32,43 @@ public class TypeConverter
     private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
     private readonly HashSet<string> _allowedAssembliesConfiguration;
     private readonly HashSet<string> _allowedTypesConfiguration;
-    private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases =
+    private readonly Dictionary<QualifiedType, Type> _wireKnownTypes = new(QualifiedType.EqualityComparer);
+    private readonly HashSet<Type> _wireKnownIdentities = [];
+    private readonly HashSet<QualifiedType> _wireAmbiguousNames = new(QualifiedType.EqualityComparer);
+    private readonly Dictionary<string, Type> _wireAliases;
+    private readonly HashSet<Type> _wireGrants = [];
+    private readonly HashSet<Type> _wireExplicitTypes = [];
+    private readonly Dictionary<Type, List<Type>> _wireClosedGenericTypes = [];
+    private readonly Dictionary<(Type Element, int Rank), Type> _wireArrayTypes = [];
+    private readonly ConcurrentDictionary<QualifiedType, bool?> _wireNameOpinions = new(QualifiedType.EqualityComparer);
+    private readonly ConcurrentDictionary<Type, bool?> _wireTypeOpinions = new();
+    private readonly HashSet<Type> _admittedExceptionTypes;
+    private readonly HashSet<Assembly> _wireAllowedAssemblies;
+    private static readonly List<(string DisplayName, Type Type)> WellKnownTypeAliases =
     [
-        ("object", "System.Object"),
-        ("string", "System.String"),
-        ("char", "System.Char"),
-        ("sbyte", "System.SByte"),
-        ("byte", "System.Byte"),
-        ("bool", "System.Boolean"),
-        ("short", "System.Int16"),
-        ("ushort", "System.UInt16"),
-        ("int", "System.Int32"),
-        ("uint", "System.UInt32"),
-        ("long", "System.Int64"),
-        ("ulong", "System.UInt64"),
-        ("float", "System.Single"),
-        ("double", "System.Double"),
-        ("decimal", "System.Decimal"),
-        ("Guid", "System.Guid"),
-        ("TimeSpan", "System.TimeSpan"),
-        ("DateTime", "System.DateTime"),
-        ("DateTimeOffset", "System.DateTimeOffset"),
-        ("Type", "System.Type"),
+        ("object", typeof(object)),
+        ("string", typeof(string)),
+        ("char", typeof(char)),
+        ("sbyte", typeof(sbyte)),
+        ("byte", typeof(byte)),
+        ("bool", typeof(bool)),
+        ("short", typeof(short)),
+        ("ushort", typeof(ushort)),
+        ("int", typeof(int)),
+        ("uint", typeof(uint)),
+        ("long", typeof(long)),
+        ("ulong", typeof(ulong)),
+        ("float", typeof(float)),
+        ("double", typeof(double)),
+        ("decimal", typeof(decimal)),
+        ("Guid", typeof(Guid)),
+        ("TimeSpan", typeof(TimeSpan)),
+        ("DateTime", typeof(DateTime)),
+        ("DateTimeOffset", typeof(DateTimeOffset)),
+        ("Type", typeof(Type)),
     ];
     private static readonly HashSet<string> WellKnownRuntimeTypeNames =
-        WellKnownTypeAliases.Select(static alias => alias.RuntimeName).ToHashSet(StringComparer.Ordinal);
+        WellKnownTypeAliases.Select(static alias => alias.Type.FullName!).ToHashSet(StringComparer.Ordinal);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TypeConverter"/> class.
@@ -77,6 +90,8 @@ public class TypeConverter
         _typeNameFilters = typeNameFilters.ToArray();
         _typeFilters = typeFilters.ToArray();
         _allowAllTypes = options.Value.AllowAllTypes;
+        _admittedExceptionTypes = options.Value.AdmittedExceptionTypes;
+        _wireAllowedAssemblies = new(options.Value.AllowedAssemblyIdentities);
         _compoundTypeAliases = options.Value.CompoundTypeAliases;
         _convertToDisplayName = ConvertToDisplayName;
         _convertFromDisplayName = ConvertFromDisplayName;
@@ -100,11 +115,11 @@ public class TypeConverter
             {
                 AddConfiguredAllowedType(t);
             }
-
-            ConsumeMetadata(options.Value);
         }
 
+        ConsumeMetadata(options.Value);
         var aliases = options.Value.WellKnownTypeAliases;
+        _wireAliases = new(aliases, StringComparer.Ordinal);
         foreach (var item in aliases)
         {
             var alias = new QualifiedType(null, item.Key);
@@ -133,6 +148,39 @@ public class TypeConverter
                 }
             }
         }
+
+        foreach (var (_, type) in WellKnownTypeAliases)
+        {
+            RegisterWireType(type, allowed: true);
+        }
+
+        foreach (var type in options.Value.WellKnownTypeIds.Values) RegisterWireType(type, allowed: true);
+        foreach (var type in aliases.Values) RegisterWireType(type, allowed: false);
+        foreach (var type in _compoundTypeAliases.GetTypes()) RegisterWireType(type, allowed: false);
+        foreach (var type in options.Value.ContextTypes) RegisterWireType(type, allowed: true);
+        foreach (var type in options.Value.InterfaceTypes) RegisterWireType(type, allowed: true);
+        foreach (var type in options.Value.AllowedTypeIdentities) RegisterWireType(type, allowed: true, explicitlyAllowed: true);
+        foreach (var type in options.Value.AllowedAssemblyTypes) RegisterWireType(type, allowed: true);
+
+        // Resolve host-provided string registrations once, before accepting wire input.
+        var identityNames = options.Value.AllowedTypeIdentities
+            .Select(static type => RuntimeTypeNameFormatter.FormatInternalNoCache(type, allowAliases: false))
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var configured in options.Value.AllowedTypes)
+        {
+            if (!identityNames.Contains(configured) && _resolver.TryResolveType(configured, out var type))
+            {
+                RegisterWireType(type, allowed: true, explicitlyAllowed: true);
+            }
+        }
+
+        foreach (var configured in options.Value.AllowedAssemblies)
+        {
+            var assemblies = _wireKnownTypes.Values.Select(static type => type.Assembly).Distinct()
+                .Where(assembly => assembly.FullName == configured || CachedTypeResolver.GetName(assembly) == configured)
+                .ToArray();
+            if (assemblies is [var assembly]) _wireAllowedAssemblies.Add(assembly);
+        }
     }
 
     private void AddConfiguredAllowedType(string typeName)
@@ -150,6 +198,8 @@ public class TypeConverter
 
     private void ConsumeMetadata(TypeManifestOptions metadata)
     {
+        foreach (var type in metadata.SerializerTypes) RegisterWireType(type, allowed: true);
+        foreach (var type in metadata.FieldCodecTypes) RegisterWireType(type, allowed: true);
         foreach (var type in metadata.CodecFactories.Keys)
         {
             AddAllowedType(type);
@@ -294,6 +344,7 @@ public class TypeConverter
 
         void FormatAndAddAllowedType(Type type)
         {
+            RegisterWireType(type, allowed: true);
             var formatted = RuntimeTypeNameFormatter.Format(type);
             var parsed = RuntimeTypeNameParser.Parse(formatted);
 
@@ -350,6 +401,232 @@ public class TypeConverter
     public bool TryParse(string formatted, [NotNullWhen(true)] out Type result)
     {
         return ParseInternal(formatted, out result);
+    }
+
+    internal Type ParseForDeserialization(string formatted)
+        => TryParseForDeserialization(formatted, out var type)
+            ? type
+            : throw new TypeLoadException($"Wire type \"{formatted}\" is unavailable. Register its Type identity in the serializer manifest.");
+
+    internal bool TryParseForDeserialization(string formatted, [NotNullWhen(true)] out Type result, bool allowAllTypes = false)
+    {
+        var parsed = RuntimeTypeNameParser.ParseForDeserialization(formatted);
+        var state = (Converter: this, AllowAll: allowAllTypes);
+        _ = RuntimeTypeNameRewriter.Rewrite(parsed, static (in QualifiedType name, ref (TypeConverter Converter, bool AllowAll) state) =>
+        {
+            state.Converter.CheckWireName(name, state.AllowAll);
+            return name;
+        }, ref state);
+        result = BindWireType(parsed, assembly: null, allowAllTypes)!;
+        return result is not null;
+    }
+
+    internal bool IsExceptionTypeAdmitted(Type type) => _admittedExceptionTypes.Contains(type);
+
+    internal void AuthorizeForDeserialization(Type type) => AuthorizeWireType(type);
+
+    private void RegisterWireType(Type type, bool allowed, bool explicitlyAllowed = false)
+    {
+        if (type.IsGenericParameter) return;
+        if (type.IsGenericType && type.ContainsGenericParameters && !type.IsGenericTypeDefinition)
+        {
+            type = type.GetGenericTypeDefinition();
+        }
+
+        if (allowed) _wireGrants.Add(type);
+        _wireKnownIdentities.Add(type);
+        if (explicitlyAllowed) _wireExplicitTypes.Add(type);
+        if (type.HasElementType)
+        {
+            if (type.IsArray && (type.IsSZArray || type.GetArrayRank() > 1))
+            {
+                _wireArrayTypes[(type.GetElementType()!, type.GetArrayRank())] = type;
+            }
+
+            RegisterWireType(type.GetElementType()!, allowed, explicitlyAllowed);
+            return;
+        }
+
+        if (type.IsConstructedGenericType)
+        {
+            var definition = type.GetGenericTypeDefinition();
+            if (!_wireClosedGenericTypes.TryGetValue(definition, out var closedTypes))
+            {
+                _wireClosedGenericTypes[definition] = closedTypes = [];
+            }
+
+            if (!closedTypes.Contains(type)) closedTypes.Add(type);
+            RegisterWireType(definition, allowed, explicitlyAllowed);
+            foreach (var argument in type.GenericTypeArguments) RegisterWireType(argument, allowed, explicitlyAllowed);
+            return;
+        }
+
+        if (type.FullName is not { } name) return;
+        Add(new QualifiedType(null, name));
+        Add(new QualifiedType(CachedTypeResolver.GetName(type.Assembly), name));
+        Add(new QualifiedType(type.Assembly.FullName, name));
+        if (type.DeclaringType is { } declaring) RegisterWireType(declaring, allowed, explicitlyAllowed);
+
+        void Add(QualifiedType key)
+        {
+            if (_wireAmbiguousNames.Contains(key)) return;
+            if (_wireKnownTypes.TryGetValue(key, out var existing) && existing != type)
+            {
+                _wireKnownTypes.Remove(key);
+                _wireAmbiguousNames.Add(key);
+                return;
+            }
+
+            _wireKnownTypes[key] = type;
+        }
+    }
+
+    private Type? FindWireType(in QualifiedType name)
+    {
+        foreach (var (displayName, type) in WellKnownTypeAliases)
+        {
+            if (name.Assembly is null && (string.Equals(name.Type, displayName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name.Type, type.FullName, StringComparison.Ordinal)))
+            {
+                return type;
+            }
+        }
+
+        if (_wireKnownTypes.TryGetValue(name, out var known)) return known;
+        if (name.Assembly is null && _wireAliases.TryGetValue(name.Type, out known)) return known;
+        return null;
+    }
+
+    private void CheckWireName(in QualifiedType name, bool allowAllTypes = false, bool knownIdentity = false)
+    {
+        if (_allowAllTypes || allowAllTypes || FindWireType(name) is { } type && _wireExplicitTypes.Contains(type)) return;
+        if (GetWireNameOpinion(name, knownIdentity) == false)
+        {
+            throw new InvalidOperationException($"Wire type \"{name.Type}\" from assembly \"{name.Assembly}\" is denied by {nameof(ITypeNameFilter)}.");
+        }
+    }
+
+    private bool? GetWireNameOpinion(QualifiedType name, bool knownIdentity = false)
+        => knownIdentity || FindWireType(name) is not null
+            ? _wireNameOpinions.GetOrAdd(name, InspectWireNameFilters)
+            : InspectWireNameFilters(name);
+
+    private bool? InspectWireNameFilters(QualifiedType key)
+    {
+        bool? result = null;
+        foreach (var filter in _typeNameFilters)
+        {
+            var opinion = filter.IsTypeNameAllowed(key.Type, key.Assembly ?? string.Empty);
+            if (opinion == false) return false;
+            if (opinion == true && filter is not DefaultTypeFilter) result = true;
+        }
+
+        return result;
+    }
+
+    private Type? BindWireType(TypeSpec spec, string? assembly, bool allowAllTypes = false)
+    {
+        Type? result;
+        switch (spec)
+        {
+            case AssemblyQualifiedTypeSpec qualified:
+                return BindWireType(qualified.Type, qualified.Assembly!.Trim(), allowAllTypes);
+            case NamedTypeSpec named:
+                result = FindWireType(new QualifiedType(assembly, named.GetNamespaceQualifiedName()));
+                break;
+            case ConstructedGenericTypeSpec generic:
+                var definition = BindWireType(generic.UnconstructedType, assembly, allowAllTypes);
+                if (definition is null) return null;
+                if (!definition.IsGenericTypeDefinition || definition.GetGenericArguments().Length != generic.Arguments.Length)
+                {
+                    throw new FormatException($"Type \"{generic.Format()}\" has an invalid generic definition.");
+                }
+
+                var arguments = new Type[generic.Arguments.Length];
+                for (var i = 0; i < arguments.Length; i++)
+                {
+                    if (BindWireType(generic.Arguments[i], assembly: null, allowAllTypes) is not { } argument) return null;
+                    arguments[i] = argument;
+                }
+
+                result = _wireClosedGenericTypes.TryGetValue(definition, out var closedTypes)
+                    ? closedTypes.Find(candidate => candidate.GenericTypeArguments.SequenceEqual(arguments))
+                    : null;
+                result ??= definition.MakeGenericType(arguments);
+                break;
+            case ArrayTypeSpec array:
+                if (BindWireType(array.ElementType, assembly, allowAllTypes) is not { } element) return null;
+                result = _wireArrayTypes.TryGetValue((element, array.Dimensions), out var registeredArray)
+                    ? registeredArray
+                    : array.Dimensions == 1 ? element.MakeArrayType() : element.MakeArrayType(array.Dimensions);
+                break;
+            case PointerTypeSpec pointer:
+                if (BindWireType(pointer.ElementType, assembly, allowAllTypes) is not { } pointed) return null;
+                result = pointed.MakePointerType();
+                break;
+            case ReferenceTypeSpec reference:
+                if (BindWireType(reference.ElementType, assembly, allowAllTypes) is not { } referenced) return null;
+                result = referenced.MakeByRefType();
+                break;
+            case TupleTypeSpec alias:
+                var tree = _compoundTypeAliases;
+                foreach (var component in alias.Elements)
+                {
+                    object key;
+                    if (component is LiteralTypeSpec literal) key = literal.Value;
+                    else if (BindWireType(component, assembly: null, allowAllTypes) is { } componentType) key = componentType;
+                    else return null;
+                    tree = tree?.GetChildOrDefault(key);
+                }
+
+                result = tree?.Value;
+                break;
+            default:
+                throw new FormatException($"Invalid wire type specification \"{spec.Format()}\".");
+        }
+
+        if (result is not null) AuthorizeWireType(result, allowAllTypes);
+        return result;
+    }
+
+    private void AuthorizeWireType(Type type, bool allowAllTypes = false)
+    {
+        if (type.HasElementType)
+        {
+            AuthorizeWireType(type.GetElementType()!, allowAllTypes);
+            return;
+        }
+
+        if (type.IsConstructedGenericType)
+        {
+            AuthorizeWireType(type.GetGenericTypeDefinition(), allowAllTypes);
+            foreach (var argument in type.GenericTypeArguments) AuthorizeWireType(argument, allowAllTypes);
+        }
+        else if (!_wireKnownIdentities.Contains(type))
+        {
+            throw new TypeLoadException($"Wire type \"{type}\" has no host-registered identity.");
+        }
+
+        if (_allowAllTypes || allowAllTypes || _wireExplicitTypes.Contains(type)) return;
+        var name = new QualifiedType(CachedTypeResolver.GetName(type.Assembly), type.FullName!);
+        CheckWireName(name, knownIdentity: true);
+        var allowed = type.IsConstructedGenericType || _wireGrants.Contains(type) || type.IsEnum
+            || _wireAllowedAssemblies.Contains(type.Assembly) || GetWireNameOpinion(name, knownIdentity: true) == true;
+        var typeOpinion = _wireTypeOpinions.GetOrAdd(type, candidate =>
+        {
+            bool? result = null;
+            foreach (var filter in _typeFilters)
+            {
+                var opinion = filter.IsTypeAllowed(candidate);
+                if (opinion == false) return false;
+                if (opinion == true) result = true;
+            }
+
+            return result;
+        });
+        if (typeOpinion == false) throw new InvalidOperationException($"Wire type \"{type}\" is denied by {nameof(ITypeFilter)}.");
+        if (typeOpinion == true) allowed = true;
+        if (!allowed) throw new InvalidOperationException($"Wire type \"{type}\" is not authorized. Register its Type identity using {nameof(TypeManifestOptions.AddAllowedType)}.");
     }
 
     private string FormatInternal(Type type, Func<TypeSpec, TypeSpec>? rewriter = null)
@@ -451,9 +728,9 @@ public class TypeConverter
             return false;
         }
 
-        foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
+        foreach (var (displayName, knownType) in WellKnownTypeAliases)
         {
-            if (displayName.Equals(type.Type, StringComparison.Ordinal) || runtimeName.Equals(type.Type, StringComparison.Ordinal))
+            if (displayName.Equals(type.Type, StringComparison.Ordinal) || knownType.FullName!.Equals(type.Type, StringComparison.Ordinal))
             {
                 return true;
             }
@@ -502,9 +779,9 @@ public class TypeConverter
     {
         state = UpdateValidationResult(input, state);
 
-        foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
+        foreach (var (displayName, type) in WellKnownTypeAliases)
         {
-            if (string.Equals(input.Type, runtimeName, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(input.Type, type.FullName, StringComparison.OrdinalIgnoreCase))
             {
                 return new QualifiedType(null, displayName);
             }
@@ -522,11 +799,11 @@ public class TypeConverter
     {
         state = UpdateValidationResult(input, state);
 
-        foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
+        foreach (var (displayName, knownType) in WellKnownTypeAliases)
         {
             if (string.Equals(input.Type, displayName, StringComparison.OrdinalIgnoreCase))
             {
-                return new QualifiedType(null, runtimeName);
+                return new QualifiedType(null, knownType.FullName!);
             }
         }
 

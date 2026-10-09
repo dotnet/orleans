@@ -175,14 +175,18 @@ namespace Orleans.Serialization.Codecs
             {
                 case SchemaType.WellKnown:
                     var typeId = reader.ReadVarUInt32();
-                    return reader.Session.WellKnownTypes.GetWellKnownType(typeId);
+                    var known = reader.Session.WellKnownTypes.GetWellKnownType(typeId);
+                    reader.Session.TypeCodec.ValidateType(known);
+                    return known;
                 case SchemaType.Encoded:
                     var encoded = reader.Session.TypeCodec.TryRead(ref reader);
                     reader.Session.ReferencedTypes.RecordReferencedType(encoded);
                     return encoded;
                 case SchemaType.Referenced:
                     var reference = reader.ReadVarUInt32();
-                    return reader.Session.ReferencedTypes.GetReferencedType(reference);
+                    var referenced = reader.Session.ReferencedTypes.GetReferencedType(reference);
+                    reader.Session.TypeCodec.ValidateType(referenced);
+                    return referenced;
                 default:
                     return ExceptionHelper.ThrowArgumentOutOfRange<Type>(nameof(SchemaType));
             }

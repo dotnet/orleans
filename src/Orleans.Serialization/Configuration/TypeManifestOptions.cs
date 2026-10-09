@@ -50,6 +50,7 @@ namespace Orleans.Serialization.Configuration
         internal HashSet<Type> ContextTypes { get; } = new();
         internal HashSet<Type> AllowedTypeIdentities { get; } = new();
         internal HashSet<Assembly> AllowedAssemblyIdentities { get; } = new();
+        internal HashSet<Type> AllowedAssemblyTypes { get; } = new();
         internal HashSet<Type> AdmittedExceptionTypes { get; } = new();
 
         /// <summary>
@@ -236,6 +237,7 @@ namespace Orleans.Serialization.Configuration
         /// <summary>
         /// Gets the mapping of well-known type aliases to their corresponding type.
         /// </summary>
+        /// <remarks>Aliases establish wire identities. Serializer metadata, explicit type grants, and filters authorize their use.</remarks>
         public Dictionary<string, Type> WellKnownTypeAliases { get; } = new Dictionary<string, Type>();
 
         /// <summary>
@@ -294,9 +296,9 @@ namespace Orleans.Serialization.Configuration
         /// Default: <see langword="false"/>.
         /// </summary>
         /// <remarks>
-        /// Setting this property to <see langword="true"/> bypasses type-name validation and permits any
-        /// resolvable type. This is insecure when serialized input can be influenced by an untrusted party.
-        /// Prefer allowing individual types or trusted assemblies.
+        /// Setting this property to <see langword="true"/> bypasses authorization for host-established wire
+        /// identities. Ordinary application lookup also permits any resolvable type.
+        /// Prefer allowing individual types or trusted assemblies for less-trusted input.
         /// </remarks>
         public bool AllowAllTypes { get; set; }
 
@@ -675,7 +677,8 @@ namespace Orleans.Serialization.Configuration
         /// </summary>
         /// <remarks>
         /// This is the preferred way to allow an available <see cref="Type"/>. It formats the underlying
-        /// CLR type name without compound aliases and includes all constructed generic components.
+        /// CLR type name without compound aliases and preserves its identity and all constructed generic components
+        /// for wire resolution. Individual registrations are authoritative over filter opinions.
         /// </remarks>
         /// <param name="type">The type to allow.</param>
         public void AddAllowedType(Type type)
@@ -690,7 +693,7 @@ namespace Orleans.Serialization.Configuration
         }
 
         /// <summary>
-        /// Adds the assembly name for <paramref name="assembly"/> to <see cref="AllowedAssemblies"/>.
+        /// Registers the available type identities in <paramref name="assembly"/> and adds its name to <see cref="AllowedAssemblies"/>.
         /// </summary>
         /// <param name="assembly">The assembly to allow.</param>
 #if NET5_0_OR_GREATER
@@ -703,11 +706,12 @@ namespace Orleans.Serialization.Configuration
                 throw new ArgumentNullException(nameof(assembly));
             }
 
+            var types = assembly.GetTypes();
             AllowedAssemblies.Add(CachedTypeResolver.GetName(assembly));
             AllowedAssemblyIdentities.Add(assembly);
-            foreach (var type in assembly.GetTypes())
+            foreach (var type in types)
             {
-                AllowedTypeIdentities.Add(type);
+                AllowedAssemblyTypes.Add(type);
             }
         }
 

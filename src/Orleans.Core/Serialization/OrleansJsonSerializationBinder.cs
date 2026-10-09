@@ -12,7 +12,6 @@ namespace Orleans.Serialization
     /// </summary>
     public class OrleansJsonSerializationBinder : DefaultSerializationBinder
     {
-        private readonly TypeResolver _typeResolver;
         private readonly TypeConverter? _typeConverter;
         private readonly bool _allowAllTypes;
 
@@ -21,13 +20,12 @@ namespace Orleans.Serialization
         /// </summary>
         /// <param name="typeResolver">The type resolver.</param>
         /// <remarks>
-        /// This constructor does not enforce the Orleans type allow-list: any resolvable type may be constructed
-        /// during deserialization. It is retained for backwards compatibility. Prefer the constructor which accepts
-        /// a <see cref="TypeConverter"/> so that the type allow-list is enforced.
+        /// Supply the constructor which accepts a <see cref="TypeConverter"/> for deserialization.
+        /// That constructor binds host-established identities and applies the Orleans type policy.
+        /// This overload is retained for binary compatibility; deserialization reports a configuration error.
         /// </remarks>
         public OrleansJsonSerializationBinder(TypeResolver typeResolver)
         {
-            _typeResolver = typeResolver;
             _allowAllTypes = true;
         }
 
@@ -36,15 +34,14 @@ namespace Orleans.Serialization
         /// Orleans type allow-list.
         /// </summary>
         /// <param name="typeConverter">The type converter used to resolve and validate types against the allow-list.</param>
-        /// <param name="typeResolver">The type resolver used to resolve types when the allow-list is disabled.</param>
+        /// <param name="typeResolver">The ordinary lookup resolver retained for signature compatibility.</param>
         /// <param name="allowAllTypes">
-        /// When <see langword="true"/>, restores the legacy behavior of allowing any resolvable type to be constructed
-        /// during deserialization, bypassing the type allow-list. This is insecure and is not recommended.
+        /// When <see langword="true"/>, bypasses authorization for host-established type identities.
+        /// Prefer individual type grants for less-trusted input.
         /// </param>
         public OrleansJsonSerializationBinder(TypeConverter typeConverter, TypeResolver typeResolver, bool allowAllTypes = false)
         {
             _typeConverter = typeConverter;
-            _typeResolver = typeResolver;
             _allowAllTypes = allowAllTypes;
         }
 
@@ -53,31 +50,20 @@ namespace Orleans.Serialization
         {
             var fullName = !string.IsNullOrWhiteSpace(assemblyName) ? typeName + ',' + assemblyName : typeName;
 
-            if (_allowAllTypes || _typeConverter is null)
+            if (_typeConverter is null)
             {
-                // Legacy, permissive behavior: resolve any type without consulting the allow-list.
-                if (_typeResolver is not null && _typeResolver.TryResolveType(fullName, out var resolvedType))
-                {
-                    return resolvedType;
-                }
-
-                return base.BindToType(assemblyName, typeName);
+                throw new JsonSerializationException("Configure OrleansJsonSerializationBinder with a TypeConverter to bind host-registered wire types.");
             }
 
-            // Enforce the Orleans type allow-list. TypeConverter.TryParse throws for types which are explicitly
-            // disallowed and only resolves types which are permitted by the configured filters and allowed-type
-            // configuration.
             try
             {
-                if (_typeConverter.TryParseForDeserialization(fullName, out var type))
+                if (_typeConverter.TryParseForDeserialization(fullName, out var type, allowAllTypes: _allowAllTypes))
                 {
                     return type;
                 }
             }
             catch (InvalidOperationException exception)
             {
-                // TypeConverter throws InvalidOperationException when the type is resolvable but not permitted by
-                // the allow-list. Surface a JSON-specific error which also mentions the opt-out.
                 throw new JsonSerializationException(BuildNotAllowedMessage(fullName), exception);
             }
 
@@ -88,6 +74,6 @@ namespace Orleans.Serialization
             $"Unable to resolve type \"{fullName}\". The type could not be found or is not permitted by the configured type allow-list. " +
             $"To allow it, mark the type with [GenerateSerializer], call {nameof(Configuration.TypeManifestOptions)}.{nameof(Configuration.TypeManifestOptions.AddAllowedType)}, " +
             $"call {nameof(Configuration.TypeManifestOptions)}.{nameof(Configuration.TypeManifestOptions.AddAllowedAssembly)}, add its Orleans-formatted name to {nameof(Configuration.TypeManifestOptions)}.{nameof(Configuration.TypeManifestOptions.AllowedTypes)}, " +
-            $"or register an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} which allows it. Setting {nameof(OrleansJsonSerializerOptions)}.{nameof(OrleansJsonSerializerOptions.AllowAllTypes)} to true restores the previous behavior but is insecure when serialized input can be influenced by an untrusted party.";
+            $"or register its Type identity and an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} which allows it.";
     }
 }

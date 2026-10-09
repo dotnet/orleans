@@ -14,6 +14,23 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed class StringCodec : IFieldCodec<string>
     {
+        internal static readonly Encoding TypeNameEncoding = new UTF8Encoding(false, true);
+
+        [return: System.Diagnostics.CodeAnalysis.MaybeNull]
+        internal static string ReadTypeName<TInput>(ref Reader<TInput> reader, Field field)
+        {
+            if (field.WireType == WireType.Reference) return ReadValue(ref reader, field);
+            field.EnsureWireType(WireType.LengthPrefixed);
+            var length = reader.ReadVarUInt32();
+            if (length > int.MaxValue) ThrowInvalidSizeException(length);
+            reader.EnsureAvailable(length);
+            var value = reader.TryReadBytes((int)length, out var bytes)
+                ? TypeNameEncoding.GetString(bytes)
+                : TypeNameEncoding.GetString(reader.ReadBytes(length));
+            ReferenceCodec.RecordObject(reader.Session, value);
+            return value;
+        }
+
         /// <inheritdoc />
         [return: System.Diagnostics.CodeAnalysis.MaybeNull]
         string IFieldCodec<string>.ReadValue<TInput>(ref Reader<TInput> reader, Field field) => ReadValue(ref reader, field);

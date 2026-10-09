@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 
 namespace Orleans.Serialization.TypeSystem
 {
@@ -31,6 +32,11 @@ namespace Orleans.Serialization.TypeSystem
         {
             _typeConverter = typeConverter;
             _getTypeKey = type => new TypeKey(Encoding.UTF8.GetBytes(_typeConverter.Format(type)));
+        }
+
+        internal void ValidateType(Type? type)
+        {
+            if (type is not null) _typeConverter.AuthorizeForDeserialization(type);
         }
 
         /// <summary>
@@ -106,7 +112,7 @@ namespace Orleans.Serialization.TypeSystem
             string typeNameString;
             fixed (byte* typeNameBytes = typeName)
             {
-                typeNameString = Encoding.UTF8.GetString(typeNameBytes, typeName.Length);
+                typeNameString = StringCodec.TypeNameEncoding.GetString(typeNameBytes, typeName.Length);
             }
 
             Type? type = null;
@@ -142,7 +148,7 @@ namespace Orleans.Serialization.TypeSystem
             string typeNameString;
             fixed (byte* typeNameBytes = typeName)
             {
-                typeNameString = Encoding.UTF8.GetString(typeNameBytes, typeName.Length);
+                typeNameString = StringCodec.TypeNameEncoding.GetString(typeNameBytes, typeName.Length);
             }
 
             var type = _typeConverter.ParseForDeserialization(typeNameString);
@@ -172,7 +178,7 @@ namespace Orleans.Serialization.TypeSystem
             string typeNameString;
             fixed (byte* typeNameBytes = typeName)
             {
-                typeNameString = Encoding.UTF8.GetString(typeNameBytes, count);
+                typeNameString = StringCodec.TypeNameEncoding.GetString(typeNameBytes, count);
             }
 
             _ = _typeConverter.TryParseForDeserialization(typeNameString, out type);

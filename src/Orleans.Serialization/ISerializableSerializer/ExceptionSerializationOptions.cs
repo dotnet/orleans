@@ -42,7 +42,7 @@ namespace Orleans.Serialization
         };
 
         /// <summary>
-        /// Admits a reviewed exception type for reconstruction using the supplied factory.
+        /// Selects the exception codec and admits a reviewed type for reconstruction using the supplied factory.
         /// </summary>
         /// <typeparam name="TException">The concrete, closed exception type.</typeparam>
         /// <param name="factory">Creates an instance whose base exception properties will be restored.</param>
@@ -77,6 +77,7 @@ namespace Orleans.Serialization
         /// Gets the collection of supported namespace prefixes for the exception serializer.
         /// Any exception type which has a namespace with one of these prefixes will be serialized using the exception serializer.
         /// </summary>
+        /// <remarks>Use <see cref="AddExceptionType{TException}"/> to admit a custom type for reconstruction.</remarks>
         public HashSet<string> SupportedNamespacePrefixes { get; } = new HashSet<string>(StringComparer.Ordinal) { "Microsoft", "System", "Azure" };
 
         /// <summary>
