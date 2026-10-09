@@ -66,6 +66,33 @@ public sealed class SerializerContextTests(ITestOutputHelper output)
     }
 
     [Theory]
+    [InlineData("System.Collections.Generic.IEnumerable<int>")]
+    [InlineData("System.Collections.Generic.IReadOnlyCollection<int>")]
+    [InlineData("System.Collections.Generic.IReadOnlyList<int>")]
+    [InlineData("System.Collections.Generic.ICollection<int>")]
+    [InlineData("System.Collections.Generic.IList<int>")]
+    [InlineData("System.Collections.Generic.ISet<int>")]
+    [InlineData("System.Collections.Generic.IReadOnlySet<int>")]
+    [InlineData("System.Collections.Generic.IDictionary<string, int>")]
+    [InlineData("System.Collections.Generic.IReadOnlyDictionary<string, int>")]
+    public void InterfaceCollectionRootsAndMembersReportSupportedBoundary(string interfaceType)
+    {
+        foreach (var root in new[] { interfaceType, "Payload" })
+        {
+            var (_, result) = Generate($$"""
+                [Orleans.GenerateSerializer]
+                public sealed class Payload { [Orleans.Id(0)] public {{interfaceType}} Values { get; set; } }
+                [Orleans.GenerateSerializerContext<{{root}}>]
+                public partial class DemoContext : Orleans.Serialization.SerializerContext { }
+                """);
+            var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Id == "ORLEANS0115");
+            Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+            Assert.Contains(interfaceType, diagnostic.GetMessage(), StringComparison.Ordinal);
+            Assert.Contains("List<T>, Dictionary<TKey, TValue>, Nullable<T>, or T[]", diagnostic.GetMessage(), StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
     [InlineData("System.Collections.Generic.List<>", "DemoContext", "CS7003")]
     [InlineData("T", "DemoContext<T>", "CS8968")]
     [InlineData("System.Collections.Generic.List<T>", "DemoContext<T>", "CS8968")]

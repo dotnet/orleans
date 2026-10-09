@@ -127,60 +127,20 @@ internal static class InterfaceCollectionCodecHelpers
         }
 
         var genericTypeDefinition = type.GetGenericTypeDefinition();
-        var arguments = type.GetGenericArguments();
-        if (genericTypeDefinition == typeof(EnumerableCodec<>))
-        {
-            interfaceType = typeof(IEnumerable<>).MakeGenericType(arguments);
-            return true;
-        }
-
-        if (genericTypeDefinition == typeof(ReadOnlyCollectionInterfaceCodec<>))
-        {
-            interfaceType = typeof(IReadOnlyCollection<>).MakeGenericType(arguments);
-            return true;
-        }
-
-        if (genericTypeDefinition == typeof(ReadOnlyListInterfaceCodec<>))
-        {
-            interfaceType = typeof(IReadOnlyList<>).MakeGenericType(arguments);
-            return true;
-        }
-
-        if (genericTypeDefinition == typeof(CollectionInterfaceCodec<>))
-        {
-            interfaceType = typeof(ICollection<>).MakeGenericType(arguments);
-            return true;
-        }
-
-        if (genericTypeDefinition == typeof(ListInterfaceCodec<>))
-        {
-            interfaceType = typeof(IList<>).MakeGenericType(arguments);
-            return true;
-        }
-
-        if (genericTypeDefinition == typeof(SetInterfaceCodec<>))
-        {
-            interfaceType = typeof(ISet<>).MakeGenericType(arguments);
-            return true;
-        }
-
+        if (genericTypeDefinition == typeof(EnumerableCodec<>)
+            || genericTypeDefinition == typeof(ReadOnlyCollectionInterfaceCodec<>)
+            || genericTypeDefinition == typeof(ReadOnlyListInterfaceCodec<>)
+            || genericTypeDefinition == typeof(CollectionInterfaceCodec<>)
+            || genericTypeDefinition == typeof(ListInterfaceCodec<>)
+            || genericTypeDefinition == typeof(SetInterfaceCodec<>)
 #if NET5_0_OR_GREATER
-        if (genericTypeDefinition == typeof(ReadOnlySetInterfaceCodec<>))
-        {
-            interfaceType = typeof(IReadOnlySet<>).MakeGenericType(arguments);
-            return true;
-        }
+            || genericTypeDefinition == typeof(ReadOnlySetInterfaceCodec<>)
 #endif
-
-        if (genericTypeDefinition == typeof(DictionaryInterfaceCodec<,>))
+            || genericTypeDefinition == typeof(DictionaryInterfaceCodec<,>)
+            || genericTypeDefinition == typeof(ReadOnlyDictionaryInterfaceCodec<,>))
         {
-            interfaceType = typeof(IDictionary<,>).MakeGenericType(arguments);
-            return true;
-        }
-
-        if (genericTypeDefinition == typeof(ReadOnlyDictionaryInterfaceCodec<,>))
-        {
-            interfaceType = typeof(IReadOnlyDictionary<,>).MakeGenericType(arguments);
+            // Each recognized codec inherits a base whose first argument is its closed collection interface.
+            interfaceType = type.BaseType!.GetGenericArguments()[0];
             return true;
         }
 
