@@ -6,7 +6,7 @@ namespace Orleans.DurableMessaging.Tests.Support;
 
 public sealed class DurableMessagingMetricProbe : IDisposable
 {
-    private readonly ConcurrentDictionary<(string Instrument, string JobName), long> _measurements = [];
+    private readonly ConcurrentDictionary<(string Instrument, string TagValue), long> _measurements = [];
     private readonly ConcurrentDictionary<string, long> _gauges = [];
     private readonly object _lock = new();
     private TaskCompletionSource _changed = CreateSignal();
@@ -20,6 +20,7 @@ public sealed class DurableMessagingMetricProbe : IDisposable
             {
                 if (instrument.Meter.Name == "Microsoft.Orleans"
                     && instrument.Name is "orleans-durable-messaging-orphaned-jobs-reclaimed"
+                        or "orleans-durable-messaging-inbox-messages-processed"
                         or "orleans-durablejobs-job-attempts-started"
                         or "orleans-durablejobs-handler-executions-started"
                         or "orleans-durablejobs-jobs-completed"
@@ -35,8 +36,8 @@ public sealed class DurableMessagingMetricProbe : IDisposable
         _listener.Start();
     }
 
-    public long GetCount(string instrument, string jobName = "") =>
-        _measurements.TryGetValue((instrument, jobName), out var count) ? count : 0;
+    public long GetCount(string instrument, string tagValue = "") =>
+        _measurements.TryGetValue((instrument, tagValue), out var count) ? count : 0;
 
     public long GetDepth(string instrument)
     {
@@ -47,27 +48,27 @@ public sealed class DurableMessagingMetricProbe : IDisposable
     public Task WaitForCountAsync(
         string instrument,
         long expected,
-        string jobName = "") =>
+        string tagValue = "") =>
         WaitForCountWithCancellationAsync(
             instrument,
             expected,
-            jobName,
+            tagValue,
             TestContext.Current.CancellationToken);
 
     public async Task WaitForCountWithCancellationAsync(
         string instrument,
         long expected,
-        string jobName,
+        string tagValue,
         CancellationToken cancellationToken)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        while (GetCount(instrument, jobName) < expected)
+        while (GetCount(instrument, tagValue) < expected)
         {
             Task changed;
             lock (_lock)
             {
-                if (GetCount(instrument, jobName) >= expected)
+                if (GetCount(instrument, tagValue) >= expected)
                 {
                     return;
                 }
@@ -93,18 +94,19 @@ public sealed class DurableMessagingMetricProbe : IDisposable
             return;
         }
 
-        var jobName = "";
+        var tagValue = "";
+        var tagName = instrument.Name == "orleans-durable-messaging-inbox-messages-processed" ? "status" : "job_name";
         foreach (var tag in tags)
         {
-            if (tag.Key == "job_name")
+            if (tag.Key == tagName)
             {
-                jobName = tag.Value as string ?? "";
+                tagValue = tag.Value as string ?? "";
                 break;
             }
         }
 
         _measurements.AddOrUpdate(
-            (instrument.Name, jobName),
+            (instrument.Name, tagValue),
             measurement,
             (_, current) => current + measurement);
         lock (_lock)
