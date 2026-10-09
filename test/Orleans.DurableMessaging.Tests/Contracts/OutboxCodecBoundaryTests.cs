@@ -439,9 +439,15 @@ public sealed class OutboxCodecBoundaryTests
     {
         await using var seed = await CodecFixture.CreateAsync();
         var journal = new JournalId($"standard-cohort/{Guid.NewGuid():N}");
-        using (var seedEnvelope = seed.CreateEnvelope()) await seed.SeedOwnerlessJournalAsync(journal, seedEnvelope);
+        var recoveredCommand = HierarchicalKey.Create("test", "owner-repair", "command", "recovered");
+        var arrivingCommand = HierarchicalKey.Create("test", "owner-repair", "command", "arriving");
+        using (var seedEnvelope = seed.CreateEnvelope(recoveredCommand)) await seed.SeedOwnerlessJournalAsync(journal, seedEnvelope);
         await using var fixture = await CodecFixture.CreateAsync(seed.Storage, journal);
-        using (var newEnvelope = fixture.CreateEnvelope()) await fixture.SendAsync(newEnvelope);
+        using (var newEnvelope = fixture.CreateEnvelope(arrivingCommand)) await fixture.SendAsync(newEnvelope);
+        Assert.NotEqual(recoveredCommand, arrivingCommand);
+        Assert.Equal(2, fixture.Outbox.Count);
+        Assert.True(fixture.Outbox.TryGetMessage(recoveredCommand, out _));
+        Assert.True(fixture.Outbox.TryGetMessage(arrivingCommand, out _));
         var writes = fixture.Storage.GetSuccessfulWriteCount(journal);
         using var storage = fixture.Storage.BlockWrite(journal);
         var first = fixture.WriteAsync(TestContext.Current.CancellationToken).AsTask();
@@ -676,7 +682,8 @@ public sealed class OutboxCodecBoundaryTests
             Assert.Equal(fixture.Job.Value!.Id, recovered.Job.Value!.Id);
             Assert.Equal(fixture.Job.Value.ShardId, recovered.Job.Value.ShardId);
         }
-        Assert.Single(fixture.Receiver.ReceivedCalls());
+        var delivered = Assert.Single(fixture.Receiver.ReceivedCalls());
+        Assert.Equal(command, ((DurableEnvelope)delivered.GetArguments()[0]!).MessageId);
         Assert.Null(fixture.States.Failure);
     });
 
