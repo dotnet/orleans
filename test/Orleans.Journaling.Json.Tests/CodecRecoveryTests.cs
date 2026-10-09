@@ -271,7 +271,8 @@ public class CodecRecoveryTests : JournalingTestBase
 
         Assert.Equal("Nonempty journal data requires stored journal format metadata.", exception.Message);
         Assert.Empty(recoveredDict);
-        Assert.False(recoveredDict.HasPendingChanges);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            recovered.Manager.WriteStateAsync(CancellationToken.None).AsTask());
         Assert.Equal(JsonLinesJournalFormat.JournalFormatKey, storage.StoredJournalFormatKey);
         Assert.Equal(before, Assert.Single(storage.Segments));
     }
