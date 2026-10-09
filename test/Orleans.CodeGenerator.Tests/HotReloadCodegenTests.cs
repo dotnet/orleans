@@ -477,14 +477,24 @@ public class HotReloadCodegenTests
     private static async Task<(int ExitCode, string Output, string Error)> RunHotReloadTestInEnabledProcess()
     {
         var assemblyPath = Assembly.GetExecutingAssembly().Location;
-        var startInfo = new ProcessStartInfo("dotnet")
+        // Reuse the parent's host so the child retains its runtime selection.
+        var startInfo = new ProcessStartInfo(Environment.ProcessPath!)
         {
-            Arguments = $"\"{assemblyPath}\" --filter-method \"*ExistingCopierCopiesAddedMemberWhoseTypeIsAddedByMetadataUpdate*\" --minimum-expected-tests 1",
+            ArgumentList =
+            {
+                "--filter-method", "*ExistingCopierCopiesAddedMemberWhoseTypeIsAddedByMetadataUpdate*",
+                "--minimum-expected-tests", "1",
+            },
             WorkingDirectory = Path.GetDirectoryName(assemblyPath)!,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
         };
+        if (string.Equals(Path.GetFileNameWithoutExtension(startInfo.FileName), "dotnet", StringComparison.OrdinalIgnoreCase))
+        {
+            startInfo.ArgumentList.Insert(0, assemblyPath);
+        }
+
         startInfo.Environment["DOTNET_MODIFIABLE_ASSEMBLIES"] = "debug";
         startInfo.Environment[HotReloadTestChild] = "1";
 
