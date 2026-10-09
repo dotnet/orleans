@@ -76,6 +76,31 @@ namespace Orleans.DurableMessaging
         public readonly DurableEnvelope Retain() { throw null; }
     }
 
+    public sealed partial class DurableInboxDispatcher : IInboxHandler
+    {
+        public System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public DurableInboxDispatcher Register<T>(DurableMessageType<T> messageType, System.Func<T, IInboxHandlerContext, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> handler) { throw null; }
+    }
+
+    public sealed partial class DurableMessageType<T>
+    {
+        public DurableMessageType(string subject, Serialization.Serializer<T> serializer) { }
+
+        public string Subject { get { throw null; } }
+
+        public T Decode(DurableEnvelope envelope) { throw null; }
+    }
+
+    public sealed partial class DurableMessageWriter : System.IDisposable
+    {
+        public DurableMessageWriter(Runtime.IGrainContext context) { }
+
+        public DurableEnvelope Create<T>(DurableMessageType<T> messageType, HierarchicalKey messageId, Runtime.GrainId receiverId, T body) { throw null; }
+
+        public void Dispose() { }
+    }
+
     [Immutable]
     [Alias("Orleans.DurableMessaging.HierarchicalKey")]
     public readonly partial struct HierarchicalKey : System.ISpanFormattable, System.IFormattable, System.IEquatable<HierarchicalKey>, System.IParsable<HierarchicalKey>, System.ISpanParsable<HierarchicalKey>
@@ -167,8 +192,8 @@ namespace Orleans.DurableMessaging
 
         System.Collections.Generic.IReadOnlyList<DurableDeadLetter> OutboxDeadLetters { get; }
 
-        bool RemoveInboxDeadLetter(Runtime.GrainId senderId, System.Guid messageId);
-        bool RemoveOutboxDeadLetter(System.Guid messageId);
+        bool RemoveInboxDeadLetter(HierarchicalKey messageId);
+        bool RemoveOutboxDeadLetter(HierarchicalKey messageId);
     }
 
     public partial interface IDurableMessagingGrain
@@ -230,6 +255,11 @@ namespace Orleans.DurableMessaging.Configuration
 
 namespace Orleans.Hosting
 {
+    public static partial class DurableMessageTypeExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDurableMessageType<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string subject) { throw null; }
+    }
+
     public static partial class DurableMessagingExtensions
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddDurableMessaging(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<DurableMessaging.Configuration.DurableInboxOptions>? configureOptions = null) { throw null; }
