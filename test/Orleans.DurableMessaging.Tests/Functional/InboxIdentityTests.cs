@@ -291,6 +291,28 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
     }
 
     [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task MissingSubject_RejectsBeforeSchedulingOrRetainingPayload(string? subject)
+    {
+        var rig = await CreateAsync();
+        using var handler = rig.Handler;
+        var key = HierarchicalKey.Create("tenant", "invalid-subject", "command");
+        using var envelope = Create(rig, key, "valid.subject.v1", "missing-subject");
+        var invalid = envelope with { Subject = subject! };
+        var writes = Writes(rig);
+        var pins = Pins(envelope.Payload.First);
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => DeliverOnTurnAsync(rig, invalid));
+        Assert.Equal(writes, Writes(rig));
+        Assert.Equal(pins, Pins(envelope.Payload.First));
+        Assert.Equal(0, Fixture.JobManagerProbe.GetAttemptCount(ReceiverTestServices.InboxJobName, rig.Context.GrainId));
+        Assert.Empty(rig.Pending);
+        Assert.Empty(rig.Processed);
+        Assert.False(handler.Entered.Task.IsCompleted);
+        Assert.False(rig.Grain.DeactivationFailure.Task.IsCompleted);
+    }
+
+    [Theory]
     [InlineData("key-bytes")]
     [InlineData("key-utf8")]
     [InlineData("key-depth")]
@@ -335,6 +357,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
     [InlineData("key-depth")]
     [InlineData("subject-bytes")]
     [InlineData("subject-utf8")]
+    [InlineData("subject-space")]
     public async Task MetadataAtExactDefaultLimit_IsAccepted(string field)
     {
         var rig = await CreateAsync();
@@ -351,6 +374,7 @@ public sealed class InboxIdentityTests : DurableMessagingBehaviorTestBase
         {
             "subject-bytes" => new string('x', 256),
             "subject-utf8" => new string('\u00e9', 128),
+            "subject-space" => " ",
             _ => "inventory.reserve.v1"
         };
         using var envelope = Create(rig, key, subject, "maximum");

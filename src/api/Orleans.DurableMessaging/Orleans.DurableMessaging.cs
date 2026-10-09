@@ -167,8 +167,8 @@ namespace Orleans.DurableMessaging
 
         System.Collections.Generic.IReadOnlyList<DurableDeadLetter> OutboxDeadLetters { get; }
 
-        bool RemoveInboxDeadLetter(Runtime.GrainId senderId, System.Guid messageId);
-        bool RemoveOutboxDeadLetter(System.Guid messageId);
+        bool RemoveInboxDeadLetter(HierarchicalKey messageId);
+        bool RemoveOutboxDeadLetter(HierarchicalKey messageId);
     }
 
     public partial interface IDurableMessagingGrain
