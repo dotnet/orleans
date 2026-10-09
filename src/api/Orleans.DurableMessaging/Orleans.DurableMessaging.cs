@@ -83,6 +83,11 @@ namespace Orleans.DurableMessaging
         public DurableInboxDispatcher Register<T>(DurableMessageType<T> messageType, System.Func<T, IInboxHandlerContext, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> handler) { throw null; }
     }
 
+    public static partial class DurableInboxExtensions
+    {
+        public static void RegisterHandlers(this IDurableInbox inbox, System.Action<DurableInboxDispatcher> configure) { }
+    }
+
     public sealed partial class DurableMessageType<T>
     {
         public DurableMessageType(string subject, Serialization.Serializer<T> serializer) { }
