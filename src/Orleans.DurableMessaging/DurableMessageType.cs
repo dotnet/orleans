@@ -32,8 +32,8 @@ public sealed class DurableMessageType<T>
 
     /// <summary>Decodes a borrowed envelope using this subject's payload contract.</summary>
     /// <param name="envelope">The envelope, kept alive through decoding.</param>
-    /// <returns>The decoded payload.</returns>
-    /// <exception cref="ArgumentException">The envelope has a different subject.</exception>
+    /// <returns>The nonnull decoded payload.</returns>
+    /// <exception cref="ArgumentException">The envelope has a different subject or a serialized null payload.</exception>
     public T Decode(DurableEnvelope envelope)
     {
         if (!string.Equals(Subject, envelope.Subject, StringComparison.Ordinal))

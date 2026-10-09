@@ -115,8 +115,8 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
     public async Task CaptureProbeSnapshot_RemainsStableAcrossLaterWrites()
     {
         var receiver = NewGrain();
-        var first = new DurableEffect(Guid.NewGuid(), 1, 1, "first");
-        var second = new DurableEffect(Guid.NewGuid(), 1, 2, "second");
+        var first = new DurableEffect(HierarchicalKey.Create("capture", "first"), 1, 1, "first");
+        var second = new DurableEffect(HierarchicalKey.Create("capture", "second"), 1, 2, "second");
         await receiver.StageEffectAsync(first);
         await receiver.RetryWriteStateAsync();
         var grain = Assert.IsType<DurableMessagingTestGrain>(Fixture.GetGrainContext(receiver).GrainInstance);
@@ -146,7 +146,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
     {
         var receiver = NewGrain();
         var sink = NewGrain();
-        var logicalId = Guid.NewGuid();
+        var logicalId = HierarchicalKey.Create("atomic", Guid.NewGuid().ToString("N"));
         using var envelope = CreateEnvelope(
             receiver,
             new DurableTestMessage(logicalId, 7, "atomic", sink.GetGrainId()));
@@ -176,7 +176,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         var sink = NewGrain();
         using var envelope = CreateEnvelope(
             receiver,
-            new DurableTestMessage(Guid.NewGuid(), 9, "preparation-failure", sink.GetGrainId(), ThrowDuringPreparation: true));
+            new DurableTestMessage(HierarchicalKey.Create("preparation", "failure"), 9, "preparation-failure", sink.GetGrainId(), ThrowDuringPreparation: true));
 
         var accepted = await DeliverAsync(receiver, envelope.Value);
         var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
@@ -202,7 +202,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/admitted-outgoing");
         using var envelope = CreateEnvelope(receiver,
-            new DurableTestMessage(Guid.NewGuid(), 91, "admitted", sink.GetGrainId()), "messages/admitted-outgoing");
+            new DurableTestMessage(HierarchicalKey.Create("preparation", "admitted"), 91, "admitted", sink.GetGrainId()), "messages/admitted-outgoing");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();
         var localPreparation = grain.GetSnapshotForTest();
@@ -281,7 +281,7 @@ public sealed class PublicInboxHandlerTransactionTests : DurableMessagingBehavio
         var oldContext = Fixture.GetGrainContext(receiver);
         var oldGrain = Assert.IsType<DurableMessagingTestGrain>(oldContext.GrainInstance);
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/completion-outcome");
-        var message = new DurableTestMessage(Guid.NewGuid(), 92, "completion-outcome", sink.GetGrainId());
+        var message = new DurableTestMessage(HierarchicalKey.Create("completion", "outcome"), 92, "completion-outcome", sink.GetGrainId());
         using var envelope = CreateEnvelope(receiver, message, "messages/completion-outcome");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope.Value)).Status);
         await handler.WaitUntilEnteredAsync();

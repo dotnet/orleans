@@ -61,7 +61,7 @@ public sealed class MessagingProviderCutoverTests
         var sender = cluster.Client.GetGrain<INamedFactoryMessagingGrain>(Guid.NewGuid());
         var receiver = cluster.Client.GetGrain<INamedFactoryMessagingGrain>(Guid.NewGuid());
         var sink = cluster.Client.GetGrain<INamedFactoryMessagingGrain>(Guid.NewGuid());
-        var logicalId = Guid.NewGuid();
+        var logicalId = HierarchicalKey.Create("cutover", Guid.NewGuid().ToString("N"));
         var receivedTask = snapshots.WaitAsync(receiver.GetGrainId(), Token);
         var forwardedTask = snapshots.WaitAsync(sink.GetGrainId(), Token);
         await sender.SendAsync(receiver.GetGrainId(), "messages/record", new DurableTestMessage(logicalId, 1, "composite", sink.GetGrainId()));

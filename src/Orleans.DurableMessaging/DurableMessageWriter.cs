@@ -39,6 +39,10 @@ public sealed class DurableMessageWriter : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(messageType);
+        if (body is null)
+        {
+            throw new ArgumentNullException(nameof(body));
+        }
         var envelope = new DurableEnvelope
         {
             MessageId = messageId,
