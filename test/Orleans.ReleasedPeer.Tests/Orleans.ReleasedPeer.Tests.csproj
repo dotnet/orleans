@@ -1,14 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="..\..\src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="..\ReleasedPeer\Contracts\ReleasedPeer.Contracts.csproj" />
-    <ProjectReference Include="..\ReleasedPeer\V103\ReleasedPeer.V103.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\ReleasedPeer\V104\ReleasedPeer.V104.csproj" ReferenceOutputAssembly="false" />
+    <!-- Build-only net10.0 helper processes serve both test-host frameworks. -->
+    <ProjectReference Include="..\ReleasedPeer\V103\ReleasedPeer.V103.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" SetTargetFramework="TargetFramework=net10.0" GlobalPropertiesToRemove="TargetFramework" />
+    <ProjectReference Include="..\ReleasedPeer\V104\ReleasedPeer.V104.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" SetTargetFramework="TargetFramework=net10.0" GlobalPropertiesToRemove="TargetFramework" />
     <Compile Include="..\ReleasedPeer\Shared\ProbeGrain.cs" Link="ProbeGrain.cs" />
     <Compile Include="..\ReleasedPeer\Shared\RuntimeProbe.cs" Link="RuntimeProbe.cs" />
   </ItemGroup>

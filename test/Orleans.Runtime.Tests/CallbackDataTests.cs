@@ -748,15 +748,15 @@ public class CallbackDataTests
     }
 
     private static Message CreateRequest() => new()
-        {
-            Direction = Message.Directions.Request,
-            TargetGrain = GrainId.Create("test", "target"),
-            TargetSilo = SiloAddress.New(IPAddress.Loopback, 30000, 1),
-            SendingGrain = GrainId.Create("test", "caller"),
-            Id = new CorrelationId(123),
-            BodyObject = "original payload",
-            TimeToLive = TimeSpan.FromMinutes(1),
-        };
+    {
+        Direction = Message.Directions.Request,
+        TargetGrain = GrainId.Create("test", "target"),
+        TargetSilo = SiloAddress.New(IPAddress.Loopback, 30000, 1),
+        SendingGrain = GrainId.Create("test", "caller"),
+        Id = new CorrelationId(123),
+        BodyObject = "original payload",
+        TimeToLive = TimeSpan.FromMinutes(1),
+    };
 
     private static ApplicationRequestInstruments CreateInstruments(IServiceProvider serviceProvider) =>
         new(new OrleansInstruments(serviceProvider.GetRequiredService<IMeterFactory>()));

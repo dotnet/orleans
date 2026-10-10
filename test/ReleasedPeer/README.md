@@ -31,8 +31,9 @@ kept package-only; documentation project policy applies only to the docs/samples
 trees and needs no exception for these test projects. The modern project references build
 both helpers without importing their runtime assemblies into the test process;
 an after-build target copies each complete, separate dependency directory.
-Qualification intentionally runs on net10.0; the portable contract targets
-net8.0.
+The current-source test host targets both net8.0 and net10.0, matching CI's
+framework partitions. Released helper processes run on net10.0 and the portable
+contract targets net8.0.
 
 ## Scenarios
 

@@ -42,6 +42,12 @@ namespace Orleans.Runtime.Messaging
 
         internal void BeginRetirement() => Volatile.Write(ref _retirementStarted, 1);
 
+        internal bool TryAdmitApplicationSend(out AdmissionGate.Admission admission)
+        {
+            admission = _outboundApplicationWork.TryEnter();
+            return admission.Entered;
+        }
+
         internal void RecordRetirementSendFailure(Message message)
         {
             if (Volatile.Read(ref _retirementStarted) != 0 && message.RequiresApplicationDrain)
@@ -118,7 +124,28 @@ namespace Orleans.Runtime.Messaging
         public bool TryDeliverToProxy(Message msg)
         {
             if (!msg.TargetGrain.IsClient()) return false;
-            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg)
+            var admission = msg.RequiresApplicationDrain ? _outboundApplicationWork.TryEnter() : default;
+            try
+            {
+                if (msg.RequiresApplicationDrain && !admission.Entered)
+                {
+                    messagingTrace.OnDropBlockedApplicationMessage(msg);
+                    msg.Dispose();
+                    return true;
+                }
+
+                return TryDeliverToProxy(msg, ref admission);
+            }
+            finally
+            {
+                admission.Dispose();
+            }
+        }
+
+        private bool TryDeliverToProxy(Message msg, ref AdmissionGate.Admission admission)
+        {
+            if (!msg.TargetGrain.IsClient()) return false;
+            if (this.Gateway is Gateway gateway && gateway.TryDeliverToProxy(msg, ref admission)
                 || this.hostedClient is HostedClient client && client.TryDispatchToClient(msg))
             {
                 _messageObserver?.Invoke(msg);
@@ -184,7 +211,17 @@ namespace Orleans.Runtime.Messaging
 
         public void SendMessage(Message msg)
         {
-            var admission = msg.RequiresApplicationDrain ? _outboundApplicationWork.TryEnter() : default;
+            AdmissionGate.Admission admission = default;
+            SendMessage(msg, ref admission);
+        }
+
+        internal void SendMessage(Message msg, ref AdmissionGate.Admission admission)
+        {
+            if (msg.RequiresApplicationDrain && !admission.Entered)
+            {
+                admission = _outboundApplicationWork.TryEnter();
+            }
+
             if (msg.RequiresApplicationDrain && !admission.Entered)
             {
                 this.messagingTrace.OnDropBlockedApplicationMessage(msg);
@@ -199,6 +236,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 admission.Dispose();
+                admission = default;
             }
         }
 
@@ -250,7 +288,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 // First check to see if it's really destined for a proxied client, instead of a local grain.
-                if (TryDeliverToProxy(msg))
+                if (TryDeliverToProxy(msg, ref admission))
                 {
                     // Message was successfully delivered to the proxy.
                     return;
@@ -275,7 +313,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (this.connectionManager.TryGetConnection(targetSilo, out var existingConnection))
                     {
-                        existingConnection.Send(msg);
+                        existingConnection.Send(msg, ref admission);
                         return;
                     }
                     else if (this.siloStatusOracle.IsDeadSilo(targetSilo))
@@ -299,7 +337,7 @@ namespace Orleans.Runtime.Messaging
                         if (connectionTask.IsCompletedSuccessfully)
                         {
                             var sender = connectionTask.Result;
-                            sender.Send(msg);
+                            sender.Send(msg, ref admission);
                         }
                         else
                         {
@@ -309,16 +347,19 @@ namespace Orleans.Runtime.Messaging
 
                             static async Task SendAsync(MessageCenter messageCenter, ValueTask<Connection> connectionTask, Message msg, AdmissionGate.Admission admission)
                             {
-                                using var _ = admission;
                                 try
                                 {
                                     var sender = await connectionTask;
-                                    sender.Send(msg);
+                                    sender.Send(msg, ref admission);
                                 }
 
                                 catch (Exception exception)
                                 {
                                     messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, $"Exception while sending message: {exception}");
+                                }
+                                finally
+                                {
+                                    admission.Dispose();
                                 }
                             }
                         }

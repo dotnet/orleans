@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Connections;
 using Orleans.Connections.Transport;
 using Orleans.Connections.Transport.Streams;
@@ -993,6 +994,50 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
+    public async Task RetirementDrain_WaitsForQueuedFrameAfterConnectionCloses()
+    {
+        using var services = CreateServiceProvider();
+        using var shared = CreateMessageHandlerShared(services);
+        using var serializer = services.GetRequiredService<MessageSerializer>();
+        await using var transport = new TrackingTransport();
+        var connection = new RecordingReceiveConnection(transport, CreateConnectionCommon(services, shared), shared.MessageCenter);
+        using var message = new Message
+        {
+            Direction = Message.Directions.Request,
+            TargetGrain = GrainId.Create("test", "target"),
+            Id = new CorrelationId(173),
+            BodyObject = "admitted frame",
+        };
+        using var frame = new ArcBufferWriter();
+        frame.AdvanceWriter(Message.LENGTH_HEADER_SIZE);
+        var (headerLength, bodyLength) = serializer.Write(frame, message);
+        var framing = new byte[Message.LENGTH_HEADER_SIZE];
+        BinaryPrimitives.WriteInt32LittleEndian(framing.AsSpan(), headerLength);
+        BinaryPrimitives.WriteInt32LittleEndian(framing.AsSpan(sizeof(int)), bodyLength);
+        frame.WriteAt(0, framing);
+        var poolLock = typeof(MessageHandlerShared).GetField("_poolLock", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(shared)!;
+        Task close;
+        Task drain;
+        // Hold serializer acquisition on the queued decoder, while OnRead can rent
+        // and return its frame validator under the same reentrant lock.
+        lock (poolLock)
+        {
+            var read = shared.GetReceiveMessageHandler();
+            read.SetConnection(connection);
+            Assert.True(read.OnRead(new ArcBufferReader(frame)));
+            close = connection.CloseAsync(null);
+            drain = connection.DrainIncomingApplicationDispatchAsync();
+            Assert.False(drain.IsCompleted);
+            Assert.Equal(0, connection.DispatchCount);
+        }
+
+        await Task.WhenAll(close, drain).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        Assert.Equal(1, connection.DispatchCount);
+        Assert.Equal(1, connection.RecordCount);
+        Assert.Equal(message.Id, connection.ReceivedId);
+    }
+
+    [Fact]
     public async Task MessageReadRequest_ClosedDispatchAdmissionDropsOnlyOrdinaryRequests()
     {
         using var services = CreateServiceProvider();
@@ -1003,40 +1048,40 @@ public class MessageTransportLifecycleTests
         await connection.DrainIncomingApplicationDispatchAsync();
 
         foreach (var direction in new[] { Message.Directions.Request, Message.Directions.OneWay, Message.Directions.Response })
-        foreach (var systemMessage in new[] { false, true })
-        {
-            using var message = new Message
+            foreach (var systemMessage in new[] { false, true })
             {
-                Direction = direction,
-                IsSystemMessage = systemMessage,
-                Id = new CorrelationId(123),
-                TargetGrain = GrainId.Create("test", "target"),
-                SendingGrain = GrainId.Create("test", "caller"),
-            };
-            using var buffer = new ArcBufferWriter();
-            var (headerLength, bodyLength) = serializer.Write(buffer, message);
-            Assert.Equal(0, bodyLength);
-            var read = shared.GetReceiveMessageHandler();
-            read.SetConnection(connection);
-            read.Headers = buffer.ConsumeSlice(headerLength);
-            var receivedBefore = connection.DispatchCount;
-            var recordedBefore = connection.RecordCount;
+                using var message = new Message
+                {
+                    Direction = direction,
+                    IsSystemMessage = systemMessage,
+                    Id = new CorrelationId(123),
+                    TargetGrain = GrainId.Create("test", "target"),
+                    SendingGrain = GrainId.Create("test", "caller"),
+                };
+                using var buffer = new ArcBufferWriter();
+                var (headerLength, bodyLength) = serializer.Write(buffer, message);
+                Assert.Equal(0, bodyLength);
+                var read = shared.GetReceiveMessageHandler();
+                read.SetConnection(connection);
+                read.Headers = buffer.ConsumeSlice(headerLength);
+                var receivedBefore = connection.DispatchCount;
+                var recordedBefore = connection.RecordCount;
 
-            ((IThreadPoolWorkItem)read).Execute();
+                ((IThreadPoolWorkItem)read).Execute();
 
-            Assert.Equal(recordedBefore + 1, connection.RecordCount);
-            Assert.Equal(message.Id, connection.RecordedId);
-            Assert.Equal(direction, connection.RecordedDirection);
-            Assert.Equal(systemMessage, connection.RecordedSystemMessage);
-            var dispatched = systemMessage || direction == Message.Directions.Response;
-            Assert.Equal(receivedBefore + (dispatched ? 1 : 0), connection.DispatchCount);
-            if (dispatched) Assert.Equal(message.Id, connection.ReceivedId);
-            var reused = shared.GetReceiveMessageHandler();
-            Assert.Same(read, reused);
-            Assert.Equal(0, reused.Headers.Length);
-            Assert.Equal(0, reused.Body.Length);
-            reused.Reset();
-        }
+                Assert.Equal(recordedBefore + 1, connection.RecordCount);
+                Assert.Equal(message.Id, connection.RecordedId);
+                Assert.Equal(direction, connection.RecordedDirection);
+                Assert.Equal(systemMessage, connection.RecordedSystemMessage);
+                var dispatched = systemMessage || direction == Message.Directions.Response;
+                Assert.Equal(receivedBefore + (dispatched ? 1 : 0), connection.DispatchCount);
+                if (dispatched) Assert.Equal(message.Id, connection.ReceivedId);
+                var reused = shared.GetReceiveMessageHandler();
+                Assert.Same(read, reused);
+                Assert.Equal(0, reused.Headers.Length);
+                Assert.Equal(0, reused.Body.Length);
+                reused.Reset();
+            }
     }
 
     [Theory]
@@ -1124,13 +1169,19 @@ public class MessageTransportLifecycleTests
             TimeToLive = TimeSpan.FromMinutes(1),
         };
         var expiry = message._timeToExpiry.GetRawTimestamp();
-        source.Send(message);
+        var outboundWork = new AdmissionGate();
+        var sendAdmission = outboundWork.TryEnter();
+        source.Send(message, ref sendAdmission);
+        Assert.False(sendAdmission.Entered);
         await source.RetryEntered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        var drain = outboundWork.CloseAsync();
+        Assert.False(drain.IsCompleted);
         Assert.Equal("original payload", message.BodyObject);
         source.Release();
         await replacement.PrepareEntered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         var bytes = await replacementTransport.Writes.Reader.ReadAsync(TestContext.Current.CancellationToken);
         await replacement.DrainAsync().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await drain.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
         Assert.True(bytes.Length > Message.LENGTH_HEADER_SIZE);
         Assert.Equal(new CorrelationId(123), message.Id);
         Assert.Equal(GrainId.Create("test", "target"), message.TargetGrain);
@@ -1714,7 +1765,7 @@ public class MessageTransportLifecycleTests
             return true;
         }
 
-        protected override void RetryMessage(Message msg, Exception? ex = null) => msg.Dispose();
+        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission sendAdmission) => msg.Dispose();
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
         protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
@@ -1737,7 +1788,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) => true;
-        protected override void RetryMessage(Message message, Exception? exception = null) => message.Dispose();
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission) => message.Dispose();
         protected internal override void OnReceivedMessage(Message message)
         {
             ReceivedId = message.Id;
@@ -1767,7 +1818,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) => true;
-        protected override void RetryMessage(Message message, Exception? exception = null) => message.Dispose();
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission) => message.Dispose();
         protected internal override void OnReceivedMessage(Message message)
         {
             DispatchCount++;
@@ -1799,7 +1850,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) => true;
-        protected override void RetryMessage(Message message, Exception? exception = null)
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission)
         {
             _entered.TrySetResult();
             _release.Wait(cancellationToken);
@@ -1821,7 +1872,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) { _prepareEntered.TrySetResult(); return true; }
-        protected override void RetryMessage(Message message, Exception? exception = null) => message.Dispose();
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission) => message.Dispose();
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
         protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) { }
@@ -1839,11 +1890,11 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message message) => true;
-        protected override void RetryMessage(Message message, Exception? exception = null)
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission)
         {
             _retryEntered.TrySetResult();
             _release.Wait(cancellationToken);
-            replacement.Send(message);
+            replacement.Send(message, ref sendAdmission);
         }
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
@@ -1962,7 +2013,7 @@ public class MessageTransportLifecycleTests
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;
         protected override bool PrepareMessageForSend(Message msg) => true;
-        protected override void RetryMessage(Message msg, Exception? ex = null) => Retries.Writer.TryWrite((msg, ex));
+        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission sendAdmission) => Retries.Writer.TryWrite((msg, ex));
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int totalBytes, int headerBytes) { }
         protected internal override void RecordMessageSend(Message message, int totalBytes, int headerBytes) => SentMessageCount++;

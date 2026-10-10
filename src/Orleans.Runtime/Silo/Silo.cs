@@ -401,6 +401,8 @@ namespace Orleans.Runtime
                     }
                 }
 
+                var messagingOptions = this.Services.GetRequiredService<IOptions<SiloMessagingOptions>>().Value;
+                await Task.Delay(messagingOptions.WaitForMessageToBeQueuedForOutboundTime, ct);
                 await messageCenter.DrainRetirementAsync(ct);
             }
             catch (Exception exc)

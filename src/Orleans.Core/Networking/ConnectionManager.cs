@@ -26,6 +26,7 @@ namespace Orleans.Runtime.Messaging
 
         private readonly ConcurrentDictionary<SiloAddress, ConnectionEntry> connections = new();
         private readonly ConcurrentDictionary<Connection, Task> connectionTasks = new();
+        private readonly ConcurrentDictionary<Connection, byte> drainingConnections = new();
         private readonly AdmissionGate connectionEstablishment = new();
         private readonly ConnectionOptions connectionOptions;
         private readonly ConnectionFactory connectionFactory;
@@ -55,12 +56,10 @@ namespace Orleans.Runtime.Messaging
         public List<SiloAddress> GetConnectedAddresses() => connections.Select(i => i.Key).ToList();
 
         internal Task DrainAsync(CancellationToken cancellationToken)
-            => Task.WhenAll(connections.Values.SelectMany(entry => entry.Connections)
-                .Distinct().Select(connection => connection.DrainAsync())).WaitAsync(cancellationToken);
+            => Task.WhenAll(drainingConnections.Keys.Select(connection => connection.DrainAsync())).WaitAsync(cancellationToken);
 
         internal Task DrainIncomingApplicationDispatchAsync(CancellationToken cancellationToken)
-            => Task.WhenAll(connections.Values.SelectMany(entry => entry.Connections)
-                .Distinct().Select(connection => connection.DrainIncomingApplicationDispatchAsync())).WaitAsync(cancellationToken);
+            => Task.WhenAll(drainingConnections.Keys.Select(connection => connection.DrainIncomingApplicationDispatchAsync())).WaitAsync(cancellationToken);
 
         public ValueTask<Connection> GetConnection(SiloAddress endpoint)
         {
@@ -203,6 +202,7 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 entry ??= GetOrCreateEntry(address);
+                drainingConnections.TryAdd(connection, 0);
                 entry.Connections = entry.Connections.Contains(connection) ? entry.Connections : entry.Connections.Add(connection);
                 entry.LastFailure = default;
             }
@@ -242,6 +242,19 @@ namespace Orleans.Runtime.Messaging
             {
                 LogDebugConnectionClosed(this.logger, connection);
             }
+
+            if (drainingConnections.ContainsKey(connection))
+            {
+                CompleteConnectionDrain(connection).Ignore();
+            }
+        }
+
+        private async Task CompleteConnectionDrain(Connection connection)
+        {
+            await connection.CloseAsync(null);
+            await connection.DrainIncomingApplicationDispatchAsync();
+            await connection.DrainAsync();
+            drainingConnections.TryRemove(connection, out _);
         }
 
         private ConnectionEntry GetOrCreateEntry(SiloAddress address) => connections.GetOrAdd(address, _ => new());
@@ -389,6 +402,13 @@ namespace Orleans.Runtime.Messaging
                         closeTasks.Add(task);
                     }
 
+                    foreach (var connection in this.drainingConnections.Keys)
+                    {
+                        closeTasks.Add(connection.CloseAsync(null));
+                        closeTasks.Add(connection.DrainIncomingApplicationDispatchAsync());
+                        closeTasks.Add(connection.DrainAsync());
+                    }
+
                     if (closeTasks.Count > 0 || pendingEstablishment)
                     {
                         // Signal existing connections before waiting for producers which may need those signals.
@@ -436,7 +456,7 @@ namespace Orleans.Runtime.Messaging
 
             bool IsQuiescent()
             {
-                if (!establishmentDrained.IsCompleted || !this.connectionTasks.IsEmpty)
+                if (!establishmentDrained.IsCompleted || !this.connectionTasks.IsEmpty || !this.drainingConnections.IsEmpty)
                 {
                     return false;
                 }

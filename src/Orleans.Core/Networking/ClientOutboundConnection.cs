@@ -1,4 +1,5 @@
 using System;
+using Orleans.Internal;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
@@ -121,7 +122,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        protected override void RetryMessage(Message msg, Exception? ex = null)
+        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission sendAdmission)
         {
             if (msg == null) return;
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)

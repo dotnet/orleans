@@ -18,7 +18,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         Justification = "MessageHandlerShared owns and pools this request; the request does not own the shared pool.")]
     private readonly MessageHandlerShared _shared;
     private readonly ArcBufferWriter _buffer = new();
-    private readonly List<(Message Message, int TotalLength, int HeaderLength, AdmissionGate.Admission Admission)> _messages = [];
+    private readonly List<(Message Message, int TotalLength, int HeaderLength, AdmissionGate.Admission Admission, AdmissionGate.Admission SendAdmission)> _messages = [];
     private Connection? _connection;
     private MessageSerializer? _messageSerializer;
     private bool _hasLargeMessages;
@@ -38,7 +38,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     public Message GetMessage(int index) => _messages[index].Message;
 
     // Successful serialization transfers admission from the send queue to this write.
-    public void WriteMessage(Message message, AdmissionGate.Admission admission)
+    public void WriteMessage(Message message, AdmissionGate.Admission admission, AdmissionGate.Admission sendAdmission = default)
     {
         var startLength = _buffer.Length;
         try
@@ -56,7 +56,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
             BinaryPrimitives.WriteInt32LittleEndian(framingBytes[sizeof(int)..], bodyLength);
 
             var totalLength = headerLength + bodyLength;
-            _messages.Add((message, totalLength, headerLength, admission));
+            _messages.Add((message, totalLength, headerLength, admission, sendAdmission));
             _hasLargeMessages |= totalLength >= LargeMessageSize;
         }
         catch
@@ -84,14 +84,14 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         try
         {
             var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
-            foreach (var (message, totalLength, headerLength, _) in _messages)
+            foreach (var (message, totalLength, headerLength, _, _) in _messages)
             {
                 connection.RecordMessageSend(message, totalLength, headerLength);
             }
         }
         finally
         {
-            foreach (var (message, _, _, _) in _messages)
+            foreach (var (message, _, _, _, _) in _messages)
             {
                 message.ReleaseBodyBuffer();
             }
@@ -134,14 +134,14 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     internal void RerouteMessage(int index, Exception? error = null)
     {
         var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
-        var (message, totalLength, headerLength, admission) = _messages[index];
+        var (message, totalLength, headerLength, admission, sendAdmission) = _messages[index];
         if (message.RequiresApplicationDrain)
         {
             connection.OnApplicationWriteFailure(message);
         }
 
-        _messages[index] = (message, totalLength, headerLength, default);
-        connection.RerouteMessage(message, error, admission);
+        _messages[index] = (message, totalLength, headerLength, default, default);
+        connection.RerouteMessage(message, error, admission, sendAdmission);
     }
 
     public void Reset()
@@ -151,9 +151,10 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
                 ? SendPageSize
                 : 0;
         CompleteWriting();
-        foreach (var (_, _, _, admission) in _messages)
+        foreach (var (_, _, _, admission, sendAdmission) in _messages)
         {
             admission.Dispose();
+            sendAdmission.Dispose();
         }
 
         _messages.Clear();
@@ -172,9 +173,10 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
         _disposed = true;
         CompleteWriting();
-        foreach (var (_, _, _, admission) in _messages)
+        foreach (var (_, _, _, admission, sendAdmission) in _messages)
         {
             admission.Dispose();
+            sendAdmission.Dispose();
         }
 
         _messages.Clear();

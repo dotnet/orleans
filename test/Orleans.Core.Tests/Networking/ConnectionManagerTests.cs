@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Internal;
 using Orleans.Messaging;
 using Orleans.Connections;
 using Orleans.Connections.Transport;
@@ -36,6 +37,124 @@ namespace Orleans.Core.Tests.Networking;
 public class ConnectionManagerTests
 {
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(10);
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetirementDrain_RetainsRemovedConnectionUntilDispatchAndRerouteComplete(bool closeEndpoint)
+    {
+        await using var rig = new TestRig();
+        using var releaseRetry = new ManualResetEventSlim();
+        var retryEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var connection = rig.CreateConnection();
+        connection.RetryObserver = message =>
+        {
+            retryEntered.TrySetResult();
+            releaseRetry.Wait(TestContext.Current.CancellationToken);
+            message.Dispose();
+        };
+        rig.Manager.OnConnected(rig.Address, connection);
+        var incoming = connection.TryAdmitIncomingApplicationDispatch();
+        Assert.True(incoming.Entered);
+        using var message = new Message { BodyObject = "admitted" };
+        try
+        {
+            connection.RerouteMessage(message);
+            await retryEntered.Task.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            if (closeEndpoint)
+            {
+                await rig.Manager.CloseAsync(rig.Address).WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            }
+            else
+            {
+                rig.Manager.OnConnectionTerminated(rig.Address, connection, null);
+            }
+
+            Assert.Equal(0, rig.Manager.ConnectionCount);
+            var incomingDrain = rig.Manager.DrainIncomingApplicationDispatchAsync(TestContext.Current.CancellationToken);
+            var outgoingDrain = rig.Manager.DrainAsync(TestContext.Current.CancellationToken);
+            Assert.False(incomingDrain.IsCompleted);
+            Assert.False(outgoingDrain.IsCompleted);
+            incoming.Dispose();
+            incoming = default;
+            await incomingDrain.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            Assert.False(outgoingDrain.IsCompleted);
+            releaseRetry.Set();
+            await outgoingDrain.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            Assert.Null(message.BodyObject);
+        }
+        finally
+        {
+            incoming.Dispose();
+            releaseRetry.Set();
+            rig.Manager.OnConnectionTerminated(rig.Address, connection, null);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetirementDrain_PretransportRetryCarriesMessageCenterAdmissionPastSeal(bool directConnectionSend)
+    {
+        using var releaseSerialization = new ManualResetEventSlim();
+        var serialized = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var rig = new TestRig(messageObserver: _ =>
+        {
+            serialized.TrySetResult();
+            releaseSerialization.Wait(TestContext.Current.CancellationToken);
+        });
+        var (source, _) = rig.CreateSiloConnection(createMessageCenter: true,
+            wrapTransport: inner => new RejectingMessageWrites(inner));
+        var center = rig.MessageCenter;
+        rig.Manager.OnConnected(rig.Address, source);
+        using var message = new Message
+        {
+            Direction = Message.Directions.Request,
+            SendingGrain = GrainId.Create("test", "caller"),
+            TargetGrain = GrainId.Create("test", "target"),
+            TargetSilo = rig.Address,
+            Id = new CorrelationId(173),
+            BodyObject = "original request",
+            TimeToLive = TimeSpan.FromMinutes(1),
+        };
+        var expiry = message._timeToExpiry.GetRawTimestamp();
+        var retried = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var replacement = rig.CreateConnection();
+        replacement.SendObserver = msg => retried.TrySetResult(msg);
+        try
+        {
+            if (directConnectionSend) source.Send(message);
+            else center.SendMessage(message);
+            await serialized.Task.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            var drain = center.DrainRetirementAsync(TestContext.Current.CancellationToken);
+            Assert.False(drain.IsCompleted);
+            rig.Manager.OnConnectionTerminated(rig.Address, source, null);
+            rig.Manager.OnConnected(rig.Address, replacement);
+            using var late = new Message
+            {
+                Direction = Message.Directions.Request,
+                TargetGrain = message.TargetGrain,
+                TargetSilo = rig.Address,
+                BodyObject = "after seal",
+            };
+            center.SendMessage(late);
+            Assert.Null(late.BodyObject);
+            releaseSerialization.Set();
+            Assert.Same(message, await retried.Task.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
+            await drain.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            Assert.Equal(1, message.RetryCount);
+            Assert.Equal(0, message.ForwardCount);
+            Assert.Equal(new CorrelationId(173), message.Id);
+            Assert.Equal(expiry, message._timeToExpiry.GetRawTimestamp());
+            Assert.Equal("original request", message.BodyObject);
+            Assert.Equal(0, rig.Factory.AttemptCount);
+        }
+        finally
+        {
+            releaseSerialization.Set();
+            rig.Manager.OnConnectionTerminated(rig.Address, replacement, null);
+        }
+    }
 
     [Theory]
     [InlineData(false, false, false)]
@@ -525,7 +644,8 @@ public class ConnectionManagerTests
         public TestRig(
             ILogger<ConnectionManager>? logger = null,
             WrappedTransportMiddleware? transportMiddleware = null,
-            TimeSpan? openConnectionTimeout = null)
+            TimeSpan? openConnectionTimeout = null,
+            Action<Message>? messageObserver = null)
         {
             _transportMiddleware = transportMiddleware;
             var services = new ServiceCollection();
@@ -557,6 +677,8 @@ public class ConnectionManagerTests
                 sp.GetRequiredService<MessagingInstruments>()));
             _services = services.BuildServiceProvider();
             var instruments = _services.GetRequiredService<MessagingInstruments>();
+            var statistics = Substitute.For<IMessageStatisticsSink>();
+            statistics.GetMessageObserver().Returns(messageObserver);
             _shared = new ConnectionCommon(
                 _services,
                 _services.GetRequiredService<MessageFactory>(),
@@ -564,7 +686,7 @@ public class ConnectionManagerTests
                 _services.GetRequiredService<ConnectionTrace>(),
                 instruments,
                 _services.GetRequiredService<NetworkingInstruments>(),
-                new NoOpMessageStatisticsSink());
+                statistics);
             _options = new ConnectionOptions
             {
                 OpenConnectionTimeout = openConnectionTimeout ?? System.Threading.Timeout.InfiniteTimeSpan,
@@ -579,6 +701,7 @@ public class ConnectionManagerTests
 
         public SiloAddress Address { get; } = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12345), 1);
         public ConnectionManager Manager { get; }
+        public MessageCenter MessageCenter => _messageCenters[^1];
         public ILocalGrainDirectory GrainDirectory { get; } = Substitute.For<ILocalGrainDirectory>();
         public TestConnectionFactory Factory { get; }
         public CancellationTokenSource ShutdownSource { get; }
@@ -602,14 +725,15 @@ public class ConnectionManagerTests
         public (SiloConnection Connection, TestMessageTransport Context) CreateSiloConnection(
             bool blockApplicationMessages = false,
             bool outbound = true,
-            Func<MessageTransport, MessageTransport>? wrapTransport = null)
+            Func<MessageTransport, MessageTransport>? wrapTransport = null,
+            bool createMessageCenter = false)
         {
             var context = new TestMessageTransport(blockDisposal: false);
             var local = Substitute.For<ILocalSiloDetails>();
             local.SiloAddress.Returns(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 12344), 1));
             local.ClusterId.Returns("test-cluster");
             MessageCenter? messageCenter = null;
-            if (blockApplicationMessages)
+            if (blockApplicationMessages || createMessageCenter)
             {
                 var directoryResolver = new GrainDirectoryResolver(
                     _services,
@@ -638,7 +762,7 @@ public class ConnectionManagerTests
                     null!,
                     new GrainLocator(locatorResolver, null!),
                     new NoOpMessageStatisticsSink());
-                messageCenter.BlockApplicationMessages();
+                if (blockApplicationMessages) messageCenter.BlockApplicationMessages();
                 _messageCenters.Add(messageCenter);
             }
 
@@ -747,6 +871,7 @@ public class ConnectionManagerTests
         public TaskCompletionSource ReleaseCleanup { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public CancellationToken InitializationToken { get; private set; }
         public Action<Message>? SendObserver { get; set; }
+        public Action<Message>? RetryObserver { get; set; }
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
         protected override TimeSpan CloseConnectionTimeout => TestTimeout;
         protected override IMessageCenter MessageCenter => null!;
@@ -791,10 +916,36 @@ public class ConnectionManagerTests
             }
         }
 
-        protected override void RetryMessage(Message message, Exception? exception = null) { }
+        internal override void Send(Message message, ref AdmissionGate.Admission sendAdmission)
+        {
+            if (SendObserver is { } observer)
+            {
+                observer(message);
+                sendAdmission.Dispose();
+                sendAdmission = default;
+            }
+            else
+            {
+                base.Send(message, ref sendAdmission);
+            }
+        }
+
+        protected override void RetryMessage(Message message, Exception? exception, ref AdmissionGate.Admission sendAdmission)
+            => RetryObserver?.Invoke(message);
         protected internal override void OnReceivedMessage(Message message) { }
         protected internal override void RecordMessageReceive(Message message, int numTotalBytes, int headerBytes) { }
         protected internal override void RecordMessageSend(Message message, int numTotalBytes, int headerBytes) { }
+    }
+
+    private sealed class RejectingMessageWrites(MessageTransport inner) : MessageTransport
+    {
+        public override CancellationToken Closed => inner.Closed;
+        public override IFeatureCollection Features => inner.Features;
+        public override bool EnqueueRead(ReadRequest request) => inner.EnqueueRead(request);
+        public override bool EnqueueWrite(WriteRequest request) => false;
+        public override ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default)
+            => inner.CloseAsync(closeException, cancellationToken);
+        public override ValueTask DisposeAsync() => inner.DisposeAsync();
     }
 
     private sealed class TestMessageTransport : MessageTransport

@@ -1,4 +1,5 @@
 using System;
+using Orleans.Internal;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -49,6 +50,9 @@ namespace Orleans.Runtime.Messaging
         protected override MessageCenter MessageCenter => this.messageCenter;
 
         internal override void OnApplicationWriteFailure(Message message) => messageCenter.RecordRetirementSendFailure(message);
+
+        protected override bool TryAdmitApplicationSend(out AdmissionGate.Admission admission)
+            => messageCenter.TryAdmitApplicationSend(out admission);
 
         internal protected override void RecordMessageReceive(Message message, int totalBytes, int headerBytes)
         {
@@ -197,13 +201,13 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void RetryMessage(Message msg, Exception? ex = null)
+        protected override void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission sendAdmission)
         {
             if (msg == null) return;
             if (msg.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
                 msg.RetryCount++;
-                this.messageCenter.SendMessage(msg);
+                this.messageCenter.SendMessage(msg, ref sendAdmission);
             }
             else
             {

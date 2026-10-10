@@ -316,7 +316,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         /// <param name="msg"></param>
         /// <returns>true if the message should be delivered to a proxied grain, false if not.</returns>
-        internal bool TryDeliverToProxy(Message msg)
+        internal bool TryDeliverToProxy(Message msg, ref AdmissionGate.Admission sendAdmission)
         {
             // See if it's a grain we're proxying.
             var targetGrain = msg.TargetGrain;
@@ -341,7 +341,7 @@ namespace Orleans.Runtime.Messaging
             msg.TargetSilo = null;
             msg.SendingSilo ??= gatewayAddress;
 
-            client.Send(msg);
+            client.Send(msg, ref sendAdmission);
             return true;
         }
 
@@ -349,7 +349,7 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly Gateway _gateway;
             private readonly Task _messageLoop;
-            private readonly ConcurrentQueue<Message> _pendingToSend = new();
+            private readonly ConcurrentQueue<(Message Message, AdmissionGate.Admission SendAdmission)> _pendingToSend = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
                 RunContinuationsAsynchronously = true
@@ -422,7 +422,7 @@ namespace Orleans.Runtime.Messaging
                 _signal.Signal();
             }
 
-            public void Send(Message msg)
+            public void Send(Message msg, ref AdmissionGate.Admission sendAdmission)
             {
                 if (msg.RequiresApplicationDrain && !_gateway._outboundWork.TryEnterUnscoped())
                 {
@@ -432,7 +432,8 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                _pendingToSend.Enqueue(msg);
+                _pendingToSend.Enqueue((msg, sendAdmission));
+                sendAdmission = default;
                 _signal.Signal();
                 LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
             }
@@ -458,25 +459,28 @@ namespace Orleans.Runtime.Messaging
                         }
 
                         // Send all pending messages.
-                        while (_pendingToSend.TryDequeue(out var message))
+                        while (_pendingToSend.TryDequeue(out var item))
                         {
+                            var (message, sendAdmission) = item;
                             var requeued = false;
                             try
                             {
-                                if (TrySend(connection, message))
+                                if (TrySend(connection, message, ref sendAdmission))
                                 {
                                     LogTraceSentQueuedMessage(_gateway.logger, message, Id);
                                 }
                                 else
                                 {
                                     // Re-enqueue the message. It's ok that it is at the end of the queue: message ordering is not guaranteed.
-                                    _pendingToSend.Enqueue(message);
+                                    _pendingToSend.Enqueue((message, sendAdmission));
+                                    sendAdmission = default;
                                     requeued = true;
                                     break;
                                 }
                             }
                             finally
                             {
+                                sendAdmission.Dispose();
                                 if (!requeued && message.RequiresApplicationDrain)
                                 {
                                     _gateway._outboundWork.Exit();
@@ -494,8 +498,9 @@ namespace Orleans.Runtime.Messaging
             private void RejectDroppedClientMessages()
             {
                 ClientNotAvailableException? exception = null;
-                while (_pendingToSend.TryDequeue(out var message))
+                while (_pendingToSend.TryDequeue(out var item))
                 {
+                    var (message, sendAdmission) = item;
                     exception ??= new ClientNotAvailableException(Id.GrainId);
                     try
                     {
@@ -504,6 +509,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     finally
                     {
+                        sendAdmission.Dispose();
                         if (message.RequiresApplicationDrain)
                         {
                             _gateway._outboundWork.Exit();
@@ -512,7 +518,7 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            private bool TrySend(GatewayInboundConnection connection, Message message)
+            private bool TrySend(GatewayInboundConnection connection, Message message, ref AdmissionGate.Admission sendAdmission)
             {
                 if (connection is null)
                 {
@@ -521,7 +527,7 @@ namespace Orleans.Runtime.Messaging
 
                 try
                 {
-                    connection.Send(message);
+                    connection.Send(message, ref sendAdmission);
                     return true;
                 }
                 catch (Exception exception)

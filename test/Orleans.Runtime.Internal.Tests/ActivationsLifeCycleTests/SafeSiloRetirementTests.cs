@@ -69,6 +69,9 @@ public sealed partial class SafeSiloRetirementTests
         var first = await control.GatewayRequest("learned-route").Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(fixture.A.SiloAddress, first.TargetSilo);
         Assert.Equal(fixture.ExpectedSendingGrain, first.SendingGrain);
+        var received = await control.ReceiverRequest(fixture.A.SiloAddress, "learned-route").Task.WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(first.Id, received.Id);
+        Assert.Equal(1, activation.WaitingCount);
         control.ReleaseDeactivation.TrySetResult();
         await control.UnregisterEntered.Task.WaitAsync(Timeout, TestCancellation);
         control.ReleaseUnregister.TrySetResult();
@@ -81,9 +84,11 @@ public sealed partial class SafeSiloRetirementTests
         await fixture.Retirement!.WaitAsync(Timeout, TestCancellation);
         fixture.BreakOutstandingToA();
         Assert.False(invocation.IsCompleted);
+        var acceptedRoute = await control.OutsideRouteOnC.Task.WaitAsync(Timeout, TestCancellation);
+        Assert.Equal(first.Id, acceptedRoute.Id);
+        Assert.Equal(1, acceptedRoute.Generation);
         control.ReleaseReplacementActivation.TrySetResult();
         Assert.Equal(Result, await invocation.WaitAsync(Timeout, TestCancellation));
-        // The original result is causally later than its advisory route on the same gateway.
         var subsequent = fixture.InvokeOutsideAsync("cached-route", TestCancellation);
         var second = await control.GatewayRequest("cached-route").Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(fixture.C.SiloAddress, second.TargetSilo);
@@ -252,7 +257,8 @@ public sealed partial class SafeSiloRetirementTests
             var inCache = fixture.B.ServiceProvider.GetRequiredService<GrainLocator>().TryLookupInCache(control.GrainId, out var cached);
             throw new TimeoutException(
                 $"C was not activated. Caller={callerKind}; original task={originalTask.Status}; B cache={(inCache ? cached : null)}; "
-                + $"directory={control.Directory.Registration}; route notices={control.RouteUpdates.Count}; "
+                + $"A={fixture.A.SiloAddress}; B={fixture.B.SiloAddress}; C={fixture.C.SiloAddress}; "
+                + $"directory={control.Directory.Registration}; routes=[{string.Join(", ", control.RouteUpdates)}]; "
                 + $"execution silos=[{string.Join(", ", control.Executions.Select(execution => execution.Silo))}].",
                 exception);
         }
@@ -286,9 +292,10 @@ public sealed partial class SafeSiloRetirementTests
         if (verifyDelayedCleanup)
         {
             var locator = fixture.B.ServiceProvider.GetRequiredService<GrainLocator>();
-            // B no longer replays/re-addresses the invocation. Learn the replacement using
-            // its ordinary directory lookup before exercising delayed cleanup.
-            Assert.Equal(replacement.Address, await locator.Lookup(control.GrainId));
+            // Retire the known A hint before learning C. Locator results can carry
+            // a silo-only placement hint or the directory's full activation address.
+            locator.InvalidateCache(retiring.Address);
+            Assert.True(replacement.Address.Matches(await locator.Lookup(control.GrainId)));
             Assert.True(locator.TryLookupInCache(control.GrainId, out var cachedBefore));
             Assert.Equal(fixture.C.SiloAddress, cachedBefore!.SiloAddress);
             await locator.Unregister(retiring.Address, UnregistrationCause.Force).WaitAsync(Timeout, TestCancellation);
@@ -637,6 +644,7 @@ public sealed partial class SafeSiloRetirementTests
             {
                 CancellationManager = holdCancellationDelivery ? Substitute.For<IGrainCallCancellationManager>() : null,
                 FailureMatrix = failureMatrix,
+                AwaitOutsideInitialRoute = callerKind == CallerKind.Outside,
             };
             var builder = new InProcessTestClusterBuilder(3);
             builder.Options.ConfigureFileLogging = false;
@@ -706,6 +714,29 @@ public sealed partial class SafeSiloRetirementTests
             {
                 await cluster.DeployAsync(TestCancellation).WaitAsync(Timeout, TestCancellation);
                 var fixture = new Fixture(cluster, control, callerKind);
+                if (callerKind == CallerKind.Outside)
+                {
+                    var center = cluster.Client.ServiceProvider.GetRequiredService<ClientMessageCenter>();
+                    var handler = (Action<Message>)typeof(ClientMessageCenter)
+                        .GetField("messageHandler", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(center)!;
+                    var callbacks = (ConcurrentDictionary<CorrelationId, CallbackData>)typeof(OutsideRuntimeClient)
+                        .GetField("callbacks", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(fixture.OutsideCaller)!;
+                    center.RegisterLocalMessageHandler(message =>
+                    {
+                        var status = message.Result == Message.ResponseTypes.Status ? message.BodyObject as StatusResponse : null;
+                        callbacks.TryGetValue(message.Id, out var callback);
+                        handler(message);
+                        if (status?.ForwardedTo is { } destination && callback is { IsCompleted: false }
+                            && callback.Message.TargetGrain == control.GrainId
+                            && destination.Equals(callback.Message.TargetSilo) && callback.Message.ForwardCount == message.ForwardCount)
+                        {
+                            var update = new RouteUpdate(message.Id, message.ForwardCount, destination, message.SendingSilo);
+                            if (destination.Equals(control.A)) control.OutsideRouteOnA.TrySetResult(update);
+                            if (destination.Equals(control.C)) control.OutsideRouteOnC.TrySetResult(update);
+                        }
+                    });
+                }
+
                 foreach (var silo in cluster.Silos)
                 {
                     // Capture typed route bodies before response dispatch/write clears them.
@@ -874,6 +905,7 @@ public sealed partial class SafeSiloRetirementTests
         internal bool FailUnregister;
         internal bool HoldDisposal;
         internal IGrainCallCancellationManager? CancellationManager;
+        internal bool AwaitOutsideInitialRoute;
         internal DeactivationReasonCode DeactivationReason;
         internal ControlledDirectory Directory { get; }
         internal ConcurrentQueue<Execution> Executions { get; } = new();
@@ -894,6 +926,8 @@ public sealed partial class SafeSiloRetirementTests
         internal TaskCompletionSource<ReceivedRequest> IncomingRequestOnA { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource<ReceivedRequest> RequestOnC { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource<RouteUpdate> RouteUpdateObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource<RouteUpdate> OutsideRouteOnA { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource<RouteUpdate> OutsideRouteOnC { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource<Task<int>> GrainCallerInvocationEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource ReleaseDeactivation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource ReleaseUnregister { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -909,6 +943,8 @@ public sealed partial class SafeSiloRetirementTests
             ReleaseUnregister.TrySetResult();
             ReleaseReplacementActivation.TrySetResult();
             ReleaseDisposal.TrySetResult();
+            OutsideRouteOnA.TrySetCanceled();
+            OutsideRouteOnC.TrySetCanceled();
             ReleaseFailureMatrixBarriers();
         }
     }
@@ -1096,7 +1132,15 @@ public class SafeSiloRetirementGrain(SafeSiloRetirementTests.Control control) : 
 {
     private ActivationData Activation => (ActivationData)GrainContext;
 
-    public Task<SiloAddress> GetSiloAddress() => Task.FromResult(Activation.Address.SiloAddress!);
+    public async Task<SiloAddress> GetSiloAddress()
+    {
+        if (control.AwaitOutsideInitialRoute && Activation.Address.SiloAddress!.Equals(control.A))
+        {
+            await control.OutsideRouteOnA.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        }
+
+        return Activation.Address.SiloAddress!;
+    }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
