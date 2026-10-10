@@ -18,6 +18,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     private readonly SortedSet<string> _storageKeys = new(StringComparer.Ordinal);
     private readonly object _catalogLock = new();
     private readonly JournalStorageTelemetry _telemetry;
+    private readonly VolatileJournalStorageOptions _storageOptions = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class using the default journal format.
@@ -51,6 +52,31 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
         _telemetry = new JournalStorageTelemetry(instruments);
     }
 
+    /// <summary>
+    /// Initializes an in-memory provider with configurable snapshot thresholds.
+    /// </summary>
+    /// <param name="options">The journaled state manager options.</param>
+    /// <param name="storageOptions">The provider's snapshot thresholds.</param>
+    /// <param name="instruments">The optional Orleans runtime metrics meter.</param>
+    public VolatileJournalStorageProvider(
+        IOptions<JournaledStateManagerOptions> options,
+        IOptions<VolatileJournalStorageOptions> storageOptions,
+        OrleansInstruments? instruments) : this(options)
+    {
+        ArgumentNullException.ThrowIfNull(storageOptions);
+        var configuration = storageOptions.Value;
+        configuration.Validate();
+        _storageOptions = new()
+        {
+            MaxAppendsBeforeSnapshot = configuration.MaxAppendsBeforeSnapshot,
+            MaxBytesBeforeSnapshot = configuration.MaxBytesBeforeSnapshot
+        };
+        if (instruments is not null)
+        {
+            _telemetry = new JournalStorageTelemetry(instruments);
+        }
+    }
+
     /// <inheritdoc/>
     public IJournalStorage CreateStorage(JournalId journalId)
     {
@@ -73,7 +99,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
             }
         }
 
-        return new VolatileJournalStorage(store, journalFormatKey);
+        return new VolatileJournalStorage(store, journalFormatKey, _storageOptions);
     }
 
     /// <inheritdoc/>
@@ -147,6 +173,8 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 public sealed class VolatileJournalStorage : IJournalStorage
 {
     private readonly Store _store;
+    private readonly int _maxAppendsBeforeSnapshot;
+    private readonly long _maxBytesBeforeSnapshot;
     private string? _configuredJournalFormatKey;
 
     /// <summary>
@@ -164,10 +192,24 @@ public sealed class VolatileJournalStorage : IJournalStorage
     {
     }
 
-    internal VolatileJournalStorage(Store store, string? journalFormatKey)
+    /// <summary>
+    /// Initializes an isolated in-memory journal with configurable snapshot thresholds.
+    /// </summary>
+    /// <param name="journalFormatKey">The journal format key to stamp on writes.</param>
+    /// <param name="options">The snapshot thresholds.</param>
+    public VolatileJournalStorage(string? journalFormatKey, VolatileJournalStorageOptions options)
+        : this(new Store(CreateVolatileStorageId()), journalFormatKey, options ?? throw new ArgumentNullException(nameof(options)))
+    {
+    }
+
+    internal VolatileJournalStorage(Store store, string? journalFormatKey, VolatileJournalStorageOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(store);
+        options ??= new();
+        options.Validate();
         _store = store;
+        _maxAppendsBeforeSnapshot = options.MaxAppendsBeforeSnapshot;
+        _maxBytesBeforeSnapshot = options.MaxBytesBeforeSnapshot;
         SetConfiguredJournalFormatKey(journalFormatKey);
     }
 
@@ -178,7 +220,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
         {
             lock (_store.SyncRoot)
             {
-                return _store.Segments.Count > 10;
+                return _store.AppendCount >= _maxAppendsBeforeSnapshot || _store.AppendedBytes >= _maxBytesBeforeSnapshot;
             }
         }
     }
@@ -295,6 +337,8 @@ public sealed class VolatileJournalStorage : IJournalStorage
             _store.Exists = true;
             _store.StoredJournalFormatKey = _configuredJournalFormatKey;
             _store.Segments.Add(segment.ToArray());
+            _store.AppendedBytes += segment.Length;
+            _store.AppendCount++;
             _store.RefreshETag();
         }
 
@@ -305,12 +349,15 @@ public sealed class VolatileJournalStorage : IJournalStorage
     public ValueTask ReplaceAsync(ReadOnlySequence<byte> snapshot, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var data = snapshot.ToArray();
         lock (_store.SyncRoot)
         {
             _store.Exists = true;
             _store.StoredJournalFormatKey = _configuredJournalFormatKey;
             _store.Segments.Clear();
-            _store.Segments.Add(snapshot.ToArray());
+            _store.Segments.Add(data);
+            _store.AppendedBytes = 0;
+            _store.AppendCount = 0;
             _store.RefreshETag();
         }
 
@@ -337,6 +384,10 @@ public sealed class VolatileJournalStorage : IJournalStorage
 
         public List<byte[]> Segments { get; } = [];
 
+        public long AppendCount { get; set; }
+
+        public long AppendedBytes { get; set; }
+
         public Dictionary<string, string> Properties { get; } = new(StringComparer.Ordinal);
 
         public string? StoredJournalFormatKey { get; set; }
@@ -351,6 +402,8 @@ public sealed class VolatileJournalStorage : IJournalStorage
         {
             Exists = true;
             Segments.Clear();
+            AppendCount = 0;
+            AppendedBytes = 0;
             Properties.Clear();
             StoredJournalFormatKey = null;
             if (properties is not null)
@@ -368,6 +421,8 @@ public sealed class VolatileJournalStorage : IJournalStorage
         {
             Exists = false;
             Segments.Clear();
+            AppendCount = 0;
+            AppendedBytes = 0;
             Properties.Clear();
             StoredJournalFormatKey = null;
             ETag = null;
