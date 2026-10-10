@@ -83,6 +83,23 @@ public sealed class ExceptionAdmissionTests
     }
 
     [Fact]
+    public void ReviewedKeyNotFoundExceptionRoundTripsThroughDefaultCodec()
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer>();
+        var original = new KeyNotFoundException("missing provider", new ArgumentException("inner"));
+        original.Data["key"] = "value";
+
+        var result = Assert.IsType<KeyNotFoundException>(
+            serializer.Deserialize<Exception>(serializer.SerializeToArray<Exception>(original)));
+
+        Assert.Equal(original.Message, result.Message);
+        Assert.Equal(original.HResult, result.HResult);
+        Assert.Equal("inner", Assert.IsType<ArgumentException>(result.InnerException).Message);
+        Assert.Equal("value", result.Data["key"]);
+    }
+
+    [Fact]
     public void RegisteredCustomFactoryRoundTripsThroughDefaultCodecSelection()
     {
         var factories = 0;

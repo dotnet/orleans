@@ -25,6 +25,7 @@ namespace Orleans.Serialization
             [typeof(IndexOutOfRangeException)] = static () => new IndexOutOfRangeException(),
             [typeof(InvalidCastException)] = static () => new InvalidCastException(),
             [typeof(InvalidOperationException)] = static () => new InvalidOperationException(),
+            [typeof(KeyNotFoundException)] = static () => new KeyNotFoundException(),
             [typeof(NotImplementedException)] = static () => new NotImplementedException(),
             [typeof(NotSupportedException)] = static () => new NotSupportedException(),
             [typeof(NullReferenceException)] = static () => new NullReferenceException(),
