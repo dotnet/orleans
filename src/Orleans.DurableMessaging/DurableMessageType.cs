@@ -1,4 +1,5 @@
 using System;
+using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 
@@ -46,5 +47,42 @@ public sealed class DurableMessageType<T>
             ?? throw new ArgumentException($"Durable message subject '{Subject}' requires a nonnull payload.", nameof(envelope));
     }
 
-    internal void Encode(T body, ArcBufferWriter writer) => _serializer.Serialize(body, writer);
+    /// <summary>Encodes a typed body into an independently owned immutable envelope.</summary>
+    /// <param name="messageId">The stable application command identity.</param>
+    /// <param name="senderId">The sending grain identity.</param>
+    /// <param name="receiverId">The destination inbox.</param>
+    /// <param name="body">The nonnull body to serialize.</param>
+    /// <returns>An envelope which must be disposed by its owner.</returns>
+    /// <remarks>
+    /// Encoding borrows a process-shared pooled buffer and transfers a slice to the result.
+    /// Repeated calls can share backing pages while retaining independent payload ownership.
+    /// </remarks>
+    public DurableEnvelope Create(HierarchicalKey messageId, GrainId senderId, GrainId receiverId, T body)
+    {
+        if (body is null) throw new ArgumentNullException(nameof(body));
+        var envelope = new DurableEnvelope
+        {
+            MessageId = messageId,
+            SenderId = senderId,
+            ReceiverId = receiverId,
+            Subject = Subject,
+            Payload = default
+        };
+        DurableEnvelopeValidation.Validate(envelope);
+        var buffer = DurableMessageBuffers.Pool.Get();
+        try
+        {
+            _serializer.Serialize(body, buffer);
+            return envelope with { Payload = buffer.ConsumeSlice(buffer.Length) };
+        }
+        catch
+        {
+            buffer.Reset();
+            throw;
+        }
+        finally
+        {
+            DurableMessageBuffers.Pool.Return(buffer);
+        }
+    }
 }

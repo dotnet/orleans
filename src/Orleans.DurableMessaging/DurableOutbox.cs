@@ -172,6 +172,8 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
 
     public int Count => _messages.Count;
 
+    public GrainId SenderId => _grainContext.GrainId;
+
     public IEnumerable<DurableEnvelope> Messages => _messages.Values;
 
     public bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out DurableEnvelope envelope) =>

@@ -5,68 +5,94 @@ using System.Threading.Tasks;
 
 namespace Orleans.DurableMessaging;
 
-/// <summary>
-/// Dispatches exact subjects to typed application handlers.
-/// </summary>
+/// <summary>Dispatches exact subjects to typed application handlers.</summary>
 /// <remarks>
 /// Configure once per activation and register as the inbox's single handler. Registration freezes
 /// when installed using <see cref="DurableInboxExtensions.RegisterHandlers"/> or handling begins.
-/// Each delegate follows <see cref="IInboxHandler.HandleAsync"/>'s preparation,
-/// synchronous final-block, and explicit completion contract.
+/// Handlers follow <see cref="IInboxHandler.HandleAsync"/>'s synchronous final-block and explicit
+/// completion contract. Stateful overloads store arguments directly and support static delegates.
 /// </remarks>
 public sealed class DurableInboxDispatcher : IInboxHandler
 {
-    private readonly Dictionary<string, IHandler> _handlers = new(StringComparer.Ordinal);
+    private readonly List<IHandler> _handlers = [];
+    private Dictionary<string, IHandler>? _dispatch;
     private bool _started;
 
-    /// <summary>Adds a subject's synchronous typed handler before handling begins.</summary>
-    /// <typeparam name="T">The payload contract.</typeparam>
+    /// <summary>Registers a synchronous subject handler.</summary>
+    /// <typeparam name="T">The body contract.</typeparam>
     /// <param name="messageType">The subject and serializer binding.</param>
-    /// <param name="handler">The synchronous delegate receiving the decoded body and context.</param>
+    /// <param name="handler">The synchronous body and context delegate.</param>
     /// <returns>This dispatcher.</returns>
-    /// <remarks>
-    /// The attempt token is checked after decoding and before entering the delegate. The delegate
-    /// runs synchronously and explicitly calls <see cref="IInboxHandlerContext.Complete"/>.
-    /// Use the task-returning overload for asynchronous preparation or application cancellation checks.
-    /// </remarks>
-    /// <exception cref="ArgumentNullException">An argument is null.</exception>
-    /// <exception cref="InvalidOperationException">Registration is frozen or the subject is already registered.</exception>
     public DurableInboxDispatcher Register<T>(
-        DurableMessageType<T> messageType,
-        Action<T, IInboxHandlerContext> handler)
+        DurableMessageType<T> messageType, Action<T, IInboxHandlerContext> handler)
     {
         ArgumentNullException.ThrowIfNull(messageType);
         ArgumentNullException.ThrowIfNull(handler);
-        return Register(messageType, (body, context, token) =>
-        {
-            token.ThrowIfCancellationRequested();
-            handler(body, context);
-            return ValueTask.CompletedTask;
-        });
+        return Add(new SynchronousHandler<T>(messageType, handler));
     }
 
-    /// <summary>Adds a subject's typed handler before handling begins.</summary>
-    /// <typeparam name="T">The payload contract.</typeparam>
+    /// <summary>Registers a synchronous subject handler with an explicit argument.</summary>
+    /// <typeparam name="T">The body contract.</typeparam>
+    /// <typeparam name="TArg">The handler argument type.</typeparam>
     /// <param name="messageType">The subject and serializer binding.</param>
-    /// <param name="handler">The delegate receiving the decoded body, context, and attempt token.</param>
+    /// <param name="argument">The argument stored with the handler.</param>
+    /// <param name="handler">The synchronous body, argument, and context delegate.</param>
     /// <returns>This dispatcher.</returns>
-    /// <exception cref="InvalidOperationException">Registration is frozen or the subject is already registered.</exception>
-    public DurableInboxDispatcher Register<T>(
-        DurableMessageType<T> messageType,
-        Func<T, IInboxHandlerContext, CancellationToken, ValueTask> handler)
+    /// <remarks>Use a static delegate to pass state without a captured closure.</remarks>
+    public DurableInboxDispatcher Register<T, TArg>(
+        DurableMessageType<T> messageType, TArg argument, Action<T, TArg, IInboxHandlerContext> handler)
     {
         ArgumentNullException.ThrowIfNull(messageType);
         ArgumentNullException.ThrowIfNull(handler);
+        return Add(new SynchronousHandler<T, TArg>(messageType, argument, handler));
+    }
+
+    /// <summary>Registers a subject handler supporting asynchronous preparation.</summary>
+    /// <typeparam name="T">The body contract.</typeparam>
+    /// <param name="messageType">The subject and serializer binding.</param>
+    /// <param name="handler">The body, context, and attempt-token delegate.</param>
+    /// <returns>This dispatcher.</returns>
+    public DurableInboxDispatcher Register<T>(
+        DurableMessageType<T> messageType, Func<T, IInboxHandlerContext, CancellationToken, ValueTask> handler)
+    {
+        ArgumentNullException.ThrowIfNull(messageType);
+        ArgumentNullException.ThrowIfNull(handler);
+        return Add(new AsynchronousHandler<T>(messageType, handler));
+    }
+
+    /// <summary>Registers an asynchronous subject handler with an explicit argument.</summary>
+    /// <typeparam name="T">The body contract.</typeparam>
+    /// <typeparam name="TArg">The handler argument type.</typeparam>
+    /// <param name="messageType">The subject and serializer binding.</param>
+    /// <param name="argument">The argument stored with the handler.</param>
+    /// <param name="handler">The body, argument, context, and attempt-token delegate.</param>
+    /// <returns>This dispatcher.</returns>
+    /// <remarks>Use a static delegate to pass state without a captured closure.</remarks>
+    public DurableInboxDispatcher Register<T, TArg>(
+        DurableMessageType<T> messageType, TArg argument,
+        Func<T, TArg, IInboxHandlerContext, CancellationToken, ValueTask> handler)
+    {
+        ArgumentNullException.ThrowIfNull(messageType);
+        ArgumentNullException.ThrowIfNull(handler);
+        return Add(new AsynchronousHandler<T, TArg>(messageType, argument, handler));
+    }
+
+    private DurableInboxDispatcher Add(IHandler handler)
+    {
         if (_started)
         {
             throw new InvalidOperationException("Durable inbox dispatcher registration is frozen.");
         }
 
-        if (!_handlers.TryAdd(messageType.Subject, new Handler<T>(messageType, handler)))
+        foreach (var existing in _handlers)
         {
-            throw new InvalidOperationException($"A handler is already registered for durable message subject '{messageType.Subject}'.");
+            if (string.Equals(existing.Subject, handler.Subject, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"A handler is already registered for durable message subject '{handler.Subject}'.");
+            }
         }
 
+        _handlers.Add(handler);
         return this;
     }
 
@@ -77,6 +103,14 @@ public sealed class DurableInboxDispatcher : IInboxHandler
             throw new InvalidOperationException("Register at least one durable message subject.");
         }
 
+        Freeze();
+    }
+
+    private void Freeze()
+    {
+        if (_started) return;
+        _dispatch = new Dictionary<string, IHandler>(_handlers.Count, StringComparer.Ordinal);
+        foreach (var handler in _handlers) _dispatch.Add(handler.Subject, handler);
         _started = true;
     }
 
@@ -84,9 +118,9 @@ public sealed class DurableInboxDispatcher : IInboxHandler
     public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
-        _started = true;
+        Freeze();
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_handlers.TryGetValue(context.Envelope.Subject, out var handler))
+        if (!_dispatch!.TryGetValue(context.Envelope.Subject, out var handler))
         {
             throw new InvalidOperationException($"No handler is registered for durable message subject '{context.Envelope.Subject}'.");
         }
@@ -96,14 +130,57 @@ public sealed class DurableInboxDispatcher : IInboxHandler
 
     private interface IHandler
     {
+        string Subject { get; }
         ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken);
     }
 
-    private sealed class Handler<T>(
-        DurableMessageType<T> messageType,
-        Func<T, IInboxHandlerContext, CancellationToken, ValueTask> handler) : IHandler
+    private abstract class Handler<T>(DurableMessageType<T> messageType) : IHandler
     {
-        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
-            handler(messageType.Decode(context.Envelope), context, cancellationToken);
+        public string Subject => messageType.Subject;
+
+        public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            var body = messageType.Decode(context.Envelope);
+            cancellationToken.ThrowIfCancellationRequested();
+            return Invoke(body, context, cancellationToken);
+        }
+
+        protected abstract ValueTask Invoke(T body, IInboxHandlerContext context, CancellationToken cancellationToken);
+    }
+
+    private sealed class SynchronousHandler<T>(
+        DurableMessageType<T> messageType, Action<T, IInboxHandlerContext> handler) : Handler<T>(messageType)
+    {
+        protected override ValueTask Invoke(T body, IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            handler(body, context);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class SynchronousHandler<T, TArg>(
+        DurableMessageType<T> messageType, TArg argument, Action<T, TArg, IInboxHandlerContext> handler) : Handler<T>(messageType)
+    {
+        protected override ValueTask Invoke(T body, IInboxHandlerContext context, CancellationToken cancellationToken)
+        {
+            handler(body, argument, context);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class AsynchronousHandler<T>(
+        DurableMessageType<T> messageType,
+        Func<T, IInboxHandlerContext, CancellationToken, ValueTask> handler) : Handler<T>(messageType)
+    {
+        protected override ValueTask Invoke(T body, IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            handler(body, context, cancellationToken);
+    }
+
+    private sealed class AsynchronousHandler<T, TArg>(
+        DurableMessageType<T> messageType, TArg argument,
+        Func<T, TArg, IInboxHandlerContext, CancellationToken, ValueTask> handler) : Handler<T>(messageType)
+    {
+        protected override ValueTask Invoke(T body, IInboxHandlerContext context, CancellationToken cancellationToken) =>
+            handler(body, argument, context, cancellationToken);
     }
 }
