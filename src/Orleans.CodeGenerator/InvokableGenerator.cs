@@ -152,6 +152,9 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
                     ParseMemberDeclaration("""
                         public void ReleaseArgumentResources()
                         {
+                            global::System.Diagnostics.Debug.Assert(
+                                (global::System.Threading.Volatile.Read(ref _ownedArgumentState) & int.MaxValue) > 0,
+                                "Every argument-resource release must match a retained use or initial completion.");
                             var state = global::System.Threading.Interlocked.Decrement(ref _ownedArgumentState);
                             if (state == int.MinValue) DisposeOwnedArguments();
                         }

@@ -258,7 +258,7 @@ namespace Orleans
                     }
                 default:
                     LogMessageNotSupported(logger, message);
-                    message.Dispose();
+                    message.Dispose(logger);
                     break;
             }
         }
@@ -332,7 +332,7 @@ namespace Orleans
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
-                    message.Dispose();
+                    message.Dispose(logger);
                     return;
                 }
             }

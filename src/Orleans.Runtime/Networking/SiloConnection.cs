@@ -74,7 +74,7 @@ namespace Orleans.Runtime.Messaging
                 }
                 finally
                 {
-                    msg.Dispose();
+                    msg.Dispose(Log);
                 }
 
                 return;
@@ -87,7 +87,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Receive);
-                msg.Dispose();
+                msg.Dispose(Log);
                 return;
             }
 
@@ -98,7 +98,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.Direction != Message.Directions.Request)
                 {
                     this.MessagingTrace.OnDropBlockedApplicationMessage(msg);
-                    msg.Dispose();
+                    msg.Dispose(Log);
                     return;
                 }
 
@@ -153,7 +153,7 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            msg.Dispose();
+            msg.Dispose(Log);
         }
 
         private void HandlePingMessage(Message msg)
@@ -253,7 +253,7 @@ namespace Orleans.Runtime.Messaging
                     LogWarningDroppingExpiredPingMessage(this.Log, msg);
                 }
 
-                msg.Dispose();
+                msg.Dispose(Log);
                 return false;
             }
 
@@ -295,7 +295,7 @@ namespace Orleans.Runtime.Messaging
             else
             {
                 this.MessagingTrace.OnSiloDropSendingMessage(this.LocalSiloAddress, msg, reason);
-                msg.Dispose();
+                msg.Dispose(Log);
             }
         }
 

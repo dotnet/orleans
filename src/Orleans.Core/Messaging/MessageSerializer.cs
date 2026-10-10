@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
@@ -62,7 +63,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 // Build message
-                message = new() { ArgumentResourceLogger = readRequest.Shared.ConnectionTrace };
+                message = new();
                 var headersReader = Reader.Create(readRequest._headers, _deserializationSession);
                 DeserializeHeaders(ref headersReader, message);
                 readRequest._originalResponseType = message.Result;
@@ -107,7 +108,7 @@ namespace Orleans.Runtime.Messaging
             return rawCodec;
         }
 
-        public (int HeaderLength, int BodyLength) Write(ArcBufferWriter buffer, Message message)
+        public (int HeaderLength, int BodyLength) Write(ArcBufferWriter buffer, Message message, ILogger? logger = null)
         {
             var bodyObject = message._bodyObject;
             if (message.IsDisposedWithOwnedArguments)
@@ -175,7 +176,7 @@ namespace Orleans.Runtime.Messaging
             finally
             {
                 _serializationSession.Reset();
-                InvokableArgumentResources.Release(owner, message.ArgumentResourceLogger);
+                InvokableArgumentResources.Release(owner, logger);
             }
         }
 

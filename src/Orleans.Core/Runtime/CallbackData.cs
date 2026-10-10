@@ -29,10 +29,6 @@ namespace Orleans.Runtime
             this.shared = shared;
             this.context = ctx;
             this.Message = msg;
-            if (msg._bodyObject is IInvokableArgumentOwner)
-            {
-                msg.ArgumentResourceLogger ??= shared.Logger;
-            }
             _applicationRequestInstruments = applicationRequestInstruments;
             _startTimestamp = shared.TimeProvider.GetTimestamp();
         }
@@ -141,7 +137,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                Message.CompleteArgumentResources();
+                Message.CompleteArgumentResources(shared.Logger);
                 DisposeCancellationRegistration();
             }
         }
@@ -178,7 +174,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                Message.CompleteArgumentResources();
+                Message.CompleteArgumentResources(shared.Logger);
                 DisposeCancellationRegistration();
             }
         }
@@ -205,7 +201,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                Message.CompleteArgumentResources();
+                Message.CompleteArgumentResources(shared.Logger);
                 DisposeCancellationRegistration();
             }
         }
@@ -229,7 +225,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                Message.CompleteArgumentResources();
+                Message.CompleteArgumentResources(shared.Logger);
                 DisposeCancellationRegistration();
             }
         }
@@ -253,7 +249,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                Message.CompleteArgumentResources();
+                Message.CompleteArgumentResources(shared.Logger);
                 DisposeCancellationRegistration();
             }
         }

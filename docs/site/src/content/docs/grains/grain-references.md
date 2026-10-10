@@ -28,6 +28,8 @@ Apply <xref:Orleans.DisposeOnCompletionAttribute> to a grain interface parameter
 
 Orleans retires owned arguments when a call completes, is rejected, is canceled, times out, or encounters host shutdown. An outgoing filter which short-circuits the call also retires its copied arguments. For one-way calls, successful transport writing retires the sending request; a rerouted write retains ownership for the next attempt.
 
+Canceling a queued grain request removes it from the activation's queue and retires its owned arguments or unread receive buffer. For request-response calls, the activation sends a cancellation response after removing the request. Cleanup runs through that terminal path even if response sending fails.
+
 Active serialization and invocation retain the arguments through their actual end. Terminal completion prevents new uses, and the last retained use releases each owned disposable exactly once. A grain method which continues after caller cancellation therefore keeps its decoded arguments valid until that invocation finishes. Code which keeps an argument beyond the invocation must acquire its own independent ownership.
 
 Cleanup attempts every owned argument even when one disposal throws. Runtime cleanup failures produce warning logs while preserving the call's original outcome. Generated copy, decode, and submission failure paths use the serializer's registered logger; when a logger is unavailable, concurrent initialization and cleanup failures surface together in an aggregate exception. Direct method calls use the ownership assigned by their caller.

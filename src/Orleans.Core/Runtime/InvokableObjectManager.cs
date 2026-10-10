@@ -84,11 +84,6 @@ namespace Orleans
 
         internal void RejectMessage(Message message)
         {
-            if (message._bodyObject is IInvokableArgumentOwner)
-            {
-                message.ArgumentResourceLogger ??= logger;
-            }
-
             LogRejectingMessageDuringShutdown(logger, message);
             try
             {
@@ -100,21 +95,16 @@ namespace Orleans
             }
             finally
             {
-                message.Dispose();
+                message.Dispose(logger);
             }
         }
 
         public void Dispatch(Message message)
         {
-            if (message._bodyObject is IInvokableArgumentOwner)
-            {
-                message.ArgumentResourceLogger ??= logger;
-            }
-
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
                 LogNotAddressedToAnObserver(logger, message);
-                message.Dispose();
+                message.Dispose(logger);
                 return;
             }
 
@@ -125,7 +115,7 @@ namespace Orleans
             else
             {
                 LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
-                message.Dispose();
+                message.Dispose(logger);
             }
         }
 
@@ -201,11 +191,6 @@ namespace Orleans
             public void ReceiveMessage(object msg)
             {
                 var message = (Message)msg;
-                if (message._bodyObject is IInvokableArgumentOwner)
-                {
-                    message.ArgumentResourceLogger ??= _manager.logger;
-                }
-
                 var gate = _manager.GetAdmissionGate(message);
                 if (!gate.TryEnterUnscoped())
                 {
@@ -237,7 +222,7 @@ namespace Orleans
                     LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
-                    message.Dispose();
+                    message.Dispose(_manager.logger);
                     return;
                 }
 
@@ -370,7 +355,7 @@ namespace Orleans
                     if (message.IsExpired)
                     {
                         _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
-                        message.Dispose();
+                        message.Dispose(_manager.logger);
                         return;
                     }
 
@@ -463,8 +448,10 @@ namespace Orleans
                         {
                             InvokableArgumentResources.Dispose(ownedRequest, _manager.logger);
                         }
-
-                        message.CompleteArgumentResources();
+                        else
+                        {
+                            message.CompleteArgumentResources(_manager.logger);
+                        }
                     }
                     finally
                     {
@@ -512,7 +499,7 @@ namespace Orleans
                 }
                 finally
                 {
-                    message.Dispose();
+                    message.Dispose(_manager.logger);
                 }
             }
 

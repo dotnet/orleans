@@ -168,6 +168,41 @@ public class OwnedRpcArgumentLifetimeTests
         Assert.Equal(Bytes, argument.Buffer);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MessageDisposal_UsesBoundaryLoggerAndKeepsTerminalStateAfterCleanupFailure(bool hasLogger)
+    {
+        using var fixture = new TransportFixture();
+        using var argument = new OwnedTransportArgument(Bytes);
+        using var request = CreateRequest(fixture.Services, argument);
+        var failure = new InvalidOperationException("owned message cleanup failed");
+        Assert.IsType<OwnedTransportArgument>(request.GetArgument(0)).DisposeError = failure;
+        var message = fixture.Message(request);
+        var logger = hasLogger ? Substitute.For<ILogger>() : null;
+        if (logger is not null) logger.IsEnabled(LogLevel.Warning).Returns(true);
+
+        if (hasLogger)
+        {
+            message.Dispose(logger);
+            Assert.Single(logger!.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger.Log)
+                && ReferenceEquals(call.GetArguments()[3], failure));
+        }
+        else
+        {
+            Assert.Same(failure, Record.Exception(message.Dispose));
+        }
+        message.Dispose();
+
+        Assert.Null(message.BodyObject);
+        Assert.True(message.IsDisposedWithOwnedArguments);
+        AssertCopies(argument, 0);
+        using var writer = new ArcBufferWriter();
+        using var serializer = fixture.Serializer();
+        Assert.Throws<OperationCanceledException>(() => serializer.Write(writer, message));
+        Assert.Equal(0, writer.Length);
+    }
+
     [Fact]
     public async Task ConcurrentSerializationInvocationAndCompletion_PreserveOwnershipAndOriginalFailure()
     {
@@ -180,8 +215,7 @@ public class OwnedRpcArgumentLifetimeTests
         var logger = Substitute.For<ILogger>();
         logger.IsEnabled(LogLevel.Warning).Returns(true);
         var message = fixture.Message(request);
-        message.ArgumentResourceLogger = logger;
-        var callback = fixture.Callback(message);
+        var callback = fixture.Callback(message, logger);
         using var cancellation = new CancellationTokenSource();
         callback.SubscribeForCancellation(cancellation.Token);
         var receiver = new HoldingReceiver();
@@ -197,7 +231,7 @@ public class OwnedRpcArgumentLifetimeTests
         Assert.True(manager.TryRegister(receiver, observer));
         using var serializer = fixture.Serializer();
         using var wire = new ArcBufferWriter();
-        var write = Task.Run(() => serializer.Write(wire, message), TestContext.Current.CancellationToken);
+        var write = Task.Run(() => serializer.Write(wire, message, logger), TestContext.Current.CancellationToken);
         var firstCause = new InvalidOperationException("original terminal rejection");
         try
         {
@@ -474,6 +508,62 @@ public class OwnedRpcArgumentLifetimeTests
         Assert.False(Assert.IsAssignableFrom<IInvokableArgumentOwner>(request).TryRetainArgumentResources());
     }
 
+    [Theory]
+    [InlineData("short-circuit")]
+    [InlineData("filter")]
+    [InlineData("send")]
+    [InlineData("forward")]
+    [InlineData("after-send")]
+    public async Task TypedOutgoingFilters_RetainThroughOutcomeAndRetireCopiedArguments(string outcome)
+    {
+        using var fixture = new TransportFixture();
+        using var argument = new OwnedTransportArgument(Bytes);
+        using var request = CreateRequest(fixture.Services, argument, out var reference);
+        var copied = Assert.IsType<OwnedTransportArgument>(request.GetArgument(0));
+        var failure = new InvalidOperationException("typed outgoing failure");
+        var cleanupFailure = new InvalidOperationException("typed outgoing cleanup failed");
+        copied.DisposeError = cleanupFailure;
+        var logger = Substitute.For<ILogger<GrainReferenceRuntime>>();
+        logger.IsEnabled(LogLevel.Warning).Returns(true);
+        var runtimeClient = Substitute.For<IRuntimeClient>();
+        runtimeClient.When(client => client.SendRequest(Arg.Any<GrainReference>(), Arg.Any<IInvokable>(),
+            Arg.Any<IResponseCompletionSource>(), Arg.Any<InvokeMethodOptions>())).Do(call =>
+            {
+                if (outcome == "send") throw failure;
+                var owner = Assert.IsAssignableFrom<IInvokableArgumentOwner>(call.Arg<IInvokable>());
+                InvokableArgumentResources.Complete(owner, logger);
+                AssertCopies(argument, 1);
+                call.Arg<IResponseCompletionSource>().Complete(Response.FromResult(31));
+            });
+        var filter = Substitute.For<IOutgoingGrainCallFilter>();
+        filter.Invoke(Arg.Any<IOutgoingGrainCallContext>()).Returns(async call =>
+        {
+            AssertCopies(argument, 1);
+            if (outcome == "filter") throw failure;
+            var context = call.Arg<IOutgoingGrainCallContext>();
+            if (outcome == "short-circuit") context.Response = Response.FromResult(31);
+            else await context.Invoke();
+            AssertCopies(argument, 1);
+            if (outcome == "after-send") throw failure;
+        });
+        var runtime = new GrainReferenceRuntime(runtimeClient, Substitute.For<IGrainCancellationTokenRuntime>(),
+            [filter], null!, null!, logger);
+
+        if (outcome is "forward" or "short-circuit")
+        {
+            Assert.Equal(31, await runtime.InvokeMethodAsync<int>(reference, request, InvokeMethodOptions.None));
+        }
+        else
+        {
+            Assert.Same(failure, await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await runtime.InvokeMethodAsync<int>(reference, request, InvokeMethodOptions.None)));
+        }
+
+        AssertCopies(argument, 0);
+        Assert.Single(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger.Log)
+            && ReferenceEquals(call.GetArguments()[3], cleanupFailure));
+    }
+
     [Fact]
     public void CleanupFailure_DoesNotReplaceCallbackFailureOrLeaveFieldsOwned()
     {
@@ -485,8 +575,7 @@ public class OwnedRpcArgumentLifetimeTests
         var logger = Substitute.For<ILogger>();
         logger.IsEnabled(LogLevel.Warning).Returns(true);
         var message = fixture.Message(request);
-        message.ArgumentResourceLogger = logger;
-        fixture.Callback(message).OnHostShutdown();
+        fixture.Callback(message, logger).OnHostShutdown();
         var log = Assert.Single(logger.ReceivedCalls(), call => call.GetMethodInfo().Name == nameof(ILogger.Log));
         Assert.Same(copied.DisposeError, log.GetArguments()[3]);
         Assert.IsType<SiloUnavailableException>(fixture.Completion.Response.Exception);
@@ -671,8 +760,8 @@ public class OwnedRpcArgumentLifetimeTests
             Id = new CorrelationId(17),
             TargetGrain = GrainId.Create("owned-rpc", "target")
         };
-        internal CallbackData Callback(Message message) => new(new SharedCallbackData(_ => { },
-            NullLogger<CallbackData>.Instance, TimeProvider.System, TimeSpan.FromSeconds(1), false, false, null),
+        internal CallbackData Callback(Message message, ILogger? logger = null) => new(new SharedCallbackData(_ => { },
+            logger ?? NullLogger<CallbackData>.Instance, TimeProvider.System, TimeSpan.FromSeconds(1), false, false, null),
             Completion, message, Instruments);
         public void Dispose() { Shared.Dispose(); Services.Dispose(); }
     }
