@@ -16,9 +16,6 @@ namespace Orleans.DurableMessaging;
 /// </remarks>
 public interface IDurableOutbox
 {
-    /// <summary>Gets the grain identity which owns this outbox and sends its messages.</summary>
-    GrainId SenderId { get; }
-
     /// <summary>
     /// Gets the grain identity which owns this outbox and sends its messages.
     /// </summary>
