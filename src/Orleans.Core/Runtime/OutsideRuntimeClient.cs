@@ -332,6 +332,7 @@ namespace Orleans
                 context?.Complete();
                 if (Volatile.Read(ref _isStopping) != 0)
                 {
+                    message.Dispose();
                     return;
                 }
             }

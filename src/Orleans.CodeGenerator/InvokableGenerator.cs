@@ -131,6 +131,49 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
             classDeclaration = classDeclaration.AddMembers(ctor);
         }
 
+        if (HasOwnedArguments(fieldDescriptions))
+        {
+            classDeclaration = classDeclaration.AddBaseListTypes(
+                SimpleBaseType(ParseTypeName("global::Orleans.Serialization.Invocation.IInvokableArgumentOwner")))
+                .AddMembers(
+                    ParseMemberDeclaration("private int _ownedArgumentState = 1;")!,
+                    ParseMemberDeclaration("""
+                        public bool TryRetainArgumentResources()
+                        {
+                            while (true)
+                            {
+                                var state = global::System.Threading.Volatile.Read(ref _ownedArgumentState);
+                                if (state <= 0) return false;
+                                if (state == int.MaxValue) throw new global::System.InvalidOperationException("Too many active argument owners.");
+                                if (global::System.Threading.Interlocked.CompareExchange(ref _ownedArgumentState, state + 1, state) == state) return true;
+                            }
+                        }
+                        """)!,
+                    ParseMemberDeclaration("""
+                        public void ReleaseArgumentResources()
+                        {
+                            var state = global::System.Threading.Interlocked.Decrement(ref _ownedArgumentState);
+                            if (state == int.MinValue) DisposeOwnedArguments();
+                        }
+                        """)!,
+                    ParseMemberDeclaration("""
+                        public void CompleteArgumentResources()
+                        {
+                            while (true)
+                            {
+                                var state = global::System.Threading.Volatile.Read(ref _ownedArgumentState);
+                                if (state <= 0) return;
+                                if (global::System.Threading.Interlocked.CompareExchange(ref _ownedArgumentState, state | int.MinValue, state) == state)
+                                {
+                                    ReleaseArgumentResources();
+                                    return;
+                                }
+                            }
+                        }
+                        """)!,
+                    GenerateDisposeOwnedArguments(fieldDescriptions));
+        }
+
         if (method.ResponseTimeoutTicks.HasValue)
         {
             classDeclaration = classDeclaration.AddMembers(GenerateResponseTimeoutPropertyMembers(method.ResponseTimeoutTicks.Value));
@@ -615,8 +658,14 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
         INamedTypeSymbol baseClassType)
     {
         var body = new List<StatementSyntax>();
+        var hasOwnedArguments = HasOwnedArguments(fields);
         foreach (var field in fields)
         {
+            if (field is MethodParameterFieldDescription ownedParameter && IsOwnedArgument(ownedParameter))
+            {
+                continue;
+            }
+
             if (field is CancellationTokenSourceFieldDescription ctsField)
             {
                 // C#
@@ -650,6 +699,60 @@ internal class InvokableGenerator(ProxyGenerationContext generationContext)
 
         return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "Dispose")
             .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.OverrideKeyword)))
+            .WithBody(hasOwnedArguments
+                ? Block(TryStatement(Block(ParseStatement("CompleteArgumentResources();")), default, FinallyClause(Block(body))))
+                : Block(body));
+    }
+
+    internal static bool IsOwnedArgument(MethodParameterFieldDescription parameter) =>
+        parameter.Parameter.GetAttributes().Any(attribute =>
+            SymbolEqualityComparer.Default.Equals(
+                attribute.AttributeClass, parameter.LibraryTypes.DisposeOnCompletionAttribute));
+
+    private static bool HasOwnedArguments(List<InvokerFieldDescription> fields) =>
+        fields.OfType<MethodParameterFieldDescription>().Any(IsOwnedArgument);
+
+    private static MemberDeclarationSyntax GenerateDisposeOwnedArguments(List<InvokerFieldDescription> fields)
+    {
+        var body = new List<StatementSyntax>
+        {
+            ParseStatement("var disposalFailure = default(global::System.Runtime.ExceptionServices.ExceptionDispatchInfo);")
+        };
+        var previousReferenceArguments = new List<string>();
+        foreach (var field in fields.OfType<MethodParameterFieldDescription>().Where(IsOwnedArgument))
+        {
+            StatementSyntax? skipDuplicate = null;
+            if (!field.Type.IsValueType)
+            {
+                if (previousReferenceArguments.Count > 0)
+                {
+                    var duplicate = string.Join(" || ", previousReferenceArguments.Select(previous =>
+                        $"global::System.Object.ReferenceEquals({field.FieldName}, {previous})"));
+                    skipDuplicate = ParseStatement($"if ({duplicate}) {{ {field.FieldName} = default; }}");
+                }
+
+                var previousName = $"disposed_{field.FieldName}";
+                body.Add(ParseStatement($"var {previousName} = {field.FieldName};"));
+                previousReferenceArguments.Add(previousName);
+            }
+
+            var dispose = ExpressionStatement(InvocationExpression(
+                ParseName("global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper")
+                    .Member("DisposeOwnedArgument"),
+                ArgumentList(SingletonSeparatedList(
+                    Argument(IdentifierName(field.FieldName)).WithRefKindKeyword(Token(SyntaxKind.RefKeyword))))));
+            var release = skipDuplicate is IfStatementSyntax duplicateCheck
+                ? duplicateCheck.WithElse(ElseClause(Block(dispose)))
+                : (StatementSyntax)dispose;
+            body.Add(TryStatement(Block(release), SingletonList(
+                CatchClause()
+                    .WithDeclaration(CatchDeclaration(ParseTypeName("global::System.Exception"), Identifier("exception")))
+                    .WithBlock(Block(ParseStatement(
+                        "disposalFailure ??= global::System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(exception);")))), null));
+        }
+        body.Add(ParseStatement("disposalFailure?.Throw();"));
+        return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "DisposeOwnedArguments")
+            .WithModifiers(TokenList(Token(SyntaxKind.PrivateKeyword)))
             .WithBody(Block(body));
     }
 

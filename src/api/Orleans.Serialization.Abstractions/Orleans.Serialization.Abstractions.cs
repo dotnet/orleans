@@ -54,6 +54,11 @@ namespace Orleans
         public System.Type ReturnType { get { throw null; } }
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Parameter)]
+    public sealed partial class DisposeOnCompletionAttribute : System.Attribute
+    {
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)]
     public sealed partial class GenerateCodeForDeclaringAssemblyAttribute : System.Attribute
     {

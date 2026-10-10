@@ -37,6 +37,7 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = body,
+                ArgumentResourceLogger = body is Orleans.Serialization.Invocation.IInvokableArgumentOwner ? _logger : null,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
 

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
@@ -12,6 +13,7 @@ namespace Orleans.Runtime
 {
     internal class GrainReferenceRuntime : IGrainReferenceRuntime
     {
+        private readonly ILogger<GrainReferenceRuntime> _logger;
         private readonly GrainReferenceActivator referenceActivator;
         private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
         private readonly IGrainCancellationTokenRuntime cancellationTokenRuntime;
@@ -23,8 +25,10 @@ namespace Orleans.Runtime
             IGrainCancellationTokenRuntime cancellationTokenRuntime,
             IEnumerable<IOutgoingGrainCallFilter> outgoingCallFilters,
             GrainReferenceActivator referenceActivator,
-            GrainInterfaceTypeResolver interfaceTypeResolver)
+            GrainInterfaceTypeResolver interfaceTypeResolver,
+            ILogger<GrainReferenceRuntime> logger)
         {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.RuntimeClient = runtimeClient;
             this.cancellationTokenRuntime = cancellationTokenRuntime;
             this.referenceActivator = referenceActivator;
@@ -40,10 +44,23 @@ namespace Orleans.Runtime
             // TODO: Remove expensive interface type check
             if (this.filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
-                SetGrainCancellationTokensTarget(reference, request);
-                var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
-                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
-                return responseCompletionSource.AsValueTask();
+                var owner = RetainArgumentResources(request);
+                try
+                {
+                    SetGrainCancellationTokensTarget(reference, request);
+                    var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
+                    this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
+                    return responseCompletionSource.AsValueTask();
+                }
+                catch
+                {
+                    InvokableArgumentResources.Complete(owner, _logger);
+                    throw;
+                }
+                finally
+                {
+                    InvokableArgumentResources.Release(owner, _logger);
+                }
             }
             else
             {
@@ -56,10 +73,23 @@ namespace Orleans.Runtime
             // TODO: Remove expensive interface type check
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
-                SetGrainCancellationTokensTarget(reference, request);
-                var responseCompletionSource = ResponseCompletionSourcePool.Get();
-                this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
-                return responseCompletionSource.AsVoidValueTask();
+                var owner = RetainArgumentResources(request);
+                try
+                {
+                    SetGrainCancellationTokensTarget(reference, request);
+                    var responseCompletionSource = ResponseCompletionSourcePool.Get();
+                    this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
+                    return responseCompletionSource.AsVoidValueTask();
+                }
+                catch
+                {
+                    InvokableArgumentResources.Complete(owner, _logger);
+                    throw;
+                }
+                finally
+                {
+                    InvokableArgumentResources.Release(owner, _logger);
+                }
             }
             else
             {
@@ -74,8 +104,21 @@ namespace Orleans.Runtime
             // TODO: Remove expensive interface type check
             if (filters.Length == 0 && request is not IOutgoingGrainCallFilter)
             {
-                SetGrainCancellationTokensTarget(reference, request);
-                this.RuntimeClient.SendRequest(reference, request, context: null, options);
+                var owner = RetainArgumentResources(request);
+                try
+                {
+                    SetGrainCancellationTokensTarget(reference, request);
+                    this.RuntimeClient.SendRequest(reference, request, context: null, options);
+                }
+                catch
+                {
+                    InvokableArgumentResources.Complete(owner, _logger);
+                    throw;
+                }
+                finally
+                {
+                    InvokableArgumentResources.Release(owner, _logger);
+                }
             }
             else
             {
@@ -83,7 +126,17 @@ namespace Orleans.Runtime
             }
         }
 
-        private async ValueTask<TResult?> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        private ValueTask<TResult?> InvokeMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options) =>
+            request is IInvokableArgumentOwner
+                ? InvokeOwnedMethodWithFiltersAsync<TResult>(reference, request, options)
+                : InvokeBorrowedMethodWithFiltersAsync<TResult>(reference, request, options);
+
+        private ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options) =>
+            request is IInvokableArgumentOwner
+                ? InvokeOwnedMethodWithFiltersAsync(reference, request, options)
+                : InvokeBorrowedMethodWithFiltersAsync(reference, request, options);
+
+        private async ValueTask<TResult?> InvokeBorrowedMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
             var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, this.sendRequest, this.filters);
@@ -91,11 +144,89 @@ namespace Orleans.Runtime
             return invoker.TypedResult;
         }
 
-        private async ValueTask InvokeMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        private async ValueTask InvokeBorrowedMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
             SetGrainCancellationTokensTarget(reference, request);
             var invoker = new OutgoingCallInvoker<object>(reference, request, options, this.sendRequest, this.filters);
             await invoker.Invoke();
+        }
+
+        private async ValueTask<TResult?> InvokeOwnedMethodWithFiltersAsync<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            var owner = RetainArgumentResources(request);
+            var sent = false;
+            try
+            {
+                SetGrainCancellationTokensTarget(reference, request);
+                var invoker = new OutgoingCallInvoker<TResult>(reference, request, options, SendOwnedRequest, this.filters);
+                await invoker.Invoke();
+                return invoker.TypedResult;
+            }
+            catch
+            {
+                InvokableArgumentResources.Complete(owner, _logger);
+                throw;
+            }
+            finally
+            {
+                // A filter can short-circuit without handing the request to the transport.
+                if (!sent)
+                {
+                    InvokableArgumentResources.Complete(owner, _logger);
+                }
+
+                InvokableArgumentResources.Release(owner, _logger);
+            }
+
+            void SendOwnedRequest(GrainReference target, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions invocationOptions)
+            {
+                this.sendRequest(target, callback, body, invocationOptions);
+                sent = true;
+            }
+        }
+
+        private async ValueTask InvokeOwnedMethodWithFiltersAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        {
+            var owner = RetainArgumentResources(request);
+            var sent = false;
+            try
+            {
+                SetGrainCancellationTokensTarget(reference, request);
+                var invoker = new OutgoingCallInvoker<object>(reference, request, options, SendOwnedRequest, this.filters);
+                await invoker.Invoke();
+            }
+            catch
+            {
+                InvokableArgumentResources.Complete(owner, _logger);
+                throw;
+            }
+            finally
+            {
+                // A filter can short-circuit without handing the request to the transport.
+                if (!sent)
+                {
+                    InvokableArgumentResources.Complete(owner, _logger);
+                }
+
+                InvokableArgumentResources.Release(owner, _logger);
+            }
+
+            void SendOwnedRequest(GrainReference target, IResponseCompletionSource callback, IInvokable body, InvokeMethodOptions invocationOptions)
+            {
+                this.sendRequest(target, callback, body, invocationOptions);
+                sent = true;
+            }
+        }
+
+        private static IInvokableArgumentOwner? RetainArgumentResources(IInvokable request)
+        {
+            var owner = request as IInvokableArgumentOwner;
+            if (owner is not null && !owner.TryRetainArgumentResources())
+            {
+                throw new OperationCanceledException("The request's owned arguments have already completed.");
+            }
+
+            return owner;
         }
 
         public object Cast(IAddressable grain, Type grainInterface)
