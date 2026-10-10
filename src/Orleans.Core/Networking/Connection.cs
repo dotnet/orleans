@@ -459,7 +459,7 @@ namespace Orleans.Runtime.Messaging
                     }
                     finally
                     {
-                        message.Dispose();
+                        message.Dispose(Log);
                     }
                 }
                 else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
@@ -473,12 +473,12 @@ namespace Orleans.Runtime.Messaging
                 {
                     LogWarningDroppingMessage(Log, exception, message);
                     MessagingMetrics.OnDroppedSentMessage(message);
-                    message.Dispose();
+                    message.Dispose(Log);
                 }
             }
             else
             {
-                message.Dispose();
+                message.Dispose(Log);
             }
         }
 

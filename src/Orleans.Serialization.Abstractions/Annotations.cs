@@ -5,6 +5,20 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Orleans
 {
     /// <summary>
+    /// Gives a generated RPC request ownership of its independently copied or decoded argument.
+    /// </summary>
+    /// <remarks>
+    /// Apply to parameters implementing <see cref="IDisposable"/> whose copier acquires independent ownership.
+    /// The generated request disposes its argument before clearing the field, including when a request is
+    /// rejected before invocation. Active serialization and invocation retain ownership through their
+    /// actual outcome. Direct method calls retain their ordinary caller-assigned ownership.
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Parameter)]
+    public sealed class DisposeOnCompletionAttribute : Attribute
+    {
+    }
+
+    /// <summary>
     /// When applied to a type, specifies that the type is intended to be serialized and that serialization code should be generated for the type.
     /// </summary>
     /// <seealso cref="System.Attribute" />

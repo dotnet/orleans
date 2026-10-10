@@ -161,6 +161,79 @@ public class CallbackDataTests
         Assert.Equal(0.125, Assert.Single(collector.GetMeasurementSnapshot()).Value);
     }
 
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Theory, TestCategory("BVT")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompletionPublicationFailure_StillCompletesOwnedResources(bool timeout)
+    {
+        using var services = CreateServiceProvider();
+        var owner = new ArgumentOwner(new byte[] { 4, 7, 9 });
+        var firstCause = new InvalidOperationException("completion publication failed");
+        var message = new Message { BodyObject = owner };
+        var callback = new CallbackData(CreateSharedCallbackData(_ => { }, TimeProvider.System, TimeSpan.FromSeconds(1)),
+            new ThrowingCompletionSource(firstCause), message, CreateInstruments(services));
+        var observed = Assert.Throws<InvalidOperationException>(() =>
+        {
+            if (timeout) callback.OnTimeout();
+            else callback.OnHostShutdown();
+        });
+        Assert.Same(firstCause, observed);
+        Assert.True(callback.IsCompleted);
+        Assert.Equal(1, owner.CompletionCount);
+        Assert.Null(owner.Buffer);
+        callback.OnHostShutdown();
+        message.Dispose();
+        Assert.Equal(1, owner.CompletionCount);
+        Assert.Null(owner.Buffer);
+    }
+
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [Fact, TestCategory("BVT")]
+    public void CancellationAwaitingAcknowledgement_DoesNotCompleteOwnedResources()
+    {
+        using var services = CreateServiceProvider();
+        var owner = new ArgumentOwner(new byte[] { 4, 7, 9 });
+        var buffer = owner.Buffer;
+        using var cancellation = new CancellationTokenSource();
+        var message = new Message { BodyObject = owner };
+        var callback = new CallbackData(new SharedCallbackData(_ => { }, NullLogger<CallbackData>.Instance,
+            TimeProvider.System, TimeSpan.FromSeconds(1), false, true, null),
+            new TestResponseCompletionSource(), message, CreateInstruments(services));
+        callback.SubscribeForCancellation(cancellation.Token);
+        cancellation.Cancel();
+        Assert.False(callback.IsCompleted);
+        Assert.Equal(0, owner.CompletionCount);
+        Assert.Same(buffer, owner.Buffer);
+        Assert.Equal(new byte[] { 4, 7, 9 }, owner.Buffer);
+        callback.OnHostShutdown();
+        Assert.Equal(1, owner.CompletionCount);
+        Assert.Null(owner.Buffer);
+        message.Dispose();
+    }
+
+    private sealed class ArgumentOwner(byte[] buffer) : IInvokableArgumentOwner
+    {
+        internal byte[]? Buffer = buffer;
+        private int _completed;
+        internal int CompletionCount => _completed;
+        public bool TryRetainArgumentResources() => throw new NotSupportedException("These callback tests do not acquire temporary uses.");
+        public void ReleaseArgumentResources() => throw new NotSupportedException("These callback tests do not acquire temporary uses.");
+        public void CompleteArgumentResources()
+        {
+            if (Interlocked.Exchange(ref _completed, 1) != 0) return;
+            Buffer = null;
+        }
+    }
+
+    private sealed class ThrowingCompletionSource(Exception exception) : IResponseCompletionSource
+    {
+        public void Complete(Response value) => throw exception;
+        public void Complete() => throw exception;
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference CreateCompletedCallback(CancellationToken cancellationToken, ApplicationRequestInstruments instruments)
     {

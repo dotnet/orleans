@@ -7,10 +7,12 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
@@ -21,6 +23,57 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
     /// </summary>
     public static class OrleansGeneratedCodeHelper
     {
+        /// <summary>
+        /// Disposes an owned RPC argument and clears its request field.
+        /// </summary>
+        /// <typeparam name="TArgument">The disposable argument type.</typeparam>
+        /// <param name="argument">The independently owned copied or decoded argument.</param>
+        public static void DisposeOwnedArgument<TArgument>(ref TArgument argument) where TArgument : IDisposable
+        {
+            try
+            {
+                if (argument is not null)
+                {
+                    argument.Dispose();
+                }
+            }
+            finally
+            {
+                argument = default!;
+            }
+        }
+
+        /// <summary>
+        /// Completes a partially initialized request while preserving the failure which interrupted initialization.
+        /// </summary>
+        /// <param name="request">The request owning copied or decoded arguments.</param>
+        /// <param name="cause">The failure which interrupted copying, decoding, or submission.</param>
+        /// <param name="services">The services used to resolve the cleanup logger.</param>
+        /// <exception cref="AggregateException">
+        /// Cleanup failed and a logger was unavailable. The aggregate contains the original cause followed by the cleanup failure.
+        /// </exception>
+        public static void CompleteArgumentResourcesOnFailure(IInvokableArgumentOwner request, Exception cause, IServiceProvider services)
+        {
+            if (request is null) throw new ArgumentNullException(nameof(request));
+            if (cause is null) throw new ArgumentNullException(nameof(cause));
+            if (services is null) throw new ArgumentNullException(nameof(services));
+
+            try
+            {
+                request.CompleteArgumentResources();
+            }
+            catch (Exception cleanupFailure)
+            {
+                var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Orleans.Serialization.Invocation");
+                if (logger is null)
+                {
+                    throw new AggregateException("RPC initialization and owned argument cleanup failed.", cause, cleanupFailure);
+                }
+
+                logger.LogWarning(cleanupFailure, "Error releasing explicitly owned RPC argument resources");
+            }
+        }
+
         private static readonly ThreadLocal<RecursiveServiceResolutionState> ResolutionState = new ThreadLocal<RecursiveServiceResolutionState>(() => new RecursiveServiceResolutionState());
 
         internal static void EnterServiceResolution(ICodecProvider provider, CodecProvider.ConstructionScope scope)

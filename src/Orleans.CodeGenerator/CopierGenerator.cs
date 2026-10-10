@@ -212,7 +212,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         var fields = new List<GeneratedFieldDescription>();
 
         var hotReloadShape = UseHotReloadShape(serializableTypeDescription);
-        if (hotReloadShape)
+        if (hotReloadShape || serializableTypeDescription.Members.OfType<MethodParameterFieldDescription>().Any(InvokableGenerator.IsOwnedArgument))
         {
             fields.Add(new CodecProviderFieldDescription(LibraryTypes.ICodecProvider.ToTypeSyntax()));
         }
@@ -464,7 +464,20 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
 
         if (!membersCopied)
         {
-            GenerateMemberwiseCopy(type, copierFields, members, originalParam, contextParam, resultVar, body, onlyDeepFields);
+            if (type.Members.OfType<MethodParameterFieldDescription>().Any(InvokableGenerator.IsOwnedArgument))
+            {
+                var copyBody = new List<StatementSyntax>();
+                GenerateMemberwiseCopy(type, copierFields, members, originalParam, contextParam, resultVar, copyBody, onlyDeepFields);
+                body.Add(TryStatement(Block(copyBody), SingletonList(CatchClause()
+                    .WithDeclaration(CatchDeclaration(ParseTypeName("global::System.Exception"), Identifier("exception")))
+                    .WithBlock(Block(
+                    ParseStatement("global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CompleteArgumentResourcesOnFailure(result, exception, _codecProvider.Services);"),
+                    ThrowStatement()))), null));
+            }
+            else
+            {
+                GenerateMemberwiseCopy(type, copierFields, members, originalParam, contextParam, resultVar, body, onlyDeepFields);
+            }
             body.Add(ReturnStatement(resultVar));
         }
 

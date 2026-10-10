@@ -432,6 +432,17 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             isAsync = true;
         }
 
+        if (invokable.Members.OfType<MethodParameterFieldDescription>().Any(InvokableGenerator.IsOwnedArgument))
+        {
+            return (isAsync, Block(
+                statements[0],
+                TryStatement(Block(statements.Skip(1)), SingletonList(CatchClause()
+                    .WithDeclaration(CatchDeclaration(ParseTypeName("global::System.Exception"), Identifier("exception")))
+                    .WithBlock(Block(
+                    ParseStatement("global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.CompleteArgumentResourcesOnFailure(request, exception, CodecProvider.Services);"),
+                    ThrowStatement()))), null)));
+        }
+
         return (isAsync, Block(statements));
     }
 

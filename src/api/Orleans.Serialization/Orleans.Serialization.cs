@@ -3481,12 +3481,17 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 {
     public static partial class OrleansGeneratedCodeHelper
     {
+        public static void CompleteArgumentResourcesOnFailure(Invocation.IInvokableArgumentOwner request, System.Exception cause, System.IServiceProvider services) { }
+
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field) { }
 
         public static void ConsumeEndBaseOrEndObject<TInput>(this ref Buffers.Reader<TInput> reader) { }
 
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field)
             where TField : class { throw null; }
+
+        public static void DisposeOwnedArgument<TArgument>(ref TArgument argument)
+            where TArgument : System.IDisposable { }
 
         public static System.Reflection.MethodInfo? GetMethodInfoOrDefault(System.Type? interfaceType, string methodName, System.Type[]? methodTypeParameters, System.Type[]? parameterTypes) { throw null; }
 
@@ -3584,6 +3589,13 @@ namespace Orleans.Serialization.Invocation
         void SetArgument(int index, object value);
         void SetTarget(ITargetHolder holder);
         bool TryCancel();
+    }
+
+    public partial interface IInvokableArgumentOwner
+    {
+        void CompleteArgumentResources();
+        void ReleaseArgumentResources();
+        bool TryRetainArgumentResources();
     }
 
     public static partial class InvokablePool

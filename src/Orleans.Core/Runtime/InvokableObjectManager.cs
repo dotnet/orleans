@@ -85,10 +85,17 @@ namespace Orleans
         internal void RejectMessage(Message message)
         {
             LogRejectingMessageDuringShutdown(logger, message);
-            if (message.Direction == Message.Directions.Request)
+            try
             {
-                runtimeClient.SendResponse(message, Response.FromException(
-                    new SiloUnavailableException("The local Orleans host is shutting down and can no longer accept observer invocations.")));
+                if (message.Direction == Message.Directions.Request)
+                {
+                    runtimeClient.SendResponse(message, Response.FromException(
+                        new SiloUnavailableException("The local Orleans host is shutting down and can no longer accept observer invocations.")));
+                }
+            }
+            finally
+            {
+                message.Dispose(logger);
             }
         }
 
@@ -97,6 +104,7 @@ namespace Orleans
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
                 LogNotAddressedToAnObserver(logger, message);
+                message.Dispose(logger);
                 return;
             }
 
@@ -107,6 +115,7 @@ namespace Orleans
             else
             {
                 LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
+                message.Dispose(logger);
             }
         }
 
@@ -213,7 +222,7 @@ namespace Orleans
                     LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
-                    message.Dispose();
+                    message.Dispose(_manager.logger);
                     return;
                 }
 
@@ -339,12 +348,14 @@ namespace Orleans
 
             private async Task ProcessMessageAsync(Message message)
             {
+                IInvokableArgumentOwner? owner = null;
+                IInvokable? ownedRequest = null;
                 try
                 {
                     if (message.IsExpired)
                     {
                         _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
-                        message.Dispose();
+                        message.Dispose(_manager.logger);
                         return;
                     }
 
@@ -375,6 +386,17 @@ namespace Orleans
 
                     try
                     {
+                        if (request is IInvokableArgumentOwner argumentOwner)
+                        {
+                            if (!argumentOwner.TryRetainArgumentResources())
+                            {
+                                throw new OperationCanceledException("The request's owned arguments completed before invocation.");
+                            }
+
+                            owner = argumentOwner;
+                            ownedRequest = request;
+                        }
+
                         request.SetTarget(this);
                         if (TryTakePendingCancellation(message))
                         {
@@ -419,7 +441,23 @@ namespace Orleans
                     }
 
                     // Generated interface metadata is stable throughout the request's lifetime.
-                    _manager.GetAdmissionGate(message).Exit();
+                    var gate = _manager.GetAdmissionGate(message);
+                    try
+                    {
+                        if (ownedRequest is not null)
+                        {
+                            InvokableArgumentResources.Dispose(ownedRequest, _manager.logger);
+                        }
+                        else
+                        {
+                            message.CompleteArgumentResources(_manager.logger);
+                        }
+                    }
+                    finally
+                    {
+                        InvokableArgumentResources.Release(owner, _manager.logger);
+                        gate.Exit();
+                    }
                 }
             }
 
@@ -453,8 +491,17 @@ namespace Orleans
                 }
             }
 
-            private void SendCanceledResponse(Message message) =>
-                _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+            private void SendCanceledResponse(Message message)
+            {
+                try
+                {
+                    _manager.runtimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
+                }
+                finally
+                {
+                    message.Dispose(_manager.logger);
+                }
+            }
 
             private void SendResponseAsync(Message message, Response resultObject)
             {
