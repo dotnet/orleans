@@ -35,6 +35,23 @@ State creation belongs to setup before initialization. After initialization begi
 
 Storage providers can split reads at arbitrary byte boundaries. The journal format buffers incomplete entries and only applies complete ordered records.
 
+### OrleansBinary persisted frames
+
+The `orleans-binary` format reads both legacy variable-length frames (V0) and fixed-width frames (V1). It selects the framing for each entry, so replay preserves physical command order when V1 appends follow a legacy journal. Current appends, preserved-entry writes, and snapshots emit V1.
+
+| Framing | Entry layout | Body length includes |
+| --- | --- | --- |
+| V0 | Orleans varuint32 body length, Orleans varuint64 stream ID, command-format byte `0`, command payload | Encoded stream ID, command-format byte, and command payload |
+| V1 | Framing byte `1`, little-endian uint32 body length, little-endian uint32 stream ID, command payload | Four-byte stream ID and command payload |
+
+The V0 length prefix uses Orleans' variable-length integer encoding. The V1 marker occupies the first byte of each entry and identifies the fixed-width layout. These framing identities remain stable across upgrades.
+
+The journal reader consumes the frame header and the V0 command-format byte before passing exactly one command payload to the state machine. Dictionary, list, queue, set, value, and persistent-state codecs read an Orleans varuint32 command discriminator; the durable task completion source codec reads a single status byte. Both framings use the same command payload encoding, command identities, and Orleans field codecs for operands.
+
+During streaming recovery, incomplete headers and bodies remain buffered until their full entry arrives. Completed input with a truncated or malformed entry fails recovery with the entry's byte offset. Unsupported legacy command-format versions fail before that entry is applied. Retain the readers and command codecs for persisted entries and retired streams throughout the upgrade and rollback window.
+
+Storage format metadata selects the journal reader independently of these per-entry framing versions. When the stored format key is absent, the configured format key selects the reader. Configure `orleans-binary` while recovering binary journals with missing format metadata; see [Migrate a journal format](configuration.md#migrate-a-journal-format) for changing the write format.
+
 ### Custom and caller-owned managers
 
 Grain-scoped managers are enrolled before resolution returns. The standard manager establishes this in its grain-bound constructor and implements both the grain-facing `IDurableStateManager` and the independent journal-owner <xref:Orleans.Journaling.IJournaledStateManager>. Custom grain manager replacements provide both contracts and their registrations as appropriate. They establish enrollment in their constructor or registration factory by enrolling their <xref:Orleans.ILifecycleParticipant`1> for <xref:Orleans.Runtime.IGrainLifecycle>, or subscribing initialization and shutdown callbacks directly. This gives ordinary grains, application-owned bases, and `DurableGrain` the same recovery and shutdown lifecycle for their injected managers.

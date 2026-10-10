@@ -74,7 +74,7 @@ Recovery reads the selected provider's physical namespace using the existing
 journal identity. Changing the selection for a grain type with existing journals
 requires a deliberate data migration or cutover strategy, including rollback.
 
-JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, Orleans treats it as legacy OrleansBinary data for compatibility.
+JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. When the stored key is absent, recovery uses the configured format key. Configure `orleans-binary` to recover binary journals whose metadata has no format key.
 
 If you already have data written with the OrleansBinary format, you can keep using it while you plan a migration:
 
@@ -86,7 +86,9 @@ siloBuilder
             options.JournalFormatKey = "orleans-binary"));
 ```
 
-To migrate to JSON, configure `JournaledStateManagerOptions.JournalFormatKey` to `JsonLinesJournalFormat.JournalFormatKey` and call `UseJsonJournalFormat(...)`, provided by `JsonJournalHostingExtensions`. When a grain recovers data written with a different format than the configured write format, the next write is forced to a full snapshot so the journal is rewritten using JSON and the storage format metadata is updated.
+The OrleansBinary reader accepts legacy variable-length frames and V1 fixed-width frames in physical order, including a legacy journal followed by newly appended V1 entries. Current appends and snapshots use framing marker `1`. Legacy frames carry a command-format byte `0` before the command payload; the reader consumes it before dispatching to the same durable command codecs.
+
+To migrate to JSON, first ensure the binary journal's stored format key is `orleans-binary`, then configure `JournaledStateManagerOptions.JournalFormatKey` to `JsonLinesJournalFormat.JournalFormatKey` and call `UseJsonJournalFormat(...)`, provided by `JsonJournalHostingExtensions`. When a grain recovers data written with a different format than the configured write format, the next write is forced to a full snapshot so the journal is rewritten using JSON and the storage format metadata is updated.
 
 ## Example - Using durable state
 ```csharp
@@ -294,7 +296,7 @@ Each record contains the state id as element 0 and the durable operation payload
 
 Inside the operation payload array, element 0 is the command name, followed by command-specific operands such as keys, values, item arrays, or versions. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
 
-Existing data is read using its stored format metadata, or as legacy OrleansBinary data when metadata is absent, and migrated to the configured write format by the next snapshot write.
+Existing data is read using its stored format key, or the configured format key when the stored key is absent. When stored and configured formats differ, the next write replaces the journal with a snapshot in the configured format.
 
 ## Catalog enumeration
 

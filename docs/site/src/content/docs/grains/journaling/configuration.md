@@ -152,6 +152,8 @@ Serializer naming policies affect application payload values. Journal command na
 
 Providers expose the persisted format key as <xref:Orleans.Journaling.IJournalMetadata.FormatKey> and <xref:Orleans.Journaling.JournalMetadata.FormatKey>. Recovery selects the stored reader independently of the configured write format. When they differ, the next write creates a full snapshot using the configured format and updates the metadata. <xref:Orleans.Journaling.Json.JsonLinesJournalFormat.JournalFormatKey> supplies the JSON Lines format key.
 
+When the stored format key is absent, recovery uses the configured format key. Configure `orleans-binary` to recover binary journals with missing format metadata. Before selecting a different write format, establish the stored key as `orleans-binary` using the provider's format-metadata mechanism and verify recovery. Back up the bytes and metadata together.
+
 Use this deployment sequence:
 
 1. Back up the journal data and provider metadata as one recoverable unit.
@@ -163,6 +165,8 @@ Use this deployment sequence:
 The Orleans binary format key is `orleans-binary`. Configure it explicitly while maintaining an existing binary journal:
 
 :::code language="csharp" source="./snippets/journaling/JournalingConfiguration.cs" id="configure_binary_format":::
+
+The binary reader recovers both legacy variable-length and V1 fixed-width entries. Current appends and snapshots use V1, preserving recovery of mixed journals through upgrades. See [OrleansBinary persisted frames](runtime-behavior.md#orleansbinary-persisted-frames) for the framing and command-codec contract.
 
 An unknown stored format key or incompatible payload fails recovery and leaves the journal unchanged.
 
