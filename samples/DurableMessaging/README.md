@@ -66,23 +66,27 @@ will not replace its declared versions.
    receiver, and owning `ArcBuffer` payload.
 3. `inbox.RegisterHandlers` installs one subject dispatcher per grain. Stock
    registers separate typed reservation and restocking methods; the order registers
-   its typed outcome method. Each method receives the decoded record, inbox context,
-   and cancellation token. Configuration freezes the routes before processing.
+   its typed outcome method. Each registration supplies the grain as state and a
+   static delegate receiving the decoded record, grain, and inbox context.
+   Configuration freezes the routes before processing; synchronous dispatch checks
+   the attempt token before entering the method.
    The console run exercises reservation and outcome subjects; `Restock` supplies
    the additional positive-stock-increment protocol for the same stock inbox.
-   `DurableMessageWriter`, scoped by `AddDurableMessaging`, prepares
-   owned envelopes with one reusable encoder. Local envelopes use `using`; handlers
-   borrow inbox envelopes through actual method completion. `IDurableOutbox.Send`
-   synchronously retains its own slice. Dependency injection disposes the scoped
-   writer at activation teardown.
+   Typed outbox `Send` and `SendReply` rent internal pooled encoders, stage the
+   message, and dispose their temporary envelopes after retaining the outbox's pin.
+   The explicit duplicate-admission call uses `DurableMessageType<T>.Create` and
+   a local `using` owner. Handlers borrow inbox envelopes through actual method
+   completion.
 4. The stock handler runs once. Its inbox completion fact recognizes the same
    command ID across senders and subjects during retention. The result reply uses
    the deterministic child `orders/order-1042/reserve-stock/result`; inventory
    stores the remaining stock, accepted reservation count, and execution count.
    One ID binds an immutable command, including quantity, destination, and subject.
-5. The dispatcher decodes; each typed handler validates, computes results, constructs any outgoing
-   envelope, and checks cancellation **before its first shared mutation**. From
-   that mutation through `context.Complete()` and method return, execution is synchronous.
+5. The dispatcher decodes and checks cancellation at its boundary. Each typed
+   handler validates and computes all results locally. Stock calls `SendReply`
+   before inventory mutation; the helper encodes before outgoing staging.
+   From that first staging through inventory assignment, `context.Complete()`,
+   and method return, execution is synchronous.
    Inventory, outgoing intent, and inbox completion share the journal
    boundary. The runtime owns the subsequent write and acknowledgement.
 6. The order's ordinary submit method awaits `WriteStateAsync` to commit its

@@ -69,50 +69,39 @@ public interface INotificationGrain : IGrainWithStringKey, IDurableMessagingGrai
     ValueTask<int> GetCount();
 }
 
-public sealed class NotificationGrain : Grain, INotificationGrain, IInboxHandler
+public sealed class NotificationGrain : Grain, INotificationGrain
 {
     private readonly IDurableOutbox _outbox;
-    private readonly DurableMessageWriter _writer;
-    private readonly DurableMessageType<Notify> _notification;
     private readonly DurableMessageType<NotificationReceived> _received;
     private readonly IDurableValue<int> _count;
 
     public NotificationGrain(
         IDurableInbox inbox,
         IDurableOutbox outbox,
-        DurableMessageWriter writer,
         [FromKeyedServices(MessagingSubjects.Notify)] DurableMessageType<Notify> notification,
         [FromKeyedServices(MessagingSubjects.NotificationReceived)] DurableMessageType<NotificationReceived> received,
         [FromKeyedServices("notification-count")] IDurableValue<int> count)
     {
         _outbox = outbox;
-        _writer = writer;
-        _notification = notification;
         _received = received;
         _count = count;
-        inbox.RegisterHandler(this);
+        inbox.RegisterHandlers(routes => routes.Register(notification, this,
+            static (message, grain, context) => grain.HandleNotification(message, context)));
     }
 
     public ValueTask<int> GetCount() => new(_count.Value);
 
-    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    private void HandleNotification(Notify message, IInboxHandlerContext context)
     {
-        var message = _notification.Decode(context.Envelope);
         ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);
         var nextCount = checked(_count.Value + 1);
-        using DurableEnvelope? reply = message.ResponseDestination is { } recipient
-            ? _writer.Create(_received, context.Envelope.MessageId.CreateChildKey("result"), recipient,
-                new NotificationReceived(message.Text, context.Envelope.MessageId))
-            : null;
-        cancellationToken.ThrowIfCancellationRequested();
-
-        _count.Value = nextCount;
-        if (reply is { } envelope)
+        if (message.ResponseDestination is { } recipient)
         {
-            _outbox.Send(envelope);
+            _outbox.SendReply(_received, context, recipient,
+                new NotificationReceived(message.Text, context.Envelope.MessageId));
         }
+        _count.Value = nextCount;
         context.Complete();
-        return ValueTask.CompletedTask;
     }
 }
 // </messaging_grain>
@@ -127,18 +116,14 @@ public sealed class NotificationSenderGrain(
     IDurableOutbox outbox,
     IDurableStateManager stateManager,
     [FromKeyedServices("sent-count")] IDurableValue<int> sentCount,
-    [FromKeyedServices(MessagingSubjects.Notify)] DurableMessageType<Notify> notification,
-    DurableMessageWriter writer) : Grain, INotificationSenderGrain
+    [FromKeyedServices(MessagingSubjects.Notify)] DurableMessageType<Notify> notification) : Grain, INotificationSenderGrain
 {
     public async Task SendAsync(HierarchicalKey commandId, GrainId receiver, string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        using (var envelope = writer.Create(notification, commandId, receiver, new Notify(message)))
-        {
-            var nextCount = checked(sentCount.Value + 1);
-            sentCount.Value = nextCount;
-            outbox.Send(envelope);
-        }
+        var nextCount = checked(sentCount.Value + 1);
+        outbox.Send(notification, commandId, receiver, new Notify(message));
+        sentCount.Value = nextCount;
         await stateManager.WriteStateAsync();
     }
 }

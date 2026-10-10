@@ -15,18 +15,17 @@ Journaling and Durable Jobs and call
 Use persistent shared providers for deployments; the in-memory configuration is
 suited to local execution.
 
-All handler examples finish local validation, asynchronous preparation, and envelope
-construction before the first shared mutation. Their final shared update, sends,
+All handler examples finish local validation and asynchronous preparation before
+the first shared mutation. Typed sends encode before staging, followed by the
+prepared business update. Their outgoing staging, shared update,
 `Complete()`, and method return run synchronously. The inbox owns their journal
 write. Ordinary methods explicitly await their application's journal write. Register one
 non-generic handler per inbox and inject the outbox directly. Exact subjects identify
 protocol operations; keyed <xref:Orleans.DurableMessaging.DurableMessageType`1>
-bindings select their ordinary serializers. The scoped
-<xref:Orleans.DurableMessaging.DurableMessageWriter> owns the reusable activation
-encoder and is disposed by dependency injection. Handler context payloads are
-borrowed; each prepared reply is a local `using` envelope. The outbox retains its own
-pin during staging, and local ownership is released even when preparation or staging
-throws.
+bindings select their ordinary serializers. Typed outbox `Send` and `SendReply`
+use private pooled encoders and release temporary envelopes internally after
+staging retains their payload pins. Handler context payloads are borrowed.
+Bulk preparation and raw/package protocols retain explicit local ownership.
 
 ## Run the stock-reservation sample
 
@@ -54,7 +53,7 @@ Use one inventory grain per tenant/SKU with `available-stock`. The sender derive
 the envelope's command ID using
 [OrderOperationKeys](durable-messaging-idempotency.md#hierarchical-business-operation-keys),
 and places the quantity and response destination in `ReserveStock`. The
-[typed writer](durable-messaging.md#encode-ordinary-application-values) encodes the
+[typed send helper](durable-messaging.md#encode-ordinary-application-values) encodes the
 record under `inventory.reserve.v1` into an owning, read-only Arc slice.
 
 The inventory registers typed methods through
@@ -62,11 +61,15 @@ The inventory registers typed methods through
 `inventory.reserve.v1` selects `ReserveStock` and its reservation method;
 `inventory.restock.v1` selects `Restock` and its stock-increment method. One
 dispatcher performs exact subject lookup and typed decoding, so each method
-receives its application record directly.
+receives its application record directly. Each registration passes the grain as
+state and uses a static delegate. Synchronous dispatch checks cancellation at the
+boundary before entering these methods.
 
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_inventory" language="csharp":::
 
-The first command commits a stock decrement, its deterministic `result` reply,
+The reservation method computes its next stock and result locally. `SendReply`
+encodes and stages the deterministic `result` reply, then the method applies stock
+and completes synchronously. The first command commits that stock decrement, reply,
 and inbox completion together. A repeat with the same command ID recognizes the
 retained completion fact and preserves the original handler effects. A shortage
 sends `Reserved = false` and completes with unchanged stock. That rejection is a
@@ -93,7 +96,9 @@ reconciliation protocol.
 
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_payment" language="csharp":::
 
-The provider call precedes shared journaled changes. If it succeeds and activation
+The provider call precedes shared journaled changes. The static asynchronous route
+passes its token to the gateway, and the method checks cancellation after that
+await before `SendReply` and the final result update. If the provider succeeds and activation
 loss interrupts the local commit, a replacement attempt uses the same provider key.
 The canonical envelope ID is also the provider idempotency key. After local
 completion, the inbox recognizes a resubmission during retention. The result-query
@@ -135,7 +140,8 @@ recipient set.
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_fanout" language="csharp":::
 
 The campaign record and every outgoing intent are captured in the same sender
-journal write. Fan-out prepares all envelopes locally before changing shared state,
+journal write. Fan-out uses the type binding's owning `Create` method to prepare
+all envelopes locally before changing shared state,
 then disposes every local owner in `finally`, including partial preparation on failure.
 The outbox keeps its independently retained pins through acknowledgement and delivery.
 Each destination commits independently through the
@@ -163,8 +169,10 @@ progress and result queries:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_dispatcher" language="csharp":::
 
-The dispatcher matches subjects ordinally, decodes using the registered binding,
-and returns the actual handler `ValueTask`. Its routes freeze on first handling.
+The dispatcher matches subjects ordinally and invokes typed handler objects
+containing each binding, static delegate, and grain state argument. Configuration
+freezes the routes before installation. Asynchronous routes return their actual
+handler `ValueTask`.
 Each delegate explicitly completes in the same synchronous block as its shared
 mutation and actual method return. Unknown subjects and decode failures enter
 processing retry/dead-letter policy before mutation.
@@ -196,11 +204,11 @@ records, using the durable inbox/outbox commit boundary for outgoing intent:
 | Request/reply grain method | Put the stable command ID and subject in the envelope and the response destination in its body; the handler stages a deterministic typed reply with completion. |
 | Business update followed by a remote call | Stage the outgoing envelope with the business update; acknowledged outbox state drives delivery and retry. |
 | External provider call | Prepare the provider outcome using the canonical command ID, then commit its local query state, reply, and inbox completion together. |
-| Notification loop | Prepare bounded, owned envelopes with one reusable encoder, stage all intents with the campaign record, and release local pins before awaiting the write. |
+| Notification loop | Prepare a bounded batch using the type binding's owning `Create` method, stage all intents with the campaign record, and release local pins before awaiting the write. |
 | Multiple encoded attachments | Build one disposable keyed package; decode only needed borrowed entries while retaining its owner. |
 
 Preserve command identity and recorded outcomes when moving application workflows.
-Typed subject bindings and the scoped writer carry ordinary records in Arc payloads.
+Typed subject bindings and outbox send/reply helpers carry ordinary records in Arc payloads.
 Applications own subject contracts, reply routing, authorization, and ID construction.
 Choose explicit retain/release at each ownership boundary. See
 [Application payload evolution](durable-messaging-operations.md#evolve-application-payload-records)

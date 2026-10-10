@@ -53,12 +53,25 @@ verifies the envelope's subject before reading the borrowed payload.
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_payload" language="csharp":::
 
-Inject <xref:Orleans.DurableMessaging.DurableMessageWriter>, registered scoped by
-`AddDurableMessaging`, to prepare typed envelopes. Its `Create` method takes the
-binding, stable command ID, destination, and body. It assigns the owning grain as
-sender and transfers an independently owned Arc slice to the returned envelope.
-Prepare it before shared mutation, then stage it with the synchronous outbox.
-Serialization failure resets partial encoder output and propagates the error.
+Use the typed outbox `Send` extension with a binding, stable command ID, destination,
+and body. The destination can be a <xref:Orleans.Runtime.GrainId> or an
+<xref:Orleans.Runtime.IAddressable> grain reference. The helper encodes the body,
+assigns <xref:Orleans.DurableMessaging.IDurableOutbox.SenderId> as sender, stages
+the envelope, and releases its temporary owner after the outbox retains its pin.
+
+The typed `SendReply` extension takes the binding, inbox context, explicit
+destination, and result body. It derives the reply ID by appending the literal
+`result` segment to the received command ID. The application supplies the reply
+destination, for example from its request body. Compute fallible business results
+locally, call typed send/reply before business mutation, then apply the prepared
+state and call `Complete()` synchronously. Encoding finishes before the helper's
+first outbox mutation; serialization errors propagate with no outgoing intent staged.
+
+For explicit admission or bulk preparation,
+<xref:Orleans.DurableMessaging.DurableMessageType`1.Create*> accepts the command ID,
+sender ID, destination ID, and body and returns an owning envelope. Use `using` or
+`finally` for these explicitly created owners. The typed outbox helpers manage
+their envelopes internally.
 
 Subjects use exact ordinal spelling, for example `inventory.reserve.v1`. Register
 each subject once; separate subjects can bind the same CLR type. Define supported
@@ -73,11 +86,18 @@ each successful handler explicitly calls `Complete()` and returns synchronously
 after shared mutation. See [Inventory dispatch](durable-messaging-recipes.md#reserve-inventory-once-per-order-line)
 and [Typed dispatch](durable-messaging-recipes.md#combine-the-recipes-into-an-order-workflow).
 
-`Register` accepts either a synchronous `Action<T, IInboxHandlerContext>` or a
-`Func<T, IInboxHandlerContext, CancellationToken, ValueTask>`. The synchronous
-overload checks the attempt token after decoding and before entering the method.
-Both forms use explicit `Complete()`. Use the task-returning form for asynchronous
-preparation and for cancellation checks within application preparation.
+`Register` accepts synchronous actions or asynchronous functions returning
+`ValueTask`. Pass a state argument with an
+`Action<T, TArg, IInboxHandlerContext>` or
+`Func<T, TArg, IInboxHandlerContext, CancellationToken, ValueTask>` to use static
+delegates. The dispatcher stores typed handler objects with that state and invokes
+their concrete generic serializer directly, supporting AOT compilation. Simple
+delegate overloads are also available.
+
+Synchronous dispatch checks the attempt token after decoding and before entering
+the method. These short synchronous methods proceed through explicit `Complete()`
+and return in the same turn. Asynchronous preparation receives the token and checks
+it after awaited work and before outgoing staging or business mutation.
 
 ### Own and borrow payload slices
 
@@ -88,31 +108,32 @@ payload. A struct assignment copies the view, not its ownership: use
 <xref:Orleans.DurableMessaging.DurableEnvelope.Retain*> to obtain an independent
 payload pin, and dispose each owning envelope exactly once.
 
-The scoped message writer writes ordinary records into one reusable
-<xref:Orleans.Serialization.Buffers.ArcBufferWriter> per non-reentrant activation.
+Typed encoding rents an <xref:Orleans.Serialization.Buffers.ArcBufferWriter>
+from a private shared pool for the synchronous serialization call.
 <xref:Orleans.Serialization.Buffers.ArcBufferWriter.ConsumeSlice*> returns an owned
 slice of the newly written bytes; subsequent messages occupy disjoint regions and
 can share backing pages. Consuming a slice advances the writer's readable range;
-the returned slice independently keeps its pages alive. Dependency injection
-disposes the scoped writer at activation teardown. Raw encoders have the same
-scope-owned lifetime and synchronous usage contract.
+the returned slice independently keeps its pages alive after the encoder returns
+to the pool. Failed encoding clears partial output before returning the encoder.
+Application-owned raw encoders have explicit scope disposal and synchronous usage.
 
 | Boundary | Ownership and release |
 | --- | --- |
 | Application constructs a slice or envelope | The caller owns it. Use `using` and dispose after staging or handing it to a delivery call which acquires independent ownership. |
+| Typed outbox `Send` or `SendReply` | Encodes and stages synchronously, then disposes its temporary envelope. Durable state owns the independently retained pin. |
 | `IDurableOutbox.Send(envelope)` | Borrows the envelope during the call. Durable dictionary state retains its own pin, so the caller can dispose its local owner immediately after staging. |
 | `IInboxHandlerContext.Envelope` | Borrowed until the actual handler method ends, including asynchronous preparation. Do not dispose the context envelope or its payload. Retain explicitly when keeping it longer. |
 | Direct `IDurableInboxExtension.DeliverAsync` call | Borrows the caller's envelope and retains an admission pin before its first asynchronous wait. The caller can dispose its local owner after initiating the call. Admission retains its pin until the actual acceptance operation finishes, including when the caller cancels its wait. |
 | `IDurableInboxExtension` RPC request | The generated proxy synchronously copies the envelope with an independent pin; the receiving request owns its decoded slice. The caller can dispose its local owner after initiating the call. Serialization and invocation retain active uses; terminal responses, rejection, cancellation, and shutdown release request ownership after those uses finish. |
 | Ordinary persistence or networking serialization | Borrows the payload and leaves its pin intact. Repeated serialization is non-consuming. Operation buffers and decoded owners have their own lifetimes. |
 
-Prepare replies as local `using` envelopes before shared mutations. Stage sends and
-call `Complete()` in the same final synchronous block, with no awaits from the first
-mutation through handler return. Scope disposal releases local replies on both
-success and exceptions; staged durable state keeps its independent pin. Never
-release an operation's retained owner merely because a caller stopped waiting: an
-actual in-flight operation can still read its bytes. The caller's local owner and
-the operation's retained owner have independent lifetimes.
+Compute reply bodies and proposed state locally before shared mutations. Typed
+`SendReply` serializes and stages the reply before applying that state. Continue
+through `Complete()` and actual handler return synchronously. For a batch of outputs,
+create every owning envelope before staging any shared changes, then stage the
+prepared envelopes and release all local owners, including partial preparation
+on failure. In-flight operations retain their own payload pins through actual
+completion independently of the caller's wait or local owner.
 
 Messaging registers
 <xref:Orleans.Journaling.IDurableDictionaryValueLifecycle`1> for envelopes and
@@ -263,9 +284,12 @@ Application dispatch, validation, authorization, and decoding run inside the han
 <xref:Orleans.DurableMessaging.IInboxHandler.HandleAsync*> returns a
 <xref:System.Threading.Tasks.ValueTask>. Perform fallible computation, asynchronous
 I/O, validation and envelope serialization using operation-local values. Recheck
-relevant preconditions and observe cancellation before the first shared mutation.
-Then apply the complete business update, stage outgoing messages using
-`outbox.Send(envelope)`, and call <xref:Orleans.DurableMessaging.IInboxHandlerContext.Complete*>.
+relevant preconditions after asynchronous preparation and observe cancellation
+before the first shared mutation. Synchronous typed routes receive the dispatcher's
+boundary cancellation check. Compute the complete business update locally, stage
+typed outgoing messages before applying it, and call
+<xref:Orleans.DurableMessaging.IInboxHandlerContext.Complete*>. For several outgoing
+messages, encode every envelope before staging the prepared batch.
 From the first shared-state mutation until the handler method completes, perform
 these operations without an intervening await, including after `Complete()`.
 This is the handler's coding contract; ordinary journaled collections remain the
@@ -281,9 +305,10 @@ acknowledgement establishes durability and releases the captured outgoing cohort
 for dispatch.
 
 The journal owner's final capture hook establishes a durable wakeup for outgoing
-intents before capture. Applications construct and encode outgoing envelopes locally
-before the first shared mutation, then call the directly injected outbox's synchronous
-`Send(envelope)` in the final block. Earlier journal writes can complete during
+intents before capture. Applications compute results locally and use typed outbox
+helpers to encode before their first outgoing mutation, followed by synchronous
+business changes and completion. Bulk output prepares all envelopes before the
+final block. Earlier journal writes can complete during
 asynchronous local preparation because proposed business effects are still local.
 
 Every successful handler calls `Complete()`, including handlers which produce no
@@ -409,8 +434,8 @@ handling before returning. The inbox owns their journal write:
 
 :::code source="../snippets/compiled/Grains/DurableMessagingSnippets.cs" id="messaging_grain" language="csharp":::
 
-An ordinary grain method accepts a stable application command ID, prepares its
-typed envelope, then stages its submission count and outgoing intent synchronously,
+An ordinary grain method accepts a stable application command ID, computes its
+submission count, then uses typed `Send` before assigning that count synchronously,
 then persists both through the application-facing state manager. The outbox hook
 confirms the wakeup before capture:
 

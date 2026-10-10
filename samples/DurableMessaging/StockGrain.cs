@@ -17,22 +17,20 @@ public sealed class StockGrain : Grain, IStockGrain
     private readonly IDurableStateManager _state;
     private readonly IDurableValue<Inventory> _inventory;
     private readonly DurableMessageType<ReservationOutcome> _result;
-    private readonly DurableMessageWriter _writer;
 
     public StockGrain(IDurableInbox inbox, IDurableOutbox outbox,
-        IDurableStateManager state, DurableMessageWriter writer,
+        IDurableStateManager state,
         [FromKeyedServices(StockProtocol.Reserve)] DurableMessageType<ReserveStock> reserve,
         [FromKeyedServices(StockProtocol.Restock)] DurableMessageType<Restock> restock,
         [FromKeyedServices(StockProtocol.Result)] DurableMessageType<ReservationOutcome> result)
     {
         _outbox = outbox;
         _state = state;
-        _writer = writer;
         _result = result;
         _inventory = state.GetOrAddState<IDurableValue<Inventory>>("stock");
         inbox.RegisterHandlers(routes => routes
-            .Register(reserve, HandleReserveStock)
-            .Register(restock, HandleRestock));
+            .Register(reserve, this, static (request, grain, context) => grain.HandleReserveStock(request, context))
+            .Register(restock, this, static (request, grain, context) => grain.HandleRestock(request, context)));
     }
 
     public async Task InitializeAsync(int quantity)
@@ -49,7 +47,7 @@ public sealed class StockGrain : Grain, IStockGrain
     public Task<StockSnapshot> GetSnapshotAsync() => Task.FromResult(new StockSnapshot(
         _inventory.Value ?? throw new InvalidOperationException("Initialize stock first.")));
 
-    private ValueTask HandleReserveStock(ReserveStock request, IInboxHandlerContext context, CancellationToken cancellationToken)
+    private void HandleReserveStock(ReserveStock request, IInboxHandlerContext context)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
         var inventory = _inventory.Value ?? throw new InvalidOperationException("Initialize stock first.");
@@ -59,19 +57,13 @@ public sealed class StockGrain : Grain, IStockGrain
         var next = new Inventory(outcome.RemainingStock,
             checked(inventory.Reservations + (accepted ? 1 : 0)),
             checked(inventory.ProcessedRequests + 1));
-        using var reply = _writer.Create(_result, context.Envelope.MessageId.CreateChildKey("result"),
-            request.ReplyDestination, outcome);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        // Final block: all fallible preparation is finished. No await through handler return.
-        // Inventory, reply intent, and inbox completion share one journal write.
+        // SendReply encodes before staging; remaining changes run synchronously through return.
+        _outbox.SendReply(_result, context, request.ReplyDestination, outcome);
         _inventory.Value = next;
-        _outbox.Send(reply);
         context.Complete();
-        return ValueTask.CompletedTask;
     }
 
-    private ValueTask HandleRestock(Restock request, IInboxHandlerContext context, CancellationToken cancellationToken)
+    private void HandleRestock(Restock request, IInboxHandlerContext context)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
         var inventory = _inventory.Value ?? throw new InvalidOperationException("Initialize stock first.");
@@ -80,10 +72,7 @@ public sealed class StockGrain : Grain, IStockGrain
             Remaining = checked(inventory.Remaining + request.Quantity),
             ProcessedRequests = checked(inventory.ProcessedRequests + 1)
         };
-        cancellationToken.ThrowIfCancellationRequested();
-
         _inventory.Value = next;
         context.Complete();
-        return ValueTask.CompletedTask;
     }
 }

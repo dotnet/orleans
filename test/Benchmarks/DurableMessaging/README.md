@@ -39,10 +39,11 @@ iteration repetition; there is no polling or manually driven pump.
 
 ## Typed subjects, command identity, and memory
 
-The non-generic inbox handler decodes `SequentialMessage` using a keyed
+The dispatcher decodes `SequentialMessage` using a keyed
 `DurableMessageType<SequentialMessage>` binding for `benchmarks.sequential-hop.v1`.
-The scoped `DurableMessageWriter` prepares each outgoing owning envelope with the
-ordinary typed serializer. Its envelope contains a command ID, subject, sender,
+Its registration stores the grain as state and invokes a static synchronous
+delegate. Typed outbox `Send` encodes and stages the next hop before business
+counter updates, then disposes its temporary owner internally. Each envelope contains a command ID, subject, sender,
 receiver, and read-only Arc payload. Normal inbox/outbox delivery traverses the
 production pipeline, and the journal hook observes every actual acknowledgement.
 
@@ -52,13 +53,13 @@ All 1,024 hops have distinct command IDs, and retries retain the same hop ID. Th
 next hop constructs its key from the run and hop rather than extending a parent
 chain. The warm-up invocation uses its own run ID.
 
-Each non-reentrant activation reuses the scoped writer's `ArcBufferWriter`, which
-dependency injection disposes at teardown. `ConsumeSlice` returns
+Typed encoding rents `ArcBufferWriter` instances from a private shared pool.
+`ConsumeSlice` returns
 owned, disjoint slices of freshly encoded messages; small messages can occupy shared
-pages. The caller disposes each local envelope after staging, and the durable outbox
+pages. The helper disposes each temporary envelope after staging, and the durable outbox
 dictionary retains its own pin. Handler context envelopes are borrowed until the
-actual handler method ends. The application disposes its local output envelopes
-and retains additional owners explicitly when extending a borrowed lifetime.
+actual handler method ends. Independently retained slices keep their pages alive
+after encoder reuse.
 Ordinary payload serialization is non-consuming, so journal capture and repeated
 sends preserve the owning pins. Generated RPC request copying separately retains
 the request clone for the extension to release on every path.

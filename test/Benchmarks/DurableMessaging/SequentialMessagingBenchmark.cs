@@ -147,7 +147,7 @@ public sealed record SequentialMessage(
     [property: Id(2)] int MessageCount);
 
 /// <summary>Runs each hop through the production inbox, outbox, journal, and durable-job pumps.</summary>
-public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain, IInboxHandler, IJournaledStateHook
+public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain, IJournaledStateHook
 {
     /// <summary>The exact protocol subject for a sequential hop.</summary>
     public const string Subject = "benchmarks.sequential-hop.v1";
@@ -159,7 +159,6 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
     private readonly IDurableValue<SequentialMessage> _progress;
     private readonly CommittedHopProbe _probe;
     private readonly DurableMessageType<SequentialMessage> _type;
-    private readonly DurableMessageWriter _writer;
     private SequentialMessage? _captured;
 
     /// <summary>Constructs the ring participant and its acknowledgement observer.</summary>
@@ -172,8 +171,7 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
         [FromKeyedServices("ring-processed")] IDurableValue<long> processed,
         [FromKeyedServices("ring-progress")] IDurableValue<SequentialMessage> progress,
         CommittedHopProbe probe,
-        [FromKeyedServices(Subject)] DurableMessageType<SequentialMessage> type,
-        DurableMessageWriter writer)
+        [FromKeyedServices(Subject)] DurableMessageType<SequentialMessage> type)
     {
         _outbox = outbox;
         _state = state;
@@ -182,8 +180,8 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
         _progress = progress;
         _probe = probe;
         _type = type;
-        _writer = writer;
-        inbox.RegisterHandler(this);
+        inbox.RegisterHandlers(routes => routes.Register(type, this,
+            static (message, grain, context) => grain.HandleHop(message, context)));
         journal.Hooks.Add(this);
     }
 
@@ -197,44 +195,31 @@ public sealed class SequentialMessagingGrain : Grain, ISequentialMessagingGrain,
     /// <inheritdoc/>
     public async Task StartAsync(Guid runId, int messageCount)
     {
-        using (var envelope = CreateEnvelope(new SequentialMessage(runId, 0, messageCount)))
-        {
-            _outbox.Send(envelope);
-        }
+        SendHop(new SequentialMessage(runId, 0, messageCount));
         await _state.WriteStateAsync();
     }
 
     /// <inheritdoc/>
     public Task<long> GetProcessedCountAsync() => Task.FromResult(_processed.Value);
 
-    /// <inheritdoc/>
-    public ValueTask HandleAsync(
-        IInboxHandlerContext context, CancellationToken cancellationToken)
+    private void HandleHop(SequentialMessage message, IInboxHandlerContext context)
     {
-        var message = _type.Decode(context.Envelope);
-        ArgumentNullException.ThrowIfNull(message);
         if (message.RunId == Guid.Empty || message.Hop < 0 || message.Hop >= message.MessageCount)
         {
             throw new ArgumentException("The sequential message has an invalid run or hop.");
         }
         var nextCount = checked(_processed.Value + 1);
-        using DurableEnvelope? output = message.Hop + 1 < message.MessageCount
-            ? CreateEnvelope(message with { Hop = message.Hop + 1 })
-            : null;
-        cancellationToken.ThrowIfCancellationRequested();
-
+        if (message.Hop + 1 < message.MessageCount)
+        {
+            SendHop(message with { Hop = message.Hop + 1 });
+        }
         _processed.Value = nextCount;
         _progress.Value = message;
-        if (output is { } envelope)
-        {
-            _outbox.Send(envelope);
-        }
         context.Complete();
-        return ValueTask.CompletedTask;
     }
 
-    private DurableEnvelope CreateEnvelope(SequentialMessage message) =>
-        _writer.Create(_type, HierarchicalKey.Create(
+    private void SendHop(SequentialMessage message) =>
+        _outbox.Send(_type, HierarchicalKey.Create(
             "runs", message.RunId.ToString("N"), "hops", message.Hop.ToString(CultureInfo.InvariantCulture)),
             _next.Value, message);
 

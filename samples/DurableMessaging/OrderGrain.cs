@@ -18,56 +18,50 @@ public sealed class OrderGrain : Grain, IOrderGrain, IJournaledStateHook
     private readonly IDurableStateManager _state;
     private readonly IDurableList<ReservationOutcome> _receipts;
     private readonly DurableMessageType<ReserveStock> _reserve;
-    private readonly DurableMessageWriter _writer;
     private readonly CommittedReceiptsProbe _probe;
     private ReservationOutcome[] _captured = [];
 
     public OrderGrain(IDurableInbox inbox, IDurableOutbox outbox, IDurableStateManager state,
-        IJournaledStateManager journal, DurableMessageWriter writer,
+        IJournaledStateManager journal,
         [FromKeyedServices(StockProtocol.Reserve)] DurableMessageType<ReserveStock> reserve,
         [FromKeyedServices(StockProtocol.Result)] DurableMessageType<ReservationOutcome> result,
         CommittedReceiptsProbe probe)
     {
         _outbox = outbox;
         _state = state;
-        _writer = writer;
         _reserve = reserve;
         _probe = probe;
         _receipts = state.GetOrAddState<IDurableList<ReservationOutcome>>("receipts");
-        inbox.RegisterHandlers(routes => routes.Register(result, HandleResult));
+        inbox.RegisterHandlers(routes => routes.Register(result, this,
+            static (outcome, grain, context) => grain.HandleResult(outcome, context)));
         journal.Hooks.Add(this);
     }
 
     public async Task<HierarchicalKey> ReserveAsync(GrainId stock, HierarchicalKey commandId, int quantity)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
-        using var request = _writer.Create(_reserve, commandId, stock,
-            new ReserveStock(quantity, this.GetGrainId()));
-        _outbox.Send(request); // Send is synchronous and retains its own payload slice.
+        _outbox.Send(_reserve, commandId, stock, new ReserveStock(quantity, this.GetGrainId()));
         await _state.WriteStateAsync(); // Ordinary callers explicitly await intent persistence.
-        return request.MessageId;
+        return commandId;
     }
 
     public async Task<DeliveryResult> ResubmitAsync(GrainId stock, HierarchicalKey commandId, int quantity)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
-        using var request = _writer.Create(_reserve, commandId, stock,
+        using var request = _reserve.Create(commandId, _outbox.SenderId, stock,
             new ReserveStock(quantity, this.GetGrainId()));
         // Explicit admission exposes the duplicate result after the original reply's ACK.
         return await GrainFactory.GetGrain<IDurableInboxExtension>(stock).DeliverAsync(request);
     }
 
-    private ValueTask HandleResult(ReservationOutcome outcome, IInboxHandlerContext context, CancellationToken cancellationToken)
+    private void HandleResult(ReservationOutcome outcome, IInboxHandlerContext context)
     {
         if (context.Envelope.MessageId != outcome.CommandId.CreateChildKey("result"))
         {
             throw new ArgumentException("The reply must identify the original reservation command.");
         }
-        cancellationToken.ThrowIfCancellationRequested();
-
         _receipts.Add(outcome);
         context.Complete();
-        return ValueTask.CompletedTask; // The runtime performs the write and acknowledgement.
     }
 
     // Capture the receipt snapshot before persistence and report it after acknowledgement.

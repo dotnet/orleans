@@ -124,8 +124,8 @@ validation applies those message-specific bounds.
 
 A handler can stage a durable reply whose ID is the command's stable `result` child.
 The [inventory recipe](durable-messaging-recipes.md#reserve-inventory-once-per-order-line)
-prepares its reservation decision and reply, then updates stock, stages the reply,
-and completes synchronously. A shortage is a completed rejection with unchanged
+computes its reservation decision and next stock locally. Typed `SendReply`
+encodes and stages the reply, then the method updates stock and completes synchronously. A shortage is a completed rejection with unchanged
 stock. The originally committed outbox intent supplies result delivery within its
 configured policy. A resubmission acknowledges the retained completion fact and
 preserves that original execution.
@@ -158,8 +158,8 @@ retain the original command ID locally for correlation. Reconcile an ambiguous
 response or retry with the original key. An API with an uncertain outcome requires
 its reconciliation workflow before another effect is authorized.
 
-Once the result is known, construct the reply, observe cancellation, and finish the
-journaled result, outgoing reply, and `Complete()` without awaiting. Every asynchronous
+Once the result is known, observe cancellation, send the typed reply, and finish the
+journaled result and `Complete()` without awaiting. Every asynchronous
 provider call precedes the first shared mutation.
 
 ## Fan-out and multi-grain workflows

@@ -81,13 +81,11 @@ public sealed class InventoryGrain : Grain, IInventoryGrain
     private readonly IDurableValue<int> _available;
     private readonly IDurableStateManager _state;
     private readonly IDurableOutbox _outbox;
-    private readonly DurableMessageWriter _writer;
     private readonly DurableMessageType<ReservationResult> _result;
 
     public InventoryGrain(
         IDurableInbox inbox,
         IDurableOutbox outbox,
-        DurableMessageWriter writer,
         [FromKeyedServices(MessagingSubjects.ReserveStock)] DurableMessageType<ReserveStock> reserve,
         [FromKeyedServices(MessagingSubjects.Restock)] DurableMessageType<Restock> restock,
         [FromKeyedServices(MessagingSubjects.ReservationResult)] DurableMessageType<ReservationResult> result,
@@ -97,11 +95,10 @@ public sealed class InventoryGrain : Grain, IInventoryGrain
         _available = available;
         _state = state;
         _outbox = outbox;
-        _writer = writer;
         _result = result;
         inbox.RegisterHandlers(routes => routes
-            .Register(reserve, HandleReserveStock)
-            .Register(restock, HandleRestock));
+            .Register(reserve, this, static (request, grain, context) => grain.HandleReserveStock(request, context))
+            .Register(restock, this, static (request, grain, context) => grain.HandleRestock(request, context)));
     }
 
     public async Task SetAvailableAsync(int quantity)
@@ -113,30 +110,25 @@ public sealed class InventoryGrain : Grain, IInventoryGrain
 
     public ValueTask<int> GetAvailableAsync() => new(_available.Value);
 
-    private ValueTask HandleReserveStock(ReserveStock request, IInboxHandlerContext context, CancellationToken cancellationToken)
+    private void HandleReserveStock(ReserveStock request, IInboxHandlerContext context)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
         var available = _available.Value;
         var reserved = available >= request.Quantity;
-        using var reply = _writer.Create(_result, context.Envelope.MessageId.CreateChildKey("result"),
-            request.ResponseDestination, new ReservationResult(request.Quantity, reserved));
-        cancellationToken.ThrowIfCancellationRequested();
+        var nextAvailable = reserved ? checked(available - request.Quantity) : available;
+        var result = new ReservationResult(request.Quantity, reserved);
 
-        if (reserved) _available.Value = available - request.Quantity;
-        _outbox.Send(reply);
+        _outbox.SendReply(_result, context, request.ResponseDestination, result);
+        _available.Value = nextAvailable;
         context.Complete();
-        return ValueTask.CompletedTask;
     }
 
-    private ValueTask HandleRestock(Restock request, IInboxHandlerContext context, CancellationToken cancellationToken)
+    private void HandleRestock(Restock request, IInboxHandlerContext context)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
         var available = checked(_available.Value + request.Quantity);
-        cancellationToken.ThrowIfCancellationRequested();
-
         _available.Value = available;
         context.Complete();
-        return ValueTask.CompletedTask;
     }
 }
 // </messaging_inventory>
@@ -166,19 +158,16 @@ public interface IPaymentGrain : IGrainWithStringKey, IDurableMessagingGrain
     ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey commandId);
 }
 
-public sealed class PaymentGrain : Grain, IPaymentGrain, IInboxHandler
+public sealed class PaymentGrain : Grain, IPaymentGrain
 {
     private readonly IIdempotentPaymentGateway _gateway;
     private readonly IDurableOutbox _outbox;
-    private readonly DurableMessageWriter _writer;
-    private readonly DurableMessageType<ChargePayment> _charge;
     private readonly DurableMessageType<PaymentResult> _result;
     private readonly IDurableDictionary<HierarchicalKey, PaymentResult> _results;
 
     public PaymentGrain(
         IDurableInbox inbox,
         IDurableOutbox outbox,
-        DurableMessageWriter writer,
         [FromKeyedServices(MessagingSubjects.ChargePayment)] DurableMessageType<ChargePayment> charge,
         [FromKeyedServices(MessagingSubjects.PaymentResult)] DurableMessageType<PaymentResult> result,
         IIdempotentPaymentGateway gateway,
@@ -186,19 +175,18 @@ public sealed class PaymentGrain : Grain, IPaymentGrain, IInboxHandler
     {
         _gateway = gateway;
         _outbox = outbox;
-        _writer = writer;
-        _charge = charge;
         _result = result;
         _results = results;
-        inbox.RegisterHandler(this);
+        inbox.RegisterHandlers(routes => routes.Register(charge, this,
+            static (request, grain, context, token) => grain.HandleChargeAsync(request, context, token)));
     }
 
     public ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey commandId) =>
         new(_results.TryGetValue(commandId, out var result) ? result : null);
 
-    public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    private async ValueTask HandleChargeAsync(
+        ChargePayment request, IInboxHandlerContext context, CancellationToken cancellationToken)
     {
-        var request = _charge.Decode(context.Envelope);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Amount);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Currency);
         if (request.ResponseDestination.IsDefault)
@@ -213,12 +201,10 @@ public sealed class PaymentGrain : Grain, IPaymentGrain, IInboxHandler
             throw new InvalidOperationException("The payment provider returned an inconsistent result.");
         }
 
-        using var reply = _writer.Create(_result, commandId.CreateChildKey("result"),
-            request.ResponseDestination, result);
         cancellationToken.ThrowIfCancellationRequested();
 
+        _outbox.SendReply(_result, context, request.ResponseDestination, result);
         _results[commandId] = result;
-        _outbox.Send(reply);
         context.Complete();
     }
 }
@@ -235,10 +221,9 @@ public interface IStockProjectionGrain : IGrainWithStringKey, IDurableMessagingG
     ValueTask<StockSnapshot> GetSnapshotAsync();
 }
 
-public sealed class StockProjectionGrain : Grain, IStockProjectionGrain, IInboxHandler
+public sealed class StockProjectionGrain : Grain, IStockProjectionGrain
 {
     private readonly IDurableValue<StockSnapshot> _snapshot;
-    private readonly DurableMessageType<StockSnapshot> _type;
 
     public StockProjectionGrain(
         IDurableInbox inbox,
@@ -246,16 +231,15 @@ public sealed class StockProjectionGrain : Grain, IStockProjectionGrain, IInboxH
         [FromKeyedServices("stock-snapshot")] IDurableValue<StockSnapshot> snapshot)
     {
         _snapshot = snapshot;
-        _type = type;
-        inbox.RegisterHandler(this);
+        inbox.RegisterHandlers(routes => routes.Register(type, this,
+            static (update, grain, context) => grain.HandleSnapshot(update, context)));
     }
 
     public ValueTask<StockSnapshot> GetSnapshotAsync() =>
         new(_snapshot.Value ?? new StockSnapshot(0, 0));
 
-    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    private void HandleSnapshot(StockSnapshot update, IInboxHandlerContext context)
     {
-        var update = _type.Decode(context.Envelope);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(update.Version);
         ArgumentOutOfRangeException.ThrowIfNegative(update.Available);
         var current = _snapshot.Value;
@@ -263,14 +247,11 @@ public sealed class StockProjectionGrain : Grain, IStockProjectionGrain, IInboxH
         {
             throw new ArgumentException("A snapshot version must retain its original value.");
         }
-        cancellationToken.ThrowIfCancellationRequested();
-
         if (current is null || update.Version > current.Version)
         {
             _snapshot.Value = update;
         }
         context.Complete();
-        return ValueTask.CompletedTask;
     }
 }
 // </messaging_projection>
@@ -292,7 +273,6 @@ public sealed class CampaignGrain(
     IDurableStateManager state,
     [FromKeyedServices("campaigns")] IDurableDictionary<Guid, NotificationCampaign> campaigns,
     [FromKeyedServices(MessagingSubjects.Notify)] DurableMessageType<Notify> notification,
-    DurableMessageWriter writer,
     IGrainContext grainContext) : Grain(grainContext), ICampaignGrain
 {
     public ValueTask<NotificationCampaign?> GetCampaignAsync(Guid campaignId) =>
@@ -329,8 +309,8 @@ public sealed class CampaignGrain(
         {
             foreach (var recipient in campaign.Recipients)
             {
-                messages.Add(writer.Create(notification, root.CreateChildKey(recipient.ToString()),
-                    recipient, new Notify(text)));
+                messages.Add(notification.Create(root.CreateChildKey(recipient.ToString()),
+                    outbox.SenderId, recipient, new Notify(text)));
             }
 
             campaigns.Add(campaignId, campaign);
@@ -370,8 +350,8 @@ public sealed class OrderOutcomesGrain : Grain, IOrderOutcomesGrain
     {
         _outcomes = outcomes;
         inbox.RegisterHandlers(routes => routes
-            .Register(reservation, Record)
-            .Register(payment, Record));
+            .Register(reservation, this, static (outcome, grain, context) => grain.Record(outcome, context))
+            .Register(payment, this, static (outcome, grain, context) => grain.Record(outcome, context)));
     }
 
     public ValueTask<int> GetCompletedStepCountAsync() => new(_outcomes.Count);

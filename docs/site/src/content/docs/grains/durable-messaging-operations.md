@@ -164,7 +164,8 @@ throughput alongside steady-state handling.
 
 ### Budget allocations and owned memory
 
-Payloads are owned Arc slices. The scoped typed writer's reusable activation encoder can
+Payloads are owned Arc slices. Typed encoding rents reusable Arc encoders from a
+private shared pool. These encoders can
 pack small messages into disjoint regions of shared pages using `ConsumeSlice`.
 Measure retained pages and their occupancy alongside logical payload length: several
 live messages can share a page, and a retained slice can keep that page alive after
@@ -179,8 +180,9 @@ ends the wait while actual admission, serialization, and invocation retain their
 own pins.
 The handler borrows its context envelope through actual method completion. Release
 application-local envelopes after staging and decoded packages after use; use explicit
-`Retain()` when crossing those lifetimes. Dependency injection disposes the typed
-writer at teardown; application-owned raw encoders follow the same scope lifetime.
+`Retain()` when crossing those lifetimes. Typed send/reply helpers dispose their
+temporary envelopes internally; independently owned slices keep their pages alive
+after pooled encoder reuse. Application-owned raw encoders have explicit scope disposal.
 See [Payload ownership](durable-messaging.md#own-and-borrow-payload-slices) for each
 borrow/retain/release boundary.
 
@@ -232,13 +234,13 @@ diagnostic logs.
 The repository's `DurableMessaging.Sequential` benchmark measures a single chain
 through 2, 4, or 8 interacting grains on one silo. It performs 1,024 sequential
 durable deliveries per invocation and awaits actual journal acknowledgement of every
-handler step. Its non-generic handler decodes an ordinary `SequentialMessage`
-record through a keyed typed binding and stages the scoped writer's owning envelope
-through the directly injected outbox. Each invocation assigns a root once;
+handler step. A keyed typed binding decodes `SequentialMessage` for a static
+handler delegate with the grain as its state argument. Typed outbox `Send` encodes
+and stages each next hop before the grain updates its business counters. Each invocation assigns a root once;
 every hop uses a fixed-depth `runs/{invocation}/hops/{hop}` command ID with invariant
 numeric formatting. Retries preserve that hop's ID. Normal inbox/outbox pumps and
-real time drive progress. Each non-reentrant activation reuses its scoped encoder
-and disposes local outputs after staging. The payload serializer borrows
+real time drive progress. Typed encoding rents internal pooled encoders and
+releases temporary output owners after staging. The payload serializer borrows
 bytes during serialization, so journal capture leaves owners intact. The journal hook
 observes actual acknowledgements independently of handler
 return, and cleanup checks exact total and per-grain business-effect counts.
