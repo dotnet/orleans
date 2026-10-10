@@ -18,12 +18,12 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     private static readonly GrainId Receiver = GrainId.Create("inventory", "widget");
     private static readonly HierarchicalKey Command = HierarchicalKey.Create("orders", "42", "reserve");
     private readonly List<DurableEnvelope> _owned = [];
-    private readonly List<DurableMessageWriter> _writers = [];
     private readonly IDurableOutbox _outbox = Substitute.For<IDurableOutbox>();
     private (List<DurableEnvelope> Output, List<string> Events) _activeAttempt;
 
     public DurableMessagingRecipeTests()
     {
+        _outbox.SenderId.Returns(Receiver);
         _outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
         {
             _activeAttempt.Output.Add(Own(call.Arg<DurableEnvelope>().Retain()));
@@ -33,13 +33,14 @@ public sealed class DurableMessagingRecipeTests : IDisposable
 
     private DurableMessageType<T> Type<T>() => new(typeof(T).Name, _services.GetRequiredService<Serializer<T>>());
 
-    private DurableMessageWriter Writer(GrainId sender)
+    private static (TGrain Grain, IInboxHandler Handler) Register<TGrain>(Func<IDurableInbox, TGrain> factory)
     {
-        var context = Substitute.For<IGrainContext>();
-        context.GrainId.Returns(sender);
-        var writer = new DurableMessageWriter(context);
-        _writers.Add(writer);
-        return writer;
+        var inbox = Substitute.For<IDurableInbox>();
+        IInboxHandler handler = null!;
+        inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => handler = call.Arg<IInboxHandler>());
+        var grain = factory(inbox);
+        inbox.Received(1).RegisterHandler(handler);
+        return (grain, handler);
     }
 
     private DurableEnvelope Own(DurableEnvelope envelope)
@@ -175,13 +176,8 @@ public sealed class DurableMessagingRecipeTests : IDisposable
 
     private (InventoryGrain Grain, IInboxHandler Handler) CreateInventory(TestValue<int> stock)
     {
-        var inbox = Substitute.For<IDurableInbox>();
-        IInboxHandler handler = null!;
-        inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => handler = call.Arg<IInboxHandler>());
-        var grain = new InventoryGrain(inbox, _outbox, Writer(Receiver), Type<ReserveStock>(),
-            Type<Restock>(), Type<ReservationResult>(), Substitute.For<IDurableStateManager>(), stock);
-        inbox.Received(1).RegisterHandler(handler);
-        return (grain, handler);
+        return Register(inbox => new InventoryGrain(inbox, _outbox, Type<ReserveStock>(),
+            Type<Restock>(), Type<ReservationResult>(), Substitute.For<IDurableStateManager>(), stock));
     }
 
     [Theory]
@@ -196,20 +192,20 @@ public sealed class DurableMessagingRecipeTests : IDisposable
             LoseFirstResponse = !cancelAfterProviderSuccess,
             AfterFirstCharge = cancelAfterProviderSuccess ? cancellation.Cancel : null
         };
-        var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), _outbox, Writer(Receiver),
-            Type<ChargePayment>(), Type<PaymentResult>(), gateway, results);
+        var (grain, handler) = Register(inbox => new PaymentGrain(inbox, _outbox,
+            Type<ChargePayment>(), Type<PaymentResult>(), gateway, results));
         var request = new ChargePayment(12.5m, "USD", Sender);
         var key = HierarchicalKey.Create("tenants", "acme", "orders", "42", "charge");
         var first = CreateContext(request, key);
         if (cancelAfterProviderSuccess)
         {
             await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-                await grain.HandleAsync(first.Context, cancellation.Token));
+                await handler.HandleAsync(first.Context, cancellation.Token));
         }
         else
         {
             await Assert.ThrowsAsync<IOException>(async () =>
-                await grain.HandleAsync(first.Context, cancellation.Token));
+                await handler.HandleAsync(first.Context, cancellation.Token));
         }
         Assert.Empty(results);
         Assert.Empty(first.Output);
@@ -217,7 +213,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         Assert.Equal(1, gateway.Charges);
 
         var retry = CreateContext(request, key);
-        await grain.HandleAsync(retry.Context, TestContext.Current.CancellationToken);
+        await handler.HandleAsync(retry.Context, TestContext.Current.CancellationToken);
 
         Assert.Equal(key, retry.Context.Envelope.MessageId);
         Assert.Equal(1, gateway.Charges);
@@ -243,11 +239,10 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var prepared = new TaskCompletionSource<PaymentResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         gateway.ChargeAsync(Command.ToString(), request, Arg.Any<CancellationToken>()).Returns(prepared.Task);
         var attempt = CreateContext(request, Command);
-        var writer = Writer(Receiver);
-        var grain = new PaymentGrain(Substitute.For<IDurableInbox>(), _outbox, writer,
-            Type<ChargePayment>(), Type<PaymentResult>(), gateway, results);
+        var (_, handler) = Register(inbox => new PaymentGrain(inbox, _outbox,
+            Type<ChargePayment>(), Type<PaymentResult>(), gateway, results));
 
-        var handling = grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+        var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
         Assert.False(handling.IsCompleted);
         Assert.Empty(results);
         Assert.Empty(attempt.Output);
@@ -256,7 +251,6 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         prepared.SetResult(outcome);
         await handling;
         Assert.Equal(new[] { "send", "complete" }, attempt.Events);
-        writer.Dispose();
         Assert.Equal(outcome, ReadBody<PaymentResult>(Assert.Single(attempt.Output)));
         Assert.Equal(outcome, results[Command]);
     }
@@ -269,10 +263,10 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         long incomingVersion, int incomingStock, long expectedVersion, int expectedStock)
     {
         var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
-        var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), Type<StockSnapshot>(), snapshot);
+        var (grain, handler) = Register(inbox => new StockProjectionGrain(inbox, Type<StockSnapshot>(), snapshot));
         var attempt = CreateContext(new StockSnapshot(incomingVersion, incomingStock), Command);
 
-        var handling = grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+        var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
         Assert.True(handling.IsCompletedSuccessfully);
         await handling;
@@ -285,11 +279,11 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public async Task Projection_ConflictingVersionPreservesOriginalSnapshot()
     {
         var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
-        var grain = new StockProjectionGrain(Substitute.For<IDurableInbox>(), Type<StockSnapshot>(), snapshot);
+        var (_, handler) = Register(inbox => new StockProjectionGrain(inbox, Type<StockSnapshot>(), snapshot));
         var attempt = CreateContext(new StockSnapshot(10, 99), Command);
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+            await handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
         Assert.Equal(new StockSnapshot(10, 7), snapshot.Value);
         Assert.Empty(attempt.Events);
@@ -330,10 +324,11 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     {
         var campaigns = new TestDictionary<Guid, NotificationCampaign>();
         var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Sender);
         var state = Substitute.For<IDurableStateManager>();
         var grainContext = Substitute.For<IGrainContext>();
         grainContext.GrainId.Returns(Sender);
-        var grain = new CampaignGrain(outbox, state, campaigns, Type<Notify>(), Writer(Sender), grainContext);
+        var grain = new CampaignGrain(outbox, state, campaigns, Type<Notify>(), grainContext);
         var id = Guid.Parse("3dd3fbec-0197-47cf-9233-92ecbddcd057");
         GrainId[] original = [GrainId.Create("notification", "alice"), GrainId.Create("notification", "bob")];
         var recipients = original.ToArray();
@@ -387,10 +382,11 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var campaign = new NotificationCampaign("original", original);
         var campaigns = new TestDictionary<Guid, NotificationCampaign> { [id] = campaign };
         var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Sender);
         var state = Substitute.For<IDurableStateManager>();
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(Sender);
-        var grain = new CampaignGrain(outbox, state, campaigns, Type<Notify>(), Writer(Sender), context);
+        var grain = new CampaignGrain(outbox, state, campaigns, Type<Notify>(), context);
 
         await Assert.ThrowsAsync<ArgumentException>(() => grain.PublishAsync(id,
             changeRecipients ? "original" : "changed",
@@ -404,7 +400,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
 
     private (IInboxHandlerContext Context, List<DurableEnvelope> Output, List<string> Events) CreateContext<T>(T body, HierarchicalKey key)
     {
-        var envelope = Own(Writer(Sender).Create(Type<T>(), key, Receiver, body));
+        var envelope = Own(Type<T>().Create(key, Sender, Receiver, body));
         var context = Substitute.For<IInboxHandlerContext>();
         var output = new List<DurableEnvelope>();
         var events = new List<string>();
@@ -422,7 +418,6 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public void Dispose()
     {
         foreach (var envelope in _owned) envelope.Dispose();
-        foreach (var writer in _writers) writer.Dispose();
         _services.Dispose();
     }
 

@@ -21,18 +21,8 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     private static readonly HierarchicalKey Command = HierarchicalKey.Create("notifications", "42");
     private Serializer Serializer => _services.GetRequiredService<Serializer>();
     private readonly List<DurableEnvelope> _owned = [];
-    private readonly List<DurableMessageWriter> _writers = [];
 
     private DurableMessageType<T> Type<T>() => new(typeof(T).Name, _services.GetRequiredService<Serializer<T>>());
-
-    private DurableMessageWriter Writer(GrainId sender)
-    {
-        var context = Substitute.For<IGrainContext>();
-        context.GrainId.Returns(sender);
-        var writer = new DurableMessageWriter(context);
-        _writers.Add(writer);
-        return writer;
-    }
 
     private DurableEnvelope Own(DurableEnvelope envelope)
     {
@@ -44,10 +34,10 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     public async Task NotificationReply_DerivesResultIdentityFromApplicationCommand()
     {
         var attempt = Create(new Notify("received message", Sender));
-        var handling = attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+        var handling = attempt.Handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
         Assert.True(handling.IsCompletedSuccessfully);
-        Assert.Equal(new[] { "count", "send", "complete" }, attempt.Events);
+        Assert.Equal(new[] { "send", "count", "complete" }, attempt.Events);
         await handling;
         var reply = Assert.Single(attempt.Output);
         Assert.Equal(Sender, reply.ReceiverId);
@@ -56,7 +46,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         Assert.Equal(Type<NotificationReceived>().Subject, reply.Subject);
         Assert.Equal(new NotificationReceived("received message", Command), Type<NotificationReceived>().Decode(reply));
         Assert.Equal(8, attempt.Count.Value);
-        attempt.Inbox.Received(1).RegisterHandler(attempt.Grain);
+        attempt.Inbox.Received(1).RegisterHandler(attempt.Handler);
         attempt.Outbox.Received(1).Send(reply);
         attempt.Context.Received(1).Complete();
     }
@@ -69,7 +59,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await attempt.Grain.HandleAsync(attempt.Context, cancellation.Token));
+            await attempt.Handler.HandleAsync(attempt.Context, cancellation.Token));
 
         Assert.Equal(7, attempt.Count.Value);
         Assert.Empty(attempt.Output);
@@ -77,19 +67,19 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     }
 
     [Fact]
-    public async Task NotificationHandling_CancellationDuringLocalPreparationPreservesBusinessState()
+    public async Task NotificationHandling_CancellationDuringSynchronousPreparationPreservesCompletedOutcome()
     {
         var attempt = Create(new Notify("prepared message", Sender));
         using var cancellation = new CancellationTokenSource();
         attempt.Count.OnRead = cancellation.Cancel;
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await attempt.Grain.HandleAsync(attempt.Context, cancellation.Token));
+        await attempt.Handler.HandleAsync(attempt.Context, cancellation.Token);
 
         attempt.Count.OnRead = null;
-        Assert.Equal(7, attempt.Count.Value);
-        Assert.Empty(attempt.Output);
-        Assert.Empty(attempt.Events);
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.Equal(8, attempt.Count.Value);
+        Assert.Single(attempt.Output);
+        Assert.Equal(new[] { "send", "count", "complete" }, attempt.Events);
     }
 
     [Theory]
@@ -105,11 +95,11 @@ public sealed class DurableMessagingSnippetTests : IDisposable
             cancellation.Cancel();
         };
 
-        var handling = attempt.Grain.HandleAsync(attempt.Context, cancellation.Token);
+        var handling = attempt.Handler.HandleAsync(attempt.Context, cancellation.Token);
 
         Assert.True(handling.IsCompletedSuccessfully);
         Assert.True(cancellation.IsCancellationRequested);
-        Assert.Equal(replyRequested ? new[] { "count", "send", "complete" } : new[] { "count", "complete" }, attempt.Events);
+        Assert.Equal(replyRequested ? new[] { "send", "count", "complete" } : new[] { "count", "complete" }, attempt.Events);
         await handling;
         Assert.Equal(8, attempt.Count.Value);
         attempt.Context.Received(1).Complete();
@@ -119,7 +109,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     public async Task NotificationWithoutReply_StagesCountAndCompletes()
     {
         var attempt = Create(new Notify("received message"));
-        var handling = attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
+        var handling = attempt.Handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
 
         Assert.True(handling.IsCompletedSuccessfully);
         Assert.Equal(new[] { "count", "complete" }, attempt.Events);
@@ -137,7 +127,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     {
         var attempt = Create(new Notify(body));
         var exception = await Assert.ThrowsAnyAsync<ArgumentException>(async () =>
-            await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+            await attempt.Handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
         Assert.IsType(body is null ? typeof(ArgumentNullException) : typeof(ArgumentException), exception);
         Assert.Equal("message.Text", exception.ParamName);
@@ -150,12 +140,12 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     public async Task NotificationHandling_UnexpectedSubjectPreservesBusinessState()
     {
         var attempt = Create(new Notify("prepared"));
-        var unexpected = Own(Writer(Sender).Create(
-            Type<NotificationReceived>(), Command, Receiver, new NotificationReceived("receipt", Command)));
+        var unexpected = Own(Type<NotificationReceived>().Create(
+            Command, Sender, Receiver, new NotificationReceived("receipt", Command)));
         attempt.Context.Envelope.Returns(unexpected);
 
-        await Assert.ThrowsAsync<ArgumentException>(async () =>
-            await attempt.Grain.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await attempt.Handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken));
 
         Assert.Equal(7, attempt.Count.Value);
         Assert.Empty(attempt.Events);
@@ -225,8 +215,7 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     public void Envelope_RetainOwnsIndependentPinAndSerializationDoesNotConsumePayload()
     {
         DurableEnvelope retained;
-        using (var writer = Writer(Sender))
-        using (var envelope = writer.Create(Type<Notify>(), Command, Receiver, new Notify("owned")))
+        using (var envelope = Type<Notify>().Create(Command, Sender, Receiver, new Notify("owned")))
         {
             retained = envelope.Retain();
         }
@@ -248,12 +237,13 @@ public sealed class DurableMessagingSnippetTests : IDisposable
     }
 
     [Fact]
-    public async Task NotificationHandling_StagingFailureReleasesLocalReplyAndLeavesCompletionUnstaged()
+    public async Task NotificationHandling_StagingFailureLeavesBusinessAndCompletionUnstaged()
     {
         var inbox = Substitute.For<IDurableInbox>();
         var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Receiver);
         var context = Substitute.For<IInboxHandlerContext>();
-        var input = Own(Writer(Sender).Create(Type<Notify>(), Command, Receiver, new Notify("prepared", Sender)));
+        var input = Own(Type<Notify>().Create(Command, Sender, Receiver, new Notify("prepared", Sender)));
         context.Envelope.Returns(input);
         ArcBuffer borrowedReply = default;
         outbox.When(value => value.Send(Arg.Any<DurableEnvelope>())).Do(call =>
@@ -261,23 +251,24 @@ public sealed class DurableMessagingSnippetTests : IDisposable
             borrowedReply = call.Arg<DurableEnvelope>().Payload;
             throw new IOException("staging failed");
         });
-        using (var writer = Writer(Receiver))
-        {
-            var grain = new NotificationGrain(inbox, outbox, writer, Type<Notify>(), Type<NotificationReceived>(), new TestCount([]));
-            await Assert.ThrowsAsync<IOException>(async () =>
-                await grain.HandleAsync(context, TestContext.Current.CancellationToken));
-            context.DidNotReceive().Complete();
-            Assert.NotEqual(0, borrowedReply.Length);
-        }
-        Assert.Throws<InvalidOperationException>(() => borrowedReply.ToArray());
+        IInboxHandler handler = null!;
+        inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => handler = call.Arg<IInboxHandler>());
+        var count = new TestCount([]);
+        _ = new NotificationGrain(inbox, outbox, Type<Notify>(), Type<NotificationReceived>(), count);
+        await Assert.ThrowsAsync<IOException>(async () =>
+            await handler.HandleAsync(context, TestContext.Current.CancellationToken));
+        context.DidNotReceive().Complete();
+        Assert.NotEqual(0, borrowedReply.Length);
+        Assert.Equal(7, count.Value);
     }
 
     private Attempt Create(Notify message)
     {
         var inbox = Substitute.For<IDurableInbox>();
         var outbox = Substitute.For<IDurableOutbox>();
+        outbox.SenderId.Returns(Receiver);
         var context = Substitute.For<IInboxHandlerContext>();
-        var input = Own(Writer(Sender).Create(Type<Notify>(), Command, Receiver, message));
+        var input = Own(Type<Notify>().Create(Command, Sender, Receiver, message));
         context.Envelope.Returns(input);
         var events = new List<string>();
         var output = new List<DurableEnvelope>();
@@ -288,20 +279,20 @@ public sealed class DurableMessagingSnippetTests : IDisposable
             events.Add("send");
         });
         context.When(value => value.Complete()).Do(_ => events.Add("complete"));
-        var writer = Writer(Receiver);
-        var grain = new NotificationGrain(inbox, outbox, writer, Type<Notify>(), Type<NotificationReceived>(), count);
-        return new(grain, inbox, outbox, context, count, writer, output, events);
+        IInboxHandler handler = null!;
+        inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => handler = call.Arg<IInboxHandler>());
+        var grain = new NotificationGrain(inbox, outbox, Type<Notify>(), Type<NotificationReceived>(), count);
+        return new(grain, handler, inbox, outbox, context, count, output, events);
     }
 
     public void Dispose()
     {
         foreach (var envelope in _owned) envelope.Dispose();
-        foreach (var writer in _writers) writer.Dispose();
         _services.Dispose();
     }
 
-    private sealed record Attempt(NotificationGrain Grain, IDurableInbox Inbox, IDurableOutbox Outbox,
-        IInboxHandlerContext Context, TestCount Count, DurableMessageWriter Writer, List<DurableEnvelope> Output, List<string> Events);
+    private sealed record Attempt(NotificationGrain Grain, IInboxHandler Handler, IDurableInbox Inbox, IDurableOutbox Outbox,
+        IInboxHandlerContext Context, TestCount Count, List<DurableEnvelope> Output, List<string> Events);
 
     private sealed class TestCount(List<string> events) : IDurableValue<int>
     {
