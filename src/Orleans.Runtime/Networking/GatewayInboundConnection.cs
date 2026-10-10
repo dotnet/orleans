@@ -48,7 +48,7 @@ namespace Orleans.Runtime.Messaging
 
         protected override MessageCenter MessageCenter => this.messageCenter;
 
-        protected override void OnApplicationWriteFailure(Message message) => messageCenter.RecordRetirementSendFailure(message);
+        internal override void OnApplicationWriteFailure(Message message) => messageCenter.RecordRetirementSendFailure(message);
 
         internal protected override void RecordMessageReceive(Message message, int totalBytes, int headerBytes)
         {

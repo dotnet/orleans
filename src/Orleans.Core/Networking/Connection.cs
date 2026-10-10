@@ -25,68 +25,19 @@ namespace Orleans.Runtime.Messaging
         private readonly string _id;
         private readonly MessageTransport _transport;
         private readonly SendWorker _sendWorker;
-        private readonly AdmissionGate _applicationSendWork = new();
-        private readonly AdmissionGate _applicationWrites = new();
+        private readonly AdmissionGate _outgoingApplicationWork = new();
         private readonly AdmissionGate _incomingApplicationDispatch = new();
-        private readonly AdmissionGate _pendingApplicationReroutes = new();
-        private int _applicationSendFailed;
-        private int _drainingApplicationSends;
         private Task? _processIncomingTask;
         private Task? _closeTask;
         private int _runState;
         private bool _openedSocket;
         private long _lastMessageReceivedTimestamp;
 
-        internal bool TryAdmitIncomingApplicationDispatch() => _incomingApplicationDispatch.TryEnterUnscoped();
-        internal void CompleteIncomingApplicationDispatch() => _incomingApplicationDispatch.Exit();
+        internal AdmissionGate.Admission TryAdmitIncomingApplicationDispatch() => _incomingApplicationDispatch.TryEnter();
         internal Task DrainIncomingApplicationDispatchAsync() => _incomingApplicationDispatch.CloseAsync();
+        internal Task DrainAsync() => _outgoingApplicationWork.CloseAsync();
 
-        internal async Task DrainAsync()
-        {
-            Volatile.Write(ref _drainingApplicationSends, 1);
-            await _applicationSendWork.CloseAsync().ConfigureAwait(false);
-            await _applicationWrites.CloseAsync().ConfigureAwait(false);
-            await _pendingApplicationReroutes.CloseAsync().ConfigureAwait(false);
-            if (Volatile.Read(ref _applicationSendFailed) != 0)
-            {
-                throw new ConnectionClosedException("Application message drain includes an unsuccessful transport write.");
-            }
-        }
-
-        private void CompleteApplicationSend(Message message)
-        {
-            if (message.RequiresApplicationDrain)
-            {
-                _applicationSendWork.Exit();
-            }
-        }
-
-        internal void BeginApplicationWrite(Message message)
-        {
-            if (message.RequiresApplicationDrain && !_applicationWrites.TryEnterUnscoped())
-            {
-                throw new ConnectionClosedException("Application write admission has closed.");
-            }
-        }
-
-        internal void CompleteApplicationWrite(Message message, bool succeeded)
-        {
-            if (message.RequiresApplicationDrain)
-            {
-                if (!succeeded)
-                {
-                    OnApplicationWriteFailure(message);
-                    if (Volatile.Read(ref _drainingApplicationSends) != 0)
-                    {
-                        Volatile.Write(ref _applicationSendFailed, 1);
-                    }
-                }
-
-                _applicationWrites.Exit();
-            }
-        }
-
-        protected virtual void OnApplicationWriteFailure(Message message) { }
+        internal virtual void OnApplicationWriteFailure(Message message) { }
 
         protected Connection(
             MessageTransport transport,
@@ -297,7 +248,7 @@ namespace Orleans.Runtime.Messaging
         {
             private const int MaxMessagesPerBatch = 64;
             private const int SoftMaxBatchBytes = 64 * 1024;
-            private readonly ConcurrentQueue<Message> _workItems = new();
+            private readonly ConcurrentQueue<(Message Message, AdmissionGate.Admission Admission)> _workItems = new();
             private readonly Action<Message>? _messageObserver = connection._shared.MessageObserver;
             private readonly Connection _connection = connection;
             private readonly TaskCompletionSource _stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -307,16 +258,17 @@ namespace Orleans.Runtime.Messaging
 
             public void Schedule(Message message)
             {
-                if (message.RequiresApplicationDrain && !_connection._applicationSendWork.TryEnterUnscoped())
+                var admission = message.RequiresApplicationDrain ? _connection._outgoingApplicationWork.TryEnter() : default;
+                if (message.RequiresApplicationDrain && !admission.Entered)
                 {
+                    _connection.MessagingTrace.OnDropBlockedApplicationMessage(message);
                     message.Dispose();
                     return;
                 }
 
                 if (!_connection._shared.MessageHandlerShared.TryAcquireSendWork())
                 {
-                    _connection.RerouteMessage(message, new ConnectionClosedException());
-                    _connection.CompleteApplicationSend(message);
+                    _connection.RerouteMessage(message, new ConnectionClosedException(), admission);
                     return;
                 }
 
@@ -326,20 +278,22 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (Volatile.Read(ref _stopping) != 0)
                     {
-                        _connection.RerouteMessage(message, new ConnectionClosedException());
+                        _connection.RerouteMessage(message, new ConnectionClosedException(), admission);
+                        admission = default;
                         return;
                     }
 
-                    _workItems.Enqueue(message);
+                    _workItems.Enqueue((message, admission));
+                    admission = default;
                     queued = true;
                     Activate();
                 }
                 finally
                 {
+                    admission.Dispose();
                     if (!queued)
                     {
                         _connection._shared.MessageHandlerShared.ReleaseSendWork();
-                        _connection.CompleteApplicationSend(message);
                     }
 
                     if (Interlocked.Decrement(ref _scheduling) == 0 && Volatile.Read(ref _stopping) != 0)
@@ -366,16 +320,15 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (Volatile.Read(ref _stopping) != 0)
                     {
-                        while (_workItems.TryDequeue(out var message))
+                        while (_workItems.TryDequeue(out var item))
                         {
                             try
                             {
-                                _connection.RerouteMessage(message, new ConnectionClosedException());
+                                _connection.RerouteMessage(item.Message, new ConnectionClosedException(), item.Admission);
                             }
                             finally
                             {
                                 _connection._shared.MessageHandlerShared.ReleaseSendWork();
-                                _connection.CompleteApplicationSend(message);
                             }
                         }
 
@@ -387,13 +340,15 @@ namespace Orleans.Runtime.Messaging
                     while (attempts++ < MaxMessagesPerBatch
                         && writeRequest.Length < SoftMaxBatchBytes
                         && !writeRequest.HasLargeMessages
-                        && _workItems.TryDequeue(out var message))
+                        && _workItems.TryDequeue(out var item))
                     {
+                        var (message, admission) = item;
                         try
                         {
                             if (Volatile.Read(ref _stopping) != 0)
                             {
-                                _connection.RerouteMessage(message, new ConnectionClosedException());
+                                _connection.RerouteMessage(message, new ConnectionClosedException(), admission);
+                                admission = default;
                                 continue;
                             }
 
@@ -404,7 +359,8 @@ namespace Orleans.Runtime.Messaging
 
                             try
                             {
-                                writeRequest.WriteMessage(message);
+                                writeRequest.WriteMessage(message, admission);
+                                admission = default;
                                 _messageObserver?.Invoke(message);
                             }
                             catch (Exception exception)
@@ -416,7 +372,7 @@ namespace Orleans.Runtime.Messaging
                         finally
                         {
                             _connection._shared.MessageHandlerShared.ReleaseSendWork();
-                            _connection.CompleteApplicationSend(message);
+                            admission.Dispose();
                         }
                     }
 
@@ -430,7 +386,7 @@ namespace Orleans.Runtime.Messaging
                         _connection.StartClosing(new ConnectionClosedException());
                         for (var i = 0; i < writeRequest.MessageCount; i++)
                         {
-                            _connection.RerouteMessage(writeRequest.GetMessage(i));
+                            writeRequest.RerouteMessage(i);
                         }
 
                         writeRequest.Reset();
@@ -493,10 +449,14 @@ namespace Orleans.Runtime.Messaging
             await _startedClosing.Task.ConfigureAwait(false);
         }
 
-        internal void RerouteMessage(Message message, Exception? error = null)
+        internal void RerouteMessage(Message message, Exception? error = null, AdmissionGate.Admission admission = default)
         {
             LogInformationReroutingMessage(Log, message, this);
-            var admission = message.RequiresApplicationDrain ? _pendingApplicationReroutes.TryEnter() : default;
+            if (message.RequiresApplicationDrain && !admission.Entered)
+            {
+                admission = _outgoingApplicationWork.TryEnter();
+            }
+
             if (message.RequiresApplicationDrain && !admission.Entered)
             {
                 MessagingTrace.OnDropBlockedApplicationMessage(message);

@@ -538,7 +538,7 @@ public class MessageTransportLifecycleTests
         };
         if (!buffered) read.Reset();
         var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(message);
+        write.WriteMessage(message, default);
         write.CompleteWriting();
         Assert.NotNull(message._bodyObject);
         Assert.True(write.Length > Message.LENGTH_HEADER_SIZE);
@@ -769,7 +769,8 @@ public class MessageTransportLifecycleTests
         var drain = connection.DrainAsync();
         Assert.False(drain.IsCompleted);
         await transport.CloseAsync(new ConnectionClosedException(), TestContext.Current.CancellationToken);
-        await Assert.ThrowsAsync<ConnectionClosedException>(() => drain);
+        await drain.WaitAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, connection.ApplicationWriteFailures);
         Assert.Equal(0, connection.SentMessageCount);
         Assert.False(connection.Retries.Reader.TryRead(out _));
         shared.MessageCenter.DidNotReceive().DispatchLocalMessage(Arg.Any<Message>());
@@ -853,7 +854,7 @@ public class MessageTransportLifecycleTests
             message.SetMessageReadRequest(read);
         }
         var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(message);
+        write.WriteMessage(message, default);
         write.CompleteWriting();
         Assert.True(transport.EnqueueWrite(write));
         Assert.Same(message, write.GetMessage(0));
@@ -927,7 +928,7 @@ public class MessageTransportLifecycleTests
         };
         Assert.False(message.IsRelocatableRequest);
         var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(message);
+        write.WriteMessage(message, default);
         write.CompleteWriting();
         Assert.True(transport.EnqueueWrite(write));
         var error = new ConnectionClosedException();
@@ -992,7 +993,7 @@ public class MessageTransportLifecycleTests
     }
 
     [Fact]
-    public async Task MessageReadRequest_UnownedDecodedHeadersDropOnlyOrdinaryRequests()
+    public async Task MessageReadRequest_ClosedDispatchAdmissionDropsOnlyOrdinaryRequests()
     {
         using var services = CreateServiceProvider();
         using var shared = CreateMessageHandlerShared(services);
@@ -1021,8 +1022,6 @@ public class MessageTransportLifecycleTests
             var receivedBefore = connection.DispatchCount;
             var recordedBefore = connection.RecordCount;
 
-            // Exercise the decoded-header branch synchronously, without pretending
-            // to own an ingress lease. Actual OnRead accounting is covered separately.
             ((IThreadPoolWorkItem)read).Execute();
 
             Assert.Equal(recordedBefore + 1, connection.RecordCount);
@@ -1040,18 +1039,38 @@ public class MessageTransportLifecycleTests
         }
     }
 
-    [Fact]
-    public async Task RetirementDrain_WaitsForQueuedRerouteProducer()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RetirementDrain_WaitsForQueuedRerouteProducer(bool acceptedWrite)
     {
         using var services = CreateServiceProvider();
         using var shared = CreateMessageHandlerShared(services);
         await using var transport = new CancelableTransport();
         using var connection = new BlockingRerouteConnection(transport, CreateConnectionCommon(services, shared),
             shared.MessageCenter, TestContext.Current.CancellationToken);
-        using var message = new Message { BodyObject = "pending disposition" };
-        connection.RerouteMessage(message);
+        using var message = new Message
+        {
+            Direction = Message.Directions.Response,
+            TargetGrain = GrainId.Create("test", "target"),
+            BodyObject = "pending disposition",
+        };
+        Task drain;
+        if (acceptedWrite)
+        {
+            connection.Send(message);
+            await transport.WriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            drain = connection.DrainAsync();
+            Assert.False(drain.IsCompleted);
+            await transport.CloseAsync(new ConnectionClosedException(), TestContext.Current.CancellationToken);
+        }
+        else
+        {
+            connection.RerouteMessage(message);
+            drain = connection.DrainAsync();
+        }
+
         await connection.Entered.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-        var drain = connection.DrainAsync();
         Assert.False(drain.IsCompleted);
         connection.Release();
         await drain.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
@@ -1141,8 +1160,8 @@ public class MessageTransportLifecycleTests
         using var first = new Message { Direction = Message.Directions.Request, TargetGrain = GrainId.Create("test", "target"), BodyObject = new byte[] { 1 } };
         using var second = new Message { Direction = Message.Directions.Response, BodyObject = new byte[] { 2 } };
         var request = shared.GetSendMessageHandler(connection);
-        request.WriteMessage(first);
-        request.WriteMessage(second);
+        request.WriteMessage(first, default);
+        request.WriteMessage(second, default);
         request.CompleteWriting();
         Assert.True(transport.EnqueueWrite(request));
         Exception error = exceptionType switch
@@ -1259,10 +1278,10 @@ public class MessageTransportLifecycleTests
         var valid = new Message();
         var invalid = new Message { BodyObject = new byte[2] };
 
-        request.WriteMessage(valid);
+        request.WriteMessage(valid, default);
         var validLength = request.Length;
 
-        Assert.Throws<InvalidMessageFrameException>(() => request.WriteMessage(invalid));
+        Assert.Throws<InvalidMessageFrameException>(() => request.WriteMessage(invalid, default));
         Assert.Equal(validLength, request.Length);
         Assert.Equal(1, request.MessageCount);
         Assert.Same(valid, request.GetMessage(0));
@@ -1276,12 +1295,12 @@ public class MessageTransportLifecycleTests
         var shared = CreateMessageHandlerShared(serviceProvider);
         var request = shared.GetSendMessageHandler();
 
-        request.WriteMessage(new Message());
+        request.WriteMessage(new Message(), default);
         Assert.False(request.HasLargeMessages);
         request.Reset();
 
         request = shared.GetSendMessageHandler();
-        request.WriteMessage(new Message { BodyObject = new byte[8 * 1024] });
+        request.WriteMessage(new Message { BodyObject = new byte[8 * 1024] }, default);
         Assert.True(request.HasLargeMessages);
 
         request.Reset();
@@ -1289,7 +1308,7 @@ public class MessageTransportLifecycleTests
         Assert.Same(request, reused);
         Assert.False(reused.HasLargeMessages);
 
-        reused.WriteMessage(new Message { BodyObject = new byte[16 * 1024] });
+        reused.WriteMessage(new Message { BodyObject = new byte[16 * 1024] }, default);
         var segmentCount = 0;
         using var slice = reused.Buffers.ConsumeSlice(reused.Buffers.Length);
         var segments = slice.ArraySegments;
@@ -1937,6 +1956,8 @@ public class MessageTransportLifecycleTests
         public Channel<(Message Message, Exception? Error)> Retries { get; } =
             Channel.CreateUnbounded<(Message, Exception?)>();
         public int SentMessageCount { get; private set; }
+        public int ApplicationWriteFailures { get; private set; }
+        internal override void OnApplicationWriteFailure(Message message) => ApplicationWriteFailures++;
         protected override ConnectionDirection ConnectionDirection => ConnectionDirection.SiloToSilo;
         protected override TimeSpan CloseConnectionTimeout => TimeSpan.FromSeconds(1);
         protected override IMessageCenter MessageCenter => messageCenter;

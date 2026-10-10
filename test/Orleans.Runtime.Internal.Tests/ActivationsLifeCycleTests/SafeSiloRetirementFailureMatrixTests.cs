@@ -57,7 +57,7 @@ public sealed partial class SafeSiloRetirementTests
         };
         var shared = fixture.B.ServiceProvider.GetRequiredService<MessageHandlerShared>();
         var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(accepted);
+        write.WriteMessage(accepted, default);
         write.CompleteWriting();
         await using var transport = new BoundaryWriteTransport();
         Assert.True(transport.EnqueueWrite(write));
@@ -138,7 +138,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Equal(origin != "system", reply.RequiresApplicationDrain);
         if (beginBeforeFailure) center.BeginRetirement();
         var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(reply);
+        write.WriteMessage(reply, default);
         write.CompleteWriting();
         await using var transport = new BoundaryWriteTransport();
         Assert.True(transport.EnqueueWrite(write));
@@ -195,7 +195,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.True(reply.RequiresApplicationDrain);
         center.BeginRetirement();
         var write = shared.GetSendMessageHandler(connection);
-        write.WriteMessage(reply);
+        write.WriteMessage(reply, default);
         write.CompleteWriting();
         Assert.True(transport.EnqueueWrite(write));
         await transport.CloseAsync(new ConnectionClosedException(), TestCancellation);
@@ -803,7 +803,7 @@ public sealed partial class SafeSiloRetirementTests
     public async Task FailureMatrix_DestinationLostBeforeReceipt_ZeroEntryAndNoReplay(
         bool partition)
     {
-        var options = new FailureMatrixOptions();
+        var options = new FailureMatrixOptions { HoldDestinationPlacement = true };
         await using var fixture = await Fixture.CreateAsync(
             holdCancellationDelivery: true, failureMatrix: options);
         var control = fixture.Control;
@@ -820,6 +820,13 @@ public sealed partial class SafeSiloRetirementTests
         await control.MatrixEmptyLookupEntered.Task.WaitAsync(Timeout, TestCancellation);
         await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
         Assert.False(control.ReplacementActivationEntered.Task.IsCompleted);
+        var source = fixture.A;
+        var producerDrain = source.ServiceProvider.GetRequiredService<MessageCenter>().DrainRetirementAsync(TestCancellation);
+        Assert.False(producerDrain.IsCompleted);
+        control.MatrixReleaseLookup.TrySetResult();
+        // Select C while it is healthy, then lose it before transport admission.
+        // A placement hint alone permits selecting another healthy silo after C dies.
+        Assert.Equal(fixture.C.SiloAddress, await control.MatrixDestinationSelected.Task.WaitAsync(Timeout, TestCancellation));
         if (partition)
         {
             await CutSiloTransportAsync(fixture.C, fixture.B.SiloAddress);
@@ -829,10 +836,8 @@ public sealed partial class SafeSiloRetirementTests
             await fixture.CrashSiloAsync(fixture.C).WaitAsync(Timeout, TestCancellation);
         }
 
-        var source = fixture.A;
-        var producerDrain = source.ServiceProvider.GetRequiredService<MessageCenter>().DrainRetirementAsync(TestCancellation);
         Assert.False(producerDrain.IsCompleted);
-        control.MatrixReleaseLookup.TrySetResult();
+        control.MatrixReleaseDestination.TrySetResult();
         try
         {
             // Do not expire the caller while the very first placement is still held: that
@@ -1002,6 +1007,21 @@ public sealed partial class SafeSiloRetirementTests
         }
     }
 
+    private sealed class FailureMatrixDestinationDirector(Control control, IPlacementDirector ordinary) : IPlacementDirector
+    {
+        public async Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
+        {
+            var destination = await ordinary.OnAddActivation(strategy, target, context);
+            if (target.GrainIdentity == control.GrainId && destination.Equals(control.C))
+            {
+                control.MatrixDestinationSelected.TrySetResult(destination);
+                await control.MatrixReleaseDestination.Task.WaitAsync(TestCancellation);
+            }
+
+            return destination;
+        }
+    }
+
     private sealed class FailureMatrixStatelessProperties : IGrainPropertiesProvider
     {
         public void Populate(Type grainClass, GrainType grainType, Dictionary<string, string> properties)
@@ -1135,6 +1155,7 @@ public sealed partial class SafeSiloRetirementTests
         internal int? HeldArgument { get; init; }
         internal bool HoldOnC { get; init; }
         internal bool HoldEmptyLookup { get; set; }
+        internal bool HoldDestinationPlacement { get; init; }
         internal bool HoldEveryReplacementActivation { get; init; }
         internal FakeTimeProvider CallerClock { get; } = new(new DateTimeOffset(2026, 10, 9, 0, 0, 0, TimeSpan.Zero));
         internal FakeTimeProvider ActivationClock { get; } = new(new DateTimeOffset(2026, 10, 9, 0, 0, 0, TimeSpan.Zero));
@@ -1155,6 +1176,8 @@ public sealed partial class SafeSiloRetirementTests
         internal TaskCompletionSource MatrixReleaseExecution { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource<GrainId> MatrixEmptyLookupEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource MatrixReleaseLookup { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource<SiloAddress> MatrixDestinationSelected { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource MatrixReleaseDestination { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource<ActivationData> MatrixReplacementActivationEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource MatrixReleaseReplacement { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource<CorrelationId> TransportRejectionObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1211,6 +1234,7 @@ public sealed partial class SafeSiloRetirementTests
         {
             MatrixReleaseExecution.TrySetResult();
             MatrixReleaseLookup.TrySetResult();
+            MatrixReleaseDestination.TrySetResult();
             MatrixReleaseReplacement.TrySetResult();
         }
     }

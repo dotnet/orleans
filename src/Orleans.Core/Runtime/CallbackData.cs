@@ -13,6 +13,7 @@ namespace Orleans.Runtime
         private const int StateCancellationRegistrationPublished = 4;
         private const int StateRouteUpdateReceived = 8;
         private const int StateCancellationRequested = 16;
+        private const int StateCancellable = 32;
 
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
@@ -23,7 +24,6 @@ namespace Orleans.Runtime
         private CancellationTokenRegistration _cancellationTokenRegistration;
         private readonly TimeSpan _responseTimeout;
         private readonly long _responseTimeoutTicks;
-        private readonly bool _isCancellable;
 
         public CallbackData(
             SharedCallbackData shared,
@@ -37,7 +37,7 @@ namespace Orleans.Runtime
             var invokable = msg.BodyObject as IInvokable;
             _responseTimeout = invokable?.GetDefaultResponseTimeout() ?? shared.ResponseTimeout;
             _responseTimeoutTicks = shared.GetTimestampTicks(_responseTimeout);
-            _isCancellable = invokable?.IsCancellable == true;
+            _state = invokable?.IsCancellable == true ? StateCancellable : StateNone;
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
         }
@@ -60,7 +60,7 @@ namespace Orleans.Runtime
                     return;
                 }
 
-                Interlocked.Or(ref _state, StateCancellationRegistrationPending);
+                _state |= StateCancellationRegistrationPending;
             }
 
             var registration = cancellationToken.UnsafeRegister(static (arg, token) =>
@@ -69,12 +69,12 @@ namespace Orleans.Runtime
                 callbackData.OnCancellation(token);
             }, this);
 
-            _cancellationTokenRegistration = registration;
             lock (Message)
             {
                 if (!IsCompleted)
                 {
-                    Interlocked.Exchange(ref _state, (_state & ~StateCancellationRegistrationPending) | StateCancellationRegistrationPublished);
+                    _cancellationTokenRegistration = registration;
+                    _state = (_state & ~StateCancellationRegistrationPending) | StateCancellationRegistrationPublished;
                     return;
                 }
             }
@@ -84,10 +84,7 @@ namespace Orleans.Runtime
 
         private void SignalCancellation()
         {
-            // Only cancel requests which honor cancellation token.
-            // Not all targets support IGrainCallCancellationExtension, so sending a cancellation in those cases could result in an error.
-            // There are opportunities to cancel requests at the infrastructure layer which this will not exploit if the target method does not support cancellation.
-            if (_isCancellable)
+            if ((Volatile.Read(ref _state) & StateCancellable) != 0)
             {
                 shared.CancellationManager?.SignalCancellation(Message.TargetSilo, Message.TargetGrain, Message.SendingGrain, Message.Id);
             }
@@ -111,7 +108,7 @@ namespace Orleans.Runtime
 
                     Message.ForwardCount = forwardingGeneration;
                     Message.TargetSilo = status.ForwardedTo;
-                    Interlocked.Or(ref _state, StateRouteUpdateReceived);
+                    _state |= StateRouteUpdateReceived;
                     if ((_state & StateCancellationRequested) != 0)
                     {
                         SignalCancellation();
@@ -132,8 +129,6 @@ namespace Orleans.Runtime
             return duration > _responseTimeoutTicks;
         }
 
-        private TimeSpan GetResponseTimeout() => _responseTimeout;
-
         private string GetTargetGrainType()
         {
             var type = Message.TargetGrain.Type;
@@ -144,7 +139,7 @@ namespace Orleans.Runtime
         {
             lock (Message)
             {
-                Interlocked.Or(ref _state, StateCancellationRequested);
+                _state |= StateCancellationRequested;
             }
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
@@ -192,7 +187,7 @@ namespace Orleans.Runtime
             var msg = this.Message; // Local working copy
 
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
-            var timeout = GetResponseTimeout();
+            var timeout = _responseTimeout;
             LogTimeout(this.shared.Logger, timeout, msg, statusMessage);
 
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
@@ -252,7 +247,6 @@ namespace Orleans.Runtime
             RecordElapsedTime();
             DisposeCancellationRegistration();
 
-            // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
             response.Dispose();
         }
@@ -261,7 +255,13 @@ namespace Orleans.Runtime
         {
             lock (Message)
             {
-                return (Interlocked.Or(ref _state, StateCompleted) & StateCompleted) == 0;
+                if (IsCompleted)
+                {
+                    return false;
+                }
+
+                _state |= StateCompleted;
+                return true;
             }
         }
 

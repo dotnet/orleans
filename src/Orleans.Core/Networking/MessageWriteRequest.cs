@@ -4,6 +4,7 @@ using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging;
 
@@ -17,7 +18,7 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         Justification = "MessageHandlerShared owns and pools this request; the request does not own the shared pool.")]
     private readonly MessageHandlerShared _shared;
     private readonly ArcBufferWriter _buffer = new();
-    private readonly List<(Message Message, int TotalLength, int HeaderLength)> _messages = [];
+    private readonly List<(Message Message, int TotalLength, int HeaderLength, AdmissionGate.Admission Admission)> _messages = [];
     private Connection? _connection;
     private MessageSerializer? _messageSerializer;
     private bool _hasLargeMessages;
@@ -36,13 +37,13 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
     public void Initialize(Connection connection) => _connection = connection;
     public Message GetMessage(int index) => _messages[index].Message;
 
-    public void WriteMessage(Message message)
+    // Successful serialization transfers admission from the send queue to this write.
+    public void WriteMessage(Message message, AdmissionGate.Admission admission)
     {
         var startLength = _buffer.Length;
-        var messageSerializer = _messageSerializer ??= _shared.GetMessageSerializer();
-        _connection?.BeginApplicationWrite(message);
         try
         {
+            var messageSerializer = _messageSerializer ??= _shared.GetMessageSerializer();
             // Reserve space for framing
             var framingBytes = _buffer.GetSpan(Message.LENGTH_HEADER_SIZE);
             _buffer.AdvanceWriter(Message.LENGTH_HEADER_SIZE);
@@ -55,13 +56,16 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
             BinaryPrimitives.WriteInt32LittleEndian(framingBytes[sizeof(int)..], bodyLength);
 
             var totalLength = headerLength + bodyLength;
-            _messages.Add((message, totalLength, headerLength));
+            _messages.Add((message, totalLength, headerLength, admission));
             _hasLargeMessages |= totalLength >= LargeMessageSize;
         }
         catch
         {
             _buffer.Truncate(startLength);
-            _connection?.CompleteApplicationWrite(message, succeeded: false);
+            if (message.RequiresApplicationDrain)
+            {
+                _connection?.OnApplicationWriteFailure(message);
+            }
             throw;
         }
     }
@@ -80,19 +84,19 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         try
         {
             var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
-            foreach (var (message, totalLength, headerLength) in _messages)
+            foreach (var (message, totalLength, headerLength, _) in _messages)
             {
                 connection.RecordMessageSend(message, totalLength, headerLength);
             }
         }
         finally
         {
-            foreach (var (message, _, _) in _messages)
+            foreach (var (message, _, _, _) in _messages)
             {
                 message.ReleaseBodyBuffer();
             }
 
-            Reset(succeeded: true);
+            Reset();
         }
     }
 
@@ -108,33 +112,48 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         }
 
         var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
-        foreach (var (message, _, _) in _messages)
+        for (var i = 0; i < _messages.Count; i++)
         {
+            var message = _messages[i].Message;
             if (message.IsRelocatableRequest)
             {
+                connection.OnApplicationWriteFailure(message);
                 // An accepted write can have reached the receiver. The original callback awaits its outcome.
                 _shared.MessagingInstruments.OnFailedSentMessage(message);
                 message.Dispose();
             }
             else
             {
-                connection.RerouteMessage(message, error);
+                RerouteMessage(i, error);
             }
         }
 
         Reset();
     }
 
-    public void Reset(bool succeeded = false)
+    internal void RerouteMessage(int index, Exception? error = null)
+    {
+        var connection = _connection ?? throw new InvalidOperationException("The write request has no owning connection.");
+        var (message, totalLength, headerLength, admission) = _messages[index];
+        if (message.RequiresApplicationDrain)
+        {
+            connection.OnApplicationWriteFailure(message);
+        }
+
+        _messages[index] = (message, totalLength, headerLength, default);
+        connection.RerouteMessage(message, error, admission);
+    }
+
+    public void Reset()
     {
         var nextPageSize = _messages.Count == 1
             && _messages[0].TotalLength is >= LargeMessageSize and < SendPageSize
                 ? SendPageSize
                 : 0;
         CompleteWriting();
-        foreach (var (message, _, _) in _messages)
+        foreach (var (_, _, _, admission) in _messages)
         {
-            _connection?.CompleteApplicationWrite(message, succeeded);
+            admission.Dispose();
         }
 
         _messages.Clear();
@@ -153,6 +172,11 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
         _disposed = true;
         CompleteWriting();
+        foreach (var (_, _, _, admission) in _messages)
+        {
+            admission.Dispose();
+        }
+
         _messages.Clear();
         _buffer.Dispose();
     }

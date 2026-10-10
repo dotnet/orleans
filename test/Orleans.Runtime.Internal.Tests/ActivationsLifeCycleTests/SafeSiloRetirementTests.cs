@@ -679,6 +679,12 @@ public sealed partial class SafeSiloRetirementTests
 
                 if (failureMatrix is { } matrix)
                 {
+                    if (matrix.HoldDestinationPlacement)
+                    {
+                        silo.Services.AddPlacementDirector<ResourceOptimizedPlacement>(provider =>
+                            new FailureMatrixDestinationDirector(control, ActivatorUtilities.CreateInstance<ResourceOptimizedPlacementDirector>(provider)));
+                    }
+
                     if (matrix.Stateless)
                     {
                         silo.Services.AddPlacementDirector<StatelessWorkerPlacement, FailureMatrixStatelessDirector>();
