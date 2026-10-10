@@ -1,12 +1,18 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Orleans.DurableMessaging;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
-using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
-var integers = new DurableMessageType<int>("aot.number.v1", services.GetRequiredService<Serializer<int>>());
-var strings = new DurableMessageType<string>("aot.text.v1", services.GetRequiredService<Serializer<string>>());
+using var services = new ServiceCollection()
+    .AddSerializerContext(new MessagingSerializerContext())
+    .AddDurableMessageType<int>("aot.number.v1")
+    .AddDurableMessageType<string>("aot.text.v1")
+    .BuildServiceProvider();
+var integers = services.GetRequiredKeyedService<DurableMessageType<int>>("aot.number.v1");
+var strings = services.GetRequiredKeyedService<DurableMessageType<string>>("aot.text.v1");
 var sender = GrainId.Create("aot", "sender");
 var receiver = GrainId.Create("aot", "receiver");
 var key = HierarchicalKey.Create("aot", "command", "1");
@@ -49,6 +55,10 @@ if (integers.Decode(outbox.Messages.Last()) != 7) throw new InvalidOperationExce
 Console.WriteLine("NativeAOT typed sends, deterministic replies, and static class/struct handler arguments passed.");
 
 internal readonly record struct Offset(int Value);
+
+[GenerateSerializerContext<int>]
+[GenerateSerializerContext<string>]
+internal partial class MessagingSerializerContext : SerializerContext;
 
 internal sealed class SmokeState(SmokeOutbox outbox, DurableMessageType<string> replyType, GrainId replyDestination)
 {

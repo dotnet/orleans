@@ -1,5 +1,6 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.DurableMessaging;
 using Orleans.Serialization;
 
@@ -29,6 +30,7 @@ public static class DurableMessageTypeExtensions
             }
         }
 
+        services.TryAddSingleton<Serializer<T>>(static provider => provider.GetRequiredService<Serializer>().GetSerializer<T>());
         services.AddKeyedSingleton<DurableMessageType<T>>(subject,
             (provider, _) => new DurableMessageType<T>(subject, provider.GetRequiredService<Serializer<T>>()));
         return services;
