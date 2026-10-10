@@ -12,6 +12,18 @@ namespace Orleans.Journaling;
 /// </remarks>
 public interface IJournaledStateManager : IAsyncDisposable
 {
+    /// <summary>
+    /// Gets the mutable, lazily allocated list of journal operation hooks.
+    /// </summary>
+    /// <remarks>
+    /// Inspect, add, remove, and deduplicate hooks on the owner's logical execution context while
+    /// no persistence operation is running. Ordinary before hooks and all after hooks execute in list
+    /// order. The optional single <see cref="IJournaledStateCaptureHook"/> supplies the final prerequisite.
+    /// Registration is independent
+    /// of state-machine registration and persists through recovery and deletion.
+    /// </remarks>
+    IList<IJournaledStateHook> Hooks { get; }
+
     /// <inheritdoc/>
     ValueTask IAsyncDisposable.DisposeAsync() => default;
 
@@ -53,6 +65,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// by all callers using this manager. Storage acknowledgement establishes durability.
     /// A failed journal operation fences the manager; recovery requires a new manager and state machine instances.
     /// Cancellation stops the caller's wait; an already queued write continues to its storage outcome.
+    /// Before-hook failure reports <see cref="JournaledStatePreCommitException"/> and retains pending
+    /// changes for an explicit retry. After-hook failure reports
+    /// <see cref="JournaledStatePostCommitException"/> after successful persistence.
     /// </remarks>
     /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
     /// <returns>A task representing the write acknowledgement.</returns>

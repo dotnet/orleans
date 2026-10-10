@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization.Invocation;
 
@@ -21,6 +22,14 @@ namespace Orleans.Runtime
         public CoarseStopwatch _timeToExpiry;
 
         internal object? _bodyObject;
+        private bool _disposedWithOwnedArguments;
+
+        internal ILogger? ArgumentResourceLogger { get; set; }
+
+        internal bool IsDisposedWithOwnedArguments => Volatile.Read(ref _disposedWithOwnedArguments);
+
+        // Do not deserialize an unread body solely for cleanup: its raw buffer already owns it.
+        internal void CompleteArgumentResources() => InvokableArgumentResources.Complete(_bodyObject as IInvokableArgumentOwner, ArgumentResourceLogger);
 
         public object? BodyObject
         {
@@ -36,6 +45,11 @@ namespace Orleans.Runtime
 
             set
             {
+                if (!ReferenceEquals(_bodyObject, value))
+                {
+                    CompleteArgumentResources();
+                }
+
                 (_bodyObject as MessageReadRequest)?.Reset();
                 _bodyObject = value;
             }
@@ -130,6 +144,12 @@ namespace Orleans.Runtime
 
         public void Dispose()
         {
+            if (_bodyObject is IInvokableArgumentOwner owner)
+            {
+                Volatile.Write(ref _disposedWithOwnedArguments, true);
+                InvokableArgumentResources.Complete(owner, ArgumentResourceLogger);
+            }
+
             (_bodyObject as MessageReadRequest)?.Reset();
             _bodyObject = null;
         }

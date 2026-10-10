@@ -216,6 +216,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             ValidateCommittedPrefix(buffer);
             _buffer.AdvanceReader(buffer.Length);
             _committedLength -= buffer.Length;
+            TrimDrainedBuffer();
         }
     }
 
@@ -341,6 +342,18 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     private void ClearActiveEntry()
     {
         _hasActiveEntry = false;
+        TrimDrainedBuffer();
+    }
+
+    private void TrimDrainedBuffer()
+    {
+        // Preserve small-page coalescing, and never invalidate memory borrowed by an active entry.
+        // Retained storage/reader slices have independent pins and survive releasing this writer's pin.
+        if (!_hasActiveEntry && _buffer.Length == 0)
+        {
+            using var drained = _buffer.PeekSlice(0);
+            if (drained.First.Array.Length > ArcBufferWriter.MinimumPageSize) _buffer.Reset();
+        }
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

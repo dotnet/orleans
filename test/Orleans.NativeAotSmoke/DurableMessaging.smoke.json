@@ -1,0 +1,5 @@
+{
+  "scenario": "DurableMessaging",
+  "diagnostics": "strict",
+  "rejectDiagnostics": []
+}

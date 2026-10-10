@@ -492,6 +492,38 @@ namespace Orleans.Serialization.Buffers
         }
 
         /// <summary>
+        /// Tries to read an independently owned slice without copying the underlying pages.
+        /// </summary>
+        /// <param name="length">The number of bytes to read.</param>
+        /// <param name="value">An owned slice which the caller must dispose, if supported.</param>
+        /// <returns>Whether the input supports owned Arc slices.</returns>
+        /// <remarks>Invalid lengths and truncated Arc input throw rather than falling back to copying.</remarks>
+        public bool TryReadArcBuffer(int length, out ArcBuffer value)
+        {
+            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+            if (!IsArcBufferInput)
+            {
+                value = default;
+                return false;
+            }
+
+            EnsureAvailable((uint)length);
+            ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
+            var result = input.Slice(checked((int)(Position - _sequenceOffset)), length);
+            try
+            {
+                Skip(length);
+                value = result;
+                return true;
+            }
+            catch
+            {
+                result.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Skips the specified number of bytes.
         /// </summary>
         /// <param name="count">The number of bytes to skip.</param>
@@ -614,7 +646,7 @@ namespace Orleans.Serialization.Buffers
             else if (IsArcBufferInput)
             {
                 ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
-                var newInput = input.ForkFrom(checked((int)position));
+                var newInput = input.ForkFrom(checked((int)(position - _sequenceOffset)));
                 forked = new Reader<TInput>(Unsafe.As<ArcBufferReaderInput, TInput>(ref newInput), Session, position);
 
                 if (forked.Position != position)

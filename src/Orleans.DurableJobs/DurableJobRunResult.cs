@@ -93,9 +93,6 @@ public sealed class DurableJobRunResult
     /// <returns>A durable rescheduling result.</returns>
     /// <remarks>
     /// Rescheduling resets the failure-attempt count, so the next dequeue count is one.
-    /// During a mixed-version rolling upgrade, callers emit this result after every durable job executor
-    /// understands <see cref="DurableJobRunStatus.RescheduleRequested"/> (serialized value 3).
-    /// This rollout order preserves compatibility with executors that understand serialized values 0 through 2.
     /// </remarks>
     public static DurableJobRunResult RescheduleAt(DateTimeOffset dueTime)
     {
@@ -141,8 +138,7 @@ public enum DurableJobRunStatus
     /// The current execution completed successfully and requested durable rescheduling with its failure-attempt count reset.
     /// </summary>
     /// <remarks>
-    /// This value is serialized as 3. During rolling upgrades, emit it after all durable job executors support it.
-    /// Newer executors treat unknown disposition values as failures and route them through the configured retry policy.
+    /// Executors treat unknown disposition values as failures and route them through the configured retry policy.
     /// </remarks>
     RescheduleRequested = 3
 }

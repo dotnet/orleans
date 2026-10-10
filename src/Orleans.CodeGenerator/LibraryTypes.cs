@@ -41,6 +41,7 @@ internal sealed class LibraryTypes
         AliasAttribute = Type("Orleans.AliasAttribute");
         IInvokable = Type("Orleans.Serialization.Invocation.IInvokable");
         InvokeMethodNameAttribute = Type("Orleans.InvokeMethodNameAttribute");
+        DisposeOnCompletionAttribute = Type("Orleans.DisposeOnCompletionAttribute");
         RuntimeHelpers = Type("System.Runtime.CompilerServices.RuntimeHelpers");
         HasUnsafeAccessorAttribute = TypeOrDefault("System.Runtime.CompilerServices.UnsafeAccessorAttribute") is not null;
         InvokableCustomInitializerAttribute = Type("Orleans.InvokableCustomInitializerAttribute");
@@ -304,6 +305,7 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol Exception { get; private set; }
     public INamedTypeSymbol ApplicationPartAttribute { get; private set; }
     public INamedTypeSymbol InvokeMethodNameAttribute { get; private set; }
+    public INamedTypeSymbol DisposeOnCompletionAttribute { get; private set; }
     public INamedTypeSymbol InvokableCustomInitializerAttribute { get; private set; }
     public INamedTypeSymbol InvokableBaseTypeAttribute { get; private set; }
     public INamedTypeSymbol ReturnValueProxyAttribute { get; private set; }

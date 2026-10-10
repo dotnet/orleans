@@ -38,6 +38,11 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
     public void WriteMessage(Message message)
     {
+        if (message._bodyObject is Orleans.Serialization.Invocation.IInvokableArgumentOwner)
+        {
+            message.ArgumentResourceLogger ??= _shared.ConnectionTrace;
+        }
+
         var startLength = _buffer.Length;
         var messageSerializer = _messageSerializer ??= _shared.GetMessageSerializer();
         try
@@ -87,6 +92,11 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
         {
             foreach (var (message, _, _) in _messages)
             {
+                if (message.Direction == Message.Directions.OneWay)
+                {
+                    message.CompleteArgumentResources();
+                }
+
                 message.ReleaseBodyBuffer();
             }
 
@@ -137,6 +147,11 @@ internal sealed partial class MessageWriteRequest : WriteRequest, IDisposable
 
         _disposed = true;
         CompleteWriting();
+        foreach (var (message, _, _) in _messages)
+        {
+            message.Dispose();
+        }
+
         _messages.Clear();
         _buffer.Dispose();
     }

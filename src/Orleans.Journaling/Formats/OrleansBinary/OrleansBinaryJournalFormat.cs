@@ -29,8 +29,7 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
 
 internal static class OrleansBinaryJournalReader
 {
-    internal const byte LegacyFramingVersion = OrleansBinaryV0JournalReader.FramingVersion;
-    internal const byte FramingVersion = 1;
+    internal const byte FramingVersion = 0;
 
     private const int ByteCount = sizeof(byte);
     private const int UInt32ByteCount = sizeof(uint);
@@ -107,19 +106,12 @@ internal static class OrleansBinaryJournalReader
         frameLength = 0;
         payloadStart = 0;
 
-        byte framingVersion;
         uint bodyLength;
         int lengthPrefixSize;
         bool hasVersionAndLength;
         try
         {
-            hasVersionAndLength = TryReadVersionAndLength(input, session, out framingVersion, out bodyLength, out lengthPrefixSize);
-        }
-        catch (InvalidOperationException exception)
-        {
-            throw new InvalidOperationException(
-                $"Malformed binary journal entry stream at byte offset {offset}: malformed varuint32 entry length prefix.",
-                exception);
+            hasVersionAndLength = TryReadVersionAndLength(input, session, out _, out bodyLength, out lengthPrefixSize);
         }
         catch (NotSupportedException exception)
         {
@@ -135,15 +127,11 @@ internal static class OrleansBinaryJournalReader
                 return false;
             }
 
-            var message = framingVersion == FramingVersion
-                ? "truncated fixed-width entry header"
-                : "truncated varuint32 entry length prefix";
-            throw new InvalidOperationException($"Malformed binary journal entry stream at byte offset {offset}: {message}.");
+            throw new InvalidOperationException(
+                $"Malformed binary journal entry stream at byte offset {offset}: truncated fixed-width entry header.");
         }
 
-        return framingVersion == FramingVersion
-            ? TryReadCurrentEntry(input, lengthPrefixSize, bodyLength, isCompleted, session, offset, out streamIdValue, out frameLength, out payloadStart)
-            : OrleansBinaryV0JournalReader.TryReadEntry(input, lengthPrefixSize, bodyLength, isCompleted, session, offset, out streamIdValue, out frameLength, out payloadStart);
+        return TryReadCurrentEntry(input, lengthPrefixSize, bodyLength, isCompleted, session, offset, out streamIdValue, out frameLength, out payloadStart);
     }
 
     internal static bool TryReadVersionAndLength(
@@ -160,7 +148,7 @@ internal static class OrleansBinaryJournalReader
         out uint length,
         out int lengthPrefixLength)
     {
-        version = LegacyFramingVersion;
+        version = FramingVersion;
         length = 0;
         lengthPrefixLength = 0;
 
@@ -170,21 +158,20 @@ internal static class OrleansBinaryJournalReader
         }
 
         var reader = Reader.Create(input, session);
-        var firstByte = reader.ReadByte();
-        if (firstByte == FramingVersion)
+        version = reader.ReadByte();
+        if (version != FramingVersion)
         {
-            version = FramingVersion;
-            if (input.Length < VersionedLengthPrefixLength)
-            {
-                return false;
-            }
-
-            length = reader.ReadUInt32();
-            lengthPrefixLength = checked((int)reader.Position);
-            return true;
+            throw new NotSupportedException($"Unsupported framing version: {version}.");
         }
 
-        return OrleansBinaryV0JournalReader.TryReadLength(input, session, out length, out lengthPrefixLength);
+        if (input.Length < VersionedLengthPrefixLength)
+        {
+            return false;
+        }
+
+        length = reader.ReadUInt32();
+        lengthPrefixLength = VersionedLengthPrefixLength;
+        return true;
     }
 
     private static bool TryReadCurrentEntry(

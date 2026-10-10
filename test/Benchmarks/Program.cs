@@ -7,6 +7,7 @@ using Benchmarks.Ping;
 using Benchmarks.Placement;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using Benchmarks.DurableMessaging;
 
 namespace Benchmarks;
 
@@ -369,6 +370,14 @@ internal class Program
                 Environment.ExitCode = 1;
             }
         },
+        ["DurableMessaging.Sequential"] = args =>
+        {
+            var summaries = BenchmarkSwitcher.FromTypes([typeof(SequentialMessagingBenchmark)]).Run(args).ToArray();
+            if (summaries.Length == 0 || summaries.Any(summary => summary.HasCriticalValidationErrors || summary.Reports.Any(report => !report.Success)))
+            {
+                Environment.ExitCode = 1;
+            }
+        },
         ["suite"] = args =>
         {
             _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);
@@ -378,6 +387,11 @@ internal class Program
     // requires benchmark name or 'All' word as first parameter
     public static void Main(string[] args)
     {
+        if (args is ["--ignore-exit-code", "8", var command, ..]
+            && (_benchmarks.ContainsKey(command) || command.Equals("all", StringComparison.OrdinalIgnoreCase)))
+        {
+            args = args[2..];
+        }
         if (args.Length == 0 || (!args[0].Equals("all", StringComparison.OrdinalIgnoreCase) && !_benchmarks.ContainsKey(args[0])))
         {
             Environment.ExitCode = (args.Any(arg => arg is "-automated" or "@@")

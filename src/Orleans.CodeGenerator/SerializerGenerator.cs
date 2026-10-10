@@ -964,8 +964,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             true => Argument(resultVar).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
             false => Argument(resultVar)
         };
-        innerBody.Add(
-            ExpressionStatement(
+        var deserialize = ExpressionStatement(
                 InvocationExpression(
                     IdentifierName(DeserializeMethodName),
                     ArgumentList(
@@ -973,7 +972,17 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
                             [
                                 Argument(readerParam).WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword)),
                                 resultArgument
-                            ])))));
+                            ]))));
+        if (type.Members.OfType<InvokableGenerator.MethodParameterFieldDescription>().Any(InvokableGenerator.IsOwnedArgument))
+        {
+            innerBody.Add(TryStatement(Block(deserialize), SingletonList(CatchClause().WithBlock(Block(
+                ParseStatement("result.CompleteArgumentResources();"),
+                ThrowStatement()))), null));
+        }
+        else
+        {
+            innerBody.Add(deserialize);
+        }
 
         innerBody.Add(ReturnStatement(resultVar));
 

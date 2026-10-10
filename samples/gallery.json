@@ -165,6 +165,17 @@
     "featured": false
   },
   {
+    "slug": "durable-messaging",
+    "title": "Durable Messaging stock reservations",
+    "description": "A standalone order and stock workflow demonstrating typed subjects, stable command IDs, inbox deduplication, and journal-acknowledged replies.",
+    "path": "DurableMessaging",
+    "sourceRepository": "https://github.com/dotnet/orleans",
+    "image": null,
+    "languages": ["C#"],
+    "tags": ["durable-messaging", "journaling", "grains"],
+    "featured": false
+  },
+  {
     "slug": "journaling-azure-blob-json",
     "title": "Journaling with Azure Blob JSON",
     "description": "An Aspire sample using Orleans journaling with JSON events stored in Azure Blob Storage.",

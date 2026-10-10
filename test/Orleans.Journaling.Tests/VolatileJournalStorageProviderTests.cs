@@ -8,6 +8,118 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class VolatileJournalStorageProviderTests
 {
+    [Fact]
+    public async Task Compaction_ByteThresholdExcludesSnapshotAndResetsAfterReplacement()
+    {
+        var storage = new VolatileJournalStorage(null, new()
+        {
+            MaxAppendsBeforeSnapshot = int.MaxValue,
+            MaxBytesBeforeSnapshot = 1000
+        });
+        var token = TestContext.Current.CancellationToken;
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>(new byte[1000]), token);
+        var append = new ReadOnlySequence<byte>(new byte[10]);
+        for (var index = 0; index < 99; index++)
+        {
+            await storage.AppendAsync(append, token);
+            Assert.False(storage.IsCompactionRequested);
+        }
+        await storage.AppendAsync(append, token);
+        Assert.True(storage.IsCompactionRequested);
+        Assert.Equal(2000, storage.Segments.Sum(static segment => segment.Length));
+
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>(new byte[2000]), token);
+        Assert.False(storage.IsCompactionRequested);
+        Assert.Equal(2000, Assert.Single(storage.Segments).Length);
+        for (var index = 0; index < 99; index++)
+        {
+            await storage.AppendAsync(append, token);
+        }
+        Assert.False(storage.IsCompactionRequested);
+        await storage.AppendAsync(append, token);
+        Assert.True(storage.IsCompactionRequested);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Compaction_DefaultAppendThresholdAndResetExcludeSnapshot(bool recreate)
+    {
+        var storage = new VolatileJournalStorage();
+        var token = TestContext.Current.CancellationToken;
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>(new byte[1000]), token);
+        await storage.AppendAsync(new ReadOnlySequence<byte>(new byte[500]), token);
+        await storage.DeleteAsync(token);
+        if (recreate)
+        {
+            Assert.True(await storage.CreateIfNotExistsAsync(cancellationToken: token));
+        }
+        for (var index = 0; index < 99; index++)
+        {
+            await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+            Assert.False(storage.IsCompactionRequested);
+        }
+        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), token);
+        Assert.True(storage.IsCompactionRequested);
+        Assert.Equal(100, storage.Segments.Count);
+        Assert.Equal([2], storage.Segments[^1]);
+    }
+
+    [Fact]
+    public async Task Compaction_DefaultByteThresholdRequestsAtOneMiBIndependentlyOfAppendCount()
+    {
+        var storage = new VolatileJournalStorage();
+        var token = TestContext.Current.CancellationToken;
+        await storage.AppendAsync(new ReadOnlySequence<byte>(new byte[1024 * 1024 - 1]), token);
+        Assert.False(storage.IsCompactionRequested);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+        Assert.True(storage.IsCompactionRequested);
+        Assert.Equal(2, storage.Segments.Count);
+        Assert.Equal(1024 * 1024, storage.Segments.Sum(static segment => segment.Length));
+    }
+
+    [Theory]
+    [InlineData(3, 100, 1)]
+    [InlineData(100, 3, 1)]
+    public async Task Compaction_ConfiguredLimitsAndCountersAreSharedAcrossProviderHandles(int appends, long bytes, int appendSize)
+    {
+        var provider = new VolatileJournalStorageProvider(
+            Microsoft.Extensions.Options.Options.Create(new JournaledStateManagerOptions()),
+            Microsoft.Extensions.Options.Options.Create(new VolatileJournalStorageOptions
+            {
+                MaxAppendsBeforeSnapshot = appends,
+                MaxBytesBeforeSnapshot = bytes
+            }), null);
+        var first = provider.CreateStorage(new("thresholds"));
+        var second = provider.CreateStorage(new("thresholds"));
+        var token = TestContext.Current.CancellationToken;
+        for (var index = 0; index < 2; index++)
+        {
+            await first.AppendAsync(new ReadOnlySequence<byte>(new byte[appendSize]), token);
+            Assert.False(second.IsCompactionRequested);
+        }
+        await second.AppendAsync(new ReadOnlySequence<byte>(new byte[appendSize]), token);
+        Assert.True(first.IsCompactionRequested);
+        await second.ReplaceAsync(new ReadOnlySequence<byte>(new byte[100]), token);
+        Assert.False(first.IsCompactionRequested);
+        await first.AppendAsync(new ReadOnlySequence<byte>([1]), token);
+        Assert.False(second.IsCompactionRequested);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(-1, 1)]
+    [InlineData(1, 0)]
+    [InlineData(1, -1)]
+    public void Compaction_InvalidLimitsFailAtConstruction(int appends, long bytes)
+    {
+        var options = new VolatileJournalStorageOptions { MaxAppendsBeforeSnapshot = appends, MaxBytesBeforeSnapshot = bytes };
+        Assert.Throws<ArgumentOutOfRangeException>(() => new VolatileJournalStorage(null, options));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new VolatileJournalStorageProvider(
+            Microsoft.Extensions.Options.Options.Create(new JournaledStateManagerOptions()),
+            Microsoft.Extensions.Options.Options.Create(options), null));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

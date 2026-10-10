@@ -68,10 +68,14 @@ The [`samples` directory](https://github.com/dotnet/orleans/tree/main/samples) c
 | [Bank Account](https://github.com/dotnet/orleans/tree/main/samples/BankAccount) | ACID transactions across stateful grains. |
 | [Journaled Todo List](https://github.com/dotnet/orleans/tree/main/samples/JournaledTodoList) | Event Sourcing with `JournaledGrain`, log-consistency providers, and Aspire. |
 | [Journaling with Azure Blob JSON](https://github.com/dotnet/orleans/tree/main/samples/JournalingAzureBlobJson) | Experimental Journaling APIs with Azure Blob Storage. |
+| [Durable Messaging](https://github.com/dotnet/orleans/tree/main/samples/DurableMessaging) | Typed subjects, stable command IDs, journal-acknowledged replies, and one stock reservation for repeated submissions. |
 | [Chat Room](https://github.com/dotnet/orleans/tree/main/samples/ChatRoom) | A terminal chat application using Orleans Streams. |
 | [Stocks](https://github.com/dotnet/orleans/tree/main/samples/Stocks) | Grain timers, HTTP calls, and temporary caching. |
 
 The Azure Blob JSON sample uses the experimental `Microsoft.Orleans.Journaling` package. The Journaled Todo List uses the supported [Orleans Event Sourcing](../grains/event-sourcing/index.md) model. See the [Journaling sample guide](../grains/journaling/samples.md) to run the Azure Blob and Redis durable-state samples.
+
+The [Durable Messaging recipe](../grains/durable-messaging-recipes.md#run-the-stock-reservation-sample)
+shows how to run the stock-reservation sample against locally packed Orleans packages.
 
 ### Deployment and operations
 

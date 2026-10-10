@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
 using Orleans.Journaling.Json;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -18,6 +19,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     private readonly SortedSet<string> _storageKeys = new(StringComparer.Ordinal);
     private readonly object _catalogLock = new();
     private readonly JournalStorageTelemetry _telemetry;
+    private readonly VolatileJournalStorageOptions _storageOptions = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class using the default journal format.
@@ -51,6 +53,31 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
         _telemetry = new JournalStorageTelemetry(instruments);
     }
 
+    /// <summary>
+    /// Initializes an in-memory provider with configurable snapshot thresholds.
+    /// </summary>
+    /// <param name="options">The journaled state manager options.</param>
+    /// <param name="storageOptions">The provider's snapshot thresholds.</param>
+    /// <param name="instruments">The optional Orleans runtime metrics meter.</param>
+    public VolatileJournalStorageProvider(
+        IOptions<JournaledStateManagerOptions> options,
+        IOptions<VolatileJournalStorageOptions> storageOptions,
+        OrleansInstruments? instruments) : this(options)
+    {
+        ArgumentNullException.ThrowIfNull(storageOptions);
+        var configuration = storageOptions.Value;
+        configuration.Validate();
+        _storageOptions = new()
+        {
+            MaxAppendsBeforeSnapshot = configuration.MaxAppendsBeforeSnapshot,
+            MaxBytesBeforeSnapshot = configuration.MaxBytesBeforeSnapshot
+        };
+        if (instruments is not null)
+        {
+            _telemetry = new JournalStorageTelemetry(instruments);
+        }
+    }
+
     /// <inheritdoc/>
     public IJournalStorage CreateStorage(JournalId journalId)
     {
@@ -73,7 +100,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
             }
         }
 
-        return new VolatileJournalStorage(store, journalFormatKey);
+        return new VolatileJournalStorage(store, journalFormatKey, _storageOptions);
     }
 
     /// <inheritdoc/>
@@ -144,9 +171,11 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 /// <summary>
 /// An in-memory, volatile implementation of <see cref="IJournalStorage"/> for non-durable use cases, such as development and testing.
 /// </summary>
-public sealed class VolatileJournalStorage : IJournalStorage
+public sealed class VolatileJournalStorage : IJournalStorage, IRetainedJournalStorage
 {
     private readonly Store _store;
+    private readonly int _maxAppendsBeforeSnapshot;
+    private readonly long _maxBytesBeforeSnapshot;
     private string? _configuredJournalFormatKey;
 
     /// <summary>
@@ -164,10 +193,24 @@ public sealed class VolatileJournalStorage : IJournalStorage
     {
     }
 
-    internal VolatileJournalStorage(Store store, string? journalFormatKey)
+    /// <summary>
+    /// Initializes an isolated in-memory journal with configurable snapshot thresholds.
+    /// </summary>
+    /// <param name="journalFormatKey">The journal format key to stamp on writes.</param>
+    /// <param name="options">The snapshot thresholds.</param>
+    public VolatileJournalStorage(string? journalFormatKey, VolatileJournalStorageOptions options)
+        : this(new Store(CreateVolatileStorageId()), journalFormatKey, options ?? throw new ArgumentNullException(nameof(options)))
+    {
+    }
+
+    internal VolatileJournalStorage(Store store, string? journalFormatKey, VolatileJournalStorageOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(store);
+        options ??= new();
+        options.Validate();
         _store = store;
+        _maxAppendsBeforeSnapshot = options.MaxAppendsBeforeSnapshot;
+        _maxBytesBeforeSnapshot = options.MaxBytesBeforeSnapshot;
         SetConfiguredJournalFormatKey(journalFormatKey);
     }
 
@@ -178,12 +221,60 @@ public sealed class VolatileJournalStorage : IJournalStorage
         {
             lock (_store.SyncRoot)
             {
-                return _store.Segments.Count > 10;
+                return _store.AppendCount >= _maxAppendsBeforeSnapshot || _store.AppendedBytes >= _maxBytesBeforeSnapshot;
             }
         }
     }
 
-    internal IReadOnlyList<byte[]> Segments => _store.Segments;
+    // Diagnostic snapshots never expose pooled memory beyond a pinned lifetime.
+    internal IReadOnlyList<byte[]> Segments
+    {
+        get
+        {
+            lock (_store.SyncRoot)
+            {
+                return _store.Segments.Select(static segment => segment.Length == 0 ? [] : segment.ToArray()).ToArray();
+            }
+        }
+    }
+
+    internal (int Segments, int ReaderReferences, long CopiedBytes, long SharedBytes, long RetainedCapacity, int RetainedPages) MemoryStatistics
+    {
+        get
+        {
+            lock (_store.SyncRoot)
+            {
+                var pages = new HashSet<ArcBufferPage>();
+                foreach (var segment in _store.Segments) AddPages(segment, pages);
+                foreach (var snapshot in _store.ReadSnapshots)
+                {
+                    foreach (var segment in snapshot) AddPages(segment, pages);
+                }
+
+                if (_store.CopyWriter is { } writer)
+                {
+                    using var tail = writer.PeekSlice(0);
+                    pages.Add(tail.First);
+                }
+
+                return (_store.Segments.Count, _store.ReadSnapshots.Sum(static snapshot => snapshot.Count(static segment => segment.Length > 0)),
+                    _store.CopiedBytes, _store.SharedBytes, pages.Sum(static page => (long)page.Array.Length), pages.Count);
+            }
+        }
+    }
+
+    private static void AddPages(ArcBuffer segment, HashSet<ArcBufferPage> pages)
+    {
+        if (segment.Length == 0) return;
+        var remaining = segment.Length;
+        var offset = segment.Offset;
+        for (var page = segment.First; remaining > 0; page = page.Next!)
+        {
+            pages.Add(page);
+            remaining -= page.Length - offset;
+            offset = 0;
+        }
+    }
 
     internal string? StoredJournalFormatKey
     {
@@ -264,25 +355,57 @@ public sealed class VolatileJournalStorage : IJournalStorage
     public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        byte[][] segments;
+        ArcBuffer[] segments;
         IJournalMetadata metadata;
         lock (_store.SyncRoot)
         {
             metadata = _store.Exists ? _store.GetMetadata() : JournalMetadata.Empty;
-            segments = _store.Segments.ToArray();
+            segments = new ArcBuffer[_store.Segments.Count];
+            try
+            {
+                for (var i = 0; i < segments.Length; i++)
+                {
+                    var segment = _store.Segments[i];
+                    if (segment.Length > 0) segments[i] = segment.Slice(0);
+                }
+                _store.ReadSnapshots.Add(segments);
+            }
+            catch
+            {
+                ReleaseSegments(segments);
+                throw;
+            }
         }
 
-        consumer.Read(GetSegments(segments, cancellationToken), metadata, complete: true);
-        return default;
+        try
+        {
+            consumer.Read(GetSegments(segments, cancellationToken), metadata, complete: true);
+            return default;
+        }
+        finally
+        {
+            lock (_store.SyncRoot)
+            {
+                _store.ReadSnapshots.Remove(segments);
+                if (_store.ReadSnapshots.Count == 0) _store.ReadSnapshots.TrimExcess();
+                ReleaseSegments(segments);
+            }
+        }
     }
 
-    private static IEnumerable<ReadOnlyMemory<byte>> GetSegments(IEnumerable<byte[]> segments, CancellationToken cancellationToken)
+    private static IEnumerable<ReadOnlyMemory<byte>> GetSegments(ArcBuffer[] segments, CancellationToken cancellationToken)
     {
         foreach (var segment in segments)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            yield return segment;
+            if (segment.Length == 0) continue;
+            foreach (var memory in segment.MemorySegments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return memory;
+            }
         }
     }
 
@@ -292,10 +415,10 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
-            _store.Exists = true;
-            _store.StoredJournalFormatKey = _configuredJournalFormatKey;
-            _store.Segments.Add(segment.ToArray());
-            _store.RefreshETag();
+            _store.Segments.EnsureCapacity(_store.Segments.Count + 1);
+            var retained = _store.Copy(segment);
+            Publish(retained);
+            _store.CopiedBytes += segment.Length;
         }
 
         return default;
@@ -307,14 +430,67 @@ public sealed class VolatileJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         lock (_store.SyncRoot)
         {
-            _store.Exists = true;
-            _store.StoredJournalFormatKey = _configuredJournalFormatKey;
-            _store.Segments.Clear();
-            _store.Segments.Add(snapshot.ToArray());
-            _store.RefreshETag();
+            var replacement = new List<ArcBuffer>(1);
+            // Build before retiring the old journal: a failed copy must not alter committed storage.
+            using var writer = new ArcBufferWriter();
+            writer.Write(snapshot);
+            var retained = snapshot.IsEmpty ? default : writer.PeekSlice(writer.Length);
+            Publish(retained, replacement);
+            _store.CopiedBytes += snapshot.Length;
         }
 
         return default;
+    }
+
+    ValueTask IRetainedJournalStorage.AppendRetainedAsync(ArcBuffer value, CancellationToken cancellationToken)
+        => WriteRetained(value, replace: false, cancellationToken);
+
+    ValueTask IRetainedJournalStorage.ReplaceRetainedAsync(ArcBuffer value, CancellationToken cancellationToken)
+        => WriteRetained(value, replace: true, cancellationToken);
+
+    private ValueTask WriteRetained(ArcBuffer value, bool replace, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_store.SyncRoot)
+        {
+            var replacement = replace ? new List<ArcBuffer>(1) : null;
+            if (!replace) _store.Segments.EnsureCapacity(_store.Segments.Count + 1);
+            var retained = value.Length == 0 ? default : value.Slice(0);
+            Publish(retained, replacement);
+            _store.SharedBytes += value.Length;
+        }
+
+        return default;
+    }
+
+    // Called under the store lock, with an independently owned reference. Takes ownership of it.
+    private void Publish(ArcBuffer retained, List<ArcBuffer>? replacement = null)
+    {
+        if (replacement is not null)
+        {
+            _store.ReleaseContents();
+            _store.Segments = replacement;
+            _store.AppendedBytes = 0;
+            _store.AppendCount = 0;
+        }
+        else
+        {
+            _store.AppendedBytes += retained.Length;
+            _store.AppendCount++;
+        }
+
+        _store.Exists = true;
+        _store.StoredJournalFormatKey = _configuredJournalFormatKey;
+        _store.Segments.Add(retained);
+        _store.RefreshETag();
+    }
+
+    private static void ReleaseSegments(IEnumerable<ArcBuffer> segments)
+    {
+        foreach (var segment in segments)
+        {
+            if (segment.Length > 0) segment.Dispose();
+        }
     }
 
     /// <inheritdoc/>
@@ -335,7 +511,46 @@ public sealed class VolatileJournalStorage : IJournalStorage
     {
         public object SyncRoot { get; } = new();
 
-        public List<byte[]> Segments { get; } = [];
+        // Every nonempty entry owns exactly one pin, independent of the writer and readers.
+        public List<ArcBuffer> Segments { get; set; } = [];
+        public HashSet<ArcBuffer[]> ReadSnapshots { get; } = [];
+        public ArcBufferWriter? CopyWriter { get; private set; }
+        public long CopiedBytes { get; set; }
+        public long SharedBytes { get; set; }
+
+        // Storage outlives individual handles/managers. Return its pins if the whole shared store
+        // becomes unreachable, without requiring a new public disposal contract for handles.
+        ~Store() => ReleaseContents();
+
+        public ArcBuffer Copy(ReadOnlySequence<byte> input)
+        {
+            if (input.IsEmpty) return default;
+            var length = checked((int)input.Length);
+            var writer = CopyWriter ??= new ArcBufferWriter();
+            try
+            {
+                writer.Write(input);
+                return writer.ConsumeSlice(length);
+            }
+            catch
+            {
+                writer.Truncate(0);
+                throw;
+            }
+        }
+
+        public void ReleaseContents()
+        {
+            ReleaseSegments(Segments);
+            Segments.Clear();
+            Segments.Capacity = 0;
+            CopyWriter?.Dispose();
+            CopyWriter = null;
+        }
+
+        public long AppendCount { get; set; }
+
+        public long AppendedBytes { get; set; }
 
         public Dictionary<string, string> Properties { get; } = new(StringComparer.Ordinal);
 
@@ -350,7 +565,9 @@ public sealed class VolatileJournalStorage : IJournalStorage
         public void Create(IReadOnlyDictionary<string, string>? properties)
         {
             Exists = true;
-            Segments.Clear();
+            ReleaseContents();
+            AppendCount = 0;
+            AppendedBytes = 0;
             Properties.Clear();
             StoredJournalFormatKey = null;
             if (properties is not null)
@@ -367,7 +584,9 @@ public sealed class VolatileJournalStorage : IJournalStorage
         public void Delete()
         {
             Exists = false;
-            Segments.Clear();
+            ReleaseContents();
+            AppendCount = 0;
+            AppendedBytes = 0;
             Properties.Clear();
             StoredJournalFormatKey = null;
             ETag = null;
