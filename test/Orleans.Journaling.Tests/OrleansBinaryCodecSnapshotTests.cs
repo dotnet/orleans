@@ -14,11 +14,11 @@ namespace Orleans.Journaling.Tests;
 /// <remarks>
 /// <para>
 /// These tests guard against accidental OrleansBinary wire-format changes. Every command writes its
-/// operands through the Orleans <c>IFieldCodec</c> path, matching the legacy value encoding while the
-/// entry framing is pinned by the snapshot bytes.
+/// operands through the Orleans <c>IFieldCodec</c> path. The entry framing and serialized operands
+/// are pinned by the snapshot bytes.
 /// </para>
 /// <para>
-/// Since this branch flips the default journal format from OrleansBinary to JSONL, the tests below
+/// JSON Lines is the default journal format, so the tests below
 /// explicitly construct <see cref="OrleansBinaryJournalFormat"/>/<see cref="OrleansBinaryJournalBufferWriter"/>
 /// to opt into the binary path. Each scenario:
 /// 1. writes a single operation through a real codec into a binary batch,

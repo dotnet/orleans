@@ -1,4 +1,4 @@
-﻿HEX: 0106000000080000000701
+﻿HEX: 0006000000080000000701
 DISASSEMBLY:
-[entry 0] frame-version=1 length=6 streamId=8 payload-bytes=2
+[entry 0] frame-version=0 length=6 streamId=8 payload-bytes=2
 0000  07 01                                              |..|

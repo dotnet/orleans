@@ -269,6 +269,13 @@
   </Suppression>
   <Suppression>
     <DiagnosticId>CP0006</DiagnosticId>
+    <Target>P:Orleans.Journaling.IJournaledStateManager.Hooks</Target>
+    <Left>lib/net10.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net10.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
     <Target>P:Orleans.Journaling.IJournalMetadata.FormatKey</Target>
     <Left>lib/net10.0/Orleans.Journaling.dll</Left>
     <Right>lib/net10.0/Orleans.Journaling.dll</Right>
@@ -298,6 +305,13 @@
   <Suppression>
     <DiagnosticId>CP0006</DiagnosticId>
     <Target>M:Orleans.Journaling.IJournalStorageCatalog.ListAsync(Orleans.Journaling.JournalCatalogListOptions,System.Threading.CancellationToken)</Target>
+    <Left>lib/net8.0/Orleans.Journaling.dll</Left>
+    <Right>lib/net8.0/Orleans.Journaling.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0006</DiagnosticId>
+    <Target>P:Orleans.Journaling.IJournaledStateManager.Hooks</Target>
     <Left>lib/net8.0/Orleans.Journaling.dll</Left>
     <Right>lib/net8.0/Orleans.Journaling.dll</Right>
     <IsBaselineSuppression>true</IsBaselineSuppression>

@@ -49,6 +49,24 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public const int MinimumPageSize = ArcBufferPagePool.MinimumPageSize;
 
     /// <summary>
+    /// Gets or sets the maximum aggregate size, in bytes, of free pages retained by the process-wide page pool.
+    /// </summary>
+    /// <remarks>
+    /// The default is 4 MiB. Setting this value to zero disables free-page retention. Reducing the limit releases
+    /// excess already-free pages immediately, without affecting pages owned by writers or pinned by readers.
+    /// Concurrent in-flight returns can temporarily exceed a reduced limit; the pool trims that excess as those
+    /// returns finish publishing their pages, so the settled pool stays within the limit.
+    /// This limit does not control the separate <see cref="ArrayPool{T}.Shared"/> used for large backing arrays
+    /// or change the maximum size of an individual page which can be retained.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
+    public static int MaxRetainedPoolBytes
+    {
+        get => ArcBufferPagePool.Shared.MaxRetainedBytes;
+        set => ArcBufferPagePool.Shared.MaxRetainedBytes = value;
+    }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ArcBufferWriter"/> struct.
     /// </summary>
     public ArcBufferWriter()
@@ -389,6 +407,11 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
     private void ThrowIfPinnedPages()
     {
+        if (_writePage is null)
+        {
+            throw new ObjectDisposedException(nameof(ArcBufferWriter));
+        }
+
         if (_hasPinnedPages)
         {
             throw new InvalidOperationException("A writer containing pinned pages cannot be mutated.");
@@ -568,42 +591,122 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
 internal sealed class ArcBufferPagePool
 {
+    internal const int DefaultMaximumRetainedBytes = 4 * 1024 * 1024;
+    internal const int MaximumRetainedPageSize = 1024 * 1024;
     public static ArcBufferPagePool Shared { get; } = new();
     public const int MinimumPageSize = 16 * 1024;
+    // Only configuration changes and overflow trimming take this lock, not ordinary rents or returns.
+    private readonly object _trimLock = new();
     private readonly ConcurrentQueue<ArcBufferPage> _pages = new();
     private readonly ConcurrentQueue<ArcBufferPage> _largePages = new();
+    private int _maximumRetainedBytes;
+    private int _retainedBytes;
+    private int _retainedPages;
 
-    private ArcBufferPagePool() { }
+    internal ArcBufferPagePool(int maximumRetainedBytes = DefaultMaximumRetainedBytes)
+    {
+        if (maximumRetainedBytes < 0) throw new ArgumentOutOfRangeException(nameof(maximumRetainedBytes));
+        _maximumRetainedBytes = maximumRetainedBytes;
+    }
+
+    internal int MaxRetainedBytes
+    {
+        get => Volatile.Read(ref _maximumRetainedBytes);
+        set
+        {
+            if (value < 0) throw new ArgumentOutOfRangeException(nameof(value));
+            lock (_trimLock)
+            {
+                var previous = _maximumRetainedBytes;
+                Volatile.Write(ref _maximumRetainedBytes, value);
+                if (value < previous) TrimCore();
+            }
+        }
+    }
+
+    internal int RetainedBytes => Volatile.Read(ref _retainedBytes);
+    internal int RetainedPages => Volatile.Read(ref _retainedPages);
 
     public ArcBufferPage Rent(int size = -1)
     {
-        ArcBufferPage? block;
-        if (size <= MinimumPageSize)
-        {
-            if (!_pages.TryDequeue(out block))
-            {
-                block = new ArcBufferPage(size);
-            }
-        }
-        else if (_largePages.TryDequeue(out block))
-        {
-            block.ResizeLargeSegment(size);
-            return block;
-        }
+        var queue = size <= MinimumPageSize ? _pages : _largePages;
+        if (!queue.TryDequeue(out var block)) return new ArcBufferPage(size);
 
-        return block ?? new ArcBufferPage(size);
+        Interlocked.Add(ref _retainedBytes, -block.Array.Length);
+        Interlocked.Decrement(ref _retainedPages);
+        if (size > MinimumPageSize) block.ResizeLargeSegment(size);
+        return block;
     }
 
     internal void Return(ArcBufferPage block)
     {
         Debug.Assert(block.IsValid);
-        if (block.IsMinimumSize)
+        if (TryReserve(block.Array.Length))
         {
-            _pages.Enqueue(block);
+            Publish(block);
+            return;
         }
-        else
+
+        // Do not keep pinned minimum-sized arrays or oversized rented arrays indefinitely.
+        block.ReleaseArray();
+    }
+
+    // Each successful reservation must be followed by exactly one Publish. These are separate phases because
+    // a configuration change can occur between reserving capacity and making the page available to renters.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool TryReserve(int size)
+    {
+        if (size <= MaximumRetainedPageSize)
         {
-            _largePages.Enqueue(block);
+            var retained = Volatile.Read(ref _retainedBytes);
+            while (size <= Volatile.Read(ref _maximumRetainedBytes) - retained)
+            {
+                var observed = Interlocked.CompareExchange(ref _retainedBytes, retained + size, retained);
+                if (observed == retained)
+                {
+                    Interlocked.Increment(ref _retainedPages);
+                    return true;
+                }
+
+                retained = observed;
+            }
+        }
+
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void Publish(ArcBufferPage block)
+    {
+        (block.IsMinimumSize ? _pages : _largePages).Enqueue(block);
+        // A shrink may have finished while this reservation was not yet queued. Always check after publication.
+        if (Volatile.Read(ref _retainedBytes) > Volatile.Read(ref _maximumRetainedBytes)) Trim();
+    }
+
+    internal void Trim()
+    {
+        lock (_trimLock)
+        {
+            // Recheck the current budget inside the gate: an increase may have made this trim request obsolete.
+            TrimCore();
+        }
+    }
+
+    private void TrimCore()
+    {
+        while (Volatile.Read(ref _retainedBytes) > _maximumRetainedBytes)
+        {
+            // Prefer releasing large arrays so more minimum-sized pages can remain available.
+            if (!_largePages.TryDequeue(out var block) && !_pages.TryDequeue(out block))
+            {
+                // Remaining accounting belongs to in-flight rents or unpublished returns. Rents remove their
+                // accounting, and returns recheck for overflow after publishing, so neither needs to be waited on.
+                break;
+            }
+
+            Interlocked.Add(ref _retainedBytes, -block.Array.Length);
+            Interlocked.Decrement(ref _retainedPages);
+            block.ReleaseArray();
         }
     }
 }
@@ -679,6 +782,12 @@ public sealed class ArcBufferPage
 
             Array = ArrayPool<byte>.Shared.Rent(length);
         }
+    }
+
+    internal void ReleaseArray()
+    {
+        if (!IsMinimumSize) ArrayPool<byte>.Shared.Return(Array);
+        Array = [];
     }
 
     /// <summary>
@@ -1025,10 +1134,13 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
 }
 
 /// <summary>
-/// Represents a slice of a <see cref="ArcBufferWriter"/>.
+/// Represents a reference-counted slice of raw bytes from an <see cref="ArcBufferWriter"/>.
 /// </summary>
 /// <remarks>
-/// Initializes a new instance of the <see cref="ArcBuffer"/> type.
+/// An owned slice must be disposed when no longer needed. Copying this struct does not acquire another pin:
+/// such copies are borrowed views and must not be disposed independently. Use <see cref="Slice(int)"/>
+/// to obtain an independent owner. Referenced bytes must not be mutated while a slice is in use.
+/// The default value is a valid, owner-free empty buffer.
 /// </remarks>
 /// <param name="first">The first page in the sequence.</param>
 /// <param name="token">The token of the first page in the sequence.</param>
@@ -1055,6 +1167,12 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// Gets the length of this sequence.
     /// </summary>
     public readonly int Length = length;
+
+    /// <summary>Gets an empty buffer which owns no pages.</summary>
+    public static ArcBuffer Empty => default;
+
+    /// <summary>Gets whether this buffer contains no bytes.</summary>
+    public readonly bool IsEmpty => Length == 0;
 
     /// <summary>Copies the contents of this writer to a span.</summary>
     public readonly int CopyTo(Span<byte> output)
@@ -1186,7 +1304,17 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// <summary>
     /// Throws if the buffer it no longer valid.
     /// </summary>
-    private readonly void CheckValidity() => First.CheckValidity(_firstPageToken);
+    internal readonly void CheckValidity()
+    {
+        if (First is not null)
+        {
+            First.CheckValidity(_firstPageToken);
+        }
+        else if (Length != 0 || Offset != 0)
+        {
+            throw new InvalidOperationException("An owner-free buffer must be empty.");
+        }
+    }
 
     /// <summary>
     /// Creates a pinned slice from the specified offset to the end of this buffer.
@@ -1232,6 +1360,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
         Debug.Assert(offset >= 0);
         Debug.Assert(length >= 0);
         Debug.Assert(length <= Length - offset);
+        if (First is null) return Empty;
         ArcBuffer result;
 
         // Navigate to the offset page & calculate the offset into the page.
@@ -1267,6 +1396,13 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     public readonly void Pin()
     {
         CheckValidity();
+        if (First is null) return;
+        if (IsEmpty)
+        {
+            First.Pin(_firstPageToken);
+            return;
+        }
+
         var pageEnumerator = Pages.GetEnumerator();
         if (pageEnumerator.MoveNext())
         {
@@ -1286,6 +1422,15 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// </summary>
     public void Unpin()
     {
+        if (First is null) return;
+        CheckValidity();
+        if (IsEmpty)
+        {
+            First.Unpin(_firstPageToken);
+            _firstPageToken = -1;
+            return;
+        }
+
         var pageEnumerator = Pages.GetEnumerator();
         if (pageEnumerator.MoveNext())
         {
@@ -1321,7 +1466,14 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// Returns an enumerator which can be used to enumerate the pages referenced by this instance.
     /// </summary>
     /// <returns>An enumerator for the data contained in this instance.</returns>
-    internal readonly PageSegmentEnumerator PageSegments => new(this);
+    internal readonly PageSegmentEnumerator PageSegments
+    {
+        get
+        {
+            CheckValidity();
+            return new(this);
+        }
+    }
 
     /// <summary>
     /// Returns an enumerator which can be used to enumerate the span segments referenced by this instance.
@@ -1419,6 +1571,7 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
         /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the collection.</returns>
         public bool MoveNext()
         {
+            if (_position == 0 && (Length == 0 || _page == First)) Slice.CheckValidity();
             Debug.Assert(_position <= Length);
             if (_page is null || _position == Length)
             {
