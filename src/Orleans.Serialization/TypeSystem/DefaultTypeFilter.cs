@@ -3,8 +3,9 @@ using System;
 namespace Orleans.Serialization.TypeSystem
 {
     /// <summary>
-    /// Type which allows any exception type to be resolved.
+    /// Supplies compatibility name grants for ordinary application type lookup.
     /// </summary>
+    /// <remarks>Wire readers bind host-registered identities and apply their independent authorization policy.</remarks>
     public sealed class DefaultTypeFilter : ITypeNameFilter
     {
         /// <inheritdoc/>

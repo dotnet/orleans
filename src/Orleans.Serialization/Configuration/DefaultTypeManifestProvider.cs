@@ -65,6 +65,7 @@ namespace Orleans.Serialization.Configuration
 
             var allowedTypes = typeManifest.AllowedTypes;
             allowedTypes.Add("System.Globalization.CompareOptions");
+            typeManifest.ContextTypes.Add(typeof(Codecs.WellKnownStringComparerCodec));
         }
     }
 }

@@ -41,6 +41,11 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
     protected override void Configure(ISerializerBuilder builder)
     {
         builder.AddMessagePackSerializer();
+        builder.Configure(options =>
+        {
+            options.AddAllowedType(typeof(MyMessagePackUnionVariant1));
+            options.AddAllowedType(typeof(MyMessagePackUnionVariant2));
+        });
     }
 
     protected override MyMessagePackClass? CreateValue() => new() { IntProperty = 30, StringProperty = "hello", SubClass = new() { Id = Guid.NewGuid() } };
@@ -117,6 +122,11 @@ public class MessagePackUnionCodecTests : FieldCodecTester<IMyMessagePackUnion?,
     protected override void Configure(ISerializerBuilder builder)
     {
         builder.AddMessagePackSerializer();
+        builder.Configure(options =>
+        {
+            options.AddAllowedType(typeof(MyMessagePackUnionVariant1));
+            options.AddAllowedType(typeof(MyMessagePackUnionVariant2));
+        });
     }
 
     protected override IMyMessagePackUnion? CreateValue() => new MyMessagePackUnionVariant1() { IntProperty = 30 };
@@ -143,6 +153,11 @@ public class MessagePackCodecCopierTests : CopierTester<MyMessagePackClass?, IDe
     protected override void Configure(ISerializerBuilder builder)
     {
         builder.AddMessagePackSerializer();
+        builder.Configure(options =>
+        {
+            options.AddAllowedType(typeof(MyMessagePackUnionVariant1));
+            options.AddAllowedType(typeof(MyMessagePackUnionVariant2));
+        });
     }
     protected override IDeepCopier<MyMessagePackClass?> CreateCopier() => ServiceProvider.GetRequiredService<ICodecProvider>().GetDeepCopier<MyMessagePackClass?>();
 

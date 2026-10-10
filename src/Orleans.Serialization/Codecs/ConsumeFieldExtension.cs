@@ -23,6 +23,12 @@ namespace Orleans.Serialization.Codecs
         /// <param name="reader">The reader.</param>
         /// <param name="field">The field.</param>
         public static void ConsumeUnknownField<TInput>(this ref Reader<TInput> reader, scoped ref Field field)
+            => ConsumeField(ref reader, ref field, preserveReferences: true);
+
+        internal static void ConsumeDiscardedField<TInput>(this ref Reader<TInput> reader, Field field)
+            => ConsumeField(ref reader, ref field, preserveReferences: false);
+
+        private static void ConsumeField<TInput>(ref Reader<TInput> reader, scoped ref Field field, bool preserveReferences)
         {
             // References cannot themselves be referenced.
             if (field.WireType == WireType.Reference)
@@ -33,7 +39,14 @@ namespace Orleans.Serialization.Codecs
             }
 
             // Record a placeholder so that this field can later be correctly deserialized if it is referenced.
-            ReferenceCodec.RecordObject(reader.Session, new UnknownFieldMarker(field, reader.Position));
+            if (preserveReferences)
+            {
+                ReferenceCodec.RecordObject(reader.Session, new UnknownFieldMarker(field, reader.Position));
+            }
+            else
+            {
+                ReferenceCodec.MarkValueField(reader.Session);
+            }
 
             switch (field.WireType)
             {
@@ -42,7 +55,7 @@ namespace Orleans.Serialization.Codecs
                     break;
                 case WireType.TagDelimited:
                     // Since tag delimited fields can be comprised of other fields, recursively consume those, too.
-                    reader.ConsumeTagDelimitedField();
+                    reader.ConsumeTagDelimitedField(preserveReferences);
                     break;
                 case WireType.LengthPrefixed:
                     SkipFieldExtension.SkipLengthPrefixedField(ref reader);
@@ -67,7 +80,7 @@ namespace Orleans.Serialization.Codecs
         /// </summary>
         /// <typeparam name="TInput">The reader input type.</typeparam>
         /// <param name="reader">The reader.</param>
-        private static void ConsumeTagDelimitedField<TInput>(this ref Reader<TInput> reader)
+        private static void ConsumeTagDelimitedField<TInput>(this ref Reader<TInput> reader, bool preserveReferences)
         {
             while (true)
             {
@@ -82,7 +95,7 @@ namespace Orleans.Serialization.Codecs
                     continue;
                 }
 
-                reader.ConsumeUnknownField(field);
+                ConsumeField(ref reader, ref field, preserveReferences);
             }
         }
     }

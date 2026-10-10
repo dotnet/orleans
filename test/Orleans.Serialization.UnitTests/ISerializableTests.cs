@@ -1,4 +1,5 @@
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
@@ -49,6 +50,13 @@ namespace Orleans.Serialization.UnitTests
         {
             var services = new ServiceCollection();
             _ = services.AddSerializer();
+            services.Configure<TypeManifestOptions>(options =>
+            {
+                options.AddAllowedType(typeof(SimpleISerializableObject));
+                options.AddAllowedType(typeof(SimpleISerializableStruct));
+                options.AddAllowedType(typeof(PrivateCallbacksISerializableClass));
+                options.AddAllowedType(typeof(PrivateCallbacksISerializableStruct));
+            });
             services.RemoveAll(typeof(TypeResolver));
             services.AddSingleton<TypeResolver>(sp => new BanningTypeResolver(typeof(UnserializableConformingException), typeof(UnserializableNonConformingException)));
             services.AddSingleton<IGeneralizedCodec, DotNetSerializableCodec>();
@@ -316,12 +324,12 @@ namespace Orleans.Serialization.UnitTests
             Assert.Contains(message, result.Message);
             Assert.Equal(RuntimeTypeNameFormatter.Format(source.GetType()), result.ExceptionType);
 
-            var inner = Assert.IsType<InvalidOperationException>(result.InnerException);
-            Assert.Equal("invalid", inner.Message);
-
-            Assert.True(result.Properties.ContainsKey("SomeObject"));
-            var baseField = Assert.IsType<SimpleISerializableObject>(result.Properties["BaseField"]);
-            Assert.Equal("payload", baseField.Payload);
+            Assert.Null(result.InnerException);
+            Assert.Empty(result.Data);
+            Assert.Equal(message, result.Properties["Message"]);
+            Assert.Equal(source.HResult, result.HResult);
+            Assert.DoesNotContain("SomeObject", result.Properties.Keys);
+            Assert.DoesNotContain("BaseField", result.Properties.Keys);
         }
 
         [Serializable]

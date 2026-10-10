@@ -9,6 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 
 namespace Orleans.Serialization.TypeSystem
 {
@@ -31,6 +32,11 @@ namespace Orleans.Serialization.TypeSystem
         {
             _typeConverter = typeConverter;
             _getTypeKey = type => new TypeKey(Encoding.UTF8.GetBytes(_typeConverter.Format(type)));
+        }
+
+        internal void ValidateType(Type? type)
+        {
+            if (type is not null) _typeConverter.AuthorizeForDeserialization(type);
         }
 
         /// <summary>
@@ -106,11 +112,11 @@ namespace Orleans.Serialization.TypeSystem
             string typeNameString;
             fixed (byte* typeNameBytes = typeName)
             {
-                typeNameString = Encoding.UTF8.GetString(typeNameBytes, typeName.Length);
+                typeNameString = StringCodec.TypeNameEncoding.GetString(typeNameBytes, typeName.Length);
             }
 
             Type? type = null;
-            if (_typeConverter.TryParse(typeNameString, out var parsedType))
+            if (_typeConverter.TryParseForDeserialization(typeNameString, out var parsedType))
             {
                 type = parsedType;
                 var key = new TypeKey(hashCode, typeName.ToArray());
@@ -142,10 +148,10 @@ namespace Orleans.Serialization.TypeSystem
             string typeNameString;
             fixed (byte* typeNameBytes = typeName)
             {
-                typeNameString = Encoding.UTF8.GetString(typeNameBytes, typeName.Length);
+                typeNameString = StringCodec.TypeNameEncoding.GetString(typeNameBytes, typeName.Length);
             }
 
-            var type = _typeConverter.Parse(typeNameString);
+            var type = _typeConverter.ParseForDeserialization(typeNameString);
             return type;
         }
 
@@ -172,10 +178,10 @@ namespace Orleans.Serialization.TypeSystem
             string typeNameString;
             fixed (byte* typeNameBytes = typeName)
             {
-                typeNameString = Encoding.UTF8.GetString(typeNameBytes, count);
+                typeNameString = StringCodec.TypeNameEncoding.GetString(typeNameBytes, count);
             }
 
-            _ = _typeConverter.TryParse(typeNameString, out type);
+            _ = _typeConverter.TryParseForDeserialization(typeNameString, out type);
             var key = new TypeKey(hashCode, typeName.ToArray());
             typeString = key.ToString();
             return type is not null;

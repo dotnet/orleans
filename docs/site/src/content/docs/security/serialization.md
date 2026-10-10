@@ -13,9 +13,11 @@ Limit who can supply serialized input using [network controls](networking.md), [
 
 ## Keep type-name resolution restricted
 
-Orleans-generated serializers use the application's known type manifest. External serializers can support types which include runtime type names, particularly in polymorphic contracts. Registering an external serializer selects a codec, while the type policy determines which CLR types the codec may resolve.
+Orleans wire readers bind complete type-name graphs to CLR type identities established by the host's serializer manifest, generated contexts, aliases, and explicit registrations. Type names select those identities. Orleans authorizes the generic definition, every argument, and every array element before returning the type. Typed compound-alias components use the same boundary.
 
-<xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`. Preserve that default when any connected client, stream, queue, or storage system can be influenced by a less-trusted party. Enabling it bypasses Orleans type-name validation and permits any resolvable type.
+Registering an external serializer selects a codec. The host separately establishes the CLR identities which its type policy permits. Alias registration establishes identity knowledge; permission comes from serializer contracts, explicit type or assembly grants, or configured filters. Ordinary application lookup has a separate cache and resolution path.
+
+<xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`. Preserve that default when any connected client, stream, queue, or storage system can be influenced by a less-trusted party. Enabling it bypasses authorization for host-known identities. Wire misses produce an unavailable-type result. Approved CLR type operations can load their normal dependencies; this boundary controls which identities input can select.
 
 An open type-resolution surface lets input select code paths from types outside the application's declared message contracts. Depending on the configured serializer and available types, deserialization gadget behavior can result in unintended side effects or code execution. An allow list reduces that attack surface, and each allowed type and serializer must be safe for the data source.
 
@@ -26,7 +28,13 @@ Use the narrowest applicable mechanism:
 1. Allow assemblies whose relevant types belong inside the same trust boundary.
 1. Implement <xref:Orleans.Serialization.ITypeNameFilter> or <xref:Orleans.Serialization.ITypeFilter> when trust requires an explicit policy.
 
-A denial from a registered type-name filter takes precedence over assembly trust. Constructed generic types require an authorized definition and approved arguments; array element types are checked independently. An explicit resolved-type filter grant for a closed generic type authorizes that construction, while argument denials still take precedence within the resolved-type checks. See [configure serialization](../host/configuration-guide/serialization-configuration.md#authorize-type-name-resolution) for the supported APIs and examples.
+A denial from a registered type-name filter takes precedence over metadata, alias knowledge, and assembly trust on the wire path. Explicit individual type registrations remain authoritative. Wire readers cache filter opinions for bound host identities for the configuration's lifetime. See [configure serialization](../host/configuration-guide/serialization-configuration.md#authorize-type-name-resolution) for registration and migration guidance.
+
+## Admit exception reconstruction
+
+The exception codec reconstructs a reviewed set of framework exception identities using registered factories. It establishes admission immediately after reading the embedded type name, before decoding `InnerException` or `Data`. <xref:Orleans.Serialization.ExceptionSerializationOptions.AddExceptionType*> registers a concrete, closed custom exception and its factory, and selects the exception codec for that type. Review its initialization, factory, serialization callbacks, and property restoration, including virtual `Data` access, for the input's trust boundary. Namespace predicates provide additional codec selection; factory registration admits reconstruction. `AggregateException` retains its dedicated codec.
+
+A well-formed unavailable or unadmitted exception uses <xref:Orleans.Serialization.UnavailableExceptionFallbackException>. The fallback preserves the original type name, message, stack trace, and HResult. Orleans consumes nested exception and data fields as discarded input and maintains the wire reference counters. Later references to discarded objects fail explicitly. Missing, repeated, malformed, explicitly denied, or known non-exception type names produce errors, as does structurally corrupt input. Registered factory failures remain explicit errors.
 
 ## Treat serializer extensions as security-sensitive
 

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Utilities.Internal;
@@ -95,7 +96,16 @@ public static class SerializationHostingExtensions
             services.AddFromExisting<IGeneralizedCodec, NewtonsoftJsonCodec>();
             services.AddFromExisting<IGeneralizedCopier, NewtonsoftJsonCodec>();
             services.AddFromExisting<ITypeFilter, NewtonsoftJsonCodec>();
-            serializerBuilder.Configure(options => options.WellKnownTypeAliases[NewtonsoftJsonCodec.WellKnownAlias] = typeof(NewtonsoftJsonCodec));
+            serializerBuilder.Configure(options =>
+            {
+                options.WellKnownTypeAliases[NewtonsoftJsonCodec.WellKnownAlias] = typeof(NewtonsoftJsonCodec);
+                options.AddAllowedType(typeof(JObject));
+                options.AddAllowedType(typeof(JArray));
+                options.AddAllowedType(typeof(JValue));
+                options.AddAllowedType(typeof(JProperty));
+                options.AddAllowedType(typeof(JRaw));
+                options.AddAllowedType(typeof(JConstructor));
+            });
         }
 
         return serializerBuilder;

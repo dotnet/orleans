@@ -288,6 +288,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Reader<TInput> reader, scoped ref Field field) where TField : class
         {
+            FieldHeaderCodec.EnsureRequiredType(field);
             var specificSerializer = reader.Session.CodecProvider.GetCodec(field.FieldType!);
             return (TField)specificSerializer.ReadValue(ref reader, field)!;
         }
