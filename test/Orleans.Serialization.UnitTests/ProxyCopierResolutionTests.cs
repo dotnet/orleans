@@ -20,8 +20,57 @@ namespace Orleans.Serialization.UnitTests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("Serialization")]
-public sealed class ProxyCopierResolutionTests
+public sealed class ProxyCopierResolutionTests(ITestOutputHelper output)
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void WarmRegisteredDependencyResolutionDoesNotAllocate(bool closedFactories)
+    {
+        var constructions = 0;
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.AddTransient<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(services =>
+        {
+            constructions++;
+            return ActivatorUtilities.CreateInstance<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(services);
+        });
+        if (closedFactories)
+        {
+            registrations.Configure<TypeManifestOptions>(options =>
+                options.AddSerializerService<PayloadActivator>(static _ => new()));
+        }
+
+        using var services = registrations.BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var caller = new object();
+        var expected = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(caller, provider);
+        for (var i = 0; i < 100; i++)
+        {
+            _ = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(caller, provider);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1000; i++)
+        {
+            _ = OrleansGeneratedCodeHelper.GetService<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(caller, provider);
+        }
+
+        var cachedBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.Equal(1, constructions);
+        Assert.Same(expected, provider.GetDeepCopier<CacheResolutionPayload>());
+        before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < 1000; i++)
+        {
+            _ = ActivatorUtilities.GetServiceOrCreateInstance<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(provider.Services);
+        }
+
+        var activationBytes = GC.GetAllocatedBytesForCurrentThread() - before;
+        output.WriteLine($"1000 warm resolutions: cached={cachedBytes} bytes and 0 constructors; uncached activation={activationBytes} bytes and {constructions - 1} constructors; closed factories={closedFactories}");
+        Assert.Equal(0, cachedBytes);
+        Assert.True(activationBytes > 0);
+        Assert.Equal(1001, constructions);
+    }
+
     [Fact]
     public void WarmProxiesReuseProviderCopiersWithoutConstructingDependencies()
     {
