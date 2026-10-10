@@ -132,13 +132,13 @@ internal static class ShipmentPackage
     internal static DurableEnvelope CreateEnvelope(
         Serializer serializer, ArcBufferWriter encoder, HierarchicalKey commandId,
         GrainId sender, GrainId receiver, ReserveStock request, ReadOnlySpan<byte> manifest) => new()
-    {
-        MessageId = commandId,
-        Subject = Subject,
-        SenderId = sender,
-        ReceiverId = receiver,
-        Payload = Encode(serializer, encoder, request, manifest)
-    };
+        {
+            MessageId = commandId,
+            Subject = Subject,
+            SenderId = sender,
+            ReceiverId = receiver,
+            Payload = Encode(serializer, encoder, request, manifest)
+        };
 
     internal static ArcBuffer Encode(
         Serializer serializer, ArcBufferWriter encoder, ReserveStock request, ReadOnlySpan<byte> manifest)
@@ -191,13 +191,13 @@ internal static class ArcPayloadEncoder
     internal static DurableEnvelope CreateEnvelope(
         Serializer<Notify> serializer, ArcBufferWriter encoder, HierarchicalKey commandId,
         GrainId sender, GrainId receiver, Notify message) => new()
-    {
-        MessageId = commandId,
-        Subject = MessagingSubjects.Notify,
-        SenderId = sender,
-        ReceiverId = receiver,
-        Payload = Encode(serializer, encoder, message)
-    };
+        {
+            MessageId = commandId,
+            Subject = MessagingSubjects.Notify,
+            SenderId = sender,
+            ReceiverId = receiver,
+            Payload = Encode(serializer, encoder, message)
+        };
 
     internal static ArcBuffer Encode(Serializer<Notify> serializer, ArcBufferWriter encoder, Notify message)
     {

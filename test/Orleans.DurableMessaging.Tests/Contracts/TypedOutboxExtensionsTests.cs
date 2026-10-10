@@ -242,19 +242,19 @@ public sealed class TypedOutboxExtensionsTests
     public static IEnumerable<object[]> ValidationCases()
     {
         foreach (var reply in new[] { false, true })
-        foreach (var addressable in new[] { false, true })
-        {
-            foreach (var variation in new[] { "outbox", "messageType", "body", "sender", "segments", "bytes", "multibyte-bytes" })
-                yield return [reply, addressable, variation];
-            if (reply)
+            foreach (var addressable in new[] { false, true })
             {
-                yield return [reply, addressable, "context"];
-                yield return [reply, addressable, "unset-parent"];
+                foreach (var variation in new[] { "outbox", "messageType", "body", "sender", "segments", "bytes", "multibyte-bytes" })
+                    yield return [reply, addressable, variation];
+                if (reply)
+                {
+                    yield return [reply, addressable, "context"];
+                    yield return [reply, addressable, "unset-parent"];
+                }
+                else yield return [reply, addressable, "messageId"];
+                yield return [reply, addressable, addressable ? "null-reference" : "destination"];
+                if (addressable) yield return [reply, addressable, "invalid-reference"];
             }
-            else yield return [reply, addressable, "messageId"];
-            yield return [reply, addressable, addressable ? "null-reference" : "destination"];
-            if (addressable) yield return [reply, addressable, "invalid-reference"];
-        }
     }
 
     [Theory]

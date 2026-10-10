@@ -22,7 +22,7 @@ public sealed class TypedMessageHelperTests
     private const string Subject = "orders.reserve";
     private static GrainId Sender => GrainId.Create("sender", "typed-helper");
     private static GrainId Receiver => GrainId.Create("receiver", "warehouse");
-    private static HierarchicalKey MessageKey => HierarchicalKey.Create("orders","42","reserve");
+    private static HierarchicalKey MessageKey => HierarchicalKey.Create("orders", "42", "reserve");
 
     [Fact]
     public void DurableMessageType_RejectsNullSerializer()
@@ -359,7 +359,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var messageType = new DurableMessageType<string>(Subject, serializer);
-        var key = HierarchicalKey.Create("orders","42","reserve");
+        var key = HierarchicalKey.Create("orders", "42", "reserve");
         using var first = messageType.Create(key, Sender, Receiver, "reserve first");
         var otherReceiver = GrainId.Create("receiver", "other-warehouse");
         var otherSender = GrainId.Create("sender", "other-owner");
@@ -2082,7 +2082,7 @@ public sealed class TypedMessageHelperTests
 
     private static DurableEnvelope Envelope(string subject, ArcBuffer payload) => new()
     {
-        MessageId = HierarchicalKey.Create("orders","42","reserve"),
+        MessageId = HierarchicalKey.Create("orders", "42", "reserve"),
         SenderId = Sender,
         ReceiverId = Receiver,
         Subject = subject,
