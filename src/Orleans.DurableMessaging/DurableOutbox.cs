@@ -170,9 +170,9 @@ internal sealed partial class DurableOutbox : IDurableOutbox, IDurableJobFeature
     internal IDurableValue<string> CompletedJobIdState => _completedJobId;
     internal IDurableValue<long> JobSequenceState => _jobSequence;
 
-    public int Count => _messages.Count;
-
     public GrainId SenderId => _grainContext.GrainId;
+
+    public int Count => _messages.Count;
 
     public IEnumerable<DurableEnvelope> Messages => _messages.Values;
 
