@@ -495,10 +495,10 @@ namespace Orleans.Serialization.Buffers
         /// Reads bytes into an independently owned <see cref="ArcBuffer"/>.
         /// </summary>
         /// <param name="length">The number of bytes to read.</param>
-        /// <returns>An owned buffer which the caller must dispose.</returns>
+        /// <returns>An owned buffer which the caller must dispose, or <see cref="ArcBuffer.Empty"/> for a zero-length read.</returns>
         /// <remarks>
-        /// Advances the reader by <paramref name="length"/> bytes. Arc input acquires an independent pin over the
-        /// referenced pages; other inputs copy the bytes into owned pooled pages.
+        /// Advances the reader by <paramref name="length"/> bytes. A nonempty read from Arc input acquires an
+        /// independent pin over the referenced pages; other nonempty reads copy the bytes into owned pooled pages.
         /// </remarks>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
         /// <exception cref="IndexOutOfRangeException">The input contains fewer than <paramref name="length"/> unread bytes.</exception>
@@ -506,6 +506,8 @@ namespace Orleans.Serialization.Buffers
         {
             if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
             EnsureAvailable((uint)length);
+            if (length == 0) return ArcBuffer.Empty;
+
             if (IsArcBufferInput)
             {
                 ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
@@ -513,8 +515,6 @@ namespace Orleans.Serialization.Buffers
                 Skip(length);
                 return result;
             }
-
-            if (length == 0) return ArcBuffer.Empty;
 
             using var output = new ArcBufferWriter();
             while (length > 0)

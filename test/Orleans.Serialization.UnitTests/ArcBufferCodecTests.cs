@@ -450,7 +450,7 @@ public sealed class ArcBufferCodecTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void EmptyArcInputPayload_ReturnsExactlyOneOwnedPin(bool pageBacked)
+    public void EmptyArcInputPayload_ReturnsOwnerFreeBuffer(bool pageBacked)
     {
         using var services = Services();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
@@ -458,7 +458,9 @@ public sealed class ArcBufferCodecTests
         {
             var reader = Reader.Create(ArcBuffer.Empty, session);
             var empty = reader.ReadArcBuffer(0);
+            Assert.True(empty.IsEmpty);
             Assert.Null(empty.First);
+            Assert.Equal(0, reader.Position);
             empty.Dispose();
             return;
         }
@@ -468,10 +470,35 @@ public sealed class ArcBufferCodecTests
         var before = input.First.ReferenceCount;
         var ownedReader = Reader.Create(input, session);
         var result = ownedReader.ReadArcBuffer(0);
-        Assert.Same(input.First, result.First);
-        Assert.Equal(before + 1, input.First.ReferenceCount);
+        Assert.True(result.IsEmpty);
+        Assert.Null(result.First);
+        Assert.Equal(0, ownedReader.Position);
+        Assert.Equal(before, input.First.ReferenceCount);
         result.Dispose();
         Assert.Equal(before, input.First.ReferenceCount);
+    }
+
+    [Fact]
+    public void ReadArcBuffer_ZeroLengthAtNonzeroOffsetReturnsOwnerFreeBuffer()
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        using var source = new ArcBufferWriter();
+        source.Write(Bytes(50037));
+        using var input = source.PeekSlice(source.Length);
+        var pages = input.Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var reader = Reader.Create(input, session);
+        reader.Skip(17000);
+        var remaining = reader.Remaining;
+        var empty = reader.ReadArcBuffer(0);
+        Assert.True(empty.IsEmpty);
+        Assert.Null(empty.First);
+        Assert.Equal(17000, reader.Position);
+        Assert.Equal(remaining, reader.Remaining);
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+        empty.Dispose();
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
     }
 
     [Theory]
