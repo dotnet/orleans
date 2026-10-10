@@ -34,6 +34,7 @@ Set the orchestrator's termination grace period longer than the host shutdown ti
 - Load balancers and readiness probes to stop sending new traffic.
 - Gateway and membership changes to propagate.
 - Grain deactivation callbacks and state writes.
+- Conditional grain-directory retirement, queued-request disposition, and the outbound work it produces.
 - Admitted client-observer invocations and their response handling.
 - Stream, reminder, storage, and telemetry providers to flush and stop.
 
@@ -47,7 +48,13 @@ If the external grace period expires first, the process is killed and graceful s
 - Make recovery safe after abrupt termination, because crashes and node loss remain possible.
 - Avoid synchronous blocking and unbounded retries in shutdown callbacks.
 
-Grains can move or reactivate elsewhere after a silo leaves. Don't use graceful shutdown as an application-wide drain barrier unless the application separately coordinates that behavior.
+Grains can move or reactivate elsewhere after a silo leaves. The catalog waits for admitted deactivation work, including disposition of waiting-request queues, before draining transport work. The retiring receiver forwards waiting requests after registration retirement, preserving their original identities and deadlines. Already-running invocations finish through their established execution and cancellation paths.
+
+Retirement failure accounting starts before activation deactivation, so application send failures during that phase contribute to the drain outcome. Application replies to system-target callers participate in draining according to their application origin. System-target protocol traffic remains eligible after application admission closes.
+
+The configured <xref:Orleans.Configuration.SiloMessagingOptions.WaitForMessageToBeQueuedForOutboundTime> provides an additional outbound queueing window after activation deactivation. Shutdown then seals complete-frame admission on established connections and waits for admitted frames to finish decoding and dispatch, including work queued before a connection closes. Responses and system protocol messages continue through dispatch after this seal. It closes runtime request admission, awaits admitted placement and disposition producers, and seals outbound admission. Each admitted outbound message carries its admission through send queueing, gateway buffering, transport completion, and asynchronous rerouting, allowing retries of admitted work to finish after the seal. Closing connections remain tracked until their admitted dispatches and outbound work finish. Successful transport completion establishes local write progress. The destination's runtime admission and the caller's response are separate completion boundaries. Ordinary requests received after their admission boundary closes remain bounded by their original caller deadlines.
+
+Directory failures, canceled deactivation, stuck activations, failed writes, and budget expiration produce unsuccessful or incomplete drain outcomes. The forced-stop path remains bounded by the shutdown token. Application-wide work draining requires an application-owned coordination boundary across the remaining silos.
 
 ## Containers and orchestrators
 

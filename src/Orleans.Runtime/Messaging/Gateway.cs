@@ -14,6 +14,8 @@ using Orleans.Configuration;
 using Orleans.Connections.Transport;
 using Orleans.Core.Diagnostics;
 using Orleans.Runtime.Internal;
+using Orleans.Internal;
+using System.Linq;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -25,6 +27,10 @@ namespace Orleans.Runtime.Messaging
         // Anything that appears in those 2 collections should also appear in the main clients collection.
         private readonly ConcurrentDictionary<ClientGrainId, ClientState> clients = new();
         private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = new();
+        private readonly ConcurrentDictionary<GatewayInboundConnection, byte> _drainingConnections = new();
+        private readonly AdmissionGate _outboundWork = new();
+        private Task? _incomingDispatchDrain;
+
         private readonly SiloAddress siloAddress;
         private readonly SiloAddress gatewayAddress;
         private readonly IAsyncTimer gatewayMaintenanceTimer;
@@ -65,6 +71,21 @@ namespace Orleans.Runtime.Messaging
         }
 
         internal GatewayInstruments GatewayInstruments { get; }
+
+        internal Task DrainIncomingAsync(CancellationToken cancellationToken)
+        {
+            lock (clients)
+            {
+                _incomingDispatchDrain ??= Task.WhenAll(_drainingConnections.Keys.Select(connection => connection.DrainIncomingApplicationDispatchAsync()));
+                return _incomingDispatchDrain.WaitAsync(cancellationToken);
+            }
+        }
+
+        internal async Task DrainOutboundAsync(CancellationToken cancellationToken)
+        {
+            await _outboundWork.CloseAsync().WaitAsync(cancellationToken);
+            await Task.WhenAll(_drainingConnections.Keys.Select(connection => connection.DrainAsync())).WaitAsync(cancellationToken);
+        }
 
         public static GrainAddress GetClientActivationAddress(GrainId clientId, SiloAddress siloAddress)
         {
@@ -138,6 +159,12 @@ namespace Orleans.Runtime.Messaging
             LogInformationGatewayClientOpenedSocket(logger, connection.RemoteEndPoint, clientId);
             lock (clients)
             {
+                if (_incomingDispatchDrain is not null)
+                {
+                    connection.DrainIncomingApplicationDispatchAsync().Ignore();
+                }
+
+                _drainingConnections.TryAdd(connection, 0);
                 if (clients.TryGetValue(clientId, out var clientState))
                 {
                     var oldSocket = clientState.Connection;
@@ -162,6 +189,7 @@ namespace Orleans.Runtime.Messaging
         internal void RecordClosedConnection(GatewayInboundConnection connection)
         {
             if (connection == null) return;
+            CompleteConnectionDrain(connection).Ignore();
 
             ClientState? clientState;
             lock (clients)
@@ -173,6 +201,24 @@ namespace Orleans.Runtime.Messaging
             }
 
             LogInformationGatewayClientClosedSocket(logger, connection.RemoteEndPoint?.ToString() ?? "null", clientState.Id);
+        }
+
+        private async Task CompleteConnectionDrain(GatewayInboundConnection connection)
+        {
+            try
+            {
+                await connection.CloseAsync(null);
+                await connection.DrainIncomingApplicationDispatchAsync();
+                await connection.DrainAsync();
+            }
+            catch (Exception exception)
+            {
+                LogGatewayConnectionDrainFailure(logger, exception, connection);
+            }
+            finally
+            {
+                _drainingConnections.TryRemove(connection, out _);
+            }
         }
 
         internal SiloAddress? TryToReroute(Message msg)
@@ -190,6 +236,11 @@ namespace Orleans.Runtime.Messaging
             if (msg.TargetGrain.IsSystemTarget() && !IsTargetingLocalGateway(msg.TargetSilo!))
             {
                 return msg.TargetSilo;
+            }
+
+            if (msg.IsRelocatableRequest && msg.TargetSilo is { Generation: not 0 } targetSilo && !IsTargetingLocalGateway(targetSilo))
+            {
+                return targetSilo;
             }
 
             // for responses from ClientAddressableObject to ClientGrain try to use clientsReplyRoutingCache for sending replies directly back.
@@ -276,7 +327,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         /// <param name="msg"></param>
         /// <returns>true if the message should be delivered to a proxied grain, false if not.</returns>
-        internal bool TryDeliverToProxy(Message msg)
+        internal bool TryDeliverToProxy(Message msg, ref AdmissionGate.Admission sendAdmission)
         {
             // See if it's a grain we're proxying.
             var targetGrain = msg.TargetGrain;
@@ -301,7 +352,7 @@ namespace Orleans.Runtime.Messaging
             msg.TargetSilo = null;
             msg.SendingSilo ??= gatewayAddress;
 
-            client.Send(msg);
+            client.Send(msg, ref sendAdmission);
             return true;
         }
 
@@ -309,7 +360,7 @@ namespace Orleans.Runtime.Messaging
         {
             private readonly Gateway _gateway;
             private readonly Task _messageLoop;
-            private readonly ConcurrentQueue<Message> _pendingToSend = new();
+            private readonly ConcurrentQueue<(Message Message, AdmissionGate.Admission SendAdmission)> _pendingToSend = new();
             private readonly SingleWaiterAutoResetEvent _signal = new()
             {
                 RunContinuationsAsynchronously = true
@@ -382,9 +433,18 @@ namespace Orleans.Runtime.Messaging
                 _signal.Signal();
             }
 
-            public void Send(Message msg)
+            public void Send(Message msg, ref AdmissionGate.Admission sendAdmission)
             {
-                _pendingToSend.Enqueue(msg);
+                if (msg.RequiresApplicationDrain && !_gateway._outboundWork.TryEnterUnscoped())
+                {
+                    _gateway.messageCenter.RecordRetirementSendFailure(msg);
+                    _gateway.messageCenter.RejectMessage(msg, Message.RejectionTypes.Transient,
+                        new SiloUnavailableException("Gateway application send admission has closed."));
+                    return;
+                }
+
+                _pendingToSend.Enqueue((msg, sendAdmission));
+                sendAdmission = default;
                 _signal.Signal();
                 LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
             }
@@ -410,17 +470,32 @@ namespace Orleans.Runtime.Messaging
                         }
 
                         // Send all pending messages.
-                        while (_pendingToSend.TryDequeue(out var message))
+                        while (_pendingToSend.TryDequeue(out var item))
                         {
-                            if (TrySend(connection, message))
+                            var (message, sendAdmission) = item;
+                            var requeued = false;
+                            try
                             {
-                                LogTraceSentQueuedMessage(_gateway.logger, message, Id);
+                                if (TrySend(connection, message, ref sendAdmission))
+                                {
+                                    LogTraceSentQueuedMessage(_gateway.logger, message, Id);
+                                }
+                                else
+                                {
+                                    // Re-enqueue the message. It's ok that it is at the end of the queue: message ordering is not guaranteed.
+                                    _pendingToSend.Enqueue((message, sendAdmission));
+                                    sendAdmission = default;
+                                    requeued = true;
+                                    break;
+                                }
                             }
-                            else
+                            finally
                             {
-                                // Re-enqueue the message. It's ok that it is at the end of the queue: message ordering is not guaranteed.
-                                _pendingToSend.Enqueue(message);
-                                return;
+                                sendAdmission.Dispose();
+                                if (!requeued && message.RequiresApplicationDrain)
+                                {
+                                    _gateway._outboundWork.Exit();
+                                }
                             }
                         }
                     }
@@ -434,14 +509,27 @@ namespace Orleans.Runtime.Messaging
             private void RejectDroppedClientMessages()
             {
                 ClientNotAvailableException? exception = null;
-                while (_pendingToSend.TryDequeue(out var message))
+                while (_pendingToSend.TryDequeue(out var item))
                 {
+                    var (message, sendAdmission) = item;
                     exception ??= new ClientNotAvailableException(Id.GrainId);
-                    _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: exception, rejectInfo: "Client dropped");
+                    try
+                    {
+                        _gateway.messageCenter.RecordRetirementSendFailure(message);
+                        _gateway.messageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exc: exception, rejectInfo: "Client dropped");
+                    }
+                    finally
+                    {
+                        sendAdmission.Dispose();
+                        if (message.RequiresApplicationDrain)
+                        {
+                            _gateway._outboundWork.Exit();
+                        }
+                    }
                 }
             }
 
-            private bool TrySend(GatewayInboundConnection connection, Message message)
+            private bool TrySend(GatewayInboundConnection connection, Message message, ref AdmissionGate.Admission sendAdmission)
             {
                 if (connection is null)
                 {
@@ -450,7 +538,7 @@ namespace Orleans.Runtime.Messaging
 
                 try
                 {
-                    connection.Send(message);
+                    connection.Send(message, ref sendAdmission);
                     return true;
                 }
                 catch (Exception exception)
@@ -506,6 +594,9 @@ namespace Orleans.Runtime.Messaging
                 }
             }
         }
+        [LoggerMessage(Level = LogLevel.Warning, Message = "Gateway connection drain failed for {Connection}.")]
+        private static partial void LogGatewayConnectionDrainFailure(ILogger logger, Exception exception, GatewayInboundConnection connection);
+
         [LoggerMessage(
             Level = LogLevel.Error,
             Message = "Error performing gateway maintenance"

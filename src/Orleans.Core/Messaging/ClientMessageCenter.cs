@@ -232,7 +232,7 @@ namespace Orleans.Messaging
         private ValueTask<Connection?> GetGatewayConnection(Message msg)
         {
             // If there's a specific gateway specified, use it
-            if (msg.TargetSilo != null && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
+            if (!msg.IsRelocatableRequest && msg.TargetSilo != null && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
             {
                 var siloAddress = SiloAddress.New(msg.TargetSilo.Endpoint, 0);
                 var connectionTask = this.connectionManager.GetConnection(siloAddress);

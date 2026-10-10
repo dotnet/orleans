@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Never replace with source references: this process is the released peer. -->
+    <PackageReference Include="Microsoft.Orleans.Server" VersionOverride="10.4.0" />
+    <ProjectReference Include="..\Contracts\ReleasedPeer.Contracts.csproj" />
+    <Compile Include="..\Shared\*.cs" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

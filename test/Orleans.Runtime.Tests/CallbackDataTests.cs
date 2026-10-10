@@ -2,18 +2,548 @@ using System;
 using System.Diagnostics.Metrics;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Net;
+using System.Collections.Generic;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
+using Orleans.Serialization;
+using Orleans.Runtime.GrainDirectory;
 using Xunit;
 
 namespace Tester;
 
 public class CallbackDataTests
 {
+    [Fact, TestCategory("BVT")]
+    public async Task RetirementInvalidationPreservesKnownSameSiloReplacement()
+    {
+        await using var cache = new LruGrainDirectoryCache(16, TimeSpan.FromMinutes(1), TimeProvider.System);
+        var id = GrainId.Create("test", "replacement");
+        var silo = SiloAddress.New(IPAddress.Loopback, 30000, 1);
+        var old = new GrainAddress { GrainId = id, SiloAddress = silo, ActivationId = ActivationId.NewId() };
+        var replacement = new GrainAddress { GrainId = id, SiloAddress = silo, ActivationId = ActivationId.NewId() };
+        cache.AddOrUpdate(replacement, 1);
+        Assert.False(cache.Remove(old));
+        Assert.True(cache.LookUp(id, out var current, out _));
+        Assert.Equal(replacement, current);
+        Assert.True(cache.Remove(new GrainAddress { GrainId = id, SiloAddress = silo }));
+        Assert.False(cache.LookUp(id, out _, out _));
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void PhysicalTargetDeathPreservesRelocatableInvocation()
+    {
+        using var services = CreateServiceProvider();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion);
+
+        callback.OnTargetSiloFail();
+        Assert.False(callback.IsCompleted);
+        Assert.Null(completion.Response);
+        callback.DoCallback(new Message { BodyObject = Response.FromResult(42) });
+        Assert.True(callback.IsCompleted);
+        Assert.NotNull(completion.Response);
+        Assert.Equal(42, completion.Response.GetResult<int>());
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void PinnedTargetDeathRemainsTerminal(bool systemMessage, bool localOnly)
+    {
+        using var services = CreateServiceProvider();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion);
+        callback.Message.IsSystemMessage = systemMessage;
+        callback.Message.IsLocalOnly = localOnly;
+
+        callback.OnTargetSiloFail();
+
+        Assert.True(callback.IsCompleted);
+        Assert.IsType<SiloUnavailableException>(completion.Response.Exception);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void InitialRouteAndDuplicateStatusPreserveOriginalMessageIdentity()
+    {
+        using var services = CreateServiceProvider();
+        var completion = new TestResponseCompletionSource();
+        var request = CreateRequest();
+        var callback = CreateRouteCallback(services, completion, request: request);
+        var original = callback.Message;
+        var expiry = original._timeToExpiry.GetRawTimestamp();
+        var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        var status = new StatusResponse(false, false, []) { ForwardedTo = destination };
+
+        Assert.True(callback.OnStatusUpdate(status, 0));
+        Assert.False(callback.OnStatusUpdate(status, 0));
+
+        Assert.Same(request, original);
+        Assert.Same(original, callback.Message);
+        Assert.False(callback.IsCompleted);
+        Assert.Equal(new CorrelationId(123), original.Id);
+        Assert.Equal(GrainId.Create("test", "caller"), original.SendingGrain);
+        Assert.Equal(GrainId.Create("test", "target"), original.TargetGrain);
+        Assert.Equal("original payload", original.BodyObject);
+        Assert.Equal(expiry, original._timeToExpiry.GetRawTimestamp());
+        Assert.Equal(0, original.ForwardCount);
+        Assert.Equal(destination, original.TargetSilo);
+        Assert.Null(completion.Response);
+        callback.OnHostShutdown();
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData("timeout")]
+    [InlineData("shutdown")]
+    [InlineData("response")]
+    [InlineData("cancellation")]
+    public void TerminalCompletionRejectsSubsequentRouteUpdates(string terminal)
+    {
+        using var services = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion);
+        callback.SubscribeForCancellation(cancellation.Token);
+        var initialTarget = callback.Message.TargetSilo;
+        switch (terminal)
+        {
+            case "timeout": callback.OnTimeout(); break;
+            case "shutdown": callback.OnHostShutdown(); break;
+            case "response": callback.DoCallback(new Message { BodyObject = Response.FromResult(42) }); break;
+            case "cancellation": cancellation.Cancel(); break;
+        }
+
+        Assert.True(callback.IsCompleted);
+        Assert.False(callback.OnStatusUpdate(new(false, false, [])
+        {
+            ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30002, 1),
+        }, 1));
+        Assert.Equal(initialTarget, callback.Message.TargetSilo);
+        Assert.Equal(0, callback.Message.ForwardCount);
+        Assert.Equal(1, completion.CompletionCount);
+        if (terminal == "response") Assert.Equal(42, completion.Response.GetResult<int>());
+        else Assert.IsType(terminal switch
+        {
+            "timeout" => typeof(TimeoutException),
+            "shutdown" => typeof(SiloUnavailableException),
+            _ => typeof(OperationCanceledException),
+        }, completion.Response.Exception);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void RouteUpdatesDoNotRestartOriginalResponseDeadline()
+    {
+        using var services = CreateServiceProvider();
+        var clock = new FakeTimeProvider();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion, clock);
+        var expiry = callback.Message._timeToExpiry.GetRawTimestamp();
+        for (var generation = 0; generation < 3; generation++)
+        {
+            Assert.True(callback.OnStatusUpdate(new(false, false, [])
+            {
+                ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30002 + generation, 1),
+            }, generation));
+            Assert.Equal(generation, callback.Message.ForwardCount);
+            clock.Advance(TimeSpan.FromSeconds(20));
+            Assert.False(callback.IsExpired(clock.GetTimestamp()));
+            Assert.Equal(expiry, callback.Message._timeToExpiry.GetRawTimestamp());
+        }
+
+        clock.Advance(TimeSpan.FromTicks(1));
+        Assert.True(callback.IsExpired(clock.GetTimestamp()));
+        callback.OnTimeout();
+        Assert.IsType<TimeoutException>(completion.Response!.Exception);
+        Assert.Equal(1, completion.CompletionCount);
+        Assert.Equal(2, callback.Message.ForwardCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void ForwardingRouteUpdatesAreMonotonicAndAdvisory()
+    {
+        using var services = CreateServiceProvider();
+        var callback = CreateRouteCallback(services, new());
+        var message = callback.Message;
+        var originalTarget = message.TargetSilo;
+        var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = destination }, 2));
+        Assert.Same(message, callback.Message);
+        Assert.Equal(destination, message.TargetSilo);
+        Assert.Equal(2, message.ForwardCount);
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = originalTarget }, 1));
+        Assert.Equal(destination, message.TargetSilo);
+        Assert.Equal(2, message.ForwardCount);
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = originalTarget }, 2));
+        Assert.Equal(destination, message.TargetSilo);
+        Assert.Equal(2, message.ForwardCount);
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = originalTarget }, 3));
+        Assert.Equal(originalTarget, message.TargetSilo);
+        Assert.False(callback.IsCompleted);
+        Assert.Equal(3, message.ForwardCount);
+        callback.OnHostShutdown();
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = destination }, 4));
+        Assert.Equal(originalTarget, message.TargetSilo);
+        Assert.Equal(3, message.ForwardCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void LegacyDiagnosticStatusDoesNotConsumeInitialRouteGeneration()
+    {
+        using var services = CreateServiceProvider();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion);
+        var originalTarget = callback.Message.TargetSilo;
+        Assert.True(callback.OnStatusUpdate(new(false, true, ["held below admission"]), 255));
+        Assert.Equal(originalTarget, callback.Message.TargetSilo);
+        Assert.Equal(0, callback.Message.ForwardCount);
+        var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        var route = new StatusResponse(false, false, []) { ForwardedTo = destination };
+        Assert.True(callback.OnStatusUpdate(route, 0));
+        Assert.False(callback.OnStatusUpdate(route, 0));
+        Assert.Equal(destination, callback.Message.TargetSilo);
+        Assert.Equal(0, callback.Message.ForwardCount);
+        callback.OnTimeout();
+        Assert.Contains("held below admission", Assert.IsType<TimeoutException>(completion.Response.Exception).Message);
+        Assert.Equal(1, completion.CompletionCount);
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClearedBodyCancellationUsesCachedCapability(bool cancellable)
+    {
+        using var services = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        using var request = CreateRequest();
+        var body = new CancellableTestInvokable { Cancellable = cancellable };
+        request.BodyObject = body;
+        var manager = new RecordingCancellationManager();
+        var shared = CreateSharedCallbackData(_ => { }, TimeProvider.System, TimeSpan.FromMinutes(1));
+        shared.CancellationManager = manager;
+        var completion = new TestResponseCompletionSource();
+        var callback = new CallbackData(shared, completion, request, CreateInstruments(services));
+        Assert.Same(body, callback.Message.BodyObject);
+        request.ReleaseBodyBuffer();
+        callback.SubscribeForCancellation(cancellation.Token);
+        cancellation.Cancel();
+        Assert.True(callback.IsCompleted);
+        var exception = Assert.IsType<OperationCanceledException>(completion.Response.Exception);
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(1, completion.CompletionCount);
+        Assert.Equal(0, body.Disposals);
+        Assert.Null(request.BodyObject);
+        if (cancellable)
+        {
+            var signal = Assert.Single(manager.Signals);
+            Assert.Equal(request.TargetSilo, signal.Silo);
+            Assert.Equal(request.Id, signal.Id);
+            Assert.Equal(request.TargetGrain, signal.Target);
+            Assert.Equal(request.SendingGrain, signal.Caller);
+        }
+        else Assert.Empty(manager.Signals);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task ConcurrentDuplicateRouteUpdatesAcceptExactlyOneStatus()
+    {
+        using var services = CreateServiceProvider();
+        var accepted = 0;
+        var callback = CreateRouteCallback(services, new());
+        var target = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        var status = new StatusResponse(false, false, []) { ForwardedTo = target };
+        using var start = new Barrier(2);
+        await Task.WhenAll(Task.Run(Receive, TestContext.Current.CancellationToken), Task.Run(Receive, TestContext.Current.CancellationToken));
+        Assert.Equal(1, accepted);
+        Assert.Equal(target, callback.Message.TargetSilo);
+        Assert.Equal(0, callback.Message.ForwardCount);
+        Assert.False(callback.IsCompleted);
+        callback.OnHostShutdown();
+
+        void Receive()
+        {
+            Assert.True(start.SignalAndWait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+            if (callback.OnStatusUpdate(status, 0)) Interlocked.Increment(ref accepted);
+        }
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void CancellationTracksNewestRouteAfterSuccessfulWriteClearsOriginalBody()
+    {
+        using var services = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var manager = new RecordingCancellationManager();
+        var shared = CreateSharedCallbackData(_ => { }, TimeProvider.System, TimeSpan.FromMinutes(1));
+        shared.CancellationManager = manager;
+        var message = new Message
+        {
+            Direction = Message.Directions.Request,
+            TargetGrain = GrainId.Create("test", "target"),
+            SendingGrain = GrainId.Create("test", "caller"),
+            Id = new CorrelationId(123),
+            BodyObject = new CancellableTestInvokable(),
+        };
+        var completion = new TestResponseCompletionSource();
+        var callback = new CallbackData(shared, completion, message, CreateInstruments(services));
+        Assert.Same(message, callback.Message);
+        var body = Assert.IsType<CancellableTestInvokable>(message.BodyObject);
+        message.ReleaseBodyBuffer();
+        Assert.Null(message.BodyObject);
+        Assert.Equal(0, body.Disposals);
+        var initialRoute = new StatusResponse(false, false, [])
+        {
+            ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30002, 1),
+        };
+        Assert.True(callback.OnStatusUpdate(initialRoute, 0));
+        callback.SubscribeForCancellation(cancellation.Token);
+        Assert.False(callback.OnStatusUpdate(initialRoute, 0));
+        Assert.Equal(initialRoute.ForwardedTo, message.TargetSilo);
+        Assert.Equal(0, message.ForwardCount);
+        var newest = SiloAddress.New(IPAddress.Loopback, 30003, 1);
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = newest }, 3));
+        Assert.False(callback.OnStatusUpdate(new(false, false, [])
+        {
+            ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30002, 1),
+        }, 2));
+        Assert.Equal(newest, callback.Message.TargetSilo);
+        Assert.Equal(3, callback.Message.ForwardCount);
+        cancellation.Cancel();
+        var signal = Assert.Single(manager.Signals);
+        Assert.Equal(newest, signal.Silo);
+        Assert.Equal(message.Id, signal.Id);
+        Assert.Equal(message.TargetGrain, signal.Target);
+        Assert.Equal(message.SendingGrain, signal.Caller);
+        Assert.Equal(0, body.Disposals);
+        callback.OnTimeout();
+        callback.OnHostShutdown();
+        callback.DoCallback(new Message { BodyObject = Response.FromResult(42) });
+        Assert.Equal(0, body.Disposals);
+        Assert.Equal(1, completion.CompletionCount);
+        Assert.IsType<OperationCanceledException>(completion.Response!.Exception);
+        message.Dispose();
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void ClearedBodyRetainsMethodSpecificResponseTimeout()
+    {
+        using var services = CreateServiceProvider();
+        var clock = new FakeTimeProvider();
+        var completion = new TestResponseCompletionSource();
+        using var message = CreateRequest();
+        var body = new CancellableTestInvokable();
+        message.BodyObject = body;
+        var callback = CreateRouteCallback(services, completion, clock, message);
+        message.ReleaseBodyBuffer();
+        clock.Advance(TimeSpan.FromSeconds(7));
+        Assert.False(callback.IsExpired(clock.GetTimestamp()));
+        clock.Advance(TimeSpan.FromTicks(1));
+        Assert.True(callback.IsExpired(clock.GetTimestamp()));
+        callback.OnTimeout();
+        Assert.True(callback.IsCompleted);
+        Assert.Contains("00:00:07", Assert.IsType<TimeoutException>(completion.Response.Exception).Message);
+        Assert.Null(message.BodyObject);
+        Assert.Equal(0, body.Disposals);
+        Assert.Equal(1, completion.CompletionCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void PhysicalTargetDeathWaitsForOriginalDeadlineWithoutReplay()
+    {
+        using var services = CreateServiceProvider();
+        var clock = new FakeTimeProvider();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion, clock);
+        callback.OnTargetSiloFail();
+        Assert.False(callback.IsCompleted);
+        Assert.Null(completion.Response);
+        clock.Advance(TimeSpan.FromMinutes(1) + TimeSpan.FromTicks(1));
+        Assert.True(callback.IsExpired(clock.GetTimestamp()));
+        callback.OnTimeout();
+        Assert.IsType<TimeoutException>(completion.Response!.Exception);
+        Assert.Equal(1, completion.CompletionCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void ApplicationSiloUnavailableExceptionRemainsTerminalWithoutReplay()
+    {
+        using var services = CreateServiceProvider();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion);
+        var exception = new SiloUnavailableException("Application failure");
+        callback.DoCallback(new Message { BodyObject = Response.FromException(exception) });
+        Assert.True(callback.IsCompleted);
+        Assert.Same(exception, completion.Response.Exception);
+        Assert.Equal(1, completion.CompletionCount);
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData("death-route-response")]
+    [InlineData("route-death-response")]
+    [InlineData("route-response-death")]
+    [InlineData("response-route-death")]
+    public void MembershipAndRouteOrderingPreservesOneLogicalCompletion(string ordering)
+    {
+        using var services = CreateServiceProvider();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion);
+        var originalTarget = callback.Message.TargetSilo;
+        var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        var status = new StatusResponse(false, false, []) { ForwardedTo = destination };
+        foreach (var step in ordering.Split('-'))
+        {
+            switch (step)
+            {
+                case "death": callback.OnTargetSiloFail(); break;
+                case "route":
+                    Assert.Equal(!callback.IsCompleted, callback.OnStatusUpdate(status, 1));
+                    break;
+                case "response": callback.DoCallback(new Message { BodyObject = Response.FromResult(174) }); break;
+            }
+        }
+
+        Assert.Equal(1, completion.CompletionCount);
+        Assert.Equal(174, completion.Response.GetResult<int>());
+        Assert.Equal(ordering.StartsWith("response", StringComparison.Ordinal) ? originalTarget : destination, callback.Message.TargetSilo);
+        Assert.Equal(ordering.StartsWith("response", StringComparison.Ordinal) ? 0 : 1, callback.Message.ForwardCount);
+    }
+
+    [Theory, TestCategory("BVT")]
+    [InlineData("timeout")]
+    [InlineData("cancellation")]
+    [InlineData("shutdown")]
+    [InlineData("response")]
+    public async Task RouteUpdateRacingTerminalTransitionCannotChangeCompletedRoute(string terminal)
+    {
+        using var services = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion);
+        callback.SubscribeForCancellation(cancellation.Token);
+        var destination = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        var status = new StatusResponse(false, false, []) { ForwardedTo = destination };
+        var accepted = false;
+        using var barrier = new Barrier(2);
+        await Task.WhenAll(
+            Task.Run(() =>
+            {
+                Assert.True(barrier.SignalAndWait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+                accepted = callback.OnStatusUpdate(status, 2);
+            }, TestContext.Current.CancellationToken),
+            Task.Run(() =>
+            {
+                Assert.True(barrier.SignalAndWait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+                switch (terminal)
+                {
+                    case "timeout": callback.OnTimeout(); break;
+                    case "cancellation": cancellation.Cancel(); break;
+                    case "shutdown": callback.OnHostShutdown(); break;
+                    case "response": callback.DoCallback(new Message { BodyObject = Response.FromResult(174) }); break;
+                }
+            }, TestContext.Current.CancellationToken));
+
+        Assert.True(callback.IsCompleted);
+        Assert.Equal(1, completion.CompletionCount);
+        Assert.Equal(accepted ? destination : SiloAddress.New(IPAddress.Loopback, 30000, 1), callback.Message.TargetSilo);
+        Assert.Equal(accepted ? 2 : 0, callback.Message.ForwardCount);
+        var terminalRoute = callback.Message.TargetSilo;
+        Assert.False(callback.OnStatusUpdate(new(false, false, [])
+        {
+            ForwardedTo = SiloAddress.New(IPAddress.Loopback, 30003, 1),
+        }, 3));
+        Assert.Equal(terminalRoute, callback.Message.TargetSilo);
+        Assert.Equal(accepted ? 2 : 0, callback.Message.ForwardCount);
+        if (terminal == "response") Assert.Equal(174, completion.Response.GetResult<int>());
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void CancellationAwaitingAcknowledgementTracksAcceptedRouteAfterBodyRelease()
+    {
+        using var services = CreateServiceProvider();
+        using var cancellation = new CancellationTokenSource();
+        var completion = new TestResponseCompletionSource();
+        var manager = new RecordingCancellationManager();
+        var shared = new SharedCallbackData(_ => { }, NullLogger<CallbackData>.Instance,
+            TimeProvider.System, TimeSpan.FromMinutes(1), false, true, manager);
+        using var request = CreateRequest();
+        request.BodyObject = new CancellableTestInvokable();
+        var callback = new CallbackData(shared, completion, request, CreateInstruments(services));
+        request.ReleaseBodyBuffer();
+        callback.SubscribeForCancellation(cancellation.Token);
+        cancellation.Cancel();
+        Assert.False(callback.IsCompleted);
+        Assert.Null(completion.Response);
+        var initialSignal = Assert.Single(manager.Signals);
+        Assert.Equal(request.TargetSilo, initialSignal.Silo);
+        var next = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = next }, 0));
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = next }, 0));
+        Assert.Equal(0, callback.Message.ForwardCount);
+        Assert.Equal(2, manager.Signals.Count);
+        Assert.Equal(next, manager.Signals[1].Silo);
+        Assert.Equal(request.Id, manager.Signals[1].Id);
+        Assert.Equal(request.TargetGrain, manager.Signals[1].Target);
+        Assert.Equal(request.SendingGrain, manager.Signals[1].Caller);
+        callback.DoCallback(new Message { BodyObject = Response.FromException(new OperationCanceledException()) });
+        Assert.IsType<OperationCanceledException>(completion.Response!.Exception);
+        Assert.Equal(1, completion.CompletionCount);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public void MultiHopRouteNoticesDiscardStaleOwnershipAndCompletedUpdates()
+    {
+        using var services = CreateServiceProvider();
+        var completion = new TestResponseCompletionSource();
+        var callback = CreateRouteCallback(services, completion);
+        var c = SiloAddress.New(IPAddress.Loopback, 30002, 1);
+        var d = SiloAddress.New(IPAddress.Loopback, 30003, 1);
+        Assert.True(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = d }, 2));
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = c }, 1));
+        Assert.Equal(d, callback.Message.TargetSilo);
+        Assert.Equal(2, callback.Message.ForwardCount);
+        Assert.False(callback.IsCompleted);
+        callback.OnTargetSiloFail();
+        Assert.False(callback.IsCompleted);
+        callback.DoCallback(new Message { BodyObject = Response.FromResult(174) });
+        Assert.False(callback.OnStatusUpdate(new(false, false, []) { ForwardedTo = c }, 3));
+        Assert.Equal(d, callback.Message.TargetSilo);
+        Assert.Equal(2, callback.Message.ForwardCount);
+        Assert.Equal(174, completion.Response.GetResult<int>());
+        Assert.Equal(1, completion.CompletionCount);
+    }
+
+    [GenerateSerializer]
+    public sealed class CancellableTestInvokable : IInvokable
+    {
+        [Id(0)] public int Disposals { get; private set; }
+        [Id(1)] public bool Cancellable { get; init; } = true;
+        public bool IsCancellable => Cancellable;
+        public TimeSpan? GetDefaultResponseTimeout() => TimeSpan.FromSeconds(7);
+        public void Dispose() => Disposals++;
+        public object? GetTarget() => null;
+        public void SetTarget(ITargetHolder holder) { }
+        public ValueTask<Response> Invoke() => throw new InvalidOperationException("This request is a callback fixture.");
+        public int GetArgumentCount() => 0;
+        public object? GetArgument(int index) => throw new ArgumentOutOfRangeException(nameof(index));
+        public void SetArgument(int index, object value) => throw new ArgumentOutOfRangeException(nameof(index));
+        public string GetMethodName() => nameof(Invoke);
+        public string GetInterfaceName() => nameof(IInvokable);
+        public string GetActivityName() => nameof(CancellableTestInvokable);
+        public MethodInfo GetMethod() => typeof(CancellableTestInvokable).GetMethod(nameof(Invoke))!;
+        public Type GetInterfaceType() => typeof(IInvokable);
+    }
+
+    private sealed class RecordingCancellationManager : IGrainCallCancellationManager
+    {
+        public List<(SiloAddress? Silo, GrainId Target, GrainId Caller, CorrelationId Id)> Signals { get; } = [];
+        public void SignalCancellation(SiloAddress? targetSilo, GrainId targetGrainId, GrainId sendingGrainId, CorrelationId messageId)
+            => Signals.Add((targetSilo, targetGrainId, sendingGrainId, messageId));
+    }
+
     [TestSuite("BVT")]
     [TestProvider("None")]
     [Fact, TestCategory("BVT")]
@@ -203,8 +733,30 @@ public class CallbackDataTests
     {
         var services = new ServiceCollection();
         services.AddMetrics();
+        services.AddSerializer();
         return services.BuildServiceProvider();
     }
+
+    private static CallbackData CreateRouteCallback(
+        IServiceProvider services,
+        TestResponseCompletionSource completion,
+        TimeProvider? clock = null,
+        Message? request = null)
+    {
+        var shared = CreateSharedCallbackData(_ => { }, clock ?? TimeProvider.System, TimeSpan.FromMinutes(1));
+        return new CallbackData(shared, completion, request ?? CreateRequest(), CreateInstruments(services));
+    }
+
+    private static Message CreateRequest() => new()
+    {
+        Direction = Message.Directions.Request,
+        TargetGrain = GrainId.Create("test", "target"),
+        TargetSilo = SiloAddress.New(IPAddress.Loopback, 30000, 1),
+        SendingGrain = GrainId.Create("test", "caller"),
+        Id = new CorrelationId(123),
+        BodyObject = "original payload",
+        TimeToLive = TimeSpan.FromMinutes(1),
+    };
 
     private static ApplicationRequestInstruments CreateInstruments(IServiceProvider serviceProvider) =>
         new(new OrleansInstruments(serviceProvider.GetRequiredService<IMeterFactory>()));
@@ -212,8 +764,13 @@ public class CallbackDataTests
     private sealed class TestResponseCompletionSource : IResponseCompletionSource
     {
         public Response Response { get; private set; } = null!;
+        public int CompletionCount { get; private set; }
 
-        public void Complete(Response value) => Response = value;
+        public void Complete(Response value)
+        {
+            Response = value;
+            CompletionCount++;
+        }
 
         public void Complete() => Response = Orleans.Serialization.Invocation.Response.Completed;
     }

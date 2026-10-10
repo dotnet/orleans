@@ -41,13 +41,21 @@ The target grain address is a routing hint whose validity `Catalog` and `Activat
 
 The dispatch boundary is also where shutdown policy applies. When application messages are blocked, responses and membership traffic remain eligible while new application requests are rejected or dropped. This lets the lifecycle protocol drain while the stopping silo admits responses and membership traffic and rejects new application work.
 
-## Routing repair is not call retry
+## Runtime address repair
 
 A message can encounter a stale activation address because an activation deactivated, moved, or its silo failed. The runtime can reject, invalidate, forward, or reroute that same logical request while locating the current activation. Forwarding is bounded by silo messaging options.
 
-This internal address repair must not be confused with retrying an application call after its response timeout. Orleans does **not** automatically resubmit a call because the caller's response timer elapsed.
+During graceful retirement, the receiver forwards queued requests before invocation admission. The activation removes those requests from its waiting queue under the same synchronization used to admit execution, including incoming filters. For directory-backed grains, successful conditional unregister precedes forwarding. Stateless workers use their directory-free retirement admission boundary. Admitted invocations finish through their established execution and cancellation paths.
 
-Transport code can also retry a failed socket send. That repairs a transport attempt using the same message identity; it is not a new application invocation policy.
+The receiver owns forwarding of the original request, preserving correlation identity, caller, arguments, request context, cancellation registration, and deadline. Each activation forwarding step consumes the existing forwarding budget. A request-correlated status reports the selected destination and carries the request's forwarding count in its existing header. The caller updates its recorded target and forwarding count in place when it receives a newer route.
+
+The callback for a relocatable grain invocation remains pending when its recorded physical target becomes dead, including when membership skips the shutting-down view. A forwarded invocation can therefore complete from its replacement activation. Responses, terminal rejections, cancellation, local caller shutdown, and the original timeout determine completion. A genuinely lost invocation can consequently wait until its original timeout. Silo-bound system targets and client/observer references retain their target-failure handling.
+
+Transports retry work refused before transport acceptance. An error on an accepted grain-request write leaves delivery uncertain: the caller continues awaiting its outcome within the original deadline. Application retries create separate invocations with their own outcome semantics.
+
+Forwarding status records the latest known destination and a monotonic generation for cancellation routing. Gateways also report the initial placement of outside-client requests. Outside clients keep a bounded cache of grain-location hints and send subsequent requests through their gateway connections with the cached hosting silo as the logical target. Matching invalidation removes an old hint while preserving a known replacement. Gateways prefer their existing live placement-cache entries over client hints, honor live hints when the cache has no usable entry, and re-address hints whose silos are known dead.
+
+Status messages are advisory route progress. Invocation admission and response completion remain separate boundaries, and a lost status leaves the original callback awaiting its outcome.
 
 ## Response timeout means unknown outcome
 
@@ -84,7 +92,7 @@ The runtime can return a rejection when it knows that it cannot process a reques
 
 Messages have expiration metadata derived from the response timeout. With <xref:Orleans.Configuration.MessagingOptions.DropExpiredMessages?displayProperty=nameWithType> set to `true` (the default), an expired request or response can be dropped instead of consuming work which can no longer complete the original callback.
 
-Rejections carry more information than a timeout because the runtime has made an explicit decision for the current processing attempt. Earlier forwarded or transported attempts remain outcome-uncertain. Treat the rejection type as a routing or availability signal.
+Activation and gateway admission rejections identify requests refused before execution. Senders distinguish ordinary grain requests refused before transport acceptance from failures of accepted writes. Before acceptance, definite send failures produce rejection responses. After acceptance, the transport records a failed write and releases its send-side resources while the original callback awaits its response or deadline. Receiver-owned forwarding transfers requests before invocation admission; timeouts and ambiguous transport errors retain their outcome uncertainty.
 
 ## Designing callers
 

@@ -6,6 +6,7 @@ using Orleans.Serialization.Buffers;
 using System.Buffers.Binary;
 using Orleans.Connections.Transport;
 using System.Diagnostics;
+using Orleans.Internal;
 
 namespace Orleans.Runtime.Messaging;
 
@@ -22,6 +23,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
     private int _bodyLength;
     internal ArcBuffer _headers;
     private ArcBuffer _body;
+    private AdmissionGate.Admission _incomingDispatch;
 
     public int PayloadLength => _headerLength + _bodyLength;
 
@@ -39,6 +41,8 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
 
     public void Reset()
     {
+        _incomingDispatch.Dispose();
+        _incomingDispatch = default;
         _headerLength = default;
         _bodyLength = default;
         _originalResponseType = default;
@@ -110,6 +114,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         Debug.Assert(_headers.Length == _headerLength);
         Debug.Assert(_body.Length == _bodyLength);
 
+        _incomingDispatch = _connection.TryAdmitIncomingApplicationDispatch();
         _connection.EnqueueRead();
         ThreadPool.UnsafeQueueUserWorkItem(this, preferLocal: false);
         return true;
@@ -123,12 +128,16 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
     {
         Message? message = null;
         var connection = _connection ?? throw new InvalidOperationException("Cannot process a message before a connection is set.");
+        var admission = _incomingDispatch;
+        _incomingDispatch = default;
         var shouldReset = true;
         MessageSerializer? messageSerializer = null;
         try
         {
             messageSerializer = Shared.GetMessageSerializer();
             messageSerializer.ReadHeaders(this, out message);
+            var applicationRequest = !message.IsSystemMessage
+                && message.Direction is Message.Directions.Request or Message.Directions.OneWay;
             connection.MarkMessageReceived();
             connection.RecordMessageReceive(message, PayloadLength, HeaderLength);
 
@@ -140,7 +149,15 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
                 message.SetMessageReadRequest(this);
                 shouldReset = false;
             }
-            connection.OnReceivedMessage(message);
+            if (applicationRequest && !admission.Entered)
+            {
+                Shared.MessagingTrace.OnDropBlockedApplicationMessage(message);
+                message.Dispose();
+            }
+            else
+            {
+                connection.OnReceivedMessage(message);
+            }
         }
         catch (Exception exception)
         {
@@ -160,6 +177,7 @@ internal sealed partial class MessageReadRequest(MessageHandlerShared shared) : 
         }
         finally
         {
+            admission.Dispose();
             if (shouldReset)
             {
                 Reset();

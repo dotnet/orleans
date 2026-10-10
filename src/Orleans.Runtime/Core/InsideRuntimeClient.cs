@@ -492,7 +492,7 @@ namespace Orleans.Runtime
             var request = callback?.Message;
             if (request is not null)
             {
-                callback!.OnStatusUpdate(status);
+                callback!.OnStatusUpdate(status, message.ForwardCount);
                 if (status.Diagnostics is { Count: > 0 })
                 {
                     LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
@@ -511,7 +511,7 @@ namespace Orleans.Runtime
                 // Cancel the call since the caller has abandoned it.
                 // Note that the target and sender arguments are swapped because this is a response to the original request.
                 _cancellationManager.SignalCancellation(
-                    message.SendingSilo,
+                    status.ForwardedTo ?? message.SendingSilo,
                     targetGrainId: message.SendingGrain,
                     sendingGrainId: message.TargetGrain,
                     messageId: message.Id);

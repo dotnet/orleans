@@ -1,0 +1,11 @@
+<Project>
+  <Import Project="..\Directory.Build.props" />
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsTestProject>false</IsTestProject>
+    <IsOrleansTestApplication>false</IsOrleansTestApplication>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+    <OrleansBuildTimeCodeGen>false</OrleansBuildTimeCodeGen>
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+</Project>

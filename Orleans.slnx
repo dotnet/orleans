@@ -144,6 +144,7 @@
     <Project Path="test/Orleans.Serialization.UnitTests/Orleans.Serialization.UnitTests.csproj" />
     <Project Path="test/Orleans.Runtime.Tests/Orleans.Runtime.Tests.csproj" />
     <Project Path="test/Orleans.Runtime.Internal.Tests/Orleans.Runtime.Internal.Tests.csproj" />
+    <Project Path="test/Orleans.ReleasedPeer.Tests/Orleans.ReleasedPeer.Tests.csproj" />
     <Project Path="test/Orleans.Reminders.Tests/Orleans.Reminders.Tests.csproj" />
     <Project Path="test/Orleans.Placement.Tests/Orleans.Placement.Tests.csproj" />
     <Project Path="test/Orleans.Persistence.FileStorage.Tests/Orleans.Persistence.FileStorage.Tests.csproj" />
@@ -167,6 +168,11 @@
     <Project Path="test/Benchmarks/Benchmarks.csproj" />
     <Project Path="test/Grains/BenchmarkGrainInterfaces/BenchmarkGrainInterfaces.csproj" />
     <Project Path="test/Grains/BenchmarkGrains/BenchmarkGrains.csproj" />
+  </Folder>
+  <Folder Name="/test/ReleasedPeer/">
+    <Project Path="test/ReleasedPeer/Contracts/ReleasedPeer.Contracts.csproj" />
+    <Project Path="test/ReleasedPeer/V103/ReleasedPeer.V103.csproj" />
+    <Project Path="test/ReleasedPeer/V104/ReleasedPeer.V104.csproj" />
   </Folder>
   <Folder Name="/test/DistributedTests/">
     <File Path="test/DistributedTests/README.md" />

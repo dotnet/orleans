@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Caching;
 using Orleans.ClientObservers;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
@@ -26,6 +27,7 @@ namespace Orleans
         private readonly ClientMessagingOptions clientMessagingOptions;
 
         private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
+        private readonly ConcurrentLruCache<GrainId, SiloAddress> _grainLocations = new(ClientMessagingOptions.DEFAULT_CLIENT_SENDER_BUCKETS);
         private InvokableObjectManager? localObjects;
         private int _isStopping;
         private int _disposeRequested;
@@ -295,11 +297,20 @@ namespace Orleans
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             message.SendingGrain = CurrentActivationAddress.GrainId;
             message.TargetGrain = targetGrainId;
-
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
+            }
+            else if (message.IsRelocatableRequest)
+            {
+                lock (_grainLocations)
+                {
+                    if (_grainLocations.TryGet(targetGrainId, out var targetSilo))
+                    {
+                        message.TargetSilo = targetSilo;
+                    }
+                }
             }
 
             if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
@@ -346,6 +357,28 @@ namespace Orleans
 
             LogReceivedMessage(logger, response);
 
+            if (response.CacheInvalidationHeader is { } updates)
+            {
+                lock (_grainLocations)
+                {
+                    foreach (var update in updates)
+                    {
+                        if (!_grainLocations.TryGet(update.GrainId, out var cached)
+                            || cached.Equals(update.InvalidSiloAddress))
+                        {
+                            if (update.ValidGrainAddress?.SiloAddress is { } validSilo)
+                            {
+                                _grainLocations.AddOrUpdate(update.GrainId, validSilo);
+                            }
+                            else
+                            {
+                                _grainLocations.TryRemove(update.GrainId);
+                            }
+                        }
+                    }
+                }
+            }
+
             if (response.Result is Message.ResponseTypes.Status)
             {
                 using var statusMessage = response;
@@ -354,7 +387,17 @@ namespace Orleans
                 var request = callback?.Message;
                 if (request is not null)
                 {
-                    callback!.OnStatusUpdate(status);
+                    lock (_grainLocations)
+                    {
+                        var previousTarget = request.TargetSilo;
+                        if (callback!.OnStatusUpdate(status, response.ForwardCount) && request.IsRelocatableRequest
+                            && status.ForwardedTo is { } forwardedTo
+                            && (!_grainLocations.TryGet(request.TargetGrain, out var cached) || cached.Equals(previousTarget)))
+                        {
+                            _grainLocations.AddOrUpdate(request.TargetGrain, forwardedTo);
+                        }
+                    }
+
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0)
                     {
                         LogReceivedStatusUpdateForPendingRequest(logger, request, new(status.Diagnostics));
@@ -367,7 +410,7 @@ namespace Orleans
                         // Cancel the call since the caller has abandoned it.
                         // Note that the target and sender arguments are swapped because this is a response to the original request.
                         _cancellationManager?.SignalCancellation(
-                            response.SendingSilo,
+                            status.ForwardedTo ?? response.SendingSilo,
                             targetGrainId: response.SendingGrain,
                             sendingGrainId: response.TargetGrain,
                             messageId: response.Id);
@@ -383,6 +426,19 @@ namespace Orleans
             }
 
             CallbackData? callbackData;
+            if (response.Result is Message.ResponseTypes.Rejection
+                && callbacks.TryGetValue(response.Id, out var pending)
+                && pending.Message.IsRelocatableRequest)
+            {
+                if (!response.HasCacheInvalidationHeader)
+                {
+                    lock (_grainLocations)
+                    {
+                        _grainLocations.TryRemove(response.SendingGrain, static (cached, rejectedSilo) => cached.Equals(rejectedSilo), response.SendingSilo);
+                    }
+                }
+            }
+
             var found = callbacks.TryRemove(response.Id, out callbackData);
             if (found)
             {
@@ -467,6 +523,7 @@ namespace Orleans
             {
                 await drain.ConfigureAwait(false);
                 MessageCenter?.Dispose();
+                await _grainLocations.DisposeAsync();
             }
             catch (Exception exception)
             {

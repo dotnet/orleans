@@ -46,7 +46,7 @@ namespace UnitTests.MembershipTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("Liveness")]
-        public async Task SiloUngracefulShutdown_OutstandingRequestsBreak()
+        public async Task SiloUngracefulShutdown_OutstandingGrainRequestsAwaitOriginalDeadline()
         {
             var grain = await GetGrainOnTargetSilo(HostedCluster.Primary!);
             Assert.NotNull(grain);
@@ -58,7 +58,8 @@ namespace UnitTests.MembershipTests
             await Task.Delay(500, TestContext.Current.CancellationToken);
             await HostedCluster.KillSiloAsync(HostedCluster.SecondarySilos[0], TestContext.Current.CancellationToken);
 
-            await Assert.ThrowsAsync<SiloUnavailableException>(() => promise);
+            var exception = await Assert.ThrowsAsync<TimeoutException>(() => promise);
+            Assert.Contains("Response did not arrive on time", exception.Message);
         }
 
         private async Task<ILongRunningTaskGrain<bool>?> GetGrainOnTargetSilo(SiloHandle siloHandle)

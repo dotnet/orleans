@@ -24,6 +24,11 @@ namespace Orleans.Runtime
 
         public bool IsWaiting => (_statusFlags & 0x2) != 0;
 
-        public override string ToString() => $"IsExecuting: {IsExecuting}, IsWaiting: {IsWaiting}, Diagnostics: [{string.Join(", ", this.Diagnostics)}]";
+        [Id(2)]
+        public SiloAddress? ForwardedTo { get; init; }
+
+        public bool IsRouteUpdate => ForwardedTo is not null;
+
+        public override string ToString() => $"IsExecuting: {IsExecuting}, IsWaiting: {IsWaiting}, ForwardedTo: {ForwardedTo}, Diagnostics: [{string.Join(", ", this.Diagnostics)}]";
     }
 }

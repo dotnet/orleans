@@ -71,6 +71,8 @@ internal sealed partial class ActivationData :
 #pragma warning restore IDE0052 // Remove unread private members
 
     private Activity? _activationActivity;
+    private bool _registrationRetired;
+    private bool _ownsRetirementAdmission;
 
     /// <summary>
     /// Constants for activity error event names used during activation lifecycle.
@@ -752,9 +754,10 @@ internal sealed partial class ActivationData :
 
                     _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
                     SetState(ActivationState.Deactivating);
+                    _ownsRetirementAdmission = _shared.InternalRuntime.Catalog.TryAdmitRetirement();
                     var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     cts.CancelAfter(_shared.InternalRuntime.CollectionOptions.Value.DeactivationTimeout);
-                    ScheduleOperation(new Command.Deactivate(cts, state, deactivateActivity));
+                    ScheduleOperation(new Command.Deactivate(cts, state, deactivateActivity, cancellationToken));
                 }
                 else
                 {
@@ -793,6 +796,7 @@ internal sealed partial class ActivationData :
         // application bug, perhaps a deadlock)
         UnregisterMessageTarget();
         _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).Ignore();
+        CompleteRetirementDrain(RetirementDrainResult.Incomplete);
     }
 
     void IGrainTimerRegistry.OnTimerCreated(IGrainTimer timer)
@@ -1313,6 +1317,7 @@ internal sealed partial class ActivationData :
             ForwardingAddress = null;
             UnregisterMessageTarget();
             _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).Ignore();
+            CompleteRetirementDrain(RetirementDrainResult.Incomplete);
             GetDeactivationCompletionSource().TrySetResult(true);
         }
 
@@ -1688,10 +1693,24 @@ internal sealed partial class ActivationData :
 
         lock (_lock)
         {
+            if (State == ActivationState.Invalid)
+            {
+                DispositionRetirementRequest(message);
+                return;
+            }
+
             _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
         }
 
         _workSignal.Signal();
+    }
+
+    private void DispositionRetirementRequest(Message message)
+    {
+        _shared.InternalRuntime.MessageCenter.ProcessRequestToInvalidActivation(message, Address, ForwardingAddress,
+            DeactivationReason.Description, DeactivationException,
+            rejectMessages: (!_registrationRetired && DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown)
+                || (DeactivationException is not null && ForwardingAddress is null));
     }
 
     /// <summary>
@@ -2060,6 +2079,7 @@ internal sealed partial class ActivationData :
         var deactivationMetrics = CatalogInstruments.DeactivationMetricTracker.Start(_shared.CatalogInstruments, _shared.GrainTypeMetricName);
         var migrating = false;
         var encounteredError = false;
+        var registrationRetired = !IsUsingGrainDirectory;
         try
         {
             try
@@ -2142,9 +2162,11 @@ internal sealed partial class ActivationData :
                     try
                     {
                         await _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).WaitAsync(cancellationToken);
+                        registrationRetired = true;
                     }
                     catch (Exception exception)
                     {
+                        encounteredError = true;
                         if (!cancellationToken.IsCancellationRequested)
                         {
                             LogFailedToUnregisterActivation(_shared.Logger, exception, this);
@@ -2154,6 +2176,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception ex)
             {
+                encounteredError = true;
                 SetActivityError(deactivateCommand.Activity, ex, "Error in FinishDeactivating");
                 LogErrorDeactivating(_shared.Logger, ex, this);
             }
@@ -2179,6 +2202,15 @@ internal sealed partial class ActivationData :
                 _shared.CatalogInstruments.ActivationShutdownViaCollection(_shared.GrainTypeMetricName);
             }
 
+            var canceledAtRetirement = cancellationToken.IsCancellationRequested;
+            lock (_lock)
+            {
+                _registrationRetired = registrationRetired && !migrating
+                    && DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown
+                    && !canceledAtRetirement
+                    && !IsStuckDeactivating && !IsStuckProcessingMessage;
+            }
+
             UnregisterMessageTarget();
 
             try
@@ -2189,6 +2221,7 @@ internal sealed partial class ActivationData :
             {
                 SetActivityError(deactivateCommand.Activity, exception, "Error in FinishDeactivating");
                 LogExceptionDisposing(_shared.Logger, exception, this);
+                encounteredError = true;
             }
 
             if (DeactivationStartTime is not null)
@@ -2198,12 +2231,31 @@ internal sealed partial class ActivationData :
 
             deactivationMetrics = deactivationMetrics.Record();
 
-            // Signal deactivation
+            List<Message> retirementRequests;
+            lock (_lock)
+            {
+                retirementRequests = DequeueAllWaitingRequests();
+            }
+
             GetDeactivationCompletionSource().TrySetResult(true);
+            foreach (var request in retirementRequests)
+            {
+                DispositionRetirementRequest(request);
+            }
+
+            var drainResult = canceledAtRetirement || deactivateCommand.UpstreamCancellationToken.IsCancellationRequested
+                ? RetirementDrainResult.Canceled
+                : IsStuckDeactivating || IsStuckProcessingMessage
+                    ? RetirementDrainResult.Incomplete
+                    : encounteredError || (!registrationRetired && !migrating)
+                        ? RetirementDrainResult.Failed
+                        : RetirementDrainResult.Succeeded;
+            CompleteRetirementDrain(drainResult);
             _workSignal.Signal();
         }
         finally
         {
+            CompleteRetirementDrain(RetirementDrainResult.Incomplete);
             deactivationMetrics.RecordIfNeeded();
         }
 
@@ -2239,6 +2291,20 @@ internal sealed partial class ActivationData :
             {
                 LogFailedToMigrateActivation(_shared.Logger, exception, this);
                 return false;
+            }
+        }
+    }
+
+    private void CompleteRetirementDrain(RetirementDrainResult result)
+    {
+        lock (_lock)
+        {
+            if (_ownsRetirementAdmission)
+            {
+                _ownsRetirementAdmission = false;
+                _shared.InternalRuntime.Catalog.CompleteRetirement(
+                    result,
+                    DeactivationReason.ReasonCode == DeactivationReasonCode.ShuttingDown);
             }
         }
     }
@@ -2591,10 +2657,12 @@ internal sealed partial class ActivationData :
             GC.SuppressFinalize(this);
         }
 
-        public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState, Activity? activity) : Command(cts)
+        public sealed class Deactivate(CancellationTokenSource cts, ActivationState previousState, Activity? activity,
+            CancellationToken upstreamCancellationToken) : Command(cts)
         {
             public ActivationState PreviousState { get; } = previousState;
             public Activity? Activity { get; } = activity;
+            public CancellationToken UpstreamCancellationToken { get; } = upstreamCancellationToken;
         }
 
         public sealed class Activate(Dictionary<string, object>? requestContext, CancellationTokenSource cts, CatalogInstruments.ActivationMetricTracker metrics) : Command(cts)

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Connections;
 using Orleans.Connections.Transport;
+using Orleans.Internal;
 using Orleans.Messaging;
 using Orleans.Runtime.Internal;
 using Orleans.Serialization.Invocation;
@@ -24,11 +25,25 @@ namespace Orleans.Runtime.Messaging
         private readonly string _id;
         private readonly MessageTransport _transport;
         private readonly SendWorker _sendWorker;
+        private readonly AdmissionGate _outgoingApplicationWork = new();
+        private readonly AdmissionGate _incomingApplicationDispatch = new();
         private Task? _processIncomingTask;
         private Task? _closeTask;
         private int _runState;
         private bool _openedSocket;
         private long _lastMessageReceivedTimestamp;
+
+        internal AdmissionGate.Admission TryAdmitIncomingApplicationDispatch() => _incomingApplicationDispatch.TryEnter();
+        internal Task DrainIncomingApplicationDispatchAsync() => _incomingApplicationDispatch.CloseAsync();
+        internal Task DrainAsync() => _outgoingApplicationWork.CloseAsync();
+
+        internal virtual void OnApplicationWriteFailure(Message message) { }
+
+        protected virtual bool TryAdmitApplicationSend(out AdmissionGate.Admission admission)
+        {
+            admission = default;
+            return true;
+        }
 
         protected Connection(
             MessageTransport transport,
@@ -129,7 +144,7 @@ namespace Orleans.Runtime.Messaging
         /// <returns>Whether or not to continue transporting the message.</returns>
         protected abstract bool PrepareMessageForSend(Message msg);
 
-        protected abstract void RetryMessage(Message msg, Exception? ex = null);
+        protected abstract void RetryMessage(Message msg, Exception? ex, ref AdmissionGate.Admission sendAdmission);
 
         public Task CloseAsync(Exception? exception)
         {
@@ -225,7 +240,14 @@ namespace Orleans.Runtime.Messaging
         public virtual void Send(Message message)
         {
             Debug.Assert(!message.IsLocalOnly);
-            _sendWorker.Schedule(message);
+            _sendWorker.Schedule(message, default);
+        }
+
+        internal virtual void Send(Message message, ref AdmissionGate.Admission sendAdmission)
+        {
+            Debug.Assert(!message.IsLocalOnly);
+            _sendWorker.Schedule(message, sendAdmission);
+            sendAdmission = default;
         }
 
         private sealed class UnknownEndPoint : EndPoint
@@ -239,7 +261,7 @@ namespace Orleans.Runtime.Messaging
         {
             private const int MaxMessagesPerBatch = 64;
             private const int SoftMaxBatchBytes = 64 * 1024;
-            private readonly ConcurrentQueue<Message> _workItems = new();
+            private readonly ConcurrentQueue<(Message Message, AdmissionGate.Admission Admission, AdmissionGate.Admission SendAdmission)> _workItems = new();
             private readonly Action<Message>? _messageObserver = connection._shared.MessageObserver;
             private readonly Connection _connection = connection;
             private readonly TaskCompletionSource _stopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -247,11 +269,26 @@ namespace Orleans.Runtime.Messaging
             private int _scheduling;
             private int _stopping;
 
-            public void Schedule(Message message)
+            public void Schedule(Message message, AdmissionGate.Admission sendAdmission)
             {
+                if (message.RequiresApplicationDrain && !sendAdmission.Entered
+                    && !_connection.TryAdmitApplicationSend(out sendAdmission))
+                {
+                    _connection.MessagingTrace.OnDropBlockedApplicationMessage(message);
+                    message.Dispose();
+                    return;
+                }
+
+                var admission = message.RequiresApplicationDrain ? _connection._outgoingApplicationWork.TryEnter() : default;
+                if (message.RequiresApplicationDrain && !admission.Entered)
+                {
+                    _connection.RerouteMessage(message, new ConnectionClosedException(), sendAdmission: sendAdmission);
+                    return;
+                }
+
                 if (!_connection._shared.MessageHandlerShared.TryAcquireSendWork())
                 {
-                    _connection.RerouteMessage(message, new ConnectionClosedException());
+                    _connection.RerouteMessage(message, new ConnectionClosedException(), admission, sendAdmission);
                     return;
                 }
 
@@ -261,16 +298,22 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (Volatile.Read(ref _stopping) != 0)
                     {
-                        _connection.RerouteMessage(message, new ConnectionClosedException());
+                        _connection.RerouteMessage(message, new ConnectionClosedException(), admission, sendAdmission);
+                        admission = default;
+                        sendAdmission = default;
                         return;
                     }
 
-                    _workItems.Enqueue(message);
+                    _workItems.Enqueue((message, admission, sendAdmission));
+                    admission = default;
+                    sendAdmission = default;
                     queued = true;
                     Activate();
                 }
                 finally
                 {
+                    admission.Dispose();
+                    sendAdmission.Dispose();
                     if (!queued)
                     {
                         _connection._shared.MessageHandlerShared.ReleaseSendWork();
@@ -300,11 +343,11 @@ namespace Orleans.Runtime.Messaging
                 {
                     if (Volatile.Read(ref _stopping) != 0)
                     {
-                        while (_workItems.TryDequeue(out var message))
+                        while (_workItems.TryDequeue(out var item))
                         {
                             try
                             {
-                                _connection.RerouteMessage(message, new ConnectionClosedException());
+                                _connection.RerouteMessage(item.Message, new ConnectionClosedException(), item.Admission, item.SendAdmission);
                             }
                             finally
                             {
@@ -320,13 +363,16 @@ namespace Orleans.Runtime.Messaging
                     while (attempts++ < MaxMessagesPerBatch
                         && writeRequest.Length < SoftMaxBatchBytes
                         && !writeRequest.HasLargeMessages
-                        && _workItems.TryDequeue(out var message))
+                        && _workItems.TryDequeue(out var item))
                     {
+                        var (message, admission, sendAdmission) = item;
                         try
                         {
                             if (Volatile.Read(ref _stopping) != 0)
                             {
-                                _connection.RerouteMessage(message, new ConnectionClosedException());
+                                _connection.RerouteMessage(message, new ConnectionClosedException(), admission, sendAdmission);
+                                admission = default;
+                                sendAdmission = default;
                                 continue;
                             }
 
@@ -337,18 +383,22 @@ namespace Orleans.Runtime.Messaging
 
                             try
                             {
-                                writeRequest.WriteMessage(message);
+                                writeRequest.WriteMessage(message, admission, sendAdmission);
+                                admission = default;
+                                sendAdmission = default;
                                 _messageObserver?.Invoke(message);
                             }
                             catch (Exception exception)
                             {
-                                _connection.OnMessageSerializationFailure(message, exception);
+                                _connection.OnMessageSerializationFailure(message, exception, ref sendAdmission);
                                 break;
                             }
                         }
                         finally
                         {
                             _connection._shared.MessageHandlerShared.ReleaseSendWork();
+                            admission.Dispose();
+                            sendAdmission.Dispose();
                         }
                     }
 
@@ -362,7 +412,7 @@ namespace Orleans.Runtime.Messaging
                         _connection.StartClosing(new ConnectionClosedException());
                         for (var i = 0; i < writeRequest.MessageCount; i++)
                         {
-                            _connection.RerouteMessage(writeRequest.GetMessage(i));
+                            writeRequest.RerouteMessage(i);
                         }
 
                         writeRequest.Reset();
@@ -425,22 +475,42 @@ namespace Orleans.Runtime.Messaging
             await _startedClosing.Task.ConfigureAwait(false);
         }
 
-        internal void RerouteMessage(Message message, Exception? error = null)
+        internal void RerouteMessage(Message message, Exception? error = null, AdmissionGate.Admission admission = default, AdmissionGate.Admission sendAdmission = default)
         {
             LogInformationReroutingMessage(Log, message, this);
+            if (message.RequiresApplicationDrain && !admission.Entered)
+            {
+                admission = _outgoingApplicationWork.TryEnter();
+            }
+
+            if (message.RequiresApplicationDrain && !admission.Entered && !sendAdmission.Entered)
+            {
+                MessagingTrace.OnDropBlockedApplicationMessage(message);
+                message.Dispose();
+                sendAdmission.Dispose();
+                return;
+            }
 
             ThreadPool.UnsafeQueueUserWorkItem(static state =>
             {
-                var (connection, msg, exception) = ((Connection, Message, Exception?))state!;
-                connection.RetryMessage(msg, exception);
-            }, (this, message, error), preferLocal: true);
+                var (connection, msg, exception, admission, sendAdmission) = ((Connection, Message, Exception?, AdmissionGate.Admission, AdmissionGate.Admission))state!;
+                using var _ = admission;
+                try
+                {
+                    connection.RetryMessage(msg, exception, ref sendAdmission);
+                }
+                finally
+                {
+                    sendAdmission.Dispose();
+                }
+            }, (this, message, error, admission, sendAdmission), preferLocal: true);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage(
             "Reliability",
             "CA2000:Dispose objects before losing scope",
             Justification = "Ownership of the response message is transferred to the local message dispatcher.")]
-        private void OnMessageSerializationFailure(Message message, Exception exception)
+        private void OnMessageSerializationFailure(Message message, Exception exception, ref AdmissionGate.Admission sendAdmission)
         {
             LogErrorExceptionSerializingMessage(Log, exception, message, this);
 
@@ -467,7 +537,7 @@ namespace Orleans.Runtime.Messaging
                     message.Result = Message.ResponseTypes.Error;
                     message.BodyObject = Response.FromException(exception);
                     ++message.RetryCount;
-                    Send(message);
+                    Send(message, ref sendAdmission);
                 }
                 else
                 {

@@ -8,7 +8,7 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class LruGrainDirectoryCache : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>, IGrainDirectoryCache, IAsyncDisposable
 {
-    private static readonly Func<(GrainAddress Address, int Version), GrainAddress, bool> ActivationAddressesMatch = (value, state) => GrainAddress.MatchesGrainIdAndSilo(state, value.Address);
+    private static readonly Func<(GrainAddress Address, int Version), GrainAddress, bool> ActivationAddressesMatch = (value, state) => state.Matches(value.Address);
     private readonly IDisposable _cacheSizeRegistration;
 
     public LruGrainDirectoryCache(

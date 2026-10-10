@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Internal;
 
 namespace Orleans.Runtime;
 
@@ -33,6 +34,10 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 #pragma warning restore IDE0052 // Remove unread private members
 
     private bool _terminated;
+    private bool _retiring;
+    private readonly AdmissionGate _messageAdmissions = new();
+
+    internal Task DrainRequestsAsync() => _messageAdmissions.CloseAsync();
 
     // Idle worker removal fields
     private Timer? _inspectionTimer;
@@ -99,7 +104,17 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
 
-    public void ReceiveMessage(object message) => EnqueueWorkItem(WorkItemType.Message, message);
+    public void ReceiveMessage(object message)
+    {
+        if (_messageAdmissions.TryEnterUnscoped())
+        {
+            EnqueueWorkItem(WorkItemType.Message, message);
+        }
+        else
+        {
+            DispositionRetiringRequest((Message)message);
+        }
+    }
 
     public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) =>
         EnqueueWorkItem(WorkItemType.Deactivate, new DeactivateWorkItemState(deactivationReason, cancellationToken));
@@ -147,7 +162,15 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                     switch (workItem.Type)
                     {
                         case WorkItemType.Message:
-                            ReceiveMessageInternal(workItem.State);
+                            try
+                            {
+                                ReceiveMessageInternal(workItem.State);
+                            }
+                            finally
+                            {
+                                _messageAdmissions.Exit();
+                            }
+
                             break;
                         case WorkItemType.Deactivate:
                             {
@@ -249,6 +272,12 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     private void ReceiveMessageInternal(object message)
     {
+        if (_retiring)
+        {
+            DispositionRetiringRequest((Message)message);
+            return;
+        }
+
         if (_terminated)
         {
             ForwardToReplacementContext((Message)message);
@@ -326,7 +355,12 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         var replacement = _shared.Shared.InternalRuntime.Catalog.GetOrCreateActivation(
             GrainId,
             message.RequestContextData ?? [],
-            rehydrationContext: null)!;
+            rehydrationContext: null);
+        if (replacement is null)
+        {
+            DispositionRetiringRequest(message);
+            return;
+        }
         Debug.Assert(!ReferenceEquals(replacement, this), "Catalog must not resolve to a terminated stateless worker context.");
         StatelessWorkerEvents.EmitMessageForwarded(this, replacement, message);
         replacement.ReceiveMessage(message);
@@ -354,10 +388,21 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     private void DeactivateInternal(DeactivationReason reason, CancellationToken cancellationToken)
     {
+        if (reason.ReasonCode == DeactivationReasonCode.ShuttingDown)
+        {
+            _retiring = true;
+        }
+
         foreach (var worker in _workers)
         {
             worker.Deactivate(reason, cancellationToken);
         }
+    }
+
+    private void DispositionRetiringRequest(Message message)
+    {
+        var center = _shared.Shared.InternalRuntime.MessageCenter;
+        center.ProcessRequestToInvalidActivation(message, Address, forwardingAddress: null, "Stateless worker context retired");
     }
 
     private async Task DeactivatedTaskInternal(TaskCompletionSource completion)
