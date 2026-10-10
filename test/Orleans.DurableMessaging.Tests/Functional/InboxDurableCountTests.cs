@@ -175,7 +175,8 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         await turn;
         await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Cancellation);
         Assert.Equal(new Counts(0, 0, 0), probe.Read());
-        _ = await receiver.GetSnapshotAsync();
+        // The recovered drain turn can hold admission ahead of this snapshot request.
+        var recoverySnapshot = receiver.GetSnapshotAsync();
         await handlers.WaitUntilEnteredAsync();
         var freshContext = Fixture.GetGrainContext(receiver);
         Assert.NotSame(context, freshContext);
@@ -184,6 +185,7 @@ public sealed class InboxDurableCountTests() : DurableMessagingBehaviorTestBase(
         await AssertCountsAsync(freshContext, fresh, new(restored, 0, restored));
         Assert.Equal(new Counts(0, 0, 0), probe.Read());
         handlers.Release();
+        _ = await recoverySnapshot;
         await Fixture.WaitForEffectCountAsync(receiver, restored);
         _ = await receiver.GetSnapshotAsync();
         await AssertCountsAsync(freshContext, fresh, new(0, 0, 0));
