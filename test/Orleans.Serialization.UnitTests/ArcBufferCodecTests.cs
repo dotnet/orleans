@@ -224,6 +224,59 @@ public sealed class ArcBufferCodecTests
         catch (IndexOutOfRangeException) { }
     }
 
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 17000)]
+    [InlineData(true, 0)]
+    [InlineData(true, 17000)]
+    public void ReadArcBuffer_ValidatedSkipReachesExactEnd(bool leadingEmptyPages, int offset)
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        using var source = new ArcBufferWriter();
+        if (leadingEmptyPages)
+        {
+            source.GetSpan(ArcBufferWriter.MinimumPageSize * 2);
+            source.GetSpan(ArcBufferWriter.MinimumPageSize * 4);
+        }
+
+        var expected = Bytes(50037);
+        source.Write(expected);
+        using var input = source.PeekSlice(source.Length);
+        if (leadingEmptyPages)
+        {
+            Assert.Equal(0, input.First.Length);
+            Assert.Equal(0, input.First.Next!.Length);
+        }
+
+        var pages = input.Pages.ToArray();
+        var before = pages.Select(page => page.ReferenceCount).ToArray();
+        var reader = new Reader<ArcBufferReaderInput>(new ArcBufferReaderInput(in input), session, 113);
+        reader.Skip(offset);
+        var remaining = (int)reader.Remaining;
+        reader.EnsureAvailable((uint)remaining);
+        var value = reader.ReadArcBuffer(remaining);
+        try
+        {
+            Assert.Equal(113 + input.Length, reader.Position);
+            Assert.Equal(0, reader.Remaining);
+            reader.Skip(0);
+            Assert.Equal(113 + input.Length, reader.Position);
+            Assert.Equal(expected.AsSpan(offset).ToArray(), value.ToArray());
+            var ownedPages = value.Pages.ToArray();
+            for (var i = 0; i < pages.Length; i++)
+            {
+                Assert.Equal(before[i] + (ownedPages.Contains(pages[i]) ? 1 : 0), pages[i].ReferenceCount);
+            }
+        }
+        finally
+        {
+            value.Dispose();
+        }
+
+        Assert.Equal(before, pages.Select(page => page.ReferenceCount));
+    }
+
     [Fact]
     public void NonArcInputs_CopyIntoOwnedPagesWithoutArrayIntermediate()
     {

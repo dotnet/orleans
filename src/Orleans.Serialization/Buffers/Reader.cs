@@ -510,16 +510,8 @@ namespace Orleans.Serialization.Buffers
             {
                 ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
                 var result = input.Slice(checked((int)(Position - _sequenceOffset)), length);
-                try
-                {
-                    Skip(length);
-                    return result;
-                }
-                catch
-                {
-                    result.Dispose();
-                    throw;
-                }
+                Skip(length);
+                return result;
             }
 
             if (length == 0) return ArcBuffer.Empty;
