@@ -12,8 +12,7 @@ namespace Orleans.Journaling;
 /// Buffers returned by <see cref="GetBuffer"/> are pinned, caller-owned snapshots which must remain
 /// valid for the caller's lifetime even if <see cref="Reset"/> or <see cref="Dispose"/> is called
 /// before the caller disposes the returned buffer.
-/// Despite the name, this type does not perform storage I/O; it accumulates encoded journal entries until
-/// callers hand the buffer off to <see cref="IJournalStorage"/>.
+/// The writer accumulates encoded journal entries for callers to persist through <see cref="IJournalStorage"/>.
 /// </remarks>
 public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 {
@@ -216,6 +215,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             ValidateCommittedPrefix(buffer);
             _buffer.AdvanceReader(buffer.Length);
             _committedLength -= buffer.Length;
+            TrimDrainedBuffer();
         }
     }
 
@@ -341,6 +341,20 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     private void ClearActiveEntry()
     {
         _hasActiveEntry = false;
+        TrimDrainedBuffer();
+    }
+
+    private void TrimDrainedBuffer()
+    {
+        // Keep small pages for coalescing and preserve writable memory borrowed by active entries.
+        if (!_hasActiveEntry && _buffer.Length == 0)
+        {
+            using var drained = _buffer.PeekSlice(0);
+            if (drained.First.Array.Length > ArcBufferWriter.MinimumPageSize)
+            {
+                _buffer.Reset();
+            }
+        }
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
