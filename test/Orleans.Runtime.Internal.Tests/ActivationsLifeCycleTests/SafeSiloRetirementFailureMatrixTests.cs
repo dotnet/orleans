@@ -164,6 +164,64 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Empty(fixture.Control.Executions);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailureMatrix_GatewayIncomingDrainSealsConnectionsRegisteredDuringOrAfterDrain(bool finishBeforeRegistration)
+    {
+        await using var fixture = await Fixture.CreateAsync();
+        var services = fixture.B.ServiceProvider;
+        var center = services.GetRequiredService<MessageCenter>();
+        var gateway = center.Gateway!;
+        await using var existingTransport = new BoundaryWriteTransport();
+        await using var lateTransport = new BoundaryWriteTransport();
+        var existing = CreateConnection(existingTransport);
+        var late = CreateConnection(lateTransport);
+        gateway.RecordOpenedConnection(existing, ClientGrainId.Create());
+        var admitted = existing.TryAdmitIncomingApplicationDispatch();
+        Assert.True(admitted.Entered);
+        try
+        {
+            var drain = gateway.DrainIncomingAsync(TestCancellation);
+            Assert.False(drain.IsCompleted);
+            if (finishBeforeRegistration)
+            {
+                admitted.Dispose();
+                admitted = default;
+                await drain.WaitAsync(Timeout, TestCancellation);
+            }
+
+            gateway.RecordOpenedConnection(late, ClientGrainId.Create());
+            Assert.True(late.IsValid);
+            using var rejected = late.TryAdmitIncomingApplicationDispatch();
+            Assert.False(rejected.Entered);
+            using var existingRejected = existing.TryAdmitIncomingApplicationDispatch();
+            Assert.False(existingRejected.Entered);
+            if (!finishBeforeRegistration)
+            {
+                Assert.False(drain.IsCompleted);
+                admitted.Dispose();
+                admitted = default;
+            }
+
+            await drain.WaitAsync(Timeout, TestCancellation);
+            await gateway.DrainIncomingAsync(TestCancellation).WaitAsync(Timeout, TestCancellation);
+        }
+        finally
+        {
+            admitted.Dispose();
+            gateway.RecordClosedConnection(existing);
+            gateway.RecordClosedConnection(late);
+            await Task.WhenAll(existing.CloseAsync(null), late.CloseAsync(null)).WaitAsync(Timeout, TestCancellation);
+        }
+
+        GatewayInboundConnection CreateConnection(MessageTransport transport) => new(
+            transport, gateway, services.GetRequiredService<OverloadDetector>(),
+            services.GetRequiredService<ILocalSiloDetails>(), services.GetRequiredService<IOptions<ConnectionOptions>>().Value,
+            center, services.GetRequiredService<ConnectionCommon>(), services.GetRequiredService<ConnectionPreambleHelper>(),
+            new GatewayInstruments(services.GetRequiredService<OrleansInstruments>()));
+    }
+
     [Fact]
     public async Task FailureMatrix_GatewayApplicationReplyFailureIsRecordedBeforeConnectionDrain()
     {

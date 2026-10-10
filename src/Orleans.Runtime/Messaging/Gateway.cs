@@ -29,6 +29,7 @@ namespace Orleans.Runtime.Messaging
         private readonly Dictionary<GatewayInboundConnection, ClientState> clientConnections = new();
         private readonly ConcurrentDictionary<GatewayInboundConnection, byte> _drainingConnections = new();
         private readonly AdmissionGate _outboundWork = new();
+        private Task? _incomingDispatchDrain;
 
         private readonly SiloAddress siloAddress;
         private readonly SiloAddress gatewayAddress;
@@ -72,8 +73,13 @@ namespace Orleans.Runtime.Messaging
         internal GatewayInstruments GatewayInstruments { get; }
 
         internal Task DrainIncomingAsync(CancellationToken cancellationToken)
-            => Task.WhenAll(_drainingConnections.Keys.Select(connection => connection.DrainIncomingApplicationDispatchAsync()))
-                .WaitAsync(cancellationToken);
+        {
+            lock (clients)
+            {
+                _incomingDispatchDrain ??= Task.WhenAll(_drainingConnections.Keys.Select(connection => connection.DrainIncomingApplicationDispatchAsync()));
+                return _incomingDispatchDrain.WaitAsync(cancellationToken);
+            }
+        }
 
         internal async Task DrainOutboundAsync(CancellationToken cancellationToken)
         {
@@ -150,10 +156,15 @@ namespace Orleans.Runtime.Messaging
 
         internal void RecordOpenedConnection(GatewayInboundConnection connection, ClientGrainId clientId)
         {
-            _drainingConnections.TryAdd(connection, 0);
             LogInformationGatewayClientOpenedSocket(logger, connection.RemoteEndPoint, clientId);
             lock (clients)
             {
+                if (_incomingDispatchDrain is not null)
+                {
+                    connection.DrainIncomingApplicationDispatchAsync().Ignore();
+                }
+
+                _drainingConnections.TryAdd(connection, 0);
                 if (clients.TryGetValue(clientId, out var clientState))
                 {
                     var oldSocket = clientState.Connection;

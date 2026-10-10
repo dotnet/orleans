@@ -38,6 +38,7 @@ namespace Orleans.Runtime.Messaging
         private readonly object lockObj = new();
 #endif
         private readonly TaskCompletionSource<int> closedTaskCompletionSource = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private Task? incomingDispatchDrain;
 
         public ConnectionManager(
             IOptions<ConnectionOptions> connectionOptions,
@@ -59,7 +60,13 @@ namespace Orleans.Runtime.Messaging
             => Task.WhenAll(drainingConnections.Keys.Select(connection => connection.DrainAsync())).WaitAsync(cancellationToken);
 
         internal Task DrainIncomingApplicationDispatchAsync(CancellationToken cancellationToken)
-            => Task.WhenAll(drainingConnections.Keys.Select(connection => connection.DrainIncomingApplicationDispatchAsync())).WaitAsync(cancellationToken);
+        {
+            lock (lockObj)
+            {
+                incomingDispatchDrain ??= Task.WhenAll(drainingConnections.Keys.Select(connection => connection.DrainIncomingApplicationDispatchAsync()));
+                return incomingDispatchDrain.WaitAsync(cancellationToken);
+            }
+        }
 
         public ValueTask<Connection> GetConnection(SiloAddress endpoint)
         {
@@ -202,6 +209,11 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 entry ??= GetOrCreateEntry(address);
+                if (incomingDispatchDrain is not null)
+                {
+                    connection.DrainIncomingApplicationDispatchAsync().Ignore();
+                }
+
                 drainingConnections.TryAdd(connection, 0);
                 entry.Connections = entry.Connections.Contains(connection) ? entry.Connections : entry.Connections.Add(connection);
                 entry.LastFailure = default;

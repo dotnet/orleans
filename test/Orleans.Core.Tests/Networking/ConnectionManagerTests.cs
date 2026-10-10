@@ -41,6 +41,55 @@ public class ConnectionManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task IncomingDrain_SealsConnectionsRegisteredDuringOrAfterDrain(bool finishBeforeRegistration)
+    {
+        await using var rig = new TestRig();
+        var existing = rig.CreateConnection();
+        var late = rig.CreateConnection();
+        rig.Manager.OnConnected(rig.Address, existing);
+        var admitted = existing.TryAdmitIncomingApplicationDispatch();
+        Assert.True(admitted.Entered);
+        try
+        {
+            var drain = rig.Manager.DrainIncomingApplicationDispatchAsync(TestContext.Current.CancellationToken);
+            Assert.False(drain.IsCompleted);
+            if (finishBeforeRegistration)
+            {
+                admitted.Dispose();
+                admitted = default;
+                await drain.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            }
+
+            rig.Manager.OnConnected(rig.Address, late);
+            Assert.Equal(2, rig.Manager.ConnectionCount);
+            Assert.True(late.IsValid);
+            using var rejected = late.TryAdmitIncomingApplicationDispatch();
+            Assert.False(rejected.Entered);
+            using var existingRejected = existing.TryAdmitIncomingApplicationDispatch();
+            Assert.False(existingRejected.Entered);
+
+            if (!finishBeforeRegistration)
+            {
+                Assert.False(drain.IsCompleted);
+                admitted.Dispose();
+                admitted = default;
+            }
+
+            await drain.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            await rig.Manager.DrainIncomingApplicationDispatchAsync(TestContext.Current.CancellationToken)
+                .WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            admitted.Dispose();
+            rig.Manager.OnConnectionTerminated(rig.Address, existing, null);
+            rig.Manager.OnConnectionTerminated(rig.Address, late, null);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task RetirementDrain_RetainsRemovedConnectionUntilDispatchAndRerouteComplete(bool closeEndpoint)
     {
         await using var rig = new TestRig();
