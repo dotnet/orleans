@@ -115,11 +115,9 @@ public sealed class InventoryGrain : Grain, IInventoryGrain
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
         var available = _available.Value;
         var reserved = available >= request.Quantity;
-        var nextAvailable = reserved ? checked(available - request.Quantity) : available;
-        var result = new ReservationResult(request.Quantity, reserved);
 
-        _outbox.SendReply(_result, context, request.ResponseDestination, result);
-        _available.Value = nextAvailable;
+        _outbox.SendReply(_result, context, request.ResponseDestination, new ReservationResult(request.Quantity, reserved));
+        if (reserved) _available.Value = available - request.Quantity;
         context.Complete();
     }
 
