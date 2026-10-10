@@ -594,6 +594,11 @@ public partial class StateManagerTests
     [InlineData(true, true)]
     public async Task Hooks_ShutdownCallbackFailureDrainsActualStorageAndPreservesItsOutcome(bool snapshot, bool storageFails)
     {
+        var entered = NewSignal();
+        var release = NewSignal();
+        var cancellationFailure = new IOException("Cancellation callback failed.");
+        var storageFailure = new IOException("Actual storage failure.");
+        var completed = false;
         var storage = Substitute.For<IJournalStorage>();
         storage.IsCompactionRequested.Returns(snapshot);
         storage.ReadAsync(Arg.Any<IJournalStorageConsumer>(), Arg.Any<CancellationToken>()).Returns(call =>
@@ -609,12 +614,7 @@ public partial class StateManagerTests
         var state = new LifecycleState();
         manager.RegisterStateMachine("state", state);
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        var entered = NewSignal();
-        var release = NewSignal();
-        var cancellationFailure = new IOException("Cancellation callback failed.");
-        var storageFailure = new IOException("Actual storage failure.");
         CancellationTokenRegistration registration = default;
-        var completed = false;
         var after = 0;
         manager.Hooks.Add(new JournaledStateHook
         {
