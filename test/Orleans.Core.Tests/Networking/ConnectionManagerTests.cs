@@ -206,6 +206,70 @@ public class ConnectionManagerTests
     }
 
     [Theory]
+    [InlineData((int)Message.Directions.Request)]
+    [InlineData((int)Message.Directions.Response)]
+    public async Task RetirementDrain_SelectedConnectionRefusalTransfersParentAdmissionToRetry(int direction)
+    {
+        await using var rig = new TestRig();
+        var (source, _) = rig.CreateSiloConnection(createMessageCenter: true);
+        var center = rig.MessageCenter;
+        var replacement = rig.CreateConnection();
+        var retried = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
+        replacement.SendObserver = msg => retried.TrySetResult(msg);
+        rig.Manager.OnConnected(rig.Address, source);
+        Assert.True(center.TryAdmitApplicationSend(out var sendAdmission));
+        Assert.True(rig.Manager.TryGetConnection(rig.Address, out var selected));
+        Assert.Same(source, selected);
+        using var message = new Message
+        {
+            Direction = (Message.Directions)direction,
+            SendingGrain = GrainId.Create("test", "caller"),
+            TargetGrain = GrainId.Create("test", "target"),
+            TargetSilo = rig.Address,
+            Id = new CorrelationId(173),
+            BodyObject = "original payload",
+            TimeToLive = TimeSpan.FromMinutes(1),
+        };
+        var expiry = message._timeToExpiry.GetRawTimestamp();
+        try
+        {
+            rig.Manager.OnConnectionTerminated(rig.Address, source, null);
+            await source.DrainAsync().WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            rig.Manager.OnConnected(rig.Address, replacement);
+            var drain = center.DrainRetirementAsync(TestContext.Current.CancellationToken);
+            Assert.False(drain.IsCompleted);
+            using var late = new Message
+            {
+                Direction = message.Direction,
+                SendingGrain = message.SendingGrain,
+                TargetGrain = message.TargetGrain,
+                TargetSilo = rig.Address,
+                BodyObject = "fresh send after seal",
+            };
+            center.SendMessage(late);
+            Assert.Null(late.BodyObject);
+            Assert.False(retried.Task.IsCompleted);
+
+            selected.Send(message, ref sendAdmission);
+            Assert.False(sendAdmission.Entered);
+            Assert.Same(message, await retried.Task.WaitAsync(TestTimeout, TestContext.Current.CancellationToken));
+            await drain.WaitAsync(TestTimeout, TestContext.Current.CancellationToken);
+            Assert.Equal(1, message.RetryCount);
+            Assert.Equal(0, message.ForwardCount);
+            Assert.Equal(new CorrelationId(173), message.Id);
+            Assert.Equal(expiry, message._timeToExpiry.GetRawTimestamp());
+            Assert.Equal("original payload", message.BodyObject);
+            Assert.Equal(0, rig.Factory.AttemptCount);
+        }
+        finally
+        {
+            sendAdmission.Dispose();
+            rig.Manager.OnConnectionTerminated(rig.Address, source, null);
+            rig.Manager.OnConnectionTerminated(rig.Address, replacement, null);
+        }
+    }
+
+    [Theory]
     [InlineData(false, false, false)]
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]

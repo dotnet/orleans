@@ -282,9 +282,7 @@ namespace Orleans.Runtime.Messaging
                 var admission = message.RequiresApplicationDrain ? _connection._outgoingApplicationWork.TryEnter() : default;
                 if (message.RequiresApplicationDrain && !admission.Entered)
                 {
-                    _connection.MessagingTrace.OnDropBlockedApplicationMessage(message);
-                    message.Dispose();
-                    sendAdmission.Dispose();
+                    _connection.RerouteMessage(message, new ConnectionClosedException(), sendAdmission: sendAdmission);
                     return;
                 }
 
@@ -485,7 +483,7 @@ namespace Orleans.Runtime.Messaging
                 admission = _outgoingApplicationWork.TryEnter();
             }
 
-            if (message.RequiresApplicationDrain && !admission.Entered)
+            if (message.RequiresApplicationDrain && !admission.Entered && !sendAdmission.Entered)
             {
                 MessagingTrace.OnDropBlockedApplicationMessage(message);
                 message.Dispose();
