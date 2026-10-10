@@ -124,6 +124,7 @@ public struct ArcBufferReaderInput(in ArcBuffer slice)
     private int _position;
 
     internal readonly ArcBufferPage? First => _slice.First;
+    internal readonly ArcBuffer Slice(int offset, int length) => _slice.Slice(offset, length);
     internal readonly int Position => _position;
     internal readonly int Offset => _slice.Offset;
     internal readonly int Length => _slice.Length;

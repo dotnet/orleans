@@ -493,6 +493,44 @@ namespace Orleans.Serialization.Buffers
         }
 
         /// <summary>
+        /// Reads bytes into an independently owned <see cref="ArcBuffer"/>.
+        /// </summary>
+        /// <param name="length">The number of bytes to read.</param>
+        /// <returns>An owned buffer which the caller must dispose, or <see cref="ArcBuffer.Empty"/> for a zero-length read.</returns>
+        /// <remarks>
+        /// Advances the reader by <paramref name="length"/> bytes. A nonempty read from Arc input acquires an
+        /// independent pin over the referenced pages; other nonempty reads copy the bytes into owned pooled pages.
+        /// </remarks>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
+        /// <exception cref="IndexOutOfRangeException">The input contains fewer than <paramref name="length"/> unread bytes.</exception>
+        public ArcBuffer ReadOwnedBuffer(int length)
+        {
+            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+            EnsureAvailable((uint)length);
+            if (length == 0) return ArcBuffer.Empty;
+
+            if (IsArcBufferInput)
+            {
+                ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
+                var result = input.Slice(checked((int)(Position - _sequenceOffset)), length);
+                Skip(length);
+                return result;
+            }
+
+            using var output = new ArcBufferWriter();
+            while (length > 0)
+            {
+                var destination = output.GetSpan();
+                var count = Math.Min(length, destination.Length);
+                ReadBytes(destination[..count]);
+                output.AdvanceWriter(count);
+                length -= count;
+            }
+
+            return output.ConsumeSlice(output.Length);
+        }
+
+        /// <summary>
         /// Skips the specified number of bytes.
         /// </summary>
         /// <param name="count">The number of bytes to skip.</param>
