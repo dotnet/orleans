@@ -492,37 +492,48 @@ namespace Orleans.Serialization.Buffers
         }
 
         /// <summary>
-        /// Tries to read an independently owned slice from Arc input.
+        /// Reads bytes into an independently owned <see cref="ArcBuffer"/>.
         /// </summary>
         /// <param name="length">The number of bytes to read.</param>
-        /// <param name="value">An owned slice which the caller must dispose, if supported.</param>
-        /// <returns><see langword="true"/> if the input supports owned Arc slices; otherwise, <see langword="false"/>.</returns>
-        /// <remarks>A successful read advances the reader by <paramref name="length"/> bytes and pins the referenced pages.</remarks>
+        /// <returns>An owned buffer which the caller must dispose.</returns>
+        /// <remarks>
+        /// Advances the reader by <paramref name="length"/> bytes. Arc input acquires an independent pin over the
+        /// referenced pages; other inputs copy the bytes into owned pooled pages.
+        /// </remarks>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
-        /// <exception cref="IndexOutOfRangeException">The Arc input contains fewer than <paramref name="length"/> unread bytes.</exception>
-        public bool TryReadArcBuffer(int length, out ArcBuffer value)
+        /// <exception cref="IndexOutOfRangeException">The input contains fewer than <paramref name="length"/> unread bytes.</exception>
+        public ArcBuffer ReadArcBuffer(int length)
         {
             if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
-            if (!IsArcBufferInput)
+            EnsureAvailable((uint)length);
+            if (IsArcBufferInput)
             {
-                value = default;
-                return false;
+                ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
+                var result = input.Slice(checked((int)(Position - _sequenceOffset)), length);
+                try
+                {
+                    Skip(length);
+                    return result;
+                }
+                catch
+                {
+                    result.Dispose();
+                    throw;
+                }
             }
 
-            EnsureAvailable((uint)length);
-            ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
-            var result = input.Slice(checked((int)(Position - _sequenceOffset)), length);
-            try
+            if (length == 0) return ArcBuffer.Empty;
+
+            using var output = new ArcBufferWriter();
+            while (length > 0)
             {
-                Skip(length);
-                value = result;
-                return true;
+                var count = Math.Min(length, 4096);
+                ReadBytes(output.GetSpan(count)[..count]);
+                output.AdvanceWriter(count);
+                length -= count;
             }
-            catch
-            {
-                result.Dispose();
-                throw;
-            }
+
+            return output.ConsumeSlice(output.Length);
         }
 
         /// <summary>

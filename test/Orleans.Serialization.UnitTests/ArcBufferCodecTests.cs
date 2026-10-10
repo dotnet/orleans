@@ -204,7 +204,7 @@ public sealed class ArcBufferCodecTests
         using var input = source.PeekSlice(source.Length);
         var reader = new Reader<ArcBufferReaderInput>(new ArcBufferReaderInput(in input), session, 113);
         reader.Skip(17000);
-        Assert.True(reader.TryReadArcBuffer(18000, out var value));
+        var value = reader.ReadArcBuffer(18000);
         using (value)
         {
             Assert.Equal(expected.AsSpan(17000, 18000).ToArray(), value.ToArray());
@@ -212,15 +212,15 @@ public sealed class ArcBufferCodecTests
         }
         reader.ForkFrom(18113, out var fork);
         fork.ForkFrom(19113, out var nestedFork);
-        Assert.True(nestedFork.TryReadArcBuffer(7, out var forked));
+        var forked = nestedFork.ReadArcBuffer(7);
         using (forked) Assert.Equal(expected.AsSpan(19000, 7).ToArray(), forked.ToArray());
 
         var emptyReader = Reader.Create(default(ArcBuffer), session);
         Assert.Equal(0, emptyReader.Remaining);
-        Assert.True(emptyReader.TryReadArcBuffer(0, out var empty));
+        var empty = emptyReader.ReadArcBuffer(0);
         Assert.Null(empty.First);
         empty.Dispose();
-        try { emptyReader.TryReadArcBuffer(1, out _); Assert.Fail("Truncated Arc input must throw."); }
+        try { emptyReader.ReadArcBuffer(1); Assert.Fail("Truncated Arc input must throw."); }
         catch (IndexOutOfRangeException) { }
     }
 
@@ -247,26 +247,110 @@ public sealed class ArcBufferCodecTests
         Assert.NotSame(value.First, sequenceValue.First);
     }
 
-    [Fact]
-    public void NonArcReader_ReportsUnsupportedWithoutAdvancing()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7)]
+    [InlineData(50037)]
+    public void ReadArcBuffer_NonArcInputsReturnOwnedBytesAndAdvanceExactly(int length)
     {
         using var services = Services();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
-        var reader = Reader.Create(Bytes(7), session);
-        Assert.False(reader.TryReadArcBuffer(3, out var value));
-        Assert.Null(value.First);
-        Assert.Equal(0, reader.Position);
-        Assert.Equal(7, reader.Remaining);
+        var input = Bytes(length + 11);
+        var expected = input.AsSpan(7, length).ToArray();
+        var spanReader = Reader.Create(input, session);
+        spanReader.Skip(7);
+        var spanValue = spanReader.ReadArcBuffer(length);
+        Assert.Equal(length + 7, spanReader.Position);
+        Assert.Equal(4, spanReader.Remaining);
+
+        using var pooled = new PooledBuffer();
+        pooled.Write(input);
+        var sequenceReader = Reader.Create(pooled.AsReadOnlySequence(), session);
+        sequenceReader.Skip(7);
+        var sequenceValue = sequenceReader.ReadArcBuffer(length);
+        Assert.Equal(length + 7, sequenceReader.Position);
+        Assert.Equal(4, sequenceReader.Remaining);
+
+        var pooledReader = Reader.Create(pooled, session);
+        pooledReader.Skip(7);
+        var pooledValue = pooledReader.ReadArcBuffer(length);
+        Assert.Equal(length + 7, pooledReader.Position);
+        Assert.Equal(4, pooledReader.Remaining);
+
+        using var stream = new MemoryStream(input, writable: false);
+        var streamReader = Reader.Create(stream, session);
+        streamReader.Skip(7);
+        var streamValue = streamReader.ReadArcBuffer(length);
+        Assert.Equal(length + 7, streamReader.Position);
+        Assert.Equal(4, streamReader.Remaining);
+
+        pooled.Dispose();
+        stream.Dispose();
+        Array.Fill(input, (byte)0);
+        var values = new[] { spanValue, sequenceValue, pooledValue, streamValue };
+        foreach (var buffer in values)
+        {
+            var owned = buffer;
+            Assert.Equal(expected, owned.ToArray());
+            if (length == 0)
+            {
+                Assert.Null(owned.First);
+                owned.Dispose();
+            }
+            else
+            {
+                var pages = owned.Pages.ToArray();
+                Assert.All(pages, page => Assert.Equal(1, page.ReferenceCount));
+                owned.Dispose();
+                Assert.All(pages, page => Assert.Equal(0, page.ReferenceCount));
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(8)]
+    [InlineData(int.MaxValue)]
+    public void ReadArcBuffer_InvalidLengthsPreservePositionAndOwnership(int length)
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        using var source = new ArcBufferWriter();
+        source.Write(Bytes(7));
+        using var input = source.PeekSlice(source.Length);
+        var before = input.First.ReferenceCount;
+        var arcReader = Reader.Create(input, session);
+        VerifyInvalidLength(ref arcReader, length);
+        Assert.Equal(before, input.First.ReferenceCount);
+
+        var spanReader = Reader.Create(Bytes(7), session);
+        VerifyInvalidLength(ref spanReader, length);
+        var sequenceReader = Reader.Create(new ReadOnlySequence<byte>(Bytes(7)), session);
+        VerifyInvalidLength(ref sequenceReader, length);
+        using var stream = new MemoryStream(Bytes(7), writable: false);
+        var streamReader = Reader.Create(stream, session);
+        VerifyInvalidLength(ref streamReader, length);
+        using var pooled = new PooledBuffer();
+        pooled.Write(Bytes(7));
+        var pooledReader = Reader.Create(pooled, session);
+        VerifyInvalidLength(ref pooledReader, length);
+    }
+
+    private static void VerifyInvalidLength<TInput>(ref Reader<TInput> reader, int length)
+    {
+        Exception? error = null;
         try
         {
-            reader.TryReadArcBuffer(-1, out _);
-            Assert.Fail("Expected invalid length");
+            using var value = reader.ReadArcBuffer(length);
         }
-        catch (ArgumentOutOfRangeException)
+        catch (Exception exception)
         {
+            error = exception;
         }
 
+        Assert.Equal(length < 0 ? typeof(ArgumentOutOfRangeException) : typeof(IndexOutOfRangeException), error?.GetType());
         Assert.Equal(0, reader.Position);
+        Assert.Equal(7, reader.Remaining);
     }
 
     [Fact]
@@ -320,7 +404,7 @@ public sealed class ArcBufferCodecTests
         if (!pageBacked)
         {
             var reader = Reader.Create(ArcBuffer.Empty, session);
-            Assert.True(reader.TryReadArcBuffer(0, out var empty));
+            var empty = reader.ReadArcBuffer(0);
             Assert.Null(empty.First);
             empty.Dispose();
             return;
@@ -330,7 +414,7 @@ public sealed class ArcBufferCodecTests
         using var input = writer.PeekSlice(0);
         var before = input.First.ReferenceCount;
         var ownedReader = Reader.Create(input, session);
-        Assert.True(ownedReader.TryReadArcBuffer(0, out var result));
+        var result = ownedReader.ReadArcBuffer(0);
         Assert.Same(input.First, result.First);
         Assert.Equal(before + 1, input.First.ReferenceCount);
         result.Dispose();
@@ -410,6 +494,29 @@ public sealed class ArcBufferCodecTests
         Assert.Equal(2, input.ByteReadCalls);
         Assert.Equal(Bytes(50037), value.ToArray());
         Assert.Equal(2, value.First.ReferenceCount);
+    }
+
+    [Fact]
+    public void ReadArcBuffer_InputFailurePropagatesAfterPartialCopy()
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var input = new FailingReaderInput(Bytes(50037));
+        var reader = new Reader<ReaderInput>(input, session, 0);
+        Exception? error = null;
+        try
+        {
+            using var value = reader.ReadArcBuffer(50037);
+        }
+        catch (Exception exception)
+        {
+            error = exception;
+        }
+
+        Assert.IsType<IOException>(error);
+        Assert.Equal(2, input.ByteReadCalls);
+        Assert.Equal(4096, reader.Position);
+        Assert.Equal(50037 - 4096, reader.Remaining);
     }
 
     private sealed class FailingReaderInput(byte[] input) : ReaderInput

@@ -32,21 +32,7 @@ public sealed class ArcBufferCodec : IFieldCodec<ArcBuffer>
             throw new IndexOutOfRangeException($"The declared ArcBuffer length, {encodedLength}, exceeds {int.MaxValue}.");
         }
 
-        reader.EnsureAvailable(encodedLength);
-        var length = (int)encodedLength;
-        if (reader.TryReadArcBuffer(length, out var value)) return value;
-        if (length == 0) return ArcBuffer.Empty;
-
-        using var output = new ArcBufferWriter();
-        while (length > 0)
-        {
-            var count = Math.Min(length, 4096);
-            reader.ReadBytes(output.GetSpan(count)[..count]);
-            output.AdvanceWriter(count);
-            length -= count;
-        }
-
-        return output.ConsumeSlice(output.Length);
+        return reader.ReadArcBuffer((int)encodedLength);
     }
 }
 
