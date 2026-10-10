@@ -17,7 +17,6 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, Du
     public Exception? NextSendFailure { get; set; }
     public IDurableDictionary<HierarchicalKey, DurableEnvelope> StoredMessages { get; } = messages;
     public int Count => StoredMessages.Count;
-    public GrainId SenderId => context.GrainId;
     public IEnumerable<DurableEnvelope> Messages => StoredMessages.Values;
     public IEnumerator<KeyValuePair<HierarchicalKey, DurableEnvelope>> GetEnumerator() => StoredMessages.GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
