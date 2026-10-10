@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 using Orleans.Serialization;
 using Xunit;
 
@@ -523,6 +525,150 @@ public partial class StateManagerTests
         {
             release.TrySetResult();
             await Assert.ThrowsAsync<AggregateException>(() => manager.DisposeAsync().AsTask());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Hooks_ShutdownCancelsQueuedInitializationAfterOwnedCallbackDrains(bool after)
+    {
+        var storage = new CapturingStorage();
+        var manager = CreateTestSystem(storage).Manager;
+        var state = new LifecycleState();
+        manager.RegisterStateMachine("state", state);
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        var entered = NewSignal();
+        var release = NewSignal();
+        Func<JournaledStateOperation, CancellationToken, ValueTask> callback = async (_, _) =>
+        {
+            entered.TrySetResult();
+            await release.Task;
+        };
+        manager.Hooks.Add(new JournaledStateHook
+        {
+            BeforeOperationAsync = after ? null : callback,
+            AfterOperationAsync = after ? callback : null
+        });
+        var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        try
+        {
+            await WaitFor(entered.Task);
+            var initializing = manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask();
+            var deleting = manager.DeleteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            var shutdown = manager.DisposeAsync().AsTask();
+            Assert.False(shutdown.IsCompleted);
+            Assert.False(initializing.IsCompleted);
+            Assert.False(deleting.IsCompleted);
+            release.TrySetResult();
+            await WaitFor(shutdown);
+            if (after)
+            {
+                await WaitFor(write);
+            }
+            else
+            {
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(write));
+            }
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(initializing));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(deleting));
+            Assert.True(initializing.IsCanceled);
+            Assert.True(deleting.IsCanceled);
+            Assert.Equal(after ? 1 : 0, state.CaptureCount);
+            Assert.Equal(after ? 1 : 0, state.WriteCompletedCount);
+            Assert.Equal(after ? 1 : 0, storage.Appends.Count);
+            Assert.Equal(0, storage.DeleteCount);
+        }
+        finally
+        {
+            release.TrySetResult();
+            await manager.DisposeAsync();
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Hooks_ShutdownCallbackFailureDrainsActualStorageAndPreservesItsOutcome(bool snapshot, bool storageFails)
+    {
+        var storage = Substitute.For<IJournalStorage>();
+        storage.IsCompactionRequested.Returns(snapshot);
+        storage.ReadAsync(Arg.Any<IJournalStorageConsumer>(), Arg.Any<CancellationToken>()).Returns(call =>
+        {
+            call.Arg<IJournalStorageConsumer>().Complete(metadata: null);
+            return ValueTask.CompletedTask;
+        });
+        storage.AppendAsync(Arg.Any<ReadOnlySequence<byte>>(), Arg.Any<CancellationToken>())
+            .Returns(call => WriteAsync(call.Arg<ReadOnlySequence<byte>>(), call.Arg<CancellationToken>()));
+        storage.ReplaceAsync(Arg.Any<ReadOnlySequence<byte>>(), Arg.Any<CancellationToken>())
+            .Returns(call => WriteAsync(call.Arg<ReadOnlySequence<byte>>(), call.Arg<CancellationToken>()));
+        var manager = CreateTestSystem(storage).Manager;
+        var state = new LifecycleState();
+        manager.RegisterStateMachine("state", state);
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        var entered = NewSignal();
+        var release = NewSignal();
+        var cancellationFailure = new IOException("Cancellation callback failed.");
+        var storageFailure = new IOException("Actual storage failure.");
+        CancellationTokenRegistration registration = default;
+        var completed = false;
+        var after = 0;
+        manager.Hooks.Add(new JournaledStateHook
+        {
+            BeforeOperation = (_, token) => registration = token.Register(() => throw cancellationFailure),
+            AfterOperation = (_, _) => after++
+        });
+        var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        try
+        {
+            await WaitFor(entered.Task);
+            var queued = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            var shutdown = manager.DisposeAsync().AsTask();
+            Assert.Same(shutdown, manager.DisposeAsync().AsTask());
+            Assert.False(shutdown.IsCompleted);
+            Assert.False(completed);
+            Assert.Equal(0, state.WriteCompletedCount);
+            Assert.Equal(0, after);
+            release.TrySetResult();
+            var caught = await Assert.ThrowsAsync<AggregateException>(() => WaitFor(shutdown));
+            Assert.Same(cancellationFailure, Assert.Single(caught.InnerExceptions));
+            Assert.True(completed);
+            if (storageFails)
+            {
+                Assert.Same(storageFailure, await Assert.ThrowsAsync<IOException>(() => WaitFor(write)));
+                Assert.Same(storageFailure, await Assert.ThrowsAsync<IOException>(() => WaitFor(queued)));
+            }
+            else
+            {
+                await WaitFor(write);
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(queued));
+            }
+
+            Assert.Equal(storageFails ? 0 : 1, state.WriteCompletedCount);
+            Assert.Equal(storageFails ? 0 : 1, after);
+        }
+        finally
+        {
+            release.TrySetResult();
+            registration.Dispose();
+            await Assert.ThrowsAsync<AggregateException>(() => manager.DisposeAsync().AsTask());
+        }
+
+        async ValueTask WriteAsync(ReadOnlySequence<byte> bytes, CancellationToken token)
+        {
+            var original = bytes.ToArray();
+            entered.TrySetResult();
+            await release.Task;
+            Assert.True(token.IsCancellationRequested);
+            Assert.Equal(original, bytes.ToArray());
+            completed = true;
+            if (storageFails)
+            {
+                throw storageFailure;
+            }
         }
     }
 

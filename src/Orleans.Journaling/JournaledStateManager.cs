@@ -263,6 +263,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     WorkItem workItem;
                     lock (_lock)
                     {
+                        if (_shutdownCancellation.IsCancellationRequested)
+                        {
+                            return;
+                        }
+
                         if (!_workQueue.TryDequeue(out var dequeuedWorkItem))
                         {
                             // Wait for the queue to be signaled again.
@@ -693,9 +698,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     private IJournaledStateCaptureHook? GetCaptureHook()
     {
-        foreach (var hook in _hooks!)
+        for (var i = 0; i < _hooks!.Count; i++)
         {
-            if (hook is IJournaledStateCaptureHook captureHook)
+            if (_hooks[i] is IJournaledStateCaptureHook captureHook)
             {
                 return captureHook;
             }
@@ -710,8 +715,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         CurrentHookOwner.Value = this;
         try
         {
-            foreach (var hook in _hooks!)
+            for (var i = 0; i < _hooks!.Count; i++)
             {
+                var hook = _hooks[i];
                 if (hook is IJournaledStateCaptureHook)
                 {
                     continue;
@@ -736,11 +742,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         List<Exception>? failures = null;
         try
         {
-            foreach (var hook in _hooks!)
+            for (var i = 0; i < _hooks!.Count; i++)
             {
                 try
                 {
-                    await hook.AfterOperationAsync(operation, cancellationToken).ConfigureAwait(true);
+                    await _hooks[i].AfterOperationAsync(operation, cancellationToken).ConfigureAwait(true);
                 }
                 catch (Exception exception)
                 {

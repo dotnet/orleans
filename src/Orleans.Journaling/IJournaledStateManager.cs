@@ -8,7 +8,6 @@ namespace Orleans.Journaling;
 /// <remarks>
 /// The owner registers state machines and initializes the journal before using recovered state.
 /// State machine instances and their dependencies retain the lifetime assigned by their caller.
-/// Disposing this manager stops journal processing and releases its journal resources.
 /// Disposal drains owned storage and hook operations before releasing resources.
 /// </remarks>
 public interface IJournaledStateManager : IAsyncDisposable
@@ -82,7 +81,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <remarks>
     /// The caller keeps other operations quiescent through completion: deletion resets every registered state machine.
     /// Cancellation ends the caller's wait; an already queued deletion continues to its storage and reset outcome.
-    /// A failed deletion permanently fences the manager and requests deactivation of its owning grain.
+    /// A storage or state-reset failure permanently fences the manager and requests deactivation of its owning grain.
     /// Before-hook failure reports <see cref="JournaledStatePreCommitException"/> with state retained.
     /// After-hook failure reports <see cref="JournaledStatePostCommitException"/> after storage deletion
     /// and state reset succeed.
