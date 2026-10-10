@@ -197,10 +197,21 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         }
 
         // Assert no error-level logs occurred.
-        var errors = errorLogs
-            .ToArray()
+        var capturedErrors = errorLogs.ToArray();
+        var initialConnectivityRetries = capturedErrors.Where(static error => IsExpectedInitialConnectivityRetry(error)).ToArray();
+        if (initialConnectivityRetries.Length > 0)
+        {
+            output.WriteLine($"FILTERED INITIAL-CONNECTIVITY RETRY LOGS ({initialConnectivityRetries.Length}):");
+            foreach (var retry in initialConnectivityRetries.Take(20))
+            {
+                output.WriteLine($"  {retry}");
+            }
+        }
+
+        var errors = capturedErrors
             .Where(static error => !IsExpectedClientRoutingTableCancellation(error))
             .Where(static error => !IsExpectedDirectoryPartitionRejection(error))
+            .Where(static error => !IsExpectedInitialConnectivityRetry(error))
             .ToArray();
         if (errors.Length > 0)
         {
@@ -573,6 +584,21 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         error.StartsWith("[Orleans.Messaging] Failed to address message", StringComparison.Ordinal)
         && error.Contains("IGrainDirectoryPartition.", StringComparison.Ordinal)
         && error.Contains("not active on this silo", StringComparison.Ordinal);
+
+    /// <summary>
+    /// A joining silo validates connectivity with every active silo before becoming active, retrying on a timer
+    /// until <c>ClusterMembershipOptions.MaxJoinAttemptTime</c> elapses. Every attempt — including the final,
+    /// unrecoverable one — logs this error before the retry-exhaustion check runs, so matching this message alone
+    /// does not prove the attempt was recoverable. Startup only reaches this test's final assertion if every
+    /// awaited silo start succeeded; an exhausted connectivity validation throws
+    /// <c>OrleansClusterConnectivityCheckFailedException</c> from <c>BecomeActive</c>, which fails
+    /// <see cref="InProcessTestCluster.DeployAsync"/> or <see cref="InProcessTestCluster.StartAdditionalSiloAsync"/>
+    /// before this filter is ever evaluated. Reaching this point therefore guarantees any matching log here was a
+    /// recovered, non-terminal retry.
+    /// </summary>
+    private static bool IsExpectedInitialConnectivityRetry(string error) =>
+        error.StartsWith("[Orleans.Runtime.MembershipService.MembershipAgent] Failed to get ping responses from", StringComparison.Ordinal)
+        && error.Contains("Will continue attempting to validate connectivity until", StringComparison.Ordinal);
 
     /// <summary>
     /// Activates grains by calling each one. Retries individual calls that fail with transient
