@@ -1,3 +1,9 @@
+## Implementation and code review
+
+Follow root `AGENTS.md` and applicable directory instructions for implementation principles and repository workflow.
+
+For code review, use `.github/skills/code-review/SKILL.md`.
+
 ## Build, test, and style commands
 
 * The repo builds with the .NET SDK from `global.json` (`10.0.400`, roll-forward `major`). Do not edit `global.json` unless explicitly asked.
@@ -20,7 +26,7 @@
 * `src\Orleans.Sdk`, `src\Orleans.Client`, and `src\Orleans.Server` are packaging/metapackage projects. The SDK brings in core packages plus analyzers/code generation; the client/server packages compose the SDK with client or silo dependencies.
 * Provider packages are intentionally split by backend and capability under `src\Azure`, `src\AWS`, `src\AdoNet`, `src\Cassandra`, `src\Redis`, and related top-level provider directories. They usually expose builder extensions in `Orleans.Hosting` and options in `Orleans.Configuration`.
 * Tests mirror runtime areas under `test\`. Shared test infrastructure is in `test\TestInfrastructure\TestExtensions`, test grains and grain interfaces are under `test\Grains`, and `Orleans.TestingHost`/`TestClusterBuilder` are the primary integration-test harnesses.
-* `src\api` contains generated public API surface files for packable projects. Do not edit these files manually. Regenerate an affected project by restoring with `dotnet restore <project> --configfile .github/NuGet.GenAPI.Config -p:GenerateOrleansApiSource=true`, then running `dotnet build <project> --framework net8.0 --configuration Release --no-incremental --no-restore -p:GenerateOrleansApiSource=true /t:"Build;GenAPIGenerateReferenceAssemblySource"`, matching `.github\workflows\generate-api-diffs.yml`.
+* `src\api` contains generated public API surfaces. Follow the regeneration and package compatibility commands in root `AGENTS.md`.
 
 ## Key conventions
 
@@ -29,9 +35,7 @@
 * `src\Directory.Build.props` makes source projects packable by default; `test\Directory.Build.props` makes test projects non-packable and configures MTP test applications. The root `Directory.Build.targets` copies `test\testconfig.json` under each test assembly name.
 * Build-time code generation is controlled by `OrleansBuildTimeCodeGen=true`, which imports the Orleans code generator and analyzers as build analyzers for framework projects.
 * Serializable Orleans types that cross grain calls, storage, or streams generally need `[GenerateSerializer]` plus stable `[Id(n)]` members. Do not renumber existing serialization IDs.
-* Public API changes in packable `src\` projects usually require corresponding generated API-surface changes under `src\api`; always regenerate them with the GenAPI target instead of editing them by hand.
 * Tests use xUnit with the custom `[TestCategory("...")]` attribute from `test\TestInfrastructure\TestExtensions\TestCategory.cs`; this maps categories to xUnit traits for `dotnet test --filter-trait "Category=..."`.
 * Cluster tests usually derive from or compose fixtures in `test\TestInfrastructure\TestExtensions` and configure silos through `TestClusterBuilder`, `ISiloConfigurator`, or `ISiloBuilder`. The default cluster fixture uses in-memory reminders, durable jobs, and grain storage.
 * Follow `.editorconfig`: C# uses file-scoped namespaces, system directives first, `var` preferences, braces on new lines, `_camelCase` private fields, and preview language features. Nullable is enabled for source projects and disabled for test projects.
 * Add XML docs for new or changed public APIs even though CS1591 is currently suppressed; package projects generate documentation files.
-* PR workflow from `AGENTS.md`: open PRs against `dotnet/orleans`, push feature branches to the `origin` fork, and create PRs with `gh pr create --repo dotnet/orleans --base main --head ReubenBond:<branch>`.
