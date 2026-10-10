@@ -83,6 +83,10 @@ namespace Orleans.DurableMessaging
         public DurableInboxDispatcher Register<T>(DurableMessageType<T> messageType, System.Action<T, IInboxHandlerContext> handler) { throw null; }
 
         public DurableInboxDispatcher Register<T>(DurableMessageType<T> messageType, System.Func<T, IInboxHandlerContext, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> handler) { throw null; }
+
+        public DurableInboxDispatcher Register<T, TArg>(DurableMessageType<T> messageType, TArg argument, System.Action<T, TArg, IInboxHandlerContext> handler) { throw null; }
+
+        public DurableInboxDispatcher Register<T, TArg>(DurableMessageType<T> messageType, TArg argument, System.Func<T, TArg, IInboxHandlerContext, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> handler) { throw null; }
     }
 
     public static partial class DurableInboxExtensions
@@ -96,16 +100,20 @@ namespace Orleans.DurableMessaging
 
         public string Subject { get { throw null; } }
 
+        public DurableEnvelope Create(HierarchicalKey messageId, Runtime.GrainId senderId, Runtime.GrainId receiverId, T body) { throw null; }
+
         public T Decode(DurableEnvelope envelope) { throw null; }
     }
 
-    public sealed partial class DurableMessageWriter : System.IDisposable
+    public static partial class DurableOutboxExtensions
     {
-        public DurableMessageWriter(Runtime.IGrainContext context) { }
+        public static void Send<T>(this IDurableOutbox outbox, DurableMessageType<T> messageType, HierarchicalKey messageId, Runtime.GrainId destination, T body) { }
 
-        public DurableEnvelope Create<T>(DurableMessageType<T> messageType, HierarchicalKey messageId, Runtime.GrainId receiverId, T body) { throw null; }
+        public static void Send<T>(this IDurableOutbox outbox, DurableMessageType<T> messageType, HierarchicalKey messageId, Runtime.IAddressable destination, T body) { }
 
-        public void Dispose() { }
+        public static void SendReply<T>(this IDurableOutbox outbox, DurableMessageType<T> messageType, IInboxHandlerContext context, Runtime.GrainId destination, T body) { }
+
+        public static void SendReply<T>(this IDurableOutbox outbox, DurableMessageType<T> messageType, IInboxHandlerContext context, Runtime.IAddressable destination, T body) { }
     }
 
     [Immutable]
