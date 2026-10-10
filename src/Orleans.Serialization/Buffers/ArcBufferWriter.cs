@@ -1479,7 +1479,6 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
             if (_page == First)
             {
                 Debug.Assert(_position == 0);
-                Slice.CheckValidity();
                 var offset = Offset;
                 var length = Math.Min(Length, _page.Length - offset);
                 _position += length;

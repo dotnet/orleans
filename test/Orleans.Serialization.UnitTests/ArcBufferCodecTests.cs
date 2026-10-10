@@ -360,6 +360,23 @@ public sealed class ArcBufferCodecTests
         }
     }
 
+    [Fact]
+    public void ReadArcBuffer_CopyFillsPagesBeforeAllocatingAnother()
+    {
+        using var services = Services();
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        var expected = Bytes(ArcBufferWriter.MinimumPageSize * 3);
+        var reader = Reader.Create(expected, session);
+        using var value = reader.ReadArcBuffer(expected.Length);
+        var pages = value.Pages.ToArray();
+        Assert.Equal(3, pages.Length);
+        Assert.All(pages, page => Assert.Equal(ArcBufferWriter.MinimumPageSize, page.Length));
+        Assert.All(pages, page => Assert.Equal(1, page.ReferenceCount));
+        Assert.Equal(expected, value.ToArray());
+        Assert.Equal(expected.Length, reader.Position);
+        Assert.Equal(0, reader.Remaining);
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(8)]
@@ -595,8 +612,8 @@ public sealed class ArcBufferCodecTests
 
         Assert.IsType<IOException>(error);
         Assert.Equal(2, input.ByteReadCalls);
-        Assert.Equal(4096, reader.Position);
-        Assert.Equal(50037 - 4096, reader.Remaining);
+        Assert.Equal(ArcBufferWriter.MinimumPageSize, reader.Position);
+        Assert.Equal(50037 - ArcBufferWriter.MinimumPageSize, reader.Remaining);
     }
 
     private sealed class FailingReaderInput(byte[] input) : ReaderInput

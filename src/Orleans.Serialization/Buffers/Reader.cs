@@ -208,6 +208,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="input">The input.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
+        /// <remarks>The input must remain valid and its referenced bytes unchanged for the lifetime of the reader.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Reader<ArcBufferReaderInput> Create(ArcBuffer input, SerializerSession session) => new(new ArcBufferReaderInput(in input), session, 0);
 
@@ -519,8 +520,9 @@ namespace Orleans.Serialization.Buffers
             using var output = new ArcBufferWriter();
             while (length > 0)
             {
-                var count = Math.Min(length, 4096);
-                ReadBytes(output.GetSpan(count)[..count]);
+                var destination = output.GetSpan();
+                var count = Math.Min(length, destination.Length);
+                ReadBytes(destination[..count]);
                 output.AdvanceWriter(count);
                 length -= count;
             }

@@ -32,6 +32,27 @@ public sealed class ArcBufferLifetimeTests
         Assert.Throws<ArgumentOutOfRangeException>(() => value.Slice(1));
     }
 
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    [InlineData(1, 1)]
+    public void OwnerFreeBuffer_RejectsInvalidShape(int offset, int length)
+    {
+        var value = new ArcBuffer(null!, 0, offset, length);
+        Assert.Throws<InvalidOperationException>(() => value.ToArray());
+        Assert.Throws<InvalidOperationException>(() => value.Slice(0));
+        Assert.Throws<InvalidOperationException>(() => value.MemorySegments.MoveNext());
+        using var services = ArcBufferCodecTests.Services();
+        var serializer = services.GetRequiredService<Serializer<ArcBuffer>>();
+        Assert.Throws<InvalidOperationException>(() => serializer.SerializeToArray(value));
+        using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
+        Assert.Throws<InvalidOperationException>(() =>
+        {
+            var reader = Reader.Create(value, session);
+            _ = reader.Length;
+        });
+    }
+
     [Fact]
     public void ZeroLengthPageBackedSlice_OwnsIndependentPin()
     {
