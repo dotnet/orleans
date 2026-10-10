@@ -608,12 +608,16 @@ namespace Orleans.Serialization.Buffers
     public partial struct ArcBuffer : System.IDisposable
     {
         private int _dummyPrimitive;
-        public readonly ArcBufferPage First;
+        public readonly ArcBufferPage? First;
         public readonly int Length;
         public readonly int Offset;
-        public ArcBuffer(ArcBufferPage first, int token, int offset, int length) { }
+        public ArcBuffer(ArcBufferPage? first, int token, int offset, int length) { }
 
         public ArraySegmentEnumerator ArraySegments { get { throw null; } }
+
+        public static ArcBuffer Empty { get { throw null; } }
+
+        public bool IsEmpty { get { throw null; } }
 
         public MemoryEnumerator MemorySegments { get { throw null; } }
 

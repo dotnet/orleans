@@ -123,7 +123,7 @@ public struct ArcBufferReaderInput(in ArcBuffer slice)
     private ArcBufferPage? _page = slice.First;
     private int _position;
 
-    internal readonly ArcBufferPage First => _slice.First;
+    internal readonly ArcBufferPage? First => _slice.First;
     internal readonly int Position => _position;
     internal readonly int Offset => _slice.Offset;
     internal readonly int Length => _slice.Length;
@@ -138,28 +138,19 @@ public struct ArcBufferReaderInput(in ArcBuffer slice)
 
     internal ReadOnlySpan<byte> GetNext()
     {
+        _slice.CheckValidity();
         Debug.Assert(_position <= Length);
-        if (_page is not null)
+        if (Length == 0) return default;
+        while (_page is not null && _position < Length)
         {
-            if (_page == First)
-            {
-                Debug.Assert(_position == 0);
-                var offset = Offset;
-                var length = Math.Min(Length, _page.Length - offset);
-                _position += length;
-                var result = _page.AsSpan(offset, length);
-                _page = _page.Next;
-                return result;
-            }
+            var page = _page;
+            var offset = page == First ? Offset : 0;
+            var length = Math.Min(Length - _position, page.Length - offset);
+            _page = page.Next;
+            if (length == 0) continue;
 
-            if (_position != Length)
-            {
-                var length = Math.Min(Length - _position, _page.Length);
-                _position += length;
-                var result = _page.AsSpan(0, length);
-                _page = _page.Next;
-                return result;
-            }
+            _position += length;
+            return page.AsSpan(offset, length);
         }
 
         ThrowInsufficientData();
