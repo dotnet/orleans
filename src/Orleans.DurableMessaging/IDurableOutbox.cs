@@ -20,6 +20,11 @@ public interface IDurableOutbox
     GrainId SenderId { get; }
 
     /// <summary>
+    /// Gets the grain identity which owns this outbox and sends its messages.
+    /// </summary>
+    GrainId SenderId { get; }
+
+    /// <summary>
     /// Gets the number of pending outbound messages.
     /// </summary>
     int Count { get; }
