@@ -248,7 +248,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                 $"wal/{basePrefix}journals/alpha",
                 $"wal/{basePrefix}journals/beta",
                 $"checkpoints/{basePrefix}journals/alpha/snapshot",
-                $"{basePrefix}journals/legacy/wal",
+                $"{basePrefix}journals/misplaced/wal",
                 "unrelated",
             ];
             var requests = new List<ListObjectsV2Request>();
@@ -594,7 +594,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     S3Objects =
                     [
                         new S3Object { Key = "wal/current/journals/alpha" },
-                        new S3Object { Key = "wal/legacy/journals/alpha" },
+                        new S3Object { Key = "wal/alias/journals/alpha" },
                     ],
                 }));
             var options = CreateOptions();
@@ -628,7 +628,7 @@ public sealed class S3JournalStorageTests : IAsyncLifetime
                     IsTruncated = false,
                     S3Objects =
                     [
-                        new S3Object { Key = "wal/legacy/journals/alpha" },
+                        new S3Object { Key = "wal/alias/journals/alpha" },
                     ],
                 }));
             var options = CreateOptions();

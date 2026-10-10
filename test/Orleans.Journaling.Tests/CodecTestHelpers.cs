@@ -22,21 +22,13 @@ public static class CodecTestHelpers
         using var committed = batch.GetBuffer();
 
         // Strip the OrleansBinary entry framing and return the operation payload.
-        if (!OrleansBinaryJournalReader.TryReadVersionAndLength(committed, out var version, out var bodyLength, out var lengthPrefixLength))
+        if (!OrleansBinaryJournalReader.TryReadVersionAndLength(committed, out _, out var bodyLength, out var lengthPrefixLength))
         {
             throw new InvalidOperationException("The binary journal entry stream is malformed.");
         }
 
         var entry = committed.UnsafeSlice(lengthPrefixLength, checked((int)bodyLength));
-        if (version == OrleansBinaryJournalReader.FramingVersion)
-        {
-            return entry.UnsafeSlice(sizeof(uint), entry.Length - sizeof(uint)).ToArray();
-        }
-
-        var streamIdReader = Reader.Create(entry, session: null!);
-        streamIdReader.ReadVarUInt64();
-        var payloadOffset = checked((int)streamIdReader.Position);
-        return entry.UnsafeSlice(payloadOffset, entry.Length - payloadOffset).ToArray();
+        return entry.UnsafeSlice(sizeof(uint), entry.Length - sizeof(uint)).ToArray();
     }
 
     public static JournalBufferReader ReadBuffer(ReadOnlyMemory<byte> bytes)
