@@ -615,6 +615,10 @@ namespace Orleans.Serialization.Buffers
 
         public ArraySegmentEnumerator ArraySegments { get { throw null; } }
 
+        public static ArcBuffer Empty { get { throw null; } }
+
+        public bool IsEmpty { get { throw null; } }
+
         public MemoryEnumerator MemorySegments { get { throw null; } }
 
         public SpanEnumerator SpanSegments { get { throw null; } }
@@ -800,6 +804,8 @@ namespace Orleans.Serialization.Buffers
         public const int MinimumPageSize = 16384;
         public int Length { get { throw null; } }
 
+        public static int MaxRetainedPoolBytes { get { throw null; } set { } }
+
         public ArcBufferReader Reader { get { throw null; } }
 
         public int UnconsumedLength { get { throw null; } }
@@ -850,6 +856,36 @@ namespace Orleans.Serialization.Buffers
         public readonly System.Memory<byte> GetMemory(int sizeHint = 0) { throw null; }
 
         public readonly System.Span<byte> GetSpan(int sizeHint = 0) { throw null; }
+    }
+
+    public sealed partial class BufferPackage : System.IDisposable
+    {
+        internal BufferPackage() { }
+
+        public ArcBuffer Buffer { get { throw null; } }
+
+        public int Count { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlyCollection<string> Keys { get { throw null; } }
+
+        public void Dispose() { }
+
+        public void Release() { }
+
+        public BufferPackage Retain() { throw null; }
+
+        public bool TryGetBytes(string key, out System.Buffers.ReadOnlySequence<byte> bytes) { throw null; }
+    }
+
+    public sealed partial class BufferPackageBuilder : System.IDisposable
+    {
+        public void Add(string key, System.Action<System.Buffers.IBufferWriter<byte>> write) { }
+
+        public void Add(string key, System.ReadOnlySpan<byte> bytes) { }
+
+        public BufferPackage Build() { throw null; }
+
+        public void Dispose() { }
     }
 
     public static partial class BufferWriterExtensions
@@ -1067,6 +1103,8 @@ namespace Orleans.Serialization.Buffers
         public void ResumeFrom(long position) { }
 
         public void Skip(long count) { }
+
+        public bool TryReadArcBuffer(int length, out ArcBuffer value) { throw null; }
 
         public bool TryReadBytes(int length, out System.ReadOnlySpan<byte> bytes) { throw null; }
     }
@@ -1421,6 +1459,21 @@ namespace Orleans.Serialization.Cloning
 namespace Orleans.Serialization.Codecs
 {
     [RegisterSerializer]
+    public sealed partial class ArcBufferCodec : IFieldCodec<Buffers.ArcBuffer>, IFieldCodec
+    {
+        public Buffers.ArcBuffer ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type? expectedType, Buffers.ArcBuffer value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [RegisterCopier]
+    public sealed partial class ArcBufferCopier : Cloning.IDeepCopier<Buffers.ArcBuffer>, Cloning.IDeepCopier
+    {
+        public Buffers.ArcBuffer DeepCopy(Buffers.ArcBuffer input, Cloning.CopyContext context) { throw null; }
+    }
+
+    [RegisterSerializer]
     public sealed partial class ArrayCodec<T> : IFieldCodec<T[]>, IFieldCodec
     {
         public ArrayCodec(IFieldCodec<T> fieldCodec) { }
@@ -1542,6 +1595,23 @@ namespace Orleans.Serialization.Codecs
 
         public static void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, bool value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [RegisterSerializer]
+    public sealed partial class BufferPackageCodec : IFieldCodec<Buffers.BufferPackage>, IFieldCodec
+    {
+        public BufferPackageCodec(IFieldCodec<string> keyCodec) { }
+
+        public Buffers.BufferPackage ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type? expectedType, Buffers.BufferPackage? value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [RegisterCopier]
+    public sealed partial class BufferPackageCopier : Cloning.IDeepCopier<Buffers.BufferPackage>, Cloning.IDeepCopier
+    {
+        public Buffers.BufferPackage? DeepCopy(Buffers.BufferPackage? input, Cloning.CopyContext context) { throw null; }
     }
 
     [RegisterSerializer]
@@ -3488,6 +3558,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static TField DeserializeUnexpectedType<TInput, TField>(this ref Buffers.Reader<TInput> reader, scoped ref WireProtocol.Field field)
             where TField : class { throw null; }
 
+        public static void DisposeOwnedArgument<TArgument>(ref TArgument argument)
+            where TArgument : System.IDisposable { }
+
         public static System.Reflection.MethodInfo? GetMethodInfoOrDefault(System.Type? interfaceType, string methodName, System.Type[]? methodTypeParameters, System.Type[]? parameterTypes) { throw null; }
 
         public static Cloning.IDeepCopier<T>? GetOptionalCopier<T>(Cloning.IDeepCopier<T> copier) { throw null; }
@@ -3584,6 +3657,13 @@ namespace Orleans.Serialization.Invocation
         void SetArgument(int index, object value);
         void SetTarget(ITargetHolder holder);
         bool TryCancel();
+    }
+
+    public partial interface IInvokableArgumentOwner
+    {
+        void CompleteArgumentResources();
+        void ReleaseArgumentResources();
+        bool TryRetainArgumentResources();
     }
 
     public static partial class InvokablePool

@@ -9,6 +9,58 @@ Application code uses `IDurableStateManager` to manage the grain's durable state
 `IStateMachine` defines the low-level replay and snapshot protocol for state implementations.
 `IJournaledStateManager` is an independent contract for journal ownership and lifetime operations.
 
+## Volatile storage snapshot thresholds
+
+`AddVolatileJournalStorage(options => ...)` configures
+`VolatileJournalStorageOptions.MaxAppendsBeforeSnapshot` (default 100) and
+`MaxBytesBeforeSnapshot` (default 1,048,576 bytes). The named-provider overload
+configures each provider independently. Both values must be positive.
+
+Reaching either threshold requests a snapshot before the next journal write.
+Successful replacement resets both counters; the snapshot itself is excluded
+from append history. Deletion and recreation reset the history too. A single
+append can exceed the byte threshold. Larger limits amortize snapshot copies
+over more updates; smaller limits reduce retained history and replay work.
+
+## Persistence hooks
+
+`IJournaledStateManager.Hooks` exposes a mutable list of `IJournaledStateHook`
+objects. Its backing list is allocated on first access. Features can inspect the
+list and add a hook only when an equivalent registration is absent. Modify list
+membership on the owner's logical execution context between persistence operations.
+
+`JournaledStateHook` adapts synchronous `Action<JournaledStateOperation,
+CancellationToken>` callbacks and asynchronous
+`Func<JournaledStateOperation, CancellationToken, ValueTask>` callbacks. A custom
+hook object can carry feature identity and operation-local state. Within each
+delegate adapter, the synchronous callback precedes the asynchronous callback.
+
+Hooks surround actual coalesced writes, snapshots, and deletion. Ordinary before
+callbacks run in list order. An optional single `IJournaledStateCaptureHook` runs
+last, directly in the work loop before capture or deletion. Its prerequisite
+covers changes staged while ordinary callbacks awaited, and changes arriving
+during its own I/O. The same list supports inspecting and deduplicating this
+registration; multiple final capture hooks produce a prerequisite error before
+any callback or storage work. After
+callbacks run after storage acknowledgement and state acknowledgement or reset.
+Successful zero-byte writes also complete their callbacks. Prerequisites must cover
+changes which arrive during an asynchronous before callback; captured changes and
+later pending changes retain their separate acknowledgement boundaries.
+
+The token passed to hooks belongs to the owned operation and is canceled by owner
+shutdown. Caller cancellation ends that caller's wait while owned callbacks and
+storage work continue. A before-hook failure is reported as
+`JournaledStatePreCommitException` and preserves pending state for an explicit
+retry. An after-hook failure is reported as `JournaledStatePostCommitException`,
+identifies the completed operation, and leaves the manager usable. Remaining after
+hooks still execute, and multiple failures are aggregated. Feature recovery
+reconciles interrupted post-persistence effects using durable state.
+
+Hook callbacks execute outside the manager lock. Enqueuing another operation on
+the same owner from its callback is rejected to preserve work-loop progress.
+For full deletion, stop feature admission and drain owned work before queuing
+deletion; the after callback can release resources associated with the deleted owner.
+
 ## Getting Started
 To use this package, install it via NuGet:
 
@@ -74,7 +126,7 @@ Recovery reads the selected provider's physical namespace using the existing
 journal identity. Changing the selection for a grain type with existing journals
 requires a deliberate data migration or cutover strategy, including rollback.
 
-JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, Orleans treats it as legacy OrleansBinary data for compatibility.
+JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. Storage providers expose the stored journal format key through `IJournalMetadata.FormatKey` and `JournalMetadata.FormatKey`. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. Nonempty journals require stored format metadata; recovery fails explicitly when the format key is absent. New empty journals use the configured write format.
 
 If you already have data written with the OrleansBinary format, you can keep using it while you plan a migration:
 
@@ -294,7 +346,7 @@ Each record contains the state id as element 0 and the durable operation payload
 
 Inside the operation payload array, element 0 is the command name, followed by command-specific operands such as keys, values, item arrays, or versions. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
 
-Existing data is read using its stored format metadata, or as legacy OrleansBinary data when metadata is absent, and migrated to the configured write format by the next snapshot write.
+Existing data is read using its required stored format metadata and migrated to the configured write format by the next snapshot write.
 
 ## Catalog enumeration
 
