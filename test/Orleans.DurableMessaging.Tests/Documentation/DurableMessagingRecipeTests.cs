@@ -33,12 +33,14 @@ public sealed class DurableMessagingRecipeTests : IDisposable
 
     private DurableMessageType<T> Type<T>() => new(typeof(T).Name, _services.GetRequiredService<Serializer<T>>());
 
-    private static (TGrain Grain, IInboxHandler Handler) Register<TGrain>(Func<IDurableInbox, TGrain> factory)
+    private static async Task<(TGrain Grain, IInboxHandler Handler)> RegisterAsync<TGrain>(Func<IDurableInbox, TGrain> factory)
+        where TGrain : Grain
     {
         var inbox = Substitute.For<IDurableInbox>();
         IInboxHandler handler = null!;
         inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => handler = call.Arg<IInboxHandler>());
         var grain = factory(inbox);
+        await grain.OnActivateAsync(TestContext.Current.CancellationToken);
         inbox.Received(1).RegisterHandler(handler);
         return (grain, handler);
     }
@@ -77,7 +79,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         int available, int quantity, bool reserved, int expectedStock)
     {
         var stock = new TestValue<int> { Value = available };
-        var (_, handler) = CreateInventory(stock);
+        var (_, handler) = await CreateInventoryAsync(stock);
         var request = new ReserveStock(quantity, Sender);
         var attempt = CreateContext(request, Command);
 
@@ -97,7 +99,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public async Task Reservation_LocalCancellationPreservesStockAndCompletion()
     {
         var stock = new TestValue<int> { Value = 10 };
-        var (_, handler) = CreateInventory(stock);
+        var (_, handler) = await CreateInventoryAsync(stock);
         var attempt = CreateContext(new ReserveStock(3, Sender), Command);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -114,7 +116,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public async Task InventorySubjects_RestockAndReservationSelectTheirTypedMethods()
     {
         var stock = new TestValue<int> { Value = 2 };
-        var (grain, handler) = CreateInventory(stock);
+        var (grain, handler) = await CreateInventoryAsync(stock);
         var restock = CreateContext(new Restock(5), HierarchicalKey.Create("stock", "restock"));
         await handler.HandleAsync(restock.Context, TestContext.Current.CancellationToken);
         Assert.Equal(7, await grain.GetAvailableAsync());
@@ -137,7 +139,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public async Task Restock_InvalidOrOverflowingQuantityLeavesStockAndCompletionUnchanged(int quantity)
     {
         var stock = new TestValue<int> { Value = 10 };
-        var (_, handler) = CreateInventory(stock);
+        var (_, handler) = await CreateInventoryAsync(stock);
         var attempt = CreateContext(new Restock(quantity), Command);
 
         if (quantity <= 0)
@@ -161,7 +163,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public async Task Restock_PreMutationCancellationLeavesStockAndCompletionUnchanged()
     {
         var stock = new TestValue<int> { Value = 10 };
-        var (_, handler) = CreateInventory(stock);
+        var (_, handler) = await CreateInventoryAsync(stock);
         var attempt = CreateContext(new Restock(5), Command);
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
@@ -174,9 +176,9 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         Assert.Empty(attempt.Events);
     }
 
-    private (InventoryGrain Grain, IInboxHandler Handler) CreateInventory(TestValue<int> stock)
+    private Task<(InventoryGrain Grain, IInboxHandler Handler)> CreateInventoryAsync(TestValue<int> stock)
     {
-        return Register(inbox => new InventoryGrain(inbox, _outbox, Type<ReserveStock>(),
+        return RegisterAsync(inbox => new InventoryGrain(inbox, _outbox, Type<ReserveStock>(),
             Type<Restock>(), Type<ReservationResult>(), Substitute.For<IDurableStateManager>(), stock));
     }
 
@@ -192,7 +194,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
             LoseFirstResponse = !cancelAfterProviderSuccess,
             AfterFirstCharge = cancelAfterProviderSuccess ? cancellation.Cancel : null
         };
-        var (grain, handler) = Register(inbox => new PaymentGrain(inbox, _outbox,
+        var (grain, handler) = await RegisterAsync(inbox => new PaymentGrain(inbox, _outbox,
             Type<ChargePayment>(), Type<PaymentResult>(), gateway, results));
         var request = new ChargePayment(12.5m, "USD", Sender);
         var key = HierarchicalKey.Create("tenants", "acme", "orders", "42", "charge");
@@ -239,7 +241,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         var prepared = new TaskCompletionSource<PaymentResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         gateway.ChargeAsync(Command.ToString(), request, Arg.Any<CancellationToken>()).Returns(prepared.Task);
         var attempt = CreateContext(request, Command);
-        var (_, handler) = Register(inbox => new PaymentGrain(inbox, _outbox,
+        var (_, handler) = await RegisterAsync(inbox => new PaymentGrain(inbox, _outbox,
             Type<ChargePayment>(), Type<PaymentResult>(), gateway, results));
 
         var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
@@ -263,7 +265,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         long incomingVersion, int incomingStock, long expectedVersion, int expectedStock)
     {
         var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
-        var (grain, handler) = Register(inbox => new StockProjectionGrain(inbox, Type<StockSnapshot>(), snapshot));
+        var (grain, handler) = await RegisterAsync(inbox => new StockProjectionGrain(inbox, Type<StockSnapshot>(), snapshot));
         var attempt = CreateContext(new StockSnapshot(incomingVersion, incomingStock), Command);
 
         var handling = handler.HandleAsync(attempt.Context, TestContext.Current.CancellationToken);
@@ -279,7 +281,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
     public async Task Projection_ConflictingVersionPreservesOriginalSnapshot()
     {
         var snapshot = new TestValue<StockSnapshot> { Value = new StockSnapshot(10, 7) };
-        var (_, handler) = Register(inbox => new StockProjectionGrain(inbox, Type<StockSnapshot>(), snapshot));
+        var (_, handler) = await RegisterAsync(inbox => new StockProjectionGrain(inbox, Type<StockSnapshot>(), snapshot));
         var attempt = CreateContext(new StockSnapshot(10, 99), Command);
 
         await Assert.ThrowsAsync<ArgumentException>(async () =>
@@ -297,6 +299,7 @@ public sealed class DurableMessagingRecipeTests : IDisposable
         IInboxHandler dispatcher = null!;
         inbox.When(value => value.RegisterHandler(Arg.Any<IInboxHandler>())).Do(call => dispatcher = call.Arg<IInboxHandler>());
         var grain = new OrderOutcomesGrain(inbox, Type<ReservationResult>(), Type<PaymentResult>(), outcomes);
+        await grain.OnActivateAsync(TestContext.Current.CancellationToken);
         var reservation = new ReservationResult(3, true);
         var payment = new PaymentResult(new ChargePayment(12.5m, "USD", Sender), "provider-charge-1", true);
         var reservationId = Command.CreateChildKey("result");

@@ -68,6 +68,9 @@ will not replace its declared versions.
    registers separate typed reservation and restocking methods; the order registers
    its typed outcome method. Each registration supplies the grain as state and a
    static delegate receiving the decoded record, grain, and inbox context.
+   The primary-constructor grains register routes and the order's receipt hook in
+   `OnActivateAsync`. Journal recovery restores their durable state first; requests
+   and queued inbox pump turns begin after activation completes.
    Configuration freezes the routes before processing; synchronous dispatch checks
    the attempt token before entering the method.
    The console run exercises reservation and outcome subjects; `Restock` supplies

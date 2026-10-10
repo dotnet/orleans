@@ -69,38 +69,33 @@ public interface INotificationGrain : IGrainWithStringKey, IDurableMessagingGrai
     ValueTask<int> GetCount();
 }
 
-public sealed class NotificationGrain : Grain, INotificationGrain
+public sealed class NotificationGrain(
+    IDurableInbox inbox,
+    IDurableOutbox outbox,
+    [FromKeyedServices(MessagingSubjects.Notify)] DurableMessageType<Notify> notification,
+    [FromKeyedServices(MessagingSubjects.NotificationReceived)] DurableMessageType<NotificationReceived> received,
+    [FromKeyedServices("notification-count")] IDurableValue<int> count)
+    : Grain, INotificationGrain
 {
-    private readonly IDurableOutbox _outbox;
-    private readonly DurableMessageType<NotificationReceived> _received;
-    private readonly IDurableValue<int> _count;
-
-    public NotificationGrain(
-        IDurableInbox inbox,
-        IDurableOutbox outbox,
-        [FromKeyedServices(MessagingSubjects.Notify)] DurableMessageType<Notify> notification,
-        [FromKeyedServices(MessagingSubjects.NotificationReceived)] DurableMessageType<NotificationReceived> received,
-        [FromKeyedServices("notification-count")] IDurableValue<int> count)
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _outbox = outbox;
-        _received = received;
-        _count = count;
         inbox.RegisterHandlers(routes => routes.Register(notification, this,
             static (message, grain, context) => grain.HandleNotification(message, context)));
+        return base.OnActivateAsync(cancellationToken);
     }
 
-    public ValueTask<int> GetCount() => new(_count.Value);
+    public ValueTask<int> GetCount() => new(count.Value);
 
     private void HandleNotification(Notify message, IInboxHandlerContext context)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message.Text);
-        var nextCount = checked(_count.Value + 1);
+        var nextCount = checked(count.Value + 1);
         if (message.ResponseDestination is { } recipient)
         {
-            _outbox.SendReply(_received, context, recipient,
+            outbox.SendReply(received, context, recipient,
                 new NotificationReceived(message.Text, context.Envelope.MessageId));
         }
-        _count.Value = nextCount;
+        count.Value = nextCount;
         context.Complete();
     }
 }

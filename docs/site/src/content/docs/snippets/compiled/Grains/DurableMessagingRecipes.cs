@@ -76,56 +76,49 @@ public interface IInventoryGrain : IGrainWithStringKey, IDurableMessagingGrain
     ValueTask<int> GetAvailableAsync();
 }
 
-public sealed class InventoryGrain : Grain, IInventoryGrain
+public sealed class InventoryGrain(
+    IDurableInbox inbox,
+    IDurableOutbox outbox,
+    [FromKeyedServices(MessagingSubjects.ReserveStock)] DurableMessageType<ReserveStock> reserve,
+    [FromKeyedServices(MessagingSubjects.Restock)] DurableMessageType<Restock> restock,
+    [FromKeyedServices(MessagingSubjects.ReservationResult)] DurableMessageType<ReservationResult> result,
+    IDurableStateManager state,
+    [FromKeyedServices("available-stock")] IDurableValue<int> available)
+    : Grain, IInventoryGrain
 {
-    private readonly IDurableValue<int> _available;
-    private readonly IDurableStateManager _state;
-    private readonly IDurableOutbox _outbox;
-    private readonly DurableMessageType<ReservationResult> _result;
-
-    public InventoryGrain(
-        IDurableInbox inbox,
-        IDurableOutbox outbox,
-        [FromKeyedServices(MessagingSubjects.ReserveStock)] DurableMessageType<ReserveStock> reserve,
-        [FromKeyedServices(MessagingSubjects.Restock)] DurableMessageType<Restock> restock,
-        [FromKeyedServices(MessagingSubjects.ReservationResult)] DurableMessageType<ReservationResult> result,
-        IDurableStateManager state,
-        [FromKeyedServices("available-stock")] IDurableValue<int> available)
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _available = available;
-        _state = state;
-        _outbox = outbox;
-        _result = result;
         inbox.RegisterHandlers(routes => routes
             .Register(reserve, this, static (request, grain, context) => grain.HandleReserveStock(request, context))
             .Register(restock, this, static (request, grain, context) => grain.HandleRestock(request, context)));
+        return base.OnActivateAsync(cancellationToken);
     }
 
     public async Task SetAvailableAsync(int quantity)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(quantity);
-        _available.Value = quantity;
-        await _state.WriteStateAsync();
+        available.Value = quantity;
+        await state.WriteStateAsync();
     }
 
-    public ValueTask<int> GetAvailableAsync() => new(_available.Value);
+    public ValueTask<int> GetAvailableAsync() => new(available.Value);
 
     private void HandleReserveStock(ReserveStock request, IInboxHandlerContext context)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
-        var available = _available.Value;
-        var reserved = available >= request.Quantity;
+        var current = available.Value;
+        var reserved = current >= request.Quantity;
 
-        _outbox.SendReply(_result, context, request.ResponseDestination, new ReservationResult(request.Quantity, reserved));
-        if (reserved) _available.Value = available - request.Quantity;
+        outbox.SendReply(result, context, request.ResponseDestination, new ReservationResult(request.Quantity, reserved));
+        if (reserved) available.Value = current - request.Quantity;
         context.Complete();
     }
 
     private void HandleRestock(Restock request, IInboxHandlerContext context)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(request.Quantity);
-        var available = checked(_available.Value + request.Quantity);
-        _available.Value = available;
+        var next = checked(available.Value + request.Quantity);
+        available.Value = next;
         context.Complete();
     }
 }
@@ -156,31 +149,24 @@ public interface IPaymentGrain : IGrainWithStringKey, IDurableMessagingGrain
     ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey commandId);
 }
 
-public sealed class PaymentGrain : Grain, IPaymentGrain
+public sealed class PaymentGrain(
+    IDurableInbox inbox,
+    IDurableOutbox outbox,
+    [FromKeyedServices(MessagingSubjects.ChargePayment)] DurableMessageType<ChargePayment> charge,
+    [FromKeyedServices(MessagingSubjects.PaymentResult)] DurableMessageType<PaymentResult> result,
+    IIdempotentPaymentGateway gateway,
+    [FromKeyedServices("payment-results")] IDurableDictionary<HierarchicalKey, PaymentResult> results)
+    : Grain, IPaymentGrain
 {
-    private readonly IIdempotentPaymentGateway _gateway;
-    private readonly IDurableOutbox _outbox;
-    private readonly DurableMessageType<PaymentResult> _result;
-    private readonly IDurableDictionary<HierarchicalKey, PaymentResult> _results;
-
-    public PaymentGrain(
-        IDurableInbox inbox,
-        IDurableOutbox outbox,
-        [FromKeyedServices(MessagingSubjects.ChargePayment)] DurableMessageType<ChargePayment> charge,
-        [FromKeyedServices(MessagingSubjects.PaymentResult)] DurableMessageType<PaymentResult> result,
-        IIdempotentPaymentGateway gateway,
-        [FromKeyedServices("payment-results")] IDurableDictionary<HierarchicalKey, PaymentResult> results)
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _gateway = gateway;
-        _outbox = outbox;
-        _result = result;
-        _results = results;
         inbox.RegisterHandlers(routes => routes.Register(charge, this,
             static (request, grain, context, token) => grain.HandleChargeAsync(request, context, token)));
+        return base.OnActivateAsync(cancellationToken);
     }
 
     public ValueTask<PaymentResult?> GetResultAsync(HierarchicalKey commandId) =>
-        new(_results.TryGetValue(commandId, out var result) ? result : null);
+        new(results.TryGetValue(commandId, out var outcome) ? outcome : null);
 
     private async ValueTask HandleChargeAsync(
         ChargePayment request, IInboxHandlerContext context, CancellationToken cancellationToken)
@@ -193,16 +179,16 @@ public sealed class PaymentGrain : Grain, IPaymentGrain
         }
         cancellationToken.ThrowIfCancellationRequested();
         var commandId = context.Envelope.MessageId;
-        var result = await _gateway.ChargeAsync(commandId.ToString(), request, cancellationToken);
-        if (result.Request != request || string.IsNullOrWhiteSpace(result.ProviderReference))
+        var outcome = await gateway.ChargeAsync(commandId.ToString(), request, cancellationToken);
+        if (outcome.Request != request || string.IsNullOrWhiteSpace(outcome.ProviderReference))
         {
             throw new InvalidOperationException("The payment provider returned an inconsistent result.");
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        _outbox.SendReply(_result, context, request.ResponseDestination, result);
-        _results[commandId] = result;
+        outbox.SendReply(result, context, request.ResponseDestination, outcome);
+        results[commandId] = outcome;
         context.Complete();
     }
 }
@@ -219,35 +205,34 @@ public interface IStockProjectionGrain : IGrainWithStringKey, IDurableMessagingG
     ValueTask<StockSnapshot> GetSnapshotAsync();
 }
 
-public sealed class StockProjectionGrain : Grain, IStockProjectionGrain
+public sealed class StockProjectionGrain(
+    IDurableInbox inbox,
+    [FromKeyedServices(MessagingSubjects.StockSnapshot)] DurableMessageType<StockSnapshot> type,
+    [FromKeyedServices("stock-snapshot")] IDurableValue<StockSnapshot> snapshot)
+    : Grain, IStockProjectionGrain
 {
-    private readonly IDurableValue<StockSnapshot> _snapshot;
-
-    public StockProjectionGrain(
-        IDurableInbox inbox,
-        [FromKeyedServices(MessagingSubjects.StockSnapshot)] DurableMessageType<StockSnapshot> type,
-        [FromKeyedServices("stock-snapshot")] IDurableValue<StockSnapshot> snapshot)
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _snapshot = snapshot;
         inbox.RegisterHandlers(routes => routes.Register(type, this,
             static (update, grain, context) => grain.HandleSnapshot(update, context)));
+        return base.OnActivateAsync(cancellationToken);
     }
 
     public ValueTask<StockSnapshot> GetSnapshotAsync() =>
-        new(_snapshot.Value ?? new StockSnapshot(0, 0));
+        new(snapshot.Value ?? new StockSnapshot(0, 0));
 
     private void HandleSnapshot(StockSnapshot update, IInboxHandlerContext context)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(update.Version);
         ArgumentOutOfRangeException.ThrowIfNegative(update.Available);
-        var current = _snapshot.Value;
+        var current = snapshot.Value;
         if (current is not null && update.Version == current.Version && update != current)
         {
             throw new ArgumentException("A snapshot version must retain its original value.");
         }
         if (current is null || update.Version > current.Version)
         {
-            _snapshot.Value = update;
+            snapshot.Value = update;
         }
         context.Complete();
     }
@@ -336,30 +321,29 @@ public interface IOrderOutcomesGrain : IGrainWithStringKey, IDurableMessagingGra
     ValueTask<OrderOutcome?> GetOutcomeAsync(HierarchicalKey replyId);
 }
 
-public sealed class OrderOutcomesGrain : Grain, IOrderOutcomesGrain
+public sealed class OrderOutcomesGrain(
+    IDurableInbox inbox,
+    [FromKeyedServices(MessagingSubjects.ReservationResult)] DurableMessageType<ReservationResult> reservation,
+    [FromKeyedServices(MessagingSubjects.PaymentResult)] DurableMessageType<PaymentResult> payment,
+    [FromKeyedServices("order-outcomes")] IDurableDictionary<HierarchicalKey, OrderOutcome> outcomes)
+    : Grain, IOrderOutcomesGrain
 {
-    private readonly IDurableDictionary<HierarchicalKey, OrderOutcome> _outcomes;
-
-    public OrderOutcomesGrain(
-        IDurableInbox inbox,
-        [FromKeyedServices(MessagingSubjects.ReservationResult)] DurableMessageType<ReservationResult> reservation,
-        [FromKeyedServices(MessagingSubjects.PaymentResult)] DurableMessageType<PaymentResult> payment,
-        [FromKeyedServices("order-outcomes")] IDurableDictionary<HierarchicalKey, OrderOutcome> outcomes)
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _outcomes = outcomes;
         inbox.RegisterHandlers(routes => routes
             .Register(reservation, this, static (outcome, grain, context) => grain.Record(outcome, context))
             .Register(payment, this, static (outcome, grain, context) => grain.Record(outcome, context)));
+        return base.OnActivateAsync(cancellationToken);
     }
 
-    public ValueTask<int> GetCompletedStepCountAsync() => new(_outcomes.Count);
+    public ValueTask<int> GetCompletedStepCountAsync() => new(outcomes.Count);
 
     public ValueTask<OrderOutcome?> GetOutcomeAsync(HierarchicalKey replyId) =>
-        new(_outcomes.TryGetValue(replyId, out var outcome) ? outcome : null);
+        new(outcomes.TryGetValue(replyId, out var outcome) ? outcome : null);
 
     private void Record(OrderOutcome outcome, IInboxHandlerContext context)
     {
-        _outcomes[context.Envelope.MessageId] = outcome;
+        outcomes[context.Envelope.MessageId] = outcome;
         context.Complete();
     }
 }

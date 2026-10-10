@@ -94,6 +94,11 @@ delegates. The dispatcher stores typed handler objects with that state and invok
 their concrete generic serializer directly, supporting AOT compilation. Simple
 delegate overloads are also available.
 
+Register handlers in <xref:Orleans.Grain.OnActivateAsync*>. Journal recovery
+restores durable state before this method runs, and queued inbox pump turns and
+incoming requests begin after it completes. Initialize named durable state during
+construction so it participates in recovery.
+
 Synchronous dispatch checks the attempt token after decoding and before entering
 the method. These short synchronous methods proceed through explicit `Complete()`
 and return in the same turn. Asynchronous preparation receives the token and checks

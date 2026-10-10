@@ -11,26 +11,23 @@ public interface IStockGrain : IGrainWithStringKey, IDurableMessagingGrain
     Task<StockSnapshot> GetSnapshotAsync();
 }
 
-public sealed class StockGrain : Grain, IStockGrain
+public sealed class StockGrain(
+    IDurableInbox inbox,
+    IDurableOutbox outbox,
+    IDurableStateManager state,
+    [FromKeyedServices(StockProtocol.Reserve)] DurableMessageType<ReserveStock> reserve,
+    [FromKeyedServices(StockProtocol.Restock)] DurableMessageType<Restock> restock,
+    [FromKeyedServices(StockProtocol.Result)] DurableMessageType<ReservationOutcome> result)
+    : Grain, IStockGrain
 {
-    private readonly IDurableOutbox _outbox;
-    private readonly IDurableStateManager _state;
-    private readonly IDurableValue<Inventory> _inventory;
-    private readonly DurableMessageType<ReservationOutcome> _result;
+    private readonly IDurableValue<Inventory> _inventory = state.GetOrAddState<IDurableValue<Inventory>>("stock");
 
-    public StockGrain(IDurableInbox inbox, IDurableOutbox outbox,
-        IDurableStateManager state,
-        [FromKeyedServices(StockProtocol.Reserve)] DurableMessageType<ReserveStock> reserve,
-        [FromKeyedServices(StockProtocol.Restock)] DurableMessageType<Restock> restock,
-        [FromKeyedServices(StockProtocol.Result)] DurableMessageType<ReservationOutcome> result)
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _outbox = outbox;
-        _state = state;
-        _result = result;
-        _inventory = state.GetOrAddState<IDurableValue<Inventory>>("stock");
         inbox.RegisterHandlers(routes => routes
             .Register(reserve, this, static (request, grain, context) => grain.HandleReserveStock(request, context))
             .Register(restock, this, static (request, grain, context) => grain.HandleRestock(request, context)));
+        return base.OnActivateAsync(cancellationToken);
     }
 
     public async Task InitializeAsync(int quantity)
@@ -41,7 +38,7 @@ public sealed class StockGrain : Grain, IStockGrain
             throw new InvalidOperationException("Stock has already been initialized.");
         }
         _inventory.Value = new(quantity, 0, 0);
-        await _state.WriteStateAsync();
+        await state.WriteStateAsync();
     }
 
     public Task<StockSnapshot> GetSnapshotAsync() => Task.FromResult(new StockSnapshot(
@@ -58,7 +55,7 @@ public sealed class StockGrain : Grain, IStockGrain
             checked(inventory.Reservations + (accepted ? 1 : 0)),
             checked(inventory.ProcessedRequests + 1));
         // SendReply encodes before staging; remaining changes run synchronously through return.
-        _outbox.SendReply(_result, context, request.ReplyDestination, outcome);
+        outbox.SendReply(result, context, request.ReplyDestination, outcome);
         _inventory.Value = next;
         context.Complete();
     }

@@ -65,6 +65,11 @@ receives its application record directly. Each registration passes the grain as
 state and uses a static delegate. Synchronous dispatch checks cancellation at the
 boundary before entering these methods.
 
+These primary-constructor grains register routes in
+<xref:Orleans.Grain.OnActivateAsync*>. Journal recovery restores durable state
+before this method runs. Incoming requests and queued inbox pump turns begin
+after `OnActivateAsync` completes, so recovered messages use the registered handlers.
+
 :::code source="../snippets/compiled/Grains/DurableMessagingRecipes.cs" id="messaging_inventory" language="csharp":::
 
 The reservation method computes its next stock and result locally. `SendReply`

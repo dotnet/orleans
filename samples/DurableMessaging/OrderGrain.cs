@@ -12,43 +12,39 @@ public interface IOrderGrain : IGrainWithStringKey, IDurableMessagingGrain
     Task<DeliveryResult> ResubmitAsync(GrainId stock, HierarchicalKey commandId, int quantity);
 }
 
-public sealed class OrderGrain : Grain, IOrderGrain, IJournaledStateHook
+public sealed class OrderGrain(
+    IDurableInbox inbox,
+    IDurableOutbox outbox,
+    IDurableStateManager state,
+    IJournaledStateManager journal,
+    [FromKeyedServices(StockProtocol.Reserve)] DurableMessageType<ReserveStock> reserve,
+    [FromKeyedServices(StockProtocol.Result)] DurableMessageType<ReservationOutcome> result,
+    CommittedReceiptsProbe probe)
+    : Grain, IOrderGrain, IJournaledStateHook
 {
-    private readonly IDurableOutbox _outbox;
-    private readonly IDurableStateManager _state;
-    private readonly IDurableList<ReservationOutcome> _receipts;
-    private readonly DurableMessageType<ReserveStock> _reserve;
-    private readonly CommittedReceiptsProbe _probe;
+    private readonly IDurableList<ReservationOutcome> _receipts = state.GetOrAddState<IDurableList<ReservationOutcome>>("receipts");
     private ReservationOutcome[] _captured = [];
 
-    public OrderGrain(IDurableInbox inbox, IDurableOutbox outbox, IDurableStateManager state,
-        IJournaledStateManager journal,
-        [FromKeyedServices(StockProtocol.Reserve)] DurableMessageType<ReserveStock> reserve,
-        [FromKeyedServices(StockProtocol.Result)] DurableMessageType<ReservationOutcome> result,
-        CommittedReceiptsProbe probe)
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _outbox = outbox;
-        _state = state;
-        _reserve = reserve;
-        _probe = probe;
-        _receipts = state.GetOrAddState<IDurableList<ReservationOutcome>>("receipts");
         inbox.RegisterHandlers(routes => routes.Register(result, this,
             static (outcome, grain, context) => grain.HandleResult(outcome, context)));
         journal.Hooks.Add(this);
+        return base.OnActivateAsync(cancellationToken);
     }
 
     public async Task<HierarchicalKey> ReserveAsync(GrainId stock, HierarchicalKey commandId, int quantity)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
-        _outbox.Send(_reserve, commandId, stock, new ReserveStock(quantity, this.GetGrainId()));
-        await _state.WriteStateAsync(); // Ordinary callers explicitly await intent persistence.
+        outbox.Send(reserve, commandId, stock, new ReserveStock(quantity, this.GetGrainId()));
+        await state.WriteStateAsync(); // Ordinary callers explicitly await intent persistence.
         return commandId;
     }
 
     public async Task<DeliveryResult> ResubmitAsync(GrainId stock, HierarchicalKey commandId, int quantity)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(quantity);
-        using var request = _reserve.Create(commandId, _outbox.SenderId, stock,
+        using var request = reserve.Create(commandId, outbox.SenderId, stock,
             new ReserveStock(quantity, this.GetGrainId()));
         // Explicit admission exposes the duplicate result after the original reply's ACK.
         return await GrainFactory.GetGrain<IDurableInboxExtension>(stock).DeliverAsync(request);
@@ -75,7 +71,7 @@ public sealed class OrderGrain : Grain, IOrderGrain, IJournaledStateHook
     {
         if (operation is JournaledStateOperation.Write or JournaledStateOperation.Snapshot)
         {
-            _probe.OnAcknowledged(_captured);
+            probe.OnAcknowledged(_captured);
         }
         _captured = [];
         return ValueTask.CompletedTask;
