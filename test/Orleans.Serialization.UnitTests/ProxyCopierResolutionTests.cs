@@ -5,7 +5,9 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Activators;
 using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.GeneratedCodeHelpers;
 using Orleans.Serialization.Invocation;
@@ -108,6 +110,58 @@ public sealed class ProxyCopierResolutionTests
         Assert.Same(secondCopier, secondProvider.GetDeepCopier<CacheResolutionPayload>());
         Assert.Equal(1, firstConstructions);
         Assert.Equal(1, secondConstructions);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RegisteredSerializationImplementationsReuseProviderInstances(bool helperFirst)
+    {
+        AssertImplementationCached<OrleansCodeGen.Orleans.Serialization.UnitTests.Codec_CacheResolutionPayload>(
+            static _ => { }, static provider => provider.GetCodec<CacheResolutionPayload>(), helperFirst);
+        AssertImplementationCached<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(
+            static _ => { }, static provider => provider.GetDeepCopier<CacheResolutionPayload>(), helperFirst);
+        AssertImplementationCached<ListCodec<int>>(
+            static _ => { }, static provider => provider.GetCodec<List<int>>(), helperFirst);
+        AssertImplementationCached<ListCodec<string>>(
+            static _ => { }, static provider => provider.GetCodec<List<string>>(), helperFirst);
+        AssertImplementationCached<ListCopier<CacheResolutionPayload>>(
+            static _ => { }, static provider => provider.GetDeepCopier<List<CacheResolutionPayload>>(), helperFirst);
+        AssertImplementationCached<ArrayCodec<int>>(
+            static _ => { }, static provider => provider.GetCodec<int[]>(), helperFirst);
+        AssertImplementationCached<ArrayCopier<CacheResolutionPayload>>(
+            static _ => { }, static provider => provider.GetDeepCopier<CacheResolutionPayload[]>(), helperFirst);
+        AssertImplementationCached<PayloadActivator>(
+            static options => options.AddActivator(typeof(PayloadActivator)),
+            static provider => provider.GetActivator<CacheResolutionPayload>(), helperFirst);
+    }
+
+    private static void AssertImplementationCached<TService>(
+        Action<TypeManifestOptions> configure,
+        Func<CodecProvider, object> getImplementation,
+        bool helperFirst) where TService : class
+    {
+        var constructions = 0;
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.Configure(configure);
+        registrations.AddTransient<TService>(services =>
+        {
+            constructions++;
+            return ActivatorUtilities.CreateInstance<TService>(services);
+        });
+        using var services = registrations.BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var caller = new object();
+        var expected = helperFirst
+            ? OrleansGeneratedCodeHelper.GetService<TService>(caller, provider)
+            : Assert.IsType<TService>(getImplementation(provider));
+        for (var i = 0; i < 100; i++)
+        {
+            Assert.Same(expected, OrleansGeneratedCodeHelper.GetService<TService>(caller, provider));
+            Assert.Same(expected, getImplementation(provider));
+        }
+
+        Assert.Equal(1, constructions);
     }
 
     [Fact]
@@ -283,8 +337,10 @@ public sealed class ProxyCopierResolutionTests
         Assert.Same(expected, provider.GetDeepCopier<CacheResolutionPayload>());
     }
 
-    [Fact]
-    public void ArbitraryHelperServicesKeepTheirDiLifetimes()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ArbitraryHelperServicesKeepTheirDiLifetimes(bool closedFactories)
     {
         var registrations = new ServiceCollection().AddSerializer();
         registrations.AddTransient<TransientDependency>();
@@ -292,8 +348,14 @@ public sealed class ProxyCopierResolutionTests
         using var services = registrations.BuildServiceProvider();
         using var firstScope = services.CreateScope();
         using var secondScope = services.CreateScope();
-        var first = new CodecProvider(firstScope.ServiceProvider, Microsoft.Extensions.Options.Options.Create(new TypeManifestOptions()));
-        var second = new CodecProvider(secondScope.ServiceProvider, Microsoft.Extensions.Options.Options.Create(new TypeManifestOptions()));
+        var options = new TypeManifestOptions();
+        if (closedFactories)
+        {
+            options.AddSerializerService<PayloadActivator>(static _ => new());
+        }
+
+        var first = new CodecProvider(firstScope.ServiceProvider, Microsoft.Extensions.Options.Options.Create(options));
+        var second = new CodecProvider(secondScope.ServiceProvider, Microsoft.Extensions.Options.Options.Create(options));
         var caller = new object();
         Assert.NotSame(OrleansGeneratedCodeHelper.GetService<TransientDependency>(caller, first), OrleansGeneratedCodeHelper.GetService<TransientDependency>(caller, first));
         var scoped = OrleansGeneratedCodeHelper.GetService<ScopedDependency>(caller, first);
@@ -331,6 +393,11 @@ public sealed class ProxyCopierResolutionTests
 
     public sealed class TransientDependency { }
     public sealed class ScopedDependency { }
+
+    public sealed class PayloadActivator : IActivator<CacheResolutionPayload>
+    {
+        public CacheResolutionPayload Create() => new();
+    }
 
     private sealed class OverrideCopier : IDeepCopier<CacheResolutionPayload>
     {

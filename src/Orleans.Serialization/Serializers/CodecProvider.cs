@@ -597,13 +597,13 @@ namespace Orleans.Serialization.Serializers
         {
             try
             {
-                var cacheCopier = type.IsClass && typeof(IDeepCopier).IsAssignableFrom(type);
-                if (_manifest.SerializerServiceFactories.Count == 0 && !cacheCopier) return ActivateService(type, constructorArguments);
+                var cacheImplementation = IsRegisteredImplementation(type);
+                if (_manifest.SerializerServiceFactories.Count == 0 && !cacheImplementation) return ActivateService(type, constructorArguments);
                 if (OrleansGeneratedCodeHelper.TryGetService(type, this) is { } caller) return caller;
                 if (TryGetCached(_serializerServices, type, out var completed)) return completed;
                 if (TryGetSerializerService(type, out var registered)) return registered;
                 var result = ConstructService(type, () => ActivateService(type, constructorArguments), beginGraph: false);
-                return cacheCopier ? CacheValue(_serializerServices, type, result) : result;
+                return cacheImplementation ? CacheValue(_serializerServices, type, result) : result;
             }
             catch (Exception exception) { RecordConstructionFailure(exception); throw; }
         }
