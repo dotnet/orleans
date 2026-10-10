@@ -428,8 +428,12 @@ public class OwnedRpcArgumentLifetimeTests
         switch (outcome)
         {
             case "success": callback.DoCallback(new Message { BodyObject = Response.Completed }); break;
-            case "rejection": callback.DoCallback(new Message { BodyObject = new RejectionResponse
-                { RejectionType = Message.RejectionTypes.Unrecoverable, Exception = new InvalidOperationException("rejected") } }); break;
+            case "rejection":
+                callback.DoCallback(new Message
+                {
+                    BodyObject = new RejectionResponse
+                    { RejectionType = Message.RejectionTypes.Unrecoverable, Exception = new InvalidOperationException("rejected") }
+                }); break;
             case "cancellation": cancellation.Cancel(); break;
             case "timeout": callback.OnTimeout(); break;
             case "unavailable": callback.OnTargetSiloFail(); break;
@@ -485,8 +489,12 @@ public class OwnedRpcArgumentLifetimeTests
         private ApplicationRequestInstruments Instruments { get; }
         internal MessageSerializer Serializer() => new(Services.GetRequiredService<SerializerSessionPool>(), new SiloMessagingOptions());
         internal Message Message(IInvokable request, bool oneWay = false) => new()
-        { BodyObject = request, Direction = oneWay ? Orleans.Runtime.Message.Directions.OneWay : Orleans.Runtime.Message.Directions.Request,
-            Id = new CorrelationId(17), TargetGrain = GrainId.Create("owned-rpc", "target") };
+        {
+            BodyObject = request,
+            Direction = oneWay ? Orleans.Runtime.Message.Directions.OneWay : Orleans.Runtime.Message.Directions.Request,
+            Id = new CorrelationId(17),
+            TargetGrain = GrainId.Create("owned-rpc", "target")
+        };
         internal CallbackData Callback(Message message) => new(new SharedCallbackData(_ => { },
             NullLogger<CallbackData>.Instance, TimeProvider.System, TimeSpan.FromSeconds(1), false, false, null),
             Completion, message, Instruments);
