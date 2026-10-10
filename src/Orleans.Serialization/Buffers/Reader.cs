@@ -492,6 +492,40 @@ namespace Orleans.Serialization.Buffers
         }
 
         /// <summary>
+        /// Tries to read an independently owned slice from Arc input.
+        /// </summary>
+        /// <param name="length">The number of bytes to read.</param>
+        /// <param name="value">An owned slice which the caller must dispose, if supported.</param>
+        /// <returns><see langword="true"/> if the input supports owned Arc slices; otherwise, <see langword="false"/>.</returns>
+        /// <remarks>A successful read advances the reader by <paramref name="length"/> bytes and pins the referenced pages.</remarks>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
+        /// <exception cref="IndexOutOfRangeException">The Arc input contains fewer than <paramref name="length"/> unread bytes.</exception>
+        public bool TryReadArcBuffer(int length, out ArcBuffer value)
+        {
+            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+            if (!IsArcBufferInput)
+            {
+                value = default;
+                return false;
+            }
+
+            EnsureAvailable((uint)length);
+            ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
+            var result = input.Slice(checked((int)(Position - _sequenceOffset)), length);
+            try
+            {
+                Skip(length);
+                value = result;
+                return true;
+            }
+            catch
+            {
+                result.Dispose();
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Skips the specified number of bytes.
         /// </summary>
         /// <param name="count">The number of bytes to skip.</param>
@@ -614,7 +648,7 @@ namespace Orleans.Serialization.Buffers
             else if (IsArcBufferInput)
             {
                 ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
-                var newInput = input.ForkFrom(checked((int)position));
+                var newInput = input.ForkFrom(checked((int)(position - _sequenceOffset)));
                 forked = new Reader<TInput>(Unsafe.As<ArcBufferReaderInput, TInput>(ref newInput), Session, position);
 
                 if (forked.Position != position)
