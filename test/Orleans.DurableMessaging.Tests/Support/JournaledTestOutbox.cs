@@ -1,15 +1,17 @@
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Journaling;
+using Orleans.Runtime;
 
 namespace Orleans.DurableMessaging.Tests.Support;
 
 // Captures opaque handler output in the same journal as inbox effects. Dispatch belongs to the outbox layer.
-internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, DurableEnvelope> messages)
+internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, DurableEnvelope> messages, IGrainContext context)
     : IDurableOutbox, ILifecycleObserver, IEnumerable<KeyValuePair<HierarchicalKey, DurableEnvelope>>
 {
     private bool _stopped;
     private readonly TaskCompletionSource _stopping = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public GrainId SenderId => context.GrainId;
     public Task Stopping => _stopping.Task;
     public int SendCalls { get; private set; }
     public Exception? NextSendFailure { get; set; }

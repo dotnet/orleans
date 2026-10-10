@@ -80,7 +80,9 @@ internal static class ReceiverTestServices
         services.TryAddScoped<IDurableInbox>(sp => (IDurableInbox)sp.GetRequiredService(inboxType));
 
         services.AddScoped<IDurableOutbox>(static sp =>
-            new JournaledTestOutbox(sp.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("test-handler-output")));
+            new JournaledTestOutbox(
+                sp.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, DurableEnvelope>>("test-handler-output"),
+                sp.GetRequiredService<IGrainContext>()));
         services.TryAddScoped(typeof(IDurableMessagingDiagnostics), GetImplementationType("DurableMessagingDiagnostics"));
         services.TryAddScoped(pumpResultsType, sp =>
         {
