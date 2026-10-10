@@ -75,6 +75,12 @@ namespace Orleans.Journaling
         void Reset(int capacityHint);
     }
 
+    public partial interface IDurableDictionaryValueLifecycle<TValue>
+    {
+        void Release(TValue value);
+        TValue Retain(TValue value);
+    }
+
     public partial interface IDurableDictionary<TKey, TValue> : System.Collections.Generic.IDictionary<TKey, TValue>, System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<TKey, TValue>>, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>>, System.Collections.IEnumerable
     {
     }

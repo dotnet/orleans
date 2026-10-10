@@ -51,6 +51,14 @@ Coordination with another grain or an external service requires an application p
 
 An <xref:Orleans.Journaling.IDurableTaskCompletionSource`1> changes status in memory when `TrySetResult`, `TrySetException`, or `TrySetCanceled` succeeds. Its `Task` completes after a write acknowledges that status or recovery replays it, allowing waiters to observe a durable completion.
 
+## Own dictionary value resources
+
+Register <xref:Orleans.Journaling.IDurableDictionaryValueLifecycle`1> for a dictionary value type whose resources have explicit owners. Each live add or assignment acquires an independent owner before encoding, so the caller can release its own value after the mutation. Reads borrow the stored value; acquire an independent owner when retaining a read beyond that entry's lifetime. Reusing a value under multiple keys and assigning an entry to itself each acquire a separate owner.
+
+Replay transfers decoded owners into the dictionary. Replacement, successful removal, clear, reset, and whole-journal deletion release the stored owners. A rejected mutation releases any owner it acquired and preserves existing entries. Snapshot encoding borrows the current entries.
+
+Lifecycle implementations complete retention atomically and release synchronously without throwing. Orleans disposes DI-created dictionaries with the activation scope, releasing their remaining owners. Applications arrange disposal of manually constructed dictionaries and their dependencies. Value types with ordinary managed lifetimes retain the standard dictionary reference semantics.
+
 ## Keep state names and schemas stable
 
 The name supplied to the manager or keyed service identifies a durable state component across activations and deployments. Apply these rules:
