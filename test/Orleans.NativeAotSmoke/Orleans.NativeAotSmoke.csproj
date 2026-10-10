@@ -9,10 +9,10 @@
     <OrleansBuildTimeCodeGen Condition="'$(NativeAotSmokeScenario)' != 'DependencyInjection'">true</OrleansBuildTimeCodeGen>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <DefineConstants>$(DefineConstants);NATIVE_AOT_SMOKE</DefineConstants>
-    <EnableTrimAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">true</EnableTrimAnalyzer>
-    <EnableAotAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">true</EnableAotAnalyzer>
-    <ILLinkTreatWarningsAsErrors Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">true</ILLinkTreatWarningsAsErrors>
-    <TrimmerSingleWarn Condition="'$(NativeAotSmokeScenario)' == 'Contexts'">false</TrimmerSingleWarn>
+    <EnableTrimAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'DurableMessaging'">true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'DurableMessaging'">true</EnableAotAnalyzer>
+    <ILLinkTreatWarningsAsErrors Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'DurableMessaging'">true</ILLinkTreatWarningsAsErrors>
+    <TrimmerSingleWarn Condition="'$(NativeAotSmokeScenario)' == 'Contexts' or '$(NativeAotSmokeScenario)' == 'DurableMessaging'">false</TrimmerSingleWarn>
   </PropertyGroup>
 
   <ItemGroup>
