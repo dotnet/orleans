@@ -1461,6 +1461,7 @@ public sealed class DurableOutboxDeliveryBatchTests
     public void SenderMustMatchOwningGrain()
     {
         using var fixture = new OutboxFixture(hasDurableMessage: false);
+        Assert.Equal(fixture.SenderId, fixture.Outbox.SenderId);
         using var envelope = fixture.CreateEnvelope(
             fixture.NextMessageId(),
             senderId: GrainId.Create("sender", "spoofed"));
