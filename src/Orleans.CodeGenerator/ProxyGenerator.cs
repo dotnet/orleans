@@ -68,18 +68,6 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
             .Where(method => method.MethodTypeParameters.Count == 0)
             .SelectMany(method => method.GeneratedInvokable.Members);
         _copierGenerator.GetCopierFieldDescriptions(paramCopiers, fields);
-        // Resolve copier contracts through the provider's cache and configured factories.
-        for (var i = 0; i < fields.Count; i++)
-        {
-            if (fields[i] is CopierFieldDescription copier)
-            {
-                fields[i] = new CopierFieldDescription(
-                    LibraryTypes.DeepCopier_1.ToTypeSyntax(copier.UnderlyingType.ToTypeSyntax()),
-                    copier.FieldName,
-                    copier.UnderlyingType);
-            }
-        }
-
         return fields;
     }
 
@@ -550,7 +538,7 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                                 AssignmentExpression(
                                     SyntaxKind.SimpleAssignmentExpression,
                                     field.FieldName.ToIdentifierName(),
-                                    GetCopier(codec.UnderlyingType.ToTypeSyntax()))));
+                                    GetService(field.FieldType))));
                         }
                         break;
                 }
@@ -564,10 +552,11 @@ internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenera
                     ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
             }
 
-            static ExpressionSyntax GetCopier(TypeSyntax type)
+            static ExpressionSyntax GetService(TypeSyntax type)
             {
                 return InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName(CodecProviderMemberName), GenericName(Identifier("GetDeepCopier"), TypeArgumentList(SingletonSeparatedList(type)))));
+                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(type)))),
+                    ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName(CodecProviderMemberName))])));
             }
         }
     }

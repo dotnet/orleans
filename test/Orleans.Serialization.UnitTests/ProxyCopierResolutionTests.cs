@@ -71,7 +71,47 @@ public sealed class ProxyCopierResolutionTests
     }
 
     [Fact]
-    public void ClosedFactoriesOverrideGeneratedAndCollectionCopiersPerProvider()
+    public void ConcreteCopiersAreCachedPerProvider()
+    {
+        var firstConstructions = 0;
+        var secondConstructions = 0;
+        var firstRegistrations = new ServiceCollection().AddSerializer();
+        firstRegistrations.AddTransient<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(services =>
+        {
+            firstConstructions++;
+            return ActivatorUtilities.CreateInstance<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(services);
+        });
+        var secondRegistrations = new ServiceCollection().AddSerializer();
+        secondRegistrations.AddTransient<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(services =>
+        {
+            secondConstructions++;
+            return ActivatorUtilities.CreateInstance<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(services);
+        });
+        using var first = firstRegistrations.BuildServiceProvider();
+        using var second = secondRegistrations.BuildServiceProvider();
+        var firstProvider = first.GetRequiredService<CodecProvider>();
+        var secondProvider = second.GetRequiredService<CodecProvider>();
+        var firstPool = first.GetRequiredService<CopyContextPool>();
+        var secondPool = second.GetRequiredService<CopyContextPool>();
+        var firstCopier = GetCopier<CacheResolutionPayload>(CreateProxy(firstPool, firstProvider));
+        var secondCopier = GetCopier<CacheResolutionPayload>(CreateProxy(secondPool, secondProvider));
+        Assert.IsType<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(firstCopier);
+        Assert.IsType<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(secondCopier);
+        Assert.NotSame(firstCopier, secondCopier);
+        for (var i = 0; i < 100; i++)
+        {
+            Assert.Same(firstCopier, GetCopier<CacheResolutionPayload>(CreateProxy(firstPool, firstProvider)));
+            Assert.Same(secondCopier, GetCopier<CacheResolutionPayload>(CreateProxy(secondPool, secondProvider)));
+        }
+
+        Assert.Same(firstCopier, firstProvider.GetDeepCopier<CacheResolutionPayload>());
+        Assert.Same(secondCopier, secondProvider.GetDeepCopier<CacheResolutionPayload>());
+        Assert.Equal(1, firstConstructions);
+        Assert.Equal(1, secondConstructions);
+    }
+
+    [Fact]
+    public void ConcreteAndInterfaceDependenciesKeepTheirResolutionSemantics()
     {
         var firstCalls = 0;
         var secondCalls = 0;
@@ -92,28 +132,37 @@ public sealed class ProxyCopierResolutionTests
         using var second = secondRegistrations.BuildServiceProvider();
         for (var i = 0; i < 100; i++)
         {
-            var proxy = CreateProxy(first.GetRequiredService<CopyContextPool>(), first.GetRequiredService<CodecProvider>());
+            var proxy = CreateGenericProxy(first.GetRequiredService<CopyContextPool>(), first.GetRequiredService<CodecProvider>());
             Assert.Same(firstCopier, GetCopier<CacheResolutionPayload>(proxy));
-            Assert.Same(listCopier, GetCopier<List<CacheResolutionPayload>>(proxy));
-            Assert.Same(secondCopier, GetCopier<CacheResolutionPayload>(CreateProxy(second.GetRequiredService<CopyContextPool>(), second.GetRequiredService<CodecProvider>())));
+            Assert.IsType<Orleans.Serialization.Codecs.ListCopier<CacheResolutionPayload>>(GetCopier<List<CacheResolutionPayload>>(proxy));
+            Assert.Same(secondCopier, GetCopier<CacheResolutionPayload>(CreateGenericProxy(second.GetRequiredService<CopyContextPool>(), second.GetRequiredService<CodecProvider>())));
         }
 
         Assert.Equal(1, firstCalls);
         Assert.Equal(1, secondCalls);
-        Assert.Equal(1, listCalls);
+        Assert.Equal(0, listCalls);
         var firstProxy = new OrleansCodeGen.Orleans.Serialization.UnitTests.Proxy_IGenericCacheResolutionProxy<CacheResolutionPayload>(
             first.GetRequiredService<CopyContextPool>(), first.GetRequiredService<CodecProvider>());
         Assert.Same(firstCopier, GetCopier<CacheResolutionPayload>(firstProxy));
-        Assert.Same(listCopier, GetCopier<List<CacheResolutionPayload>>(firstProxy));
+        Assert.IsType<Orleans.Serialization.Codecs.ListCopier<CacheResolutionPayload>>(GetCopier<List<CacheResolutionPayload>>(firstProxy));
         IInvokable? request = null;
         firstProxy.OnInvoke = value => request = value;
         var input = new CacheResolutionPayload { Value = 42 };
         var list = new List<CacheResolutionPayload> { input };
         _ = ((IGenericCacheResolutionProxy<CacheResolutionPayload>)firstProxy).Send(input, list, []);
         Assert.Equal(43, Assert.IsType<CacheResolutionPayload>(request!.GetArgument(0)).Value);
-        Assert.Same(list, request.GetArgument(1));
+        var copiedList = Assert.IsType<List<CacheResolutionPayload>>(request.GetArgument(1));
+        Assert.NotSame(list, copiedList);
+        Assert.Equal(43, Assert.Single(copiedList).Value);
         Assert.Equal(1, firstCalls);
-        Assert.Equal(1, listCalls);
+        Assert.Equal(0, listCalls);
+
+        var concreteProxy = CreateProxy(first.GetRequiredService<CopyContextPool>(), first.GetRequiredService<CodecProvider>());
+        Assert.IsType<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(GetCopier<CacheResolutionPayload>(concreteProxy));
+        request = null;
+        concreteProxy.OnInvoke = value => request = value;
+        _ = ((ICacheResolutionProxy)concreteProxy).Send(input, list, []);
+        Assert.Equal(42, Assert.IsType<CacheResolutionPayload>(request!.GetArgument(0)).Value);
     }
 
     [Fact]
@@ -140,15 +189,65 @@ public sealed class ProxyCopierResolutionTests
         using var services = registrations.BuildServiceProvider();
         var provider = services.GetRequiredService<CodecProvider>();
         var pool = services.GetRequiredService<CopyContextPool>();
-        var error = Assert.Throws<InvalidOperationException>(() => CreateProxy(pool, provider));
+        var error = Assert.Throws<InvalidOperationException>(() => CreateGenericProxy(pool, provider));
         Assert.Equal("Injected copier construction failure", error.Message);
-        Assert.Same(copier, GetCopier<CacheResolutionPayload>(CreateProxy(pool, provider)));
-        Assert.Same(copier, GetCopier<CacheResolutionPayload>(CreateProxy(pool, provider)));
+        Assert.Same(copier, GetCopier<CacheResolutionPayload>(CreateGenericProxy(pool, provider)));
+        Assert.Same(copier, GetCopier<CacheResolutionPayload>(CreateGenericProxy(pool, provider)));
         Assert.Equal(2, calls);
         Assert.NotNull(failedDependency);
         Assert.NotNull(completedDependency);
         Assert.NotSame(failedDependency, completedDependency);
         Assert.Same(completedDependency, provider.GetDeepCopier<List<int>>());
+    }
+
+    [Fact]
+    public void FailedConcreteCopierConstructionCanRetry()
+    {
+        var calls = 0;
+        var failure = new InvalidOperationException("Injected concrete copier construction failure");
+        var registrations = new ServiceCollection().AddSerializer();
+        registrations.AddTransient<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(services =>
+        {
+            if (++calls == 1)
+            {
+                throw failure;
+            }
+
+            return ActivatorUtilities.CreateInstance<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(services);
+        });
+        using var services = registrations.BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var pool = services.GetRequiredService<CopyContextPool>();
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => CreateProxy(pool, provider)));
+        var proxy = CreateProxy(pool, provider);
+        Assert.Same(GetCopier<CacheResolutionPayload>(proxy), GetCopier<CacheResolutionPayload>(CreateProxy(pool, provider)));
+        Assert.Equal(2, calls);
+        AssertCopiedArguments(proxy, (value, list, array) => ((ICacheResolutionProxy)proxy).Send(value, list, array));
+    }
+
+    [Fact]
+    public async Task ConcurrentProxiesPublishTheSameConcreteCopier()
+    {
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var provider = services.GetRequiredService<CodecProvider>();
+        var pool = services.GetRequiredService<CopyContextPool>();
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tasks = new Task<MyInvokableProxyBase>[32];
+        for (var i = 0; i < tasks.Length; i++)
+        {
+            tasks[i] = Task.Run(async () =>
+            {
+                await start.Task;
+                return CreateProxy(pool, provider);
+            }, TestContext.Current.CancellationToken);
+        }
+
+        start.SetResult();
+        var proxies = await Task.WhenAll(tasks);
+        var expected = GetCopier<CacheResolutionPayload>(proxies[0]);
+        Assert.IsType<OrleansCodeGen.Orleans.Serialization.UnitTests.Copier_CacheResolutionPayload>(expected);
+        Assert.All(proxies, proxy => Assert.Same(expected, GetCopier<CacheResolutionPayload>(proxy)));
+        Assert.Same(expected, provider.GetDeepCopier<CacheResolutionPayload>());
     }
 
     [Fact]
@@ -172,7 +271,7 @@ public sealed class ProxyCopierResolutionTests
             tasks[i] = Task.Run(async () =>
             {
                 await start.Task;
-                return CreateProxy(pool, provider);
+                return CreateGenericProxy(pool, provider);
             }, TestContext.Current.CancellationToken);
         }
 
@@ -224,8 +323,11 @@ public sealed class ProxyCopierResolutionTests
     private static MyInvokableProxyBase CreateProxy(CopyContextPool pool, CodecProvider provider) =>
         new OrleansCodeGen.Orleans.Serialization.UnitTests.Proxy_ICacheResolutionProxy(pool, provider);
 
+    private static MyInvokableProxyBase CreateGenericProxy(CopyContextPool pool, CodecProvider provider) =>
+        new OrleansCodeGen.Orleans.Serialization.UnitTests.Proxy_IGenericCacheResolutionProxy<CacheResolutionPayload>(pool, provider);
+
     private static object GetCopier<T>(MyInvokableProxyBase proxy) =>
-        Assert.Single(proxy.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance), field => field.FieldType == typeof(IDeepCopier<T>)).GetValue(proxy)!;
+        Assert.Single(proxy.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance), field => typeof(IDeepCopier<T>).IsAssignableFrom(field.FieldType)).GetValue(proxy)!;
 
     public sealed class TransientDependency { }
     public sealed class ScopedDependency { }

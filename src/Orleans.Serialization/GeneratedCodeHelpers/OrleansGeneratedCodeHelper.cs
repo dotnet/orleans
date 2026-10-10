@@ -76,8 +76,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         }
 
         /// <summary>
-        /// Unwraps the provided service if it was wrapped.
+        /// Resolves and unwraps the requested service.
         /// </summary>
+        /// <remarks>
+        /// Concrete deep copier implementations are cached by the codec provider.
+        /// Other services retain their configured dependency-injection lifetimes.
+        /// </remarks>
         /// <typeparam name="TService">The service type.</typeparam>
         /// <param name="caller">The caller.</param>
         /// <param name="codecProvider">The codec provider.</param>
@@ -118,7 +122,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
 
                 }
 
-                val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
+                val = codecProvider is CodecProvider copierProvider && typeof(TService).IsClass && typeof(IDeepCopier).IsAssignableFrom(typeof(TService))
+                    ? (TService)copierProvider.GetServiceOrCreateInstance(typeof(TService))
+                    : ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
                 while (val is IServiceHolder<TService> wrapping)
                 {
                     val = wrapping.Value;

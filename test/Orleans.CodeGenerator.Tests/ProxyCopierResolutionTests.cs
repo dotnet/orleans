@@ -8,7 +8,7 @@ namespace Orleans.CodeGenerator.Tests;
 public sealed class ProxyCopierResolutionTests
 {
     [Fact]
-    public async Task ProxyCopierFieldsResolveContractsThroughProviderCaches()
+    public async Task ProxyCopierFieldsPreserveConcreteTypesAndCallSites()
     {
         const string source = """
             using Orleans;
@@ -33,15 +33,12 @@ public sealed class ProxyCopierResolutionTests
         var proxy = driver.GetRunResult().GeneratedTrees.SelectMany(tree => tree.GetRoot(TestContext.Current.CancellationToken).DescendantNodes())
             .OfType<ClassDeclarationSyntax>().Single(type => type.Identifier.ValueText == "Proxy_IProxyGrain");
         var text = proxy.NormalizeWhitespace().ToFullString();
-        Assert.Contains("IDeepCopier<global::TestProject.Payload>", text);
-        Assert.Contains("IDeepCopier<global::System.Collections.Generic.List<global::TestProject.Payload>>", text);
-        Assert.Contains("IDeepCopier<global::TestProject.Payload[]>", text);
+        Assert.Contains("private readonly OrleansCodeGen.TestProject.Copier_Payload", text);
+        Assert.Contains("private readonly global::Orleans.Serialization.Codecs.ListCopier<global::TestProject.Payload>", text);
+        Assert.Contains("private readonly global::Orleans.Serialization.Codecs.ArrayCopier<global::TestProject.Payload>", text);
         Assert.Contains("IDeepCopier<T>", text);
-        Assert.Contains("CodecProvider.GetDeepCopier<global::TestProject.Payload>()", text);
-        Assert.Contains("CodecProvider.GetDeepCopier<global::System.Collections.Generic.List<global::TestProject.Payload>>()", text);
-        Assert.Contains("CodecProvider.GetDeepCopier<global::TestProject.Payload[]>()", text);
-        Assert.Contains("CodecProvider.GetDeepCopier<T>()", text);
-        Assert.DoesNotContain("GetService<", text);
-        Assert.DoesNotContain("Copier_Payload", text);
+        Assert.Contains("GetService<OrleansCodeGen.TestProject.Copier_Payload>(this, CodecProvider)", text);
+        Assert.Contains("GetService<global::Orleans.Serialization.Cloning.IDeepCopier<T>>(this, CodecProvider)", text);
+        Assert.DoesNotContain("CodecProvider.GetDeepCopier<", text);
     }
 }
