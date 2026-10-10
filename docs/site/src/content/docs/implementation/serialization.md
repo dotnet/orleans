@@ -74,6 +74,10 @@ Boxed value-type delegates initialize the existing box. Statically closed value-
 
 Grain-reference construction resolves the generated proxy from the registered type manifest and invokes its `(GrainReferenceShared, IdSpan)` constructor. The activator caches the constructor delegate and shares the runtime, interface version, invocation options, and serialization services across references for the same grain type and interface. Each reference retains its own grain key. JIT runtimes use an emitted constructor delegate; NativeAOT uses a cached reflection constructor invoker. Generated `AddInterfaceProxy` registrations preserve the public proxy constructor during trimming.
 
+Generated proxies retain concrete generated and built-in copier types in readonly fields, allowing direct copier calls. The generated-code helper delegates dependency resolution to the codec provider, which caches registered serializer, codec, copier, activator, and converter implementations by their closed implementation type. Generated dependencies and provider lookups reuse completed implementations within the same provider, including closed generic implementations. Other dependencies retain their configured dependency-injection lifetimes. Interface-typed dependencies follow their configured registrations. A shared copy context preserves cycles and repeated references across the arguments of one call.
+
+The provider retains completed implementations and their dependency graphs for its lifetime, using its existing service cache. Concurrent cold resolutions can construct multiple implementations and converge on the published instance; closed service factories use the provider's coordinated construction graph. Warm lookups reuse completed instances without allocating construction state.
+
 For each grain interface method, generated code captures arguments in an invokable object. The generated proxy submits that object through its proxy base. On the target, generated dispatch metadata invokes the concrete implementation and encodes the response.
 
 The request object is serializable like any other Orleans value. Stable method and interface metadata allow caller and target assemblies to evolve independently within the supported versioning rules. Outgoing and incoming call filters wrap the generated invocation; they do not replace serialization or dispatch.
@@ -144,6 +148,10 @@ Generated request names are implementation details. Their wire identity is a com
 The method identity uses an explicit <xref:Orleans.IdAttribute> value, an <xref:Orleans.AliasAttribute>, or a deterministic hash of the method signature. When an explicit identity differs from the generated hash, Orleans emits compatibility aliases for both identities. This lets manifest resolution identify the request type independently of its generated CLR name.
 
 The message also carries the grain interface type and version used by version selection. Type identity resolves the serialized request body; interface/version metadata selects compatible dispatch. These are related compatibility boundaries with separate responsibilities.
+
+The interface-type resolver caches successful identities for its lifetime, keyed by the CLR interface type. Each closed generic interface has its own cache entry with its exact type arguments. Configured identity providers retain their precedence over naming conventions and define stable identities for the resolver's lifetime.
+
+Each entry retains its CLR interface type and formatted identity until the resolver is released. Cache size follows the distinct interfaces and closed generic combinations used by the application.
 
 ### Source and referenced assembly metadata
 

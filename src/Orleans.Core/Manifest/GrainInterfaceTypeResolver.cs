@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Orleans.Runtime;
@@ -13,6 +14,7 @@ namespace Orleans.Metadata
     {
         private readonly IGrainInterfaceTypeProvider[] _providers;
         private readonly TypeConverter _typeConverter;
+        private readonly ConcurrentDictionary<Type, GrainInterfaceType> _interfaceTypes = new();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="GrainInterfaceTypeResolver"/> class.
@@ -32,11 +34,20 @@ namespace Orleans.Metadata
         }
 
         /// <summary>
-        /// Returns the <see cref="GrainInterfaceType"/> for the provided interface.
+        /// Returns the cached <see cref="GrainInterfaceType"/> for the provided interface.
         /// </summary>
+        /// <remarks>
+        /// Identities are cached per resolver and CLR interface type, including closed generic arguments.
+        /// Configured providers define stable identities for the lifetime of the resolver.
+        /// </remarks>
         /// <param name="type">The grain interface.</param>
         /// <returns>The <see cref="GrainInterfaceType"/> for the provided interface.</returns>
         public GrainInterfaceType GetGrainInterfaceType(Type type)
+        {
+            return _interfaceTypes.GetOrAdd(type, static (interfaceType, resolver) => resolver.ResolveGrainInterfaceType(interfaceType), this);
+        }
+
+        private GrainInterfaceType ResolveGrainInterfaceType(Type type)
         {
             if (!type.IsInterface)
             {

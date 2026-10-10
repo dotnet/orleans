@@ -76,8 +76,12 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         }
 
         /// <summary>
-        /// Unwraps the provided service if it was wrapped.
+        /// Resolves and unwraps the requested service.
         /// </summary>
+        /// <remarks>
+        /// Registered serialization implementations are cached by the codec provider.
+        /// Other services retain their configured dependency-injection lifetimes.
+        /// </remarks>
         /// <typeparam name="TService">The service type.</typeparam>
         /// <param name="caller">The caller.</param>
         /// <param name="codecProvider">The codec provider.</param>
@@ -108,17 +112,9 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                     }
                 }
 
-                TService val;
-                if (codecProvider is CodecProvider provider)
-                {
-                    if (provider.TryGetSerializerService(typeof(TService), out var registered))
-                    {
-                        return (TService)registered;
-                    }
-
-                }
-
-                val = ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
+                var val = codecProvider is CodecProvider provider
+                    ? (TService)provider.GetServiceOrCreateInstance(typeof(TService))
+                    : ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
                 while (val is IServiceHolder<TService> wrapping)
                 {
                     val = wrapping.Value;
