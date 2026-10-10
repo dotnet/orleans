@@ -203,7 +203,8 @@ public sealed class TypedMessageHelperTests
         var services = new ServiceCollection();
         var result = services.AddDurableMessageType<string>(Subject);
         Assert.Same(services, result);
-        var registration = Assert.Single(services);
+        Assert.Equal(2, services.Count);
+        var registration = Assert.Single(services, descriptor => descriptor.IsKeyedService);
         Assert.True(registration.IsKeyedService);
         Assert.Equal(Subject, registration.ServiceKey);
         Assert.Equal(typeof(DurableMessageType<string>), registration.ServiceType);
@@ -219,6 +220,26 @@ public sealed class TypedMessageHelperTests
         Assert.Same(messageType, scope.ServiceProvider.GetRequiredKeyedService<DurableMessageType<string>>(Subject));
         using var envelope = DirectEnvelope(provider.GetRequiredService<Serializer<string>>(), Subject, "keyed reserve");
         Assert.Equal("keyed reserve", messageType.Decode(envelope));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AddDurableMessageType_RegistersClosedSingletonSerializerFactoryBeforeKeyedBinding(bool valueType)
+    {
+        if (valueType) AssertClosedSerializerFactory(731);
+        else AssertClosedSerializerFactory("closed factory €42");
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void AddDurableMessageType_PreservesExistingCustomClosedSerializerAndUsesItForBinding(bool valueType, bool factory)
+    {
+        if (valueType) AssertCustomClosedSerializerPreserved(731, factory);
+        else AssertCustomClosedSerializerPreserved("custom closed €42", factory);
     }
 
     [Fact]
@@ -292,35 +313,6 @@ public sealed class TypedMessageHelperTests
         Assert.Throws<ArgumentException>(() => lower.Decode(upperEnvelope));
     }
 
-    [Fact]
-    public void DurableMessageWriter_RejectsNullContext()
-    {
-        var exception = Assert.Throws<ArgumentNullException>(() => new DurableMessageWriter(null!));
-        Assert.Equal("context", exception.ParamName);
-    }
-
-    [Fact]
-    public void DurableMessageWriter_CreateRejectsNullMessageTypeBeforeCodecWrite()
-    {
-        using var services = CreateServices();
-        var (serializer, probe) = CreateProbedSerializer<string>(services);
-        var validType = new DurableMessageType<string>(Subject, serializer);
-        var context = ActivationContext(Sender);
-        using var writer = new DurableMessageWriter(context);
-
-        var exception = Assert.Throws<ArgumentNullException>(
-            () => writer.Create<string>(null!, MessageKey, Receiver, "reserve"));
-
-        Assert.Equal("messageType", exception.ParamName);
-        Assert.Equal(0, probe.WriteCount);
-        // The probe is not attached to the null descriptor. A real subsequent write
-        // is the positive control, not a claim that an unrelated probe proves order.
-        using var control = writer.Create(validType, MessageKey, Receiver, "valid control");
-        Assert.Equal(1, probe.WriteCount);
-        Assert.Equal("valid control", services.GetRequiredService<Serializer<string>>().Deserialize(control.Payload));
-        AssertPreparationOnly(context);
-    }
-
     [Theory]
     [InlineData("sender")]
     [InlineData("receiver")]
@@ -328,13 +320,12 @@ public sealed class TypedMessageHelperTests
     [InlineData("key-segments")]
     [InlineData("key-ascii-bytes")]
     [InlineData("key-multibyte-bytes")]
-    public void DurableMessageWriter_CreateRejectsInvalidIdentitiesBeforeCodecWrite(string invalidIdentity)
+    public void DurableMessageType_CreateRejectsInvalidIdentitiesBeforeCodecWrite(string invalidIdentity)
     {
         using var services = CreateServices();
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         var messageType = new DurableMessageType<string>(Subject, serializer);
-        var context = ActivationContext(invalidIdentity == "sender" ? default : Sender);
-        using var writer = new DurableMessageWriter(context);
+        var sender = invalidIdentity == "sender" ? default : Sender;
         var receiver = invalidIdentity == "receiver" ? default : Receiver;
         var key = invalidIdentity switch
         {
@@ -349,12 +340,11 @@ public sealed class TypedMessageHelperTests
         {
             var exception = Assert.Throws<ArgumentException>(() =>
             {
-                result = writer.Create(messageType, key, receiver, "must not encode");
+                result = messageType.Create(key, sender, receiver, "must not encode");
             });
             Assert.Equal("envelope", exception.ParamName);
             Assert.Null(result);
             Assert.Equal(0, probe.WriteCount);
-            AssertPreparationOnly(context);
         }
         finally
         {
@@ -364,40 +354,36 @@ public sealed class TypedMessageHelperTests
     }
 
     [Fact]
-    public void DurableMessageWriter_CreateUsesActivationIdentityAndSuppliedHierarchicalKey()
+    public void DurableMessageType_CreateUsesExplicitIdentitiesAndSuppliedHierarchicalKey()
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var messageType = new DurableMessageType<string>(Subject, serializer);
-        var context = ActivationContext(Sender);
-        using var writer = new DurableMessageWriter(context);
         var key = HierarchicalKey.Create("orders","42","reserve");
-        using var first = writer.Create(messageType, key, Receiver, "reserve first");
+        using var first = messageType.Create(key, Sender, Receiver, "reserve first");
         var otherReceiver = GrainId.Create("receiver", "other-warehouse");
-        using var second = writer.Create(messageType, key, otherReceiver, "reserve second");
+        var otherSender = GrainId.Create("sender", "other-owner");
+        using var second = messageType.Create(key, otherSender, otherReceiver, "reserve second");
 
         AssertEnvelopeIdentity(first, key, Sender, Receiver, Subject);
-        AssertEnvelopeIdentity(second, key, Sender, otherReceiver, Subject);
+        AssertEnvelopeIdentity(second, key, otherSender, otherReceiver, Subject);
         Assert.Equal("orders/42/reserve", first.MessageId.ToString());
         Assert.Equal("orders/42/reserve", second.MessageId.ToString());
         Assert.Equal(3, first.MessageId.SegmentCount);
         Assert.Equal(3, second.MessageId.SegmentCount);
         Assert.Equal("reserve first", serializer.Deserialize(first.Payload));
         Assert.Equal("reserve second", serializer.Deserialize(second.Payload));
-        AssertPreparationOnly(context);
     }
 
     [Theory]
     [InlineData("segments")]
     [InlineData("ascii-bytes")]
     [InlineData("multibyte-bytes")]
-    public void DurableMessageWriter_CreateAcceptsMessageKeyAtAdmissionLimits(string variation)
+    public void DurableMessageType_CreateAcceptsMessageKeyAtAdmissionLimits(string variation)
     {
         using var services = CreateServices();
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         var messageType = new DurableMessageType<string>(Subject, serializer);
-        var context = ActivationContext(Sender);
-        using var writer = new DurableMessageWriter(context);
         var key = variation switch
         {
             "segments" => HierarchicalKey.Create(Enumerable.Repeat("s", 32).ToArray()),
@@ -406,7 +392,7 @@ public sealed class TypedMessageHelperTests
             _ => throw new ArgumentOutOfRangeException(nameof(variation))
         };
 
-        using var envelope = writer.Create(messageType, key, Receiver, "admitted boundary");
+        using var envelope = messageType.Create(key, Sender, Receiver, "admitted boundary");
 
         Assert.Equal(1, probe.WriteCount);
         AssertEnvelopeIdentity(envelope, key, Sender, Receiver, Subject);
@@ -419,57 +405,55 @@ public sealed class TypedMessageHelperTests
             Assert.Equal(1024, Encoding.UTF8.GetByteCount(envelope.MessageId.ToString()));
         }
         Assert.Equal("admitted boundary", services.GetRequiredService<Serializer<string>>().Deserialize(envelope.Payload));
-        AssertPreparationOnly(context);
     }
 
     [Theory]
     [InlineData("string")]
     [InlineData("empty-string")]
     [InlineData("int")]
+    [InlineData("zero-int")]
     [InlineData("negative-int")]
     [InlineData("bytes")]
     [InlineData("empty-bytes")]
-    public void DurableMessageWriter_CreateMatchesDirectSerializerWireFormat(string contract)
+    public void DurableMessageType_CreateMatchesDirectSerializerWireFormat(string contract)
     {
         using var services = CreateServices();
         using var receivingServices = CreateServices();
-        var context = ActivationContext(Sender);
-        using var writer = new DurableMessageWriter(context);
         switch (contract)
         {
             case "string":
-                AssertWriterWire(writer, services, receivingServices, "reserve €42 / 東京");
+                AssertCreateWire(services, receivingServices, "reserve €42 / 東京");
                 break;
             case "empty-string":
-                AssertWriterWire(writer, services, receivingServices, "");
+                AssertCreateWire(services, receivingServices, "");
                 break;
             case "int":
-                AssertWriterWire(writer, services, receivingServices, 42_017);
+                AssertCreateWire(services, receivingServices, 42_017);
+                break;
+            case "zero-int":
+                AssertCreateWire(services, receivingServices, 0);
                 break;
             case "negative-int":
-                AssertWriterWire(writer, services, receivingServices, -709);
+                AssertCreateWire(services, receivingServices, -709);
                 break;
             case "bytes":
-                AssertWriterWire(writer, services, receivingServices, new byte[] { 0, 255, 128, 17, 42 });
+                AssertCreateWire(services, receivingServices, new byte[] { 0, 255, 128, 17, 42 });
                 break;
             case "empty-bytes":
-                AssertWriterWire(writer, services, receivingServices, Array.Empty<byte>());
+                AssertCreateWire(services, receivingServices, Array.Empty<byte>());
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(contract));
         }
 
-        AssertPreparationOnly(context);
     }
 
     [Fact]
-    public void DurableMessageWriter_CreatePreservesIndependentSlicesAcrossReuseAndDisposal()
+    public void DurableMessageType_CreatePreservesIndependentSlicesAcrossPoolReuseAndNeighborDisposal()
     {
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<byte[]>>();
         var messageType = new DurableMessageType<byte[]>(Subject, serializer);
-        var context = ActivationContext(Sender);
-        var writer = new DurableMessageWriter(context);
         var firstBody = new byte[] { 9, 8, 7, 255 };
         var largeBody = Enumerable.Range(0, 1_048_576).Select(i => (byte)(i * 31 + 7)).ToArray();
         var lastBody = new byte[] { 42, 0, 128, 255, 19, 21 };
@@ -480,8 +464,8 @@ public sealed class TypedMessageHelperTests
         DurableEnvelope? last = null;
         try
         {
-            first = writer.Create(messageType, MessageKey, Receiver, firstBody);
-            large = writer.Create(messageType, MessageKey, Receiver, largeBody);
+            first = messageType.Create(MessageKey, Sender, Receiver, firstBody);
+            large = messageType.Create(MessageKey, Sender, Receiver, largeBody);
             // Public span enumeration proves actual segmentation, not an assumed
             // PageCount API or a guessed relationship between body size and capacity.
             Assert.True(CountSegments(large.Value.Payload) > 1);
@@ -490,8 +474,8 @@ public sealed class TypedMessageHelperTests
             first.Value.Dispose();
             first = null;
 
-            last = writer.Create(messageType, MessageKey, Receiver, lastBody);
-            writer.Dispose();
+            last = messageType.Create(MessageKey, Sender, Receiver, lastBody);
+            Assert.NotEqual(large.Value.Payload, last.Value.Payload);
 
             Assert.Equal(largeWire, large.Value.Payload.ToArray());
             Assert.Equal(lastWire, last.Value.Payload.ToArray());
@@ -499,27 +483,23 @@ public sealed class TypedMessageHelperTests
             Assert.Equal(lastBody, serializer.Deserialize(last.Value.Payload));
             AssertEnvelopeIdentity(large.Value, MessageKey, Sender, Receiver, Subject);
             AssertEnvelopeIdentity(last.Value, MessageKey, Sender, Receiver, Subject);
-            AssertPreparationOnly(context);
         }
         finally
         {
             first?.Dispose();
             large?.Dispose();
             last?.Dispose();
-            writer.Dispose();
         }
     }
 
     [Fact]
-    public void DurableMessageWriter_CreateResetsCommittedPartialOutputAfterCodecFailure()
+    public void DurableMessageType_CreateResetsCommittedPartialOutputAfterCodecFailure()
     {
         using var services = CreateServices();
         var pristine = services.GetRequiredService<Serializer<string>>();
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         var messageType = new DurableMessageType<string>(Subject, serializer);
-        var context = ActivationContext(Sender);
-        using var writer = new DurableMessageWriter(context);
-        using var outstanding = writer.Create(messageType, MessageKey, Receiver, "outstanding € order");
+        using var outstanding = messageType.Create(MessageKey, Sender, Receiver, "outstanding € order");
         var outstandingWire = pristine.SerializeToArray("outstanding € order");
         var sentinel = new InvalidDataException("committed partial codec failure");
         probe.NextWriteFailure = sentinel;
@@ -528,7 +508,7 @@ public sealed class TypedMessageHelperTests
         {
             var exception = Assert.Throws<InvalidDataException>(() =>
             {
-                failedResult = writer.Create(messageType, MessageKey, Receiver, "failing preparation");
+                failedResult = messageType.Create(MessageKey, Sender, Receiver, "failing preparation");
             });
             Assert.Same(sentinel, exception);
             Assert.Null(failedResult);
@@ -536,14 +516,13 @@ public sealed class TypedMessageHelperTests
             Assert.Equal(1, probe.CommittedFailureCount);
             Assert.Equal((byte)0x7e, probe.CommittedFailureByte);
 
-            using var recovered = writer.Create(messageType, MessageKey, Receiver, "recovered 東京 reserve");
+            using var recovered = messageType.Create(MessageKey, Sender, Receiver, "recovered 東京 reserve");
             Assert.Equal(3, probe.WriteCount);
             Assert.Equal(pristine.SerializeToArray("recovered 東京 reserve"), recovered.Payload.ToArray());
             Assert.Equal("recovered 東京 reserve", pristine.Deserialize(recovered.Payload));
             Assert.Equal(outstandingWire, outstanding.Payload.ToArray());
             Assert.Equal("outstanding € order", pristine.Deserialize(outstanding.Payload));
             AssertEnvelopeIdentity(recovered, MessageKey, Sender, Receiver, Subject);
-            AssertPreparationOnly(context);
         }
         finally
         {
@@ -552,43 +531,62 @@ public sealed class TypedMessageHelperTests
     }
 
     [Fact]
-    public void DurableMessageWriter_DisposeIsIdempotentAndCreateRejectsDisposedWriterBeforeCodecWrite()
+    public void DurableMessageType_CreateRetainedEnvelopeSurvivesOriginalOwnerReleaseAndSubsequentCreate()
     {
         using var services = CreateServices();
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         var messageType = new DurableMessageType<string>(Subject, serializer);
-        var context = ActivationContext(Sender);
-        using var writer = new DurableMessageWriter(context);
-        using var surviving = writer.Create(messageType, MessageKey, Receiver, "surviving reserve");
-        writer.Dispose();
-        writer.Dispose();
+        var original = messageType.Create(MessageKey, Sender, Receiver, "surviving reserve");
+        using var surviving = original.Retain();
+        original.Dispose();
+        using var subsequent = messageType.Create(MessageKey.CreateChildKey("next"), Sender, Receiver, "new reserve");
 
-        Assert.Throws<ObjectDisposedException>(
-            () => writer.Create(messageType, MessageKey, Receiver, "must not encode"));
-
-        Assert.Equal(1, probe.WriteCount);
+        Assert.Equal(2, probe.WriteCount);
+        Assert.NotEqual(surviving.Payload, subsequent.Payload);
+        Assert.Equal(MessageKey, surviving.MessageId);
+        Assert.Equal(MessageKey.CreateChildKey("next"), subsequent.MessageId);
         Assert.Equal("surviving reserve", services.GetRequiredService<Serializer<string>>().Deserialize(surviving.Payload));
-        AssertPreparationOnly(context);
+        Assert.Equal("new reserve", services.GetRequiredService<Serializer<string>>().Deserialize(subsequent.Payload));
     }
 
     [Fact]
-    public void DurableMessageWriter_CreateRejectsNullBodyBeforeCodecWrite()
+    public void DurableMessageType_CreateRejectsNullBodyBeforeCodecWrite()
     {
         using var services = CreateServices();
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         var messageType = new DurableMessageType<string>(Subject, serializer);
-        var context = ActivationContext(Sender);
-        using var writer = new DurableMessageWriter(context);
 
         var exception = Assert.Throws<ArgumentNullException>(
-            () => writer.Create(messageType, MessageKey, Receiver, null!));
+            () => messageType.Create(MessageKey, Sender, Receiver, null!));
 
         Assert.Equal("body", exception.ParamName);
         Assert.Equal(0, probe.WriteCount);
-        using var control = writer.Create(messageType, MessageKey, Receiver, "nonnull recovery");
+        using var control = messageType.Create(MessageKey, Sender, Receiver, "nonnull recovery");
         Assert.Equal(1, probe.WriteCount);
         Assert.Equal("nonnull recovery", services.GetRequiredService<Serializer<string>>().Deserialize(control.Payload));
-        AssertPreparationOnly(context);
+    }
+
+    [Fact]
+    public void DurableMessageType_CreateDoesNotConsumeResourceBodyAndRetainOwnsIndependentPin()
+    {
+        using var services = CreateServices();
+        var codec = new ResourceCodec();
+        var serializer = new Serializer<OwnedResource>(codec, services.GetRequiredService<SerializerSessionPool>());
+        var type = new DurableMessageType<OwnedResource>(Subject, serializer);
+        using var body = new OwnedResource("resource €42");
+        var original = type.Create(MessageKey, Sender, Receiver, body);
+        using var retained = original.Retain();
+        original.Dispose();
+
+        Assert.Equal(0, body.DisposeCount);
+        Assert.Equal(MessageKey, retained.MessageId);
+        Assert.Equal(services.GetRequiredService<Serializer<string>>().SerializeToArray(body.Name), retained.Payload.ToArray());
+        using var decoded = type.Decode(retained);
+        Assert.NotSame(body, decoded);
+        Assert.Same(codec.LastDecoded, decoded);
+        Assert.Equal("resource €42", decoded.Name);
+        Assert.Equal(0, decoded.DisposeCount);
+        Assert.Equal(1, codec.ReadCount);
     }
 
     [Fact]
@@ -1336,6 +1334,406 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(0, context.CompletionCount);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegisterStateAction_StaticDelegateReceivesExactReferenceStateBodyAndContext(bool complete)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        using var envelope = type.Create(MessageKey, Sender, Receiver, "stateful €42");
+        var context = new CountingInboxHandlerContext(envelope);
+        var state = new HandlerState { Complete = complete };
+        Action<string, HandlerState, IInboxHandlerContext> handler = ObserveState;
+        Assert.Null(handler.Target); // Named static method, not a captured test closure.
+        var dispatcher = new DurableInboxDispatcher();
+        Assert.Same(dispatcher, dispatcher.Register(type, state, handler));
+
+        var outcome = dispatcher.HandleAsync(context, CancellationToken.None);
+
+        Assert.True(outcome.IsCompletedSuccessfully);
+        await outcome;
+        Assert.Equal("stateful €42", state.Body);
+        Assert.Same(context, state.Context);
+        Assert.Same(state, state.Argument);
+        Assert.Equal(1, state.Calls);
+        Assert.Equal(complete ? 1 : 0, context.CompletionCount);
+    }
+
+    [Fact]
+    public async Task RegisterState_MixedStaticReferenceAndStructArgumentsRouteOrdinalSubjectsAndFreeze()
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var syncType = new DurableMessageType<string>(Subject, serializer);
+        var asyncType = new DurableMessageType<string>("Orders.Reserve", serializer);
+        var syncState = new HandlerState { Complete = true };
+        var asyncState = new HandlerState();
+        var argument = new StructHandlerState(asyncState, 731);
+        Action<string, HandlerState, IInboxHandlerContext> sync = ObserveState;
+        Func<string, StructHandlerState, IInboxHandlerContext, CancellationToken, ValueTask> asyncHandler = ObserveStructState;
+        Assert.Null(sync.Target);
+        Assert.Null(asyncHandler.Target);
+        var dispatcher = new DurableInboxDispatcher().Register(syncType, syncState, sync).Register(asyncType, argument, asyncHandler);
+        using var syncEnvelope = syncType.Create(MessageKey, Sender, Receiver, "lower");
+        using var asyncEnvelope = asyncType.Create(MessageKey, Sender, Receiver, "upper");
+        var syncContext = new CountingInboxHandlerContext(syncEnvelope);
+        var asyncContext = new CountingInboxHandlerContext(asyncEnvelope);
+        using var cancellation = new CancellationTokenSource();
+
+        await dispatcher.HandleAsync(syncContext, CancellationToken.None);
+        Assert.Throws<InvalidOperationException>(() => dispatcher.Register(
+            new DurableMessageType<string>("later", serializer), syncState, sync));
+        await dispatcher.HandleAsync(asyncContext, cancellation.Token);
+
+        Assert.Equal("lower", syncState.Body);
+        Assert.Equal("upper", asyncState.Body);
+        Assert.Same(syncContext, syncState.Context);
+        Assert.Same(asyncContext, asyncState.Context);
+        Assert.Equal(731, asyncState.Marker);
+        Assert.Equal(cancellation.Token, asyncState.Token);
+        Assert.Equal(1, syncState.Calls);
+        Assert.Equal(1, asyncState.Calls);
+        Assert.Equal(1, syncContext.CompletionCount);
+        Assert.Equal(0, asyncContext.CompletionCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegisterState_StaticStructArgumentIsStoredByValueAndInvokedExactly(bool asynchronous)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        using var envelope = type.Create(MessageKey, Sender, Receiver, "struct state");
+        var context = new CountingInboxHandlerContext(envelope);
+        using var cancellation = new CancellationTokenSource();
+        var observation = new HandlerState { Complete = true };
+        var argument = new StructHandlerState(observation, 731);
+        var dispatcher = new DurableInboxDispatcher();
+        if (asynchronous)
+        {
+            Func<string, StructHandlerState, IInboxHandlerContext, CancellationToken, ValueTask> handler = ObserveStructState;
+            Assert.Null(handler.Target);
+            Assert.Same(dispatcher, dispatcher.Register(type, argument, handler));
+        }
+        else
+        {
+            Action<string, StructHandlerState, IInboxHandlerContext> handler = ObserveStructAction;
+            Assert.Null(handler.Target);
+            Assert.Same(dispatcher, dispatcher.Register(type, argument, handler));
+        }
+        argument = argument with { Marker = 999 };
+
+        await dispatcher.HandleAsync(context, cancellation.Token);
+
+        Assert.Equal(999, argument.Marker);
+        Assert.Equal(731, observation.Marker);
+        Assert.Equal("struct state", observation.Body);
+        Assert.Same(context, observation.Context);
+        Assert.Same(observation, observation.Argument);
+        Assert.Equal(asynchronous ? cancellation.Token : default, observation.Token);
+        Assert.Equal(1, observation.Calls);
+        Assert.Equal(1, context.CompletionCount);
+    }
+
+    [Theory]
+    [InlineData("success")]
+    [InlineData("fault")]
+    [InlineData("cancel")]
+    public async Task RegisterStateAsync_ReturnsActualDeferredValueTaskAndExactOutcome(string outcomeKind)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        using var envelope = type.Create(MessageKey, Sender, Receiver, "deferred state");
+        var context = new CountingInboxHandlerContext(envelope);
+        using var cancellation = new CancellationTokenSource();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var state = new HandlerState { Outcome = new ValueTask(gate.Task) };
+        Func<string, HandlerState, IInboxHandlerContext, CancellationToken, ValueTask> handler = ObserveAsyncState;
+        Assert.Null(handler.Target);
+        var dispatcher = new DurableInboxDispatcher().Register(type, state, handler);
+
+        var outcome = dispatcher.HandleAsync(context, cancellation.Token);
+
+        Assert.Equal(state.Outcome, outcome); // No async adapter replacing the actual ValueTask.
+        Assert.False(outcome.IsCompleted);
+        Assert.Equal("deferred state", state.Body);
+        Assert.Same(state, state.Argument);
+        Assert.Same(context, state.Context);
+        Assert.Equal(cancellation.Token, state.Token);
+        Assert.Equal(1, state.Calls);
+        Assert.Equal(0, context.CompletionCount);
+        var sentinel = new IOException("stateful deferred sentinel");
+        if (outcomeKind == "fault")
+        {
+            gate.SetException(sentinel);
+            Assert.Same(sentinel, await Assert.ThrowsAsync<IOException>(async () => await outcome));
+        }
+        else if (outcomeKind == "cancel")
+        {
+            cancellation.Cancel();
+            gate.SetCanceled(cancellation.Token);
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await outcome);
+            Assert.Equal(cancellation.Token, exception.CancellationToken);
+        }
+        else
+        {
+            // Cancellation after a delegate's successful work must not change its outcome.
+            cancellation.Cancel();
+            gate.SetResult();
+            await outcome;
+            Assert.True(outcome.IsCompletedSuccessfully);
+        }
+        Assert.Equal(0, context.CompletionCount);
+        Assert.Equal(1, state.Calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegisterState_PropagatesOriginalSynchronousFailureWithoutCompleting(bool faultedValueTask)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        using var envelope = type.Create(MessageKey, Sender, Receiver, "sentinel");
+        var context = new CountingInboxHandlerContext(envelope);
+        var sentinel = new IOException("stateful sync sentinel");
+        var state = new HandlerState();
+        var dispatcher = new DurableInboxDispatcher();
+        if (faultedValueTask)
+        {
+            state.Outcome = ValueTask.FromException(sentinel);
+            dispatcher.Register(type, state, ObserveAsyncState);
+            var outcome = dispatcher.HandleAsync(context, CancellationToken.None);
+            Assert.Equal(state.Outcome, outcome);
+            Assert.Same(sentinel, await Assert.ThrowsAsync<IOException>(async () => await outcome));
+        }
+        else
+        {
+            state.Failure = sentinel;
+            dispatcher.Register(type, state, ObserveState);
+            Assert.Same(sentinel, Assert.Throws<IOException>(() => dispatcher.HandleAsync(context, CancellationToken.None)));
+        }
+        Assert.Equal("sentinel", state.Body);
+        Assert.Same(context, state.Context);
+        Assert.Equal(1, state.Calls);
+        Assert.Equal(0, context.CompletionCount);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void RegisterState_CancellationBeforeOrDuringDecodePreventsAllDelegateEffects(bool asynchronous, bool duringDecode)
+    {
+        using var services = CreateServices();
+        var direct = services.GetRequiredService<Serializer<string>>();
+        var (serializer, probe) = CreateProbedSerializer<string>(services);
+        using var cancellation = new CancellationTokenSource();
+        if (duringDecode) probe.OnRead = cancellation.Cancel;
+        else cancellation.Cancel();
+        using var envelope = DirectEnvelope(direct, Subject, "canceled state");
+        var context = new CountingInboxHandlerContext(envelope);
+        var state = new HandlerState { Complete = true };
+        var type = new DurableMessageType<string>(Subject, serializer);
+        var dispatcher = new DurableInboxDispatcher();
+        if (asynchronous) dispatcher.Register(type, state, ObserveAsyncState);
+        else dispatcher.Register(type, state, ObserveState);
+
+        var exception = Assert.Throws<OperationCanceledException>(() => dispatcher.HandleAsync(context, cancellation.Token));
+
+        Assert.Equal(cancellation.Token, exception.CancellationToken);
+        Assert.Equal(duringDecode ? 1 : 0, probe.ReadCount);
+        Assert.Equal(0, state.Calls);
+        Assert.Null(state.Body);
+        Assert.Null(state.Context);
+        Assert.Equal(0, context.CompletionCount);
+        Assert.Throws<InvalidOperationException>(() => dispatcher.Register(
+            new DurableMessageType<string>("late", serializer), state, ObserveState));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegisterState_CancellationInsideSuccessfulDelegatePreservesExplicitCompletion(bool asynchronous)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        using var envelope = type.Create(MessageKey, Sender, Receiver, "completed despite cancel");
+        var context = new CountingInboxHandlerContext(envelope);
+        using var cancellation = new CancellationTokenSource();
+        var state = new HandlerState { Complete = true, CancelOnInvoke = cancellation };
+        var dispatcher = new DurableInboxDispatcher();
+        if (asynchronous) dispatcher.Register(type, state, ObserveAsyncState);
+        else dispatcher.Register(type, state, ObserveState);
+
+        var outcome = dispatcher.HandleAsync(context, cancellation.Token);
+        await outcome;
+
+        Assert.True(cancellation.IsCancellationRequested);
+        Assert.True(outcome.IsCompletedSuccessfully);
+        Assert.Equal("completed despite cancel", state.Body);
+        Assert.Same(context, state.Context);
+        Assert.Equal(1, state.Calls);
+        Assert.Equal(1, context.CompletionCount);
+    }
+
+    [Theory]
+    [InlineData(false, "unknown")]
+    [InlineData(true, "unknown")]
+    [InlineData(false, "malformed")]
+    [InlineData(true, "malformed")]
+    [InlineData(false, "codec-failure")]
+    [InlineData(true, "codec-failure")]
+    [InlineData(false, "null")]
+    [InlineData(true, "null")]
+    public void RegisterState_UnknownMalformedOrNullPayloadRejectsBeforeEffects(bool asynchronous, string variation)
+    {
+        using var services = CreateServices();
+        var direct = services.GetRequiredService<Serializer<string>>();
+        var (serializer, probe) = CreateProbedSerializer<string>(services);
+        var sentinel = new InvalidDataException("malformed stateful payload");
+        if (variation == "codec-failure") probe.ReadFailure = sentinel;
+        var wire = direct.SerializeToArray("nonempty truncated €42");
+        using var envelope = variation == "malformed"
+            ? WireEnvelope(Subject, wire[..^1])
+            : DirectEnvelope(direct, variation == "unknown" ? "Orders.Reserve" : Subject,
+                variation == "null" ? null! : "payload");
+        var context = new CountingInboxHandlerContext(envelope);
+        var type = new DurableMessageType<string>(Subject, serializer);
+        var state = new HandlerState { Complete = true };
+        var dispatcher = new DurableInboxDispatcher();
+        if (asynchronous) dispatcher.Register(type, state, ObserveAsyncState);
+        else dispatcher.Register(type, state, ObserveState);
+
+        if (variation == "unknown")
+            Assert.Throws<InvalidOperationException>(() => dispatcher.HandleAsync(context, CancellationToken.None));
+        else if (variation == "codec-failure")
+            Assert.Same(sentinel, Assert.Throws<InvalidDataException>(() => dispatcher.HandleAsync(context, CancellationToken.None)));
+        else if (variation == "malformed")
+        {
+            Assert.Throws<IndexOutOfRangeException>(() => dispatcher.HandleAsync(context, CancellationToken.None));
+            Assert.Equal(wire[..^1], envelope.Payload.ToArray());
+        }
+        else
+            Assert.Equal("envelope", Assert.Throws<ArgumentException>(() =>
+                dispatcher.HandleAsync(context, CancellationToken.None)).ParamName);
+
+        Assert.Equal(variation == "unknown" ? 0 : 1, probe.ReadCount);
+        Assert.Equal(0, state.Calls);
+        Assert.Null(state.Context);
+        Assert.Equal(0, context.CompletionCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegisterState_DuplicateSameOrCrossTypePreservesOriginalState(bool crossType)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        var original = new HandlerState();
+        var replacement = new HandlerState { Complete = true };
+        var dispatcher = new DurableInboxDispatcher().Register(type, original, ObserveState);
+        if (crossType)
+            Assert.Throws<InvalidOperationException>(() => dispatcher.Register(
+                new DurableMessageType<int>(Subject, services.GetRequiredService<Serializer<int>>()),
+                replacement, ObserveNumberState));
+        else
+            Assert.Throws<InvalidOperationException>(() => dispatcher.Register(type, replacement, ObserveAsyncState));
+        using var envelope = type.Create(MessageKey, Sender, Receiver, "original state");
+        var context = new CountingInboxHandlerContext(envelope);
+
+        await dispatcher.HandleAsync(context, CancellationToken.None);
+
+        Assert.Equal("original state", original.Body);
+        Assert.Same(original, original.Argument);
+        Assert.Equal(1, original.Calls);
+        Assert.Equal(0, replacement.Calls);
+        Assert.Equal(0, context.CompletionCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RegisterState_RejectsNullTypeAndDelegateWithoutReservingSubject(bool asynchronous)
+    {
+        using var services = CreateServices();
+        var type = new DurableMessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+        var state = new HandlerState();
+        var dispatcher = new DurableInboxDispatcher();
+        if (asynchronous)
+        {
+            Assert.Equal("messageType", Assert.Throws<ArgumentNullException>(() =>
+                dispatcher.Register<string, HandlerState>(null!, state, ObserveAsyncState)).ParamName);
+            Assert.Equal("handler", Assert.Throws<ArgumentNullException>(() => dispatcher.Register(type, state,
+                (Func<string, HandlerState, IInboxHandlerContext, CancellationToken, ValueTask>)null!)).ParamName);
+            Assert.Same(dispatcher, dispatcher.Register(type, state, ObserveAsyncState));
+        }
+        else
+        {
+            Assert.Equal("messageType", Assert.Throws<ArgumentNullException>(() =>
+                dispatcher.Register<string, HandlerState>(null!, state, ObserveState)).ParamName);
+            Assert.Equal("handler", Assert.Throws<ArgumentNullException>(() => dispatcher.Register(type, state,
+                (Action<string, HandlerState, IInboxHandlerContext>)null!)).ParamName);
+            Assert.Same(dispatcher, dispatcher.Register(type, state, ObserveState));
+        }
+        using var envelope = type.Create(MessageKey, Sender, Receiver, "positive control");
+        var context = new CountingInboxHandlerContext(envelope);
+        Assert.True(dispatcher.HandleAsync(context, CancellationToken.None).IsCompletedSuccessfully);
+        Assert.Equal("positive control", state.Body);
+        Assert.Equal(1, state.Calls);
+        Assert.Equal(0, context.CompletionCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RegisterState_StructArgumentDispatchDoesNotAddPerInvocationBoxingAllocations(bool asynchronous)
+    {
+        using var services = CreateServices();
+        var serializer = services.GetRequiredService<Serializer<string>>();
+        var type = new DurableMessageType<string>(Subject, serializer);
+        using var envelope = type.Create(MessageKey, Sender, Receiver, "allocation control");
+        var context = new CountingInboxHandlerContext(envelope);
+        var baselineState = new HandlerState();
+        var structState = new HandlerState();
+        var baseline = new DurableInboxDispatcher();
+        var withStruct = new DurableInboxDispatcher();
+        if (asynchronous)
+        {
+            baseline.Register(type, baselineState, ObserveAsyncState);
+            withStruct.Register(type, new StructHandlerState(structState, 731), ObserveStructState);
+        }
+        else
+        {
+            baseline.Register(type, baselineState, ObserveState);
+            withStruct.Register(type, new StructHandlerState(structState, 731), ObserveStructAction);
+        }
+        // Same serializer/body/context, warmed routes and session pool. No assertions,
+        // async continuations, timing, or boxed arguments inside the measured loops.
+        MeasureDispatchAllocations(baseline, context, 64);
+        MeasureDispatchAllocations(withStruct, context, 64);
+        var referenceBytes = MeasureDispatchAllocations(baseline, context, 256);
+        var structBytes = MeasureDispatchAllocations(withStruct, context, 256);
+
+        Assert.True(structBytes <= referenceBytes, $"Struct dispatch allocated {structBytes}, reference dispatch {referenceBytes}.");
+        Assert.Equal(320, baselineState.Calls);
+        Assert.Equal(320, structState.Calls);
+        Assert.Equal(731, structState.Marker);
+        Assert.Equal("allocation control", structState.Body);
+        Assert.Same(context, structState.Context);
+        Assert.Equal(0, context.CompletionCount);
+    }
+
     [Fact]
     public void RegisterHandlers_RejectsNullInboxBeforeConfiguration()
     {
@@ -1509,6 +1907,146 @@ public sealed class TypedMessageHelperTests
     private static ServiceProvider CreateServices() =>
         new ServiceCollection().AddSerializer().BuildServiceProvider();
 
+    private static void AssertClosedSerializerFactory<T>(T body)
+    {
+        var services = new ServiceCollection();
+        services.AddDurableMessageType<T>(Subject).AddDurableMessageType<T>("orders.cancel");
+        var closed = Assert.Single(services, descriptor =>
+            !descriptor.IsKeyedService && descriptor.ServiceType == typeof(Serializer<T>));
+        Assert.Equal(ServiceLifetime.Singleton, closed.Lifetime);
+        Assert.Null(closed.ImplementationType);
+        Assert.Null(closed.ImplementationInstance);
+        var factory = closed.ImplementationFactory;
+        Assert.NotNull(factory);
+        var bindings = services.Where(descriptor => descriptor.IsKeyedService).ToArray();
+        Assert.Equal(2, bindings.Length);
+        Assert.All(bindings, descriptor => Assert.True(services.IndexOf(closed) < services.IndexOf(descriptor)));
+        // Factory registration succeeds before serializer infrastructure exists:
+        // it must be lazy and must use the closed contract, including struct T.
+        services.AddSerializer();
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var serializer = provider.GetRequiredService<Serializer<T>>();
+        Assert.Same(serializer, scope.ServiceProvider.GetRequiredService<Serializer<T>>());
+        var factoryProvider = Substitute.For<IServiceProvider>();
+        factoryProvider.GetService(typeof(Serializer)).Returns(provider.GetRequiredService<Serializer>());
+        factoryProvider.ClearReceivedCalls();
+        var createdByFactory = Assert.IsType<Serializer<T>>(factory(factoryProvider));
+        factoryProvider.Received(1).GetService(typeof(Serializer));
+        factoryProvider.DidNotReceive().GetService(typeof(Serializer<T>));
+        Assert.Equal(serializer.SerializeToArray(body), createdByFactory.SerializeToArray(body));
+        var first = provider.GetRequiredKeyedService<DurableMessageType<T>>(Subject);
+        var second = provider.GetRequiredKeyedService<DurableMessageType<T>>("orders.cancel");
+        using var envelope = first.Create(MessageKey, Sender, Receiver, body);
+        using var other = second.Create(MessageKey, Sender, Receiver, body);
+        Assert.Equal(serializer.SerializeToArray(body), envelope.Payload.ToArray());
+        Assert.Equal(body, first.Decode(envelope));
+        Assert.Equal(body, second.Decode(other));
+        AssertEnvelopeIdentity(envelope, MessageKey, Sender, Receiver, Subject);
+        AssertEnvelopeIdentity(other, MessageKey, Sender, Receiver, "orders.cancel");
+        Assert.NotSame(first, second);
+    }
+
+    private static void AssertCustomClosedSerializerPreserved<T>(T body, bool factory)
+    {
+        using var codecServices = CreateServices();
+        var (custom, probe) = CreateProbedSerializer<T>(codecServices);
+        var services = new ServiceCollection();
+        var factoryCalls = 0;
+        if (factory)
+            services.AddSingleton<Serializer<T>>(_ =>
+            {
+                factoryCalls++;
+                return custom;
+            });
+        else services.AddSingleton(custom);
+        var original = Assert.Single(services);
+
+        services.AddDurableMessageType<T>(Subject).AddDurableMessageType<T>("orders.cancel");
+
+        Assert.Same(original, Assert.Single(services, descriptor =>
+            !descriptor.IsKeyedService && descriptor.ServiceType == typeof(Serializer<T>)));
+        Assert.Equal(0, factoryCalls);
+        // No untyped Serializer service is installed here. Replacing this closed
+        // custom registration with the default factory would fail resolution.
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        Assert.Same(custom, provider.GetRequiredService<Serializer<T>>());
+        Assert.Same(custom, scope.ServiceProvider.GetRequiredService<Serializer<T>>());
+        var first = provider.GetRequiredKeyedService<DurableMessageType<T>>(Subject);
+        var second = provider.GetRequiredKeyedService<DurableMessageType<T>>("orders.cancel");
+        using var envelope = first.Create(MessageKey, Sender, Receiver, body);
+        using var other = second.Create(MessageKey, Sender, Receiver, body);
+        Assert.Equal(2, probe.WriteCount);
+        Assert.Equal(codecServices.GetRequiredService<Serializer<T>>().SerializeToArray(body), envelope.Payload.ToArray());
+        Assert.Equal(body, first.Decode(envelope));
+        Assert.Equal(body, second.Decode(other));
+        Assert.Equal(2, probe.ReadCount);
+        Assert.Equal(factory ? 1 : 0, factoryCalls);
+        AssertEnvelopeIdentity(envelope, MessageKey, Sender, Receiver, Subject);
+        AssertEnvelopeIdentity(other, MessageKey, Sender, Receiver, "orders.cancel");
+    }
+
+    private static void ObserveState(string body, HandlerState argument, IInboxHandlerContext context)
+    {
+        argument.Calls++;
+        argument.Body = body;
+        argument.Context = context;
+        argument.Argument = argument;
+        if (argument.Failure is { } failure) throw failure;
+        argument.CancelOnInvoke?.Cancel();
+        if (argument.Complete) context.Complete();
+    }
+
+    private static ValueTask ObserveAsyncState(string body, HandlerState argument, IInboxHandlerContext context, CancellationToken token)
+    {
+        argument.Token = token;
+        ObserveState(body, argument, context);
+        return argument.Outcome;
+    }
+
+    private static ValueTask ObserveStructState(string body, StructHandlerState argument, IInboxHandlerContext context, CancellationToken token)
+    {
+        argument.Observation.Marker = argument.Marker;
+        return ObserveAsyncState(body, argument.Observation, context, token);
+    }
+
+    private static void ObserveStructAction(string body, StructHandlerState argument, IInboxHandlerContext context)
+    {
+        argument.Observation.Marker = argument.Marker;
+        ObserveState(body, argument.Observation, context);
+    }
+
+    private static ValueTask ObserveNumberState(int body, HandlerState argument, IInboxHandlerContext context, CancellationToken token)
+    {
+        argument.Marker = body;
+        return ObserveAsyncState("number", argument, context, token);
+    }
+
+    private static long MeasureDispatchAllocations(DurableInboxDispatcher dispatcher, IInboxHandlerContext context, int count)
+    {
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var i = 0; i < count; i++)
+            dispatcher.HandleAsync(context, CancellationToken.None).GetAwaiter().GetResult();
+        return GC.GetAllocatedBytesForCurrentThread() - before;
+    }
+
+    private readonly record struct StructHandlerState(HandlerState Observation, int Marker);
+
+    private sealed class HandlerState
+    {
+        public int Calls { get; set; }
+        public string? Body { get; set; }
+        public object? Argument { get; set; }
+        public IInboxHandlerContext? Context { get; set; }
+        public CancellationToken Token { get; set; }
+        public int Marker { get; set; }
+        public bool Complete { get; set; }
+        public CancellationTokenSource? CancelOnInvoke { get; set; }
+        public Exception? Failure { get; set; }
+        public ValueTask Outcome { get; set; }
+    }
+
     private static string InvalidSubject(string variation) => variation switch
     {
         "empty" => "",
@@ -1519,23 +2057,6 @@ public sealed class TypedMessageHelperTests
 
     private static string SubjectAtLimit(bool multibyte) =>
         multibyte ? new string('\u20ac', 85) + "a" : new string('s', 256);
-
-    private static IGrainContext ActivationContext(GrainId sender)
-    {
-        var context = Substitute.For<IGrainContext>();
-        context.GrainId.Returns(sender);
-        context.ClearReceivedCalls();
-        return context;
-    }
-
-    private static void AssertPreparationOnly(IGrainContext context)
-    {
-        // Create accepts only activation identity; it has no Send/Complete seam.
-        // Check actual activation interactions rather than an unrelated outbox spy.
-        var call = Assert.Single(context.ReceivedCalls());
-        Assert.Equal("get_GrainId", call.GetMethodInfo().Name);
-        Assert.Empty(call.GetArguments());
-    }
 
     private static (Serializer<T> Serializer, ProbeCodec<T> Probe) CreateProbedSerializer<T>(IServiceProvider services)
     {
@@ -1577,15 +2098,15 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(subject, envelope.Subject);
     }
 
-    private static void AssertWriterWire<T>(
-        DurableMessageWriter writer, IServiceProvider sendingServices, IServiceProvider receivingServices, T body)
+    private static void AssertCreateWire<T>(
+        IServiceProvider sendingServices, IServiceProvider receivingServices, T body)
     {
         var sending = sendingServices.GetRequiredService<Serializer<T>>();
         var receiving = receivingServices.GetRequiredService<Serializer<T>>();
         var messageType = new DurableMessageType<T>(Subject, sending);
         var key = MessageKey;
         var expectedWire = sending.SerializeToArray(body);
-        using var envelope = writer.Create(messageType, key, Receiver, body);
+        using var envelope = messageType.Create(key, Sender, Receiver, body);
         Assert.Equal(expectedWire, envelope.Payload.ToArray());
         Assert.Equal(body, receiving.Deserialize(envelope.Payload));
         AssertEnvelopeIdentity(envelope, key, Sender, Receiver, Subject);
