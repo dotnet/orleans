@@ -77,22 +77,6 @@ strategy on JIT-enabled runtimes.
 NativeAOT applications also need statically available codecs, copiers, and
 activators for their closed payload types.
 
-## Reference-counted byte buffers
-
-`ArcBufferWriter` stores bytes in pooled pages. `PeekSlice` and `ConsumeSlice`
-return an owned `ArcBuffer`, and `ArcBuffer.Slice` acquires an independent pin
-over the referenced pages. Dispose each owned buffer when its bytes are no
-longer needed. A direct struct assignment creates a borrowed view whose
-lifetime is bounded by the owner. Keep the referenced bytes unchanged while
-any slice is in use.
-
-The built-in `ArcBuffer` codec preserves the source's ownership and contents
-across serialization. Deserialization from an Arc-backed reader pins the
-payload pages; deserialization from other inputs copies the bytes into owned
-pooled pages. Each decoded or deep-copied buffer has its own lifetime and must
-be disposed independently. `ArcBuffer.Empty` and the default value represent
-owner-free empty buffers.
-
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
