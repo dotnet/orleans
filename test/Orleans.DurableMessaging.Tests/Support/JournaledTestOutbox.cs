@@ -11,6 +11,7 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, Du
 {
     private bool _stopped;
     private readonly TaskCompletionSource _stopping = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public GrainId SenderId => context.GrainId;
     public Task Stopping => _stopping.Task;
     public int SendCalls { get; private set; }
     public Exception? NextSendFailure { get; set; }
