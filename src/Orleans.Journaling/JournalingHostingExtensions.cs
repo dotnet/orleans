@@ -257,7 +257,44 @@ public static class JournalingHostingExtensions
     /// <param name="name">The provider name.</param>
     /// <returns>The silo builder.</returns>
     public static ISiloBuilder AddVolatileJournalStorage(this ISiloBuilder builder, string name)
-        => builder.AddJournalStorage(name, static services => ActivatorUtilities.CreateInstance<VolatileJournalStorageProvider>(services));
+        => builder.AddVolatileJournalStorage(name, configureOptions: null);
+
+    /// <summary>
+    /// Registers the default volatile journal provider with configurable snapshot thresholds.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="configureOptions">Configures the provider's snapshot thresholds.</param>
+    /// <returns>The silo builder.</returns>
+    public static ISiloBuilder AddVolatileJournalStorage(this ISiloBuilder builder, Action<VolatileJournalStorageOptions> configureOptions)
+        => builder.AddVolatileJournalStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+
+    /// <summary>
+    /// Registers a named volatile journal provider with configurable snapshot thresholds.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="name">The provider name.</param>
+    /// <param name="configureOptions">Optionally configures the provider's snapshot thresholds.</param>
+    /// <returns>The silo builder.</returns>
+    public static ISiloBuilder AddVolatileJournalStorage(
+        this ISiloBuilder builder, string name, Action<VolatileJournalStorageOptions>? configureOptions)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var options = builder.Services.AddJournalStorageOptions<VolatileJournalStorageOptions>(name)
+            .Validate(static configuration => configuration.MaxAppendsBeforeSnapshot > 0,
+                "MaxAppendsBeforeSnapshot must be positive.")
+            .Validate(static configuration => configuration.MaxBytesBeforeSnapshot > 0,
+                "MaxBytesBeforeSnapshot must be positive.");
+        if (configureOptions is not null)
+        {
+            options.Configure(configureOptions);
+        }
+
+        return builder.AddJournalStorage(name, services => new VolatileJournalStorageProvider(
+            services.GetRequiredService<IOptions<JournaledStateManagerOptions>>(),
+            services.GetJournalStorageOptions<VolatileJournalStorageOptions>(name),
+            services.GetService<OrleansInstruments>()));
+    }
 
     private sealed record JournalStorageRegistration(string Name, Type ProviderType);
 

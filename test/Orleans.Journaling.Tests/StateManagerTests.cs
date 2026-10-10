@@ -1367,7 +1367,10 @@ public partial class StateManagerTests : JournalingTestBase
 
         var period = ManagerOptions.RetirementGracePeriod;
         var timeProvider = new FakeTimeProvider(DateTime.UtcNow);
-        var storage = CreateStorage();
+        var storage = new VolatileJournalStorage(null, new()
+        {
+            MaxAppendsBeforeSnapshot = 10
+        });
 
         // -------------- STEP 1 --------------
 
