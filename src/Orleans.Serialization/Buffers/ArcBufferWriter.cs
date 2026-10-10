@@ -49,6 +49,24 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public const int MinimumPageSize = ArcBufferPagePool.MinimumPageSize;
 
     /// <summary>
+    /// Gets or sets the maximum aggregate size, in bytes, of free pages retained by the process-wide page pool.
+    /// </summary>
+    /// <remarks>
+    /// The default is 4 MiB. Setting this value to zero releases free pages and disables free-page retention.
+    /// Reducing the limit releases excess already-free pages immediately. Writers and pinned readers retain
+    /// ownership of their active pages. Returns in flight during a reduction recheck the limit after publishing
+    /// their pages, keeping the settled pool within the current budget.
+    /// Pages up to 1 MiB are eligible for retention. Large backing arrays released by this pool are returned to
+    /// the separately managed <see cref="ArrayPool{T}.Shared"/>.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
+    public static int MaxRetainedPoolBytes
+    {
+        get => ArcBufferPagePool.Shared.MaxRetainedBytes;
+        set => ArcBufferPagePool.Shared.MaxRetainedBytes = value;
+    }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="ArcBufferWriter"/> struct.
     /// </summary>
     public ArcBufferWriter()
@@ -583,42 +601,144 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
 internal sealed class ArcBufferPagePool
 {
+    internal const int DefaultMaximumRetainedBytes = 4 * 1024 * 1024;
+    internal const int MaximumRetainedPageSize = 1024 * 1024;
     public static ArcBufferPagePool Shared { get; } = new();
     public const int MinimumPageSize = 16 * 1024;
+    private readonly object _trimLock = new();
     private readonly ConcurrentQueue<ArcBufferPage> _pages = new();
     private readonly ConcurrentQueue<ArcBufferPage> _largePages = new();
+    private int _maximumRetainedBytes;
+    private int _retainedBytes;
 
-    private ArcBufferPagePool() { }
+    internal ArcBufferPagePool(int maximumRetainedBytes = DefaultMaximumRetainedBytes)
+    {
+        if (maximumRetainedBytes < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumRetainedBytes));
+        }
+
+        _maximumRetainedBytes = maximumRetainedBytes;
+    }
+
+    internal int MaxRetainedBytes
+    {
+        get => Volatile.Read(ref _maximumRetainedBytes);
+        set
+        {
+            if (value < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            lock (_trimLock)
+            {
+                var previous = _maximumRetainedBytes;
+                Volatile.Write(ref _maximumRetainedBytes, value);
+                if (value < previous)
+                {
+                    TrimCore();
+                }
+            }
+        }
+    }
+
+    internal int RetainedBytes => Volatile.Read(ref _retainedBytes);
+    internal int RetainedPages => _pages.Count + _largePages.Count;
 
     public ArcBufferPage Rent(int size = -1)
     {
-        ArcBufferPage? block;
-        if (size <= MinimumPageSize)
+        var queue = size <= MinimumPageSize ? _pages : _largePages;
+        if (!queue.TryDequeue(out var block))
         {
-            if (!_pages.TryDequeue(out block))
-            {
-                block = new ArcBufferPage(size);
-            }
-        }
-        else if (_largePages.TryDequeue(out block))
-        {
-            block.ResizeLargeSegment(size);
-            return block;
+            return new ArcBufferPage(size);
         }
 
-        return block ?? new ArcBufferPage(size);
+        Interlocked.Add(ref _retainedBytes, -block.Array.Length);
+        if (size > MinimumPageSize)
+        {
+            block.ResizeLargeSegment(size);
+        }
+
+        return block;
     }
 
     internal void Return(ArcBufferPage block)
     {
         Debug.Assert(block.IsValid);
-        if (block.IsMinimumSize)
+        Debug.Assert(block.ReferenceCount == 0);
+        if (TryReserve(block.Array.Length))
         {
-            _pages.Enqueue(block);
+            Publish(block);
+            return;
         }
-        else
+
+        block.ReleaseArray();
+    }
+
+    // Every successful reservation is published once, including returns which race with a budget reduction.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool TryReserve(int size)
+    {
+        Debug.Assert(size >= MinimumPageSize);
+        if (size <= MaximumRetainedPageSize)
         {
-            _largePages.Enqueue(block);
+            var retained = Volatile.Read(ref _retainedBytes);
+            while (size <= Volatile.Read(ref _maximumRetainedBytes) - retained)
+            {
+                var observed = Interlocked.CompareExchange(ref _retainedBytes, retained + size, retained);
+                if (observed == retained)
+                {
+                    return true;
+                }
+
+                retained = observed;
+            }
+        }
+
+        return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void Publish(ArcBufferPage block)
+    {
+        try
+        {
+            (block.IsMinimumSize ? _pages : _largePages).Enqueue(block);
+        }
+        catch
+        {
+            Interlocked.Add(ref _retainedBytes, -block.Array.Length);
+            block.ReleaseArray();
+            throw;
+        }
+
+        if (Volatile.Read(ref _retainedBytes) > Volatile.Read(ref _maximumRetainedBytes))
+        {
+            Trim();
+        }
+    }
+
+    internal void Trim()
+    {
+        lock (_trimLock)
+        {
+            TrimCore();
+        }
+    }
+
+    private void TrimCore()
+    {
+        while (Volatile.Read(ref _retainedBytes) > _maximumRetainedBytes)
+        {
+            if (!_largePages.TryDequeue(out var block) && !_pages.TryDequeue(out block))
+            {
+                // Rents remove their accounting; unpublished returns recheck the budget after publication.
+                break;
+            }
+
+            Interlocked.Add(ref _retainedBytes, -block.Array.Length);
+            block.ReleaseArray();
         }
     }
 }
@@ -694,6 +814,16 @@ public sealed class ArcBufferPage
 
             Array = ArrayPool<byte>.Shared.Rent(length);
         }
+    }
+
+    internal void ReleaseArray()
+    {
+        if (!IsMinimumSize)
+        {
+            ArrayPool<byte>.Shared.Return(Array);
+        }
+
+        Array = [];
     }
 
     /// <summary>
