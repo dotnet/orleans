@@ -59,6 +59,33 @@ Concurrent calls made while the same kind of write is queued can share that queu
 > [!IMPORTANT]
 > In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.
 
+### Captured bytes and retained storage
+
+The journal owner pins the committed byte prefix through actual storage completion. A successful
+acknowledgement consumes that prefix and runs the state machines' completion bookkeeping.
+Cancelling a caller's wait leaves the owned storage operation running; owner disposal drains that
+operation before releasing its captured bytes and writer.
+
+<xref:Orleans.Journaling.VolatileJournalStorage> acquires independent page references for retained
+batches. Its reads pin a stable snapshot of journal bytes and metadata until the consumer finishes,
+including when another handle replaces, deletes, or recreates the journal. Replacement and deletion
+release the retired storage references; readers release their own references on completion, failure,
+or cancellation. The shared store owns retained bytes across handle and manager lifetimes, and
+releases its remaining references when the store becomes unreachable.
+
+Sequence-based <xref:Orleans.Journaling.IJournalStorage.AppendAsync*> and
+<xref:Orleans.Journaling.IJournalStorage.ReplaceAsync*> consume or copy borrowed bytes before their
+returned operation completes. Volatile storage coalesces copied append bytes on pooled pages.
+An oversized drained journal-writer tail is released after its active entry completes; minimum-sized
+pages are reused for small batches.
+
+<xref:Orleans.Serialization.Buffers.ArcBufferWriter.MaxRetainedPoolBytes> sets the process-wide
+free-page cache budget, with a default of 4 MiB. Setting zero releases free pages and disables caching.
+Pages up to 1 MiB are eligible for retention. A reduction immediately trims already-free pages, and
+returns in flight trim after publishing so the settled cache fits the current budget. Writers and
+pinned readers retain ownership of active pages through their full lifetimes. Released large backing
+arrays return to the separately managed `ArrayPool<byte>.Shared`.
+
 ## Safe-to-commit staging
 
 All interleaved callers share the manager's pending journal. Prepare fallible work, external acknowledgements,
