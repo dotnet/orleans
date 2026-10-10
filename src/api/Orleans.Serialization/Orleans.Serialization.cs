@@ -615,6 +615,10 @@ namespace Orleans.Serialization.Buffers
 
         public ArraySegmentEnumerator ArraySegments { get { throw null; } }
 
+        public static ArcBuffer Empty { get { throw null; } }
+
+        public bool IsEmpty { get { throw null; } }
+
         public MemoryEnumerator MemorySegments { get { throw null; } }
 
         public SpanEnumerator SpanSegments { get { throw null; } }
@@ -1043,6 +1047,8 @@ namespace Orleans.Serialization.Buffers
 
         public byte PeekByte() { throw null; }
 
+        public ArcBuffer ReadArcBuffer(int length) { throw null; }
+
         public byte ReadByte() { throw null; }
 
         public void ReadBytes(scoped System.Span<byte> destination) { }
@@ -1420,6 +1426,21 @@ namespace Orleans.Serialization.Cloning
 
 namespace Orleans.Serialization.Codecs
 {
+    [RegisterSerializer]
+    public sealed partial class ArcBufferCodec : IFieldCodec<Buffers.ArcBuffer>, IFieldCodec
+    {
+        public Buffers.ArcBuffer ReadValue<TInput>(ref Buffers.Reader<TInput> reader, WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type? expectedType, Buffers.ArcBuffer value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [RegisterCopier]
+    public sealed partial class ArcBufferCopier : Cloning.IDeepCopier<Buffers.ArcBuffer>, Cloning.IDeepCopier
+    {
+        public Buffers.ArcBuffer DeepCopy(Buffers.ArcBuffer input, Cloning.CopyContext context) { throw null; }
+    }
+
     [RegisterSerializer]
     public sealed partial class ArrayCodec<T> : IFieldCodec<T[]>, IFieldCodec
     {

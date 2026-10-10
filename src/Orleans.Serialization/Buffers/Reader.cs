@@ -208,6 +208,7 @@ namespace Orleans.Serialization.Buffers
         /// <param name="input">The input.</param>
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Reader{TInput}"/>.</returns>
+        /// <remarks>The input must remain valid and its referenced bytes unchanged for the lifetime of the reader.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Reader<ArcBufferReaderInput> Create(ArcBuffer input, SerializerSession session) => new(new ArcBufferReaderInput(in input), session, 0);
 
@@ -492,6 +493,44 @@ namespace Orleans.Serialization.Buffers
         }
 
         /// <summary>
+        /// Reads bytes into an independently owned <see cref="ArcBuffer"/>.
+        /// </summary>
+        /// <param name="length">The number of bytes to read.</param>
+        /// <returns>An owned buffer which the caller must dispose, or <see cref="ArcBuffer.Empty"/> for a zero-length read.</returns>
+        /// <remarks>
+        /// Advances the reader by <paramref name="length"/> bytes. A nonempty read from Arc input acquires an
+        /// independent pin over the referenced pages; other nonempty reads copy the bytes into owned pooled pages.
+        /// </remarks>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
+        /// <exception cref="IndexOutOfRangeException">The input contains fewer than <paramref name="length"/> unread bytes.</exception>
+        public ArcBuffer ReadArcBuffer(int length)
+        {
+            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+            EnsureAvailable((uint)length);
+            if (length == 0) return ArcBuffer.Empty;
+
+            if (IsArcBufferInput)
+            {
+                ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
+                var result = input.Slice(checked((int)(Position - _sequenceOffset)), length);
+                Skip(length);
+                return result;
+            }
+
+            using var output = new ArcBufferWriter();
+            while (length > 0)
+            {
+                var destination = output.GetSpan();
+                var count = Math.Min(length, destination.Length);
+                ReadBytes(destination[..count]);
+                output.AdvanceWriter(count);
+                length -= count;
+            }
+
+            return output.ConsumeSlice(output.Length);
+        }
+
+        /// <summary>
         /// Skips the specified number of bytes.
         /// </summary>
         /// <param name="count">The number of bytes to skip.</param>
@@ -614,7 +653,7 @@ namespace Orleans.Serialization.Buffers
             else if (IsArcBufferInput)
             {
                 ref var input = ref Unsafe.As<TInput, ArcBufferReaderInput>(ref _input);
-                var newInput = input.ForkFrom(checked((int)position));
+                var newInput = input.ForkFrom(checked((int)(position - _sequenceOffset)));
                 forked = new Reader<TInput>(Unsafe.As<ArcBufferReaderInput, TInput>(ref newInput), Session, position);
 
                 if (forked.Position != position)
