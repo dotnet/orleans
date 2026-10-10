@@ -147,9 +147,13 @@ public sealed class DurableEnvelopeContractTests
             Method("RegisterHandler", typeof(void), typeof(IInboxHandler)),
             Method("TryGetMessage", typeof(bool), typeof(HierarchicalKey), typeof(DurableEnvelope).MakeByRefType()));
         AssertSurface(typeof(IDurableOutbox),
+            Property("SenderId", typeof(GrainId)),
             Property("Count", typeof(int)), Property("Messages", typeof(IEnumerable<DurableEnvelope>)),
             Method("Send", typeof(void), typeof(DurableEnvelope)),
             Method("TryGetMessage", typeof(bool), typeof(HierarchicalKey), typeof(DurableEnvelope).MakeByRefType()));
+        var sender = typeof(IDurableOutbox).GetProperty(nameof(IDurableOutbox.SenderId))!;
+        Assert.True(sender.GetMethod!.IsAbstract);
+        Assert.Null(sender.SetMethod);
         Assert.True(Assert.Single(typeof(IDurableInbox).GetMethod("TryGetMessage")!.GetParameters(), p => p.ParameterType.IsByRef).IsOut);
         Assert.True(Assert.Single(typeof(IDurableOutbox).GetMethod("TryGetMessage")!.GetParameters(), p => p.ParameterType.IsByRef).IsOut);
 

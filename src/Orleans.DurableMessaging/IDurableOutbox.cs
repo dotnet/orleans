@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using Orleans.Runtime;
 
 namespace Orleans.DurableMessaging;
 
@@ -15,6 +16,11 @@ namespace Orleans.DurableMessaging;
 /// </remarks>
 public interface IDurableOutbox
 {
+    /// <summary>
+    /// Gets the grain identity which owns this outbox and sends its messages.
+    /// </summary>
+    GrainId SenderId { get; }
+
     /// <summary>
     /// Gets the number of pending outbound messages.
     /// </summary>

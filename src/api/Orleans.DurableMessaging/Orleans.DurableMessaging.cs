@@ -156,6 +156,8 @@ namespace Orleans.DurableMessaging
 
         System.Collections.Generic.IEnumerable<DurableEnvelope> Messages { get; }
 
+        Runtime.GrainId SenderId { get; }
+
         void Send(DurableEnvelope envelope);
         bool TryGetMessage(HierarchicalKey messageId, out DurableEnvelope envelope);
     }
