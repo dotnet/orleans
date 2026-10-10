@@ -68,6 +68,41 @@ Orleans executes that synchronous block on a single activation thread. Another g
 the operation awaits, so keep shared state safe to commit at each await. Any caller's write can include
 staged mutations from other calls.
 
+## Journal operation hooks
+
+Activation-scoped features coordinate prerequisites and completion through
+<xref:Orleans.Journaling.IJournaledStateManager.Hooks>. The owner exposes a stable, lazily
+allocated list of <xref:Orleans.Journaling.IJournaledStateHook> registrations. Inspect and
+deduplicate feature registrations on the owner's logical execution context while persistence
+is quiescent. Registration survives recovery and deletion; the standard manager rejects hook-list
+mutation throughout each operation.
+
+Each actual append, snapshot, or deletion runs ordinary before callbacks in list order, outside
+the manager lock. At most one <xref:Orleans.Journaling.IJournaledStateCaptureHook> supplies the
+final prerequisite. Its before callback runs last, and the work loop awaits it directly before
+synchronous capture or storage deletion. Prerequisites cover changes staged during asynchronous
+preparation, including the final hook's own I/O wait. Preserve operation-local bookkeeping for
+the captured batch separately from changes staged later.
+
+Storage acknowledgement and registered-state acknowledgement or reset precede after callbacks.
+All after callbacks run in list order, including for successful zero-byte writes. Coalesced callers
+share callbacks for the actual operation. <xref:Orleans.Journaling.JournaledStateHook> adapts delegates,
+executing the synchronous delegate before the asynchronous delegate in each phase.
+
+A failed prerequisite reports <xref:Orleans.Journaling.JournaledStatePreCommitException> with pending
+state retained for an explicit persistence retry after the prerequisite is restored. A failed after
+callback reports <xref:Orleans.Journaling.JournaledStatePostCommitException> with persistence completed.
+Remaining after callbacks run, multiple failures are aggregated, and the manager stays usable.
+The feature's durable recovery protocol resumes interrupted post-persistence work. Storage and
+state-processing failures retain the manager's fencing and fresh-recovery behavior.
+
+Hook callbacks receive the owner's shutdown token. Cancelling a caller's wait leaves the owned
+operation running through its actual outcome. Disposal drains owned hooks and storage before releasing
+journal resources, including when cancellation callbacks or cleanup fail. Concurrent disposal callers
+share this completion. Recursive initialization, persistence, or disposal on the same owner from a
+hook is rejected. For deletion, the feature owner stops admission and drains feature operations before
+queuing the whole-journal reset.
+
 ## Consistency and competing writers
 
 Orleans grain placement normally supplies a single active writer for a grain identity. Journal storage providers also use optimistic concurrency to protect the journal when a stale or competing writer reaches storage.

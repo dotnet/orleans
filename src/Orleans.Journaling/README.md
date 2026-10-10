@@ -246,6 +246,39 @@ the operation's token before use, or deliberately supply them through a registra
 lifecycle ownership. Creation through the explicit-journal factory keeps failure handling independent
 of the ambient grain context, including when the caller subsequently enrolls the manager in a lifecycle.
 
+## Journal operation hooks
+
+`IJournaledStateManager.Hooks` is a lazily allocated, stable list of `IJournaledStateHook`
+registrations. Features inspect and deduplicate their registrations on the owner's logical
+execution context while persistence is quiescent. Registration persists through recovery and
+whole-journal deletion. The standard manager rejects mutation of the list throughout an
+operation and admits at most one `IJournaledStateCaptureHook`.
+
+For each actual write, snapshot, or deletion, ordinary before hooks run in list order outside
+the manager lock. The capture hook runs last: the work loop awaits it directly, then synchronously
+captures the registered states or starts deletion. Prerequisites cover all changes staged during
+asynchronous preparation, including changes arriving while the capture hook awaits its own I/O.
+Keep operation-local bookkeeping for the captured batch separate from later pending changes.
+
+After hooks run in list order after storage acknowledgement and state acknowledgement or reset.
+They also run for a successful zero-byte write. Coalesced callers share the hooks for their actual
+operation. `JournaledStateHook` adapts synchronous and asynchronous delegates; within each phase
+the synchronous delegate executes first.
+
+| Outcome | Owner and caller behavior |
+| --- | --- |
+| Before hook fails | `JournaledStatePreCommitException` retains pending state for an explicit retry after restoring the prerequisite. |
+| Storage or state processing fails | The original failure fences the manager; create a fresh owner and recover the durable outcome. |
+| After hook fails | `JournaledStatePostCommitException` reports successful persistence. Every remaining after hook runs, failures are aggregated, and the manager stays usable. The feature's durable recovery protocol resumes interrupted post-persistence work. |
+
+Hooks receive the owner's shutdown token. Caller cancellation ends the caller's wait while
+the owned prerequisite, capture, storage, and completion phases continue. Disposal cancels the
+owner token and drains owned work before releasing journal resources, including when cancellation
+callbacks or after-hook cleanup fail. Concurrent disposal callers share that drain and its outcome.
+Recursive initialization, persistence, or disposal on the same owner from a hook is rejected.
+Before whole-journal deletion, the feature owner stops admission and drains its own operations;
+deletion completion follows storage deletion and registered-state reset.
+
 ## State identity and retirement
 
 Preserve state names across activations and deployments. A stream absent from the setup declarations
