@@ -482,6 +482,7 @@ public sealed partial class SafeSiloRetirementTests
                 error);
         }
         Assert.Equal(1, activation.WaitingCount);
+        await control.RouteUpdateObserved.Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(late.Id, Assert.Single(control.RouteUpdates).Id);
         Assert.Equal(fixture.A.SiloAddress, Assert.Single(control.RouteUpdates).SendingSilo);
         Assert.Empty(control.Executions);
@@ -601,6 +602,7 @@ public sealed partial class SafeSiloRetirementTests
         Assert.Equal(control.GrainId, replacement.GrainId);
         await control.MatrixSecondReceipt("stuck-waiting").Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(1, replacement.WaitingCount);
+        await control.RouteUpdateObserved.Task.WaitAsync(Timeout, TestCancellation);
         var advisory = Assert.Single(control.RouteUpdates);
         Assert.Equal(waiting.Id, advisory.Id);
         Assert.Equal(1, advisory.Generation);
@@ -762,6 +764,7 @@ public sealed partial class SafeSiloRetirementTests
         var replacement = await control.ReplacementActivationEntered.Task.WaitAsync(Timeout, TestCancellation);
         var accepted = await MatrixReceivedAsync(control, fixture.C.SiloAddress, "owner-crash-after-proof");
         await fixture.CatalogRetirement.WaitAsync(Timeout, TestCancellation);
+        await control.RouteUpdateObserved.Task.WaitAsync(Timeout, TestCancellation);
         Assert.Equal(original.Id, Assert.Single(control.RouteUpdates).Id);
         Assert.Equal(original.Id, accepted.Id);
         Assert.Equal(1, accepted.ForwardCount);

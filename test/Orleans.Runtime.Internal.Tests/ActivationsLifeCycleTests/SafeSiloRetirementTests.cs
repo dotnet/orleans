@@ -1021,10 +1021,12 @@ public sealed partial class SafeSiloRetirementTests
             if (observer.Equals(message.SendingSilo) && control.RecordedRouteMessages.TryAdd(message, 0))
             {
                 if (message.ForwardCount == 0) control.InitialRouteUpdates.Enqueue(snapshot);
-                else control.RouteUpdates.Enqueue(snapshot);
+                else
+                {
+                    control.RouteUpdates.Enqueue(snapshot);
+                    control.RouteUpdateObserved.TrySetResult(snapshot);
+                }
             }
-            // Initial outside-client placement is generation0; observe the subsequent hop.
-            if (message.ForwardCount > 0) control.RouteUpdateObserved.TrySetResult(snapshot);
         }
     }
 
