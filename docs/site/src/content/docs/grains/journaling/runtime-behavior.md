@@ -55,9 +55,11 @@ Durable collections encode their operation before applying it to the in-memory c
 - **Snapshot replacement** writes the current state of every registered stream and atomically publishes it as the new journal generation.
 
 Concurrent calls made while a write is queued share that queued operation. A snapshot requirement
-from any caller upgrades the queued write to a snapshot and remains set until that operation runs.
+from any caller upgrades pending work to a snapshot. The manager consumes the requirement when
+selecting a write and restores it if a prerequisite hook fails. Storage acknowledgement leaves
+newer pending requirements untouched.
 Each caller observes its completion or failure. Calls made after a storage operation starts are
-processed by a later operation with its own snapshot requirement.
+processed by a later operation.
 
 > [!IMPORTANT]
 > In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.

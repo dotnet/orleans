@@ -284,7 +284,9 @@ They also run for a successful zero-byte write. Coalesced callers share the hook
 operation. Features implement the before and after callbacks on their own hook, retaining their
 identity and operation-local bookkeeping there.
 Queued writes coalesce into one operation. A snapshot requirement from any caller upgrades that
-queued operation to a snapshot, even if the storage compaction signal clears before it runs.
+pending work to a snapshot, even if the storage compaction signal clears before it runs.
+The manager consumes the pending requirement when selecting a write and restores it when a before
+hook fails. Storage acknowledgement leaves newer snapshot requests untouched.
 
 | Outcome | Owner and caller behavior |
 | --- | --- |

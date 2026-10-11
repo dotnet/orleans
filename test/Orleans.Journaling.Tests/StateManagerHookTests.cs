@@ -1,7 +1,10 @@
 using System.Buffers;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using Orleans.Diagnostics;
 using Orleans.Serialization;
 using Xunit;
 
@@ -9,6 +12,58 @@ namespace Orleans.Journaling.Tests;
 
 public partial class StateManagerTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Hooks_QueueActivityUsesSelectedOperationAndCompletesWithStorageOutcome(bool snapshot, bool storageFails)
+    {
+        using var parent = new Activity("journal queue test").SetIdFormat(ActivityIdFormat.W3C).Start();
+        var stopped = new ConcurrentBag<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == ActivitySources.StorageActivitySourceName,
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            ActivityStopped = activity =>
+            {
+                if (activity.ParentSpanId == parent.SpanId)
+                {
+                    stopped.Add(activity);
+                }
+            }
+        };
+        ActivitySource.AddActivityListener(listener);
+        var failure = new IOException("Storage failed.");
+        var storage = new CapturingStorage
+        {
+            IsCompactionRequested = snapshot,
+            NextAppendException = storageFails && !snapshot ? failure : null,
+            NextReplaceException = storageFails && snapshot ? failure : null
+        };
+        await using var manager = CreateTestSystem(storage).Manager;
+        var state = new DurableValue<int>("state", manager, CreateValueCodec<int>());
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        state.Value = 1;
+        if (storageFails)
+        {
+            Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() =>
+                manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()));
+        }
+        else
+        {
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        }
+
+        await manager.DisposeAsync();
+        var activity = Assert.Single(stopped);
+        var operation = snapshot ? "snapshot" : "append";
+        Assert.Equal($"journal {operation}", activity.OperationName);
+        Assert.Equal(operation, activity.GetTagItem(ActivityTagKeys.JournalStorageOperation));
+        Assert.Equal(storageFails ? ActivityStatusCode.Error : ActivityStatusCode.Ok, activity.Status);
+        Assert.Equal(storageFails ? failure.Message : null, activity.StatusDescription);
+    }
+
     [Fact]
     public async Task Hooks_ListIsLazyStableAndSupportsInPlaceDeduplication()
     {
@@ -196,6 +251,7 @@ public partial class StateManagerTests
         Assert.Empty(storage.Replaces);
         Assert.Equal(0, storage.DeleteCount);
         Assert.Equal(0, after);
+        storage.IsCompactionRequested = false;
         fail = false;
         await InvokeAsync();
         Assert.Equal(1, after);
@@ -813,6 +869,61 @@ public partial class StateManagerTests
             await recoveredManager.InitializeAsync(TestContext.Current.CancellationToken);
             Assert.Equal(3, recovered.Value);
         });
+    }
+
+    [Fact]
+    public async Task Hooks_BeforeFailureRestoresSnapshotForAlreadyQueuedWrite()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true };
+        await using var manager = CreateTestSystem(storage).Manager;
+        var state = new DurableValue<int>("state", manager, CreateValueCodec<int>());
+        var entered = NewSignal();
+        var release = NewSignal();
+        var failure = new IOException("Snapshot prerequisite failed.");
+        List<JournaledStateOperation> before = [];
+        List<JournaledStateOperation> after = [];
+        manager.Hooks.Add(new DelegateTestHook
+        {
+            BeforeOperationAsync = async (operation, _) =>
+            {
+                before.Add(operation);
+                if (before.Count == 1)
+                {
+                    entered.TrySetResult();
+                    await release.Task;
+                    throw failure;
+                }
+            },
+            AfterOperation = (operation, _) => after.Add(operation)
+        });
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        state.Value = 1;
+        var first = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        try
+        {
+            await WaitFor(entered.Task);
+            storage.IsCompactionRequested = false;
+            state.Value = 2;
+            var retry = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            Assert.Empty(storage.Appends);
+            Assert.Empty(storage.Replaces);
+            release.TrySetResult();
+            var caught = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => WaitFor(first));
+            Assert.Same(failure, caught.InnerException);
+            await WaitFor(retry);
+            Assert.Equal([JournaledStateOperation.Snapshot, JournaledStateOperation.Snapshot], before);
+            Assert.Equal([JournaledStateOperation.Snapshot], after);
+            Assert.Empty(storage.Appends);
+            Assert.Single(storage.Replaces);
+            await using var recoveredManager = CreateTestSystem(storage).Manager;
+            var recovered = new DurableValue<int>("state", recoveredManager, CreateValueCodec<int>());
+            await recoveredManager.InitializeAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(2, recovered.Value);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
     }
 
     [Fact]

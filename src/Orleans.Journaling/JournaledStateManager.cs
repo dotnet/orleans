@@ -32,7 +32,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private ManagerState _state;
     private long _deletionGeneration;
     private Exception? _failure;
-    // Recovery format changes require a snapshot; queued writes retain their own snapshot requests.
+    // A snapshot requirement not yet claimed by a write. Consume under the lock before preparation awaits.
     private bool _snapshotRequired;
     private int _disposed;
     private Task? _disposeTask;
@@ -265,43 +265,44 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     }
 
                     var processingTimestamp = _shared.TimeProvider.GetTimestamp();
-                    var queueOperation = GetStorageQueueOperation(workItem);
-                    var queueDuration = queueOperation is null
-                        ? default
-                        : _shared.TimeProvider.GetElapsedTime(workItem.EnqueuedTimestamp, processingTimestamp);
+                    string? queueOperation = null;
+                    TimeSpan queueDuration = default;
                     var recordQueueDuration = workItem is DeleteStateWorkItem;
-                    Activity? storageActivity = queueOperation is null
-                        ? null
-                        : ActivitySources.StorageGrainSource.StartActivity(
-                            $"journal {queueOperation}",
-                            ActivityKind.Internal,
-                            workItem.TraceParent,
-                            tags: null,
-                            links: workItem.TraceLinks);
-                    if (storageActivity is not null)
-                    {
-                        storageActivity.SetTag(ActivityTagKeys.JournalStorageOperation, queueOperation);
-                    }
+                    Activity? storageActivity = null;
 
                     JournaledStateOperation? operationType = null;
+                    string? compactionReason = null;
                     var beforeHookRunning = false;
                     var afterHookRunning = false;
                     try
                     {
-                        if (workItem is WriteStateWorkItem
-                            && workItem.DeletionGeneration != Volatile.Read(ref _deletionGeneration))
+                        lock (_lock)
                         {
-                            throw new InvalidOperationException(
-                                "The journaled state operation was queued before deletion reset its state.");
+                            if (workItem is WriteStateWorkItem
+                                && workItem.DeletionGeneration != _deletionGeneration)
+                            {
+                                throw new InvalidOperationException(
+                                    "The journaled state operation was queued before deletion reset its state.");
+                            }
+
+                            operationType = workItem switch
+                            {
+                                WriteStateWorkItem when IsSnapshotRequired => JournaledStateOperation.Snapshot,
+                                WriteStateWorkItem => JournaledStateOperation.Write,
+                                DeleteStateWorkItem => JournaledStateOperation.Delete,
+                                _ => null
+                            };
+                            if (operationType == JournaledStateOperation.Snapshot)
+                            {
+                                compactionReason = _snapshotRequired
+                                    ? JournalingInstruments.CompactionReasonUserSnapshot
+                                    : JournalingInstruments.CompactionReasonStorageRequested;
+                                _snapshotRequired = false;
+                            }
                         }
 
-                        operationType = workItem switch
-                        {
-                            WriteStateWorkItem write when write.SnapshotRequired || IsSnapshotRequired => JournaledStateOperation.Snapshot,
-                            WriteStateWorkItem => JournaledStateOperation.Write,
-                            DeleteStateWorkItem => JournaledStateOperation.Delete,
-                            _ => null
-                        };
+                        (queueOperation, queueDuration, storageActivity) = GetStorageQueueOperation(workItem, operationType, processingTimestamp);
+
                         if (operationType is { } operation && _hooks is { Count: > 0 })
                         {
                             beforeHookRunning = true;
@@ -321,7 +322,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         switch (workItem)
                         {
-                            case WriteStateWorkItem writeState:
+                            case WriteStateWorkItem:
                                 {
                                     // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
                                     //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
@@ -331,12 +332,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                         : JournalingInstruments.OperationAppend;
                                     if (isSnapshot)
                                     {
-                                        var compactionReason = writeState.SnapshotRequired
-                                            ? JournalingInstruments.CompactionReasonUserSnapshot
-                                            : _snapshotRequired
-                                                ? JournalingInstruments.CompactionReasonMigration
-                                                : JournalingInstruments.CompactionReasonStorageRequested;
-                                        _shared.Instruments.OnCompactionTriggered(compactionReason);
+                                        _shared.Instruments.OnCompactionTriggered(compactionReason!);
                                     }
                                     _shared.Instruments.OnWriteCoalesced(operationLabel, workItem.CallerCount);
                                     var gatherStartTimestamp = _shared.TimeProvider.GetTimestamp();
@@ -355,11 +351,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             if (_retirementTracker.Count > 0)
                                             {
                                                 RetireOrResurectStates();
-                                            }
-
-                                            if (_snapshotRequired)
-                                            {
-                                                ThrowIfMigrationBlockedByRetiredStates();
                                             }
 
                                             // The map of state ids is itself stored as a durable state with the id 0.
@@ -502,11 +493,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             {
                                                 state.OnWriteCompleted();
                                             }
-
-                                            if (isSnapshot)
-                                            {
-                                                _snapshotRequired = false;
-                                            }
                                         }
                                     }
 
@@ -589,6 +575,14 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     }
                     catch (Exception exception) when (beforeHookRunning || afterHookRunning)
                     {
+                        if (beforeHookRunning && operationType == JournaledStateOperation.Snapshot)
+                        {
+                            lock (_lock)
+                            {
+                                _snapshotRequired = true;
+                            }
+                        }
+
                         if (beforeHookRunning && exception is OperationCanceledException && _shutdownCancellation.IsCancellationRequested)
                         {
                             workItem.TrySetCanceled(_shutdownCancellation.Token);
@@ -722,20 +716,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     // We remove the tracker from memory only, since the snapshot will persist the change.
                     _retirementTracker.ApplyRemove(name);
                 }
-            }
-        }
-    }
-
-    private void ThrowIfMigrationBlockedByRetiredStates()
-    {
-        foreach (var state in _statesMap.Values)
-        {
-            if (state is RetiredStateMachine { PreservedEntries.Count: > 0 } retiredState)
-            {
-                throw new InvalidOperationException(
-                    $"Cannot migrate journal to format key '{_shared.JournalFormatKey}' because stream " +
-                    $"{retiredState.StreamId.Value} belongs to a state which is not currently registered. Register the state so it can be decoded " +
-                    "and snapshotted in the configured format, or keep the previous journal format configured until the state can be retired.");
             }
         }
     }
@@ -952,11 +932,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
-            var isSnapshot = IsSnapshotRequired;
-            operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
-            var workItem = EnqueueOrGetPendingWorkItem<WriteStateWorkItem>(out didEnqueue);
-            workItem.SnapshotRequired |= isSnapshot;
-            pendingWrite = workItem.Task;
+            _snapshotRequired = IsSnapshotRequired;
+            operation = _snapshotRequired ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
+            pendingWrite = EnqueueOrGetPendingWorkItem<WriteStateWorkItem>(out didEnqueue).Task;
         }
 
         if (didEnqueue)
@@ -1289,21 +1267,37 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
     }
 
-    private static string? GetStorageQueueOperation(WorkItem workItem) =>
-        workItem switch
+    private (string? Operation, TimeSpan QueueDuration, Activity? Activity) GetStorageQueueOperation(
+        WorkItem workItem,
+        JournaledStateOperation? operationType,
+        long processingTimestamp)
+    {
+        var operation = operationType switch
         {
-            WriteStateWorkItem { SnapshotRequired: true } => JournalingInstruments.OperationSnapshot,
-            WriteStateWorkItem => JournalingInstruments.OperationAppend,
-            DeleteStateWorkItem => JournalingInstruments.OperationDelete,
+            JournaledStateOperation.Snapshot => JournalingInstruments.OperationSnapshot,
+            JournaledStateOperation.Write => JournalingInstruments.OperationAppend,
+            JournaledStateOperation.Delete => JournalingInstruments.OperationDelete,
             _ => null
         };
+        if (operation is null)
+        {
+            return default;
+        }
+
+        var queueDuration = _shared.TimeProvider.GetElapsedTime(workItem.EnqueuedTimestamp, processingTimestamp);
+        var activity = ActivitySources.StorageGrainSource.StartActivity(
+            $"journal {operation}",
+            ActivityKind.Internal,
+            workItem.TraceParent,
+            tags: null,
+            links: workItem.TraceLinks);
+        activity?.SetTag(ActivityTagKeys.JournalStorageOperation, operation);
+        return (operation, queueDuration, activity);
+    }
 
     private sealed class InitializeWorkItem : WorkItem;
 
-    private sealed class WriteStateWorkItem : WorkItem
-    {
-        public bool SnapshotRequired { get; set; }
-    }
+    private sealed class WriteStateWorkItem : WorkItem;
 
     private sealed class DeleteStateWorkItem : WorkItem;
 
@@ -1426,8 +1420,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         private readonly List<IPreservedJournalEntry> _preservedEntries = [];
 
         public JournalStreamId StreamId { get; } = streamId;
-
-        public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
 
         void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             _preservedEntries.Add(new PreservedJournalEntry(entry.FormatKey, entry.Reader));
