@@ -359,7 +359,7 @@ public partial class StateManagerTests
         manager.RegisterStateMachine("ack", new HookAcknowledgementState(events));
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        manager.Hooks.Add(new CaptureTestHook(
+        manager.Hooks.Add(new DelegateTestHook(
             (_, _) =>
             {
                 Assert.Equal(3, state["late"]);
@@ -407,10 +407,8 @@ public partial class StateManagerTests
         Assert.Equal(3, recovered["late"]);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Hooks_CanceledCallerRetainsFinalPreparationAndPostCompletion(bool captureHook)
+    [Fact]
+    public async Task Hooks_CanceledCallerRetainsFinalPreparationAndPostCompletion()
     {
         var storage = new CapturingStorage();
         await using var manager = CreateTestSystem(storage).Manager;
@@ -433,9 +431,7 @@ public partial class StateManagerTests
             Assert.Single(storage.Appends);
             completed.TrySetResult();
         };
-        manager.Hooks.Add(captureHook
-            ? new CaptureTestHook(before, after)
-            : new DelegateTestHook { BeforeOperationAsync = before, AfterOperation = after });
+        manager.Hooks.Add(new DelegateTestHook(before, after));
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         using var caller = new CancellationTokenSource();
         state["business"] = 1;
@@ -468,21 +464,31 @@ public partial class StateManagerTests
     }
 
     [Fact]
-    public async Task Hooks_RegistrationEnforcesSingleCapturePrerequisite()
+    public async Task Hooks_BeforeCallbacksRunInReverseAndAfterCallbacksRunInListOrder()
     {
         await using var manager = CreateTestSystem().Manager;
-        var first = new CaptureTestHook((_, _) => default);
-        var second = new CaptureTestHook((_, _) => default);
-        var ordinary = new DelegateTestHook();
-        manager.Hooks.Add(first);
-        manager.Hooks.Add(ordinary);
-        Assert.Throws<InvalidOperationException>(() => manager.Hooks.Add(second));
-        Assert.Throws<InvalidOperationException>(() => manager.Hooks[1] = second);
-        Assert.Equal(new IJournaledStateHook[] { first, ordinary }, manager.Hooks);
-        manager.Hooks[0] = second;
-        Assert.Same(second, manager.Hooks[0]);
+        List<string> events = [];
+        manager.RegisterStateMachine("ack", new HookAcknowledgementState(events));
+        manager.Hooks.Add(new DelegateTestHook
+        {
+            BeforeOperation = (_, _) => events.Add("second-before"),
+            AfterOperation = (_, _) => events.Add("second-after")
+        });
+        manager.Hooks.Add(new DelegateTestHook
+        {
+            BeforeOperation = (_, _) => events.Add("third-before"),
+            AfterOperation = (_, _) => events.Add("third-after")
+        });
+        manager.Hooks.Insert(0, new DelegateTestHook
+        {
+            BeforeOperation = (_, _) => events.Add("first-before"),
+            AfterOperation = (_, _) => events.Add("first-after")
+        });
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(
+            ["third-before", "second-before", "first-before", "capture", "ack", "first-after", "second-after", "third-after"],
+            events);
     }
 
     [Fact]
@@ -495,7 +501,7 @@ public partial class StateManagerTests
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var after = 0;
-        manager.Hooks.Add(new CaptureTestHook(
+        manager.Hooks.Add(new DelegateTestHook(
             async (operation, token) =>
             {
                 if (!deleting)
@@ -1102,25 +1108,13 @@ public partial class StateManagerTests
         Assert.Equal(original.Message, copy.Message);
     }
 
-    private sealed class CaptureTestHook(
-        Func<JournaledStateOperation, CancellationToken, ValueTask> before,
-        Action<JournaledStateOperation, CancellationToken>? after = null) : IJournaledStateCaptureHook
-    {
-        public ValueTask BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken) =>
-            before(operation, cancellationToken);
-
-        public ValueTask AfterOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
-        {
-            after?.Invoke(operation, cancellationToken);
-            return default;
-        }
-    }
-
-    private sealed class DelegateTestHook : IJournaledStateHook
+    private sealed class DelegateTestHook(
+        Func<JournaledStateOperation, CancellationToken, ValueTask>? before = null,
+        Action<JournaledStateOperation, CancellationToken>? after = null) : IJournaledStateHook
     {
         public Action<JournaledStateOperation, CancellationToken>? BeforeOperation { get; init; }
-        public Func<JournaledStateOperation, CancellationToken, ValueTask>? BeforeOperationAsync { get; init; }
-        public Action<JournaledStateOperation, CancellationToken>? AfterOperation { get; init; }
+        public Func<JournaledStateOperation, CancellationToken, ValueTask>? BeforeOperationAsync { get; init; } = before;
+        public Action<JournaledStateOperation, CancellationToken>? AfterOperation { get; init; } = after;
         public Func<JournaledStateOperation, CancellationToken, ValueTask>? AfterOperationAsync { get; init; }
 
         ValueTask IJournaledStateHook.BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)

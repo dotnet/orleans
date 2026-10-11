@@ -18,24 +18,15 @@ internal partial class JournaledStateManager
         }
     }
 
-    private async ValueTask<IJournaledStateCaptureHook?> InvokeBeforeHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+    private async ValueTask InvokeBeforeHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
     {
-        IJournaledStateCaptureHook? captureHook = null;
-        for (var i = 0; i < _hooks!.Count; i++)
+        for (var i = _hooks!.Count - 1; i >= 0; i--)
         {
-            var hook = _hooks[i];
-            if (hook is IJournaledStateCaptureHook capture)
-            {
-                captureHook = capture;
-                continue;
-            }
-
             cancellationToken.ThrowIfCancellationRequested();
-            await hook.BeforeOperationAsync(operation, cancellationToken).ConfigureAwait(true);
+            await _hooks[i].BeforeOperationAsync(operation, cancellationToken).ConfigureAwait(true);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        return captureHook;
     }
 
     private async ValueTask InvokeAfterHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
@@ -71,7 +62,7 @@ internal partial class JournaledStateManager
             lock (owner._lock)
             {
                 owner.EnsureRegistrationAllowed();
-                ValidateHook(item, replacingIndex: -1);
+                ArgumentNullException.ThrowIfNull(item);
                 base.InsertItem(index, item);
             }
         }
@@ -81,7 +72,7 @@ internal partial class JournaledStateManager
             lock (owner._lock)
             {
                 owner.EnsureRegistrationAllowed();
-                ValidateHook(item, index);
+                ArgumentNullException.ThrowIfNull(item);
                 base.SetItem(index, item);
             }
         }
@@ -104,19 +95,5 @@ internal partial class JournaledStateManager
             }
         }
 
-        private void ValidateHook(IJournaledStateHook item, int replacingIndex)
-        {
-            ArgumentNullException.ThrowIfNull(item);
-            if (item is IJournaledStateCaptureHook)
-            {
-                for (var i = 0; i < Count; i++)
-                {
-                    if (i != replacingIndex && this[i] is IJournaledStateCaptureHook)
-                    {
-                        throw new InvalidOperationException("A journal owner supports one final capture prerequisite hook. Inspect and deduplicate the hook list before registration.");
-                    }
-                }
-            }
-        }
     }
 }

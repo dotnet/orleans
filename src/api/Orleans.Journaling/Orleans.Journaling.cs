@@ -219,10 +219,6 @@ namespace Orleans.Journaling
         T? Value { get; set; }
     }
 
-    public partial interface IJournaledStateCaptureHook : IJournaledStateHook
-    {
-    }
-
     public partial interface IJournaledStateHook
     {
         System.Threading.Tasks.ValueTask AfterOperationAsync(JournaledStateOperation operation, System.Threading.CancellationToken cancellationToken);

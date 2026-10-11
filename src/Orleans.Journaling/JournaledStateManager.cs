@@ -306,13 +306,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         if (operationType is { } operation && _hooks is { Count: > 0 })
                         {
                             beforeHookRunning = true;
-                            var captureHook = await InvokeBeforeHooksAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
-
-                            if (captureHook is not null)
-                            {
-                                // Await the final prerequisite in this frame so capture follows its completion directly.
-                                await captureHook.BeforeOperationAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
-                            }
+                            await InvokeBeforeHooksAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
 
                             _shutdownCancellation.Token.ThrowIfCancellationRequested();
                             beforeHookRunning = false;

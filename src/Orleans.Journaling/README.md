@@ -269,14 +269,14 @@ of the ambient grain context, including when the caller subsequently enrolls the
 `IJournaledStateManager.Hooks` is a lazily allocated, stable list of `IJournaledStateHook`
 registrations. Features register and deduplicate their hooks during setup before initialization
 begins, alongside state-machine registration. The hook list then remains fixed through recovery,
-persistence and whole-journal deletion. The standard manager admits at most one `IJournaledStateCaptureHook`.
+persistence and whole-journal deletion.
 Every journal owner implementation provides the hook list and invokes registered callbacks at
 the operation boundaries described below. Delegating owners forward the list to their inner owner.
 
-For each actual write, snapshot, or deletion, ordinary before hooks run in list order outside
-the manager lock. The capture hook runs last: the work loop awaits it directly, then synchronously
-captures the registered states or starts deletion. Prerequisites cover all changes staged during
-asynchronous preparation, including changes arriving while the capture hook awaits its own I/O.
+For each actual write, snapshot, or deletion, before hooks run in reverse list order outside
+the manager lock. Register the final prerequisite at index zero so it runs last before the work loop
+captures the registered states or starts deletion. Prerequisites remain valid through capture or
+deletion, covering changes staged during asynchronous preparation and while the work loop resumes.
 Keep operation-local bookkeeping for the captured batch separate from later pending changes.
 
 After hooks run in list order after storage acknowledgement and state acknowledgement or reset.

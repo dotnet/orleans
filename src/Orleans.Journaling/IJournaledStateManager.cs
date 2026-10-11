@@ -17,9 +17,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// Inspect, add, remove, and deduplicate hooks during setup, before initialization begins.
-    /// Registration remains fixed for this manager's initialized lifetime. Ordinary before hooks
-    /// and all after hooks execute in list order. The optional single
-    /// <see cref="IJournaledStateCaptureHook"/> supplies the final prerequisite.
+    /// Registration remains fixed for this manager's initialized lifetime. Before hooks execute in
+    /// reverse list order; after hooks execute in forward list order. Register the final capture
+    /// prerequisite at index zero so it runs last before capture or deletion.
     /// Registration is independent of state-machine registration and persists through recovery and deletion.
     /// Every implementation provides this list and invokes its hooks at the documented operation boundaries.
     /// </remarks>

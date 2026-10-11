@@ -83,11 +83,10 @@ The hook list then remains fixed through recovery, persistence and deletion.
 Every journal owner implementation provides this list and runs its registered callbacks at the
 operation boundaries below. Delegating owners forward the list to the inner owner.
 
-Each actual append, snapshot, or deletion runs ordinary before callbacks in list order, outside
-the manager lock. At most one <xref:Orleans.Journaling.IJournaledStateCaptureHook> supplies the
-final prerequisite. Its before callback runs last, and the work loop awaits it directly before
-synchronous capture or storage deletion. Prerequisites cover changes staged during asynchronous
-preparation, including the final hook's own I/O wait. Preserve operation-local bookkeeping for
+Each actual append, snapshot, or deletion runs before callbacks in reverse list order, outside
+the manager lock. Register the final prerequisite at index zero so its callback runs last before
+synchronous capture or storage deletion. Prerequisites remain valid through capture or deletion, covering changes staged
+during asynchronous preparation and while the work loop resumes. Preserve operation-local bookkeeping for
 the captured batch separately from changes staged later.
 
 Storage acknowledgement and registered-state acknowledgement or reset precede after callbacks.
