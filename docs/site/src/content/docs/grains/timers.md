@@ -32,13 +32,9 @@ Register timers with <xref:Orleans.GrainBaseExtensions.RegisterGrainTimer*>. <xr
 
 ### Callback scheduling
 
-Orleans completes each callback task before scheduling the next callback for that timer. It then measures the period, so callback duration adds to the interval between callback starts.
+A timer callback never overlaps itself. Orleans waits for the callback task to complete and then measures the period before scheduling the next callback. Callback duration therefore adds to the interval between callback starts.
 
-Timer callbacks are local-only messages addressed to their activation. They participate in normal turn scheduling and start a fresh call chain. Each callback receives a fresh request context, while the state passed at registration remains available to the callback.
-
-A zero due time queues a callback directly on the activation. A zero period queues the next callback after the current callback completes. Both use the same activation scheduling, interleaving, and idle-lifetime rules as delayed ticks.
-
-The configured <xref:System.TimeProvider> controls delayed tick timing and resolution; Orleans queues the provider's tick notifications on the activation.
+Timer callbacks are local-only messages addressed to their activation. They participate in normal turn scheduling and stay on the activation which registered them.
 
 ### Interleaving
 
@@ -54,11 +50,9 @@ With <xref:Orleans.Runtime.GrainTimerCreationOptions.KeepAlive> set to `true`, e
 
 ## Change or stop a timer
 
-Call <xref:Orleans.Runtime.IGrainTimer.Change*> to replace the due time and period. When a callback is already queued or running, it keeps its turn and the change takes effect after it completes. Repeated changes use the latest due time and period for the following schedule.
+Call <xref:Orleans.Runtime.IGrainTimer.Change*> to replace the due time and period. The new due time schedules the next callback, and the new period applies after that callback completes. A change made inside a running callback takes effect after the callback completes.
 
-A physical tick already dispatched by the provider can arrive after a change to another delayed schedule. Orleans admits that tick according to the activation's scheduling rules. After its callback completes, the configured period determines the next tick, or a change made during the callback supplies the next due time.
-
-Dispose <xref:Orleans.Runtime.IGrainTimer> to invalidate queued ticks, cancel the token of an admitted callback, and stop further scheduling. Queued messages drain through activation scheduling. Orleans also cancels the token and disposes the timer when the activation begins deactivating.
+Dispose <xref:Orleans.Runtime.IGrainTimer> to cancel its callback token and stop future callbacks. Orleans also cancels the token and disposes the timer when the activation begins deactivating.
 
 ## Handle callback failures
 
