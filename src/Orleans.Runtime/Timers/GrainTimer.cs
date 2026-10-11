@@ -100,9 +100,9 @@ internal abstract partial class GrainTimer : IGrainTimer
         QueueTickOnActivation();
     }
 
-    // The admission is reserved under _cts, but delivered outside it: activation shutdown disposes
+    // The admission is reserved under _cts, but enqueued outside it: activation shutdown disposes
     // timers under its own lock. Taking that lock while holding _cts would invert the lock order.
-    // Changes during delivery affect the following tick; disposal prevents callback admission.
+    // Changes during enqueueing affect the following tick; disposal prevents callback admission.
     private void QueueTickOnActivation()
     {
         try
@@ -125,16 +125,6 @@ internal abstract partial class GrainTimer : IGrainTimer
         }
         catch (Exception exception)
         {
-            lock (_cts)
-            {
-                if (_state != TimerState.Disposed)
-                {
-                    _state = TimerState.Idle;
-                    // Release failed admission without immediately retrying the failed delivery.
-                    _timer.Change(_dueTime == TimeSpan.Zero ? Timeout.InfiniteTimeSpan : _dueTime, Timeout.InfiniteTimeSpan);
-                }
-            }
-
             try
             {
                 LogErrorScheduleTickOnActivation(Logger, exception, this);

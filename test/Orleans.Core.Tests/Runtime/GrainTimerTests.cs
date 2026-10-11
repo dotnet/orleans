@@ -268,7 +268,7 @@ public sealed class GrainTimerTests
     }
 
     [Fact]
-    public async Task DisposeDuringDelivery_StateLockIsReleasedBeforeActivationAdmission()
+    public async Task DisposeDuringEnqueue_StateLockIsReleasedBeforeActivationAdmission()
     {
         using var fixture = new TimerFixture();
         var entered = NewCompletion();
@@ -435,46 +435,6 @@ public sealed class GrainTimerTests
             await release.Task;
             throw exception;
         }
-    }
-
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(0)]
-    [InlineData(2000)]
-    public async Task AdmissionFailure_LogsErrorWithoutImplicitImmediateRetry(int replacementMilliseconds)
-    {
-        using var fixture = new TimerFixture();
-        var exception = new InvalidOperationException("Admission failed");
-        var calls = 0;
-        using var timer = fixture.Register((_, _) =>
-        {
-            calls++;
-            return Task.CompletedTask;
-        }, 0, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        fixture.BeforeReceive = () =>
-        {
-            if (replacementMilliseconds >= 0)
-            {
-                timer.Change(TimeSpan.FromMilliseconds(replacementMilliseconds), Timeout.InfiniteTimeSpan);
-            }
-            throw exception;
-        };
-        timer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
-        Assert.Empty(fixture.Messages);
-        Assert.Same(exception, fixture.SingleLoggedError());
-        fixture.BeforeReceive = null;
-        if (replacementMilliseconds > 0)
-        {
-            fixture.Time.Advance(TimeSpan.FromSeconds(2));
-        }
-        else
-        {
-            fixture.Time.Advance(TimeSpan.FromDays(1));
-            Assert.Empty(fixture.Messages);
-            timer.Change(TimeSpan.Zero, Timeout.InfiniteTimeSpan);
-        }
-        await fixture.InvokeAsync(Assert.Single(fixture.Messages));
-        Assert.Equal(1, calls);
     }
 
     [Fact]
