@@ -113,7 +113,7 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
                 }
 
                 var val = codecProvider is CodecProvider provider
-                    ? (TService)provider.GetServiceOrCreateInstance(typeof(TService))
+                    ? (TService)provider.GetService(typeof(TService))
                     : ActivatorUtilities.GetServiceOrCreateInstance<TService>(codecProvider.Services);
                 while (val is IServiceHolder<TService> wrapping)
                 {

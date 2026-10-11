@@ -577,6 +577,20 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
+        internal object GetService(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+#endif
+            Type type)
+        {
+            if (TryGetCached(_serializerServices, type, out var completed)) return completed;
+            if (TryGetSerializerService(type, out var registered)) return registered;
+            // Interface holders and external dependencies use the construction provider's routing and restrictions.
+            return IsRegisteredImplementation(type)
+                ? GetServiceOrCreateInstance(type)
+                : ActivatorUtilities.GetServiceOrCreateInstance(Services, type);
+        }
+
 #if NET5_0_OR_GREATER
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultReferenceTypeActivator<>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultValueTypeActivator<>))]
@@ -593,7 +607,7 @@ namespace Orleans.Serialization.Serializers
             "IL2067",
             Justification = "Generated manifests and trim-safe manual configuration use the annotated TypeManifestOptions registration methods, which preserve public constructors. Built-in dynamically closed implementations are rooted by DynamicDependency attributes. Other implementation types are resolved from dependency injection before this activation path. The TypeManifestOptions and dictionary boundaries cannot retain the annotations.")]
 #endif
-        internal object GetServiceOrCreateInstance(Type type, object[]? constructorArguments = null)
+        private object GetServiceOrCreateInstance(Type type, object[]? constructorArguments = null)
         {
             try
             {
