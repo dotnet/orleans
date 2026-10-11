@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
@@ -36,19 +35,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private bool _migrationSnapshotRequired;
     private int _disposed;
     private Task? _disposeTask;
-    private HookCollection? _hooks;
-    private bool _hookOperationRunning;
-
-    public IList<IJournaledStateHook> Hooks
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _hooks ??= new(this);
-            }
-        }
-    }
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
         : this(shared, CreateStorage(storageProvider, CreateJournalId(grainContext)), grainContext)
@@ -143,7 +129,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             _shutdownCancellation.Token.ThrowIfCancellationRequested();
             if (_workLoop is not null)
             {
-                throw new InvalidOperationException("New states cannot be registered after journaled state manager initialization has begun.");
+                throw new InvalidOperationException("Journal registrations cannot be changed after journaled state manager initialization has begun.");
             }
         }
     }
@@ -273,7 +259,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         }
 
                         workItem = dequeuedWorkItem;
-                        _hookOperationRunning = workItem is AppendJournalWorkItem or WriteSnapshotWorkItem or DeleteStateWorkItem;
                     }
 
                     var processingTimestamp = _shared.TimeProvider.GetTimestamp();
@@ -599,11 +584,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         }
 
                         storageActivity?.SetStatus(ActivityStatusCode.Ok);
-                        lock (_lock)
-                        {
-                            _hookOperationRunning = false;
-                            workItem.SetResult();
-                        }
+                        workItem.SetResult();
                     }
                     catch (Exception exception) when (beforeHookRunning || afterHookRunning)
                     {
@@ -620,13 +601,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                             _shared.Instruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: afterHookRunning);
                         }
 
-                        lock (_lock)
-                        {
-                            _hookOperationRunning = false;
-                            workItem.SetException(afterHookRunning
-                                ? new JournaledStatePostCommitException(hookOperation.Value, exception)
-                                : new JournaledStatePreCommitException(hookOperation.Value, exception));
-                        }
+                        workItem.SetException(afterHookRunning
+                            ? new JournaledStatePostCommitException(hookOperation.Value, exception)
+                            : new JournaledStatePreCommitException(hookOperation.Value, exception));
                     }
                     catch (Exception exception)
                     {
@@ -660,11 +637,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     }
                     finally
                     {
-                        lock (_lock)
-                        {
-                            _hookOperationRunning = false;
-                        }
-
                         storageActivity?.Dispose();
                     }
                 }
@@ -677,127 +649,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             {
                 Fence(exception);
                 return;
-            }
-        }
-    }
-
-    private async ValueTask<IJournaledStateCaptureHook?> InvokeBeforeHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
-    {
-        IJournaledStateCaptureHook? captureHook = null;
-        for (var i = 0; i < _hooks!.Count; i++)
-        {
-            var hook = _hooks[i];
-            if (hook is IJournaledStateCaptureHook capture)
-            {
-                captureHook = capture;
-                continue;
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            await hook.BeforeOperationAsync(operation, cancellationToken).ConfigureAwait(true);
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
-        return captureHook;
-    }
-
-    private async ValueTask InvokeAfterHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
-    {
-        List<Exception>? failures = null;
-        for (var i = 0; i < _hooks!.Count; i++)
-        {
-            try
-            {
-                await _hooks[i].AfterOperationAsync(operation, cancellationToken).ConfigureAwait(true);
-            }
-            catch (Exception exception)
-            {
-                (failures ??= []).Add(exception);
-            }
-        }
-
-        if (failures is { Count: 1 })
-        {
-            ExceptionDispatchInfo.Capture(failures[0]).Throw();
-        }
-
-        if (failures is not null)
-        {
-            throw new AggregateException(failures);
-        }
-    }
-
-    private sealed class HookCollection(JournaledStateManager owner) : Collection<IJournaledStateHook>
-    {
-        protected override void InsertItem(int index, IJournaledStateHook item)
-        {
-            lock (owner._lock)
-            {
-                EnsureMutationAllowed();
-                ValidateHook(item, replacingIndex: -1);
-                base.InsertItem(index, item);
-            }
-        }
-
-        protected override void SetItem(int index, IJournaledStateHook item)
-        {
-            lock (owner._lock)
-            {
-                EnsureMutationAllowed();
-                ValidateHook(item, index);
-                base.SetItem(index, item);
-            }
-        }
-
-        protected override void RemoveItem(int index)
-        {
-            lock (owner._lock)
-            {
-                EnsureMutationAllowed();
-                base.RemoveItem(index);
-            }
-        }
-
-        protected override void ClearItems()
-        {
-            lock (owner._lock)
-            {
-                EnsureMutationAllowed();
-                base.ClearItems();
-            }
-        }
-
-        private void EnsureMutationAllowed()
-        {
-            ObjectDisposedException.ThrowIf(owner._disposed != 0, owner);
-            owner._shutdownCancellation.Token.ThrowIfCancellationRequested();
-            owner.ThrowIfFenced();
-            if (owner._hookOperationRunning)
-            {
-                throw new InvalidOperationException("Journal operation hooks can be changed only while persistence is quiescent.");
-            }
-
-            foreach (var workItem in owner._workQueue)
-            {
-                if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem or DeleteStateWorkItem)
-                {
-                    throw new InvalidOperationException("Journal operation hooks can be changed only while persistence is quiescent.");
-                }
-            }
-        }
-
-        private void ValidateHook(IJournaledStateHook item, int replacingIndex)
-        {
-            ArgumentNullException.ThrowIfNull(item);
-            if (item is IJournaledStateCaptureHook)
-            {
-                for (var i = 0; i < Count; i++)
-                {
-                    if (i != replacingIndex && this[i] is IJournaledStateCaptureHook)
-                    {
-                        throw new InvalidOperationException("A journal owner supports one final capture prerequisite hook. Inspect and deduplicate the hook list before registration.");
-                    }
-                }
             }
         }
     }
@@ -1325,21 +1176,37 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     {
         lock (_lock)
         {
-            return new(_disposeTask ??= DisposeCoreAsync());
+            if (_disposeTask is null)
+            {
+                var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _disposeTask = completion.Task;
+                _ = DisposeCoreAsync(completion);
+            }
+
+            return new(_disposeTask);
         }
     }
 
-    private async Task DisposeCoreAsync()
+    private async Task DisposeCoreAsync(TaskCompletionSource completion)
     {
         _disposed = 1;
         try
         {
-            await StopAsync(CancellationToken.None).ConfigureAwait(false);
+            try
+            {
+                await StopAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            finally
+            {
+                _shutdownCancellation.Dispose();
+                _journalWriter.Dispose();
+            }
+
+            completion.SetResult();
         }
-        finally
+        catch (Exception exception)
         {
-            _shutdownCancellation.Dispose();
-            _journalWriter.Dispose();
+            completion.SetException(exception);
         }
     }
 

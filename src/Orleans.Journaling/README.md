@@ -267,10 +267,9 @@ of the ambient grain context, including when the caller subsequently enrolls the
 ## Journal operation hooks
 
 `IJournaledStateManager.Hooks` is a lazily allocated, stable list of `IJournaledStateHook`
-registrations. Features inspect and deduplicate their registrations on the owner's logical
-execution context while persistence is quiescent. Registration persists through recovery and
-whole-journal deletion. The standard manager rejects mutation of the list while persistence is
-queued or running and admits at most one `IJournaledStateCaptureHook`.
+registrations. Features register and deduplicate their hooks during setup before initialization
+begins, alongside state-machine registration. The hook list then remains fixed through recovery,
+persistence and whole-journal deletion. The standard manager admits at most one `IJournaledStateCaptureHook`.
 Every journal owner implementation provides the hook list and invokes registered callbacks at
 the operation boundaries described below. Delegating owners forward the list to their inner owner.
 
@@ -299,6 +298,7 @@ Shutdown closes work admission and cancels queued operations while an already ru
 drains to its actual storage and hook outcome.
 Hook implementations complete without calling initialization, persistence, or disposal on their
 own owner: awaiting an operation serialized behind the current callback creates a circular dependency.
+Dependencies between journal owners also remain acyclic.
 Before whole-journal deletion, the feature owner stops admission and drains its own operations;
 deletion completion follows storage deletion and registered-state reset.
 

@@ -72,10 +72,9 @@ staged mutations from other calls.
 
 Activation-scoped features coordinate prerequisites and completion through
 <xref:Orleans.Journaling.IJournaledStateManager.Hooks>. The owner exposes a stable, lazily
-allocated list of <xref:Orleans.Journaling.IJournaledStateHook> registrations. Inspect and
-deduplicate feature registrations on the owner's logical execution context while persistence
-is quiescent. Registration survives recovery and deletion; the standard manager rejects hook-list
-mutation while persistence is queued or running.
+allocated list of <xref:Orleans.Journaling.IJournaledStateHook> registrations. Register and
+deduplicate feature hooks during setup before initialization begins, alongside state machines.
+The hook list then remains fixed through recovery, persistence and deletion.
 Every journal owner implementation provides this list and runs its registered callbacks at the
 operation boundaries below. Delegating owners forward the list to the inner owner.
 
@@ -103,7 +102,8 @@ operation running through its actual outcome. Disposal drains owned hooks and st
 journal resources, including when cancellation callbacks or cleanup fail. Concurrent disposal callers
 share this completion. Hook implementations complete without calling initialization, persistence,
 or disposal on their own owner. Awaiting an operation serialized behind the current callback creates
-a circular dependency. Shutdown closes work admission and cancels queued operations while the current
+a circular dependency. Dependencies between journal owners also remain acyclic.
+Shutdown closes work admission and cancels queued operations while the current
 operation drains to its actual storage and hook outcome. For deletion, the feature owner stops
 admission and drains feature operations before
 queuing the whole-journal reset.

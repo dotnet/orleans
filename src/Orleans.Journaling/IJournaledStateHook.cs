@@ -27,6 +27,7 @@ public enum JournaledStateOperation
 /// pending changes separate. Hook implementations must complete without calling initialization,
 /// persistence, or disposal on their own journal owner. Those operations are serialized behind the
 /// current operation, so awaiting them from a hook would create a circular dependency.
+/// Dependencies between journal owners must also remain acyclic.
 /// </remarks>
 public interface IJournaledStateHook
 {

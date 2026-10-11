@@ -16,8 +16,8 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// Gets the mutable, lazily allocated list of journal operation hooks.
     /// </summary>
     /// <remarks>
-    /// Inspect, add, remove, and deduplicate hooks on the owner's logical execution context while
-    /// persistence is quiescent. Mutation while persistence is queued or running is rejected. Ordinary before hooks
+    /// Inspect, add, remove, and deduplicate hooks during setup, before initialization begins.
+    /// Registration remains fixed for this manager's initialized lifetime. Ordinary before hooks
     /// and all after hooks execute in list order. The optional single
     /// <see cref="IJournaledStateCaptureHook"/> supplies the final prerequisite.
     /// Registration is independent of state-machine registration and persists through recovery and deletion.
