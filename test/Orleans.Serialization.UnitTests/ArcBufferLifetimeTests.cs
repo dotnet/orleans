@@ -217,6 +217,40 @@ public sealed class ArcBufferLifetimeTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AppendPinned_EmptyInputChecksWriterDisposalWithoutAcquiringPins(bool pageBacked)
+    {
+        using var source = new ArcBufferWriter();
+        using var input = pageBacked ? source.PeekSlice(0) : ArcBuffer.Empty;
+        var page = input.First;
+        var references = page?.ReferenceCount;
+        using var writer = new ArcBufferWriter();
+        writer.AppendPinned(input);
+        Assert.Equal(0, writer.Length);
+        Assert.Equal(references, page?.ReferenceCount);
+        writer.Write(new byte[] { 1, 2 });
+        writer.AppendPinned(input);
+        using var retained = writer.PeekSlice(writer.Length);
+        Assert.Equal(new byte[] { 1, 2 }, retained.ToArray());
+        Assert.Equal(references, page?.ReferenceCount);
+
+        writer.Dispose();
+        var error = Assert.Throws<ObjectDisposedException>(() => writer.AppendPinned(input));
+        Assert.Equal(nameof(ArcBufferWriter), error.ObjectName);
+        Assert.Equal(0, writer.Length);
+        Assert.Equal(references, page?.ReferenceCount);
+        Assert.Equal(new byte[] { 1, 2 }, retained.ToArray());
+
+        writer.Reset();
+        writer.AppendPinned(input);
+        writer.Write(new byte[] { 3 });
+        using var resetSlice = writer.PeekSlice(writer.Length);
+        Assert.Equal(new byte[] { 3 }, resetSlice.ToArray());
+        Assert.Equal(references, page?.ReferenceCount);
+    }
+
+    [Theory]
     [InlineData(-1)]
     [InlineData(0)]
     [InlineData(1)]
@@ -267,6 +301,9 @@ public sealed class ArcBufferLifetimeTests
         writer.AppendPinned(input);
         Assert.All(pages, page => Assert.Equal(3, page.ReferenceCount));
 
+        writer.AppendPinned(ArcBuffer.Empty);
+        Assert.Equal(expected.Length, writer.Length);
+        Assert.All(pages, page => Assert.Equal(3, page.ReferenceCount));
         writer.AdvanceReader(0);
         Assert.All(pages, page => Assert.Equal(3, page.ReferenceCount));
         var reader = writer.Reader;

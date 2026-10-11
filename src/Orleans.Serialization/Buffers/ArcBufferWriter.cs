@@ -358,10 +358,12 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// <summary>
     /// Appends the pages referenced by <paramref name="input"/> by pinning them.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">The writer has been disposed.</exception>
     public void AppendPinned(ArcBuffer input)
     {
         if (input.Length == 0)
         {
+            ThrowIfDisposed();
             return;
         }
 
