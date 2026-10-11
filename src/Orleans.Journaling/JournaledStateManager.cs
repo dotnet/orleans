@@ -280,7 +280,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         storageActivity.SetTag(ActivityTagKeys.JournalStorageOperation, queueOperation);
                     }
 
-                    JournaledStateOperation? hookOperation = null;
+                    JournaledStateOperation? operationType = null;
                     var beforeHookRunning = false;
                     var afterHookRunning = false;
                     try
@@ -292,7 +292,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 "The journaled state operation was queued before deletion reset its state.");
                         }
 
-                        hookOperation = workItem switch
+                        operationType = workItem switch
                         {
                             AppendJournalWorkItem or WriteSnapshotWorkItem =>
                                 workItem is WriteSnapshotWorkItem || _migrationSnapshotRequired || _storage.IsCompactionRequested
@@ -300,7 +300,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                             DeleteStateWorkItem => JournaledStateOperation.Delete,
                             _ => null
                         };
-                        if (hookOperation is { } operation && _hooks is { Count: > 0 })
+                        if (operationType is { } operation && _hooks is { Count: > 0 })
                         {
                             beforeHookRunning = true;
                             var captureHook = await InvokeBeforeHooksAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
@@ -324,7 +324,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 {
                                     // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
                                     //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
-                                    var isSnapshot = hookOperation == JournaledStateOperation.Snapshot;
+                                    var isSnapshot = operationType == JournaledStateOperation.Snapshot;
                                     var operationLabel = isSnapshot
                                         ? JournalingInstruments.OperationSnapshot
                                         : JournalingInstruments.OperationAppend;
@@ -571,7 +571,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 }
                         }
 
-                        if (hookOperation is { } completedOperation && _hooks is { Count: > 0 })
+                        if (operationType is { } completedOperation && _hooks is { Count: > 0 })
                         {
                             afterHookRunning = true;
                             await InvokeAfterHooksAsync(completedOperation, _shutdownCancellation.Token).ConfigureAwait(true);
@@ -594,7 +594,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                             continue;
                         }
 
-                        LogOperationHookFailed(_shared.Logger, exception, hookOperation!.Value, afterHookRunning);
+                        LogOperationHookFailed(_shared.Logger, exception, operationType!.Value, afterHookRunning);
                         storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal operation hook failed.");
                         if (recordQueueDuration && queueOperation is not null)
                         {
@@ -602,8 +602,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         }
 
                         workItem.SetException(afterHookRunning
-                            ? new JournaledStatePostCommitException(hookOperation.Value, exception)
-                            : new JournaledStatePreCommitException(hookOperation.Value, exception));
+                            ? new JournaledStatePostCommitException(operationType.Value, exception)
+                            : new JournaledStatePreCommitException(operationType.Value, exception));
                     }
                     catch (Exception exception)
                     {
