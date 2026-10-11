@@ -575,7 +575,10 @@ public sealed class GrainTimerTests
         {
             if (ReferenceEquals(value.GrainContext, Grain))
             {
-                Events.Add(value);
+                lock (Events)
+                {
+                    Events.Add(value);
+                }
             }
         }
 
