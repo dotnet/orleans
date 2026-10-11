@@ -294,8 +294,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                         operationType = workItem switch
                         {
-                            AppendJournalWorkItem or WriteSnapshotWorkItem =>
-                                workItem is WriteSnapshotWorkItem || _migrationSnapshotRequired || _storage.IsCompactionRequested
+                            WriteSnapshotWorkItem => JournaledStateOperation.Snapshot,
+                            AppendJournalWorkItem =>
+                                _migrationSnapshotRequired || _storage.IsCompactionRequested
                                     ? JournaledStateOperation.Snapshot : JournaledStateOperation.Write,
                             DeleteStateWorkItem => JournaledStateOperation.Delete,
                             _ => null
