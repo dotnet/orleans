@@ -54,7 +54,10 @@ Durable collections encode their operation before applying it to the in-memory c
 - **Append** adds the encoded operation batch atomically.
 - **Snapshot replacement** writes the current state of every registered stream and atomically publishes it as the new journal generation.
 
-Concurrent calls made while the same kind of write is queued can share that queued operation. Each caller observes its completion or failure. Calls made after a storage operation starts are processed by a later operation.
+Concurrent calls made while a write is queued share that queued operation. A snapshot requirement
+from any caller upgrades the queued write to a snapshot and remains set until that operation runs.
+Each caller observes its completion or failure. Calls made after a storage operation starts are
+processed by a later operation with its own snapshot requirement.
 
 > [!IMPORTANT]
 > In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.

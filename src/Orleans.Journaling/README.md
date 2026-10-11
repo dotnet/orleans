@@ -283,6 +283,8 @@ After hooks run in list order after storage acknowledgement and state acknowledg
 They also run for a successful zero-byte write. Coalesced callers share the hooks for their actual
 operation. Features implement the before and after callbacks on their own hook, retaining their
 identity and operation-local bookkeeping there.
+Queued writes coalesce into one operation. A snapshot requirement from any caller upgrades that
+queued operation to a snapshot, even if the storage compaction signal clears before it runs.
 
 | Outcome | Owner and caller behavior |
 | --- | --- |

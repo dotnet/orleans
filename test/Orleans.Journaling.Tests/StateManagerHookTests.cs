@@ -774,6 +774,90 @@ public partial class StateManagerTests
     }
 
     [Fact]
+    public async Task Hooks_QueuedWritesCoalesceAndRetainSnapshotRequirement()
+    {
+        var context = new QueuedSynchronizationContext();
+        await context.Run(async () =>
+        {
+            var storage = new CapturingStorage();
+            await using var manager = CreateTestSystem(storage).Manager;
+            var state = new DurableValue<int>("state", manager, CreateValueCodec<int>());
+            List<JournaledStateOperation> before = [];
+            List<JournaledStateOperation> after = [];
+            manager.Hooks.Add(new DelegateTestHook
+            {
+                BeforeOperation = (operation, _) => before.Add(operation),
+                AfterOperation = (operation, _) => after.Add(operation)
+            });
+            await manager.InitializeAsync(TestContext.Current.CancellationToken);
+            state.Value = 1;
+            var append = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            storage.IsCompactionRequested = true;
+            state.Value = 2;
+            var snapshot = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            storage.IsCompactionRequested = false;
+            state.Value = 3;
+            var anotherAppend = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+
+            Assert.Empty(storage.Appends);
+            Assert.Empty(storage.Replaces);
+            Assert.Empty(before);
+            await Task.WhenAll(append, snapshot, anotherAppend);
+            Assert.Equal([JournaledStateOperation.Snapshot], before);
+            Assert.Equal([JournaledStateOperation.Snapshot], after);
+            Assert.Empty(storage.Appends);
+            Assert.Single(storage.Replaces);
+
+            await using var recoveredManager = CreateTestSystem(storage).Manager;
+            var recovered = new DurableValue<int>("state", recoveredManager, CreateValueCodec<int>());
+            await recoveredManager.InitializeAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(3, recovered.Value);
+        });
+    }
+
+    [Fact]
+    public async Task Hooks_SnapshotAcknowledgementPreservesLaterQueuedSnapshot()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true, BlockNextReplace = true };
+        await using var manager = CreateTestSystem(storage).Manager;
+        var state = new DurableValue<int>("state", manager, CreateValueCodec<int>());
+        List<JournaledStateOperation> before = [];
+        List<JournaledStateOperation> after = [];
+        manager.Hooks.Add(new DelegateTestHook
+        {
+            BeforeOperation = (operation, _) => before.Add(operation),
+            AfterOperation = (operation, _) => after.Add(operation)
+        });
+        await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        state.Value = 1;
+        var first = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+        try
+        {
+            await WaitFor(storage.ReplaceEntered.Task);
+            state.Value = 2;
+            var second = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
+            storage.IsCompactionRequested = false;
+            Assert.Empty(storage.Replaces);
+            Assert.Equal([JournaledStateOperation.Snapshot], before);
+            Assert.Empty(after);
+            storage.ReleaseReplace.TrySetResult();
+            await WaitFor(Task.WhenAll(first, second));
+            Assert.Equal([JournaledStateOperation.Snapshot, JournaledStateOperation.Snapshot], before);
+            Assert.Equal([JournaledStateOperation.Snapshot, JournaledStateOperation.Snapshot], after);
+            Assert.Empty(storage.Appends);
+            Assert.Equal(2, storage.Replaces.Count);
+            await using var recoveredManager = CreateTestSystem(storage).Manager;
+            var recovered = new DurableValue<int>("state", recoveredManager, CreateValueCodec<int>());
+            await recoveredManager.InitializeAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(2, recovered.Value);
+        }
+        finally
+        {
+            storage.ReleaseReplace.TrySetResult();
+        }
+    }
+
+    [Fact]
     public async Task Hooks_CoalescedCallersShareActualOperationCallbacks()
     {
         var storage = new CapturingStorage { BlockNextAppend = true };
