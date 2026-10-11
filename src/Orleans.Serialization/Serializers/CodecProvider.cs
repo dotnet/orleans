@@ -577,6 +577,20 @@ namespace Orleans.Serialization.Serializers
             }
         }
 
+        internal object GetService(
+#if NET5_0_OR_GREATER
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+#endif
+            Type type)
+        {
+            if (TryGetCached(_serializerServices, type, out var completed)) return completed;
+            if (TryGetSerializerService(type, out var registered)) return registered;
+            // Interface holders and external dependencies use the construction provider's routing and restrictions.
+            return IsRegisteredImplementation(type)
+                ? GetServiceOrCreateInstance(type)
+                : ActivatorUtilities.GetServiceOrCreateInstance(Services, type);
+        }
+
 #if NET5_0_OR_GREATER
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultReferenceTypeActivator<>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultValueTypeActivator<>))]
@@ -597,17 +611,26 @@ namespace Orleans.Serialization.Serializers
         {
             try
             {
-                if (_manifest.SerializerServiceFactories.Count == 0) return ActivateService(type, constructorArguments);
                 if (OrleansGeneratedCodeHelper.TryGetService(type, this) is { } caller) return caller;
                 if (TryGetCached(_serializerServices, type, out var completed)) return completed;
                 if (TryGetSerializerService(type, out var registered)) return registered;
-                return ConstructService(type, () => ActivateService(type, constructorArguments), beginGraph: false);
+                var cacheImplementation = IsRegisteredImplementation(type);
+                if (_manifest.SerializerServiceFactories.Count == 0 && !cacheImplementation) return ActivateService(type, constructorArguments);
+                return CreateService(this, type, constructorArguments, cacheImplementation);
             }
             catch (Exception exception) { RecordConstructionFailure(exception); throw; }
+
+            // Allocate captured construction state only on a cache miss.
+            static object CreateService(CodecProvider provider, Type type, object[]? constructorArguments, bool cacheImplementation)
+            {
+                var result = provider.ConstructService(type, () => provider.ActivateService(type, constructorArguments), beginGraph: false);
+                return cacheImplementation ? provider.CacheValue(provider._serializerServices, type, result) : result;
+            }
         }
 
         private bool IsRegisteredImplementation(Type type)
         {
+            // Manifest implementations have provider lifetime; ordinary DI services keep their configured lifetimes.
             var definition = type.IsConstructedGenericType ? type.GetGenericTypeDefinition() : type;
             return _manifest.SerializerTypes.Contains(type) || _manifest.SerializerTypes.Contains(definition)
                 || _manifest.FieldCodecTypes.Contains(type) || _manifest.FieldCodecTypes.Contains(definition)
