@@ -100,6 +100,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     internal string WriteJournalFormatKey => _shared.JournalFormatKey;
 
+    private bool IsSnapshotRequired => _migrationSnapshotRequired || _storage.IsCompactionRequested;
+
     internal IServiceProvider ServiceProvider => _grainContext is { } context ? context.ActivationServices : _shared.ServiceProvider;
 
     public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine)
@@ -295,7 +297,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         operationType = workItem switch
                         {
                             WriteSnapshotWorkItem => JournaledStateOperation.Snapshot,
-                            AppendJournalWorkItem when _migrationSnapshotRequired || _storage.IsCompactionRequested => JournaledStateOperation.Snapshot,
+                            AppendJournalWorkItem when IsSnapshotRequired => JournaledStateOperation.Snapshot,
                             AppendJournalWorkItem => JournaledStateOperation.Write,
                             DeleteStateWorkItem => JournaledStateOperation.Delete,
                             _ => null
@@ -951,7 +953,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         lock (_lock)
         {
             ThrowIfStateOperationsUnavailable();
-            var isSnapshot = _migrationSnapshotRequired || _storage.IsCompactionRequested;
+            var isSnapshot = IsSnapshotRequired;
             operation = isSnapshot ? JournalingInstruments.OperationSnapshot : JournalingInstruments.OperationAppend;
             pendingWrite = isSnapshot
                 ? EnqueueOrGetPendingWorkItem<WriteSnapshotWorkItem>(out didEnqueue)
