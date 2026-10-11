@@ -591,7 +591,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     /// unrecoverable one — logs this error before the retry-exhaustion check runs, so matching this message alone
     /// does not prove the attempt was recoverable. Startup only reaches this test's final assertion if every
     /// awaited silo start succeeded; an exhausted connectivity validation throws
-    /// <c>OrleansClusterConnectivityCheckFailedException</c> from <c>BecomeActive</c>, which fails
+    /// <c>OrleansClusterConnectivityCheckFailedException</c> from the <c>ValidateInitialConnectivity</c> lifecycle
+    /// stage (which runs before <c>BecomeActive</c>), which fails
     /// <see cref="InProcessTestCluster.DeployAsync"/> or <see cref="InProcessTestCluster.StartAdditionalSiloAsync"/>
     /// before this filter is ever evaluated. Reaching this point therefore guarantees any matching log here was a
     /// recovered, non-terminal retry.
