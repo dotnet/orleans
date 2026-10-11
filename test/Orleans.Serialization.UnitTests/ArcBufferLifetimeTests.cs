@@ -216,6 +216,79 @@ public sealed class ArcBufferLifetimeTests
         Assert.Equal(new byte[] { 1, 2, 3 }, retained.ToArray());
     }
 
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void DisposedWriter_RejectsReaderCursorMutationsAndCanBeReset(int count)
+    {
+        using var writer = new ArcBufferWriter();
+        var reader = writer.Reader;
+        writer.Write(new byte[] { 1, 2, 3 });
+        using var retained = writer.PeekSlice(writer.Length);
+        writer.Dispose();
+
+        var error = Assert.Throws<ObjectDisposedException>(() => writer.AdvanceReader(count));
+        Assert.Equal(nameof(ArcBufferWriter), error.ObjectName);
+        Assert.Throws<ObjectDisposedException>(() => reader.Skip(count));
+        Assert.Throws<ObjectDisposedException>(() => writer.PeekSlice(count));
+        Assert.Throws<ObjectDisposedException>(() => writer.ConsumeSlice(count));
+        Assert.Throws<ObjectDisposedException>(() => reader.PeekSlice(count));
+        Assert.Throws<ObjectDisposedException>(() => reader.ConsumeSlice(count));
+        if (count == 0)
+        {
+            Assert.Throws<ObjectDisposedException>(() => reader.Consume(Span<byte>.Empty));
+            Assert.Throws<ObjectDisposedException>(() => reader.IsNext(ReadOnlySpan<byte>.Empty, advancePast: true));
+        }
+
+        Assert.Equal(0, writer.Length);
+        Assert.Equal(new byte[] { 1, 2, 3 }, retained.ToArray());
+        writer.Reset();
+        writer.Write(new byte[] { 5, 6 });
+        writer.AdvanceReader(0);
+        reader.Skip(1);
+        Assert.Equal(1, reader.Length);
+        using var remainder = reader.ConsumeSlice(1);
+        Assert.Equal(new byte[] { 6 }, remainder.ToArray());
+        Assert.Equal(0, reader.Length);
+        Assert.Equal(new byte[] { 1, 2, 3 }, retained.ToArray());
+    }
+
+    [Fact]
+    public void PinnedWriter_AdvancesReaderAcrossPagesAndCanBeReset()
+    {
+        using var source = new ArcBufferWriter();
+        var expected = Bytes(ArcBufferWriter.MinimumPageSize + 3);
+        source.Write(expected);
+        using var input = source.PeekSlice(source.Length);
+        var pages = input.Pages.ToArray();
+        Assert.Equal(2, pages.Length);
+        using var writer = new ArcBufferWriter();
+        writer.AppendPinned(input);
+        Assert.All(pages, page => Assert.Equal(3, page.ReferenceCount));
+
+        writer.AdvanceReader(0);
+        Assert.All(pages, page => Assert.Equal(3, page.ReferenceCount));
+        var reader = writer.Reader;
+        reader.Skip(ArcBufferWriter.MinimumPageSize + 1);
+        Assert.Equal(2, reader.Length);
+        Assert.Equal(2, pages[0].ReferenceCount);
+        Assert.Equal(3, pages[1].ReferenceCount);
+        using var remainder = reader.ConsumeSlice(2);
+        Assert.Equal(expected.AsSpan(expected.Length - 2).ToArray(), remainder.ToArray());
+        Assert.Equal(0, reader.Length);
+        Assert.Equal(4, pages[1].ReferenceCount);
+
+        writer.Reset();
+        Assert.Equal(2, pages[0].ReferenceCount);
+        Assert.Equal(3, pages[1].ReferenceCount);
+        writer.Write(new byte[] { 7 });
+        reader.Skip(1);
+        Assert.Equal(0, reader.Length);
+        Assert.Equal(expected, input.ToArray());
+        Assert.Equal(expected.AsSpan(expected.Length - 2).ToArray(), remainder.ToArray());
+    }
+
     [Fact]
     public void LeadingEmptyPage_LastOwnerReleaseReturnsEveryPage()
     {

@@ -389,10 +389,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
     private void ThrowIfPinnedPages()
     {
-        if (_writePage is null)
-        {
-            throw new ObjectDisposedException(nameof(ArcBufferWriter));
-        }
+        ThrowIfDisposed();
 
         if (_hasPinnedPages)
         {
@@ -400,12 +397,17 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         }
     }
 
-    internal bool TryPeek(long offset, out byte value)
+    private void ThrowIfDisposed()
     {
-        if (_readPage is null)
+        if (_writePage is null)
         {
             throw new ObjectDisposedException(nameof(ArcBufferWriter));
         }
+    }
+
+    internal bool TryPeek(long offset, out byte value)
+    {
+        ThrowIfDisposed();
 
         if (offset < 0)
         {
@@ -474,8 +476,11 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// </summary>
     /// <param name="count">The number of bytes to consume.</param>
     /// <returns>A slice of unconsumed data.</returns>
+    /// <exception cref="ObjectDisposedException">The writer has been disposed.</exception>
     public ArcBuffer PeekSlice(int count)
     {
+        ThrowIfDisposed();
+
 #if NET6_0_OR_GREATER
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(count, UnconsumedLength);
@@ -510,8 +515,11 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// Advances the reader by the specified number of bytes.
     /// </summary>
     /// <param name="count">The number of bytes to advance the reader.</param>
+    /// <exception cref="ObjectDisposedException">The writer has been disposed.</exception>
     public void AdvanceReader(int count)
     {
+        ThrowIfDisposed();
+
 #if NET6_0_OR_GREATER
         ArgumentOutOfRangeException.ThrowIfNegative(count);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(count, UnconsumedLength);
