@@ -77,18 +77,6 @@ strategy on JIT-enabled runtimes.
 NativeAOT applications also need statically available codecs, copiers, and
 activators for their closed payload types.
 
-## Pooled buffer capacity
-
-`ArcBufferWriter.MaxRetainedPoolBytes` sets the process-wide budget for free reference-counted
-buffer pages. The default is 4 MiB. Setting zero releases free pages and disables caching; raising
-the budget allows subsequent returns to populate the cache. Pages up to 1 MiB are eligible for
-retention. Reducing the budget immediately trims already-free pages, and returns in flight recheck
-the budget after publication so the settled cache fits the current limit.
-
-Writers and pinned readers own their active pages independently of the free-page budget. A reader's
-pinned slice keeps its bytes valid through writer reset and disposal. Released large backing arrays
-return to the separately managed `ArrayPool<byte>.Shared`.
-
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://dotnet.github.io/orleans/docs/)
