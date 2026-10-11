@@ -101,8 +101,9 @@ state-processing failures retain the manager's fencing and fresh-recovery behavi
 Hook callbacks receive the owner's shutdown token. Cancelling a caller's wait leaves the owned
 operation running through its actual outcome. Disposal drains owned hooks and storage before releasing
 journal resources, including when cancellation callbacks or cleanup fail. Concurrent disposal callers
-share this completion. Recursive initialization, persistence, or disposal on the same owner from a
-hook is rejected. Shutdown closes work admission and cancels queued operations while the current
+share this completion. Hook implementations complete without calling initialization, persistence,
+or disposal on their own owner. Awaiting an operation serialized behind the current callback creates
+a circular dependency. Shutdown closes work admission and cancels queued operations while the current
 operation drains to its actual storage and hook outcome. For deletion, the feature owner stops
 admission and drains feature operations before
 queuing the whole-journal reset.

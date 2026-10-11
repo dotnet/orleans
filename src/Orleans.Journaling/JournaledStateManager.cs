@@ -13,7 +13,6 @@ namespace Orleans.Journaling;
 internal partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const uint MinApplicationJournalStreamId = 8u;
-    private static readonly AsyncLocal<JournaledStateManager?> CurrentHookOwner = new();
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -172,7 +171,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
     {
-        ThrowIfHookReentry();
         cancellationToken.ThrowIfCancellationRequested();
         Task task;
         bool didEnqueue;
@@ -325,16 +323,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                             if (captureHook is not null)
                             {
                                 // Await the final prerequisite in this frame so capture follows its completion directly.
-                                var previous = CurrentHookOwner.Value;
-                                CurrentHookOwner.Value = this;
-                                try
-                                {
-                                    await captureHook.BeforeOperationAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
-                                }
-                                finally
-                                {
-                                    CurrentHookOwner.Value = previous;
-                                }
+                                await captureHook.BeforeOperationAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
                             }
 
                             _shutdownCancellation.Token.ThrowIfCancellationRequested();
@@ -694,55 +683,37 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     private async ValueTask<IJournaledStateCaptureHook?> InvokeBeforeHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
     {
-        var previous = CurrentHookOwner.Value;
-        CurrentHookOwner.Value = this;
         IJournaledStateCaptureHook? captureHook = null;
-        try
+        for (var i = 0; i < _hooks!.Count; i++)
         {
-            for (var i = 0; i < _hooks!.Count; i++)
+            var hook = _hooks[i];
+            if (hook is IJournaledStateCaptureHook capture)
             {
-                var hook = _hooks[i];
-                if (hook is IJournaledStateCaptureHook capture)
-                {
-                    captureHook = capture;
-                    continue;
-                }
-
-                cancellationToken.ThrowIfCancellationRequested();
-                await hook.BeforeOperationAsync(operation, cancellationToken).ConfigureAwait(true);
+                captureHook = capture;
+                continue;
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            return captureHook;
+            await hook.BeforeOperationAsync(operation, cancellationToken).ConfigureAwait(true);
         }
-        finally
-        {
-            CurrentHookOwner.Value = previous;
-        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        return captureHook;
     }
 
     private async ValueTask InvokeAfterHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
     {
-        var previous = CurrentHookOwner.Value;
-        CurrentHookOwner.Value = this;
         List<Exception>? failures = null;
-        try
+        for (var i = 0; i < _hooks!.Count; i++)
         {
-            for (var i = 0; i < _hooks!.Count; i++)
+            try
             {
-                try
-                {
-                    await _hooks[i].AfterOperationAsync(operation, cancellationToken).ConfigureAwait(true);
-                }
-                catch (Exception exception)
-                {
-                    (failures ??= []).Add(exception);
-                }
+                await _hooks[i].AfterOperationAsync(operation, cancellationToken).ConfigureAwait(true);
             }
-        }
-        finally
-        {
-            CurrentHookOwner.Value = previous;
+            catch (Exception exception)
+            {
+                (failures ??= []).Add(exception);
+            }
         }
 
         if (failures is { Count: 1 })
@@ -753,14 +724,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         if (failures is not null)
         {
             throw new AggregateException(failures);
-        }
-    }
-
-    private void ThrowIfHookReentry()
-    {
-        if (ReferenceEquals(CurrentHookOwner.Value, this))
-        {
-            throw new InvalidOperationException("Journal operation hooks cannot enqueue another operation on the same journal owner.");
         }
     }
 
@@ -942,7 +905,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask DeleteStateAsync(CancellationToken cancellationToken = default)
     {
-        ThrowIfHookReentry();
         cancellationToken.ThrowIfCancellationRequested();
         Task task;
         bool didEnqueue;
@@ -1130,7 +1092,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
     {
-        ThrowIfHookReentry();
         cancellationToken.ThrowIfCancellationRequested();
 
         Task pendingWrite;
@@ -1307,7 +1268,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     private async Task StopAsync(CancellationToken cancellationToken)
     {
-        ThrowIfHookReentry();
         AggregateException? cancellationFailure = null;
         lock (_lock)
         {
@@ -1363,7 +1323,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public ValueTask DisposeAsync()
     {
-        ThrowIfHookReentry();
         lock (_lock)
         {
             return new(_disposeTask ??= DisposeCoreAsync());

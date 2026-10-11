@@ -447,18 +447,12 @@ namespace Orleans.Journaling
     public sealed partial class JournaledStatePostCommitException : System.Exception
     {
         public JournaledStatePostCommitException(JournaledStateOperation operation, System.Exception innerException) { }
-
-        [Id(0)]
-        public JournaledStateOperation Operation { get { throw null; } }
     }
 
     [GenerateSerializer]
     public sealed partial class JournaledStatePreCommitException : System.Exception
     {
         public JournaledStatePreCommitException(JournaledStateOperation operation, System.Exception innerException) { }
-
-        [Id(0)]
-        public JournaledStateOperation Operation { get { throw null; } }
     }
 
     public readonly ref partial struct JournalEntry
@@ -842,7 +836,7 @@ namespace OrleansCodeGen.Orleans.Journaling
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_JournaledStatePostCommitException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.JournaledStatePostCommitException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
-        public Codec_JournaledStatePostCommitException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Journaling.JournaledStatePostCommitException> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+        public Codec_JournaledStatePostCommitException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Journaling.JournaledStatePostCommitException> _activator) { }
 
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Journaling.JournaledStatePostCommitException instance) { }
 
@@ -860,7 +854,7 @@ namespace OrleansCodeGen.Orleans.Journaling
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_JournaledStatePreCommitException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.JournaledStatePreCommitException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
-        public Codec_JournaledStatePreCommitException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Journaling.JournaledStatePreCommitException> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+        public Codec_JournaledStatePreCommitException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Journaling.JournaledStatePreCommitException> _activator) { }
 
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Journaling.JournaledStatePreCommitException instance) { }
 
@@ -886,8 +880,6 @@ namespace OrleansCodeGen.Orleans.Journaling
     public sealed partial class Copier_JournaledStatePostCommitException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Journaling.JournaledStatePostCommitException, System.Exception>
     {
         public Copier_JournaledStatePostCommitException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
-
-        public override void DeepCopy(global::Orleans.Journaling.JournaledStatePostCommitException input, global::Orleans.Journaling.JournaledStatePostCommitException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -896,7 +888,5 @@ namespace OrleansCodeGen.Orleans.Journaling
     public sealed partial class Copier_JournaledStatePreCommitException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Journaling.JournaledStatePreCommitException, System.Exception>
     {
         public Copier_JournaledStatePreCommitException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
-
-        public override void DeepCopy(global::Orleans.Journaling.JournaledStatePreCommitException input, global::Orleans.Journaling.JournaledStatePreCommitException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 }

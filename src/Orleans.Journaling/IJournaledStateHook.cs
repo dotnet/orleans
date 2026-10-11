@@ -24,7 +24,9 @@ public enum JournaledStateOperation
 /// Prerequisites must cover changes staged during asynchronous preparation. After hooks run after
 /// storage acknowledgement and state acknowledgement or reset, including successful writes which
 /// produce no storage bytes. Hooks retain operation-local data across these boundaries and keep later
-/// pending changes separate. Recursive operations on the same journal owner are rejected.
+/// pending changes separate. Hook implementations must complete without calling initialization,
+/// persistence, or disposal on their own journal owner. Those operations are serialized behind the
+/// current operation, so awaiting them from a hook would create a circular dependency.
 /// </remarks>
 public interface IJournaledStateHook
 {

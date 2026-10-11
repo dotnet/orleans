@@ -122,7 +122,7 @@ public partial class StateManagerTests
         });
         var caught = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() => InvokeAsync());
         Assert.Same(failure, caught.InnerException);
-        Assert.Equal(operation, caught.Operation);
+        Assert.Contains($"'{operation}'", caught.Message, StringComparison.Ordinal);
         Assert.Equal(1, state["business"]);
         Assert.Equal(pendingBytes, manager.PendingWriteByteCount);
         Assert.Equal(0, capture.AppendEntriesCount);
@@ -172,7 +172,7 @@ public partial class StateManagerTests
         var caught = await Assert.ThrowsAsync<JournaledStatePostCommitException>(() => (operation == JournaledStateOperation.Delete
             ? manager.DeleteStateAsync(TestContext.Current.CancellationToken)
             : manager.WriteStateAsync(TestContext.Current.CancellationToken)).AsTask());
-        Assert.Equal(operation, caught.Operation);
+        Assert.Contains($"'{operation}'", caught.Message, StringComparison.Ordinal);
         Assert.Equal(new Exception[] { first, second }, Assert.IsType<AggregateException>(caught.InnerException).InnerExceptions);
         Assert.Equal(operation == JournaledStateOperation.Delete
             ? new[] { "second", "last" }
@@ -330,47 +330,6 @@ public partial class StateManagerTests
         {
             release.TrySetResult();
         }
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Hooks_SameOwnerReentryIsRejectedWithoutDeadlock(bool after)
-    {
-        await using var manager = CreateTestSystem().Manager;
-        await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        Func<JournaledStateOperation, CancellationToken, ValueTask> callback = async (_, token) =>
-        {
-            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.InitializeAsync(token).AsTask());
-            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.DeleteStateAsync(token).AsTask());
-            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.DisposeAsync().AsTask());
-            await manager.WriteStateAsync(token);
-        };
-        manager.Hooks.Add(new DelegateTestHook
-        {
-            BeforeOperationAsync = after ? null : callback,
-            AfterOperationAsync = after ? callback : null
-        });
-        var failure = await Record.ExceptionAsync(() => manager.WriteStateAsync(TestContext.Current.CancellationToken)
-            .AsTask().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-        var cause = after
-            ? Assert.IsType<JournaledStatePostCommitException>(failure).InnerException
-            : Assert.IsType<JournaledStatePreCommitException>(failure).InnerException;
-        Assert.Contains("same journal owner", Assert.IsType<InvalidOperationException>(cause).Message, StringComparison.Ordinal);
-        manager.Hooks.Clear();
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-    }
-
-    [Fact]
-    public async Task Hooks_FinalPrerequisiteRejectsSameOwnerReentry()
-    {
-        await using var manager = CreateTestSystem().Manager;
-        await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        manager.Hooks.Add(new CaptureTestHook((_, token) => manager.DeleteStateAsync(token)));
-        var failure = await Assert.ThrowsAsync<JournaledStatePreCommitException>(() =>
-            manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()
-                .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
-        Assert.Contains("same journal owner", Assert.IsType<InvalidOperationException>(failure.InnerException).Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -839,7 +798,7 @@ public partial class StateManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Hooks_FailureOutcomesRoundTripWithOperationAndOriginalCause(bool after)
+    public void Hooks_FailureOutcomesRoundTripWithTypeAndOriginalCause(bool after)
     {
         Exception original = after
             ? new JournaledStatePostCommitException(JournaledStateOperation.Delete, new IOException("Cleanup failed."))
@@ -848,11 +807,11 @@ public partial class StateManagerTests
         var copy = serializer.Deserialize<Exception>(serializer.SerializeToArray(original));
         if (after)
         {
-            Assert.Equal(JournaledStateOperation.Delete, Assert.IsType<JournaledStatePostCommitException>(copy).Operation);
+            Assert.IsType<JournaledStatePostCommitException>(copy);
         }
         else
         {
-            Assert.Equal(JournaledStateOperation.Snapshot, Assert.IsType<JournaledStatePreCommitException>(copy).Operation);
+            Assert.IsType<JournaledStatePreCommitException>(copy);
         }
 
         Assert.Equal(original.InnerException!.Message, Assert.IsType<IOException>(copy.InnerException).Message);

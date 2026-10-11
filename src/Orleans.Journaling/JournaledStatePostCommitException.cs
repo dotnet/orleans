@@ -18,10 +18,5 @@ public sealed class JournaledStatePostCommitException : Exception
     public JournaledStatePostCommitException(JournaledStateOperation operation, Exception innerException)
         : base($"Journal operation '{operation}' completed, but a post-persistence hook failed.", innerException)
     {
-        Operation = operation;
     }
-
-    /// <summary>Gets the successfully completed journal operation.</summary>
-    [Id(0)]
-    public JournaledStateOperation Operation { get; }
 }

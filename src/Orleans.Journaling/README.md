@@ -297,7 +297,8 @@ owner token and drains owned work before releasing journal resources, including 
 callbacks or after-hook cleanup fail. Concurrent disposal callers share that drain and its outcome.
 Shutdown closes work admission and cancels queued operations while an already running operation
 drains to its actual storage and hook outcome.
-Recursive initialization, persistence, or disposal on the same owner from a hook is rejected.
+Hook implementations complete without calling initialization, persistence, or disposal on their
+own owner: awaiting an operation serialized behind the current callback creates a circular dependency.
 Before whole-journal deletion, the feature owner stops admission and drains its own operations;
 deletion completion follows storage deletion and registered-state reset.
 

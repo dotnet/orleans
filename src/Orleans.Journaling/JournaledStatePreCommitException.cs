@@ -18,10 +18,5 @@ public sealed class JournaledStatePreCommitException : Exception
     public JournaledStatePreCommitException(JournaledStateOperation operation, Exception innerException)
         : base($"Journal operation '{operation}' was prevented by a prerequisite hook failure.", innerException)
     {
-        Operation = operation;
     }
-
-    /// <summary>Gets the journal operation which was prevented.</summary>
-    [Id(0)]
-    public JournaledStateOperation Operation { get; }
 }
