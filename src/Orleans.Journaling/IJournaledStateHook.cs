@@ -29,6 +29,8 @@ public enum JournaledStateOperation
 /// persistence, or disposal on their own journal owner. Those operations are serialized behind the
 /// current operation, so awaiting them from a hook would create a circular dependency.
 /// Dependencies between journal owners must also remain acyclic.
+/// Callbacks can request a hook registration change, observing its queued completion outside the
+/// callback rather than awaiting work which follows the current operation.
 /// </remarks>
 public interface IJournaledStateHook
 {

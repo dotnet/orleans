@@ -227,13 +227,15 @@ namespace Orleans.Journaling
 
     public partial interface IJournaledStateManager : System.IAsyncDisposable
     {
-        System.Collections.Generic.IList<IJournaledStateHook> Hooks { get; }
+        System.Collections.Generic.IReadOnlyList<IJournaledStateHook> Hooks { get; }
 
         long PendingWriteByteCount { get; }
 
+        System.Threading.Tasks.ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken = default);
         void RegisterStateMachine(string name, IStateMachine stateMachine);
+        System.Threading.Tasks.ValueTask RemoveHookAsync(IJournaledStateHook hook, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask System.IAsyncDisposable.DisposeAsync();
         bool TryGetStateMachine(string name, out IStateMachine? stateMachine);
         System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken = default);

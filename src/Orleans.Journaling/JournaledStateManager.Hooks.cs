@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+using System.Collections;
 using System.Runtime.ExceptionServices;
 
 namespace Orleans.Journaling;
@@ -7,14 +7,58 @@ internal partial class JournaledStateManager
 {
     private HookCollection? _hooks;
 
-    public IList<IJournaledStateHook> Hooks
+    public IReadOnlyList<IJournaledStateHook> Hooks
     {
         get
         {
             lock (_lock)
             {
-                return _hooks ??= new(_workLoop is not null || _shutdownCancellation.IsCancellationRequested);
+                return _hooks ??= new();
             }
+        }
+    }
+
+    public ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, CancellationToken cancellationToken = default) =>
+        MutateHookAsync(hook, index, remove: false, cancellationToken);
+
+    public ValueTask RemoveHookAsync(IJournaledStateHook hook, CancellationToken cancellationToken = default) =>
+        MutateHookAsync(hook, index: null, remove: true, cancellationToken);
+
+    private ValueTask MutateHookAsync(IJournaledStateHook hook, int? index, bool remove, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(hook);
+        cancellationToken.ThrowIfCancellationRequested();
+        Task task;
+        lock (_lock)
+        {
+            ThrowIfFenced();
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            _shutdownCancellation.Token.ThrowIfCancellationRequested();
+            if (_workLoop is null || (!_workItemRunning && _workQueue.Count == 0))
+            {
+                ApplyHookMutation(hook, index, remove);
+                return default;
+            }
+
+            var workItem = new HookMutationWorkItem(hook, index, remove);
+            _workQueue.Enqueue(workItem);
+            task = workItem.Task;
+        }
+
+        _workSignal.Signal();
+        return new(task.WaitAsync(cancellationToken));
+    }
+
+    private void ApplyHookMutation(IJournaledStateHook hook, int? index, bool remove)
+    {
+        var hooks = _hooks ??= new();
+        if (remove)
+        {
+            hooks.Remove(hook);
+        }
+        else
+        {
+            hooks.Insert(index, hook);
         }
     }
 
@@ -55,46 +99,30 @@ internal partial class JournaledStateManager
         }
     }
 
-    private sealed class HookCollection(bool isReadOnly) : Collection<IJournaledStateHook>, IList<IJournaledStateHook>
+    private sealed class HookCollection : IReadOnlyList<IJournaledStateHook>
     {
-        private bool _isReadOnly = isReadOnly;
+        private readonly List<IJournaledStateHook> _items = [];
 
-        bool ICollection<IJournaledStateHook>.IsReadOnly => _isReadOnly;
+        public int Count => _items.Count;
+        public IJournaledStateHook this[int index] => _items[index];
+        public IEnumerator<IJournaledStateHook> GetEnumerator() => _items.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-        public void Freeze() => _isReadOnly = true;
+        public void Insert(int? index, IJournaledStateHook hook) => _items.Insert(index ?? _items.Count, hook);
 
-        protected override void InsertItem(int index, IJournaledStateHook item)
+        public void Remove(IJournaledStateHook hook)
         {
-            ThrowIfReadOnly();
-            ArgumentNullException.ThrowIfNull(item);
-            base.InsertItem(index, item);
-        }
-
-        protected override void SetItem(int index, IJournaledStateHook item)
-        {
-            ThrowIfReadOnly();
-            ArgumentNullException.ThrowIfNull(item);
-            base.SetItem(index, item);
-        }
-
-        protected override void RemoveItem(int index)
-        {
-            ThrowIfReadOnly();
-            base.RemoveItem(index);
-        }
-
-        protected override void ClearItems()
-        {
-            ThrowIfReadOnly();
-            base.ClearItems();
-        }
-
-        private void ThrowIfReadOnly()
-        {
-            if (_isReadOnly)
+            if (!_items.Remove(hook))
             {
-                throw new NotSupportedException("Journal operation hook registrations are read-only.");
+                throw new InvalidOperationException("The journal operation hook is not registered.");
             }
         }
+    }
+
+    private sealed class HookMutationWorkItem(IJournaledStateHook hook, int? index, bool remove) : WorkItem
+    {
+        public IJournaledStateHook Hook { get; } = hook;
+        public int? Index { get; } = index;
+        public bool Remove { get; } = remove;
     }
 }

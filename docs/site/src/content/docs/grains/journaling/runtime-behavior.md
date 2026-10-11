@@ -77,16 +77,19 @@ staged mutations from other calls.
 
 Activation-scoped features coordinate prerequisites and completion through
 <xref:Orleans.Journaling.IJournaledStateManager.Hooks>. The owner exposes a stable, lazily
-allocated list of <xref:Orleans.Journaling.IJournaledStateHook> registrations. Register and
-deduplicate feature hooks during setup before initialization begins, alongside state machines.
-The hook list then remains fixed through recovery, persistence and deletion.
-Keep registration sequential with initialization and shutdown. Both transitions make the list
-read-only, including when the hook list is first accessed afterward.
-Every journal owner implementation provides this list and runs its registered callbacks at the
-operation boundaries below. Delegating owners forward the list to the inner owner.
+allocated read-only view of <xref:Orleans.Journaling.IJournaledStateHook> registrations.
+Use <xref:Orleans.Journaling.IJournaledStateManager.AddHookAsync*> and
+<xref:Orleans.Journaling.IJournaledStateManager.RemoveHookAsync*> to change the set. Idle changes
+apply synchronously; busy changes queue between complete operations, after current after callbacks.
+The hook set stays stable throughout each operation. Queued changes also separate coalesced writes,
+so writes admitted after a change observe that change.
+Cancellation ends only the caller's wait while the manager owns admitted changes.
+Every owner implements the registration methods and callback boundaries; delegating owners forward
+them to their inner owner. Synchronous state callbacks can request a queued change and observe its
+completion outside the callback. Standalone callers coordinate view inspection with changes.
 
 Each actual append, snapshot, or deletion runs before callbacks in reverse list order, outside
-the manager lock. Register the final prerequisite at index zero so its callback runs last before
+the manager lock. Add the final prerequisite at index zero so its callback runs last before
 synchronous capture or storage deletion. Prerequisites remain valid through capture or deletion, covering changes staged
 during asynchronous preparation and while the work loop resumes. Preserve operation-local bookkeeping for
 the captured batch separately from changes staged later.

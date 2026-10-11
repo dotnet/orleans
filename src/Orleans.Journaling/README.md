@@ -266,17 +266,21 @@ of the ambient grain context, including when the caller subsequently enrolls the
 
 ## Journal operation hooks
 
-`IJournaledStateManager.Hooks` is a lazily allocated, stable list of `IJournaledStateHook`
-registrations. Features register and deduplicate their hooks during setup before initialization
-begins, alongside state-machine registration. The hook list then remains fixed through recovery,
-persistence and whole-journal deletion.
-Keep hook registration sequential with initialization and shutdown. Either lifecycle transition
-makes the list read-only; its collection owns this state independently of the journal owner.
+`IJournaledStateManager.Hooks` is a lazily allocated, stable read-only view of `IJournaledStateHook`
+registrations. Use `AddHookAsync(hook, index)` and `RemoveHookAsync(hook)` to change registrations.
+Changes apply synchronously when idle, or queue between complete journal operations while busy.
+Each operation keeps its hook set through preparation, capture, storage ACK and after callbacks.
+Queued changes are write-coalescing barriers: writes admitted afterward observe the changed set.
+Caller cancellation ends only its wait for an admitted change; the manager retains ownership.
+Await registration before staging changes whose safety depends on the new hook.
 Every journal owner implementation provides the hook list and invokes registered callbacks at
-the operation boundaries described below. Delegating owners forward the list to their inner owner.
+the operation boundaries described below. Delegating owners forward registration methods and the
+read-only view to their inner owner. Synchronous state callbacks can request a queued registration
+and observe completion outside the callback. Standalone callers coordinate view inspection with
+registration changes.
 
 For each actual write, snapshot, or deletion, before hooks run in reverse list order outside
-the manager lock. Register the final prerequisite at index zero so it runs last before the work loop
+the manager lock. Add the final prerequisite with `index: 0` so it runs last before the work loop
 captures the registered states or starts deletion. Prerequisites remain valid through capture or
 deletion, covering changes staged during asynchronous preparation and while the work loop resumes.
 Keep operation-local bookkeeping for the captured batch separate from later pending changes.

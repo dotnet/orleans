@@ -29,6 +29,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private readonly StateDirectory _journalStreamDirectory;
     private readonly RetiredStateTracker _retirementTracker;
     private Task? _workLoop;
+    // Under _lock, covers recovery and dequeued work through the last after callback.
+    private bool _workItemRunning;
     private ManagerState _state;
     private long _deletionGeneration;
     private Exception? _failure;
@@ -169,7 +171,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             ThrowIfFenced();
             if (_workLoop is null)
             {
-                _hooks?.Freeze();
+                _workItemRunning = true;
                 _workLoop = Start();
             }
 
@@ -195,6 +197,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
         while (!_shutdownCancellation.IsCancellationRequested)
         {
+            lock (_lock)
+            {
+                _workItemRunning = true;
+            }
+
             try
             {
                 await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
@@ -216,7 +223,15 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     lock (_lock)
                     {
                         FaultQueuedWorkItemsUnderLock(exception);
+                        _workItemRunning = false;
                     }
+                }
+            }
+            finally
+            {
+                lock (_lock)
+                {
+                    _workItemRunning = false;
                 }
             }
 
@@ -231,7 +246,17 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                 lock (_lock)
                 {
-                    if (_workQueue.Count > 0)
+                    var retryRequested = false;
+                    foreach (var workItem in _workQueue)
+                    {
+                        if (workItem is InitializeWorkItem)
+                        {
+                            retryRequested = true;
+                            break;
+                        }
+                    }
+
+                    if (retryRequested)
                     {
                         break;
                     }
@@ -263,6 +288,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         }
 
                         workItem = dequeuedWorkItem;
+                        _workItemRunning = true;
                     }
 
                     var processingTimestamp = _shared.TimeProvider.GetTimestamp();
@@ -317,6 +343,15 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         switch (workItem)
                         {
+                            case HookMutationWorkItem mutation:
+                                {
+                                    lock (_lock)
+                                    {
+                                        ApplyHookMutation(mutation.Hook, mutation.Index, mutation.Remove);
+                                    }
+                                    break;
+                                }
+
                             case WriteStateWorkItem:
                                 {
                                     // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
@@ -566,7 +601,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         }
 
                         storageActivity?.SetStatus(ActivityStatusCode.Ok);
-                        workItem.SetResult();
+                        lock (_lock)
+                        {
+                            _workItemRunning = false;
+                            workItem.SetResult();
+                        }
                     }
                     catch (Exception exception) when (beforeHookRunning || afterHookRunning)
                     {
@@ -591,9 +630,22 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                             _shared.Instruments.OnStorageOperationQueued(queueOperation, queueDuration, succeeded: afterHookRunning);
                         }
 
-                        workItem.SetException(afterHookRunning
-                            ? new JournaledStatePostCommitException(operationType.Value, exception)
-                            : new JournaledStatePreCommitException(operationType.Value, exception));
+                        lock (_lock)
+                        {
+                            _workItemRunning = false;
+                            workItem.SetException(afterHookRunning
+                                ? new JournaledStatePostCommitException(operationType.Value, exception)
+                                : new JournaledStatePreCommitException(operationType.Value, exception));
+                        }
+                    }
+                    catch (Exception exception) when (workItem is HookMutationWorkItem)
+                    {
+                        LogHookMutationFailed(_shared.Logger, exception);
+                        lock (_lock)
+                        {
+                            _workItemRunning = false;
+                            workItem.SetException(exception);
+                        }
                     }
                     catch (Exception exception)
                     {
@@ -627,6 +679,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                     }
                     finally
                     {
+                        lock (_lock)
+                        {
+                            _workItemRunning = false;
+                        }
+
                         storageActivity?.Dispose();
                     }
                 }
@@ -1033,9 +1090,17 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private TWorkItem EnqueueOrGetPendingWorkItem<TWorkItem>(out bool didEnqueue)
         where TWorkItem : WorkItem, new()
     {
+        TWorkItem? pending = null;
         foreach (var workItem in _workQueue)
         {
-            if (workItem is not TWorkItem pending)
+            if (workItem is HookMutationWorkItem)
+            {
+                // Later callers must not coalesce into work which precedes a registration change.
+                pending = null;
+                continue;
+            }
+
+            if (pending is not null || workItem is not TWorkItem candidate)
             {
                 continue;
             }
@@ -1046,8 +1111,13 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 continue;
             }
 
-            workItem.RecordTraceContext();
-            workItem.AddCaller();
+            pending = candidate;
+        }
+
+        if (pending is not null)
+        {
+            pending.RecordTraceContext();
+            pending.AddCaller();
             didEnqueue = false;
             return pending;
         }
@@ -1096,7 +1166,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         AggregateException? cancellationFailure = null;
         lock (_lock)
         {
-            _hooks?.Freeze();
             try
             {
                 _shutdownCancellation.Cancel();
@@ -1441,6 +1510,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Level = LogLevel.Error,
         Message = "Journal {Operation} hook failed. Persistence completed: {Committed}.")]
     private static partial void LogOperationHookFailed(ILogger logger, Exception exception, JournaledStateOperation operation, bool committed);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal operation hook registration change failed.")]
+    private static partial void LogHookMutationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Error,

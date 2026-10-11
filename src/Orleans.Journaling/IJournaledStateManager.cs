@@ -13,19 +13,46 @@ namespace Orleans.Journaling;
 public interface IJournaledStateManager : IAsyncDisposable
 {
     /// <summary>
-    /// Gets the mutable, lazily allocated list of journal operation hooks.
+    /// Gets the read-only view of registered journal operation hooks.
     /// </summary>
     /// <remarks>
-    /// Inspect, add, remove, and deduplicate hooks during setup, before initialization begins.
-    /// The caller keeps hook registration sequential with initialization and shutdown.
-    /// Initialization or shutdown makes the list read-only.
-    /// Registration remains fixed for this manager's initialized lifetime. Before hooks execute in
+    /// Inspect hooks on the owner's logical execution context, coordinating standalone inspection
+    /// with registration changes. Use <see cref="AddHookAsync"/> and <see cref="RemoveHookAsync"/>
+    /// to change registrations. Before hooks execute in
     /// reverse list order; after hooks execute in forward list order. Register the final capture
     /// prerequisite at index zero so it runs last before capture or deletion.
     /// Registration is independent of state-machine registration and persists through recovery and deletion.
     /// Every implementation provides this list and invokes its hooks at the documented operation boundaries.
     /// </remarks>
-    IList<IJournaledStateHook> Hooks { get; }
+    IReadOnlyList<IJournaledStateHook> Hooks { get; }
+
+    /// <summary>
+    /// Adds a hook before the next persistence operation which follows this registration.
+    /// </summary>
+    /// <param name="hook">The hook to register.</param>
+    /// <param name="index">The insertion index, or <see langword="null"/> to append.</param>
+    /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
+    /// <returns>A completion representing application of the registration.</returns>
+    /// <remarks>
+    /// Idle registration applies synchronously. Otherwise it is queued between owned operations,
+    /// after the current operation's after hooks finish. Queued registration is a write-coalescing barrier.
+    /// Cancellation ends the caller's wait while admitted registration remains owned by the manager.
+    /// Synchronous state callbacks can request registration and observe its completion outside the callback.
+    /// Await registration before staging changes whose safety depends on the added hook.
+    /// </remarks>
+    ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a hook between persistence operations.
+    /// </summary>
+    /// <param name="hook">The registered hook to remove.</param>
+    /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
+    /// <returns>A completion representing application of the removal.</returns>
+    /// <exception cref="InvalidOperationException">The hook is not registered when the removal is applied.</exception>
+    /// <remarks>
+    /// Removal has the same ownership and ordering guarantees as <see cref="AddHookAsync"/>.
+    /// </remarks>
+    ValueTask RemoveHookAsync(IJournaledStateHook hook, CancellationToken cancellationToken = default);
 
     /// <inheritdoc/>
     ValueTask IAsyncDisposable.DisposeAsync() => default;

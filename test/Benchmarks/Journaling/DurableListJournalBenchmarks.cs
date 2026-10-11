@@ -126,7 +126,24 @@ public class DurableListJournalBenchmarks
 
     private sealed class BenchmarkJournalManager(OrleansBinaryJournalBufferWriter buffer, JournalStreamId streamId) : IJournaledStateManager
     {
-        public IList<IJournaledStateHook> Hooks { get; } = [];
+        private readonly List<IJournaledStateHook> _hooks = [];
+
+        public IReadOnlyList<IJournaledStateHook> Hooks => _hooks;
+
+        public ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, CancellationToken cancellationToken = default)
+        {
+            _hooks.Insert(index ?? _hooks.Count, hook);
+            return default;
+        }
+
+        public ValueTask RemoveHookAsync(IJournaledStateHook hook, CancellationToken cancellationToken = default)
+        {
+            if (!_hooks.Remove(hook))
+            {
+                throw new InvalidOperationException("The journal operation hook is not registered.");
+            }
+            return default;
+        }
 
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
