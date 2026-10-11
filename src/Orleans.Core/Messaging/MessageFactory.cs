@@ -27,7 +27,10 @@ namespace Orleans.Runtime
             _seed = unchecked((ulong)Random.Shared.NextInt64());
         }
 
-        public Message CreateMessage(object? body, InvokeMethodOptions options)
+        public Message CreateMessage(object? body, InvokeMethodOptions options) =>
+            CreateMessage(body, options, RequestContextExtensions.Export(_deepCopier));
+
+        public Message CreateMessage(object? body, InvokeMethodOptions options, Dictionary<string, object>? requestContextData)
         {
             var message = new Message
             {
@@ -37,7 +40,7 @@ namespace Orleans.Runtime
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = body,
-                RequestContextData = RequestContextExtensions.Export(_deepCopier),
+                RequestContextData = requestContextData,
             };
 
             return message;
