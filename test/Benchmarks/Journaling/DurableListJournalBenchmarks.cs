@@ -126,6 +126,8 @@ public class DurableListJournalBenchmarks
 
     private sealed class BenchmarkJournalManager(OrleansBinaryJournalBufferWriter buffer, JournalStreamId streamId) : IJournaledStateManager
     {
+        public IList<IJournaledStateHook> Hooks { get; } = [];
+
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
         public void RegisterStateMachine(string name, IStateMachine state) => state.Reset(buffer.CreateJournalStreamWriter(streamId));

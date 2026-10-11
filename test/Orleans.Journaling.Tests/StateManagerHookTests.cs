@@ -859,28 +859,6 @@ public partial class StateManagerTests
         Assert.Equal(original.Message, copy.Message);
     }
 
-    [Fact]
-    public async Task Hooks_LegacyCustomOwnerKeepsExistingOperationsAndReportsUnsupportedHooks()
-    {
-        await using IJournaledStateManager manager = new LegacyHookTestOwner();
-        await manager.InitializeAsync(TestContext.Current.CancellationToken);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        Assert.Throws<NotSupportedException>(() => manager.Hooks);
-    }
-
-    private sealed class LegacyHookTestOwner : IJournaledStateManager
-    {
-        public ValueTask InitializeAsync(CancellationToken cancellationToken = default) => default;
-        public ValueTask WriteStateAsync(CancellationToken cancellationToken = default) => default;
-        public ValueTask DeleteStateAsync(CancellationToken cancellationToken = default) => default;
-        public void RegisterStateMachine(string name, IStateMachine stateMachine) { }
-        public bool TryGetStateMachine(string name, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IStateMachine? stateMachine)
-        {
-            stateMachine = null;
-            return false;
-        }
-    }
-
     private sealed class CaptureTestHook(
         Func<JournaledStateOperation, CancellationToken, ValueTask> before,
         Action<JournaledStateOperation, CancellationToken>? after = null) : IJournaledStateCaptureHook

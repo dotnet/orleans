@@ -21,10 +21,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// and all after hooks execute in list order. The optional single
     /// <see cref="IJournaledStateCaptureHook"/> supplies the final prerequisite.
     /// Registration is independent of state-machine registration and persists through recovery and deletion.
-    /// Custom owners implement this property to support hooks.
+    /// Every implementation provides this list and invokes its hooks at the documented operation boundaries.
     /// </remarks>
-    /// <exception cref="NotSupportedException">The custom owner does not support hooks.</exception>
-    IList<IJournaledStateHook> Hooks => throw new NotSupportedException("This journal owner does not support operation hooks.");
+    IList<IJournaledStateHook> Hooks { get; }
 
     /// <inheritdoc/>
     ValueTask IAsyncDisposable.DisposeAsync() => default;

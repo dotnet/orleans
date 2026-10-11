@@ -271,6 +271,8 @@ registrations. Features inspect and deduplicate their registrations on the owner
 execution context while persistence is quiescent. Registration persists through recovery and
 whole-journal deletion. The standard manager rejects mutation of the list while persistence is
 queued or running and admits at most one `IJournaledStateCaptureHook`.
+Every journal owner implementation provides the hook list and invokes registered callbacks at
+the operation boundaries described below. Delegating owners forward the list to their inner owner.
 
 For each actual write, snapshot, or deletion, ordinary before hooks run in list order outside
 the manager lock. The capture hook runs last: the work loop awaits it directly, then synchronously

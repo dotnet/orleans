@@ -76,6 +76,8 @@ allocated list of <xref:Orleans.Journaling.IJournaledStateHook> registrations. I
 deduplicate feature registrations on the owner's logical execution context while persistence
 is quiescent. Registration survives recovery and deletion; the standard manager rejects hook-list
 mutation while persistence is queued or running.
+Every journal owner implementation provides this list and runs its registered callbacks at the
+operation boundaries below. Delegating owners forward the list to the inner owner.
 
 Each actual append, snapshot, or deletion runs ordinary before callbacks in list order, outside
 the manager lock. At most one <xref:Orleans.Journaling.IJournaledStateCaptureHook> supplies the
