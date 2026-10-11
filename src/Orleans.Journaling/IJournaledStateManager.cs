@@ -17,7 +17,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// Inspect, add, remove, and deduplicate hooks on the owner's logical execution context while
-    /// persistence is quiescent. Mutation during an operation is rejected. Ordinary before hooks
+    /// persistence is quiescent. Mutation while persistence is queued or running is rejected. Ordinary before hooks
     /// and all after hooks execute in list order. The optional single
     /// <see cref="IJournaledStateCaptureHook"/> supplies the final prerequisite.
     /// Registration is independent of state-machine registration and persists through recovery and deletion.

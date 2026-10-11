@@ -269,8 +269,8 @@ of the ambient grain context, including when the caller subsequently enrolls the
 `IJournaledStateManager.Hooks` is a lazily allocated, stable list of `IJournaledStateHook`
 registrations. Features inspect and deduplicate their registrations on the owner's logical
 execution context while persistence is quiescent. Registration persists through recovery and
-whole-journal deletion. The standard manager rejects mutation of the list throughout an
-operation and admits at most one `IJournaledStateCaptureHook`.
+whole-journal deletion. The standard manager rejects mutation of the list while persistence is
+queued or running and admits at most one `IJournaledStateCaptureHook`.
 
 For each actual write, snapshot, or deletion, ordinary before hooks run in list order outside
 the manager lock. The capture hook runs last: the work loop awaits it directly, then synchronously

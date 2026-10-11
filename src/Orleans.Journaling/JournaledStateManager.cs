@@ -813,6 +813,14 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             {
                 throw new InvalidOperationException("Journal operation hooks can be changed only while persistence is quiescent.");
             }
+
+            foreach (var workItem in owner._workQueue)
+            {
+                if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem or DeleteStateWorkItem)
+                {
+                    throw new InvalidOperationException("Journal operation hooks can be changed only while persistence is quiescent.");
+                }
+            }
         }
 
         private void ValidateHook(IJournaledStateHook item, int replacingIndex)

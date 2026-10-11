@@ -437,6 +437,68 @@ public partial class StateManagerTests
     }
 
     [Theory]
+    [InlineData(JournaledStateOperation.Write)]
+    [InlineData(JournaledStateOperation.Snapshot)]
+    [InlineData(JournaledStateOperation.Delete)]
+    public async Task Hooks_MutationIsRejectedWhilePersistenceIsQueued(JournaledStateOperation operation)
+    {
+        var context = new QueuedSynchronizationContext();
+        await context.Run(async () =>
+        {
+            var storage = new CapturingStorage { IsCompactionRequested = operation == JournaledStateOperation.Snapshot };
+            await using var manager = CreateTestSystem(storage).Manager;
+            var state = new LifecycleState();
+            manager.RegisterStateMachine("state", state);
+            var before = 0;
+            var after = 0;
+            var hook = new CaptureTestHook(
+                (actual, _) =>
+                {
+                    Assert.Equal(operation, actual);
+                    before++;
+                    return default;
+                },
+                (actual, _) =>
+                {
+                    Assert.Equal(operation, actual);
+                    after++;
+                });
+            manager.Hooks.Add(hook);
+            await manager.InitializeAsync(TestContext.Current.CancellationToken);
+            using var caller = new CancellationTokenSource();
+            var canceledWaiter = InvokeAsync(caller.Token);
+            var remainingWaiter = InvokeAsync(TestContext.Current.CancellationToken);
+            caller.Cancel();
+
+            Assert.Equal(0, state.CaptureCount);
+            Assert.Equal(0, storage.DeleteCount);
+            Assert.Equal(0, before);
+            Assert.False(remainingWaiter.IsCompleted);
+            Assert.Throws<InvalidOperationException>(() => manager.Hooks.Add(new DelegateTestHook()));
+            Assert.Throws<InvalidOperationException>(() => manager.Hooks.Insert(0, new DelegateTestHook()));
+            Assert.Throws<InvalidOperationException>(() => manager.Hooks[0] = new DelegateTestHook());
+            Assert.Throws<InvalidOperationException>(() => manager.Hooks.Remove(hook));
+            Assert.Throws<InvalidOperationException>(() => manager.Hooks.Clear());
+            Assert.Same(hook, Assert.Single(manager.Hooks));
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => canceledWaiter);
+            await remainingWaiter;
+            Assert.Equal(1, before);
+            Assert.Equal(1, after);
+            Assert.Equal(operation == JournaledStateOperation.Delete ? 0 : 1, state.CaptureCount);
+            Assert.Equal(operation == JournaledStateOperation.Write ? 1 : 0, storage.Appends.Count);
+            Assert.Equal(operation == JournaledStateOperation.Snapshot ? 1 : 0, storage.Replaces.Count);
+            Assert.Equal(operation == JournaledStateOperation.Delete ? 1 : 0, storage.DeleteCount);
+            manager.Hooks.Clear();
+            Assert.Empty(manager.Hooks);
+
+            Task InvokeAsync(CancellationToken token) => (operation == JournaledStateOperation.Delete
+                ? manager.DeleteStateAsync(token)
+                : manager.WriteStateAsync(token)).AsTask();
+        });
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Hooks_MutationIsRejectedThroughoutOwnedOperation(bool after)

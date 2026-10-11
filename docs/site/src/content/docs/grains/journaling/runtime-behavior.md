@@ -75,7 +75,7 @@ Activation-scoped features coordinate prerequisites and completion through
 allocated list of <xref:Orleans.Journaling.IJournaledStateHook> registrations. Inspect and
 deduplicate feature registrations on the owner's logical execution context while persistence
 is quiescent. Registration survives recovery and deletion; the standard manager rejects hook-list
-mutation throughout each operation.
+mutation while persistence is queued or running.
 
 Each actual append, snapshot, or deletion runs ordinary before callbacks in list order, outside
 the manager lock. At most one <xref:Orleans.Journaling.IJournaledStateCaptureHook> supplies the
