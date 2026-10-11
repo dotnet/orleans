@@ -52,7 +52,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// Gets or sets the maximum aggregate size, in bytes, of free pages retained by the process-wide page pool.
     /// </summary>
     /// <remarks>
-    /// The default is 4 MiB. Setting this value to zero releases free pages and disables free-page retention.
+    /// The default is 128 MiB. Setting this value to zero releases free pages and disables free-page retention.
     /// Reducing the limit releases excess already-free pages immediately. Writers and pinned readers retain
     /// ownership of their active pages. Returns in flight during a reduction recheck the limit after publishing
     /// their pages, keeping the settled pool within the current budget.
@@ -601,7 +601,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
 internal sealed class ArcBufferPagePool
 {
-    internal const int DefaultMaximumRetainedBytes = 4 * 1024 * 1024;
+    internal const int DefaultMaximumRetainedBytes = 128 * 1024 * 1024;
     internal const int MaximumRetainedPageSize = 1024 * 1024;
     public static ArcBufferPagePool Shared { get; } = new();
     public const int MinimumPageSize = 16 * 1024;

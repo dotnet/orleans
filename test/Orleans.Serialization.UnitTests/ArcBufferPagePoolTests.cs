@@ -19,19 +19,21 @@ public sealed class ArcBufferPagePoolTests
     private const int PageSize = ArcBufferWriter.MinimumPageSize;
 
     [Fact]
-    public void DefaultBudget_RetainsExactlyFourMiB()
+    public void DefaultBudget_RetainsExactly128MiB()
     {
         var pool = new ArcBufferPagePool();
-        Assert.Equal(4 * 1024 * 1024, pool.MaxRetainedBytes);
+        const int budget = 128 * 1024 * 1024;
+        Assert.Equal(budget, pool.MaxRetainedBytes);
         Assert.Equal(pool.MaxRetainedBytes, ArcBufferWriter.MaxRetainedPoolBytes);
         Assert.Equal(0, pool.RetainedBytes);
         Assert.Equal(0, pool.RetainedPages);
 
-        var pages = Enumerable.Range(0, 257).Select(_ => pool.Rent()).ToArray();
+        var pageCount = budget / PageSize;
+        var pages = Enumerable.Range(0, pageCount + 1).Select(_ => pool.Rent()).ToArray();
         foreach (var page in pages) pool.Return(page);
 
-        Assert.Equal(4 * 1024 * 1024, pool.RetainedBytes);
-        Assert.Equal(256, pool.RetainedPages);
+        Assert.Equal(budget, pool.RetainedBytes);
+        Assert.Equal(pageCount, pool.RetainedPages);
         Assert.Empty(pages[^1].Array);
         Assert.All(pages[..^1], page => Assert.Equal(PageSize, page.Array.Length));
         pool.MaxRetainedBytes = 0;
@@ -89,7 +91,7 @@ public sealed class ArcBufferPagePoolTests
     private static void AssertPublicConfiguration()
     {
         var shared = ArcBufferPagePool.Shared;
-        Assert.Equal(4 * 1024 * 1024, ArcBufferWriter.MaxRetainedPoolBytes);
+        Assert.Equal(128 * 1024 * 1024, ArcBufferWriter.MaxRetainedPoolBytes);
         Assert.Equal(ArcBufferWriter.MaxRetainedPoolBytes, shared.MaxRetainedBytes);
 
         // Exercise valid writes through the public API, observing the underlying pool rather than just the getter.
