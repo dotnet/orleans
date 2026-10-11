@@ -19,7 +19,7 @@ public partial class StateManagerTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Null(field.GetValue(manager));
 
-        var hook = new JournaledStateHook();
+        var hook = new DelegateTestHook();
         var hooks = manager.Hooks;
         hooks.Add(hook);
         Assert.True(hooks.Contains(hook));
@@ -43,7 +43,7 @@ public partial class StateManagerTests
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         var expected = snapshot ? JournaledStateOperation.Snapshot : JournaledStateOperation.Write;
         CancellationToken ownedToken = default;
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new DelegateTestHook
         {
             BeforeOperation = (operation, token) =>
             {
@@ -115,7 +115,7 @@ public partial class StateManagerTests
         var pendingBytes = manager.PendingWriteByteCount;
         var failure = new IOException("Prerequisite failed.");
         var after = 0;
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new DelegateTestHook
         {
             BeforeOperation = (_, _) => throw failure,
             AfterOperation = (_, _) => after++
@@ -158,8 +158,8 @@ public partial class StateManagerTests
         state["business"] = 1;
         var first = new IOException("First cleanup failed.");
         var second = new IOException("Second cleanup failed.");
-        manager.Hooks.Add(new JournaledStateHook { AfterOperation = (_, _) => throw first });
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new DelegateTestHook { AfterOperation = (_, _) => throw first });
+        manager.Hooks.Add(new DelegateTestHook
         {
             AfterOperationAsync = async (_, _) =>
             {
@@ -168,7 +168,7 @@ public partial class StateManagerTests
                 throw second;
             }
         });
-        manager.Hooks.Add(new JournaledStateHook { AfterOperation = (_, _) => events.Add("last") });
+        manager.Hooks.Add(new DelegateTestHook { AfterOperation = (_, _) => events.Add("last") });
         var caught = await Assert.ThrowsAsync<JournaledStatePostCommitException>(() => (operation == JournaledStateOperation.Delete
             ? manager.DeleteStateAsync(TestContext.Current.CancellationToken)
             : manager.WriteStateAsync(TestContext.Current.CancellationToken)).AsTask());
@@ -204,7 +204,7 @@ public partial class StateManagerTests
         var state = new DurableDictionary<string, int>("state", manager, CreateDictionaryCodec<string, int>());
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         var after = 0;
-        manager.Hooks.Add(new JournaledStateHook { AfterOperation = (_, _) => after++ });
+        manager.Hooks.Add(new DelegateTestHook { AfterOperation = (_, _) => after++ });
         state["business"] = 1;
         Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask()));
         Assert.Equal(0, after);
@@ -234,7 +234,7 @@ public partial class StateManagerTests
                 return default;
             },
             (_, _) => events.Add("capture-after")));
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new DelegateTestHook
         {
             BeforeOperationAsync = async (_, token) =>
             {
@@ -301,7 +301,7 @@ public partial class StateManagerTests
         };
         manager.Hooks.Add(captureHook
             ? new CaptureTestHook(before, after)
-            : new JournaledStateHook { BeforeOperationAsync = before, AfterOperation = after });
+            : new DelegateTestHook { BeforeOperationAsync = before, AfterOperation = after });
         using var caller = new CancellationTokenSource();
         state["business"] = 1;
         var write = manager.WriteStateAsync(caller.Token).AsTask();
@@ -346,7 +346,7 @@ public partial class StateManagerTests
             await Assert.ThrowsAsync<InvalidOperationException>(() => manager.DisposeAsync().AsTask());
             await manager.WriteStateAsync(token);
         };
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new DelegateTestHook
         {
             BeforeOperationAsync = after ? null : callback,
             AfterOperationAsync = after ? callback : null
@@ -379,7 +379,7 @@ public partial class StateManagerTests
         await using var manager = CreateTestSystem().Manager;
         var first = new CaptureTestHook((_, _) => default);
         var second = new CaptureTestHook((_, _) => default);
-        var ordinary = new JournaledStateHook();
+        var ordinary = new DelegateTestHook();
         manager.Hooks.Add(first);
         manager.Hooks.Add(ordinary);
         Assert.Throws<InvalidOperationException>(() => manager.Hooks.Add(second));
@@ -448,14 +448,15 @@ public partial class StateManagerTests
         state.Value = 1;
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var hook = new JournaledStateHook
+        var hook = new DelegateTestHook
         {
             BeforeOperation = (_, _) => Assert.Throws<InvalidOperationException>(() => manager.Hooks.Clear()),
             AfterOperationAsync = after ? async (_, _) =>
             {
                 entered.TrySetResult();
                 await release.Task;
-            } : null
+            }
+            : null
         };
         manager.Hooks.Add(hook);
         var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
@@ -463,8 +464,8 @@ public partial class StateManagerTests
         {
             await (after ? entered : storage.BlockedAppendStarted).Task
                 .WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-            Assert.Throws<InvalidOperationException>(() => manager.Hooks.Add(new JournaledStateHook()));
-            Assert.Throws<InvalidOperationException>(() => manager.Hooks[0] = new JournaledStateHook());
+            Assert.Throws<InvalidOperationException>(() => manager.Hooks.Add(new DelegateTestHook()));
+            Assert.Throws<InvalidOperationException>(() => manager.Hooks[0] = new DelegateTestHook());
             Assert.Throws<InvalidOperationException>(() => manager.Hooks.Remove(hook));
             Assert.Throws<InvalidOperationException>(() => manager.Hooks.Clear());
             Assert.Same(hook, Assert.Single(manager.Hooks));
@@ -491,7 +492,7 @@ public partial class StateManagerTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var drained = false;
         var failure = new IOException("Cancellation callback failed.");
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new DelegateTestHook
         {
             BeforeOperationAsync = async (_, token) =>
             {
@@ -545,7 +546,7 @@ public partial class StateManagerTests
             entered.TrySetResult();
             await release.Task;
         };
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new DelegateTestHook
         {
             BeforeOperationAsync = after ? null : callback,
             AfterOperationAsync = after ? callback : null
@@ -616,7 +617,7 @@ public partial class StateManagerTests
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         CancellationTokenRegistration registration = default;
         var after = 0;
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new DelegateTestHook
         {
             BeforeOperation = (_, token) => registration = token.Register(() => throw cancellationFailure),
             AfterOperation = (_, _) => after++
@@ -685,7 +686,7 @@ public partial class StateManagerTests
         var first = new IOException("First cleanup failed.");
         var second = new IOException("Second cleanup failed.");
         List<string> events = [];
-        manager.Hooks.Add(new JournaledStateHook
+        manager.Hooks.Add(new DelegateTestHook
         {
             AfterOperationAsync = async (_, token) =>
             {
@@ -697,8 +698,8 @@ public partial class StateManagerTests
                 throw first;
             }
         });
-        manager.Hooks.Add(new JournaledStateHook { AfterOperation = (_, _) => throw second });
-        manager.Hooks.Add(new JournaledStateHook { AfterOperation = (_, _) => events.Add("last") });
+        manager.Hooks.Add(new DelegateTestHook { AfterOperation = (_, _) => throw second });
+        manager.Hooks.Add(new DelegateTestHook { AfterOperation = (_, _) => events.Add("last") });
         var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         try
         {
@@ -731,7 +732,7 @@ public partial class StateManagerTests
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         var before = 0;
         var after = 0;
-        manager.Hooks.Add(new JournaledStateHook { BeforeOperation = (_, _) => before++, AfterOperation = (_, _) => after++ });
+        manager.Hooks.Add(new DelegateTestHook { BeforeOperation = (_, _) => before++, AfterOperation = (_, _) => after++ });
         state["first"] = 1;
         var first = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         try
@@ -766,7 +767,7 @@ public partial class StateManagerTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         var before = 0;
         var after = 0;
-        manager.Hooks.Add(new JournaledStateHook { BeforeOperation = (_, _) => before++, AfterOperation = (_, _) => after++ });
+        manager.Hooks.Add(new DelegateTestHook { BeforeOperation = (_, _) => before++, AfterOperation = (_, _) => after++ });
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, before);
         Assert.Equal(1, after);
@@ -829,6 +830,26 @@ public partial class StateManagerTests
         {
             after?.Invoke(operation, cancellationToken);
             return default;
+        }
+    }
+
+    private sealed class DelegateTestHook : IJournaledStateHook
+    {
+        public Action<JournaledStateOperation, CancellationToken>? BeforeOperation { get; init; }
+        public Func<JournaledStateOperation, CancellationToken, ValueTask>? BeforeOperationAsync { get; init; }
+        public Action<JournaledStateOperation, CancellationToken>? AfterOperation { get; init; }
+        public Func<JournaledStateOperation, CancellationToken, ValueTask>? AfterOperationAsync { get; init; }
+
+        ValueTask IJournaledStateHook.BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+        {
+            BeforeOperation?.Invoke(operation, cancellationToken);
+            return BeforeOperationAsync?.Invoke(operation, cancellationToken) ?? default;
+        }
+
+        ValueTask IJournaledStateHook.AfterOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+        {
+            AfterOperation?.Invoke(operation, cancellationToken);
+            return AfterOperationAsync?.Invoke(operation, cancellationToken) ?? default;
         }
     }
 

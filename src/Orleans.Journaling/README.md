@@ -280,8 +280,8 @@ Keep operation-local bookkeeping for the captured batch separate from later pend
 
 After hooks run in list order after storage acknowledgement and state acknowledgement or reset.
 They also run for a successful zero-byte write. Coalesced callers share the hooks for their actual
-operation. `JournaledStateHook` adapts synchronous and asynchronous delegates; within each phase
-the synchronous delegate executes first.
+operation. Features implement the before and after callbacks on their own hook, retaining their
+identity and operation-local bookkeeping there.
 
 | Outcome | Owner and caller behavior |
 | --- | --- |

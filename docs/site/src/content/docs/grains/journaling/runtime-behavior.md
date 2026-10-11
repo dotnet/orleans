@@ -86,8 +86,8 @@ the captured batch separately from changes staged later.
 
 Storage acknowledgement and registered-state acknowledgement or reset precede after callbacks.
 All after callbacks run in list order, including for successful zero-byte writes. Coalesced callers
-share callbacks for the actual operation. <xref:Orleans.Journaling.JournaledStateHook> adapts delegates,
-executing the synchronous delegate before the asynchronous delegate in each phase.
+share callbacks for the actual operation. Features implement the before and after callbacks on
+their own hook, retaining feature identity and operation-local bookkeeping there.
 
 A failed prerequisite reports <xref:Orleans.Journaling.JournaledStatePreCommitException> with pending
 state retained for an explicit persistence retry after the prerequisite is restored. A failed after

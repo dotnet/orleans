@@ -320,11 +320,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         if (hookOperation is { } operation && _hooks is { Count: > 0 })
                         {
                             beforeHookRunning = true;
-                            var captureHook = GetCaptureHook();
-                            if (captureHook is null || _hooks.Count > 1)
-                            {
-                                await InvokeBeforeHooksAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
-                            }
+                            var captureHook = await InvokeBeforeHooksAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
 
                             if (captureHook is not null)
                             {
@@ -696,30 +692,19 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
     }
 
-    private IJournaledStateCaptureHook? GetCaptureHook()
-    {
-        for (var i = 0; i < _hooks!.Count; i++)
-        {
-            if (_hooks[i] is IJournaledStateCaptureHook captureHook)
-            {
-                return captureHook;
-            }
-        }
-
-        return null;
-    }
-
-    private async ValueTask InvokeBeforeHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
+    private async ValueTask<IJournaledStateCaptureHook?> InvokeBeforeHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
     {
         var previous = CurrentHookOwner.Value;
         CurrentHookOwner.Value = this;
+        IJournaledStateCaptureHook? captureHook = null;
         try
         {
             for (var i = 0; i < _hooks!.Count; i++)
             {
                 var hook = _hooks[i];
-                if (hook is IJournaledStateCaptureHook)
+                if (hook is IJournaledStateCaptureHook capture)
                 {
+                    captureHook = capture;
                     continue;
                 }
 
@@ -728,6 +713,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            return captureHook;
         }
         finally
         {

@@ -428,21 +428,6 @@ namespace Orleans.Journaling
         public JournalId Prefix { get { throw null; } set { } }
     }
 
-    public sealed partial class JournaledStateHook : IJournaledStateHook
-    {
-        public System.Action<JournaledStateOperation, System.Threading.CancellationToken>? AfterOperation { get { throw null; } init { } }
-
-        public System.Func<JournaledStateOperation, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>? AfterOperationAsync { get { throw null; } init { } }
-
-        public System.Action<JournaledStateOperation, System.Threading.CancellationToken>? BeforeOperation { get { throw null; } init { } }
-
-        public System.Func<JournaledStateOperation, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>? BeforeOperationAsync { get { throw null; } init { } }
-
-        System.Threading.Tasks.ValueTask IJournaledStateHook.AfterOperationAsync(JournaledStateOperation operation, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        System.Threading.Tasks.ValueTask IJournaledStateHook.BeforeOperationAsync(JournaledStateOperation operation, System.Threading.CancellationToken cancellationToken) { throw null; }
-    }
-
     public sealed partial class JournaledStateManagerOptions
     {
         public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
