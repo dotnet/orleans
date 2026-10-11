@@ -1008,10 +1008,10 @@ public class ArcBufferWriterTests
         using var buffer = new ArcBufferWriter();
         buffer.Write(new byte[100]);
         var slice = buffer.PeekSlice(100);
-        var page = slice.First;
+        var page = Assert.IsType<ArcBufferPage>(slice.First);
         int before = page.ReferenceCount;
         var unsafeSlice = slice.UnsafeSlice(10, 10);
-        Assert.Equal(before, unsafeSlice.First.ReferenceCount);
+        Assert.Equal(before, Assert.IsType<ArcBufferPage>(unsafeSlice.First).ReferenceCount);
     }
 
     /// <summary>
@@ -1308,7 +1308,7 @@ public class ArcBufferWriterTests
         buffer.Write(new byte[PageSize]);
         var s1 = buffer.PeekSlice(PageSize / 2);
         var s2 = buffer.PeekSlice(PageSize / 2);
-        var page = s1.First;
+        var page = Assert.IsType<ArcBufferPage>(s1.First);
         Assert.True(page.ReferenceCount >= 2);
         s1.Dispose();
         Assert.True(page.ReferenceCount >= 1);
