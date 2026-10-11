@@ -80,6 +80,8 @@ Activation-scoped features coordinate prerequisites and completion through
 allocated list of <xref:Orleans.Journaling.IJournaledStateHook> registrations. Register and
 deduplicate feature hooks during setup before initialization begins, alongside state machines.
 The hook list then remains fixed through recovery, persistence and deletion.
+Keep registration sequential with initialization and shutdown. Both transitions make the list
+read-only, including when the hook list is first accessed afterward.
 Every journal owner implementation provides this list and runs its registered callbacks at the
 operation boundaries below. Delegating owners forward the list to the inner owner.
 

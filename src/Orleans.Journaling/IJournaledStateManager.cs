@@ -17,6 +17,8 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// Inspect, add, remove, and deduplicate hooks during setup, before initialization begins.
+    /// The caller keeps hook registration sequential with initialization and shutdown.
+    /// Initialization or shutdown makes the list read-only.
     /// Registration remains fixed for this manager's initialized lifetime. Before hooks execute in
     /// reverse list order; after hooks execute in forward list order. Register the final capture
     /// prerequisite at index zero so it runs last before capture or deletion.

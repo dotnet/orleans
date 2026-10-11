@@ -270,6 +270,8 @@ of the ambient grain context, including when the caller subsequently enrolls the
 registrations. Features register and deduplicate their hooks during setup before initialization
 begins, alongside state-machine registration. The hook list then remains fixed through recovery,
 persistence and whole-journal deletion.
+Keep hook registration sequential with initialization and shutdown. Either lifecycle transition
+makes the list read-only; its collection owns this state independently of the journal owner.
 Every journal owner implementation provides the hook list and invokes registered callbacks at
 the operation boundaries described below. Delegating owners forward the list to their inner owner.
 

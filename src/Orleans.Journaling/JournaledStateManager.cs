@@ -169,6 +169,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             ThrowIfFenced();
             if (_workLoop is null)
             {
+                _hooks?.Freeze();
                 _workLoop = Start();
             }
 
@@ -1095,6 +1096,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         AggregateException? cancellationFailure = null;
         lock (_lock)
         {
+            _hooks?.Freeze();
             try
             {
                 _shutdownCancellation.Cancel();

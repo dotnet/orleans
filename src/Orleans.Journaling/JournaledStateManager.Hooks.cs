@@ -13,7 +13,7 @@ internal partial class JournaledStateManager
         {
             lock (_lock)
             {
-                return _hooks ??= new(this);
+                return _hooks ??= new(_workLoop is not null || _shutdownCancellation.IsCancellationRequested);
             }
         }
     }
@@ -55,45 +55,46 @@ internal partial class JournaledStateManager
         }
     }
 
-    private sealed class HookCollection(JournaledStateManager owner) : Collection<IJournaledStateHook>
+    private sealed class HookCollection(bool isReadOnly) : Collection<IJournaledStateHook>, IList<IJournaledStateHook>
     {
+        private bool _isReadOnly = isReadOnly;
+
+        bool ICollection<IJournaledStateHook>.IsReadOnly => _isReadOnly;
+
+        public void Freeze() => _isReadOnly = true;
+
         protected override void InsertItem(int index, IJournaledStateHook item)
         {
-            lock (owner._lock)
-            {
-                owner.EnsureRegistrationAllowed();
-                ArgumentNullException.ThrowIfNull(item);
-                base.InsertItem(index, item);
-            }
+            ThrowIfReadOnly();
+            ArgumentNullException.ThrowIfNull(item);
+            base.InsertItem(index, item);
         }
 
         protected override void SetItem(int index, IJournaledStateHook item)
         {
-            lock (owner._lock)
-            {
-                owner.EnsureRegistrationAllowed();
-                ArgumentNullException.ThrowIfNull(item);
-                base.SetItem(index, item);
-            }
+            ThrowIfReadOnly();
+            ArgumentNullException.ThrowIfNull(item);
+            base.SetItem(index, item);
         }
 
         protected override void RemoveItem(int index)
         {
-            lock (owner._lock)
-            {
-                owner.EnsureRegistrationAllowed();
-                base.RemoveItem(index);
-            }
+            ThrowIfReadOnly();
+            base.RemoveItem(index);
         }
 
         protected override void ClearItems()
         {
-            lock (owner._lock)
-            {
-                owner.EnsureRegistrationAllowed();
-                base.ClearItems();
-            }
+            ThrowIfReadOnly();
+            base.ClearItems();
         }
 
+        private void ThrowIfReadOnly()
+        {
+            if (_isReadOnly)
+            {
+                throw new NotSupportedException("Journal operation hook registrations are read-only.");
+            }
+        }
     }
 }

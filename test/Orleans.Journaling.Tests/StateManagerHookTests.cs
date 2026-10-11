@@ -73,6 +73,7 @@ public partial class StateManagerTests
 
         var hook = new DelegateTestHook();
         var hooks = manager.Hooks;
+        Assert.False(hooks.IsReadOnly);
         hooks.Add(hook);
         Assert.True(hooks.Contains(hook));
         Assert.Same(hooks, manager.Hooks);
@@ -85,12 +86,38 @@ public partial class StateManagerTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Same(hooks, manager.Hooks);
         Assert.Same(hook, Assert.Single(hooks));
-        Assert.Throws<InvalidOperationException>(() => hooks.Clear());
+        Assert.True(hooks.IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => hooks.Clear());
 
         await using var withoutHooks = CreateTestSystem().Manager;
         await withoutHooks.InitializeAsync(TestContext.Current.CancellationToken);
         await withoutHooks.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Null(field.GetValue(withoutHooks));
+        Assert.True(withoutHooks.Hooks.IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => withoutHooks.Hooks.Add(hook));
+    }
+
+    [Fact]
+    public async Task Hooks_ShutdownMakesSetupRegistrationsReadOnlyBeforeInitialization()
+    {
+        var manager = CreateTestSystem().Manager;
+        var hooks = manager.Hooks;
+        var hook = new DelegateTestHook();
+        hooks.Add(hook);
+        Assert.False(hooks.IsReadOnly);
+
+        await manager.DisposeAsync();
+
+        Assert.True(hooks.IsReadOnly);
+        Assert.Same(hooks, manager.Hooks);
+        Assert.Same(hook, Assert.Single(hooks));
+        Assert.Throws<NotSupportedException>(() => hooks.Add(hook));
+        Assert.Throws<NotSupportedException>(() => hooks.Clear());
+
+        var withoutHooks = CreateTestSystem().Manager;
+        await withoutHooks.DisposeAsync();
+        Assert.True(withoutHooks.Hooks.IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => withoutHooks.Hooks.Add(hook));
     }
 
     [Fact]
@@ -110,19 +137,20 @@ public partial class StateManagerTests
         var initialization = manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask();
         try
         {
-            Assert.Throws<InvalidOperationException>(() => hooks.Add(new DelegateTestHook()));
-            Assert.Throws<InvalidOperationException>(() => hooks.Insert(0, new DelegateTestHook()));
-            Assert.Throws<InvalidOperationException>(() => hooks[0] = new DelegateTestHook());
-            Assert.Throws<InvalidOperationException>(() => hooks.Remove(hook));
-            Assert.Throws<InvalidOperationException>(() => hooks.Clear());
+            Assert.True(hooks.IsReadOnly);
+            Assert.Throws<NotSupportedException>(() => hooks.Add(new DelegateTestHook()));
+            Assert.Throws<NotSupportedException>(() => hooks.Insert(0, new DelegateTestHook()));
+            Assert.Throws<NotSupportedException>(() => hooks[0] = new DelegateTestHook());
+            Assert.Throws<NotSupportedException>(() => hooks.Remove(hook));
+            Assert.Throws<NotSupportedException>(() => hooks.Clear());
             await WaitFor(entered.Task);
             Assert.False(initialization.IsCompleted);
             release.TrySetResult();
             Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => WaitFor(initialization)));
-            Assert.Throws<InvalidOperationException>(() => hooks.Clear());
+            Assert.Throws<NotSupportedException>(() => hooks.Clear());
             fail = false;
             await manager.InitializeAsync(TestContext.Current.CancellationToken);
-            Assert.Throws<InvalidOperationException>(() => hooks.Clear());
+            Assert.Throws<NotSupportedException>(() => hooks.Clear());
             Assert.Same(hook, Assert.Single(hooks));
         }
         finally
@@ -587,7 +615,7 @@ public partial class StateManagerTests
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => queued);
             Assert.True(drained);
             Assert.Empty(storage.Appends);
-            Assert.Throws<ObjectDisposedException>(() => manager.Hooks.Clear());
+            Assert.Throws<NotSupportedException>(() => manager.Hooks.Clear());
         }
         finally
         {
