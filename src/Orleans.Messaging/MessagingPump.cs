@@ -131,6 +131,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     private async Task RunAsync()
     {
+        // Callers start the loop from grain calls and job executions; queue the first pass to the activation
+        // scheduler so it never runs on, and nests within, the caller's stack.
+        await Task.Yield();
         var cancellationToken = _shutdown.Token;
         while (!cancellationToken.IsCancellationRequested)
         {
