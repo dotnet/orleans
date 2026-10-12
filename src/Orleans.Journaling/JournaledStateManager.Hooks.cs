@@ -53,6 +53,12 @@ internal partial class JournaledStateManager
         }
     }
 
+    private ValueTask InvokeBeforeHookAsync(int index, JournaledStateOperation operation, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return _hooks![index].BeforeOperationAsync(operation, cancellationToken);
+    }
+
     private async ValueTask InvokeAfterHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
     {
         List<Exception>? failures = null;

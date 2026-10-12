@@ -307,13 +307,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                     "The journaled state operation was queued before deletion reset its state.");
                             }
 
-                            operationType = workItem switch
-                            {
-                                WriteStateWorkItem when IsSnapshotRequired => JournaledStateOperation.Snapshot,
-                                WriteStateWorkItem => JournaledStateOperation.Write,
-                                DeleteStateWorkItem => JournaledStateOperation.Delete,
-                                _ => null
-                            };
+                            operationType = GetOperationType(workItem);
                             if (operationType == JournaledStateOperation.Snapshot)
                             {
                                 compactionReason = _snapshotRequired
@@ -331,8 +325,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                             // Keep synchronous final completion and capture in the same work-loop continuation.
                             for (var i = _hooks.Count - 1; i >= 0; i--)
                             {
-                                _shutdownCancellation.Token.ThrowIfCancellationRequested();
-                                await _hooks[i].BeforeOperationAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
+                                await InvokeBeforeHookAsync(i, operation, _shutdownCancellation.Token).ConfigureAwait(true);
                             }
 
                             _shutdownCancellation.Token.ThrowIfCancellationRequested();
@@ -697,6 +690,14 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             }
         }
     }
+
+    private JournaledStateOperation? GetOperationType(WorkItem workItem) => workItem switch
+    {
+        WriteStateWorkItem when IsSnapshotRequired => JournaledStateOperation.Snapshot,
+        WriteStateWorkItem => JournaledStateOperation.Write,
+        DeleteStateWorkItem => JournaledStateOperation.Delete,
+        _ => null
+    };
 
     private void Fence(Exception exception)
     {
