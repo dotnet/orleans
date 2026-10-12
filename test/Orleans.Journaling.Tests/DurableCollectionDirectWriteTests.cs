@@ -193,23 +193,6 @@ public sealed class DurableCollectionDirectWriteTests
 
     private sealed class TestJournalManager(TestJournalStreamWriter writer) : IJournaledStateManager
     {
-        private readonly List<IJournaledStateHook> _hooks = [];
-
-        public ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, CancellationToken cancellationToken = default)
-        {
-            _hooks.Insert(index ?? _hooks.Count, hook);
-            return default;
-        }
-
-        public ValueTask RemoveHookAsync(IJournaledStateHook hook, CancellationToken cancellationToken = default)
-        {
-            if (!_hooks.Remove(hook))
-            {
-                throw new InvalidOperationException("The journal operation hook is not registered.");
-            }
-            return default;
-        }
-
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
         public void RegisterStateMachine(string name, IStateMachine state) => state.Reset(writer.CreateWriter());

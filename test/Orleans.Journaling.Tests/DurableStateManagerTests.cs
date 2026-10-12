@@ -592,7 +592,7 @@ public sealed class DurableStateManagerTests
     private static void AssertAdmissionRejected(Action action)
     {
         var error = Assert.Throws<InvalidOperationException>(action);
-        Assert.Equal("Journal registrations cannot be changed after journaled state manager initialization has begun.", error.Message);
+        Assert.Equal("New states cannot be registered after journaled state manager initialization has begun.", error.Message);
     }
 
     private static void AssertFenced(InvalidOperationException error, IOException cause)
