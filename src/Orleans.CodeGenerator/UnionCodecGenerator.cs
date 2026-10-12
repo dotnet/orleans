@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -200,8 +201,12 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine("        {");
         foreach (var codec in codecs)
         {
-            var conversion = codec.Case.RequiresObjectConversion ? $"({typeName})(object)" : string.Empty;
-            source.AppendLine($"            case {codec.Case.Id}U: result = {conversion}{GetReadCase(codec)}; break;");
+            // A case which derives from one instantiation of a generic closed type, such as 'IntSquare : Shape<int>', is a case of that
+            // instantiation only, so the type pattern rejects it when it is read as another instantiation.
+            var read = codec.Case.RequiresRuntimeTypeCheck
+                ? $"{GetReadCase(codec)} is {typeName} matched{codec.Case.Id} ? matched{codec.Case.Id} : {Helper}.ThrowUnknownUnionCase<{typeName}>(header.FieldIdDelta)"
+                : GetReadCase(codec);
+            source.AppendLine($"            case {codec.Case.Id}U: result = {read}; break;");
         }
 
         source.AppendLine($"            default: result = {Helper}.ThrowUnknownUnionCase<{typeName}>(header.FieldIdDelta); break;");
@@ -212,7 +217,7 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine("    }");
         source.AppendLine("}");
 
-        return ((ClassDeclarationSyntax)ParseMemberDeclaration(source.ToString())!).Members;
+        return ParseClass(source).Members;
     }
 
     /// <summary>
@@ -297,9 +302,16 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
 
     private static string GetReadCase(CaseCodec codec) => $"{codec.CodecExpression}.ReadValue(ref reader, header)";
 
+    private static ClassDeclarationSyntax ParseClass(StringBuilder source)
+    {
+        var declaration = (ClassDeclarationSyntax)ParseMemberDeclaration(source.ToString())!;
+        Debug.Assert(!declaration.ContainsDiagnostics, $"Generated source does not parse: {string.Join("; ", declaration.GetDiagnostics())}");
+        return declaration;
+    }
+
     private static ClassDeclarationSyntax FinishClass(ISerializableTypeDescription type, StringBuilder source)
     {
-        var classDeclaration = ((ClassDeclarationSyntax)ParseMemberDeclaration(source.ToString())!)
+        var classDeclaration = ParseClass(source)
             .WithModifiers(TokenList(Token(type.Accessibility == Accessibility.Public ? SyntaxKind.PublicKeyword : SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword)))
             .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes());
         if (type.IsGenericType)
