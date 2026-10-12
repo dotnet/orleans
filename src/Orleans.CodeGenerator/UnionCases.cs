@@ -31,7 +31,11 @@ internal static class UnionCaseResolver
             throw new OrleansGeneratorDiagnosticAnalysisException(InvalidUnionCaseDiagnostic.CreateClassUnionDiagnostic(type));
         }
 
-        var caseTypes = LanguageFeatureSymbols.GetUnionCaseTypes(type);
+        if (LanguageFeatureSymbols.GetUnionCaseTypes(type) is not { } caseTypes)
+        {
+            throw new OrleansGeneratorDiagnosticAnalysisException(InvalidUnionCaseDiagnostic.CreateUnionCaseTypesUnavailableDiagnostic(type));
+        }
+
         uint[] ids;
         if (libraryTypes.CaseIdsAttributeOrDefault is { } caseIdsAttributeType && type.GetAttribute(caseIdsAttributeType) is { } caseIdsAttribute)
         {

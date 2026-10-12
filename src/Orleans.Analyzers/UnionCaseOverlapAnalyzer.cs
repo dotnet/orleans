@@ -46,7 +46,7 @@ public sealed class UnionCaseOverlapAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var cases = LanguageFeatureSymbols.GetUnionCaseTypes(type);
+        var cases = LanguageFeatureSymbols.GetUnionCaseTypes(type) ?? [];
         for (var i = 0; i < cases.Length; i++)
         {
             for (var j = i + 1; j < cases.Length; j++)

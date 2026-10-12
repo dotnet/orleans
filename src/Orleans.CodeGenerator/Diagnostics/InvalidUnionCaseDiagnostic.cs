@@ -63,6 +63,14 @@ internal static class InvalidUnionCaseDiagnostic
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor UnionCaseTypesUnavailableRule = new(
+        DiagnosticId,
+        "Generated union serializers require a compiler which exposes union case types",
+        "The compiler does not expose the case types of union type '{0}' to source generators. Build with the .NET 11 SDK or later to generate its serializer.",
+        Category,
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     private static Location GetLocation(ISymbol symbol) => symbol.Locations.FirstOrDefault() ?? Location.None;
 
     internal static Diagnostic CreateMissingCaseIdDiagnostic(INamedTypeSymbol subtype, INamedTypeSymbol closedType) =>
@@ -82,6 +90,9 @@ internal static class InvalidUnionCaseDiagnostic
 
     internal static Diagnostic CreateInaccessibleCaseDiagnostic(ISymbol location, ITypeSymbol caseType, INamedTypeSymbol unionType) =>
         Diagnostic.Create(InaccessibleCaseRule, GetLocation(location), caseType.ToDisplayString(), unionType.ToDisplayString());
+
+    internal static Diagnostic CreateUnionCaseTypesUnavailableDiagnostic(INamedTypeSymbol unionType) =>
+        Diagnostic.Create(UnionCaseTypesUnavailableRule, GetLocation(unionType), unionType.ToDisplayString());
 
     internal static Diagnostic CreateClassUnionDiagnostic(INamedTypeSymbol unionType) =>
         Diagnostic.Create(ClassUnionRule, GetLocation(unionType), unionType.ToDisplayString());

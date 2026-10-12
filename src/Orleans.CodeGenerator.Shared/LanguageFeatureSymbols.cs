@@ -10,6 +10,7 @@ namespace Orleans.CodeGenerator;
 /// <remarks>
 /// The generator is compiled against an older Roslyn API so that it loads in older compilers.
 /// Compilers which predate these features cannot declare closed or union types, so the absence of the APIs means the features are absent.
+/// Some preview compilers can declare union types without exposing their case types, so callers must handle unions whose case types are unavailable.
 /// </remarks>
 internal static class LanguageFeatureSymbols
 {
@@ -21,7 +22,10 @@ internal static class LanguageFeatureSymbols
 
     public static bool IsUnion(ITypeSymbol type) => IsUnionAccessor?.Invoke(type) == true;
 
-    public static ImmutableArray<ITypeSymbol> GetUnionCaseTypes(ITypeSymbol type) => UnionCaseTypesAccessor?.Invoke(type) ?? [];
+    /// <summary>
+    /// Gets the case types of a union type in declaration order, or <see langword="null"/> if the compiler does not expose union case types.
+    /// </summary>
+    public static ImmutableArray<ITypeSymbol>? GetUnionCaseTypes(ITypeSymbol type) => UnionCaseTypesAccessor?.Invoke(type);
 
     private static Func<ITypeSymbol, T>? CreateAccessor<T>(string propertyName)
     {
