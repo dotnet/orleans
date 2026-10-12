@@ -1,3 +1,6 @@
+using System.Threading.Channels;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -7,27 +10,22 @@ public partial class StateManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Preparation_RunsAfterHooksBeforeCaptureAndAcknowledgement(bool snapshot)
+    public async Task Preparation_RunsBeforeCaptureAndAcknowledgement(bool snapshot)
     {
         var storage = new CapturingStorage { IsCompactionRequested = snapshot };
         await using var manager = CreateTestSystem(storage).Manager;
         List<string> events = [];
         var state = new PreparingValue("state", manager, CreateValueCodec<int>(), events);
-        await manager.AddHookAsync(new DelegateTestHook
-        {
-            BeforeOperation = (_, _) => { events.Add("before"); state["intent"] = 17; },
-            AfterOperation = (_, _) => events.Add("after")
-        }, cancellationToken: TestContext.Current.CancellationToken);
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        state["intent"] = 17;
 
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(["before", "prepare", "capture", "ack", "after"], events);
+        Assert.Equal(["prepare", "capture", "ack"], events);
         Assert.Equal(17, state.CapturedValue);
         Assert.Equal(1, state.WriteCompletedCount);
         Assert.Single(snapshot ? storage.Replaces : storage.Appends);
     }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -84,7 +82,7 @@ public partial class StateManagerTests
     [InlineData(true)]
     public async Task Preparation_SynchronousReadyPassAndCaptureShareOneTurn(bool snapshot)
     {
-        var scheduler = new QueuedHookTaskScheduler();
+        var scheduler = new QueuedTaskScheduler();
         await scheduler.Run(async () =>
         {
             var storage = new CapturingStorage { IsCompactionRequested = snapshot };
@@ -222,6 +220,51 @@ public partial class StateManagerTests
         }
     }
 
+    [Fact]
+    public void PreCommitFailure_RoundTripsWithOriginalCause()
+    {
+        var original = new JournaledStatePreCommitException(new IOException("Scheduling failed."));
+        var serializer = ServiceProvider.GetRequiredService<Serializer>();
+
+        var copy = Assert.IsType<JournaledStatePreCommitException>(serializer.Deserialize<Exception>(serializer.SerializeToArray(original)));
+
+        Assert.Equal(original.Message, copy.Message);
+        Assert.Equal("Scheduling failed.", Assert.IsType<IOException>(copy.InnerException).Message);
+    }
+
+    private sealed class QueuedTaskScheduler : TaskScheduler
+    {
+        private readonly Channel<Task> _queue = Channel.CreateUnbounded<Task>();
+
+        public override int MaximumConcurrencyLevel => 1;
+        protected override IEnumerable<Task>? GetScheduledTasks() => null;
+        protected override void QueueTask(Task task) => Assert.True(_queue.Writer.TryWrite(task));
+        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => false;
+
+        public Task Queue(Action action) =>
+            Task.Factory.StartNew(action, TestContext.Current.CancellationToken, TaskCreationOptions.DenyChildAttach, this);
+
+        public async Task Run(Func<Task> action)
+        {
+            var task = Task.Factory.StartNew(action, TestContext.Current.CancellationToken, TaskCreationOptions.DenyChildAttach, this).Unwrap();
+            while (!task.IsCompleted)
+            {
+                var next = await _queue.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+                var previous = SynchronizationContext.Current;
+                SynchronizationContext.SetSynchronizationContext(null);
+                try
+                {
+                    Assert.True(TryExecuteTask(next));
+                }
+                finally
+                {
+                    SynchronizationContext.SetSynchronizationContext(previous);
+                }
+            }
+
+            await task;
+        }
+    }
     private sealed class PreparingValue : IStateMachine, IDurableValueCommandHandler<int>
     {
         private readonly IDurableValueCommandCodec<int> _codec;
