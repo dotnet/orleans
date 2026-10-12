@@ -53,10 +53,21 @@ internal partial class JournaledStateManager
         }
     }
 
-    private ValueTask InvokeBeforeHookAsync(int index, JournaledStateOperation operation, CancellationToken cancellationToken)
+    private ValueTask InvokeBeforeHooksAsync(ref int index, JournaledStateOperation operation, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        return _hooks![index].BeforeOperationAsync(operation, cancellationToken);
+        while (index >= 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var pending = _hooks![index--].BeforeOperationAsync(operation, cancellationToken);
+            if (!pending.IsCompleted)
+            {
+                return pending;
+            }
+
+            pending.GetAwaiter().GetResult();
+        }
+
+        return default;
     }
 
     private async ValueTask InvokeAfterHooksAsync(JournaledStateOperation operation, CancellationToken cancellationToken)

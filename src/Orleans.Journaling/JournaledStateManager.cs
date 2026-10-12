@@ -241,17 +241,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
                 lock (_lock)
                 {
-                    var retryRequested = false;
-                    foreach (var workItem in _workQueue)
-                    {
-                        if (workItem is InitializeWorkItem)
-                        {
-                            retryRequested = true;
-                            break;
-                        }
-                    }
-
-                    if (retryRequested)
+                    if (_workQueue.Count > 0)
                     {
                         break;
                     }
@@ -323,9 +313,9 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         {
                             beforeHookRunning = true;
                             // Keep synchronous final completion and capture in the same work-loop continuation.
-                            for (var i = _hooks.Count - 1; i >= 0; i--)
+                            for (var i = _hooks.Count - 1; i >= 0;)
                             {
-                                await InvokeBeforeHookAsync(i, operation, _shutdownCancellation.Token).ConfigureAwait(true);
+                                await InvokeBeforeHooksAsync(ref i, operation, _shutdownCancellation.Token).ConfigureAwait(true);
                             }
 
                             _shutdownCancellation.Token.ThrowIfCancellationRequested();
