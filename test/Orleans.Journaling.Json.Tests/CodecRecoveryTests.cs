@@ -293,27 +293,31 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Contains("""[8,["set","alpha",1]]""", Encoding.UTF8.GetString(storage.Segments.Single()), StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Migration_WithUnregisteredRetiredState_ThrowsClearError()
+    [Theory]
+    [InlineData(OrleansBinaryJournalFormat.JournalFormatKey, JsonLinesJournalFormat.JournalFormatKey)]
+    [InlineData(JsonLinesJournalFormat.JournalFormatKey, OrleansBinaryJournalFormat.JournalFormatKey)]
+    public async Task Migration_WithUnregisteredRetiredState_PreservesStorage(string sourceFormat, string targetFormat)
     {
-        var storage = new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey);
-        using var first = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
-        var dict = CreateFormatAwareDictionary(first, OrleansBinaryJournalFormat.JournalFormatKey, "dict");
+        var storage = new VolatileJournalStorage(sourceFormat);
+        using var first = CreateFormatAwareTestSystem(storage, sourceFormat);
+        var dict = CreateFormatAwareDictionary(first, sourceFormat, "dict");
         await first.Lifecycle.OnStart(TestContext.Current.CancellationToken);
         dict.Add("alpha", 1);
         await first.Manager.WriteStateAsync(CancellationToken.None);
 
-        storage.SetConfiguredJournalFormatKey(JsonLinesJournalFormat.JournalFormatKey);
-        using var recovered = CreateFormatAwareTestSystem(storage, JsonLinesJournalFormat.JournalFormatKey);
-        var other = CreateFormatAwareDictionary(recovered, JsonLinesJournalFormat.JournalFormatKey, "other");
+        var originalBytes = Assert.Single(storage.Segments).ToArray();
+        storage.SetConfiguredJournalFormatKey(targetFormat);
+        using var recovered = CreateFormatAwareTestSystem(storage, targetFormat);
+        var other = CreateFormatAwareDictionary(recovered, targetFormat, "other");
         await recovered.Lifecycle.OnStart(TestContext.Current.CancellationToken);
 
         other.Add("beta", 2);
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => recovered.Manager.WriteStateAsync(CancellationToken.None).AsTask());
 
-        Assert.Contains("Cannot migrate journal", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("not currently registered", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("cannot append preserved entry", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(sourceFormat, storage.StoredJournalFormatKey);
+        Assert.Equal(originalBytes, Assert.Single(storage.Segments));
     }
 
     [Theory]
