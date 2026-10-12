@@ -1,7 +1,14 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Session;
+using Orleans.Serialization.Utilities;
 using Xunit;
+using static VerifyXunit.Verifier;
 
 namespace Orleans.Serialization.UnitTests.TaggedUnions;
 
@@ -29,7 +36,7 @@ public class TaggedUnionSerializationTests
 
     private T Copy<T>(T value) => _copier.GetCopier<T>().Copy(value)!;
 
-    public static TheoryData<Sensor> Sensors() =>
+    private static readonly Sensor[] SensorValues =
     [
         new Temperature(21.5) { Location = "kitchen" },
         new Humidity(40),
@@ -37,6 +44,8 @@ public class TaggedUnionSerializationTests
         new ReedContact { Open = false, Reed = 3 },
         new Light(800) { Location = "porch" },
     ];
+
+    public static TheoryData<Sensor> Sensors() => [.. SensorValues];
 
     [Theory]
     [MemberData(nameof(Sensors))]
@@ -71,35 +80,74 @@ public class TaggedUnionSerializationTests
         Assert.True(asObject.Length > asClosedType.Length + 20, $"Expected the encoded type name to dominate: {asObject.Length} vs {asClosedType.Length}");
     }
 
-    [Theory]
-    [MemberData(nameof(Sensors))]
-    public void ClosedHierarchyAndEquivalentUnionHaveTheSameEncoding(Sensor value)
+    [Fact]
+    public Task ClosedHierarchyAndEquivalentUnionEncoding_MatchesSnapshot()
     {
-        SensorUnion union = value switch
+        // The snapshot records the closed hierarchy's encoding, and the union with the same cases and case identifiers must produce the same bytes.
+        var snapshot = new StringBuilder();
+        foreach (var value in SensorValues.Append<Sensor?>(null))
         {
-            Temperature temperature => temperature,
-            Humidity humidity => humidity,
-            Environmental environmental => environmental,
-            Contact contact => contact,
-        };
+            SensorUnion union = value switch
+            {
+                null => default,
+                Temperature temperature => temperature,
+                Humidity humidity => humidity,
+                Environmental environmental => environmental,
+                Contact contact => contact,
+            };
 
-        var closedBytes = _serializer.SerializeToArray<Sensor>(value);
-        var unionBytes = _serializer.SerializeToArray(union);
+            var closedBytes = _serializer.SerializeToArray<Sensor?>(value);
+            var unionBytes = _serializer.SerializeToArray(union);
 
-        Assert.Equal(closedBytes, unionBytes);
-        Assert.Equal(value, _serializer.Deserialize<SensorUnion>(closedBytes).Value);
-        Assert.Equal(value, _serializer.Deserialize<Sensor>(unionBytes));
+            Assert.Equal(closedBytes, unionBytes);
+            Assert.Equal(value, _serializer.Deserialize<SensorUnion>(closedBytes).Value);
+            Assert.Equal(value, _serializer.Deserialize<Sensor?>(unionBytes));
+            AppendPayload(snapshot, value?.GetType().Name ?? "null", closedBytes);
+        }
+
+        return Verify(snapshot.ToString(), extension: "txt").UseDirectory("snapshots");
     }
 
     [Fact]
-    public void NullClosedValueAndEmptyUnionHaveTheSameEncoding()
+    public Task TransparentClosedHierarchyReplacedByUnionEncoding_MatchesSnapshot()
     {
-        var closedBytes = _serializer.SerializeToArray<Sensor?>(null);
-        var unionBytes = _serializer.SerializeToArray(default(SensorUnion));
+        // Before the upgrade: a stateless, serializer-transparent closed base. After: a union of the same records without the base.
+        var snapshot = new StringBuilder();
+        foreach (var (before, after) in new (ShapeV1?, ShapeV2)[] { (new CircleV1(1.5), new CircleV2(1.5)), (new SquareV1(2), new SquareV2(2)), (null, default) })
+        {
+            var beforeBytes = _serializer.SerializeToArray(before);
 
-        Assert.Equal(closedBytes, unionBytes);
-        Assert.Null(_serializer.Deserialize<Sensor?>(unionBytes));
-        Assert.Null(_serializer.Deserialize<SensorUnion>(closedBytes).Value);
+            Assert.Equal(beforeBytes, _serializer.SerializeToArray(after));
+            Assert.Equal(after, _serializer.Deserialize<ShapeV2>(beforeBytes));
+            Assert.Equal(before, _serializer.Deserialize<ShapeV1?>(beforeBytes));
+            AppendPayload(snapshot, before?.GetType().Name ?? "null", beforeBytes);
+        }
+
+        return Verify(snapshot.ToString(), extension: "txt").UseDirectory("snapshots");
+    }
+
+    [Fact]
+    public Task UnionEncoding_MatchesSnapshot()
+    {
+        var snapshot = new StringBuilder();
+        AppendPayload(snapshot, "Pet: Cat", _serializer.SerializeToArray<Pet>(new Cat("Whiskers")));
+        AppendPayload(snapshot, "Pet: Dog", _serializer.SerializeToArray<Pet>(new Dog("Rex")));
+        AppendPayload(snapshot, "Pet: empty", _serializer.SerializeToArray(default(Pet)));
+        AppendPayload(snapshot, "PetV2: Dog (case 2)", _serializer.SerializeToArray<PetV2>(new Dog("Fido")));
+        AppendPayload(snapshot, "IntOrString: int", _serializer.SerializeToArray<IntOrString>(42));
+        AppendPayload(snapshot, "IntOrString: string", _serializer.SerializeToArray<IntOrString>("text"));
+        AppendPayload(snapshot, "MaybeNumber: int?", _serializer.SerializeToArray<MaybeNumber>((int?)7));
+        AppendPayload(snapshot, "Either<int, string>: Value<string>", _serializer.SerializeToArray<Either<int, string>>(new Value<string>("r")));
+        AppendPayload(snapshot, "Shape<int>: Square<int>", _serializer.SerializeToArray<Shape<int>>(new Square<int>(5)));
+        return Verify(snapshot.ToString(), extension: "txt").UseDirectory("snapshots");
+    }
+
+    private void AppendPayload(StringBuilder snapshot, string label, byte[] payload)
+    {
+        using var session = _services.GetRequiredService<SerializerSessionPool>().GetSession();
+        snapshot.Append("# ").Append(label).Append('\n')
+            .Append("hex: ").Append(Convert.ToHexString(payload)).Append('\n')
+            .Append(BitStreamFormatter.Format(payload, session)).Append("\n\n");
     }
 
     [Fact]
@@ -329,6 +377,25 @@ public sealed record ReedContact : Contact
 /// </summary>
 [GenerateSerializer, CaseIds(0, 1, 2, 9)]
 public union SensorUnion(Temperature, Humidity, Environmental, Contact);
+
+// A closed hierarchy whose stateless base is invisible to serialization, and the union which replaces it.
+[GenerateSerializer, SerializerTransparent]
+public closed record ShapeV1;
+
+[GenerateSerializer, Case(0)]
+public sealed record CircleV1([property: Id(0)] double Radius) : ShapeV1;
+
+[GenerateSerializer, Case(1)]
+public sealed record SquareV1([property: Id(0)] double Side) : ShapeV1;
+
+[GenerateSerializer]
+public sealed record CircleV2([property: Id(0)] double Radius);
+
+[GenerateSerializer]
+public sealed record SquareV2([property: Id(0)] double Side);
+
+[GenerateSerializer]
+public union ShapeV2(CircleV2, SquareV2);
 
 [GenerateSerializer]
 public closed record Shape<T>;

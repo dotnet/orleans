@@ -305,6 +305,8 @@ namespace Orleans
     /// A closed type and a union type have the same serialized representation when the union's cases are the closed type's direct subtypes with the same
     /// case identifiers (see <see cref="CaseIdsAttribute"/>). A <see langword="null"/> closed-type value is represented as an empty union value.
     /// A closed type hierarchy can therefore be replaced by an equivalent union type without changing serialized data.
+    /// Each case's own representation includes its base type's members, so to remove the closed base from the cases when replacing it with a union,
+    /// declare the closed base without serialized members and apply <see cref="SerializerTransparentAttribute"/> to it.
     /// </para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
