@@ -27,6 +27,18 @@ public sealed class MessageType<T>
         _serializer = serializer;
     }
 
+    /// <summary>Creates a subject and payload-type binding using the payload serializer from <paramref name="serializer"/>.</summary>
+    /// <param name="subject">The ordinal protocol subject.</param>
+    /// <param name="serializer">The serializer which provides the payload serializer.</param>
+    /// <remarks>
+    /// Use this overload to define a protocol's bindings together in one application class, constructed from the
+    /// <see cref="Serializer"/> service.
+    /// </remarks>
+    public MessageType(string subject, Serializer serializer)
+        : this(subject, (serializer ?? throw new ArgumentNullException(nameof(serializer))).GetSerializer<T>())
+    {
+    }
+
     /// <summary>Gets the exact protocol subject.</summary>
     public string Subject { get; }
 
