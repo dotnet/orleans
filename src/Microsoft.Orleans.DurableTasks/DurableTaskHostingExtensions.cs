@@ -5,10 +5,10 @@ using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.DurableMessaging;
+using Orleans.DurableJobs;
 using Orleans.DurableTasks;
 using Orleans.Hosting;
-using Orleans.Journaling;
+using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization.Configuration;
 
@@ -30,12 +30,16 @@ public static class DurableTaskHostingExtensions
         return clientBuilder;
     }
 
-    /// <summary>Adds the silo-side durable grain RPC runtime and durable messaging protocol.</summary>
+    /// <summary>Adds the silo-side durable grain RPC runtime over Orleans Messaging and Durable Jobs.</summary>
+    /// <remarks>
+    /// Grains deriving from <see cref="Orleans.Journaling.DurableGrain"/> or implementing <see cref="IMessagingGrain"/>
+    /// bind the runtime during activation setup, before journal recovery.
+    /// </remarks>
     public static ISiloBuilder AddDurableTasks(
         this ISiloBuilder siloBuilder,
         Action<DurableTaskOptions>? configureOptions = null)
     {
-        siloBuilder.AddDurableMessaging();
+        siloBuilder.AddMessaging();
         var options = siloBuilder.Services.AddOptions<DurableTaskOptions>();
         if (configureOptions is not null)
         {
@@ -44,9 +48,6 @@ public static class DurableTaskHostingExtensions
         options.Validate(
             value => value.ResultRetentionPeriod >= TimeSpan.Zero,
             "Durable task result retention must not be negative.");
-        options.Validate(
-            value => value.RecoveryExecutionDrainTimeout > TimeSpan.Zero,
-            "Durable task recovery execution drain timeout must be greater than zero.");
         siloBuilder.Services.AddDurableTaskSerialization();
         siloBuilder.Services.TryAddSingleton<DurableTaskRequestShared>();
         siloBuilder.Configure<TypeManifestOptions>(
@@ -56,15 +57,17 @@ public static class DurableTaskHostingExtensions
                 options.AddAllowedAssembly(typeof(DurableTaskRequest).Assembly);
             });
         siloBuilder.Services.AddSingleton<DurableTaskGrainRuntimeShared>();
+        siloBuilder.Services.TryAddSingleton<DurableTaskMessageTypes>();
         siloBuilder.Services.AddScoped<DurableTaskGrainRuntime>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainRuntime, DurableTaskGrainRuntime>();
-        siloBuilder.Services.AddScoped<DurableTaskMessageTransport>();
+        siloBuilder.Services.AddScoped(static services => new DurableTaskMessageTransport(
+            new Lazy<IOutbox>(services.GetRequiredService<IOutbox>),
+            services.GetRequiredService<ILocalDurableJobManager>(),
+            services.GetRequiredService<DurableTaskMessageTypes>()));
         siloBuilder.Services.AddFromExisting<IDurableTaskMessageTransport, DurableTaskMessageTransport>();
         siloBuilder.Services.AddScoped<DurableTaskMessageHandler>();
-        siloBuilder.Services.AddScoped<IInboxHandler>(sp => sp.GetRequiredService<DurableTaskMessageHandler>());
-        siloBuilder.Services.AddScoped<DurableTaskGrainParticipant>();
         siloBuilder.Services.TryAddEnumerable(
-            ServiceDescriptor.Scoped<IJournaledGrainParticipant, DurableTaskGrainParticipant>());
+            ServiceDescriptor.Singleton<IConfigureGrainTypeComponents, DurableTaskGrainTypeConfigurator>());
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskGrainExtension), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
         siloBuilder.Services.AddKeyedTransient<IGrainExtension>(typeof(IDurableTaskServer), (sp, _) => sp.GetRequiredService<DurableTaskGrainRuntime>());
 
