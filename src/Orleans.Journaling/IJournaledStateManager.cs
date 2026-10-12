@@ -8,44 +8,10 @@ namespace Orleans.Journaling;
 /// <remarks>
 /// The owner registers state machines and initializes the journal before using recovered state.
 /// State machine instances and their dependencies retain the lifetime assigned by their caller.
-/// Disposal drains owned storage and hook operations before releasing resources.
+/// Disposing this manager stops journal processing and releases its journal resources.
 /// </remarks>
 public interface IJournaledStateManager : IAsyncDisposable
 {
-    /// <summary>
-    /// Adds a hook before the next persistence operation which follows this registration.
-    /// </summary>
-    /// <param name="hook">The hook to register.</param>
-    /// <param name="index">The insertion index, or <see langword="null"/> to append.</param>
-    /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
-    /// <returns>A completion representing application of the registration.</returns>
-    /// <remarks>
-    /// Registration completes synchronously before initialization begins, supporting constructor registration.
-    /// After initialization begins, idle registration applies synchronously; otherwise it is queued
-    /// between owned operations, after the current operation's after hooks finish.
-    /// Before hooks execute in reverse registration order; after hooks execute in forward order.
-    /// Register the final before hook at index zero. Writes then prepare the registered states before capture.
-    /// Registration is independent of state-machine registration and persists through recovery and deletion.
-    /// Every implementation provides registration and invokes hooks at the documented operation boundaries.
-    /// Queued registration is a write-coalescing barrier.
-    /// Cancellation ends the caller's wait while admitted registration remains owned by the manager.
-    /// Synchronous state callbacks can request registration and observe its completion outside the callback.
-    /// Await registration before staging changes whose safety depends on the added hook.
-    /// </remarks>
-    ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Removes a hook between persistence operations.
-    /// </summary>
-    /// <param name="hook">The registered hook to remove.</param>
-    /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
-    /// <returns>A completion representing application of the removal.</returns>
-    /// <exception cref="InvalidOperationException">The hook is not registered when the removal is applied.</exception>
-    /// <remarks>
-    /// Removal has the same ownership and ordering guarantees as <see cref="AddHookAsync"/>.
-    /// </remarks>
-    ValueTask RemoveHookAsync(IJournaledStateHook hook, CancellationToken cancellationToken = default);
-
     /// <inheritdoc/>
     ValueTask IAsyncDisposable.DisposeAsync() => default;
 
@@ -85,13 +51,11 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <remarks>
     /// Stage mutations only after establishing that they are safe to commit. Pending changes are shared
     /// by all callers using this manager. Storage acknowledgement establishes durability.
-    /// The manager invokes each state's <see cref="IStateMachine.PrepareWriteAsync"/> after before hooks,
-    /// completing a synchronous ready pass before capture.
-    /// A storage or state-processing failure fences the manager; recovery requires a new manager and state machine instances.
+    /// A failed journal operation fences the manager; recovery requires a new manager and state machine instances.
+    /// Before capture, the manager prepares each registered state through <see cref="IStateMachine.PrepareWriteAsync"/>.
+    /// A preparation failure reports <see cref="JournaledStatePreCommitException"/> and retains pending changes
+    /// for an explicit retry.
     /// Cancellation stops the caller's wait; an already queued write continues to its storage outcome.
-    /// State preparation or before-hook failure reports <see cref="JournaledStatePreCommitException"/> and retains pending
-    /// changes for an explicit retry. After-hook failure reports
-    /// <see cref="JournaledStatePostCommitException"/> after successful persistence.
     /// </remarks>
     /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
     /// <returns>A task representing the write acknowledgement.</returns>
@@ -103,10 +67,7 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <remarks>
     /// The caller keeps other operations quiescent through completion: deletion resets every registered state machine.
     /// Cancellation ends the caller's wait; an already queued deletion continues to its storage and reset outcome.
-    /// A storage or state-reset failure permanently fences the manager and requests deactivation of its owning grain.
-    /// Before-hook failure reports <see cref="JournaledStatePreCommitException"/> with state retained.
-    /// After-hook failure reports <see cref="JournaledStatePostCommitException"/> after storage deletion
-    /// and state reset succeed.
+    /// A failed deletion permanently fences the manager and requests deactivation of its owning grain.
     /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
