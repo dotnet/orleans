@@ -15,11 +15,14 @@ public class TypeUnifierTests
         public class Pair<A, B> { }
         public class Box<A> { }
         public class Defaultless { private Defaultless() { } }
-        public class Cases<T, U, TClass, TStruct, TNew, TComparable>
+        public class Cases<T, U, TClass, TStruct, TNew, TComparable, TStream, TMemoryStream, TException>
             where TClass : class
             where TStruct : struct
             where TNew : new()
             where TComparable : System.IComparable
+            where TStream : System.IO.Stream
+            where TMemoryStream : System.IO.MemoryStream
+            where TException : System.Exception
         {
             public Box<T> BoxT;
             public Box<U> BoxU;
@@ -33,6 +36,12 @@ public class TypeUnifierTests
             public Box<TStruct> BoxStruct;
             public Box<TNew> BoxNew;
             public Box<TComparable> BoxComparable;
+            public Box<TStream> BoxStream;
+            public Box<TMemoryStream> BoxMemoryStream;
+            public Box<TException> BoxException;
+            public Pair<TClass, int> PairClassInt;
+            public Pair<TClass, T> PairClassT;
+            public Pair<T, TStruct> PairTStruct;
             public Pair<T, T> PairTT;
             public Pair<T, U> PairTU;
             public Pair<U, int> PairUInt;
@@ -67,6 +76,13 @@ public class TypeUnifierTests
     [InlineData("BoxNew", "BoxDefaultless", false)]
     [InlineData("BoxComparable", "BoxString", true)]
     [InlineData("BoxComparable", "BoxObject", false)]
+    [InlineData("BoxClass", "BoxStruct", false)]
+    [InlineData("BoxClass", "BoxStream", true)]
+    [InlineData("BoxStruct", "BoxStream", false)]
+    [InlineData("BoxStream", "BoxMemoryStream", true)]
+    [InlineData("BoxStream", "BoxException", false)]
+    [InlineData("PairTT", "PairClassInt", false)]
+    [InlineData("PairClassT", "PairTStruct", false)]
     public void CanUnifyRespectsConsistentSubstitutionsAndConstraints(string first, string second, bool expected)
     {
         var firstType = GetFieldType(first);
@@ -76,6 +92,9 @@ public class TypeUnifierTests
         Assert.Equal(expected, TypeUnifier.CanUnify(Compilation, secondType, firstType));
     }
 
+    [Fact]
+    public void TestSourceCompiles() => Assert.Empty(Compilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
     private static ITypeSymbol GetFieldType(string name)
-        => Compilation.GetTypeByMetadataName("Cases`6")!.GetMembers(name).OfType<IFieldSymbol>().Single().Type;
+        => Compilation.GetTypeByMetadataName("Cases`9")!.GetMembers(name).OfType<IFieldSymbol>().Single().Type;
 }
