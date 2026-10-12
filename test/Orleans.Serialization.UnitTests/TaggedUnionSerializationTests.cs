@@ -137,6 +137,7 @@ public class TaggedUnionSerializationTests
         Assert.Equal(new Circle<int>(4), RoundTrip<Shape<int>>(new Circle<int>(4)));
         Assert.Equal(new IntSquare(5), RoundTrip<Shape<int>>(new IntSquare(5)));
         Assert.Equal(new IntSquare(5), Copy<Shape<int>>(new IntSquare(5)));
+        Assert.Equal(new RefBox<string>("x"), RoundTrip<RefHolder<string>>(new RefBox<string>("x")));
     }
 
     [Fact]
@@ -290,6 +291,12 @@ public sealed record Circle<T>([property: Id(0)] T Radius) : Shape<T>;
 
 [GenerateSerializer, Case(1)]
 public sealed record IntSquare([property: Id(0)] int Side) : Shape<int>;
+
+[GenerateSerializer]
+public closed record RefHolder<T> where T : class;
+
+[GenerateSerializer, Case(0)]
+public sealed record RefBox<T>([property: Id(0)] T Item) : RefHolder<T> where T : class;
 
 [GenerateSerializer]
 public closed record LegacyShape;
