@@ -4,36 +4,33 @@ using Microsoft.CodeAnalysis.CSharp;
 namespace Orleans.Analyzers;
 
 /// <summary>
-/// Determines whether two types can become the same type for some substitution of their type parameters.
+/// Determines whether two types can become the same type for some substitution of their type parameters which satisfies the type parameters' constraints.
 /// </summary>
 /// <remarks>
-/// Each type parameter is bound at most once across the whole comparison. A binding to a concrete type must satisfy the type parameter's
-/// constraints. A binding to another type parameter is accepted, because the result of combining both parameters' constraints is
-/// satisfiable for typical constraints. Constraints which mention type parameters are not checked, so the result can be a false positive
-/// in that case, but it is never a false negative.
+/// Type parameters are grouped into variables. Unifying two type parameters merges their variables, provided that the combined constraints
+/// can be satisfied together. Unifying a type parameter with any other type binds its variable to that type, provided that the type satisfies the
+/// constraints of every type parameter in the variable and does not contain the variable itself. Constraint types which mention type parameters
+/// are not evaluated, so the result can be a false positive in that case, but never a false negative.
 /// </remarks>
-internal sealed class TypeUnifier(Compilation compilation)
+internal sealed class TypeUnifier(CSharpCompilation compilation)
 {
-    private readonly Dictionary<ITypeParameterSymbol, ITypeSymbol> _bindings = new(SymbolEqualityComparer.Default);
+    private readonly Dictionary<ITypeParameterSymbol, Variable> _variables = new(SymbolEqualityComparer.Default);
 
-    public static bool CanUnify(Compilation compilation, ITypeSymbol first, ITypeSymbol second) => new TypeUnifier(compilation).Unify(first, second);
+    public static bool CanUnify(Compilation compilation, ITypeSymbol first, ITypeSymbol second)
+        => new TypeUnifier((CSharpCompilation)compilation).Unify(first, second);
 
     private bool Unify(ITypeSymbol first, ITypeSymbol second)
     {
         first = Resolve(first);
         second = Resolve(second);
-        if (SymbolEqualityComparer.Default.Equals(first, second))
-        {
-            return true;
-        }
-
         return (first, second) switch
         {
-            (ITypeParameterSymbol parameter, _) => Bind(parameter, second),
-            (_, ITypeParameterSymbol parameter) => Bind(parameter, first),
+            (ITypeParameterSymbol x, ITypeParameterSymbol y) => Merge(GetVariable(x), GetVariable(y)),
+            (ITypeParameterSymbol x, _) => Bind(GetVariable(x), second),
+            (_, ITypeParameterSymbol y) => Bind(GetVariable(y), first),
             (IArrayTypeSymbol x, IArrayTypeSymbol y) => x.Rank == y.Rank && Unify(x.ElementType, y.ElementType),
             (INamedTypeSymbol x, INamedTypeSymbol y) => UnifyNamed(x, y),
-            _ => false,
+            _ => SymbolEqualityComparer.Default.Equals(first, second),
         };
     }
 
@@ -60,9 +57,19 @@ internal sealed class TypeUnifier(Compilation compilation)
         return true;
     }
 
+    private Variable GetVariable(ITypeParameterSymbol parameter)
+    {
+        if (!_variables.TryGetValue(parameter, out var variable))
+        {
+            _variables[parameter] = variable = new Variable(parameter);
+        }
+
+        return variable;
+    }
+
     private ITypeSymbol Resolve(ITypeSymbol type)
     {
-        while (type is ITypeParameterSymbol parameter && _bindings.TryGetValue(parameter, out var bound))
+        while (type is ITypeParameterSymbol parameter && GetVariable(parameter).Binding is { } bound)
         {
             type = bound;
         }
@@ -70,37 +77,93 @@ internal sealed class TypeUnifier(Compilation compilation)
         return type;
     }
 
-    private bool Bind(ITypeParameterSymbol parameter, ITypeSymbol type)
+    private bool Merge(Variable first, Variable second)
     {
-        if (Occurs(parameter, type) || !SatisfiesConstraints(parameter, type))
-        {
-            return false;
-        }
-
-        _bindings[parameter] = type;
-        return true;
-    }
-
-    private bool Occurs(ITypeParameterSymbol parameter, ITypeSymbol type)
-    {
-        type = Resolve(type);
-        return type switch
-        {
-            ITypeParameterSymbol other => SymbolEqualityComparer.Default.Equals(parameter, other),
-            IArrayTypeSymbol array => Occurs(parameter, array.ElementType),
-            INamedTypeSymbol named => named.TypeArguments.Any(argument => Occurs(parameter, argument))
-                || named.ContainingType is { } container && Occurs(parameter, container),
-            _ => false,
-        };
-    }
-
-    private bool SatisfiesConstraints(ITypeParameterSymbol parameter, ITypeSymbol type)
-    {
-        if (type is ITypeParameterSymbol)
+        if (ReferenceEquals(first, second))
         {
             return true;
         }
 
+        if (!AreCompatible(first.Parameters.Concat(second.Parameters)))
+        {
+            return false;
+        }
+
+        foreach (var parameter in second.Parameters)
+        {
+            first.Parameters.Add(parameter);
+            _variables[parameter] = first;
+        }
+
+        return true;
+    }
+
+    private bool Bind(Variable variable, ITypeSymbol type)
+    {
+        if (Occurs(variable, type) || !variable.Parameters.All(parameter => SatisfiesConstraints(parameter, type)))
+        {
+            return false;
+        }
+
+        variable.Binding = type;
+        return true;
+    }
+
+    private bool Occurs(Variable variable, ITypeSymbol type) => Resolve(type) switch
+    {
+        ITypeParameterSymbol parameter => ReferenceEquals(GetVariable(parameter), variable),
+        IArrayTypeSymbol array => Occurs(variable, array.ElementType),
+        INamedTypeSymbol named => named.TypeArguments.Any(argument => Occurs(variable, argument))
+            || named.ContainingType is { } container && Occurs(variable, container),
+        _ => false,
+    };
+
+    /// <summary>
+    /// Returns <see langword="false"/> if no type can satisfy the constraints of all of the provided type parameters.
+    /// </summary>
+    private static bool AreCompatible(IEnumerable<ITypeParameterSymbol> parameters)
+    {
+        var isReferenceType = false;
+        var isValueType = false;
+        var classConstraints = new List<ITypeSymbol>();
+        foreach (var parameter in parameters)
+        {
+            isReferenceType |= parameter.HasReferenceTypeConstraint;
+            isValueType |= parameter.HasValueTypeConstraint || parameter.HasUnmanagedTypeConstraint;
+            foreach (var constraintType in parameter.ConstraintTypes)
+            {
+                if (constraintType.TypeKind == TypeKind.Class && !ContainsTypeParameter(constraintType))
+                {
+                    classConstraints.Add(constraintType);
+
+                    // 'System.ValueType' and 'System.Enum' constraints admit value types.
+                    isReferenceType |= constraintType.SpecialType is not (SpecialType.System_ValueType or SpecialType.System_Enum);
+                }
+            }
+        }
+
+        if (isReferenceType && isValueType)
+        {
+            return false;
+        }
+
+        // A type has a single base class chain, so every class constraint must be on the same chain.
+        for (var i = 0; i < classConstraints.Count; i++)
+        {
+            for (var j = i + 1; j < classConstraints.Count; j++)
+            {
+                if (!InheritsFrom(classConstraints[i], classConstraints[j]) && !InheritsFrom(classConstraints[j], classConstraints[i]))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private bool SatisfiesConstraints(ITypeParameterSymbol parameter, ITypeSymbol type)
+    {
         var isNullableValueType = type is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T };
         if (parameter.HasReferenceTypeConstraint && !type.IsReferenceType
             || parameter.HasValueTypeConstraint && (!type.IsValueType || isNullableValueType)
@@ -117,7 +180,7 @@ internal sealed class TypeUnifier(Compilation compilation)
                 continue;
             }
 
-            var conversion = ((CSharpCompilation)compilation).ClassifyConversion(type, constraintType);
+            var conversion = compilation.ClassifyConversion(type, constraintType);
             if (!conversion.IsImplicit || !(conversion.IsIdentity || conversion.IsReference || conversion.IsBoxing))
             {
                 return false;
@@ -125,6 +188,19 @@ internal sealed class TypeUnifier(Compilation compilation)
         }
 
         return true;
+    }
+
+    private static bool InheritsFrom(ITypeSymbol type, ITypeSymbol baseType)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current, baseType))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool HasPublicParameterlessConstructor(ITypeSymbol type) => type switch
@@ -141,4 +217,14 @@ internal sealed class TypeUnifier(Compilation compilation)
         INamedTypeSymbol named => named.TypeArguments.Any(ContainsTypeParameter),
         _ => false,
     };
+
+    /// <summary>
+    /// A set of type parameters which must be the same type, and the type they are bound to, if any.
+    /// </summary>
+    private sealed class Variable(ITypeParameterSymbol parameter)
+    {
+        public List<ITypeParameterSymbol> Parameters { get; } = [parameter];
+
+        public ITypeSymbol? Binding { get; set; }
+    }
 }
