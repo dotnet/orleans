@@ -7,3 +7,4 @@ Rule ID | Category | Severity | Notes
 ORLEANS0026 | Usage | Error | Invalid invokable base type mapping
 ORLEANS0028 | Usage | Error | Invalid Orleans identity
 ORLEANS0014 | Usage | Warning | ConfigureAwaitAnalyzer, Grain code should not use ConfigureAwait(false) or ConfigureAwait without ContinueOnCapturedContext
+ORLEANS0028 | Usage | Warning | Union cases can have the same type
