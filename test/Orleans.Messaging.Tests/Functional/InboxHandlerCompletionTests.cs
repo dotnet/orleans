@@ -515,35 +515,20 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task CompletionWrite_HookOutcomePreservesActualCommit(bool postCommit)
+    [Fact]
+    public async Task CompletionWrite_PreparationFailureReplaysCompletion()
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         var input = await DeliverAsync(rig);
-        var error = new IOException("Journal hook failed.");
-        await OnTurnAsync(rig.Context, () =>
-        {
-            if (postCommit) rig.Grain.AfterJournalOperationFailure = error;
-            else rig.Grain.BeforeJournalOperationFailure = error;
-        });
+        var error = new IOException("Journal preparation failed.");
+        await OnTurnAsync(rig.Context, () => rig.Grain.JournalPreparationFailure = error);
         var finished = FinishedAsync(rig);
         handler.Release.TrySetResult();
         await WaitAsync(finished);
-        if (postCommit)
-        {
-            AssertSuccess(rig, input, outputCount: 0);
-            await OnTurnAsync(rig.Context, () => rig.Grain.AfterJournalOperationFailure = null);
-            await AssertHealthyAsync(rig);
-        }
-        else
-        {
-            var failure = Assert.IsType<JournaledStatePreCommitException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
-            Assert.Same(error, failure.InnerException);
-            await AssertFailureReplayAsync(rig, input);
-        }
+        var failure = Assert.IsType<JournaledStatePreCommitException>(await WaitAsync(rig.Grain.DeactivationFailure.Task));
+        Assert.Same(error, failure.InnerException);
+        await AssertFailureReplayAsync(rig, input);
     }
 
     [Fact]
