@@ -282,6 +282,9 @@ For each actual write, snapshot, or deletion, before hooks run in reverse list o
 the manager lock. Add the final prerequisite with `index: 0` so it runs last before the work loop
 captures the registered states or starts deletion. Prerequisites remain valid through capture or
 deletion, covering changes staged during asynchronous preparation and while the work loop resumes.
+When the final callback completes synchronously, capture or the start of deletion follows in the
+same work-loop continuation. Other owner turns can stage changes while an incomplete callback is awaited,
+so its prerequisite covers those changes through capture or deletion.
 Keep operation-local bookkeeping for the captured batch separate from later pending changes.
 
 After hooks run in list order after storage acknowledgement and state acknowledgement or reset.

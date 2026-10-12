@@ -21,6 +21,8 @@ public enum JournaledStateOperation
 /// <remarks>
 /// Before hooks run in reverse list order on the owner's logical execution context, outside its lock.
 /// The hook at index zero supplies the final prerequisite before capture or deletion.
+/// When the final callback completes synchronously, capture or the start of deletion follows in the
+/// same work-loop continuation.
 /// Prerequisites remain valid until capture or deletion, covering changes staged during asynchronous
 /// preparation and while the journal work loop resumes. After hooks run in forward list order after
 /// storage acknowledgement and state acknowledgement or reset, including successful writes which

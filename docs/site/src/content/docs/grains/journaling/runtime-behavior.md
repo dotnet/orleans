@@ -94,6 +94,9 @@ the manager lock. Add the final prerequisite at index zero so its callback runs 
 synchronous capture or storage deletion. Prerequisites remain valid through capture or deletion, covering changes staged
 during asynchronous preparation and while the work loop resumes. Preserve operation-local bookkeeping for
 the captured batch separately from changes staged later.
+When the final callback completes synchronously, capture or the start of deletion follows in the
+same work-loop continuation. Other owner turns can stage changes while an incomplete callback is awaited,
+so its prerequisite covers those changes through capture or deletion.
 
 Storage acknowledgement and registered-state acknowledgement or reset precede after callbacks.
 All after callbacks run in list order, including for successful zero-byte writes. Coalesced callers

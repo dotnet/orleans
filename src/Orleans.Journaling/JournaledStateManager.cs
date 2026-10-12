@@ -328,7 +328,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         if (operationType is { } operation && _hooks is { Count: > 0 })
                         {
                             beforeHookRunning = true;
-                            await InvokeBeforeHooksAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
+                            // Keep synchronous final completion and capture in the same work-loop continuation.
+                            for (var i = _hooks.Count - 1; i >= 0; i--)
+                            {
+                                _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                                await _hooks[i].BeforeOperationAsync(operation, _shutdownCancellation.Token).ConfigureAwait(true);
+                            }
 
                             _shutdownCancellation.Token.ThrowIfCancellationRequested();
                             beforeHookRunning = false;

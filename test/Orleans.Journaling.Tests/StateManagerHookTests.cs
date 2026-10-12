@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
+using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using Orleans.Diagnostics;
@@ -776,6 +777,77 @@ public partial class StateManagerTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Hooks_SynchronousFinalPrerequisiteAndCaptureShareContinuationAfterAsyncEarlierHook(bool snapshot)
+    {
+        var scheduler = new QueuedHookTaskScheduler();
+        await scheduler.Run(async () =>
+        {
+            var storage = new CapturingStorage { IsCompactionRequested = snapshot };
+            await using var manager = CreateTestSystem(storage).Manager;
+            var state = new DurableDictionary<string, int>("state", manager, CreateDictionaryCodec<string, int>());
+            List<string> events = [];
+            List<string> prepared = [];
+            manager.RegisterStateMachine("ack", new HookAcknowledgementState(events));
+            var queueMutation = true;
+            Task? mutation = null;
+            await manager.AddHookAsync(new DelegateTestHook
+            {
+                BeforeOperation = (_, _) =>
+                {
+                    events.Add("final-before");
+                    prepared.AddRange(state.Keys);
+                    if (queueMutation)
+                    {
+                        Assert.Empty(state);
+                        queueMutation = false;
+                        mutation = scheduler.Queue(() =>
+                        {
+                            state["intent"] = 1;
+                            events.Add("queued-mutation");
+                        });
+                    }
+                }
+            }, cancellationToken: TestContext.Current.CancellationToken);
+            await manager.AddHookAsync(new DelegateTestHook
+            {
+                BeforeOperationAsync = async (_, _) =>
+                {
+                    events.Add("ordinary-before");
+                    await Task.Yield();
+                    events.Add("ordinary-complete");
+                }
+            }, cancellationToken: TestContext.Current.CancellationToken);
+            await manager.InitializeAsync(TestContext.Current.CancellationToken);
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+            Assert.NotNull(mutation);
+            await mutation;
+            Assert.Empty(prepared);
+            Assert.Equal(1, state["intent"]);
+            await using (var recoveredManager = CreateTestSystem(storage).Manager)
+            {
+                var recovered = new DurableDictionary<string, int>("state", recoveredManager, CreateDictionaryCodec<string, int>());
+                await recoveredManager.InitializeAsync(TestContext.Current.CancellationToken);
+                Assert.Empty(recovered);
+            }
+
+            Assert.Equal(
+                ["ordinary-before", "ordinary-complete", "final-before", "capture", "ack", "queued-mutation"],
+                events);
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(["intent"], prepared);
+            await using var replayManager = CreateTestSystem(storage).Manager;
+            var replayed = new DurableDictionary<string, int>("state", replayManager, CreateDictionaryCodec<string, int>());
+            await replayManager.InitializeAsync(TestContext.Current.CancellationToken);
+            var intent = Assert.Single(replayed);
+            Assert.Equal("intent", intent.Key);
+            Assert.Equal(1, intent.Value);
+        });
+    }
+
     [Fact]
     public async Task Hooks_BeforeCallbacksRunInReverseAndAfterCallbacksRunInListOrder()
     {
@@ -1425,6 +1497,40 @@ public partial class StateManagerTests
 
         Assert.Equal(original.InnerException!.Message, Assert.IsType<IOException>(copy.InnerException).Message);
         Assert.Equal(original.Message, copy.Message);
+    }
+
+    private sealed class QueuedHookTaskScheduler : TaskScheduler
+    {
+        private readonly Channel<Task> _queue = Channel.CreateUnbounded<Task>();
+
+        public override int MaximumConcurrencyLevel => 1;
+        protected override IEnumerable<Task>? GetScheduledTasks() => null;
+        protected override void QueueTask(Task task) => Assert.True(_queue.Writer.TryWrite(task));
+        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => false;
+
+        public Task Queue(Action action) =>
+            Task.Factory.StartNew(action, TestContext.Current.CancellationToken, TaskCreationOptions.DenyChildAttach, this);
+
+        public async Task Run(Func<Task> action)
+        {
+            var task = Task.Factory.StartNew(action, TestContext.Current.CancellationToken, TaskCreationOptions.DenyChildAttach, this).Unwrap();
+            while (!task.IsCompleted)
+            {
+                var next = await _queue.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+                var previous = SynchronizationContext.Current;
+                SynchronizationContext.SetSynchronizationContext(null);
+                try
+                {
+                    Assert.True(TryExecuteTask(next));
+                }
+                finally
+                {
+                    SynchronizationContext.SetSynchronizationContext(previous);
+                }
+            }
+
+            await task;
+        }
     }
 
     private sealed class DelegateTestHook(
