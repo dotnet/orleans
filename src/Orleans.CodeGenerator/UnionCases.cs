@@ -11,8 +11,8 @@ namespace Orleans.CodeGenerator;
 /// <param name="Id">The case identifier, which is the field identifier of the case value within the union field.</param>
 /// <param name="CaseType">The case type, expressed in terms of the union type's type parameters.</param>
 /// <param name="ValueType">The type of case values: <paramref name="CaseType"/>, or its underlying type when it is a nullable value type.</param>
-/// <param name="RequiresObjectConversion"><see langword="true"/> when the case type is not statically convertible to the union type, such as a case which derives from one instantiation of a generic closed type.</param>
-internal sealed record UnionCaseDescription(uint Id, ITypeSymbol CaseType, ITypeSymbol ValueType, bool RequiresObjectConversion);
+/// <param name="RequiresRuntimeTypeCheck"><see langword="true"/> when the case type is not statically convertible to the union type, such as a case which derives from one instantiation of a generic closed type.</param>
+internal sealed record UnionCaseDescription(uint Id, ITypeSymbol CaseType, ITypeSymbol ValueType, bool RequiresRuntimeTypeCheck);
 
 internal static class UnionCaseResolver
 {
@@ -63,7 +63,7 @@ internal static class UnionCaseResolver
             var valueType = caseType is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Nullable_T } nullable
                 ? nullable.TypeArguments[0]
                 : caseType;
-            result.Add(new UnionCaseDescription(ids[i], caseType, valueType, RequiresObjectConversion: false));
+            result.Add(new UnionCaseDescription(ids[i], caseType, valueType, RequiresRuntimeTypeCheck: false));
         }
 
         EnsureUniqueIds(type, type, result);
@@ -105,8 +105,8 @@ internal static class UnionCaseResolver
             }
 
             var id = (uint)attribute.ConstructorArguments[0].Value!;
-            var (caseType, requiresObjectConversion) = GetClosedCaseType(subtype, definition, compilation);
-            result.Add(new UnionCaseDescription(id, caseType, caseType, requiresObjectConversion));
+            var (caseType, requiresRuntimeTypeCheck) = GetClosedCaseType(subtype, definition, compilation);
+            result.Add(new UnionCaseDescription(id, caseType, caseType, requiresRuntimeTypeCheck));
         }
 
         EnsureUniqueIds(definition, null, result);
@@ -117,7 +117,7 @@ internal static class UnionCaseResolver
     /// <summary>
     /// Expresses a direct subtype of a closed type in terms of the closed type's type parameters.
     /// </summary>
-    private static (INamedTypeSymbol CaseType, bool RequiresObjectConversion) GetClosedCaseType(INamedTypeSymbol subtype, INamedTypeSymbol closedType, Compilation compilation)
+    private static (INamedTypeSymbol CaseType, bool RequiresRuntimeTypeCheck) GetClosedCaseType(INamedTypeSymbol subtype, INamedTypeSymbol closedType, Compilation compilation)
     {
         if (!closedType.IsGenericType)
         {
@@ -131,7 +131,7 @@ internal static class UnionCaseResolver
 
         var baseTypeArguments = subtype.BaseType!.TypeArguments;
         var subtypeArguments = new ITypeSymbol?[subtype.TypeParameters.Length];
-        var requiresObjectConversion = false;
+        var requiresRuntimeTypeCheck = false;
         for (var i = 0; i < baseTypeArguments.Length; i++)
         {
             var argument = baseTypeArguments[i];
@@ -151,7 +151,7 @@ internal static class UnionCaseResolver
             else
             {
                 // The case applies to a single instantiation of the closed type, such as 'IntShape : Shape<int>'.
-                requiresObjectConversion = true;
+                requiresRuntimeTypeCheck = true;
             }
         }
 
@@ -167,7 +167,7 @@ internal static class UnionCaseResolver
         }
 
         var caseType = subtype.TypeParameters.Length == 0 ? subtype : subtype.Construct([.. subtypeArguments!]);
-        return (caseType, requiresObjectConversion);
+        return (caseType, requiresRuntimeTypeCheck);
     }
 
     /// <summary>
