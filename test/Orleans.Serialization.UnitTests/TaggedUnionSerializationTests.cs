@@ -141,6 +141,15 @@ public class TaggedUnionSerializationTests
     }
 
     [Fact]
+    public void InstantiationSpecificCaseIsRejectedForOtherInstantiations()
+    {
+        // IntSquare is a case of Shape<int> only.
+        var bytes = _serializer.SerializeToArray<Shape<int>>(new IntSquare(5));
+
+        Assert.Throws<UnknownUnionCaseException>(() => _serializer.Deserialize<Shape<string>>(bytes));
+    }
+
+    [Fact]
     public void ClosedHierarchyWithoutCaseIdentifiersEncodesRuntimeType()
     {
         var value = new LegacySquare(3);
