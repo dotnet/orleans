@@ -8,45 +8,23 @@ using Orleans;
 
 namespace Orleans.DurableTasks.Runtime;
 
-internal sealed class GrainDurableExecutionContext : DurableExecutionContext
+internal sealed class GrainDurableExecutionContext(
+    TaskId taskId,
+    IDurableTaskGrainRuntime runtime,
+    TaskScheduler scheduler,
+    CancellationToken shutdownToken,
+    DateTimeOffset? utcNow = null) : DurableExecutionContext(taskId)
 {
-    private readonly IDurableTaskGrainRuntime _runtime;
-    private readonly TaskScheduler _scheduler;
-    private readonly DateTimeOffset _utcNow;
-    private readonly CancellationToken _shutdownToken;
-    private readonly CancellationTokenSource _executionAbortSource;
+    private readonly IDurableTaskGrainRuntime _runtime = runtime;
+    private readonly TaskScheduler _scheduler = scheduler;
+    private readonly DateTimeOffset _utcNow = utcNow ?? runtime.UtcNow;
+    private readonly CancellationToken _shutdownToken = shutdownToken;
     private HashSet<string>? _childNames;
 #if NET9_0_OR_GREATER
     private readonly Lock _idLock = new();
 #else
     private readonly object _idLock = new();
 #endif
-
-    public GrainDurableExecutionContext(
-        TaskId taskId,
-        IDurableTaskGrainRuntime runtime,
-        TaskScheduler scheduler,
-        CancellationToken shutdownToken,
-        DateTimeOffset? utcNow = null)
-        : this(taskId, runtime, scheduler, shutdownToken, utcNow ?? runtime.UtcNow, new CancellationTokenSource())
-    {
-    }
-
-    private GrainDurableExecutionContext(
-        TaskId taskId,
-        IDurableTaskGrainRuntime runtime,
-        TaskScheduler scheduler,
-        CancellationToken shutdownToken,
-        DateTimeOffset utcNow,
-        CancellationTokenSource executionAbortSource)
-        : base(taskId, executionAbortSource.Token)
-    {
-        _runtime = runtime;
-        _scheduler = scheduler;
-        _utcNow = utcNow;
-        _shutdownToken = shutdownToken;
-        _executionAbortSource = executionAbortSource;
-    }
 
     public override DateTimeOffset UtcNow => _utcNow;
 
@@ -70,8 +48,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         return new ExecutionTaskHandle(
             handle,
             _scheduler,
-            _shutdownToken,
-            _executionAbortSource.Token);
+            _shutdownToken);
     }
 
     protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
@@ -107,8 +84,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         return new ExecutionTaskHandle(
             _runtime.GetScheduledTaskHandle(taskId),
             _scheduler,
-            _shutdownToken,
-            _executionAbortSource.Token);
+            _shutdownToken);
     }
 
     protected override ValueTask<TaskId> SelectCompletionAsync(
@@ -168,21 +144,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     private CancellationTokenSource CreateExecutionCancellationSource(CancellationToken cancellationToken) =>
         CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
-            _shutdownToken,
-            _executionAbortSource.Token);
-
-    internal Exception? AbortExecution()
-    {
-        try
-        {
-            _executionAbortSource.Cancel(throwOnFirstException: false);
-            return null;
-        }
-        catch (AggregateException exception)
-        {
-            return exception;
-        }
-    }
+            _shutdownToken);
 
     private static ValueTask RunOnScheduler(TaskScheduler scheduler, Func<ValueTask> callback)
     {
@@ -238,8 +200,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     private sealed class ExecutionTaskHandle(
         IScheduledTaskHandle inner,
         TaskScheduler scheduler,
-        CancellationToken shutdownToken,
-        CancellationToken executionAbortToken) : IScheduledTaskHandle
+        CancellationToken shutdownToken) : IScheduledTaskHandle
     {
         public TaskId TaskId => inner.TaskId;
 
@@ -252,8 +213,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         {
             using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
-                shutdownToken,
-                executionAbortToken);
+                shutdownToken);
             await inner.CancelAsync(executionCts.Token);
         }
 
@@ -270,8 +230,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         {
             using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
-                shutdownToken,
-                executionAbortToken);
+                shutdownToken);
             return await inner.PollAsync(options, executionCts.Token);
         }
 
@@ -284,8 +243,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         {
             using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
-                shutdownToken,
-                executionAbortToken);
+                shutdownToken);
             return await inner.WaitAsync(executionCts.Token);
         }
     }
