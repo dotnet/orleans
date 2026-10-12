@@ -145,9 +145,14 @@ public class TaggedUnionSerializationTests
     private void AppendPayload(StringBuilder snapshot, string label, byte[] payload)
     {
         using var session = _services.GetRequiredService<SerializerSessionPool>().GetSession();
+        if (snapshot.Length > 0)
+        {
+            snapshot.Append("\n\n");
+        }
+
         snapshot.Append("# ").Append(label).Append('\n')
             .Append("hex: ").Append(Convert.ToHexString(payload)).Append('\n')
-            .Append(BitStreamFormatter.Format(payload, session)).Append("\n\n");
+            .Append(BitStreamFormatter.Format(payload, session).TrimEnd());
     }
 
     [Fact]
