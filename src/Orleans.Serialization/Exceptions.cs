@@ -162,6 +162,38 @@ namespace Orleans.Serialization
     }
 
     /// <summary>
+    /// A serialized tagged-union value identifies a case which the union type or closed type hierarchy does not declare.
+    /// </summary>
+    /// <remarks>
+    /// This occurs when data written by a newer version of a type, which declares additional cases, is read by an older version of that type.
+    /// </remarks>
+    [Serializable]
+    [GenerateSerializer]
+    public sealed class UnknownUnionCaseException : SerializerException
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UnknownUnionCaseException"/> class.
+        /// </summary>
+        /// <param name="unionType">The union type or closed base type being deserialized.</param>
+        /// <param name="caseId">The case identifier which was read.</param>
+        public UnknownUnionCaseException(Type unionType, uint caseId) : base($"Encountered unknown case {caseId} while deserializing a value of type {unionType}.")
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="UnknownUnionCaseException"/> class.
+        /// </summary>
+        /// <param name="info">The <see cref="T:System.Runtime.Serialization.SerializationInfo" /> that holds the serialized object data about the exception being thrown.</param>
+        /// <param name="context">The <see cref="T:System.Runtime.Serialization.StreamingContext" /> that contains contextual information about the source or destination.</param>
+#if NET8_0_OR_GREATER
+        [Obsolete]
+#endif
+        private UnknownUnionCaseException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+        }
+    }
+
+    /// <summary>
     /// The extended wire type is invalid.
     /// </summary>
     [Serializable]
