@@ -1,0 +1,26 @@
+﻿# CircleV1
+hex: 2020E880000000000000F83FE0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 0 SchemaType: Expected] Value: {
+
+0x0003   - End of base type fields -
+0x0004   [#3 Fixed64 Id: 0 SchemaType: Expected] Value: 0x3FF8000000000000
+0x000D  }
+0x000E }
+
+# SquareV1
+hex: 2021E8800000000000000040E0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 1 SchemaType: Expected] Value: {
+
+0x0003   - End of base type fields -
+0x0004   [#3 Fixed64 Id: 0 SchemaType: Expected] Value: 0x4000000000000000
+0x000D  }
+0x000E }
+
+# null
+hex: 20E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+
+0x0002 }
+
