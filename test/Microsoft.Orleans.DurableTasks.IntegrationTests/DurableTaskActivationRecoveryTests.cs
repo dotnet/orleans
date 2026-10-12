@@ -245,6 +245,7 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
     public DurableTaskRecoveryFixture()
     {
         Probe = new();
+        MessagingProbe = new();
         Storage = new VolatileJournalStorageProvider(
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = "orleans-binary" }));
         var clusterId = $"durable-task-recovery-{Guid.NewGuid():N}";
@@ -266,10 +267,12 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
                 options.ClusterId = clusterId;
                 options.ServiceId = serviceId;
             });
-            siloBuilder.AddJournalStorage();
+            siloBuilder.AddJournaling();
+            siloBuilder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
             siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.AddDurableTasks();
             siloBuilder.Services.AddSingleton(Probe);
+            siloBuilder.Services.AddSingleton(MessagingProbe);
             siloBuilder.Services.RemoveAll<IJournalStorageProvider>();
             siloBuilder.Services.RemoveAll<IJournalStorageCatalog>();
             siloBuilder.Services.AddSingleton(Storage);
@@ -284,6 +287,7 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
     public InProcessTestCluster Cluster { get; }
     public IClusterClient Client => Cluster.Client!;
     public DurableTaskRecoveryProbe Probe { get; }
+    public DurableTaskMessagingProbe MessagingProbe { get; }
     public VolatileJournalStorageProvider Storage { get; }
 
     public ValueTask InitializeAsync() => new(Cluster.DeployAsync());
