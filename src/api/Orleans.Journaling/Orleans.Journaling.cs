@@ -227,8 +227,6 @@ namespace Orleans.Journaling
 
     public partial interface IJournaledStateManager : System.IAsyncDisposable
     {
-        System.Collections.Generic.IReadOnlyList<IJournaledStateHook> Hooks { get; }
-
         long PendingWriteByteCount { get; }
 
         System.Threading.Tasks.ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, System.Threading.CancellationToken cancellationToken = default);

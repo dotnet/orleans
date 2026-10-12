@@ -727,7 +727,6 @@ public partial class JournaledJobShardManagerTests
 
     private sealed class TrackingJournaledStateManager(IJournaledStateManager inner) : IJournaledStateManager
     {
-        public IReadOnlyList<IJournaledStateHook> Hooks => inner.Hooks;
         public ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, CancellationToken cancellationToken = default) =>
             inner.AddHookAsync(hook, index, cancellationToken);
         public ValueTask RemoveHookAsync(IJournaledStateHook hook, CancellationToken cancellationToken = default) =>

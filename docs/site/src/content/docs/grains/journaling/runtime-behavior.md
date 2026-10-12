@@ -75,18 +75,19 @@ staged mutations from other calls.
 
 ## Journal operation hooks
 
-Activation-scoped features coordinate prerequisites and completion through
-<xref:Orleans.Journaling.IJournaledStateManager.Hooks>. The owner exposes a stable, lazily
-allocated read-only view of <xref:Orleans.Journaling.IJournaledStateHook> registrations.
-Use <xref:Orleans.Journaling.IJournaledStateManager.AddHookAsync*> and
-<xref:Orleans.Journaling.IJournaledStateManager.RemoveHookAsync*> to change the set. Idle changes
-apply synchronously; busy changes queue between complete operations, after current after callbacks.
+Features coordinate prerequisites and completion by registering
+<xref:Orleans.Journaling.IJournaledStateHook> callbacks through
+<xref:Orleans.Journaling.IJournaledStateManager.AddHookAsync*> and
+<xref:Orleans.Journaling.IJournaledStateManager.RemoveHookAsync*>.
+Registration completes synchronously before initialization, supporting constructors.
+After initialization begins, idle changes apply synchronously; busy changes queue between
+complete operations, after current after callbacks.
 The hook set stays stable throughout each operation. Queued changes also separate coalesced writes,
 so writes admitted after a change observe that change.
 Cancellation ends only the caller's wait while the manager owns admitted changes.
 Every owner implements the registration methods and callback boundaries; delegating owners forward
 them to their inner owner. Synchronous state callbacks can request a queued change and observe its
-completion outside the callback. Standalone callers coordinate view inspection with changes.
+completion outside the callback.
 
 Each actual append, snapshot, or deletion runs before callbacks in reverse list order, outside
 the manager lock. Add the final prerequisite at index zero so its callback runs last before

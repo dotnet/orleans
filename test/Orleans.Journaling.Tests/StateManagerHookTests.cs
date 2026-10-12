@@ -65,30 +65,28 @@ public partial class StateManagerTests
     }
 
     [Fact]
-    public async Task Hooks_IdleRegistrationAppliesSynchronouslyAndExposesStableView()
+    public async Task Hooks_IdleRegistrationAppliesSynchronously()
     {
         await using var manager = CreateTestSystem().Manager;
         _ = new DurableValue<int>("state", manager, CreateValueCodec<int>());
         var field = typeof(JournaledStateManager).GetField("_hooks", BindingFlags.Instance | BindingFlags.NonPublic)!;
         Assert.Null(field.GetValue(manager));
 
-        var hook = new DelegateTestHook();
+        var before = 0;
+        var hook = new DelegateTestHook { BeforeOperation = (_, _) => before++ };
         Assert.True(manager.AddHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken).IsCompletedSuccessfully);
-        var hooks = manager.Hooks;
-        Assert.False(hooks is IList<IJournaledStateHook>);
-        Assert.Contains(hook, hooks);
-        Assert.Same(hooks, manager.Hooks);
-        Assert.Same(hook, Assert.Single(hooks));
         Assert.True(manager.RemoveHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken).IsCompletedSuccessfully);
-        Assert.Empty(manager.Hooks);
         await Assert.ThrowsAsync<ArgumentNullException>(() => manager.AddHookAsync(null!, cancellationToken: TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAsync<InvalidOperationException>(() => manager.RemoveHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken).AsTask());
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(0, before);
         Assert.True(manager.AddHookAsync(hook, index: 0, cancellationToken: TestContext.Current.CancellationToken).IsCompletedSuccessfully);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        Assert.Same(hooks, manager.Hooks);
-        Assert.Same(hook, Assert.Single(hooks));
+        Assert.Equal(1, before);
         Assert.True(manager.RemoveHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken).IsCompletedSuccessfully);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(1, before);
 
         await using var withoutHooks = CreateTestSystem().Manager;
         await withoutHooks.InitializeAsync(TestContext.Current.CancellationToken);
@@ -102,12 +100,9 @@ public partial class StateManagerTests
         var manager = CreateTestSystem().Manager;
         var hook = new DelegateTestHook();
         await manager.AddHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken);
-        var hooks = manager.Hooks;
 
         await manager.DisposeAsync();
 
-        Assert.Same(hooks, manager.Hooks);
-        Assert.Same(hook, Assert.Single(hooks));
         await Assert.ThrowsAsync<ObjectDisposedException>(() => manager.AddHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken).AsTask());
         await Assert.ThrowsAsync<ObjectDisposedException>(() => manager.RemoveHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken).AsTask());
     }
@@ -135,10 +130,8 @@ public partial class StateManagerTests
             await WaitFor(entered.Task);
             Assert.False(initialization.IsCompleted);
             Assert.False(registration.IsCompleted);
-            Assert.Empty(manager.Hooks);
             release.TrySetResult();
             await WaitFor(Task.WhenAll(initialization, registration));
-            Assert.Same(hook, Assert.Single(manager.Hooks));
             await manager.WriteStateAsync(TestContext.Current.CancellationToken);
             Assert.Equal(1, before);
             Assert.Equal(1, after);
@@ -169,21 +162,27 @@ public partial class StateManagerTests
             .Returns(call => ReadAsync(call.Arg<IJournalStorageConsumer>(), call.Arg<CancellationToken>()));
         await using var manager = CreateTestSystem(storage).Manager;
         var initialization = manager.InitializeAsync(TestContext.Current.CancellationToken).AsTask();
-        var failedRegistration = manager.AddHookAsync(new DelegateTestHook(), cancellationToken: TestContext.Current.CancellationToken).AsTask();
+        var failedBefore = 0;
+        var failedRegistration = manager.AddHookAsync(new DelegateTestHook
+        {
+            BeforeOperation = (_, _) => failedBefore++
+        }, cancellationToken: TestContext.Current.CancellationToken).AsTask();
         try
         {
             await WaitFor(entered.Task);
             release.TrySetResult();
             Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => WaitFor(initialization)));
             Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => WaitFor(failedRegistration)));
-            Assert.Empty(manager.Hooks);
-            var hook = new DelegateTestHook();
+            var before = 0;
+            var hook = new DelegateTestHook { BeforeOperation = (_, _) => before++ };
             Assert.True(manager.AddHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken).IsCompletedSuccessfully);
             Assert.Equal(1, reads);
             fail = false;
             await manager.InitializeAsync(TestContext.Current.CancellationToken);
             Assert.Equal(2, reads);
-            Assert.Same(hook, Assert.Single(manager.Hooks));
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(0, failedBefore);
+            Assert.Equal(1, before);
         }
         finally
         {
@@ -258,17 +257,14 @@ public partial class StateManagerTests
             var next = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
             Assert.False(added.IsCompleted);
             Assert.False(removed.IsCompleted);
-            Assert.Same(original, Assert.Single(manager.Hooks));
             Assert.Equal(0, newBefore);
             Assert.Equal(0, newAfter);
             caller.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => added);
-            Assert.Same(original, Assert.Single(manager.Hooks));
 
             release.TrySetResult();
             storage.ReleaseAppend.TrySetResult();
             await WaitFor(Task.WhenAll(first, removed, next));
-            Assert.Same(replacement, Assert.Single(manager.Hooks));
             Assert.Equal(1, oldBefore);
             Assert.Equal(1, oldAfter);
             Assert.Equal(1, newBefore);
@@ -381,13 +377,14 @@ public partial class StateManagerTests
         {
             await WaitFor(storage.BlockedAppendStarted.Task);
             var invalid = manager.AddHookAsync(new DelegateTestHook(), index: 1, cancellationToken: TestContext.Current.CancellationToken).AsTask();
-            var valid = new DelegateTestHook();
+            var before = 0;
+            var valid = new DelegateTestHook { BeforeOperation = (_, _) => before++ };
             var accepted = manager.AddHookAsync(valid, cancellationToken: TestContext.Current.CancellationToken).AsTask();
             storage.ReleaseAppend.TrySetResult();
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => WaitFor(invalid));
             await WaitFor(Task.WhenAll(first, accepted));
-            Assert.Same(valid, Assert.Single(manager.Hooks));
             await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(1, before);
         }
         finally
         {
@@ -411,7 +408,6 @@ public partial class StateManagerTests
             storage.ReleaseAppend.TrySetResult();
             Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => WaitFor(write)));
             Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => WaitFor(registration)));
-            Assert.Empty(manager.Hooks);
             var fenced = await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 manager.AddHookAsync(new DelegateTestHook(), cancellationToken: TestContext.Current.CancellationToken).AsTask());
             Assert.Same(failure, fenced.InnerException);
@@ -452,7 +448,6 @@ public partial class StateManagerTests
             await WaitFor(Task.WhenAll(write, shutdown));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(added));
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WaitFor(removed));
-            Assert.Same(original, Assert.Single(manager.Hooks));
             Assert.Single(storage.Appends);
         }
         finally
@@ -818,10 +813,12 @@ public partial class StateManagerTests
         var deleting = false;
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var before = 0;
         var after = 0;
         await manager.AddHookAsync(new DelegateTestHook(
             async (operation, token) =>
             {
+                before++;
                 if (!deleting)
                 {
                     Assert.Equal(JournaledStateOperation.Write, operation);
@@ -859,7 +856,9 @@ public partial class StateManagerTests
             release.TrySetResult();
             await deletion.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
             Assert.Equal(1, after);
-            Assert.Single(manager.Hooks);
+            deleting = false;
+            await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+            Assert.Equal(3, before);
         }
         finally
         {
@@ -876,7 +875,7 @@ public partial class StateManagerTests
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var drained = false;
         var failure = new IOException("Cancellation callback failed.");
-        await manager.AddHookAsync(new DelegateTestHook
+        var hook = new DelegateTestHook
         {
             BeforeOperationAsync = async (_, token) =>
             {
@@ -885,7 +884,8 @@ public partial class StateManagerTests
                 await release.Task;
                 drained = true;
             }
-        }, cancellationToken: TestContext.Current.CancellationToken);
+        };
+        await manager.AddHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken);
         await manager.InitializeAsync(TestContext.Current.CancellationToken);
         var write = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         try
@@ -906,7 +906,7 @@ public partial class StateManagerTests
             Assert.True(drained);
             Assert.Empty(storage.Appends);
             await Assert.ThrowsAsync<ObjectDisposedException>(() =>
-                manager.RemoveHookAsync(Assert.Single(manager.Hooks), cancellationToken: TestContext.Current.CancellationToken).AsTask());
+                manager.RemoveHookAsync(hook, cancellationToken: TestContext.Current.CancellationToken).AsTask());
         }
         finally
         {

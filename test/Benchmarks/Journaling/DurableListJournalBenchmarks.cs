@@ -128,8 +128,6 @@ public class DurableListJournalBenchmarks
     {
         private readonly List<IJournaledStateHook> _hooks = [];
 
-        public IReadOnlyList<IJournaledStateHook> Hooks => _hooks;
-
         public ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, CancellationToken cancellationToken = default)
         {
             _hooks.Insert(index ?? _hooks.Count, hook);

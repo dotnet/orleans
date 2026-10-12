@@ -202,6 +202,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 _workItemRunning = true;
             }
 
+            Exception? recoveryFailure = null;
             try
             {
                 await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
@@ -214,24 +215,18 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             }
             catch (Exception exception)
             {
-                try
-                {
-                    LogErrorProcessingWorkItems(_shared.Logger, exception);
-                }
-                finally
-                {
-                    lock (_lock)
-                    {
-                        FaultQueuedWorkItemsUnderLock(exception);
-                        _workItemRunning = false;
-                    }
-                }
+                recoveryFailure = exception;
+                LogErrorProcessingWorkItems(_shared.Logger, exception);
             }
             finally
             {
                 lock (_lock)
                 {
                     _workItemRunning = false;
+                    if (recoveryFailure is not null)
+                    {
+                        FaultQueuedWorkItemsUnderLock(recoveryFailure);
+                    }
                 }
             }
 
@@ -345,10 +340,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                         {
                             case HookMutationWorkItem mutation:
                                 {
-                                    lock (_lock)
-                                    {
-                                        ApplyHookMutation(mutation.Hook, mutation.Index, mutation.Remove);
-                                    }
+                                    // The work loop owns the hook set while _workItemRunning is true.
+                                    ApplyHookMutation(mutation.Hook, mutation.Index, mutation.Remove);
                                     break;
                                 }
 

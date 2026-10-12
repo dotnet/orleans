@@ -266,18 +266,17 @@ of the ambient grain context, including when the caller subsequently enrolls the
 
 ## Journal operation hooks
 
-`IJournaledStateManager.Hooks` is a lazily allocated, stable read-only view of `IJournaledStateHook`
-registrations. Use `AddHookAsync(hook, index)` and `RemoveHookAsync(hook)` to change registrations.
-Changes apply synchronously when idle, or queue between complete journal operations while busy.
+Use `IJournaledStateManager.AddHookAsync(hook, index)` and `RemoveHookAsync(hook)` to register
+`IJournaledStateHook` callbacks. Registration completes synchronously before initialization,
+supporting constructors. After initialization begins, changes apply synchronously when idle,
+or queue between complete journal operations while busy.
 Each operation keeps its hook set through preparation, capture, storage ACK and after callbacks.
 Queued changes are write-coalescing barriers: writes admitted afterward observe the changed set.
 Caller cancellation ends only its wait for an admitted change; the manager retains ownership.
 Await registration before staging changes whose safety depends on the new hook.
-Every journal owner implementation provides the hook list and invokes registered callbacks at
-the operation boundaries described below. Delegating owners forward registration methods and the
-read-only view to their inner owner. Synchronous state callbacks can request a queued registration
-and observe completion outside the callback. Standalone callers coordinate view inspection with
-registration changes.
+Every journal owner implementation provides registration and invokes callbacks at the operation
+boundaries described below. Delegating owners forward registration methods to their inner owner.
+Synchronous state callbacks can request a queued registration and observe completion outside the callback.
 
 For each actual write, snapshot, or deletion, before hooks run in reverse list order outside
 the manager lock. Add the final prerequisite with `index: 0` so it runs last before the work loop

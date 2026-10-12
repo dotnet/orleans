@@ -1,22 +1,10 @@
-using System.Collections;
 using System.Runtime.ExceptionServices;
 
 namespace Orleans.Journaling;
 
 internal partial class JournaledStateManager
 {
-    private HookCollection? _hooks;
-
-    public IReadOnlyList<IJournaledStateHook> Hooks
-    {
-        get
-        {
-            lock (_lock)
-            {
-                return _hooks ??= new();
-            }
-        }
-    }
+    private List<IJournaledStateHook>? _hooks;
 
     public ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, CancellationToken cancellationToken = default) =>
         MutateHookAsync(hook, index, remove: false, cancellationToken);
@@ -54,11 +42,14 @@ internal partial class JournaledStateManager
         var hooks = _hooks ??= new();
         if (remove)
         {
-            hooks.Remove(hook);
+            if (!hooks.Remove(hook))
+            {
+                throw new InvalidOperationException("The journal operation hook is not registered.");
+            }
         }
         else
         {
-            hooks.Insert(index, hook);
+            hooks.Insert(index ?? hooks.Count, hook);
         }
     }
 
@@ -96,26 +87,6 @@ internal partial class JournaledStateManager
         if (failures is not null)
         {
             throw new AggregateException(failures);
-        }
-    }
-
-    private sealed class HookCollection : IReadOnlyList<IJournaledStateHook>
-    {
-        private readonly List<IJournaledStateHook> _items = [];
-
-        public int Count => _items.Count;
-        public IJournaledStateHook this[int index] => _items[index];
-        public IEnumerator<IJournaledStateHook> GetEnumerator() => _items.GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-        public void Insert(int? index, IJournaledStateHook hook) => _items.Insert(index ?? _items.Count, hook);
-
-        public void Remove(IJournaledStateHook hook)
-        {
-            if (!_items.Remove(hook))
-            {
-                throw new InvalidOperationException("The journal operation hook is not registered.");
-            }
         }
     }
 

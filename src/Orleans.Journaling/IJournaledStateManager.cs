@@ -13,20 +13,6 @@ namespace Orleans.Journaling;
 public interface IJournaledStateManager : IAsyncDisposable
 {
     /// <summary>
-    /// Gets the read-only view of registered journal operation hooks.
-    /// </summary>
-    /// <remarks>
-    /// Inspect hooks on the owner's logical execution context, coordinating standalone inspection
-    /// with registration changes. Use <see cref="AddHookAsync"/> and <see cref="RemoveHookAsync"/>
-    /// to change registrations. Before hooks execute in
-    /// reverse list order; after hooks execute in forward list order. Register the final capture
-    /// prerequisite at index zero so it runs last before capture or deletion.
-    /// Registration is independent of state-machine registration and persists through recovery and deletion.
-    /// Every implementation provides this list and invokes its hooks at the documented operation boundaries.
-    /// </remarks>
-    IReadOnlyList<IJournaledStateHook> Hooks { get; }
-
-    /// <summary>
     /// Adds a hook before the next persistence operation which follows this registration.
     /// </summary>
     /// <param name="hook">The hook to register.</param>
@@ -34,8 +20,14 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
     /// <returns>A completion representing application of the registration.</returns>
     /// <remarks>
-    /// Idle registration applies synchronously. Otherwise it is queued between owned operations,
-    /// after the current operation's after hooks finish. Queued registration is a write-coalescing barrier.
+    /// Registration completes synchronously before initialization begins, supporting constructor registration.
+    /// After initialization begins, idle registration applies synchronously; otherwise it is queued
+    /// between owned operations, after the current operation's after hooks finish.
+    /// Before hooks execute in reverse registration order; after hooks execute in forward order.
+    /// Register the final capture prerequisite at index zero so it runs last before capture or deletion.
+    /// Registration is independent of state-machine registration and persists through recovery and deletion.
+    /// Every implementation provides registration and invokes hooks at the documented operation boundaries.
+    /// Queued registration is a write-coalescing barrier.
     /// Cancellation ends the caller's wait while admitted registration remains owned by the manager.
     /// Synchronous state callbacks can request registration and observe its completion outside the callback.
     /// Await registration before staging changes whose safety depends on the added hook.
