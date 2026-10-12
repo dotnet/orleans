@@ -28,7 +28,7 @@ siloBuilder.AddDurableTasks();
 The silo registration composes Messaging and Durable Jobs. Configure Journaling
 with a durable journal storage provider and a Durable Jobs provider for
 production. Task state uses Orleans serialization, so the Orleans binary journal
-format is required. Tests can register volatile task storage through
+format is required; silo startup fails with any other journal format. Tests can register volatile task storage through
 `AddVolatileDurableTaskStorage`.
 
 Durable grains derive from `DurableGrain` or implement `IMessagingGrain`. During
@@ -77,8 +77,10 @@ validation disabled until its first published version establishes a baseline.
 - Recovery precedes new execution. Child identifiers, selection decisions, and
   outbound durable messages remain replay-stable. Each execution's logical UTC
   time is persisted before its effects commit and reused during replay.
-- Activation shutdown stops new execution, cancels adapter-controlled waits,
-  drains active execution, and leaves committed work available for replay.
+- Activation shutdown stops new execution, signals the attempt-scoped execution-abort
+  token observed by delegate and delay operations and adapter-controlled waits,
+  drains active execution, discards its results, and leaves committed work
+  available for replay in the next activation.
 
 Durability covers state and messages participating in Orleans Journaling and
 Messaging commits. Direct external side effects require their own idempotency
