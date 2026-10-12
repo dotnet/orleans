@@ -33,8 +33,8 @@ internal static class InvalidUnionCaseDiagnostic
 
     private static readonly DiagnosticDescriptor UnsupportedGenericCaseRule = new(
         DiagnosticId,
-        "The type arguments of a closed type's case must be determined by the closed type's type arguments",
-        "Generated serializers cannot determine the type arguments of case '{0}' from its base type '{1}'. Declare each type parameter of '{0}' as a type argument of '{1}'.",
+        "Cases of a generic closed type must be cases of every instantiation",
+        "Case '{0}' must pass its own type parameters as the type arguments of '{1}', as in 'Case<T> : Base<T>', so that it is a case of every instantiation of '{1}'",
         Category,
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);

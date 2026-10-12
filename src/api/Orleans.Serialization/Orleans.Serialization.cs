@@ -3529,9 +3529,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         [System.Diagnostics.CodeAnalysis.DoesNotReturn]
-        public static TField ThrowMissingUnionCase<TField>() { throw null; }
-
-        [System.Diagnostics.CodeAnalysis.DoesNotReturn]
         public static TField ThrowUnknownUnionCase<TField>(uint caseId) { throw null; }
 
         [System.Diagnostics.CodeAnalysis.DoesNotReturn]

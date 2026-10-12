@@ -71,6 +71,47 @@ public class TaggedUnionSerializationTests
         Assert.True(asObject.Length > asClosedType.Length + 20, $"Expected the encoded type name to dominate: {asObject.Length} vs {asClosedType.Length}");
     }
 
+    [Theory]
+    [MemberData(nameof(Sensors))]
+    public void ClosedHierarchyAndEquivalentUnionHaveTheSameEncoding(Sensor value)
+    {
+        SensorUnion union = value switch
+        {
+            Temperature temperature => temperature,
+            Humidity humidity => humidity,
+            Environmental environmental => environmental,
+            Contact contact => contact,
+        };
+
+        var closedBytes = _serializer.SerializeToArray<Sensor>(value);
+        var unionBytes = _serializer.SerializeToArray(union);
+
+        Assert.Equal(closedBytes, unionBytes);
+        Assert.Equal(value, _serializer.Deserialize<SensorUnion>(closedBytes).Value);
+        Assert.Equal(value, _serializer.Deserialize<Sensor>(unionBytes));
+    }
+
+    [Fact]
+    public void NullClosedValueAndEmptyUnionHaveTheSameEncoding()
+    {
+        var closedBytes = _serializer.SerializeToArray<Sensor?>(null);
+        var unionBytes = _serializer.SerializeToArray(default(SensorUnion));
+
+        Assert.Equal(closedBytes, unionBytes);
+        Assert.Null(_serializer.Deserialize<Sensor?>(unionBytes));
+        Assert.Null(_serializer.Deserialize<SensorUnion>(closedBytes).Value);
+    }
+
+    [Fact]
+    public void UnionReadsPayloadsWithEncodedRuntimeTypeOrNullReference()
+    {
+        // Payloads written for a closed type before it used case identifiers encode the runtime type, and encode null as a null reference.
+        var value = new Humidity(55) { Location = "attic" };
+
+        Assert.Equal(value, _serializer.Deserialize<SensorUnion>(_serializer.SerializeToArray<object>(value)).Value);
+        Assert.Null(_serializer.Deserialize<SensorUnion>(_serializer.SerializeToArray<object?>(null)).Value);
+    }
+
     [Fact]
     public void ClosedHierarchyCaseIdentifiersAboveSixAreSupported()
     {
@@ -135,18 +176,9 @@ public class TaggedUnionSerializationTests
     {
         Assert.Equal(new Circle<string>("r"), RoundTrip<Shape<string>>(new Circle<string>("r")));
         Assert.Equal(new Circle<int>(4), RoundTrip<Shape<int>>(new Circle<int>(4)));
-        Assert.Equal(new IntSquare(5), RoundTrip<Shape<int>>(new IntSquare(5)));
-        Assert.Equal(new IntSquare(5), Copy<Shape<int>>(new IntSquare(5)));
+        Assert.Equal(new Square<long>(5), RoundTrip<Shape<long>>(new Square<long>(5)));
+        Assert.Equal(new Square<long>(5), Copy<Shape<long>>(new Square<long>(5)));
         Assert.Equal(new RefBox<string>("x"), RoundTrip<RefHolder<string>>(new RefBox<string>("x")));
-    }
-
-    [Fact]
-    public void InstantiationSpecificCaseIsRejectedForOtherInstantiations()
-    {
-        // IntSquare is a case of Shape<int> only.
-        var bytes = _serializer.SerializeToArray<Shape<int>>(new IntSquare(5));
-
-        Assert.Throws<UnknownUnionCaseException>(() => _serializer.Deserialize<Shape<string>>(bytes));
     }
 
     [Fact]
@@ -292,6 +324,12 @@ public sealed record ReedContact : Contact
     public int Reed { get; init; }
 }
 
+/// <summary>
+/// A union with the same cases and case identifiers as <see cref="Sensor"/>.
+/// </summary>
+[GenerateSerializer, CaseIds(0, 1, 2, 9)]
+public union SensorUnion(Temperature, Humidity, Environmental, Contact);
+
 [GenerateSerializer]
 public closed record Shape<T>;
 
@@ -299,7 +337,7 @@ public closed record Shape<T>;
 public sealed record Circle<T>([property: Id(0)] T Radius) : Shape<T>;
 
 [GenerateSerializer, Case(1)]
-public sealed record IntSquare([property: Id(0)] int Side) : Shape<int>;
+public sealed record Square<T>([property: Id(0)] T Side) : Shape<T>;
 
 [GenerateSerializer]
 public closed record RefHolder<T> where T : class;
