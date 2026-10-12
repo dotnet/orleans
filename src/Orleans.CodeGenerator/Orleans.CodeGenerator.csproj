@@ -33,7 +33,6 @@
   <ItemGroup>
     <Compile Include="..\Orleans.CodeGenerator.Shared\InvokableBaseTypeResolver.cs" Link="InvokableBaseTypeResolver.cs" />
     <Compile Include="..\Orleans.CodeGenerator.Shared\MethodIdProvider.cs" Link="MethodIdProvider.cs" />
-    <Compile Include="..\Orleans.CodeGenerator.Shared\LanguageFeatureSymbols.cs" Link="LanguageFeatureSymbols.cs" />
   </ItemGroup>
 
   <ItemGroup>
