@@ -12,14 +12,12 @@ using NSubstitute;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
-using Orleans.DurableMessaging;
 using Orleans.Invocation;
 using Orleans.Journaling;
+using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
-using Orleans.Serialization.Session;
-using Orleans.Storage;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
@@ -29,29 +27,16 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 [TestArea("DurableTasks")]
 public sealed class DurableTaskRuntimeInvariantTests
 {
-    private static readonly ServiceProvider EnvelopeServiceProvider = new ServiceCollection()
-        .AddSerializer(builder => builder
-            .AddAssembly(typeof(DurableTaskMessageHandler).Assembly)
-            .AddAssembly(typeof(DurableTaskRuntimeInvariantTests).Assembly))
-        .BuildServiceProvider();
-
     [Fact]
-    public void Participant_WithoutObserverSupport_ThrowsDescriptiveConfigurationError()
+    public void RuntimeJournalHookWritesNoEntries()
     {
-        var (runtime, _, _, _) = CreateRuntime();
-        var grainContext = new TestGrainContext(GrainId.Create("test", "observer-support"));
-        var jobHandlers = Substitute.For<IDurableJobHandlerRegistry>();
-        var stateManager = Substitute.For<IJournaledStateManager>();
-        stateManager
-            .When(manager => manager.RegisterObserver(Arg.Any<IJournaledStateObserver>()))
-            .Do(_ => throw new NotSupportedException("Observers are not supported."));
-        var participant = new DurableTaskGrainParticipant(runtime, grainContext, jobHandlers, stateManager);
+        var (runtime, _, manager, _) = CreateRuntime();
 
-        var exception = Assert.Throws<InvalidOperationException>(participant.Initialize);
-
-        Assert.Contains("Durable Tasks requires", exception.Message, StringComparison.Ordinal);
-        Assert.Contains(nameof(IJournaledStateManager.RegisterObserver), exception.Message, StringComparison.Ordinal);
-        Assert.IsType<NotSupportedException>(exception.InnerException);
+        Assert.True(manager.TryGetStateMachine(DurableTaskGrainRuntime.StateMachineName, out var stateMachine));
+        Assert.Same(runtime, stateMachine);
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => stateMachine.ReplayEntry(default, default));
+        Assert.Contains(DurableTaskGrainRuntime.StateMachineName, exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -63,6 +48,7 @@ public sealed class DurableTaskRuntimeInvariantTests
             () => runtime.SignalCancellationAsync(TaskId.Parse("root"), TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains(nameof(DurableGrain), exception.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(IMessagingGrain), exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -87,7 +73,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         var request = CreateRequest(1, () => DurableTask.Run(_ => invoked.TrySetResult()));
         var taskId = TaskId.Parse("root");
 
-        var response = await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
+        var response = runtime.ScheduleFromInbox(taskId, request);
 
         Assert.Equal(DurableTaskResponseKind.Subscribed, response.ResponseKind);
         Assert.False(invoked.Task.IsCompleted);
@@ -105,7 +91,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         var (runtime, storage, manager, _) = CreateRuntime();
         var request = CreateRequest(1);
         var taskId = TaskId.Parse("root");
-        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
+        runtime.ScheduleFromInbox(taskId, request);
         manager.AfterWriteStarted = () =>
         {
             manager.AfterWriteStarted = null;
@@ -129,8 +115,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         var retry = CreateRequest(1);
         var taskId = TaskId.Parse("root");
 
-        await runtime.ScheduleFromInboxAsync(taskId, first, TestContext.Current.CancellationToken);
-        await runtime.ScheduleFromInboxAsync(taskId, retry, TestContext.Current.CancellationToken);
+        runtime.ScheduleFromInbox(taskId, first);
+        runtime.ScheduleFromInbox(taskId, retry);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => first.CreateTaskCallCount + retry.CreateTaskCallCount == 1);
 
@@ -138,14 +124,14 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task ConflictingRequestForSameTaskIdFailsBeforeExecution()
+    public void ConflictingRequestForSameTaskIdFailsBeforeExecution()
     {
         var (runtime, _, _, _) = CreateRuntime();
         var taskId = TaskId.Parse("root");
-        await runtime.ScheduleFromInboxAsync(taskId, CreateRequest(1), TestContext.Current.CancellationToken);
+        runtime.ScheduleFromInbox(taskId, CreateRequest(1));
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => runtime.ScheduleFromInboxAsync(taskId, CreateRequest(2), TestContext.Current.CancellationToken).AsTask());
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => runtime.ScheduleFromInbox(taskId, CreateRequest(2)));
 
         Assert.Contains("different request", exception.Message, StringComparison.Ordinal);
     }
@@ -154,75 +140,77 @@ public sealed class DurableTaskRuntimeInvariantTests
     public async Task InvocationWithoutRequestContextFailsBeforeChangingDurableState()
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
-        var services = new ServiceCollection();
-        services.AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskRuntimeInvariantTests).Assembly));
-        using var serviceProvider = services.BuildServiceProvider();
         var sender = GrainId.Create("caller", "one");
-        var receiver = GrainId.Create("target", "one");
-        var envelope = new DurableEnvelopeBuilder(
-                serviceProvider.GetRequiredService<SerializerSessionPool>(),
-                sender)
-            .To(receiver, DurableTaskMessageTransport.InvocationRoute)
-            .WithBody(new DurableTaskInvocationMessage
-            {
-                TaskId = TaskId.Parse("legacy"),
-                Request = new TestDurableTaskRequest(),
-            })
-            .Build();
-        var context = Substitute.For<IInboxHandlerContext>();
-        context.Envelope.Returns(envelope);
-        context.GrainId.Returns(receiver);
-        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
+        var receiver = GrainId.Create("test", "one");
+        var context = InvocationContext(sender, receiver, TaskId.Parse("legacy"), new TestDurableTaskRequest());
+        var handler = CreateHandler(runtime);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await handler.HandleAsync(context, CancellationToken.None));
 
         Assert.Equal("The durable task invocation request has no context.", exception.Message);
+        context.DidNotReceive().Complete();
         Assert.Empty(storage.Tasks);
         Assert.Equal(0, manager.WriteCount);
         Assert.Empty(transport.Invocations);
         Assert.Empty(transport.Completions);
         Assert.Empty(transport.Cancellations);
         Assert.Empty(transport.ScheduledResumes);
-        Assert.Equal(0, transport.CommitCount);
     }
 
     [Fact]
-    public async Task InboxInvocationRequiresMatchingTargetAndReplyAddress()
+    public async Task InboxInvocationRequiresMatchingTargetAndSender()
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var sender = GrainId.Create("caller", "one");
         var receiver = GrainId.Create("test", "one");
         var request = CreateSerializableRequest(GrainId.Create("target", "other"));
-        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
+        var handler = CreateHandler(runtime);
 
-        var wrongTarget = CreateHandlerContext(
-            receiver,
-            CreateEnvelope(
-                sender,
-                receiver,
-                DurableTaskMessageTransport.InvocationRoute,
-                new DurableTaskInvocationMessage { TaskId = TaskId.Parse("wrong-target"), Request = request },
-                replyTo: sender));
+        var wrongTarget = InvocationContext(sender, receiver, TaskId.Parse("wrong-target"), request);
         var targetException = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await handler.HandleAsync(wrongTarget, TestContext.Current.CancellationToken));
         Assert.Contains("not receiver", targetException.Message, StringComparison.Ordinal);
+        wrongTarget.DidNotReceive().Complete();
 
         request.Context!.TargetId = receiver;
-        var wrongReply = CreateHandlerContext(
-            receiver,
-            CreateEnvelope(
-                sender,
-                receiver,
-                DurableTaskMessageTransport.InvocationRoute,
-                new DurableTaskInvocationMessage { TaskId = TaskId.Parse("wrong-reply"), Request = request },
-                replyTo: GrainId.Create("caller", "other")));
-        var replyException = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(wrongReply, TestContext.Current.CancellationToken));
-        Assert.Contains("does not match sender", replyException.Message, StringComparison.Ordinal);
+        var missingSender = InvocationContext(default, receiver, TaskId.Parse("missing-sender"), request, messageIdSender: sender);
+        var senderException = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await handler.HandleAsync(missingSender, TestContext.Current.CancellationToken));
+        Assert.Contains("no sender", senderException.Message, StringComparison.Ordinal);
+        missingSender.DidNotReceive().Complete();
 
         Assert.Empty(storage.Tasks);
         Assert.Empty(transport.Completions);
+    }
+
+    [Fact]
+    public void InboxHandlerAcceptsOnlyDurableRpcSubjects()
+    {
+        var (runtime, _, _, _) = CreateRuntime();
+        var handler = CreateHandler(runtime);
+        var durableRpc = CancellationContext(GrainId.Create("caller", "one"), GrainId.Create("test", "one"), TaskId.Parse("root"));
+        var other = MessagingTestHelpers.CreateHandlerContext(new InboxMessage
+        {
+            Envelope = new Envelope
+            {
+                MessageId = HierarchicalKey.Create("other", "one"),
+                Payload = [],
+                Subject = "orders/reserve",
+            },
+        });
+        var raw = MessagingTestHelpers.CreateHandlerContext(new InboxMessage
+        {
+            Envelope = new Envelope
+            {
+                MessageId = HierarchicalKey.Create("raw", "one"),
+                Payload = [],
+            },
+        });
+
+        Assert.True(handler.CanHandle(durableRpc));
+        Assert.False(handler.CanHandle(other));
+        Assert.False(handler.CanHandle(raw));
     }
 
     [Fact]
@@ -233,39 +221,24 @@ public sealed class DurableTaskRuntimeInvariantTests
         var caller = GrainId.Create("caller", "one");
         var otherCaller = GrainId.Create("caller", "two");
         var taskId = TaskId.Parse("bound-cancellation");
-        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
+        var handler = CreateHandler(runtime);
 
-        await handler.HandleAsync(CreateHandlerContext(
-                receiver,
-                CreateEnvelope(
-                    caller,
-                    receiver,
-                    DurableTaskMessageTransport.CancellationRoute,
-                    new DurableTaskCancellationMessage { TaskId = taskId })), TestContext.Current.CancellationToken);
+        await HandleAsync(handler, CancellationContext(caller, receiver, taskId));
 
         Assert.Equal(caller, storage.Get(taskId).CallerId);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var otherCancellation = CancellationContext(otherCaller, receiver, taskId);
         var cancellationException = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(CreateHandlerContext(
-                    receiver,
-                    CreateEnvelope(
-                        otherCaller,
-                        receiver,
-                        DurableTaskMessageTransport.CancellationRoute,
-                        new DurableTaskCancellationMessage { TaskId = taskId })), TestContext.Current.CancellationToken));
+            async () => await handler.HandleAsync(otherCancellation, TestContext.Current.CancellationToken));
         Assert.Contains("already associated with caller", cancellationException.Message, StringComparison.Ordinal);
+        otherCancellation.DidNotReceive().Complete();
 
         var request = CreateSerializableRequest(receiver);
+        var otherInvocation = InvocationContext(otherCaller, receiver, taskId, request);
         var invocationException = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(CreateHandlerContext(
-                    receiver,
-                    CreateEnvelope(
-                        otherCaller,
-                        receiver,
-                        DurableTaskMessageTransport.InvocationRoute,
-                        new DurableTaskInvocationMessage { TaskId = taskId, Request = request },
-                        replyTo: otherCaller)), TestContext.Current.CancellationToken));
+            async () => await handler.HandleAsync(otherInvocation, TestContext.Current.CancellationToken));
         Assert.Contains("already associated with caller", invocationException.Message, StringComparison.Ordinal);
+        otherInvocation.DidNotReceive().Complete();
     }
 
     [Fact]
@@ -280,15 +253,9 @@ public sealed class DurableTaskRuntimeInvariantTests
         var child = storage.GetOrCreate(childId);
         var target = GrainId.Create("target", "one");
         storage.SetRemoteRequest(childId, child, target, "fingerprint");
-        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
+        var handler = CreateHandler(runtime);
 
-        await handler.HandleAsync(CreateHandlerContext(
-                receiver,
-                CreateEnvelope(
-                    caller,
-                    receiver,
-                    DurableTaskMessageTransport.CancellationRoute,
-                    new DurableTaskCancellationMessage { TaskId = rootId })), TestContext.Current.CancellationToken);
+        await HandleAsync(handler, CancellationContext(caller, receiver, rootId));
 
         Assert.Equal(0, manager.WriteCount);
         Assert.NotNull(storage.Get(rootId).CancellationRequestedAt);
@@ -313,19 +280,13 @@ public sealed class DurableTaskRuntimeInvariantTests
                 started.TrySetResult();
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             }));
-        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
+        runtime.ScheduleFromInbox(taskId, request);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var writesBeforeCancellation = manager.WriteCount;
-        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
+        var handler = CreateHandler(runtime);
 
-        await handler.HandleAsync(CreateHandlerContext(
-                receiver,
-                CreateEnvelope(
-                    caller,
-                    receiver,
-                    DurableTaskMessageTransport.CancellationRoute,
-                    new DurableTaskCancellationMessage { TaskId = taskId })), TestContext.Current.CancellationToken);
+        await HandleAsync(handler, CancellationContext(caller, receiver, taskId));
 
         Assert.Equal(writesBeforeCancellation, manager.WriteCount);
         Assert.Null(storage.Get(taskId).Result);
@@ -362,15 +323,9 @@ public sealed class DurableTaskRuntimeInvariantTests
                 }
             }), TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
+        var handler = CreateHandler(runtime);
 
-        await handler.HandleAsync(CreateHandlerContext(
-                receiver,
-                CreateEnvelope(
-                    caller,
-                    receiver,
-                    DurableTaskMessageTransport.CancellationRoute,
-                    new DurableTaskCancellationMessage { TaskId = rootId })), TestContext.Current.CancellationToken);
+        await HandleAsync(handler, CancellationContext(caller, receiver, rootId));
         Assert.False((await childHandle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
 
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -378,6 +333,80 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(
             DurableTaskStatus.Canceled,
             (await childHandle.WaitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).Status);
+    }
+
+    [Fact]
+    public async Task InboxBatchStagesCancellationsAndCompletionsWithoutWaitingForBatchWrite()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var receiver = GrainId.Create("test", "one");
+        var caller = GrainId.Create("caller", "one");
+        var target = GrainId.Create("target", "one");
+        var handler = CreateHandler(runtime);
+        TaskId[] rootIds = [TaskId.Parse("root-a"), TaskId.Parse("root-b"), TaskId.Parse("root-c")];
+        TaskId[] remoteIds = [TaskId.Parse("remote-a"), TaskId.Parse("remote-b")];
+        var started = rootIds.ToDictionary(
+            static id => id,
+            static _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
+        foreach (var rootId in rootIds)
+        {
+            var rootStarted = started[rootId];
+            runtime.ScheduleFromInbox(
+                rootId,
+                CreateRequest(
+                    Array.IndexOf(rootIds, rootId),
+                    () => DurableTask.Run(async cancellationToken =>
+                    {
+                        rootStarted.TrySetResult();
+                        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    })));
+        }
+
+        var remoteHandles = new List<IScheduledTaskHandle>();
+        foreach (var remoteId in remoteIds)
+        {
+            storage.SetRemoteRequest(remoteId, storage.GetOrCreate(remoteId), target, $"fingerprint-{remoteId}");
+            remoteHandles.Add(runtime.GetScheduledTaskHandle(remoteId));
+        }
+
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await Task.WhenAll(started.Values.Select(static source => source.Task))
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var writesBeforeBatch = manager.WriteCount;
+
+        // The inbox handles every message of a batch before its single batch write, so no handler may wait for it.
+        IInboxHandlerContext[] batch =
+        [
+            CancellationContext(caller, receiver, rootIds[0]),
+            CompletionContext(target, receiver, remoteIds[0], DurableTaskResponse.FromResult(10)),
+            CancellationContext(caller, receiver, rootIds[1]),
+            CompletionContext(target, receiver, remoteIds[1], DurableTaskResponse.FromResult(20)),
+            CancellationContext(caller, receiver, rootIds[2]),
+            CancellationContext(caller, receiver, rootIds[0]),
+        ];
+        foreach (var context in batch)
+        {
+            var handling = handler.HandleAsync(context, TestContext.Current.CancellationToken);
+            Assert.True(handling.IsCompletedSuccessfully);
+            context.Received(1).Complete();
+        }
+
+        Assert.Equal(writesBeforeBatch, manager.WriteCount);
+        Assert.All(rootIds, rootId => Assert.Null(storage.Get(rootId).Result));
+        foreach (var handle in remoteHandles)
+        {
+            Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
+        }
+
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(10, (await remoteHandles[0].WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        Assert.Equal(20, (await remoteHandles[1].WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        await WaitUntilAsync(() => rootIds.All(rootId => storage.Get(rootId).Result is { IsCompleted: true }));
+        Assert.All(rootIds, rootId => Assert.Equal(DurableTaskStatus.Canceled, storage.Get(rootId).Result!.Status));
+        Assert.Equal(
+            remoteIds.Select(static id => (id, GrainId.Create("target", "one"))).ToHashSet(),
+            transport.CompletionAcknowledgements.Select(static ack => (ack.TaskId, ack.Target)).ToHashSet());
     }
 
     [Fact]
@@ -389,32 +418,18 @@ public sealed class DurableTaskRuntimeInvariantTests
         var expectedTarget = request.Context!.TargetId;
         var taskId = TaskId.Parse("root/remote");
         await runtime.ScheduleChildAsync(taskId, new TestStateManager.TestRemoteDurableTask(request), TestContext.Current.CancellationToken);
-        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
-        var completion = new DurableTaskCompletionMessage
-        {
-            TaskId = taskId,
-            Response = DurableTaskResponse.FromResult(42),
-        };
+        var handler = CreateHandler(runtime);
+        var response = DurableTaskResponse.FromResult(42);
 
+        var wrongSender = CompletionContext(GrainId.Create("target", "other"), receiver, taskId, response);
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(CreateHandlerContext(
-                    receiver,
-                    CreateEnvelope(
-                        GrainId.Create("target", "other"),
-                        receiver,
-                        DurableTaskMessageTransport.CompletionRoute,
-                        completion)), TestContext.Current.CancellationToken));
+            async () => await handler.HandleAsync(wrongSender, TestContext.Current.CancellationToken));
         Assert.Contains("does not accept completions", exception.Message, StringComparison.Ordinal);
+        wrongSender.DidNotReceive().Complete();
         Assert.Null(storage.Get(taskId).Result);
         Assert.Empty(transport.CompletionAcknowledgements);
 
-        await handler.HandleAsync(CreateHandlerContext(
-                receiver,
-                CreateEnvelope(
-                    expectedTarget,
-                    receiver,
-                    DurableTaskMessageTransport.CompletionRoute,
-                    completion)), TestContext.Current.CancellationToken);
+        await HandleAsync(handler, CompletionContext(expectedTarget, receiver, taskId, response));
 
         Assert.Equal(42, storage.Get(taskId).Result!.GetResult<int>());
         Assert.Equal(expectedTarget, Assert.Single(transport.CompletionAcknowledgements).Target);
@@ -433,7 +448,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         storage.AddCompletionDestination(taskId, state, caller);
         storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
 
-        var response = await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
+        var response = runtime.ScheduleFromInbox(taskId, request);
 
         Assert.Equal(42, response.GetResult<int>());
         var completion = Assert.Single(transport.Completions);
@@ -531,7 +546,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         storage.SetRemoteRequest(taskId, state, target, "fingerprint");
         var handle = runtime.GetScheduledTaskHandle(taskId);
 
-        await runtime.AcceptResponseAsync(taskId, DurableTaskResponse.FromResult(42), target, TestContext.Current.CancellationToken, persist: false);
+        runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(42), target);
 
         Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -555,7 +570,7 @@ public sealed class DurableTaskRuntimeInvariantTests
             }
         };
 
-        await runtime.AcceptResponseAsync(taskId, DurableTaskResponse.FromResult(42), target, TestContext.Current.CancellationToken, persist: false);
+        runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(42), target);
         Assert.True(storage.Contains(taskId));
 
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -576,7 +591,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task FailedExistingPendingScheduleWriteRollsBackFingerprintBeforeRetry()
+    public async Task FailedScheduleWriteFencesWithoutRevertingStagedIdentity()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/existing-pending");
@@ -584,7 +599,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         var state = storage.GetOrCreate(taskId);
         storage.SetRequest(taskId, state, request);
         _ = runtime.GetScheduledTaskHandle(taskId);
-        manager.OnRevert = () => state.RequestFingerprint = null;
         manager.BeforeWrite = () =>
         {
             manager.BeforeWrite = null;
@@ -597,53 +611,16 @@ public sealed class DurableTaskRuntimeInvariantTests
                 request,
                 TestContext.Current.CancellationToken).AsTask());
 
-        Assert.Null(storage.Get(taskId).RequestFingerprint);
-
-        var response = await ((IDurableTaskServer)runtime).ScheduleAsync(
-            taskId,
-            request,
-            TestContext.Current.CancellationToken);
-        if (!response.IsCompleted)
-        {
-            response = await runtime.GetScheduledTaskHandle(taskId)
-                .WaitAsync(TestContext.Current.CancellationToken);
-        }
-
-        Assert.Equal(0, response.GetResult<int>());
-        Assert.NotNull(storage.Get(taskId).RequestFingerprint);
-    }
-
-    [Fact]
-    public async Task FailedExistingCompletedScheduleWriteRollsBackFingerprintBeforeRetry()
-    {
-        var (runtime, storage, manager, _) = CreateRuntime();
-        var taskId = TaskId.Parse("root/existing-completed");
-        var request = CreateRequest(1);
-        var state = storage.GetOrCreate(taskId);
-        storage.SetRequest(taskId, state, request);
-        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
-        manager.OnRevert = () => state.RequestFingerprint = null;
-        manager.BeforeWrite = () =>
-        {
-            manager.BeforeWrite = null;
-            throw new IOException("Expected existing completed write failure.");
-        };
-
-        await Assert.ThrowsAsync<IOException>(
+        // The staged identity is safe to commit, so it is retained; the failed journal is fenced instead of reverted.
+        Assert.Equal(IDurableTaskRequest.GetFingerprint(request, CreateSerializer()), storage.Get(taskId).RequestFingerprint);
+        Assert.True(manager.IsFenced);
+        await Assert.ThrowsAsync<InvalidOperationException>(
             () => ((IDurableTaskServer)runtime).ScheduleAsync(
                 taskId,
                 request,
                 TestContext.Current.CancellationToken).AsTask());
-
-        Assert.Null(storage.Get(taskId).RequestFingerprint);
-
-        var response = await ((IDurableTaskServer)runtime).ScheduleAsync(
-            taskId,
-            request,
-            TestContext.Current.CancellationToken);
-
-        Assert.Equal(42, response.GetResult<int>());
-        Assert.NotNull(storage.Get(taskId).RequestFingerprint);
+        Assert.Equal(0, request.CreateTaskCallCount);
+        Assert.Equal(0, manager.WriteCount);
     }
 
     [Fact]
@@ -666,13 +643,12 @@ public sealed class DurableTaskRuntimeInvariantTests
                 pruningWriteCompleted.TrySetResult(writeCount);
             }
         };
-        await runtime.AcceptResponseAsync(firstId, DurableTaskResponse.FromResult(1), target, TestContext.Current.CancellationToken, persist: false);
-        manager.AfterWriteStarted = () => runtime.AcceptResponseAsync(
-            secondId,
-            DurableTaskResponse.FromResult(2),
-            target,
-            default,
-            persist: false);
+        runtime.AcceptResponseFromInbox(firstId, DurableTaskResponse.FromResult(1), target);
+        manager.AfterWriteStarted = () =>
+        {
+            runtime.AcceptResponseFromInbox(secondId, DurableTaskResponse.FromResult(2), target);
+            return default;
+        };
 
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         manager.AfterWriteStarted = null;
@@ -694,7 +670,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task RecoveryDiscardsProvisionalCompletionHandle()
+    public async Task JournalResetDiscardsStagedCompletionEffects()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/remote");
@@ -702,11 +678,12 @@ public sealed class DurableTaskRuntimeInvariantTests
         var state = storage.GetOrCreate(taskId);
         storage.SetRemoteRequest(taskId, state, target, "fingerprint");
 
-        await runtime.AcceptResponseAsync(taskId, DurableTaskResponse.FromResult(42), target, TestContext.Current.CancellationToken, persist: false);
+        runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(42), target);
         var handle = runtime.GetScheduledTaskHandle(taskId);
         state.Result = null;
         state.CompletedAt = null;
-        await manager.RevertPendingChangesAsync(TestContext.Current.CancellationToken);
+        ((IStateMachine)runtime).Reset(default);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
     }
@@ -745,25 +722,12 @@ public sealed class DurableTaskRuntimeInvariantTests
         var receiver = GrainId.Create("test", "one");
         var caller = GrainId.Create("caller", "one");
         var taskId = TaskId.Parse("pre-canceled");
-        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
+        var handler = CreateHandler(runtime);
 
-        await handler.HandleAsync(CreateHandlerContext(
-                receiver,
-                CreateEnvelope(
-                    caller,
-                    receiver,
-                    DurableTaskMessageTransport.CancellationRoute,
-                    new DurableTaskCancellationMessage { TaskId = taskId })), TestContext.Current.CancellationToken);
+        await HandleAsync(handler, CancellationContext(caller, receiver, taskId));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         var request = CreateSerializableRequest(receiver);
-        await handler.HandleAsync(CreateHandlerContext(
-                receiver,
-                CreateEnvelope(
-                    caller,
-                    receiver,
-                    DurableTaskMessageTransport.InvocationRoute,
-                    new DurableTaskInvocationMessage { TaskId = taskId, Request = request },
-                    replyTo: caller)), TestContext.Current.CancellationToken);
+        await HandleAsync(handler, InvocationContext(caller, receiver, taskId, request));
 
         var completion = Assert.Single(transport.Completions);
         Assert.Equal(caller, completion.Target);
@@ -866,45 +830,72 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task FailedDelaySchedulingDoesNotLeavePendingState()
+    public async Task FailedResumeSchedulingRetainsStagedDelayForRetry()
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root/failed-delay");
-        transport.BeforeScheduleResumeAsync = static (_, _, _, _, _) =>
-            ValueTask.FromException(new InvalidOperationException("Expected scheduling failure."));
+        var failure = new InvalidOperationException("Expected scheduling failure.");
+        transport.BeforeScheduleResumeAsync = (_, _, _, _, _) =>
+        {
+            transport.BeforeScheduleResumeAsync = null;
+            return ValueTask.FromException(failure);
+        };
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<JournaledStatePreCommitException>(
             () => runtime.ScheduleDelayAsync(
                 taskId,
                 TimeSpan.FromMinutes(1),
                 TestContext.Current.CancellationToken).AsTask());
 
-        Assert.Equal("Expected scheduling failure.", exception.Message);
-        Assert.False(storage.Contains(taskId));
+        // The delay is staged before preparation, and stays staged for an explicit retry.
+        Assert.Same(failure, exception.InnerException);
+        var state = storage.Get(taskId);
+        Assert.NotNull(state.DueTime);
+        Assert.Equal(1, state.ResumeGeneration);
         Assert.Empty(transport.ScheduledResumes);
         Assert.Equal(0, manager.WriteCount);
+
+        Assert.Same(
+            DurableTaskResponse.Pending,
+            await runtime.ScheduleDelayAsync(taskId, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken));
+
+        var resume = Assert.Single(transport.ScheduledResumes);
+        Assert.Equal(taskId, resume.TaskId);
+        Assert.Equal(state.DueTime, resume.DueTime);
+        Assert.Equal(1, manager.WriteCount);
     }
 
     [Fact]
-    public async Task MissingResumeStateWithUnsupportedPendingWriteSamplingReschedules()
+    public async Task ResumeJobIsScheduledBeforeItsDelayCommits()
     {
-        var (runtime, _, manager, _) = CreateRuntime();
-        manager.PendingWriteByteCount = -1;
-        var result = await runtime.ExecuteJobAsync(CreateRunContext(TaskId.Parse("root/missing"), generation: 1), TestContext.Current.CancellationToken);
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/scheduled-delay");
+        transport.BeforeScheduleResumeAsync = (_, scheduledTaskId, generation, _, _) =>
+        {
+            Assert.Equal(taskId, scheduledTaskId);
+            Assert.Equal(generation, storage.Get(taskId).ResumeGeneration);
+            Assert.Equal(0, manager.WriteCount);
+            return default;
+        };
 
-        Assert.NotSame(DurableJobRunResult.Completed, result);
+        await runtime.ScheduleDelayAsync(taskId, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Single(transport.ScheduledResumes);
+        Assert.Equal(2, manager.WriteCount);
     }
 
     [Fact]
-    public async Task PermanentlyMissingResumeStateEventuallyCompletes()
+    public async Task ResumeForMissingTaskCompletesWithoutCreatingState()
     {
-        var (runtime, _, manager, _) = CreateRuntime();
-        manager.PendingWriteByteCount = -1;
-        var context = CreateRunContext(TaskId.Parse("root/missing"), generation: 1);
-        Assert.NotSame(DurableJobRunResult.Completed, await runtime.ExecuteJobAsync(context, TestContext.Current.CancellationToken));
-        var result = await runtime.ExecuteJobAsync(context, TestContext.Current.CancellationToken);
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/missing");
+
+        var result = await runtime.ExecuteJobAsync(CreateRunContext(taskId, generation: 1), TestContext.Current.CancellationToken);
 
         Assert.Same(DurableJobRunResult.Completed, result);
+        Assert.False(storage.Contains(taskId));
+        Assert.Equal(0, manager.WriteCount);
     }
 
     [Fact]
@@ -1026,23 +1017,23 @@ public sealed class DurableTaskRuntimeInvariantTests
             Assert.Equal(target, sentTarget);
             Assert.Equal(taskId, sentTaskId);
             Assert.NotNull(storage.Get(taskId).CancellationRequestedAt);
-            Assert.Equal(1, manager.WriteCount);
+            Assert.Equal(0, manager.WriteCount);
         };
 
         await runtime.CancelRemoteAsync(taskId, target, TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, manager.WriteCount);
+        // The cancellation and its message commit in one write; the outbox delivers only committed messages.
+        Assert.Equal(1, manager.WriteCount);
         Assert.Single(transport.Cancellations);
         Assert.NotNull(storage.Get(taskId).CancellationRequestedAt);
     }
 
     [Fact]
-    public async Task FailedCancellationCommitRollsBackSoRetryPersistsRequest()
+    public async Task FailedCancellationWriteFencesAndKeepsMonotonicCancellation()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/cancellation-retry");
-        var state = storage.GetOrCreate(taskId);
-        manager.OnRevert = () => state.CancellationRequestedAt = null;
+        storage.GetOrCreate(taskId);
         manager.BeforeWrite = () =>
         {
             manager.BeforeWrite = null;
@@ -1054,12 +1045,13 @@ public sealed class DurableTaskRuntimeInvariantTests
                 taskId,
                 TestContext.Current.CancellationToken).AsTask());
 
-        Assert.Null(storage.Get(taskId).CancellationRequestedAt);
-
-        await runtime.SignalCancellationAsync(taskId, TestContext.Current.CancellationToken);
-
         Assert.NotNull(storage.Get(taskId).CancellationRequestedAt);
-        Assert.Equal(2, manager.WriteCount);
+        Assert.True(manager.IsFenced);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.SignalCancellationAsync(
+                TaskId.Parse("root/other"),
+                TestContext.Current.CancellationToken).AsTask());
+        Assert.Equal(0, manager.WriteCount);
     }
 
     [Fact]
@@ -1091,7 +1083,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var taskId = TaskId.Parse("identity");
-        await runtime.ScheduleFromInboxAsync(taskId, CreateRequest(1), TestContext.Current.CancellationToken);
+        runtime.ScheduleFromInbox(taskId, CreateRequest(1));
 
         var remoteException = await Assert.ThrowsAsync<InvalidOperationException>(
             () => runtime.ScheduleChildAsync(taskId, new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)), TestContext.Current.CancellationToken).AsTask());
@@ -1099,8 +1091,8 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         var remoteTaskId = TaskId.Parse("remote-identity");
         await runtime.ScheduleChildAsync(remoteTaskId, new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(3)), TestContext.Current.CancellationToken);
-        var topLevelException = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => runtime.ScheduleFromInboxAsync(remoteTaskId, CreateRequest(4), TestContext.Current.CancellationToken).AsTask());
+        var topLevelException = Assert.Throws<InvalidOperationException>(
+            () => runtime.ScheduleFromInbox(remoteTaskId, CreateRequest(4)));
         Assert.Contains("remote child request", topLevelException.Message, StringComparison.Ordinal);
         Assert.NotNull(storage.Get(remoteTaskId).RemoteRequestFingerprint);
 
@@ -1287,305 +1279,30 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task RecoveryCancelsStaleExecutionAndRestartsRecoveredPendingRequest()
+    public async Task RecoveredPendingRequestStartsOnlyOnActivation()
     {
-        var (runtime, storage, manager, _) = CreateRuntime();
-        var taskId = TaskId.Parse("root/recovery-restart");
-        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var attempt = 0;
-        var request = CreateRequest(
-            1,
-            () => DurableTask.Run(async cancellationToken =>
-            {
-                if (Interlocked.Increment(ref attempt) == 1)
-                {
-                    firstStarted.TrySetResult();
-                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                    return 0;
-                }
-
-                secondStarted.TrySetResult();
-                return 42;
-            }));
-
-        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        runtime.OnRecoveryCompleted();
-
-        await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        var response = await runtime.GetScheduledTaskHandle(taskId)
-            .WaitAsync(TestContext.Current.CancellationToken)
-            .AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        Assert.Equal(2, attempt);
-        Assert.Equal(42, response.GetResult<int>());
-        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(taskId).Result!.Status);
-    }
-
-    [Fact]
-    public async Task RecoveryWaitsForStaleChildExecutionBeforeReplay()
-    {
-        var (runtime, _, manager, _) = CreateRuntime();
-        var taskId = TaskId.Parse("root/recovery-drain");
-        var childStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseChild = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var rootAborted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var replayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var attempt = 0;
-        var request = CreateRequest(
-            1,
-            () => DurableTask.Run(async _ =>
-            {
-                if (Interlocked.Increment(ref attempt) == 1)
-                {
-                    try
-                    {
-                        await DurableTask.Run(async _ =>
-                        {
-                            childStarted.TrySetResult();
-                            await releaseChild.Task;
-                        });
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        rootAborted.TrySetResult();
-                        throw;
-                    }
-                }
-
-                replayStarted.TrySetResult();
-            }));
-
-        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await childStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        runtime.OnRecoveryCompleted();
-        await rootAborted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        Assert.False(replayStarted.Task.IsCompleted);
-        releaseChild.TrySetResult();
-        await replayStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.Equal(2, attempt);
-    }
-
-    [Fact]
-    public async Task NonCooperativeExecutionFencesReplayAndRequestsDeactivation()
-    {
-        var (runtime, _, manager, _) = CreateRuntime(
-            recoveryExecutionDrainTimeout: TimeSpan.FromMilliseconds(50));
-        var taskId = TaskId.Parse("root/non-cooperative");
-        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var replayed = false;
-        var attempt = 0;
-        var request = CreateRequest(
-            1,
-            () => DurableTask.Run(async _ =>
-            {
-                if (Interlocked.Increment(ref attempt) == 1)
-                {
-                    started.TrySetResult();
-                    await release.Task;
-                    return;
-                }
-
-                replayed = true;
-            }));
-
-        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        runtime.OnRecoveryCompleted();
-        var exception = await Assert.ThrowsAsync<TimeoutException>(
-            () => runtime.ScheduleChildAsync(
-                TaskId.Parse("probe"),
-                DurableTask.FromResult(1),
-                TestContext.Current.CancellationToken).AsTask());
-
-        Assert.Contains("timed out waiting", exception.Message, StringComparison.Ordinal);
-        Assert.False(replayed);
-        release.TrySetResult();
-    }
-
-    [Fact]
-    public async Task RecoveryContinuesWhenAbortCallbackThrows()
-    {
-        var (runtime, _, manager, _) = CreateRuntime();
-        var taskId = TaskId.Parse("root/recovery-abort-error");
-        var childId = TaskId.Parse("root/recovery-abort-error/child");
-        var waitStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var replayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var taskHandles = (ConcurrentDictionary<TaskId, IScheduledTaskHandle>)typeof(DurableTaskGrainRuntime)
-            .GetField("_taskHandles", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(runtime)!;
-        taskHandles[childId] = new ThrowingAbortHandle(childId, waitStarted);
-        var attempt = 0;
-        var request = CreateRequest(
-            1,
-            () => Interlocked.Increment(ref attempt) == 1
-                ? new AwaitExistingChildTask(childId)
-                : DurableTask.Run(_ => replayStarted.TrySetResult()));
-
-        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await waitStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        runtime.OnRecoveryCompleted();
-
-        await replayStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.Equal(2, attempt);
-    }
-
-    [Fact]
-    public async Task RecoveryAbortDoesNotInvokeDurableCancellationCallbacks()
-    {
-        var (runtime, _, manager, _) = CreateRuntime();
-        var taskId = TaskId.Parse("root/recovery-abort-only");
-        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var replayStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var durableCancellationObserved = false;
-        var attempt = 0;
-        var request = CreateRequest(
-            1,
-            () => DurableTask.Run(async executionCancellation =>
-            {
-                if (Interlocked.Increment(ref attempt) == 1)
-                {
-                    using var registration = DurableExecutionContext.Current!.CancellationToken.Register(
-                        () => durableCancellationObserved = true);
-                    started.TrySetResult();
-                    await Task.Delay(Timeout.InfiniteTimeSpan, executionCancellation);
-                    return;
-                }
-
-                replayStarted.TrySetResult();
-            }));
-
-        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        runtime.OnRecoveryCompleted();
-
-        await replayStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        Assert.False(durableCancellationObserved);
-        Assert.Equal(2, attempt);
-    }
-
-    [Fact]
-    public async Task RecoveryRestartsPendingRequestAfterRecoveryTriggeringExecutionFaults()
-    {
-        var (runtime, storage, manager, _) = CreateRuntime();
-        var taskId = TaskId.Parse("root/recovery-trigger-fault");
-        var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var attempt = 0;
-        var request = CreateRequest(
-            1,
-            () => DurableTask.Run(async _ =>
-            {
-                if (Interlocked.Increment(ref attempt) == 1)
-                {
-                    await releaseFirst.Task;
-                    return 1;
-                }
-
-                secondStarted.TrySetResult();
-                return 42;
-            }));
-
-        await runtime.ScheduleFromInboxAsync(taskId, request, TestContext.Current.CancellationToken);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        manager.AfterWriteStarted = () =>
-        {
-            manager.AfterWriteStarted = null;
-            storage.Get(taskId).Result = null;
-            runtime.OnRecoveryCompleted();
-            return ValueTask.FromException(
-                new InconsistentStateException("Expected recovery-triggering completion failure."));
-        };
-
-        releaseFirst.TrySetResult();
-
-        await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        var response = await runtime.GetScheduledTaskHandle(taskId)
-            .WaitAsync(TestContext.Current.CancellationToken)
-            .AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        Assert.Equal(2, attempt);
-        Assert.Equal(42, response.GetResult<int>());
-        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(taskId).Result!.Status);
-    }
-
-    [Fact]
-    public async Task InitialRecoveryDoesNotStartPendingRequestBeforeActivation()
-    {
-        var (runtime, storage, _, _) = CreateRuntime(initialize: false);
-        runtime.InitializeForActivation();
+        var (runtime, storage, _, _) = CreateRuntime();
+        var stateMachine = (IStateMachine)runtime;
         var taskId = TaskId.Parse("root/initial-recovery");
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(1, () => DurableTask.Run(_ => started.TrySetResult()));
+
+        // Recovery resets the runtime's volatile state, replays journaled task state, and completes before activation.
+        stateMachine.Reset(default);
         var state = storage.GetOrCreate(taskId);
         storage.SetRequest(taskId, state, request);
         storage.SetRequestFingerprint(
             taskId,
             state,
             IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
-
-        runtime.OnRecoveryCompleted();
+        stateMachine.OnRecoveryCompleted();
 
         Assert.False(started.Task.IsCompleted);
         Assert.Equal(0, request.CreateTaskCallCount);
 
-        runtime.MarkActivated();
-        await runtime.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
+        await runtime.OnActivateAsync(TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Equal(1, request.CreateTaskCallCount);
-    }
-
-    [Fact]
-    public async Task RecoveryMarksStaleLocalChildHandleRestartable()
-    {
-        var (runtime, _, _, _) = CreateRuntime();
-        var taskId = TaskId.Parse("root/restartable-local-child");
-        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var firstCanceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var firstHandle = await runtime.ScheduleChildAsync(
-            taskId,
-            DurableTask.Run(async cancellationToken =>
-            {
-                firstStarted.TrySetResult();
-                try
-                {
-                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    firstCanceled.TrySetResult();
-                }
-            }),
-            TestContext.Current.CancellationToken);
-        await firstStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        runtime.OnRecoveryCompleted();
-        await firstCanceled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        var secondHandle = await runtime.ScheduleChildAsync(
-            taskId,
-            DurableTask.FromResult(42),
-            TestContext.Current.CancellationToken);
-        var response = await secondHandle.WaitAsync(TestContext.Current.CancellationToken)
-            .AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        Assert.Same(firstHandle, secondHandle);
-        Assert.Equal(42, response.GetResult<int>());
     }
 
     [Theory]
@@ -1916,7 +1633,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task StopDrainContinuesAfterCallerCancellationDuringStagedResponseCommit()
+    public async Task StopDoesNotWaitForStagedInboxResponseCommit()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/remote");
@@ -1924,18 +1641,17 @@ public sealed class DurableTaskRuntimeInvariantTests
         var state = storage.GetOrCreate(taskId);
         storage.SetRemoteRequest(taskId, state, target, "fingerprint");
         var handle = runtime.GetScheduledTaskHandle(taskId);
-        await runtime.AcceptResponseAsync(taskId, DurableTaskResponse.FromResult(42), target, TestContext.Current.CancellationToken, persist: false);
+        runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(42), target);
 
         using var cancellation = new CancellationTokenSource();
-        var stopping = runtime.StopAsync(cancellation.Token);
-        Assert.False(stopping.IsCompleted);
         cancellation.Cancel();
-        await Task.Yield();
-        Assert.False(stopping.IsCompleted);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await stopping.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await runtime.StopAsync(cancellation.Token).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        Assert.Equal(42, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        // Local waiters observe shutdown; the staged response still commits with the inbox batch for the next activation.
+        Assert.Equal(DurableTaskStatus.Canceled, (await handle.WaitAsync(TestContext.Current.CancellationToken)).Status);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(42, storage.Get(taskId).Result!.GetResult<int>());
+        Assert.Equal(DurableTaskStatus.Canceled, (await handle.WaitAsync(TestContext.Current.CancellationToken)).Status);
     }
 
     [Fact]
@@ -1992,24 +1708,28 @@ public sealed class DurableTaskRuntimeInvariantTests
     [Fact]
     public async Task FirstTerminalResponseWinsAndAcknowledgementRemovesOnlyItsWaiter()
     {
-        var (runtime, storage, _, transport) = CreateRuntime();
+        var (runtime, storage, manager, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root/child");
         var target = GrainId.Create("target", "one");
-        var other = GrainId.Create("target", "two");
+        var waiter = GrainId.Create("caller", "one");
+        var other = GrainId.Create("caller", "two");
         var state = storage.GetOrCreate(taskId);
-        state.CompletionDestinations.Add(target);
+        storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        state.CompletionDestinations.Add(waiter);
         state.CompletionDestinations.Add(other);
         var handle = runtime.GetScheduledTaskHandle(taskId);
 
-        runtime.AcceptResponse(taskId, DurableTaskResponse.FromResult(7));
-        runtime.AcceptResponse(taskId, DurableTaskResponse.FromResult(8));
-        await runtime.AcknowledgeCompletionAsync(taskId, target, TestContext.Current.CancellationToken);
+        runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(7), target);
+        runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(8), target);
+        runtime.AcknowledgeCompletionFromInbox(taskId, waiter);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(7, storage.Get(taskId).Result!.GetResult<int>());
         Assert.Equal(7, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
-        Assert.DoesNotContain(target, storage.Get(taskId).CompletionDestinations);
+        Assert.DoesNotContain(waiter, storage.Get(taskId).CompletionDestinations);
         Assert.Contains(other, storage.Get(taskId).CompletionDestinations);
         Assert.Empty(transport.Completions);
+        Assert.Equal(2, transport.CompletionAcknowledgements.Count);
     }
 
     [Fact]
@@ -2068,28 +1788,27 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task FailedLocalChildCommitRollsBackBeforeRetry()
+    public async Task LocalChildPreparationFailureRetainsStateAndRetryInvokesOnce()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/local-retry");
-        IScheduledTaskHandle? failedHandle = null;
-        manager.OnRevert = storage.Clear;
-        manager.BeforeWrite = () =>
+        var failedInvocations = 0;
+        manager.BeforePrepare = () =>
         {
-            manager.BeforeWrite = null;
-            failedHandle = runtime.GetScheduledTaskHandle(taskId);
-            throw new IOException("Expected initial write failure.");
+            manager.BeforePrepare = null;
+            throw new IOException("Expected initial preparation failure.");
         };
 
-        await Assert.ThrowsAsync<IOException>(
+        var exception = await Assert.ThrowsAsync<JournaledStatePreCommitException>(
             () => runtime.ScheduleChildAsync(
                 taskId,
-                DurableTask.FromResult(1),
+                DurableTask.Run(_ => Interlocked.Increment(ref failedInvocations)),
                 TestContext.Current.CancellationToken).AsTask());
 
-        Assert.False(storage.Contains(taskId));
-        await Assert.ThrowsAsync<IOException>(
-            () => failedHandle!.WaitAsync(TestContext.Current.CancellationToken).AsTask());
+        Assert.IsType<IOException>(exception.InnerException);
+        Assert.True(storage.Contains(taskId));
+        Assert.Equal(0, failedInvocations);
+        Assert.Equal(0, manager.WriteCount);
 
         var retryHandle = await runtime.ScheduleChildAsync(
             taskId,
@@ -2097,13 +1816,13 @@ public sealed class DurableTaskRuntimeInvariantTests
             TestContext.Current.CancellationToken);
         var response = await retryHandle.WaitAsync(TestContext.Current.CancellationToken);
 
-        Assert.NotSame(failedHandle, retryHandle);
         Assert.Equal(42, response.GetResult<int>());
+        Assert.Equal(0, failedInvocations);
         Assert.Equal(2, manager.WriteCount);
     }
 
     [Fact]
-    public async Task FailedRootSchedulingCommitRollsBackBeforeRetry()
+    public async Task RootSchedulingPreparationFailureRetainsRequestAndRetryInvokesOnce()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/retry");
@@ -2111,20 +1830,20 @@ public sealed class DurableTaskRuntimeInvariantTests
         var request = CreateRequest(
             1,
             () => DurableTask.Run(_ => Interlocked.Increment(ref invoked)));
-        manager.OnRevert = storage.Clear;
-        manager.BeforeWrite = () =>
+        manager.BeforePrepare = () =>
         {
-            manager.BeforeWrite = null;
-            throw new IOException("Expected initial write failure.");
+            manager.BeforePrepare = null;
+            throw new IOException("Expected initial preparation failure.");
         };
 
-        await Assert.ThrowsAsync<IOException>(
+        await Assert.ThrowsAsync<JournaledStatePreCommitException>(
             () => ((IDurableTaskServer)runtime).ScheduleAsync(
                 taskId,
                 request,
                 TestContext.Current.CancellationToken).AsTask());
 
-        Assert.False(storage.Contains(taskId));
+        Assert.True(storage.Contains(taskId));
+        Assert.Equal(0, invoked);
 
         _ = await ((IDurableTaskServer)runtime).ScheduleAsync(
             taskId,
@@ -2167,7 +1886,8 @@ public sealed class DurableTaskRuntimeInvariantTests
             Assert.False(storage.Contains(grandchildId));
         };
 
-        await runtime.AcknowledgeCompletionAsync(rootId, waiter, TestContext.Current.CancellationToken);
+        runtime.AcknowledgeCompletionFromInbox(rootId, waiter);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.NotNull(storage.Get(rootId).TombstonedAt);
         Assert.NotNull(storage.Get(childId).TombstonedAt);
@@ -2206,7 +1926,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         var rootHandle = runtime.GetScheduledTaskHandle(rootId);
         var receiver = GrainId.Create("test", "one");
         var caller = GrainId.Create("caller", "one");
-        var handler = (IInboxHandler)new DurableTaskMessageHandler(runtime);
+        var handler = CreateHandler(runtime);
         var cancellationWriteEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseCancellationWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         manager.AfterWriteStarted = async () =>
@@ -2216,28 +1936,21 @@ public sealed class DurableTaskRuntimeInvariantTests
             await releaseCancellationWrite.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         };
 
-        await handler.HandleAsync(
-            CreateHandlerContext(
-                receiver,
-                CreateEnvelope(
-                    caller,
-                    receiver,
-                    DurableTaskMessageTransport.CancellationRoute,
-                    new DurableTaskCancellationMessage { TaskId = rootId })),
-            TestContext.Current.CancellationToken);
+        await HandleAsync(handler, CancellationContext(caller, receiver, rootId));
         var cancellationWrite = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await cancellationWriteEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var remoteRequest = CreateRemoteRequest(17);
         var childTask = new TestStateManager.TestRemoteDurableTask(remoteRequest);
 
-        var scheduling = runtime.ScheduleChildAsync(
-            childId,
-            childTask,
-            TestContext.Current.CancellationToken).AsTask();
-
+        IScheduledTaskHandle handle;
         try
         {
-            Assert.False(scheduling.IsCompleted);
+            // The staged cancellation is visible before it commits, and any effect derived from it commits after it.
+            handle = await runtime.ScheduleChildAsync(
+                childId,
+                childTask,
+                TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            Assert.False(cancellationWrite.IsCompleted);
             Assert.False(storage.Contains(childId));
             Assert.Equal(0, childTask.ScheduleAsyncCallCount);
             Assert.Empty(transport.Invocations);
@@ -2249,7 +1962,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         }
 
         await cancellationWrite;
-        var handle = await scheduling;
         var rootResponse = Assert.IsType<CanceledDurableTaskResponse>(
             await rootHandle.WaitAsync(TestContext.Current.CancellationToken)
                 .AsTask()
@@ -2269,7 +1981,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.False(storage.Contains(childId));
         Assert.Equal(0, childTask.ScheduleAsyncCallCount);
         Assert.Empty(transport.Invocations);
-        Assert.Equal(2, manager.WriteCount);
+        await WaitUntilAsync(() => manager.WriteCount == 2);
     }
 
     [Fact]
@@ -2357,9 +2069,9 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task ScheduleChildAsync_SpawnedRuntimeWriteWaitsForJournalGate()
+    public async Task ScheduleChildAsync_SpawnedRuntimeWriteCommitsAfterInFlightWrite()
     {
-        var (runtime, _, manager, transport) = CreateRuntime();
+        var (runtime, storage, manager, transport) = CreateRuntime();
         var childId = TaskId.Parse("root/custom-child");
         var nestedId = TaskId.Parse("nested/remote");
         var nestedRequest = CreateRemoteRequest(17);
@@ -2401,8 +2113,11 @@ public sealed class DurableTaskRuntimeInvariantTests
             Assert.NotNull(nestedScheduling);
             startNestedScheduling.TrySetResult();
             await nestedSchedulingStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await WaitUntilAsync(() => storage.Contains(nestedId));
+
+            // Staging is shared, but the nested operation is acknowledged only by a write which follows the in-flight one.
             Assert.False(nestedScheduling.IsCompleted);
-            Assert.Empty(transport.Invocations);
+            Assert.Equal(0, manager.WriteCount);
         }
         finally
         {
@@ -2412,6 +2127,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         await scheduling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await nestedScheduling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.Single(transport.Invocations);
+        Assert.Equal(2, manager.WriteCount);
     }
 
     [Fact]
@@ -2492,14 +2208,13 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task ScheduleChildAsync_CustomFinalizationFailureCancelsHandleAndAllowsRetry()
+    public async Task ScheduleChildAsync_CustomFinalizationPreparationFailureAllowsRetry()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var childId = TaskId.Parse("root/custom-finalization-failure");
         var schedulerHandle = Substitute.For<IScheduledTaskHandle>();
         schedulerHandle.TaskId.Returns(childId);
         var scheduleCount = 0;
-        var reverted = false;
         var task = new TestSchedulableTask(
             (_, _) =>
             {
@@ -2507,33 +2222,22 @@ public sealed class DurableTaskRuntimeInvariantTests
                 return new(DurableTaskResponse.Pending);
             },
             _ => schedulerHandle);
-        manager.BeforeWrite = () =>
+        manager.BeforePrepare = () =>
         {
-            manager.BeforeWrite = null;
-            throw new IOException("Expected custom finalization write failure.");
+            manager.BeforePrepare = null;
+            throw new IOException("Expected custom finalization preparation failure.");
         };
-        manager.OnRevert = () =>
-        {
-            reverted = true;
-            storage.Clear();
-        };
-        schedulerHandle.CancelAsync(Arg.Any<CancellationToken>())
-            .Returns(_ =>
-            {
-                Assert.True(reverted);
-                return ValueTask.CompletedTask;
-            });
 
-        var exception = await Assert.ThrowsAsync<IOException>(
+        var exception = await Assert.ThrowsAsync<JournaledStatePreCommitException>(
             () => runtime.ScheduleChildAsync(
                 childId,
                 task,
                 TestContext.Current.CancellationToken).AsTask());
 
-        Assert.Equal("Expected custom finalization write failure.", exception.Message);
-        Assert.True(reverted);
-        Assert.False(storage.Contains(childId));
-        await schedulerHandle.Received(1).CancelAsync(Arg.Any<CancellationToken>());
+        // The child remains staged and the scheduler's operation remains valid for the retry.
+        Assert.Equal("Expected custom finalization preparation failure.", exception.InnerException!.Message);
+        Assert.True(storage.Contains(childId));
+        await schedulerHandle.DidNotReceive().CancelAsync(Arg.Any<CancellationToken>());
 
         var retryHandle = await runtime.ScheduleChildAsync(
             childId,
@@ -2542,67 +2246,32 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         Assert.Same(schedulerHandle, retryHandle);
         Assert.Equal(2, scheduleCount);
+        Assert.Equal(1, manager.WriteCount);
     }
 
     [Fact]
-    public async Task ScheduleChildAsync_AmbiguousCustomFinalizationReattachesCommittedHandle()
-    {
-        var (runtime, storage, manager, _) = CreateRuntime();
-        var childId = TaskId.Parse("root/custom-ambiguous-finalization");
-        var schedulerHandle = Substitute.For<IScheduledTaskHandle>();
-        schedulerHandle.TaskId.Returns(childId);
-        var task = new TestSchedulableTask(
-            (_, _) => new(DurableTaskResponse.Pending),
-            _ => schedulerHandle);
-        var recovered = false;
-        manager.OnRevert = () => recovered = true;
-        manager.BeforeWrite = () =>
-        {
-            manager.BeforeWrite = null;
-            throw new InconsistentStateException("Expected ambiguous custom finalization failure.");
-        };
-
-        var handle = await runtime.ScheduleChildAsync(
-            childId,
-            task,
-            TestContext.Current.CancellationToken);
-
-        Assert.True(recovered);
-        Assert.Same(schedulerHandle, handle);
-        Assert.True(storage.Contains(childId));
-        await schedulerHandle.DidNotReceive().CancelAsync(Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task ScheduleChildAsync_CustomPreparationFailureRevertsRecoveredResult()
+    public async Task ScheduleChildAsync_CanceledAncestorPreparationFailureRetainsCanceledChild()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
         var childId = TaskId.Parse("root/custom-preparation-failure");
         var root = storage.GetOrCreate(rootId);
         root.CancellationRequestedAt = DateTimeOffset.UtcNow;
-        var state = storage.GetOrCreate(childId);
-        var reverted = false;
-        manager.OnRevert = () =>
+        storage.GetOrCreate(childId);
+        manager.BeforePrepare = () =>
         {
-            reverted = true;
-            state.Result = null;
-            state.CompletedAt = null;
-            state.CancellationRequestedAt = null;
-        };
-        manager.BeforeWrite = () =>
-        {
-            manager.BeforeWrite = null;
-            throw new IOException("Expected custom preparation write failure.");
+            manager.BeforePrepare = null;
+            throw new IOException("Expected custom preparation failure.");
         };
         var task = new TestSchedulableTask((_, _) => throw new InvalidOperationException("The canceled task must not be scheduled."));
 
-        await Assert.ThrowsAsync<IOException>(
+        await Assert.ThrowsAsync<JournaledStatePreCommitException>(
             () => runtime.ScheduleChildAsync(
                 childId,
                 task,
                 TestContext.Current.CancellationToken).AsTask());
-        Assert.True(reverted);
+        Assert.NotNull(storage.Get(childId).CancellationRequestedAt);
+        Assert.Same(DurableTaskResponse.Canceled, storage.Get(childId).Result);
 
         var handle = await runtime.ScheduleChildAsync(
             childId,
@@ -2610,26 +2279,20 @@ public sealed class DurableTaskRuntimeInvariantTests
             TestContext.Current.CancellationToken);
 
         Assert.Same(DurableTaskResponse.Canceled, await handle.WaitAsync(TestContext.Current.CancellationToken));
-        Assert.True(manager.WriteCount >= 1);
+        Assert.Equal(0, task.ScheduleAsyncCallCount);
+        Assert.Equal(1, manager.WriteCount);
     }
 
     [Fact]
-    public async Task ScheduleChildAsync_CustomFinalizationFailureRevertsRecoveredResult()
+    public async Task ScheduleChildAsync_CompletedCustomFinalizationPreparationFailureRetainsResult()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var childId = TaskId.Parse("root/custom-existing-finalization-failure");
-        var state = storage.GetOrCreate(childId);
-        var reverted = false;
-        manager.OnRevert = () =>
+        storage.GetOrCreate(childId);
+        manager.BeforePrepare = () =>
         {
-            reverted = true;
-            state.Result = null;
-            state.CompletedAt = null;
-        };
-        manager.BeforeWrite = () =>
-        {
-            manager.BeforeWrite = null;
-            throw new IOException("Expected custom finalization write failure.");
+            manager.BeforePrepare = null;
+            throw new IOException("Expected custom finalization preparation failure.");
         };
         var scheduleCount = 0;
         var task = new TestSchedulableTask((_, _) =>
@@ -2638,14 +2301,13 @@ public sealed class DurableTaskRuntimeInvariantTests
             return new(DurableTaskResponse.FromResult(42));
         });
 
-        await Assert.ThrowsAsync<IOException>(
+        await Assert.ThrowsAsync<JournaledStatePreCommitException>(
             () => runtime.ScheduleChildAsync(
                 childId,
                 task,
                 TestContext.Current.CancellationToken).AsTask());
 
-        Assert.True(reverted);
-        Assert.Null(storage.Get(childId).Result);
+        Assert.Equal(42, storage.Get(childId).Result!.GetResult<int>());
 
         var handle = await runtime.ScheduleChildAsync(
             childId,
@@ -2654,7 +2316,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         var response = await handle.WaitAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(42, response.GetResult<int>());
-        Assert.Equal(2, scheduleCount);
+        Assert.Equal(1, scheduleCount);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(1, manager.WriteCount);
     }
 
@@ -2676,12 +2339,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         };
 
         await runtime.ScheduleRemoteAsync(taskId, originalRequest, TestContext.Current.CancellationToken);
-        await runtime.AcceptResponseAsync(
-            taskId,
-            DurableTaskResponse.FromResult(42),
-            target,
-            TestContext.Current.CancellationToken,
-            persist: false);
+        runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(42), target);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(
             3,
@@ -2830,14 +2488,53 @@ public sealed class DurableTaskRuntimeInvariantTests
             },
         };
 
-    private static IInboxHandlerContext CreateHandlerContext(GrainId grainId, DurableEnvelope envelope)
+    private static DurableTaskMessageHandler CreateHandler(DurableTaskGrainRuntime runtime) =>
+        new(runtime, MessagingTestHelpers.MessageTypes);
+
+    private static async Task HandleAsync(IInboxHandler handler, IInboxHandlerContext context)
     {
-        var context = Substitute.For<IInboxHandlerContext>();
-        context.GrainId.Returns(grainId);
-        context.Envelope.Returns(envelope);
-        return context;
+        Assert.True(handler.CanHandle(context));
+        var handling = handler.HandleAsync(context, TestContext.Current.CancellationToken);
+
+        // Handlers stage their changes synchronously; the inbox owns the batch write.
+        Assert.True(handling.IsCompletedSuccessfully);
+        await handling;
+        context.Received(1).Complete();
+        context.DidNotReceive().Fail(Arg.Any<string>());
     }
 
+    private static IInboxHandlerContext InvocationContext(
+        GrainId sender,
+        GrainId receiver,
+        TaskId taskId,
+        IDurableTaskRequest request,
+        GrainId? messageIdSender = null) =>
+        MessagingTestHelpers.CreateHandlerContext(MessagingTestHelpers.CreateMessage(
+            MessagingTestHelpers.MessageTypes.Invocation,
+            messageIdSender ?? sender,
+            receiver,
+            taskId,
+            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender }));
+
+    private static IInboxHandlerContext CompletionContext(
+        GrainId sender,
+        GrainId receiver,
+        TaskId taskId,
+        DurableTaskResponse response) =>
+        MessagingTestHelpers.CreateHandlerContext(MessagingTestHelpers.CreateMessage(
+            MessagingTestHelpers.MessageTypes.Completion,
+            sender,
+            receiver,
+            taskId,
+            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender }));
+
+    private static IInboxHandlerContext CancellationContext(GrainId sender, GrainId receiver, TaskId taskId) =>
+        MessagingTestHelpers.CreateHandlerContext(MessagingTestHelpers.CreateMessage(
+            MessagingTestHelpers.MessageTypes.Cancellation,
+            sender,
+            receiver,
+            taskId,
+            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender }));
     private static ValueTask<TaskId> InvokeSelectCompletionCoreAsync(
         GrainDurableExecutionContext context,
         TaskId decisionId,
@@ -2851,26 +2548,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         (TaskId)typeof(GrainDurableExecutionContext)
             .GetMethod("CreateChildTaskId", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(context, [name])!;
-
-    private static DurableEnvelope CreateEnvelope<T>(
-        GrainId sender,
-        GrainId target,
-        string route,
-        T body,
-        GrainId? replyTo = null)
-    {
-        var builder = new DurableEnvelopeBuilder(
-                EnvelopeServiceProvider.GetRequiredService<SerializerSessionPool>(),
-                sender)
-            .To(target, route)
-            .WithBody(body);
-        if (replyTo is { } address)
-        {
-            builder.WithReplyTo(address);
-        }
-
-        return builder.Build();
-    }
 
     private static IJobRunContext CreateRunContext(TaskId taskId, long generation)
     {
@@ -2899,7 +2576,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         RecordingDurableTaskMessageTransport Transport) CreateRuntime(
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
-            TimeSpan? recoveryExecutionDrainTimeout = null,
             TimeProvider? timeProvider = null)
     {
         var manager = new TestStateManager();
@@ -2909,10 +2585,13 @@ public sealed class DurableTaskRuntimeInvariantTests
             manager,
             resultRetentionPeriod,
             initialize,
-            recoveryExecutionDrainTimeout,
             timeProvider);
     }
 
+    /// <summary>
+    /// Creates a runtime bound to <paramref name="manager"/>. Reusing durable storage and the manager models a
+    /// replacement activation: the new runtime replaces the previous one as the manager's journal hook.
+    /// </summary>
     private static (
         DurableTaskGrainRuntime Runtime,
         TestStorage Storage,
@@ -2922,7 +2601,6 @@ public sealed class DurableTaskRuntimeInvariantTests
             TestStateManager manager,
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
-            TimeSpan? recoveryExecutionDrainTimeout = null,
             TimeProvider? timeProvider = null)
     {
         var context = Substitute.For<IGrainContext>();
@@ -2936,8 +2614,6 @@ public sealed class DurableTaskRuntimeInvariantTests
             Options.Create(new DurableTaskOptions
             {
                 ResultRetentionPeriod = resultRetentionPeriod ?? TimeSpan.FromHours(1),
-                RecoveryExecutionDrainTimeout =
-                    recoveryExecutionDrainTimeout ?? TimeSpan.FromSeconds(30),
             }),
             CreateSerializer());
         var transport = new RecordingDurableTaskMessageTransport();
@@ -2945,17 +2621,15 @@ public sealed class DurableTaskRuntimeInvariantTests
             storage,
             storage.LogicalTimes,
             shared,
-            [transport],
-            manager);
+            [transport]);
         if (initialize)
         {
             runtime.InitializeForActivation();
-            runtime.MarkActivated();
         }
-        manager.RegisterObserver(runtime);
+
+        manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
         return (runtime, storage, manager, transport);
     }
-
     private static Serializer CreateSerializer()
     {
         var services = new ServiceCollection();
@@ -3223,25 +2897,33 @@ public sealed class DurableTaskRuntimeInvariantTests
     private sealed class TestDurableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IDurableDictionary<TKey, TValue>
         where TKey : notnull;
 
+    /// <summary>
+    /// Models the journaled state manager's write protocol: preparation, capture, storage acknowledgement, and
+    /// completion callbacks. A preparation failure retains staged changes; a storage failure fences the manager.
+    /// </summary>
     private sealed class TestStateManager : IJournaledStateManager
     {
-        private readonly List<IJournaledStateObserver> _observers = [];
+        private readonly Dictionary<string, IStateMachine> _stateMachines = new(StringComparer.Ordinal);
         private readonly SemaphoreSlim _writeGate = new(1, 1);
+        private Exception? _failure;
         public int WriteCount { get; private set; }
-        public long PendingWriteByteCount { get; set; }
+        public bool IsFenced => _failure is not null;
+
+        /// <summary>Runs before state preparation; throwing models a preparation failure.</summary>
+        public Action? BeforePrepare { get; set; }
+
+        /// <summary>Runs after preparation and before capture; throwing models a storage failure.</summary>
         public Action? BeforeWrite { get; set; }
-        public Action? OnRevert { get; set; }
+
+        /// <summary>Runs after capture and before storage acknowledgement; throwing models a storage failure.</summary>
         public Func<ValueTask>? AfterWriteStarted { get; set; }
         public Action<int>? AfterWriteCompleted { get; set; }
-        public bool SupportsRollback => true;
-        public void RegisterObserver(IJournaledStateObserver observer) => _observers.Add(observer);
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
-        public void RegisterState(string name, IJournaledState state) { }
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
-        {
-            state = null;
-            return false;
-        }
+
+        public void RegisterStateMachine(string name, IStateMachine stateMachine) => _stateMachines[name] = stateMachine;
+
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine) =>
+            _stateMachines.TryGetValue(name, out stateMachine);
 
         public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
         {
@@ -3249,22 +2931,57 @@ public sealed class DurableTaskRuntimeInvariantTests
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                BeforeWrite?.Invoke();
-                foreach (var observer in _observers)
+                if (_failure is { } failure)
                 {
-                    await observer.OnWritePreparingAsync(cancellationToken);
-                    observer.OnWriteStarted();
+                    throw new InvalidOperationException("Journaled state operations are fenced because an operation failed.", failure);
                 }
 
-                if (AfterWriteStarted is { } afterWriteStarted)
+                var stateMachines = _stateMachines.Values.ToArray();
+                try
                 {
-                    await afterWriteStarted();
+                    BeforePrepare?.Invoke();
+                    for (var prepared = false; !prepared;)
+                    {
+                        prepared = true;
+                        foreach (var stateMachine in stateMachines)
+                        {
+                            var preparation = stateMachine.PrepareWriteAsync(cancellationToken);
+                            if (!preparation.IsCompletedSuccessfully)
+                            {
+                                prepared = false;
+                                await preparation;
+                            }
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    throw new JournaledStatePreCommitException(exception);
+                }
+
+                try
+                {
+                    BeforeWrite?.Invoke();
+                    foreach (var stateMachine in stateMachines)
+                    {
+                        stateMachine.WritePendingEntries(default);
+                    }
+
+                    if (AfterWriteStarted is { } afterWriteStarted)
+                    {
+                        await afterWriteStarted();
+                    }
+                }
+                catch (Exception exception)
+                {
+                    _failure = exception;
+                    throw;
                 }
 
                 WriteCount++;
-                foreach (var observer in _observers)
+                foreach (var stateMachine in stateMachines)
                 {
-                    observer.OnWriteCompleted();
+                    stateMachine.OnWriteCompleted();
                 }
 
                 AfterWriteCompleted?.Invoke(WriteCount);
@@ -3274,7 +2991,6 @@ public sealed class DurableTaskRuntimeInvariantTests
                 _writeGate.Release();
             }
         }
-
         internal sealed class PendingDurableTask : DurableTask
         {
             protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) =>
@@ -3310,17 +3026,6 @@ public sealed class DurableTaskRuntimeInvariantTests
             public IScheduledTaskHandle GetHandle(TaskId taskId) => throw new NotSupportedException();
             protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) =>
                 throw new NotSupportedException();
-        }
-
-        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken)
-        {
-            OnRevert?.Invoke();
-            foreach (var observer in _observers)
-            {
-                observer.OnRecoveryCompleted();
-            }
-
-            return default;
         }
 
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
