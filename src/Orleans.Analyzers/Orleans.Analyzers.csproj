@@ -20,6 +20,7 @@
     <Compile Remove="GrainInterfaceVersionCodeFix.cs" />
     <Compile Include="..\Orleans.CodeGenerator.Shared\InvokableBaseTypeResolver.cs" Link="InvokableBaseTypeResolver.cs" />
     <Compile Include="..\Orleans.CodeGenerator.Shared\MethodIdProvider.cs" Link="MethodIdProvider.cs" />
+    <Compile Include="..\Orleans.CodeGenerator.Shared\LanguageFeatureSymbols.cs" Link="LanguageFeatureSymbols.cs" />
     <Compile Include="..\Orleans.CodeGenerator\Hashing\BitOperations.cs" Link="Hashing\BitOperations.cs" />
     <Compile Include="..\Orleans.CodeGenerator\Hashing\NonCryptographicHashAlgorithm.cs" Link="Hashing\NonCryptographicHashAlgorithm.cs" />
     <Compile Include="..\Orleans.CodeGenerator\Hashing\XxHash32.cs" Link="Hashing\XxHash32.cs" />

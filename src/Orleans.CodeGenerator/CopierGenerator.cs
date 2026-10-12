@@ -34,6 +34,11 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
             return null;
         }
 
+        if (!isShallowCopyable && type is SerializableTypeDescription { UnionCases: { } unionCases })
+        {
+            return new UnionCodecGenerator(_generatorServices).GenerateUnionCopier(type, unionCases);
+        }
+
         var simpleClassName = GetSimpleClassName(type);
 
         var members = new List<ISerializableMember>();

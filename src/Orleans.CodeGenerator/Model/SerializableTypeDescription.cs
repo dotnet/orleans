@@ -197,7 +197,22 @@ internal class SerializableTypeDescription : ISerializableTypeDescription
 
     public List<INamedTypeSymbol> SerializationHooks { get; }
 
-    public bool IsShallowCopyable => IsEnumType || !Type.HasBaseType(_libraryTypes.Exception) && _libraryTypes.IsShallowCopyable(Type);
+    public bool IsShallowCopyable => UnionCases is { } unionCases
+        ? unionCases.All(unionCase => _libraryTypes.IsShallowCopyable(unionCase.CaseType))
+        : IsEnumType || !Type.HasBaseType(_libraryTypes.Exception) && _libraryTypes.IsShallowCopyable(Type);
+
+    /// <summary>
+    /// Gets the cases of this union type, or <see langword="null"/> if this is not a union type.
+    /// </summary>
+    public List<UnionCaseDescription>? UnionCases { get; init; }
+
+    /// <summary>
+    /// Gets the cases of this closed type, or <see langword="null"/> if this type is not a closed type whose subtypes declare case identifiers.
+    /// </summary>
+    /// <remarks>
+    /// Closed-type cases are declared on subtypes, which can be in other source files, so they are resolved when generating source.
+    /// </remarks>
+    public List<UnionCaseDescription>? GetClosedTypeCases() => UnionCaseResolver.GetClosedTypeCases(Type, Compilation, _libraryTypes);
 
     public bool IsUnsealedImmutable => !Type.IsSealed && IsImmutable;
 

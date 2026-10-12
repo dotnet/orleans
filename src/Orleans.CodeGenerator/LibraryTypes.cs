@@ -33,6 +33,8 @@ internal sealed class LibraryTypes
         Func_2 = Type("System.Func`2");
         GenerateMethodSerializersAttribute = Type("Orleans.GenerateMethodSerializersAttribute");
         GenerateSerializerAttribute = Type("Orleans.GenerateSerializerAttribute");
+        CaseAttributeOrDefault = TypeOrDefault("Orleans.CaseAttribute");
+        CaseIdsAttributeOrDefault = TypeOrDefault("Orleans.CaseIdsAttribute");
         SerializationCallbacksAttribute = Type("Orleans.SerializationCallbacksAttribute");
         IActivator_1 = Type("Orleans.Serialization.Activators.IActivator`1");
         IBufferWriter = Type("System.Buffers.IBufferWriter`1");
@@ -220,6 +222,8 @@ internal sealed class LibraryTypes
     public INamedTypeSymbol CompoundTypeAliasAttribute { get; private set; }
     public INamedTypeSymbol GenerateMethodSerializersAttribute { get; private set; }
     public INamedTypeSymbol GenerateSerializerAttribute { get; private set; }
+    public INamedTypeSymbol? CaseAttributeOrDefault { get; private set; }
+    public INamedTypeSymbol? CaseIdsAttributeOrDefault { get; private set; }
     public INamedTypeSymbol IActivator_1 { get; private set; }
     public INamedTypeSymbol IBufferWriter { get; private set; }
     public INamedTypeSymbol IInvokable { get; private set; }
