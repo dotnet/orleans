@@ -324,10 +324,6 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
         {
             await _pump.StateManager.WriteStateAsync(CancellationToken.None).ConfigureAwait(true);
         }
-        catch (JournaledStatePostCommitException)
-        {
-            throw;
-        }
         catch (Exception exception)
         {
             _pump.Fail(exception, "Inbox persistence failed.");
