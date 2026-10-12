@@ -250,8 +250,9 @@ public sealed class EnvelopeContractTests
     [Theory]
     [InlineData("id", 1024, true)]
     [InlineData("id", 1025, false)]
-    [InlineData("depth", 32, true)]
-    [InlineData("depth", 33, false)]
+    // Segment depth is bounded only by the encoded message ID size.
+    [InlineData("depth", 512, true)]
+    [InlineData("depth", 513, false)]
     [InlineData("unicode-id", 512, true)]
     [InlineData("unicode-id", 513, false)]
     [InlineData("subject", 256, true)]

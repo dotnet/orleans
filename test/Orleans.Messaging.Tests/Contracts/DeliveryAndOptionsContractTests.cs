@@ -41,7 +41,7 @@ public sealed class DeliveryAndOptionsContractTests
     [Fact]
     public void Validate_DefaultOptions_SucceedsAndExposesDocumentedDefaults()
     {
-        var options = new InboxOptions();
+        var options = new DurableMessagingOptions();
 
         options.Validate();
 
@@ -59,24 +59,24 @@ public sealed class DeliveryAndOptionsContractTests
     [Fact]
     public void Validate_EachCapacityRetryDeadLetterAndBatchBoundary_EnforcesContract()
     {
-        var invalidCases = new (string Parameter, Action<InboxOptions> Mutate)[]
+        var invalidCases = new (string Parameter, Action<DurableMessagingOptions> Mutate)[]
         {
-            (nameof(InboxOptions.MaxCapacity), options => options.MaxCapacity = 0),
-            (nameof(InboxOptions.DeduplicationWindow), options => options.DeduplicationWindow = TimeSpan.Zero),
-            (nameof(InboxOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.Zero),
-            (nameof(InboxOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.MaxValue),
-            (nameof(InboxOptions.MaxProcessingAttempts), options => options.MaxProcessingAttempts = 0),
-            (nameof(InboxOptions.MaxDeliveryAttempts), options => options.MaxDeliveryAttempts = 0),
-            (nameof(InboxOptions.MaxOutboxRetryAge), options => options.MaxOutboxRetryAge = TimeSpan.Zero),
-            (nameof(InboxOptions.DeadLetterRetentionPeriod), options => options.DeadLetterRetentionPeriod = TimeSpan.Zero),
-            (nameof(InboxOptions.MaxRetainedDeadLetters), options => options.MaxRetainedDeadLetters = 0),
-            (nameof(InboxOptions.InboxBatchSize), options => options.InboxBatchSize = 0),
-            (nameof(InboxOptions.OutboxBatchSize), options => options.OutboxBatchSize = 0),
+            (nameof(DurableMessagingOptions.MaxCapacity), options => options.MaxCapacity = 0),
+            (nameof(DurableMessagingOptions.DeduplicationWindow), options => options.DeduplicationWindow = TimeSpan.Zero),
+            (nameof(DurableMessagingOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.Zero),
+            (nameof(DurableMessagingOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.MaxValue),
+            (nameof(DurableMessagingOptions.MaxProcessingAttempts), options => options.MaxProcessingAttempts = 0),
+            (nameof(DurableMessagingOptions.MaxDeliveryAttempts), options => options.MaxDeliveryAttempts = 0),
+            (nameof(DurableMessagingOptions.MaxOutboxRetryAge), options => options.MaxOutboxRetryAge = TimeSpan.Zero),
+            (nameof(DurableMessagingOptions.DeadLetterRetentionPeriod), options => options.DeadLetterRetentionPeriod = TimeSpan.Zero),
+            (nameof(DurableMessagingOptions.MaxRetainedDeadLetters), options => options.MaxRetainedDeadLetters = 0),
+            (nameof(DurableMessagingOptions.InboxBatchSize), options => options.InboxBatchSize = 0),
+            (nameof(DurableMessagingOptions.OutboxBatchSize), options => options.OutboxBatchSize = 0),
         };
 
         foreach (var (parameter, mutate) in invalidCases)
         {
-            var options = new InboxOptions();
+            var options = new DurableMessagingOptions();
             mutate(options);
             var exception = Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
             Assert.Equal(parameter, exception.ParamName);
@@ -89,14 +89,14 @@ public sealed class DeliveryAndOptionsContractTests
     {
         foreach (var retryAge in new[] { TimeSpan.FromHours(2), TimeSpan.FromHours(3) })
         {
-            var options = new InboxOptions
+            var options = new DurableMessagingOptions
             {
                 DeduplicationWindow = TimeSpan.FromHours(2),
                 MaxOutboxRetryAge = retryAge,
             };
 
             var exception = Assert.Throws<ArgumentOutOfRangeException>(options.Validate);
-            Assert.Equal(nameof(InboxOptions.MaxOutboxRetryAge), exception.ParamName);
+            Assert.Equal(nameof(DurableMessagingOptions.MaxOutboxRetryAge), exception.ParamName);
             Assert.Contains("less than DeduplicationWindow", exception.Message, StringComparison.Ordinal);
         }
     }
