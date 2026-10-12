@@ -3,12 +3,12 @@ using System;
 namespace Orleans.Messaging.Configuration;
 
 /// <summary>
-/// Configuration options for the inbox messaging system.
+/// Configuration options for durable messaging inboxes, outboxes, and the messaging pump.
 /// </summary>
 /// <remarks>
 /// <para>
-/// These options control the behavior of the inbox, including capacity limits,
-/// deduplication tracking, retry behavior, and pump batch sizes.
+/// These options control inbox capacity, deduplication tracking, inbox and outbox retry and
+/// dead-letter behavior, and pump batch sizes.
 /// </para>
 /// <para>
 /// Transport is at-least-once. Deduplication provides effectively-once handler effects only
@@ -16,7 +16,7 @@ namespace Orleans.Messaging.Configuration;
 /// throughput, and recovery characteristics.
 /// </para>
 /// </remarks>
-public class InboxOptions
+public class DurableMessagingOptions
 {
     internal const int MaximumBackoffExponent = 6;
     internal const int MaximumBackoffMultiplier = 1 << MaximumBackoffExponent;

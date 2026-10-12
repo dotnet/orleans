@@ -73,5 +73,5 @@ Each receiver returns a `DeliveryResult`:
 - `HandlerNotFound`: the receiver has no registered handlers.
 - `DeadLettered`: the message moved to the receiver's dead letters.
 
-`InboxOptions` configures capacity, batch sizes, retries, deduplication, and
-dead-letter retention.
+`DurableMessagingOptions` configures capacity, batch sizes, retries, deduplication,
+and dead-letter retention.

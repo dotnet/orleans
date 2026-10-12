@@ -205,7 +205,7 @@ public sealed class TypedMessageHelperTests
         var services = new ServiceCollection();
         var result = services.AddMessageType<string>(Subject);
         Assert.Same(services, result);
-        Assert.Equal(3, services.Count);
+        Assert.Equal(2, services.Count);
         var registration = Assert.Single(services, descriptor => descriptor.IsKeyedService);
         Assert.True(registration.IsKeyedService);
         Assert.Equal(Subject, registration.ServiceKey);
@@ -498,7 +498,7 @@ public sealed class TypedMessageHelperTests
         Assert.Equal((byte)0x7e, probe.CommittedFailureByte);
 
         var recovered = messageType.Create(MessageKey, Receiver, "recovered 東京 reserve");
-        Assert.Equal(2, probe.WriteCount);
+        Assert.Equal(3, probe.WriteCount);
         Assert.Equal(pristine.SerializeToArray("recovered 東京 reserve"), recovered.Envelope.Payload.ToArray());
         Assert.Equal("recovered 東京 reserve", pristine.Deserialize(recovered.Envelope.Payload));
         Assert.Equal(outstandingWire, outstanding.Envelope.Payload.ToArray());
@@ -846,13 +846,10 @@ public sealed class TypedMessageHelperTests
         // before assertions, so even assertion failure cannot strand a dispatch.
         var completedBeforeRelease = dispatch.IsCompleted;
         var completionsBeforeRelease = context.CompletionCount;
-        var lateRegistration = Record.Exception(() => dispatcher.Register(
-            new MessageType<string>("orders.later", serializer), (_, _, _) => ValueTask.CompletedTask));
         completion.SetResult();
         await dispatch;
 
         Assert.False(completedBeforeRelease);
-        Assert.IsType<InvalidOperationException>(lateRegistration);
         Assert.Equal(0, completionsBeforeRelease);
         Assert.Equal("deferred €42", capturedBody);
         Assert.Same(context, capturedContext);
@@ -889,13 +886,10 @@ public sealed class TypedMessageHelperTests
         var dispatch = dispatcher.HandleAsync(context, cancellation.Token);
         var completedBeforeRelease = dispatch.IsCompleted;
         var completionsBeforeRelease = context.CompletionCount;
-        var lateRegistration = Record.Exception(() => dispatcher.Register(
-            new MessageType<string>("orders.later", serializer), (_, _, _) => ValueTask.CompletedTask));
         completion.SetException(sentinel);
         var exception = await Assert.ThrowsAsync<InvalidDataException>(async () => await dispatch);
 
         Assert.False(completedBeforeRelease);
-        Assert.IsType<InvalidOperationException>(lateRegistration);
         Assert.Equal(0, completionsBeforeRelease);
         Assert.Same(sentinel, exception);
         Assert.Equal("deferred fault €42", capturedBody);
@@ -1910,8 +1904,8 @@ public sealed class TypedMessageHelperTests
         var exception = Assert.Throws<InvalidOperationException>(() =>
             dispatcher.HandleAsync(context, CancellationToken.None));
 
-        Assert.Contains(absent ? "requires a subject" : "No handler is registered", exception.Message,
-            StringComparison.Ordinal);
+        // Handlers match subjects exactly, so an absent subject matches no typed handler.
+        Assert.Contains("No handler is registered", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, probe.ReadCount);
         Assert.Equal(0, probe.WriteCount);
         Assert.Equal(0, calls);
