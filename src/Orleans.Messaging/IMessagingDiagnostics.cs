@@ -16,6 +16,11 @@ public interface IMessagingDiagnostics
     IReadOnlyList<DeadLetter<InboxMessage>> InboxDeadLetters { get; }
 
     /// <summary>
+    /// Gets messages which could not be delivered from the outbox.
+    /// </summary>
+    IReadOnlyList<DeadLetter<OutboxMessage>> OutboxDeadLetters { get; }
+
+    /// <summary>
     /// Stages removal of an inbox dead letter.
     /// </summary>
     /// <param name="messageId">The receiver-local command identity.</param>
@@ -24,6 +29,16 @@ public interface IMessagingDiagnostics
     /// The removal becomes durable with the grain's next journal write.
     /// </remarks>
     bool RemoveInboxDeadLetter(MessageId messageId);
+
+    /// <summary>
+    /// Stages removal of an outbox dead letter.
+    /// </summary>
+    /// <param name="messageId">The message identifier.</param>
+    /// <returns><see langword="true"/> when the dead letter existed and was removed.</returns>
+    /// <remarks>
+    /// The removal becomes durable with the grain's next journal write.
+    /// </remarks>
+    bool RemoveOutboxDeadLetter(MessageId messageId);
 }
 
 /// <summary>
@@ -62,7 +77,7 @@ public sealed class DeadLetter<TMessage>
     public int AttemptCount { get; init; }
 }
 
-internal sealed class MessagingDiagnostics(Inbox inbox) : IMessagingDiagnostics
+internal sealed class MessagingDiagnostics(Inbox inbox, Outbox outbox) : IMessagingDiagnostics
 {
     public IReadOnlyList<DeadLetter<InboxMessage>> InboxDeadLetters =>
         inbox.DeadLetterState.Values.Select(static entry => new DeadLetter<InboxMessage>
@@ -73,5 +88,16 @@ internal sealed class MessagingDiagnostics(Inbox inbox) : IMessagingDiagnostics
             AttemptCount = entry.AttemptCount
         }).ToList();
 
+    public IReadOnlyList<DeadLetter<OutboxMessage>> OutboxDeadLetters =>
+        outbox.DeadLetterState.Values.Select(static entry => new DeadLetter<OutboxMessage>
+        {
+            Message = entry.Message,
+            DeadLetteredAt = entry.DeadLetteredAt,
+            Reason = entry.Reason,
+            AttemptCount = entry.AttemptCount
+        }).ToList();
+
     public bool RemoveInboxDeadLetter(MessageId messageId) => inbox.RemoveDeadLetter(messageId);
+
+    public bool RemoveOutboxDeadLetter(MessageId messageId) => outbox.RemoveDeadLetter(messageId);
 }

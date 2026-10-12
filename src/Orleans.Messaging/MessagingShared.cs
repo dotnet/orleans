@@ -25,12 +25,15 @@ internal sealed class MessagingShared
         TimeProvider = services.GetRequiredService<TimeProvider>();
         JobTimeProvider = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
         JobManager = services.GetRequiredService<ILocalDurableJobManager>();
+        GrainFactory = services.GetRequiredService<IGrainFactory>();
         Instruments = services.GetRequiredService<MessagingInstruments>();
         var loggers = services.GetRequiredService<ILoggerFactory>();
         InboxLogger = loggers.CreateLogger<Inbox>();
+        OutboxLogger = loggers.CreateLogger<Outbox>();
         PumpLogger = loggers.CreateLogger<MessagingPump>();
         var format = services.GetRequiredService<IOptions<JournaledStateManagerOptions>>().Value.JournalFormatKey;
         InboxCodec = services.GetRequiredKeyedService<IDurableValueCommandCodec<InboxCommand>>(format);
+        OutboxCodec = services.GetRequiredKeyedService<IDurableValueCommandCodec<OutboxCommand>>(format);
     }
 
     /// <summary>Gets the grain type metric tag.</summary>
@@ -45,11 +48,17 @@ internal sealed class MessagingShared
 
     public ILocalDurableJobManager JobManager { get; }
 
+    public IGrainFactory GrainFactory { get; }
+
     public MessagingInstruments Instruments { get; }
 
     public ILogger InboxLogger { get; }
 
+    public ILogger OutboxLogger { get; }
+
     public ILogger PumpLogger { get; }
 
     public IDurableValueCommandCodec<InboxCommand> InboxCodec { get; }
+
+    public IDurableValueCommandCodec<OutboxCommand> OutboxCodec { get; }
 }

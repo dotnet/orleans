@@ -23,6 +23,7 @@ public interface IMessagingTestGrain : IGrainWithGuidKey
     Task<DeliveryResult> AcceptAndDeactivateAsync(InboxMessage envelope);
     Task ConfigureHandlerAsync(bool enabled);
     Task<bool> RemoveInboxDeadLetterAsync(MessageId messageId);
+    Task<bool> RemoveOutboxDeadLetterAsync(MessageId messageId);
     Task<EndpointSnapshot> GetSnapshotAsync();
     Task RequestDeactivationAsync();
     Task SetControlEnvelopeAsync(InboxMessage envelope);
@@ -217,6 +218,17 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
     public async Task<bool> RemoveInboxDeadLetterAsync(MessageId messageId)
     {
         if (!_diagnostics.RemoveInboxDeadLetter(messageId))
+        {
+            return false;
+        }
+
+        await WriteStateAsync();
+        return true;
+    }
+
+    public async Task<bool> RemoveOutboxDeadLetterAsync(HierarchicalKey messageId)
+    {
+        if (!_diagnostics.RemoveOutboxDeadLetter(messageId))
         {
             return false;
         }
@@ -428,10 +440,18 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
             _maxConcurrentHandlers,
             _effects.Values.OrderBy(static effect => effect.Sequence).ToArray(),
             _diagnostics.InboxDeadLetters.Select(ToSnapshot).ToArray(),
-            [],
+            _diagnostics.OutboxDeadLetters.Select(ToSnapshot).ToArray(),
             InboxTestAccess.GetProcessedCount(_inboxState));
 
     private DeadLetterSnapshot ToSnapshot(DeadLetter<InboxMessage> deadLetter) =>
+        new(
+            deadLetter.Message.Envelope.MessageId,
+            TestApplicationProtocol.Read(_sessions, deadLetter.Message).Route,
+            deadLetter.Reason,
+            deadLetter.AttemptCount,
+            deadLetter.DeadLetteredAt);
+
+    private DeadLetterSnapshot ToSnapshot(DeadLetter<OutboxMessage> deadLetter) =>
         new(
             deadLetter.Message.Envelope.MessageId,
             TestApplicationProtocol.Read(_sessions, deadLetter.Message).Route,

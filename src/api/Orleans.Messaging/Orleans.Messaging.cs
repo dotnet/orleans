@@ -206,7 +206,10 @@ namespace Orleans.Messaging
     {
         System.Collections.Generic.IReadOnlyList<DeadLetter<InboxMessage>> InboxDeadLetters { get; }
 
+        System.Collections.Generic.IReadOnlyList<DeadLetter<OutboxMessage>> OutboxDeadLetters { get; }
+
         bool RemoveInboxDeadLetter(MessageId messageId);
+        bool RemoveOutboxDeadLetter(MessageId messageId);
     }
 
     [Alias("IMessagingExtension")]

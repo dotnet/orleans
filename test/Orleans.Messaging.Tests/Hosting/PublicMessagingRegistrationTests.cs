@@ -44,7 +44,7 @@ public sealed class PublicMessagingRegistrationTests
         Assert.Equal(ServiceLifetime.Singleton, configurator.Lifetime);
         foreach (var contract in new[]
         {
-            typeof(MessagingPump), typeof(Inbox), typeof(IInbox), typeof(IMessagingDiagnostics)
+            typeof(MessagingPump), typeof(Inbox), typeof(Outbox), typeof(IInbox), typeof(IOutbox), typeof(IMessagingDiagnostics)
         })
         {
             var descriptor = Assert.Single(services, descriptor => descriptor.ServiceType == contract && !descriptor.IsKeyedService);

@@ -9,11 +9,11 @@ using Orleans.Runtime;
 namespace Orleans.Messaging;
 
 /// <summary>
-/// Drives inbox processing for one activation.
+/// Drives inbox processing and outbox delivery for one activation.
 /// </summary>
 /// <remarks>
-/// A single loop runs on the activation scheduler and services the inbox whenever it is signaled.
-/// One durable job keeps waking the grain while the inbox or a registered <see cref="IInboxWorkSource"/> holds work
+/// A single loop runs on the activation scheduler and services both queues whenever it is signaled.
+/// One durable job keeps waking the grain while either queue or a registered <see cref="IInboxWorkSource"/> holds work
 /// which the activation can perform; inbox messages wait for a handler without a wake-up.
 /// Work staged with an earlier due time than the current wake-up schedules an earlier one, and the job which a newer,
 /// earlier wake-up supersedes completes when it runs.
@@ -29,6 +29,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     private readonly SingleWaiterAutoResetEvent _signal = new() { RunContinuationsAsynchronously = true };
     private readonly CancellationTokenSource _shutdown = new();
     private Inbox? _inbox;
+    private Outbox? _outbox;
     private Task? _loop;
     private TaskCompletionSource? _nextPass;
     private Task<DurableJob>? _scheduling;
@@ -57,6 +58,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.SetupState, static _ => Task.CompletedTask, _ =>
         {
             _inbox?.ReleaseDepth();
+            _outbox?.ReleaseDepth();
             return Task.CompletedTask;
         });
     }
@@ -72,7 +74,11 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     internal void Register(Inbox inbox) => _inbox = inbox;
 
+    internal void Register(Outbox outbox) => _outbox = outbox;
+
     private Inbox Inbox => _inbox ?? throw new InvalidOperationException("The messaging inbox has not been registered.");
+
+    private Outbox Outbox => _outbox ?? throw new InvalidOperationException("The messaging outbox has not been registered.");
 
     public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
 
@@ -139,7 +145,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
-        // A running job keeps rescheduling itself until the inbox and every work source are empty.
+        // A running job keeps rescheduling itself until both queues and every work source are empty.
         var jobId = context.Job.Id;
         if (_wakeupJobId is null)
         {
@@ -157,7 +163,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         {
             // This attempt no longer guarantees a future wake-up.
             CompleteWakeup(jobId);
-            if (!_shutdown.IsCancellationRequested && Inbox.HasWork)
+            if (!_shutdown.IsCancellationRequested && (Inbox.HasWork || Outbox.Count > 0))
             {
                 RepairWakeupAsync().Ignore();
             }
@@ -166,12 +172,15 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         }
 
         var now = Shared.JobTimeProvider.GetUtcNow();
-        if (Inbox.GetNextWakeupDelay(now) is not { } delay)
+        var inboxDelay = Inbox.GetNextWakeupDelay(now);
+        var outboxDelay = Outbox.GetNextWakeupDelay();
+        if (inboxDelay is null && outboxDelay is null)
         {
             CompleteWakeup(jobId);
             return DurableJobRunResult.Completed;
         }
 
+        var delay = Min(inboxDelay, outboxDelay);
         var next = MessagingTime.AddClamped(now, delay > TimeSpan.Zero ? delay : RecheckDelay);
         if (_wakeupJobId is not null && _wakeupJobId != jobId && _wakeupDueTime <= next)
         {
@@ -190,6 +199,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         if (_wakeupJobId == jobId) _wakeupJobId = null;
         _wakeupEpoch++;
     }
+
+    private static TimeSpan Min(TimeSpan? left, TimeSpan? right) =>
+        left is { } l ? right is { } r && r < l ? r : l : right!.Value;
 
     private async Task RepairWakeupAsync()
     {
@@ -219,6 +231,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             try
             {
                 progress = await Inbox.ProcessReadyAsync(cancellationToken).ConfigureAwait(true);
+                progress |= await Outbox.AdvanceAsync(cancellationToken).ConfigureAwait(true);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -259,8 +272,9 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public async Task OnStart(CancellationToken cancellationToken)
     {
+        await Outbox.StartAsync(cancellationToken).ConfigureAwait(true);
         await Inbox.StartAsync(cancellationToken).ConfigureAwait(true);
-        if (Inbox.HasWork)
+        if (Inbox.HasWork || Outbox.Count > 0)
         {
             await EnsureWakeupAsync(Shared.JobTimeProvider.GetUtcNow(), cancellationToken).ConfigureAwait(true);
         }
@@ -271,7 +285,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         var scheduling = _scheduling;
         Stop();
 
-        // Grain calls finish before deactivation stops the lifecycle, so the loop owns every remaining write.
+        // Grain calls finish before deactivation stops the lifecycle, so the loop and outbox deliveries own every remaining write.
         if (_loop is { } loop)
         {
             await loop.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
@@ -281,6 +295,8 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         {
             await ((Task)scheduling).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
         }
+
+        await Outbox.StopAsync().ConfigureAwait(true);
     }
 
     /// <summary>Stops processing for this activation.</summary>

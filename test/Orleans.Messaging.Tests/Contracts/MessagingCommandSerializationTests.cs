@@ -12,8 +12,10 @@ namespace Orleans.Messaging.Tests.Contracts;
 public sealed class MessagingCommandSerializationTests
 {
     private static readonly DateTimeOffset Now = new(2040, 1, 2, 3, 4, 5, TimeSpan.Zero);
+    private static readonly GrainId Receiver = GrainId.Create("receiver", "1");
 
     public static TheoryData<int> InboxCommands => new(Enumerable.Range(0, CreateInboxCommands().Length));
+    public static TheoryData<int> OutboxCommands => new(Enumerable.Range(0, CreateOutboxCommands().Length));
 
     [Theory]
     [MemberData(nameof(InboxCommands))]
@@ -29,6 +31,22 @@ public sealed class MessagingCommandSerializationTests
         Assert.Equal(command.Kind, fromJson.Kind);
         Assert.Equal(json, JsonSerializer.Serialize(fromJson, InboxJsonContext.Default.InboxCommand));
         Assert.Equal(json, JsonSerializer.Serialize(fromBinary!, InboxJsonContext.Default.InboxCommand));
+    }
+
+    [Theory]
+    [MemberData(nameof(OutboxCommands))]
+    public void OutboxCommand_RoundTripsThroughJsonAndOrleansSerialization(int index)
+    {
+        var command = CreateOutboxCommands()[index];
+        var json = JsonSerializer.Serialize(command, OutboxJsonContext.Default.OutboxCommand);
+        var fromJson = JsonSerializer.Deserialize(json, OutboxJsonContext.Default.OutboxCommand)!;
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<OutboxCommand>>();
+        var fromBinary = serializer.Deserialize(serializer.SerializeToArray(command));
+
+        Assert.Equal(command.Kind, fromJson.Kind);
+        Assert.Equal(json, JsonSerializer.Serialize(fromJson, OutboxJsonContext.Default.OutboxCommand));
+        Assert.Equal(json, JsonSerializer.Serialize(fromBinary!, OutboxJsonContext.Default.OutboxCommand));
     }
 
     [Fact]
@@ -56,6 +74,8 @@ public sealed class MessagingCommandSerializationTests
     }
 
     private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt) };
+
+    private static OutboxMessage OutboxMessage(string id) => new() { Envelope = Envelope(id), ReceiverId = Receiver };
 
     private static Envelope Envelope(string id, DateTimeOffset? deliverAt = null) => new()
     {
@@ -89,6 +109,27 @@ public sealed class MessagingCommandSerializationTests
                         new() { MessageId = MessageId.Create("orders", "done"), ProcessedAt = Now },
                         new() { MessageId = MessageId.Create("orders", "dead"), ProcessedAt = Now, Rejection = rejection }
                     ],
+                    DeadLetters = [deadLetter]
+                }
+            }
+        ];
+    }
+
+    private static OutboxCommand[] CreateOutboxCommands()
+    {
+        var deadLetter = new OutboxDeadLetter { Message = OutboxMessage("dead"), DeadLetteredAt = Now, Reason = "rejected", AttemptCount = 3 };
+        return
+        [
+            new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("enqueue"), State = new() { EnqueuedAt = Now } },
+            new() { Kind = OutboxCommandKind.Delivery, MessageId = HierarchicalKey.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", EnqueuedAt = Now } },
+            new() { Kind = OutboxCommandKind.Delivery, MessageId = HierarchicalKey.Create("orders", "dead"), DeadLetter = deadLetter },
+            new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [HierarchicalKey.Create("orders", "dead")] },
+            new()
+            {
+                Kind = OutboxCommandKind.Snapshot,
+                Snapshot = new()
+                {
+                    Messages = [new() { Message = OutboxMessage("pending"), State = new() { AttemptCount = 1, EnqueuedAt = Now } }],
                     DeadLetters = [deadLetter]
                 }
             }

@@ -1,10 +1,10 @@
 # Microsoft Orleans Messaging
 
-`Microsoft.Orleans.Messaging` provides durable, grain-scoped inbox processing for
-Microsoft Orleans, built on Orleans Journaling and Durable Jobs, together with the
-messaging contracts for inboxes and outboxes. A grain's inbox accepts messages durably,
-persists them with the grain's other journaled state, processes each at least once,
-and deduplicates them by message ID.
+`Microsoft.Orleans.Messaging` provides grain-scoped durable inboxes and outboxes
+built on Orleans Journaling and Durable Jobs. A grain sends a message by staging it
+in its outbox; the message persists with the grain's other journaled state and is
+delivered to the receiver's inbox, which processes it at least once and deduplicates
+it by message ID.
 
 ## Setup
 
@@ -14,7 +14,7 @@ capacity, batch sizes, retries, deduplication, and dead-letter retention; option
 validated at startup. Register typed subjects with `AddMessageType<T>(subject)`.
 
 Messaging grains derive from `DurableGrain` or implement `IMessagingGrain`, and
-constructor-inject `IInbox`. During activation, the messaging grain-type
+constructor-inject `IInbox` and `IOutbox`. During activation, the messaging grain-type
 configurator installs the grain's messaging extension. Stateless worker grains are
 rejected; reentrant and interleaving grains are supported, and the grain's code is
 responsible for correctness when calls interleave.
@@ -72,9 +72,9 @@ A handler finishes each message with `IInboxHandlerContext.Complete()` or
   first failure, then moves to the dead letters.
 - Returning without either call, or calling both, deactivates the grain.
 
-The inbox persists each batch's outcomes and business changes in one journal write.
-Perform asynchronous and fallible preparation with local values, then apply state
-changes and complete in one synchronous block.
+The inbox persists each batch's outcomes, business changes, and outgoing messages in
+one journal write. Perform asynchronous and fallible preparation with local values,
+then apply state changes, send messages, and complete in one synchronous block.
 
 ## Send messages
 
@@ -87,7 +87,8 @@ changes and complete in one synchronous block.
   carries in its request.
 
 `MessageType<T>.Create` and `OutboxMessage.ToInboxMessage()` build messages for direct
-inbox delivery.
+inbox delivery. Sending equivalent content with a pending ID coalesces with the
+original message; different content throws `InvalidOperationException`.
 
 ## Journal payloads once
 
@@ -132,9 +133,9 @@ construction or activation setup, before journal recovery.
 
 ## Delivery and processing
 
-`IMessagingExtension.DeliverAsync` delivers a message to a grain's inbox. Accepted inbox
-messages are processed only after the receiver's journal write completes. Each
-receiver returns a `DeliveryResult`:
+Staged outgoing messages are delivered only after the sender's journal write
+completes. Accepted inbox messages are processed only after the receiver's journal
+write completes. Each receiver returns a `DeliveryResult`:
 
 - `Accepted`: the message is durable in the inbox, or, for a message an inbox sink
   accepted, in the sink's state together with its processed record.
@@ -145,29 +146,35 @@ receiver returns a `DeliveryResult`:
   The inbox admits scheduled messages regardless of `MaxCapacity`.
 - `HandlerNotFound`: the receiver has no registered handlers.
 
-Each activation runs one messaging pump on its scheduler, processing inbox batches.
-One durable job per grain wakes the pump while the inbox or a registered work source
-holds work. Journaled state determines which messages are due, so each wake-up
-processes exactly the ready work.
+The outbox removes accepted and duplicate messages, and retries other outcomes with
+exponential backoff. It dead-letters a message after `MaxDeliveryAttempts` or once it
+is older than `MaxOutboxRetryAge`. Delivery order is unspecified.
+
+Each activation runs one messaging pump on its scheduler, processing inbox batches
+and delivering outbox batches. One durable job per grain wakes the pump while either
+queue or a registered work source holds work. Journaled state determines which
+messages are due, so each wake-up processes exactly the ready work.
 
 ## State
 
-The inbox is an event-sourced journal state named `orleans.messaging.inbox`, and works
-with the JSON and Orleans binary journal formats. It persists alongside the grain's
-other journaled state. After the grain's state is deleted, it starts empty and
-continues working.
+The inbox and the outbox are event-sourced journal states named
+`orleans.messaging.inbox` and `orleans.messaging.outbox`, and work with the JSON and
+Orleans binary journal formats. They persist alongside the grain's other journaled
+state. After the grain's state is deleted, both start empty and continue working.
 
 Completed message IDs are retained for `DeduplicationWindow`. Dead letters are
-retained up to `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters`.
+retained up to `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters` for each queue.
 
 ## Diagnostics
 
-`IMessagingDiagnostics` exposes `InboxDeadLetters`, with each record's message,
-reason, attempt count, and dead-letter time. `RemoveInboxDeadLetter` removes a record,
-durably at the grain's next journal write.
+`IMessagingDiagnostics` exposes `InboxDeadLetters` and `OutboxDeadLetters`, with each
+record's message, reason, attempt count, and dead-letter time.
+`RemoveInboxDeadLetter` and `RemoveOutboxDeadLetter` remove records, durably at the
+grain's next journal write.
 
-The `Microsoft.Orleans` meter publishes counters for received and processed messages
-tagged by grain type and status, a histogram for processing duration, and the
-`orleans-messaging-inbox-depth` up-down counter for pending work. A message an inbox
+The `Microsoft.Orleans` meter publishes counters for received, processed, sent, and
+delivered messages tagged by grain type and status; histograms for processing and
+delivery duration; and `orleans-messaging-inbox-depth` and
+`orleans-messaging-outbox-depth` up-down counters for pending work. A message an inbox
 sink accepts counts as received `accepted` and processed `success`; one which the
 sink dead-letters counts as received and processed `dead_lettered`.
