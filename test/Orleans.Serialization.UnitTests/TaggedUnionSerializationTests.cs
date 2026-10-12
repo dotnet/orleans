@@ -376,10 +376,8 @@ public union MaybeNumber(int?, string);
 public sealed record Value<T>([property: Id(0)] T Item);
 
 // The cases intentionally share a generic definition to verify first-case semantics when the type arguments are equal.
-#pragma warning disable ORLEANS0028
 [GenerateSerializer]
 public union Either<L, R>(Value<L>, Value<R>);
-#pragma warning restore ORLEANS0028
 
 [GenerateSerializer]
 public sealed class SensorHolder
