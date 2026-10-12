@@ -28,10 +28,26 @@ public sealed class TypedMessageHelperTests
     [Fact]
     public void MessageType_RejectsNullSerializer()
     {
-        using var services = CreateServices();
         var exception = Assert.Throws<ArgumentNullException>(
-            () => new MessageType<string>(Subject, null!));
+            () => new MessageType<string>(Subject, (Serializer<string>)null!));
         Assert.Equal("serializer", exception.ParamName);
+
+        exception = Assert.Throws<ArgumentNullException>(
+            () => new MessageType<string>(Subject, (Serializer)null!));
+        Assert.Equal("serializer", exception.ParamName);
+    }
+
+    [Fact]
+    public void MessageType_CreatedFromSerializer_RoundTripsBody()
+    {
+        using var services = CreateServices();
+        var messageType = new MessageType<string>(Subject, services.GetRequiredService<Serializer>());
+
+        var message = messageType.Create(MessageKey, Receiver, "payload");
+
+        Assert.Equal(Subject, messageType.Subject);
+        Assert.Equal(Subject, message.Envelope.Subject);
+        Assert.Equal("payload", messageType.Decode(message));
     }
 
     [Fact]
