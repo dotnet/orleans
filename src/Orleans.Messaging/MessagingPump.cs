@@ -1,0 +1,231 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Orleans.DurableJobs;
+using Orleans.Journaling;
+using Orleans.Runtime;
+
+namespace Orleans.Messaging;
+
+/// <summary>
+/// Drives inbox processing for one activation.
+/// </summary>
+/// <remarks>
+/// A single loop runs on the activation scheduler and services the inbox whenever it is signaled.
+/// One durable job keeps waking the grain while the inbox holds work. Wake-ups may be early,
+/// late, or duplicated: every pass derives the work to perform from current state.
+/// </remarks>
+internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecycleObserver
+{
+    internal const string JobName = "orleans.messaging.pump";
+    private static readonly TimeSpan RecheckDelay = TimeSpan.FromSeconds(1);
+    private readonly SingleWaiterAutoResetEvent _signal = new() { RunContinuationsAsynchronously = true };
+    private readonly CancellationTokenSource _shutdown = new();
+    private Inbox? _inbox;
+    private Task? _loop;
+    private TaskCompletionSource? _nextPass;
+    private Task<DurableJob>? _scheduling;
+    private bool _wakeupScheduled;
+
+    public MessagingPump(IGrainContext grainContext, IJournaledStateManager stateManager, IDurableJobHandlerRegistry jobHandlers)
+    {
+        GrainContext = grainContext;
+        StateManager = stateManager;
+        Shared = grainContext.GetComponent<MessagingShared>()
+            ?? throw new InvalidOperationException($"Messaging is not configured for grain type '{grainContext.GrainId.Type}'.");
+        jobHandlers.Register(this);
+        grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.Activate, this);
+
+        // Recovery reports depth during SetupState, so releasing it there covers activations which fail before Activate.
+        grainContext.ObservableLifecycle.Subscribe(nameof(MessagingPump), GrainLifecycleStage.SetupState, static _ => Task.CompletedTask, _ =>
+        {
+            _inbox?.ReleaseDepth();
+            return Task.CompletedTask;
+        });
+    }
+
+    public IGrainContext GrainContext { get; }
+
+    public IJournaledStateManager StateManager { get; }
+
+    public MessagingShared Shared { get; }
+
+    /// <summary>Gets the token which is canceled when messaging stops for this activation.</summary>
+    public CancellationToken ShutdownToken => _shutdown.Token;
+
+    internal void Register(Inbox inbox) => _inbox = inbox;
+
+    private Inbox Inbox => _inbox ?? throw new InvalidOperationException("The messaging inbox has not been registered.");
+
+    public bool CanHandle(string jobName) => string.Equals(jobName, JobName, StringComparison.Ordinal);
+
+    /// <summary>Requests a processing pass.</summary>
+    public void Signal()
+    {
+        if (!_shutdown.IsCancellationRequested) _signal.Signal();
+    }
+
+    /// <summary>Starts the loop once the activation is servicing grain calls.</summary>
+    public void EnsureStarted()
+    {
+        if (_loop is null && !_shutdown.IsCancellationRequested)
+        {
+            _loop = RunAsync();
+        }
+    }
+
+    /// <summary>Ensures a durable job will wake this grain while messaging work remains.</summary>
+    public async ValueTask EnsureWakeupAsync(CancellationToken cancellationToken)
+    {
+        if (_wakeupScheduled) return;
+        var scheduling = _scheduling ??= Shared.JobManager.ScheduleJobAsync(new ScheduleJobRequest
+        {
+            Target = GrainContext.GrainId,
+            JobName = JobName,
+            DueTime = Shared.JobTimeProvider.GetUtcNow()
+        }, _shutdown.Token);
+        try
+        {
+            await scheduling.WaitAsync(cancellationToken).ConfigureAwait(true);
+            _wakeupScheduled = true;
+        }
+        finally
+        {
+            if (scheduling.IsCompleted && ReferenceEquals(_scheduling, scheduling)) _scheduling = null;
+        }
+    }
+
+    public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
+    {
+        // A running job keeps rescheduling itself until the inbox is empty.
+        _wakeupScheduled = true;
+        EnsureStarted();
+        var pass = _nextPass ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _signal.Signal();
+        try
+        {
+            await pass.Task.WaitAsync(cancellationToken).ConfigureAwait(true);
+        }
+        catch
+        {
+            // This attempt no longer guarantees a future wake-up.
+            _wakeupScheduled = false;
+            if (!_shutdown.IsCancellationRequested && Inbox.Count > 0)
+            {
+                EnsureWakeupAsync(CancellationToken.None).AsTask().Ignore();
+            }
+
+            throw;
+        }
+
+        if (Inbox.GetNextWakeupDelay() is not { } delay)
+        {
+            _wakeupScheduled = false;
+            return DurableJobRunResult.Completed;
+        }
+
+        return DurableJobRunResult.RescheduleAt(
+            MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), delay > TimeSpan.Zero ? delay : RecheckDelay));
+    }
+
+    private async Task RunAsync()
+    {
+        var cancellationToken = _shutdown.Token;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var pass = _nextPass;
+            _nextPass = null;
+            var progress = false;
+            try
+            {
+                progress = await Inbox.ProcessReadyAsync(cancellationToken).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception exception)
+            {
+                progress = false;
+                LogPassFailed(Shared.PumpLogger, exception, GrainContext.GrainId);
+            }
+
+            pass?.TrySetResult();
+            if (!progress)
+            {
+                await _signal.WaitAsync().ConfigureAwait(true);
+            }
+        }
+
+        _nextPass?.TrySetCanceled(cancellationToken);
+    }
+
+    public async Task OnStart(CancellationToken cancellationToken)
+    {
+        await Inbox.StartAsync(cancellationToken).ConfigureAwait(true);
+        if (Inbox.Count > 0)
+        {
+            await EnsureWakeupAsync(cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    public async Task OnStop(CancellationToken cancellationToken)
+    {
+        var scheduling = _scheduling;
+        Stop();
+
+        // Grain calls finish before deactivation stops the lifecycle, so the loop owns every remaining write.
+        if (_loop is { } loop)
+        {
+            await loop.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        }
+
+        if (scheduling is not null)
+        {
+            await ((Task)scheduling).ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
+        }
+    }
+
+    /// <summary>Stops processing for this activation.</summary>
+    internal void Stop()
+    {
+        if (_shutdown.IsCancellationRequested) return;
+        try
+        {
+            _shutdown.Cancel();
+        }
+        catch (AggregateException exception)
+        {
+            LogCancellationFailed(Shared.PumpLogger, exception);
+        }
+        finally
+        {
+            _signal.Signal();
+        }
+    }
+
+    /// <summary>Stops messaging and deactivates the grain after an unrecoverable failure.</summary>
+    internal void Fail(Exception exception, string description)
+    {
+        if (_shutdown.IsCancellationRequested) return;
+        Stop();
+        try
+        {
+            GrainContext.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, exception, description));
+        }
+        catch (Exception deactivationException)
+        {
+            LogDeactivationFailed(Shared.PumpLogger, deactivationException);
+        }
+    }
+
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Messaging processing pass failed for grain {GrainId}")]
+    private static partial void LogPassFailed(ILogger logger, Exception exception, GrainId grainId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Requesting deactivation after a messaging failure failed.")]
+    private static partial void LogDeactivationFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "A messaging cancellation callback failed during shutdown.")]
+    private static partial void LogCancellationFailed(ILogger logger, Exception exception);
+}
