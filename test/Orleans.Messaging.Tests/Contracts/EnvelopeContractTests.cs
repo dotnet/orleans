@@ -170,6 +170,7 @@ public sealed class EnvelopeContractTests
     [Theory]
     [InlineData("InboxMessage")]
     [InlineData("OutboxMessage")]
+    [InlineData("InboxDeadLetter")]
     public void MessageAndDeadLetterCopyPreservesMetadataAndIsolation(string kind)
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
