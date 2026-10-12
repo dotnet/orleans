@@ -1,10 +1,7 @@
 # Microsoft Orleans Messaging
 
-`Microsoft.Orleans.Messaging` provides grain-scoped durable inboxes and outboxes
-for Microsoft Orleans. A grain sends a message by staging it in its outbox; the
-receiver's inbox processes it at least once and deduplicates it by message ID.
-
-This package defines the messaging contracts: envelopes, hierarchical message
+`Microsoft.Orleans.Messaging` defines the contracts for grain-scoped durable
+inboxes and outboxes in Microsoft Orleans: envelopes, hierarchical message
 identities, inbox and outbox interfaces, handler registration, typed message
 bindings, delivery results, and options.
 
