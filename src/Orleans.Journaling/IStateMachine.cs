@@ -75,7 +75,7 @@ public interface IStateMachine
     /// <param name="cancellationToken">The token which cancels preparation when the journal owner stops.</param>
     /// <returns>A completion representing readiness to capture this state.</returns>
     /// <remarks>
-    /// The manager invokes preparation after before hooks and before capturing an append or snapshot.
+    /// The manager invokes preparation before capturing an append or snapshot.
     /// Preparation is idempotent and prepares this state's own prerequisites. After asynchronous
     /// preparation completes, the manager repeats preparation for all states to include changes
     /// staged on interleaved turns. Prepared prerequisites complete synchronously on subsequent calls

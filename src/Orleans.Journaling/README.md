@@ -222,7 +222,7 @@ Recovery resets state machines and replays durable entries. A failed initializat
 same manager and registered states. `JournalReplayContext.ResolveStateMachine` routes entries to the
 state machine for their stream.
 
-Write preparation runs after before hooks and before append or snapshot capture.
+Write preparation runs before append or snapshot capture.
 Each state prepares its own prerequisites idempotently. An asynchronous completion
 leaves prepared prerequisites synchronously ready; the manager then rechecks all states
 to include mutations staged on interleaved turns. A complete synchronous pass flows
@@ -277,56 +277,6 @@ created inside a grain call. Register their state components and await `Initiali
 the operation's token before use, or deliberately supply them through a registration which assigns
 lifecycle ownership. Creation through the explicit-journal factory keeps failure handling independent
 of the ambient grain context, including when the caller subsequently enrolls the manager in a lifecycle.
-
-## Journal operation hooks
-
-Use `IJournaledStateManager.AddHookAsync(hook, index)` and `RemoveHookAsync(hook)` to register
-`IJournaledStateHook` callbacks. Registration completes synchronously before initialization,
-supporting constructors. After initialization begins, changes apply synchronously when idle,
-or queue between complete journal operations while busy.
-Each operation keeps its hook set through preparation, capture, storage ACK and after callbacks.
-Queued changes are write-coalescing barriers: writes admitted afterward observe the changed set.
-Caller cancellation ends only its wait for an admitted change; the manager retains ownership.
-Await registration before staging changes whose safety depends on the new hook.
-Every journal owner implementation provides registration and invokes callbacks at the operation
-boundaries described below. Delegating owners forward registration methods to their inner owner.
-Synchronous state callbacks can request a queued registration and observe completion outside the callback.
-
-For each actual write, snapshot, or deletion, before hooks run in reverse list order outside
-the manager lock. Add the final before hook with `index: 0`. Writes then prepare the
-registered states before capture; deletion follows the before hooks. Prerequisites remain valid through capture or
-deletion, covering changes staged during asynchronous preparation and while the work loop resumes.
-When state preparation is synchronously ready, capture follows in the same work-loop
-continuation. Other owner turns can stage changes while an incomplete callback is awaited,
-so its prerequisite covers those changes through capture or deletion.
-Keep operation-local bookkeeping for the captured batch separate from later pending changes.
-
-After hooks run in list order after storage acknowledgement and state acknowledgement or reset.
-They also run for a successful zero-byte write. Coalesced callers share the hooks for their actual
-operation. Features implement the before and after callbacks on their own hook, retaining their
-identity and operation-local bookkeeping there.
-Queued writes coalesce into one operation. A snapshot requirement from any caller upgrades that
-pending work to a snapshot, even if the storage compaction signal clears before it runs.
-The manager consumes the pending requirement when selecting a write and restores it when a before
-hook or state preparation fails. Storage acknowledgement leaves newer snapshot requests untouched.
-
-| Outcome | Owner and caller behavior |
-| --- | --- |
-| Before hook or state preparation fails | `JournaledStatePreCommitException` retains pending state for an explicit retry after restoring the prerequisite. |
-| Storage or state processing fails | The original failure fences the manager; create a fresh owner and recover the durable outcome. |
-| After hook fails | `JournaledStatePostCommitException` reports successful persistence. Every remaining after hook runs, failures are aggregated, and the manager stays usable. The feature's durable recovery protocol resumes interrupted post-persistence work. |
-
-Hooks receive the owner's shutdown token. Caller cancellation ends the caller's wait while
-the owned prerequisite, capture, storage, and completion phases continue. Disposal cancels the
-owner token and drains owned work before releasing journal resources, including when cancellation
-callbacks or after-hook cleanup fail. Concurrent disposal callers share that drain and its outcome.
-Shutdown closes work admission and cancels queued operations while an already running operation
-drains to its actual storage and hook outcome.
-Hook implementations complete without calling initialization, persistence, or disposal on their
-own owner: awaiting an operation serialized behind the current callback creates a circular dependency.
-Dependencies between journal owners also remain acyclic.
-Before whole-journal deletion, the feature owner stops admission and drains its own operations;
-deletion completion follows storage deletion and registered-state reset.
 
 ## State identity and retirement
 
