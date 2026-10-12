@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-A union type with `[GenerateSerializer]` declares two cases which are constructed from the same generic type and differ only by type arguments, such as `Value<L>` and `Value<R>` in a union declared as `union Either<L, R>(Value<L>, Value<R>)`. When the type arguments are equal, both cases have the same type.
+A union type with `[GenerateSerializer]` declares two cases which are constructed from the same generic type and can be the same type for some type arguments that satisfy their constraints, such as `Value<L>` and `Value<R>` in a union declared as `union Either<L, R>(Value<L>, Value<R>)`.
 
 ## Impact
 

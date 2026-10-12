@@ -39,6 +39,14 @@ internal static class InvalidUnionCaseDiagnostic
         DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor UnsupportedConstrainedCaseRule = new(
+        DiagnosticId,
+        "The type parameter constraints of a closed type's case must be declared on the closed type",
+        "Case '{0}' has type parameter constraints which closed type '{1}' does not declare. Declare the same constraints on the corresponding type parameters of '{1}'.",
+        Category,
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     private static readonly DiagnosticDescriptor InaccessibleCaseRule = new(
         DiagnosticId,
         "Union and closed type cases must be accessible to generated code",
@@ -68,6 +76,9 @@ internal static class InvalidUnionCaseDiagnostic
 
     internal static Diagnostic CreateUnsupportedGenericCaseDiagnostic(INamedTypeSymbol subtype, INamedTypeSymbol closedType) =>
         Diagnostic.Create(UnsupportedGenericCaseRule, GetLocation(subtype), subtype.ToDisplayString(), closedType.ToDisplayString());
+
+    internal static Diagnostic CreateUnsupportedConstrainedCaseDiagnostic(INamedTypeSymbol subtype, INamedTypeSymbol closedType) =>
+        Diagnostic.Create(UnsupportedConstrainedCaseRule, GetLocation(subtype), subtype.ToDisplayString(), closedType.ToDisplayString());
 
     internal static Diagnostic CreateInaccessibleCaseDiagnostic(ISymbol location, ITypeSymbol caseType, INamedTypeSymbol unionType) =>
         Diagnostic.Create(InaccessibleCaseRule, GetLocation(location), caseType.ToDisplayString(), unionType.ToDisplayString());

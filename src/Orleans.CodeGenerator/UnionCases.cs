@@ -101,7 +101,7 @@ internal static class UnionCaseResolver
             }
 
             var id = (uint)attribute.ConstructorArguments[0].Value!;
-            var (caseType, requiresObjectConversion) = GetClosedCaseType(subtype, definition);
+            var (caseType, requiresObjectConversion) = GetClosedCaseType(subtype, definition, compilation);
             result.Add(new UnionCaseDescription(id, caseType, caseType, requiresObjectConversion));
         }
 
@@ -113,7 +113,7 @@ internal static class UnionCaseResolver
     /// <summary>
     /// Expresses a direct subtype of a closed type in terms of the closed type's type parameters.
     /// </summary>
-    private static (INamedTypeSymbol CaseType, bool RequiresObjectConversion) GetClosedCaseType(INamedTypeSymbol subtype, INamedTypeSymbol closedType)
+    private static (INamedTypeSymbol CaseType, bool RequiresObjectConversion) GetClosedCaseType(INamedTypeSymbol subtype, INamedTypeSymbol closedType, Compilation compilation)
     {
         if (!closedType.IsGenericType)
         {
@@ -156,9 +156,57 @@ internal static class UnionCaseResolver
             throw new OrleansGeneratorDiagnosticAnalysisException(InvalidUnionCaseDiagnostic.CreateUnsupportedGenericCaseDiagnostic(subtype, closedType));
         }
 
+        // The generated codec for the closed type names each case using the closed type's type parameters, so those parameters must satisfy the case's constraints.
+        if (!AreCaseConstraintsSatisfied(subtype, subtypeArguments!, compilation))
+        {
+            throw new OrleansGeneratorDiagnosticAnalysisException(InvalidUnionCaseDiagnostic.CreateUnsupportedConstrainedCaseDiagnostic(subtype, closedType));
+        }
+
         var caseType = subtype.TypeParameters.Length == 0 ? subtype : subtype.Construct([.. subtypeArguments!]);
         return (caseType, requiresObjectConversion);
     }
+
+    /// <summary>
+    /// Returns <see langword="true"/> if the closed type's type parameters, substituted for the subtype's type parameters, satisfy every constraint of the subtype.
+    /// </summary>
+    /// <remarks>
+    /// Each constraint must be declared on the corresponding closed-type parameter. Constraints which are only implied, such as an interface implemented by a class constraint, are rejected.
+    /// </remarks>
+    private static bool AreCaseConstraintsSatisfied(INamedTypeSymbol subtype, ITypeSymbol[] subtypeArguments, Compilation compilation)
+    {
+        foreach (var parameter in subtype.TypeParameters)
+        {
+            var target = (ITypeParameterSymbol)subtypeArguments[parameter.Ordinal];
+            var targetIsValueType = target.HasValueTypeConstraint || target.HasUnmanagedTypeConstraint;
+            if (parameter.HasReferenceTypeConstraint && !target.HasReferenceTypeConstraint
+                || parameter.HasValueTypeConstraint && !targetIsValueType
+                || parameter.HasUnmanagedTypeConstraint && !target.HasUnmanagedTypeConstraint
+                || parameter.HasConstructorConstraint && !target.HasConstructorConstraint && !targetIsValueType)
+            {
+                return false;
+            }
+
+            foreach (var constraintType in parameter.ConstraintTypes)
+            {
+                var substituted = Substitute(constraintType, subtype, subtypeArguments, compilation);
+                if (!target.ConstraintTypes.Any(targetConstraint => SymbolEqualityComparer.Default.Equals(targetConstraint, substituted)))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static ITypeSymbol Substitute(ITypeSymbol type, INamedTypeSymbol subtype, ITypeSymbol[] subtypeArguments, Compilation compilation) => type switch
+    {
+        ITypeParameterSymbol parameter when SymbolEqualityComparer.Default.Equals(parameter.ContainingSymbol, subtype) => subtypeArguments[parameter.Ordinal],
+        IArrayTypeSymbol array => compilation.CreateArrayTypeSymbol(Substitute(array.ElementType, subtype, subtypeArguments, compilation), array.Rank),
+        INamedTypeSymbol { IsGenericType: true } named => named.OriginalDefinition.Construct(
+            [.. named.TypeArguments.Select(argument => Substitute(argument, subtype, subtypeArguments, compilation))]),
+        _ => type,
+    };
 
     private static bool ContainsTypeParameter(ITypeSymbol type) => type switch
     {
