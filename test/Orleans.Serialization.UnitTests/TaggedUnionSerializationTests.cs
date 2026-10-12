@@ -19,7 +19,7 @@ namespace Orleans.Serialization.UnitTests.TaggedUnions;
 [Trait("Suite", "BVT")]
 [Trait("Provider", "None")]
 [Trait("Area", "Serialization")]
-public class TaggedUnionSerializationTests
+public class TaggedUnionSerializationTests : IDisposable
 {
     private readonly ServiceProvider _services;
     private readonly Serializer _serializer;
@@ -31,6 +31,8 @@ public class TaggedUnionSerializationTests
         _serializer = _services.GetRequiredService<Serializer>();
         _copier = _services.GetRequiredService<DeepCopier>();
     }
+
+    public void Dispose() => _services.Dispose();
 
     private T RoundTrip<T>(T value) => _serializer.Deserialize<T>(_serializer.SerializeToArray(value))!;
 
