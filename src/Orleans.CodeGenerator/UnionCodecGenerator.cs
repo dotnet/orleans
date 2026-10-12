@@ -139,10 +139,32 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine(MethodImpl);
         source.AppendLine($"    public {typeName} ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)");
         source.AppendLine("    {");
+        source.AppendLine("        // Null references and values which encode their runtime type are read as case values, so payloads written for a closed type");
+        source.AppendLine("        // hierarchy with the same cases, including payloads written before that hierarchy used case identifiers, are readable.");
+        source.AppendLine("        if (field.IsReference)");
+        source.AppendLine("            return FromCaseValue(global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<object, TReaderInput>(ref reader, field));");
+        source.AppendLine();
+        source.AppendLine($"        if (field.FieldType is {{ }} fieldType && fieldType != {CodecFieldTypeFieldName})");
+        source.AppendLine($"            return FromCaseValue({Helper}.DeserializeUnexpectedType<TReaderInput, object>(ref reader, ref field));");
+        source.AppendLine();
         source.AppendLine($"        {Helper}.ReadStartUnion(ref reader, field);");
         source.AppendLine($"        {typeName} result = default;");
         source.AppendLine("        Deserialize(ref reader, ref result);");
         source.AppendLine("        return result;");
+        source.AppendLine("    }");
+
+        source.AppendLine($"    private static {typeName} FromCaseValue(object value)");
+        source.AppendLine("    {");
+        source.AppendLine("        switch (value)");
+        source.AppendLine("        {");
+        source.AppendLine("            case null: return default;");
+        for (var i = 0; i < codecs.Count; i++)
+        {
+            source.AppendLine($"            case {codecs[i].ValueTypeName} case{i}: return ({codecs[i].CaseTypeName})case{i};");
+        }
+
+        source.AppendLine($"            default: {Helper}.ThrowUnsupportedUnionValue<{typeName}>(value); return default;");
+        source.AppendLine("        }");
         source.AppendLine("    }");
         source.AppendLine("}");
 
@@ -161,15 +183,11 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine(MethodImpl);
         source.AppendLine($"    public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, {typeName} value) {BufferWriterConstraint}");
         source.AppendLine("    {");
-        source.AppendLine("        if (value is null)");
-        source.AppendLine("        {");
-        source.AppendLine("            global::Orleans.Serialization.Codecs.ReferenceCodec.WriteNullReference(ref writer, fieldIdDelta);");
-        source.AppendLine("            return;");
-        source.AppendLine("        }");
-        source.AppendLine();
+        source.AppendLine("        // A null value is an empty union field, which is also how an empty union value is written.");
         source.AppendLine($"        {Helper}.WriteStartUnion(ref writer, fieldIdDelta, expectedType, {CodecFieldTypeFieldName});");
         source.AppendLine("        switch (value)");
         source.AppendLine("        {");
+        source.AppendLine("            case null: break;");
         for (var i = 0; i < codecs.Count; i++)
         {
             source.AppendLine($"            case {codecs[i].CaseTypeName} case{i}: {GetWriteCase(codecs[i], $"case{i}")} break;");
@@ -194,19 +212,14 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine($"        {Helper}.ReadStartUnion(ref reader, field);");
         source.AppendLine($"        var header = {FieldHeaderCodec}.ReadFieldHeader(ref reader);");
         source.AppendLine("        if (header.IsEndBaseOrEndObject)");
-        source.AppendLine($"            return {Helper}.ThrowMissingUnionCase<{typeName}>();");
+        source.AppendLine("            return null;");
         source.AppendLine();
         source.AppendLine($"        {typeName} result;");
         source.AppendLine("        switch (header.FieldIdDelta)");
         source.AppendLine("        {");
         foreach (var codec in codecs)
         {
-            // A case which derives from one instantiation of a generic closed type, such as 'IntSquare : Shape<int>', is a case of that
-            // instantiation only, so the type pattern rejects it when it is read as another instantiation.
-            var read = codec.Case.RequiresRuntimeTypeCheck
-                ? $"{GetReadCase(codec)} is {typeName} matched{codec.Case.Id} ? matched{codec.Case.Id} : {Helper}.ThrowUnknownUnionCase<{typeName}>(header.FieldIdDelta)"
-                : GetReadCase(codec);
-            source.AppendLine($"            case {codec.Case.Id}U: result = {read}; break;");
+            source.AppendLine($"            case {codec.Case.Id}U: result = {GetReadCase(codec)}; break;");
         }
 
         source.AppendLine($"            default: result = {Helper}.ThrowUnknownUnionCase<{typeName}>(header.FieldIdDelta); break;");
