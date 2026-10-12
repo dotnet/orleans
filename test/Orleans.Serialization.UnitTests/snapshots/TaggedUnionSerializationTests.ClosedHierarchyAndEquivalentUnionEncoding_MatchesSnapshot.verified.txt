@@ -1,0 +1,78 @@
+﻿# Temperature
+hex: 2020E8400F6B69746368656EE8E8800000000000803540E0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 0 SchemaType: Expected] Value: {
+
+0x0003   - End of base type fields -
+0x0004   [#3 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 7b) ["kitchen"]
+0x000D   - End of base type fields -
+0x000E   - End of base type fields -
+0x000F   [#4 Fixed64 Id: 0 SchemaType: Expected] Value: 0x4035800000000000
+0x0018  }
+0x0019 }
+
+# Humidity
+hex: 2021E8C001E8E8800000000000004440E0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 1 SchemaType: Expected] Value: {
+
+0x0003   - End of base type fields -
+0x0004   [#3 Reference Id: 0 SchemaType: Expected Reference: 0]
+0x0006   - End of base type fields -
+0x0007   - End of base type fields -
+0x0008   [#4 Fixed64 Id: 0 SchemaType: Expected] Value: 0x4044000000000000
+0x0011  }
+0x0012 }
+
+# Contact
+hex: 202713E8C001E8E80003E0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0003  [#2 TagDelimited Id: 9 SchemaType: Expected] Value: {
+
+0x0004   - End of base type fields -
+0x0005   [#3 Reference Id: 0 SchemaType: Expected Reference: 0]
+0x0007   - End of base type fields -
+0x0008   - End of base type fields -
+0x0009   [#4 VarInt Id: 0 SchemaType: Expected] Value: 1 (0x1)
+0x000B  }
+0x000C }
+
+# ReedContact
+hex: 20371301D07DA066B14F726C65616E732E53657269616C697A6174696F6E2E556E697454657374732E546167676564556E696F6E732E52656564436F6E746163742C4F726C65616E732E53657269616C697A6174696F6E2E556E69745465737473E8C001E8E80001E8E8000DE0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0061  [#2 TagDelimited Id: 9 SchemaType: Encoded RuntimeType: Orleans.Serialization.UnitTests.TaggedUnions.ReedContact (name: Encoded "TypeName "Orleans.Serialization.UnitTests.TaggedUnions.ReedContact,Orleans.Serialization.UnitTests" (hash 66A07DD0)" (Orleans.Serialization.UnitTests.TaggedUnions.ReedContact,Orleans.Serialization.UnitTests))] Value: {
+
+0x0062   - End of base type fields -
+0x0063   [#3 Reference Id: 0 SchemaType: Expected Reference: 0]
+0x0065   - End of base type fields -
+0x0066   - End of base type fields -
+0x0067   [#4 VarInt Id: 0 SchemaType: Expected] Value: 0 (0x0)
+0x0069   - End of base type fields -
+0x006A   - End of base type fields -
+0x006B   [#5 VarInt Id: 0 SchemaType: Expected] Value: 6 (0x6)
+0x006D  }
+0x006E }
+
+# Light
+hex: 202220E8400B706F726368E8E8E8E8000219E0E0E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 TagDelimited Id: 2 SchemaType: Expected] Value: {
+0x0003   [#3 TagDelimited Id: 0 SchemaType: Expected] Value: {
+
+0x0004    - End of base type fields -
+0x0005    [#4 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 5b) ["porch"]
+0x000C    - End of base type fields -
+0x000D    - End of base type fields -
+0x000E    - End of base type fields -
+0x000F    - End of base type fields -
+0x0010    [#5 VarInt Id: 0 SchemaType: Expected] Value: 1600 (0x640)
+0x0013   }
+0x0014  }
+0x0015 }
+
+# null
+hex: 20E0
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+
+0x0002 }
+
