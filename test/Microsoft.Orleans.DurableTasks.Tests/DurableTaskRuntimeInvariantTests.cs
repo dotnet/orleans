@@ -1212,38 +1212,64 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task StopDiscardsSuccessReturnedAfterCatchingExecutionShutdown()
+    public async Task StopAbortsRunningAttemptDiscardsItsResultAndReplaysInNextActivation()
     {
-        var (runtime, storage, _, transport) = CreateRuntime();
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var caller = GrainId.Create("caller", "one");
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var caughtShutdown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var aborted = new TaskCompletionSource<(bool ExecutionAborted, bool DurablyCanceled)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = 0;
         var request = CreateRequest(
             1,
-            () => DurableTask.Run(async durableCancellation =>
+            () => DurableTask.Run(async executionToken =>
             {
+                if (Interlocked.Increment(ref attempts) > 1)
+                {
+                    return 7;
+                }
+
                 started.TrySetResult();
                 try
                 {
-                    await DurableTask.Delay(TimeSpan.FromDays(1));
+                    await Task.Delay(Timeout.InfiniteTimeSpan, executionToken);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (executionToken.IsCancellationRequested)
                 {
-                    Assert.False(durableCancellation.IsCancellationRequested);
-                    caughtShutdown.TrySetResult();
+                    // Host abort reaches the delegate token, but it is not durable cancellation.
+                    var context = DurableExecutionContext.Current!;
+                    aborted.TrySetResult((executionToken.IsCancellationRequested, context.CancellationToken.IsCancellationRequested));
                 }
 
                 return 42;
             }));
         var taskId = TaskId.Parse("root");
 
-        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request, TestContext.Current.CancellationToken);
+        runtime.ScheduleFromInbox(taskId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        await transport.ScheduledResume.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var stopping = runtime.StopAsync(TestContext.Current.CancellationToken);
-        await caughtShutdown.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var observed = await aborted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await stopping.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
+        Assert.True(observed.ExecutionAborted);
+        Assert.False(observed.DurablyCanceled);
         Assert.Null(storage.Get(taskId).Result);
+        Assert.Null(storage.Get(taskId).CancellationRequestedAt);
+        Assert.Empty(transport.Completions);
+
+        var (replacement, _, _, replacementTransport) = CreateRuntime(storage, manager);
+        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        var response = await replacement.GetScheduledTaskHandle(taskId)
+            .WaitAsync(TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, attempts);
+        Assert.Equal(7, response.GetResult<int>());
+        Assert.Equal(7, storage.Get(taskId).Result!.GetResult<int>());
+        var completion = Assert.Single(replacementTransport.Completions);
+        Assert.Equal(caller, completion.Target);
+        Assert.Equal(7, completion.Response.GetResult<int>());
         Assert.Empty(transport.Completions);
     }
 
