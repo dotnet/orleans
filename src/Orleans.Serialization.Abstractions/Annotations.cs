@@ -301,6 +301,11 @@ namespace Orleans
     /// Case identifiers are part of the serialized format, so they must remain stable once data has been serialized.
     /// Identifiers 0 through 6 are encoded without additional bytes.
     /// </para>
+    /// <para>
+    /// A closed type and a union type have the same serialized representation when the union's cases are the closed type's direct subtypes with the same
+    /// case identifiers (see <see cref="CaseIdsAttribute"/>). A <see langword="null"/> closed-type value is represented as an empty union value.
+    /// A closed type hierarchy can therefore be replaced by an equivalent union type without changing serialized data.
+    /// </para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public sealed class CaseAttribute : Attribute
@@ -332,6 +337,10 @@ namespace Orleans
     /// </para>
     /// <para>
     /// Identifiers must be unique. Identifiers 0 through 6 are encoded without additional bytes.
+    /// </para>
+    /// <para>
+    /// A union type whose cases are the direct subtypes of a closed type, with the same case identifiers, has the same serialized representation
+    /// as that closed type (see <see cref="CaseAttribute"/>). An empty union value is represented as a <see langword="null"/> closed-type value.
     /// </para>
     /// </remarks>
     [AttributeUsage(AttributeTargets.Struct, Inherited = false)]

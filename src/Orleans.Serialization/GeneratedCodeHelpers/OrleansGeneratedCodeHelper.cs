@@ -331,15 +331,6 @@ namespace Orleans.Serialization.GeneratedCodeHelpers
         public static TField ThrowUnknownUnionCase<TField>(uint caseId) => throw new UnknownUnionCaseException(typeof(TField), caseId);
 
         /// <summary>
-        /// Throws an exception indicating that a serialized value of a closed type hierarchy does not contain a case.
-        /// </summary>
-        /// <typeparam name="TField">The closed base type.</typeparam>
-        /// <returns>This method does not return.</returns>
-        [DoesNotReturn]
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static TField ThrowMissingUnionCase<TField>() => throw new SerializerException($"A serialized value of type {typeof(TField)} does not contain a case.");
-
-        /// <summary>
         /// Throws an exception indicating that a value is not an instance of any case of a union type or closed type hierarchy.
         /// </summary>
         /// <typeparam name="TField">The union type or closed base type.</typeparam>
