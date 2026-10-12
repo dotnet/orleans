@@ -20,7 +20,7 @@ internal partial class JournaledStateManager
         lock (_lock)
         {
             ThrowIfFenced();
-            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
             _shutdownCancellation.Token.ThrowIfCancellationRequested();
             if (_workLoop is null || (!_workItemRunning && _workQueue.Count == 0))
             {

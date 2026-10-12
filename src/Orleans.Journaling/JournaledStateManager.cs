@@ -36,7 +36,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private Exception? _failure;
     // A snapshot requirement not yet claimed by a write. Consume under the lock before preparation awaits.
     private bool _snapshotRequired;
-    private int _disposed;
     private Task? _disposeTask;
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
@@ -113,7 +112,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         lock (_lock)
         {
             ThrowIfFenced();
-            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
             if (_states.TryGetValue(name, out var existing) && existing is not RetiredStateMachine)
             {
                 stateMachine = existing;
@@ -130,7 +129,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         lock (_lock)
         {
             ThrowIfFenced();
-            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            ObjectDisposedException.ThrowIf(_disposeTask is not null, this);
             _shutdownCancellation.Token.ThrowIfCancellationRequested();
             if (_workLoop is not null)
             {
@@ -1212,6 +1211,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
             if (_disposeTask is null)
             {
                 var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                // Publish before shutdown cancellation can reenter disposal.
                 _disposeTask = completion.Task;
                 _ = DisposeCoreAsync(completion);
             }
@@ -1222,7 +1222,6 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     private async Task DisposeCoreAsync(TaskCompletionSource completion)
     {
-        _disposed = 1;
         try
         {
             try
