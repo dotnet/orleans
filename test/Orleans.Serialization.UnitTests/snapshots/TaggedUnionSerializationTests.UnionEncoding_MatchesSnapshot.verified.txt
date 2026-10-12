@@ -73,4 +73,3 @@ hex: 2021E8E8E80015E0E0
 0x0006   [#3 VarInt Id: 0 SchemaType: Expected] Value: 10 (0xA)
 0x0008  }
 0x0009 }
-
