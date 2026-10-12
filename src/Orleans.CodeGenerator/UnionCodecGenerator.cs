@@ -167,7 +167,7 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine("        }");
         source.AppendLine();
         source.AppendLine($"        {Helper}.WriteStartUnion(ref writer, fieldIdDelta, expectedType, {CodecFieldTypeFieldName});");
-        source.AppendLine("        switch ((object)value)");
+        source.AppendLine("        switch (value)");
         source.AppendLine("        {");
         for (var i = 0; i < codecs.Count; i++)
         {
