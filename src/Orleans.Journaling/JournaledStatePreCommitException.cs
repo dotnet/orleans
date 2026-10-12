@@ -1,7 +1,7 @@
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Reports a persistence prerequisite failure which prevented the journal storage operation.
+/// Reports a state preparation failure which prevented a journal write.
 /// </summary>
 /// <remarks>
 /// Pending changes remain staged and safe to commit. The caller can restore the prerequisite
@@ -11,12 +11,11 @@ namespace Orleans.Journaling;
 public sealed class JournaledStatePreCommitException : Exception
 {
     /// <summary>
-    /// Initializes a persistence prerequisite failure.
+    /// Initializes a state preparation failure.
     /// </summary>
-    /// <param name="operation">The journal operation prevented by the failed prerequisite.</param>
-    /// <param name="innerException">The original prerequisite failure.</param>
-    public JournaledStatePreCommitException(JournaledStateOperation operation, Exception innerException)
-        : base($"Journal operation '{operation}' was prevented by a persistence prerequisite failure.", innerException)
+    /// <param name="innerException">The original preparation failure.</param>
+    public JournaledStatePreCommitException(Exception innerException)
+        : base("The journal write was prevented by a state preparation failure.", innerException)
     {
     }
 }

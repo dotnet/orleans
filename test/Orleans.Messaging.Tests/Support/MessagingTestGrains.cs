@@ -84,8 +84,12 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
     private readonly SerializerSessionPool _sessions;
     private readonly TestHandlerConfiguration _handlerConfiguration;
     internal IInboxHandler? HandlerOverride { get; set; }
-    internal Exception? BeforeJournalOperationFailure { get; set; }
-    internal Exception? AfterJournalOperationFailure { get; set; }
+    private readonly JournalProbeState _journalProbe;
+    internal Exception? JournalPreparationFailure
+    {
+        get => _journalProbe.PreparationFailure;
+        set => _journalProbe.PreparationFailure = value;
+    }
     private readonly ILocalSiloDetails _siloDetails;
     private readonly HandlerProbe _handlerProbe;
     private readonly SnapshotProbe _snapshotProbe;
@@ -126,7 +130,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
         _handlerProbe = handlerProbe;
         _snapshotProbe = snapshotProbe;
         _lifecycleSubscription = GrainLifecycleEvents.AllEvents.Subscribe(this);
-        _journalOwner.AddHookAsync(new ControlledJournalHook(this)).GetAwaiter().GetResult();
+        _journalProbe = new JournalProbeState(journalOwner);
     }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -441,21 +445,6 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
             return owner.HandleAsync(application.Body as TestMessage
                 ?? throw new InvalidOperationException($"Expected {nameof(TestMessage)} application payload."),
                 context, cancellationToken);
-        }
-    }
-
-    private sealed class ControlledJournalHook(MessagingTestGrain owner) : IJournaledStateHook
-    {
-        public ValueTask BeforeOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
-        {
-            if (owner.BeforeJournalOperationFailure is { } failure) throw failure;
-            return default;
-        }
-
-        public ValueTask AfterOperationAsync(JournaledStateOperation operation, CancellationToken cancellationToken)
-        {
-            if (owner.AfterJournalOperationFailure is { } failure) throw failure;
-            return default;
         }
     }
 }

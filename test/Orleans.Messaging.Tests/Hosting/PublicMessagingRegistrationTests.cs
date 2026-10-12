@@ -128,8 +128,6 @@ public sealed class PublicMessagingRegistrationTests
 
     private sealed class ConstructionTestStateManager : IJournaledStateManager
     {
-        public ValueTask AddHookAsync(IJournaledStateHook hook, int? index = null, CancellationToken cancellationToken = default) => default;
-        public ValueTask RemoveHookAsync(IJournaledStateHook hook, CancellationToken cancellationToken = default) => default;
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
         public void RegisterStateMachine(string name, IStateMachine state) { }
         public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? state)
