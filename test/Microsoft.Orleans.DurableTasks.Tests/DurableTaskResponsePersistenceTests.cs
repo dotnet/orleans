@@ -2,12 +2,9 @@ using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.DurableJobs;
-using Orleans.DurableMessaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
-using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
@@ -195,26 +192,20 @@ public sealed class DurableTaskResponsePersistenceTests
     [Fact]
     public void CanceledResponseRoundTripsThroughCompletionDelivery()
     {
-        using var services = CreateSerializationServices();
         var outbox = new RecordingOutbox();
-        var transport = new DurableTaskMessageTransport(
-            outbox,
-            new RecordingJobManager(),
-            services.GetRequiredService<SerializerSessionPool>());
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
         var taskId = TaskId.Parse("root/canceled");
+        var sender = GrainId.Create("sender", "one");
+        var receiver = GrainId.Create("receiver", "one");
 
-        transport.SendCompletion(
-            GrainId.Create("sender", "one"),
-            GrainId.Create("receiver", "one"),
-            taskId,
-            CreateCanceledResponse());
+        transport.SendCompletion(sender, receiver, taskId, CreateCanceledResponse());
 
-        var envelope = Assert.Single(outbox.Messages);
-        Assert.Equal(DurableTaskMessageTransport.CompletionRoute, envelope.RouteKey);
-        Assert.Equal(taskId, envelope.CorrelationKey.ToTaskId());
-        Assert.True(envelope.Data.TryGetBody<DurableTaskCompletionMessage>(out var message));
-        Assert.NotNull(message);
+        var sent = Assert.Single(outbox.Messages);
+        Assert.Equal(DurableTaskMessageTypes.CompletionSubject, sent.Envelope.Subject);
+        Assert.Equal(receiver, sent.ReceiverId);
+        var message = MessagingTestHelpers.MessageTypes.Completion.Decode(sent);
         Assert.Equal(taskId, message.TaskId);
+        Assert.Equal(sender, message.Sender);
         AssertCancellation(Assert.IsType<CanceledDurableTaskResponse>(message.Response));
     }
 
@@ -245,36 +236,5 @@ public sealed class DurableTaskResponsePersistenceTests
                 builder.AddAssembly(typeof(DurableTaskResponsePersistenceTests).Assembly);
             });
         return services.BuildServiceProvider();
-    }
-
-    private sealed class RecordingOutbox : IDurableOutbox
-    {
-        private readonly List<DurableEnvelope> _messages = [];
-        public IEnumerable<DurableEnvelope> Messages => _messages;
-        public int Count => _messages.Count;
-        public void Send(DurableEnvelope envelope) => _messages.Add(envelope);
-        public bool TryGetMessage(Guid messageId, out DurableEnvelope envelope)
-        {
-            foreach (var candidate in _messages)
-            {
-                if (candidate.MessageId == messageId)
-                {
-                    envelope = candidate;
-                    return true;
-                }
-            }
-
-            envelope = default;
-            return false;
-        }
-    }
-
-    private sealed class RecordingJobManager : ILocalDurableJobManager
-    {
-        public Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
     }
 }
