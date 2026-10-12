@@ -1,4 +1,6 @@
----
+Hello, Hi friend!
+GetGrain<IHello>("friend")
+SayHello("Hi friend")---
 title: 'Tutorial: Build your first Orleans app'
 description: Build a multi-project Orleans application with a silo and external client.
 ms.date: 08/18/2026
@@ -142,3 +144,6 @@ Stop the silo by pressing <kbd>Ctrl</kbd>+<kbd>C</kbd> in its terminal.
 - [Configure Orleans for production](../host/configuration-guide/index.md)
 - [Learn more about grain identity](../grains/grain-identity.md)
 - [Browse samples](../tutorials-and-samples/index.md)
+SayHello("Hi friend")
+GetGrain<IHello>("friend")
+Hello, Hi friend!
