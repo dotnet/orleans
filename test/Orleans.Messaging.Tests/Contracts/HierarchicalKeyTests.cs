@@ -27,11 +27,7 @@ public class HierarchicalKeyTests
         Assert.Empty(type.GetCustomAttributes<GenerateSerializerAttribute>());
         var field = Assert.Single(type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic));
         Assert.True(field.IsInitOnly);
-        Assert.True(field.FieldType.IsSealed);
-        Assert.Equal(typeof(string), field.FieldType.GetProperty("Canonical")!.PropertyType);
-        Assert.Equal(typeof(int), field.FieldType.GetProperty("Hash")!.PropertyType);
-        Assert.DoesNotContain(field.FieldType.GetFields(BindingFlags.Instance | BindingFlags.NonPublic),
-            value => value.FieldType == typeof(HierarchicalKey) || value.FieldType == field.FieldType);
+        Assert.Equal(typeof(string), field.FieldType);
     }
 
     [Fact]
