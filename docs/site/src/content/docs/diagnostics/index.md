@@ -114,7 +114,3 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0027
 
 [Grain interface member removed from source](orleans0027.md) — Warning. The manifest retains an RPC signature which is absent from source.
-
-## ORLEANS0028
-
-[Union cases can have the same type](orleans0028.md) — Warning. Two cases of a serializable union are constructed from the same generic type.
