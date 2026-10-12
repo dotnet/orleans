@@ -10,9 +10,9 @@ namespace Orleans
 {
     public static partial class TaskIdExtensions
     {
-        public static DurableMessaging.HierarchicalKey? ToHierarchicalKey(this DurableTasks.TaskId taskId) { throw null; }
+        public static Messaging.HierarchicalKey? ToHierarchicalKey(this DurableTasks.TaskId taskId) { throw null; }
 
-        public static DurableTasks.TaskId ToTaskId(this DurableMessaging.HierarchicalKey? key) { throw null; }
+        public static DurableTasks.TaskId ToTaskId(this Messaging.HierarchicalKey? key) { throw null; }
     }
 }
 
@@ -20,8 +20,6 @@ namespace Orleans.Configuration
 {
     public sealed partial class DurableTaskOptions
     {
-        public System.TimeSpan RecoveryExecutionDrainTimeout { get { throw null; } set { } }
-
         public System.TimeSpan ResultRetentionPeriod { get { throw null; } set { } }
     }
 }
