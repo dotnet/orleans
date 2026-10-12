@@ -12,10 +12,28 @@ namespace Orleans.Hosting
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMessageType<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string subject) { throw null; }
     }
+
+    public static partial class MessagingExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMessaging(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Messaging.Configuration.DurableMessagingOptions>? configureOptions = null) { throw null; }
+
+        public static ISiloBuilder AddMessaging(this ISiloBuilder builder, System.Action<Messaging.Configuration.DurableMessagingOptions>? configureOptions = null) { throw null; }
+    }
 }
 
 namespace Orleans.Messaging
 {
+    public sealed partial class DeadLetter<TMessage>
+    {
+        public int AttemptCount { get { throw null; } init { } }
+
+        public System.DateTimeOffset DeadLetteredAt { get { throw null; } init { } }
+
+        public required TMessage Message { get { throw null; } init { } }
+
+        public required string Reason { get { throw null; } init { } }
+    }
+
     [GenerateSerializer]
     [Alias("Orleans.Messaging.DeliveryResult")]
     public readonly partial struct DeliveryResult
@@ -177,6 +195,17 @@ namespace Orleans.Messaging
     {
         [Alias("DeliverAsync")]
         System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IMessagingDiagnostics
+    {
+        System.Collections.Generic.IReadOnlyList<DeadLetter<InboxMessage>> InboxDeadLetters { get; }
+
+        bool RemoveInboxDeadLetter(HierarchicalKey messageId);
+    }
+
+    public partial interface IMessagingGrain
+    {
     }
 
     public static partial class InboxExtensions

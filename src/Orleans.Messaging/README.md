@@ -1,9 +1,23 @@
 # Microsoft Orleans Messaging
 
-`Microsoft.Orleans.Messaging` defines the contracts for grain-scoped durable
-inboxes and outboxes in Microsoft Orleans: envelopes, hierarchical message
-identities, inbox and outbox interfaces, handler, sink, and source registration,
-typed message bindings, delivery results, and options.
+`Microsoft.Orleans.Messaging` provides durable, grain-scoped inbox processing for
+Microsoft Orleans, built on Orleans Journaling and Durable Jobs, together with the
+messaging contracts for inboxes and outboxes. A grain's inbox accepts messages durably,
+persists them with the grain's other journaled state, processes each at least once,
+and deduplicates them by message ID.
+
+## Setup
+
+Configure Journaling and Durable Jobs storage, then call `AddMessaging` on the silo
+builder or service collection. The optional `DurableMessagingOptions` callback configures
+capacity, batch sizes, retries, deduplication, and dead-letter retention; options are
+validated at startup. Register typed subjects with `AddMessageType<T>(subject)`.
+
+Messaging grains derive from `DurableGrain` or implement `IMessagingGrain`, and
+constructor-inject `IInbox`. During activation, the messaging grain-type
+configurator installs the grain's inbox extension. Stateless worker grains are
+rejected; reentrant and interleaving grains are supported, and the grain's code is
+responsible for correctness when calls interleave.
 
 ## Messages
 
@@ -45,8 +59,7 @@ inbox.Register(reserve, this, static (request, grain, context) => grain.HandleRe
 ```
 
 Overloads accept synchronous or asynchronous delegates, with or without a `TArg`
-argument for static, allocation-free delegates. Register typed subjects with
-`AddMessageType<T>(subject)`.
+argument for static, allocation-free delegates.
 
 A handler finishes each message with `IInboxHandlerContext.Complete()` or
 `Fail(reason)`:
@@ -54,6 +67,13 @@ A handler finishes each message with `IInboxHandlerContext.Complete()` or
 - `Complete()` stages the message's removal and completion record.
 - `Fail(reason)` moves the message to the inbox dead letters and records its ID as
   processed.
+- A handler exception before either call retries the message with exponential
+  backoff, and dead-letters it after `MaxProcessingAttempts`.
+- Returning without either call, or calling both, deactivates the grain.
+
+The inbox persists each batch's outcomes and business changes in one journal write.
+Perform asynchronous and fallible preparation with local values, then apply state
+changes and complete in one synchronous block.
 
 ## Send messages
 
@@ -94,9 +114,11 @@ construction or activation setup, before journal recovery.
 
   A sink that takes a scheduled message honors its `DeliverAt`. Sinks are idempotent.
 
-## Delivery results
+## Delivery and processing
 
-Each receiver returns a `DeliveryResult`:
+`IInboxExtension.DeliverAsync` delivers a message to a grain's inbox. Accepted inbox
+messages are processed only after the receiver's journal write completes. Each
+receiver returns a `DeliveryResult`:
 
 - `Accepted`: the message is durable in the inbox, or, for a message an inbox sink
   accepted, in the sink's state together with its processed record.
@@ -104,7 +126,27 @@ Each receiver returns a `DeliveryResult`:
 - `Backpressured`: the inbox holds `MaxCapacity` pending messages without `DeliverAt`.
   The inbox admits scheduled messages regardless of `MaxCapacity`.
 - `HandlerNotFound`: the receiver has no registered handlers.
-- `DeadLettered`: the message moved to the receiver's dead letters.
 
-`DurableMessagingOptions` configures capacity, batch sizes, retries, deduplication,
-and dead-letter retention.
+Each activation runs one messaging pump on its scheduler, processing inbox batches.
+One durable job per grain wakes the pump while the inbox holds work. Journaled state determines which messages are due, so each
+wake-up processes exactly the ready work.
+
+## State
+
+The inbox is an event-sourced journal state named `orleans.messaging.inbox`, and works
+with the JSON and Orleans binary journal formats. It persists alongside the grain's
+other journaled state. After the grain's state is deleted, it starts empty and
+continues working.
+
+Completed message IDs are retained for `DeduplicationWindow`. Dead letters are
+retained up to `DeadLetterRetentionPeriod` and `MaxRetainedDeadLetters`.
+
+## Diagnostics
+
+`IMessagingDiagnostics` exposes `InboxDeadLetters`, with each record's message,
+reason, attempt count, and dead-letter time. `RemoveInboxDeadLetter` removes a record,
+durably at the grain's next journal write.
+
+The `Microsoft.Orleans` meter publishes counters for received and processed messages
+tagged by grain type and status, a histogram for processing duration, and the
+`orleans-messaging-inbox-depth` up-down counter for pending work.

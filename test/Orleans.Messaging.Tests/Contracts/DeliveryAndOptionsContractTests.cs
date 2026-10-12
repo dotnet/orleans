@@ -10,6 +10,37 @@ namespace Orleans.Messaging.Tests.Contracts;
 public sealed class DeliveryAndOptionsContractTests
 {
     [Fact]
+    public void RetentionTimeArithmetic_HandlesMaximumDurationsWithoutOverflow()
+    {
+        var timestamp = DateTimeOffset.MaxValue - TimeSpan.FromTicks(1);
+        var fullDateTimeRange = TimeSpan.FromTicks(DateTimeOffset.MaxValue.UtcTicks - DateTimeOffset.MinValue.UtcTicks);
+
+        Assert.False(MessagingTime.IsExpired(DateTimeOffset.MaxValue, timestamp, TimeSpan.MaxValue));
+        Assert.True(MessagingTime.IsExpired(DateTimeOffset.MaxValue, DateTimeOffset.MinValue, fullDateTimeRange));
+        Assert.False(MessagingTime.IsExpired(DateTimeOffset.MaxValue, DateTimeOffset.MinValue, TimeSpan.MaxValue));
+        Assert.False(MessagingTime.IsExpired(DateTimeOffset.MinValue, DateTimeOffset.MaxValue, TimeSpan.FromTicks(1)));
+        Assert.Equal(DateTimeOffset.MaxValue, MessagingTime.AddClamped(timestamp, TimeSpan.MaxValue));
+    }
+
+    [Fact]
+    public void DeadLetterCompaction_SaturatesMaximumRetentionWithoutOverflow()
+    {
+        var entries = new Dictionary<string, DateTimeOffset>
+        {
+            ["oldest"] = DateTimeOffset.MinValue,
+            ["newest"] = DateTimeOffset.MaxValue
+        };
+
+        Assert.False(DeadLetterRetention.Compact(entries, DateTimeOffset.MaxValue, TimeSpan.MaxValue, int.MaxValue, static timestamp => timestamp));
+        Assert.Equal(2, entries.Count);
+
+        var fullDateTimeRange = TimeSpan.FromTicks(DateTimeOffset.MaxValue.UtcTicks - DateTimeOffset.MinValue.UtcTicks);
+        Assert.True(DeadLetterRetention.Compact(entries, DateTimeOffset.MaxValue, fullDateTimeRange, int.MaxValue, static timestamp => timestamp));
+        Assert.DoesNotContain("oldest", entries);
+        Assert.Contains("newest", entries);
+    }
+
+    [Fact]
     public void DeliveryResult_EachFactory_PreservesStatusAndPayload()
     {
         var handlerMissing = DeliveryResult.HandlerNotFound();
