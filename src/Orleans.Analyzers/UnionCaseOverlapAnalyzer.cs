@@ -16,7 +16,7 @@ public sealed class UnionCaseOverlapAnalyzer : DiagnosticAnalyzer
     private static readonly DiagnosticDescriptor Rule = new(
         id: RuleId,
         title: "Union cases can have the same type",
-        messageFormat: "Cases '{0}' and '{1}' of union '{2}' have the same type when their type arguments are equal. A value of that type matches, and is serialized as, the first of these cases.",
+        messageFormat: "Cases '{0}' and '{1}' of union '{2}' can be the same type for some type arguments. A value of that type matches, and is serialized as, the first of these cases.",
         category: "Usage",
         defaultSeverity: DiagnosticSeverity.Warning,
         isEnabledByDefault: true,
@@ -54,7 +54,7 @@ public sealed class UnionCaseOverlapAnalyzer : DiagnosticAnalyzer
                 if (cases[i] is INamedTypeSymbol { IsGenericType: true } first
                     && cases[j] is INamedTypeSymbol { IsGenericType: true } second
                     && SymbolEqualityComparer.Default.Equals(first.OriginalDefinition, second.OriginalDefinition)
-                    && CanUnify(first, second))
+                    && TypeUnifier.CanUnify(context.Compilation, first, second))
                 {
                     context.ReportDiagnostic(Diagnostic.Create(
                         Rule,
@@ -66,16 +66,4 @@ public sealed class UnionCaseOverlapAnalyzer : DiagnosticAnalyzer
             }
         }
     }
-
-    /// <summary>
-    /// Returns <see langword="true"/> if some substitution of type parameters makes both types equal.
-    /// </summary>
-    private static bool CanUnify(ITypeSymbol first, ITypeSymbol second) => (first, second) switch
-    {
-        (ITypeParameterSymbol, _) or (_, ITypeParameterSymbol) => true,
-        (IArrayTypeSymbol x, IArrayTypeSymbol y) => x.Rank == y.Rank && CanUnify(x.ElementType, y.ElementType),
-        (INamedTypeSymbol x, INamedTypeSymbol y) => SymbolEqualityComparer.Default.Equals(x.OriginalDefinition, y.OriginalDefinition)
-            && x.TypeArguments.Zip(y.TypeArguments, CanUnify).All(static unifiable => unifiable),
-        _ => SymbolEqualityComparer.Default.Equals(first, second),
-    };
 }
