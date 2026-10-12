@@ -163,16 +163,14 @@ public sealed class DurableTaskStorageTests
     private sealed class TestStateManager : IJournaledStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
-        public void RegisterState(string name, IJournaledState state) { }
-        public void RegisterObserver(IJournaledStateObserver observer) { }
-        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
+        public void RegisterStateMachine(string name, IStateMachine stateMachine) { }
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IStateMachine? stateMachine)
         {
-            state = null;
+            stateMachine = null;
             return false;
         }
 
         public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
-        public ValueTask RevertPendingChangesAsync(CancellationToken cancellationToken) => default;
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 }

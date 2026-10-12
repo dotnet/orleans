@@ -12,7 +12,7 @@ using NSubstitute;
 using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.DurableJobs;
-using Orleans.DurableMessaging;
+using Orleans.Messaging;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -98,15 +98,18 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void TaskIdsRoundTripThroughDurableMessagingCorrelationKeys()
+    public void TaskIdsRoundTripThroughMessagingHierarchicalKeys()
     {
         var taskId = TaskId.Parse("workflow/child");
 
-        global::Orleans.DurableMessaging.HierarchicalKey? correlationKey = taskId.ToHierarchicalKey();
+        global::Orleans.Messaging.HierarchicalKey? key = taskId.ToHierarchicalKey();
 
-        Assert.NotNull(correlationKey);
-        Assert.Equal(taskId, correlationKey.ToTaskId());
-        Assert.Equal(TaskId.None, ((global::Orleans.DurableMessaging.HierarchicalKey?)null).ToTaskId());
+        Assert.NotNull(key);
+        Assert.Equal("workflow/child", key.Value.ToString());
+        Assert.Equal(taskId, key.ToTaskId());
+        Assert.Null(TaskId.None.ToHierarchicalKey());
+        Assert.Equal(TaskId.None, ((global::Orleans.Messaging.HierarchicalKey?)null).ToTaskId());
+        Assert.Equal(TaskId.None, ((global::Orleans.Messaging.HierarchicalKey?)default(global::Orleans.Messaging.HierarchicalKey)).ToTaskId());
     }
 
     [Fact]
@@ -151,14 +154,8 @@ public sealed class DurableRpcProtocolTests
     [Fact]
     public async Task ResumeJobCarriesTaskIdentityAndGeneration()
     {
-        var services = new ServiceCollection()
-            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
-            .BuildServiceProvider();
         var jobs = new RecordingJobManager();
-        var transport = new DurableTaskMessageTransport(
-            new RecordingOutbox(),
-            jobs,
-            services.GetRequiredService<SerializerSessionPool>());
+        var transport = MessagingTestHelpers.CreateTransport(new RecordingOutbox(), jobs);
         var target = GrainId.Create("target", "one");
         var taskId = TaskId.Parse("root/delay");
         var dueTime = DateTimeOffset.UtcNow.AddMinutes(1);
@@ -167,9 +164,6 @@ public sealed class DurableRpcProtocolTests
 
         var request = Assert.Single(jobs.Requests);
         Assert.Equal(DurableTaskMessageTransport.ResumeJobName, request.JobName);
-        Assert.Equal(
-            DurableTaskMessageTransport.CreateStableResumeJobId(target, taskId, 7),
-            request.JobId);
         Assert.Equal(target, request.Target);
         Assert.Equal(dueTime, request.DueTime);
         Assert.Equal(taskId.ToString(), request.Metadata![DurableTaskMessageTransport.ResumeTaskIdMetadata]);
@@ -177,68 +171,89 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Theory]
-    [InlineData("target", "one", "root/delay", 7)]
-    [InlineData("target", "two", "root/delay", 7)]
-    [InlineData("other-target", "one", "root/delay", 7)]
-    [InlineData("target", "one", "root/other", 7)]
-    [InlineData("target", "one", "root/delay", 8)]
-    public void ResumeJobIdIsStableForExactIdentityAndDistinctForChangedIdentity(
-        string grainType,
-        string grainKey,
+    [InlineData("caller", "target", "root", DurableTaskMessageTypes.InvocationSubject)]
+    [InlineData("other-caller", "target", "root", DurableTaskMessageTypes.InvocationSubject)]
+    [InlineData("caller", "other-target", "root", DurableTaskMessageTypes.InvocationSubject)]
+    [InlineData("caller", "target", "root/child", DurableTaskMessageTypes.InvocationSubject)]
+    [InlineData("caller", "target", "root", DurableTaskMessageTypes.CancellationSubject)]
+    public void MessageIdIsStableForExactIdentityAndDistinctForChangedIdentity(
+        string senderKey,
+        string targetKey,
         string taskIdValue,
-        long generation)
+        string subject)
     {
-        var baseline = DurableTaskMessageTransport.CreateStableResumeJobId(
-            GrainId.Create("target", "one"),
-            TaskId.Parse("root/delay"),
-            7);
-        var candidate = DurableTaskMessageTransport.CreateStableResumeJobId(
-            GrainId.Create(grainType, grainKey),
+        var baseline = DurableTaskMessageTransport.CreateMessageId(
+            GrainId.Create("grain", "caller"),
+            GrainId.Create("grain", "target"),
+            TaskId.Parse("root"),
+            DurableTaskMessageTypes.InvocationSubject);
+        var candidate = DurableTaskMessageTransport.CreateMessageId(
+            GrainId.Create("grain", senderKey),
+            GrainId.Create("grain", targetKey),
             TaskId.Parse(taskIdValue),
-            generation);
+            subject);
 
         Assert.Equal(
-            grainType == "target"
-                && grainKey == "one"
-                && taskIdValue == "root/delay"
-                && generation == 7,
-            string.Equals(baseline, candidate, StringComparison.Ordinal));
+            senderKey == "caller"
+                && targetKey == "target"
+                && taskIdValue == "root"
+                && subject == DurableTaskMessageTypes.InvocationSubject,
+            baseline == candidate);
+        Assert.Equal(
+            baseline,
+            DurableTaskMessageTransport.CreateMessageId(
+                GrainId.Create("grain", "caller"),
+                GrainId.Create("grain", "target"),
+                TaskId.Parse("root"),
+                DurableTaskMessageTypes.InvocationSubject));
+    }
+
+    [Theory]
+    [InlineData(DurableTaskMessageTypes.InvocationSubject, "invoke")]
+    [InlineData(DurableTaskMessageTypes.CompletionSubject, "complete")]
+    [InlineData(DurableTaskMessageTypes.CompletionAckSubject, "complete-ack")]
+    [InlineData(DurableTaskMessageTypes.CancellationSubject, "cancel")]
+    public void MessageIdIsBoundedHierarchicalKeyScopedBySubject(string subject, string leaf)
+    {
+        var longTaskId = TaskId.Parse(string.Join('/', Enumerable.Repeat(new string('x', 200), 20)));
+
+        var messageId = DurableTaskMessageTransport.CreateMessageId(
+            GrainId.Create("caller", new string('c', 500)),
+            GrainId.Create("target", "one"),
+            longTaskId,
+            subject);
+
+        var segments = messageId.ToString().Split(HierarchicalKey.SegmentSeparator);
+        Assert.Equal(3, segments.Length);
+        Assert.Equal(DurableTaskMessageTransport.MessageIdRoot, segments[0]);
+        Assert.Equal(leaf, segments[1]);
+        Assert.Equal(64, segments[2].Length);
+        Assert.All(segments[2], character => Assert.True(Uri.IsHexDigit(character)));
     }
 
     [Fact]
-    public void CompletionAcknowledgementUsesDedicatedDurableRoute()
+    public void CompletionAcknowledgementUsesDedicatedSubject()
     {
-        var services = new ServiceCollection()
-            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
-            .BuildServiceProvider();
         var outbox = new RecordingOutbox();
-        var transport = new DurableTaskMessageTransport(
-            outbox,
-            new RecordingJobManager(),
-            services.GetRequiredService<SerializerSessionPool>());
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
+        var sender = GrainId.Create("caller", "one");
+        var target = GrainId.Create("target", "one");
 
-        transport.SendCompletionAck(
-            GrainId.Create("caller", "one"),
-            GrainId.Create("target", "one"),
-            TaskId.Parse("root"));
+        transport.SendCompletionAck(sender, target, TaskId.Parse("root"));
 
-        var envelope = Assert.Single(outbox.Messages);
-        Assert.Equal(DurableTaskMessageTransport.CompletionAckRoute, envelope.RouteKey);
-        Assert.True(envelope.Data.TryGetBody<DurableTaskCompletionAckMessage>(out var body));
-        Assert.Equal(TaskId.Parse("root"), body!.TaskId);
+        var message = Assert.Single(outbox.Messages);
+        Assert.Equal(DurableTaskMessageTypes.CompletionAckSubject, message.Envelope.Subject);
+        Assert.Equal(target, message.ReceiverId);
+        var body = MessagingTestHelpers.MessageTypes.CompletionAck.Decode(message);
+        Assert.Equal(TaskId.Parse("root"), body.TaskId);
+        Assert.Equal(sender, body.Sender);
     }
 
     [Fact]
     public void CompletionAcknowledgementReplayUsesStableMessageIdentity()
     {
-        var services = new ServiceCollection()
-            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
-            .BuildServiceProvider();
         var outbox = new RecordingOutbox();
-        var transport = new DurableTaskMessageTransport(
-            outbox,
-            new RecordingJobManager(),
-            services.GetRequiredService<SerializerSessionPool>());
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
         var sender = GrainId.Create("caller", "one");
         var target = GrainId.Create("target", "one");
         var taskId = TaskId.Parse("root");
@@ -248,22 +263,18 @@ public sealed class DurableRpcProtocolTests
 
         var messages = outbox.Messages.ToArray();
         Assert.Equal(2, messages.Length);
-        Assert.Equal(messages[0].MessageId, messages[1].MessageId);
-        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
-        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[1].CreatedAt);
+        Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
+        Assert.Equal(messages[0].Envelope.Payload, messages[1].Envelope.Payload);
+        Assert.Equal(
+            DurableTaskMessageTransport.CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionAckSubject),
+            messages[0].Envelope.MessageId);
     }
 
     [Fact]
-    public void InvocationReplayUsesStableRouteScopedMessageIdentity()
+    public void InvocationReplayUsesStableSubjectScopedMessageIdentity()
     {
-        var services = new ServiceCollection()
-            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
-            .BuildServiceProvider();
         var outbox = new RecordingOutbox();
-        var transport = new DurableTaskMessageTransport(
-            outbox,
-            new RecordingJobManager(),
-            services.GetRequiredService<SerializerSessionPool>());
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
         var sender = GrainId.Create("caller", "one");
         var target = GrainId.Create("target", "one");
         var taskId = TaskId.Parse("root");
@@ -283,13 +294,14 @@ public sealed class DurableRpcProtocolTests
 
         var messages = outbox.Messages.ToArray();
         Assert.Equal(3, messages.Length);
-        Assert.Equal(messages[0].MessageId, messages[1].MessageId);
-        Assert.NotEqual(messages[0].MessageId, messages[2].MessageId);
-        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
-        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[1].CreatedAt);
-        Assert.Equal(DurableTaskMessageTransport.InvocationRoute, messages[0].RouteKey);
-        Assert.True(messages[0].Data.TryGetBody<DurableTaskInvocationMessage>(out var body));
-        Assert.Equal(taskId, body!.TaskId);
+        Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
+        Assert.Equal(messages[0].Envelope.Payload, messages[1].Envelope.Payload);
+        Assert.NotEqual(messages[0].Envelope.MessageId, messages[2].Envelope.MessageId);
+        Assert.Equal(DurableTaskMessageTypes.InvocationSubject, messages[0].Envelope.Subject);
+        Assert.Equal(target, messages[0].ReceiverId);
+        var body = MessagingTestHelpers.MessageTypes.Invocation.Decode(messages[0]);
+        Assert.Equal(taskId, body.TaskId);
+        Assert.Equal(sender, body.Sender);
         var decodedRequest = Assert.IsType<TestDurableTaskRequest>(body.Request);
         Assert.Equal(sender, decodedRequest.Context!.CallerId);
         Assert.Equal(target, decodedRequest.Context.TargetId);
@@ -297,16 +309,10 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void CancellationReplayUsesStableRouteScopedMessageIdentity()
+    public void CancellationReplayUsesStableSubjectScopedMessageIdentity()
     {
-        var services = new ServiceCollection()
-            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
-            .BuildServiceProvider();
         var outbox = new RecordingOutbox();
-        var transport = new DurableTaskMessageTransport(
-            outbox,
-            new RecordingJobManager(),
-            services.GetRequiredService<SerializerSessionPool>());
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
         var sender = GrainId.Create("caller", "one");
         var target = GrainId.Create("target", "one");
         var taskId = TaskId.Parse("root");
@@ -317,26 +323,19 @@ public sealed class DurableRpcProtocolTests
 
         var messages = outbox.Messages.ToArray();
         Assert.Equal(3, messages.Length);
-        Assert.Equal(messages[0].MessageId, messages[1].MessageId);
-        Assert.NotEqual(messages[0].MessageId, messages[2].MessageId);
-        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
-        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[1].CreatedAt);
-        Assert.Equal(DurableTaskMessageTransport.CancellationRoute, messages[0].RouteKey);
-        Assert.True(messages[0].Data.TryGetBody<DurableTaskCancellationMessage>(out var body));
-        Assert.Equal(taskId, body!.TaskId);
+        Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
+        Assert.NotEqual(messages[0].Envelope.MessageId, messages[2].Envelope.MessageId);
+        Assert.Equal(DurableTaskMessageTypes.CancellationSubject, messages[0].Envelope.Subject);
+        var body = MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[0]);
+        Assert.Equal(taskId, body.TaskId);
+        Assert.Equal(sender, body.Sender);
     }
 
     [Fact]
     public void CompletionReplayUsesStableMessageIdentity()
     {
-        var services = new ServiceCollection()
-            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
-            .BuildServiceProvider();
         var outbox = new RecordingOutbox();
-        var transport = new DurableTaskMessageTransport(
-            outbox,
-            new RecordingJobManager(),
-            services.GetRequiredService<SerializerSessionPool>());
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
         var sender = GrainId.Create("sender", "one");
         var target = GrainId.Create("target", "one");
         var taskId = TaskId.Parse("root");
@@ -347,17 +346,24 @@ public sealed class DurableRpcProtocolTests
 
         var messages = outbox.Messages.ToArray();
         Assert.Equal(2, messages.Length);
-        Assert.Equal(messages[0].MessageId, messages[1].MessageId);
-        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[0].CreatedAt);
-        Assert.NotEqual(DateTimeOffset.UnixEpoch, messages[1].CreatedAt);
-        Assert.Equal(Copy(messages[0].Data.GetBodyBytes()), Copy(messages[1].Data.GetBodyBytes()));
+        Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
+        Assert.Equal(messages[0].Envelope.Payload, messages[1].Envelope.Payload);
+        var body = MessagingTestHelpers.MessageTypes.Completion.Decode(messages[0]);
+        Assert.Equal(42, body.Response.GetResult<int>());
+        Assert.Equal(sender, body.Sender);
+    }
 
-        static byte[] Copy(ReadOnlySequence<byte> sequence)
-        {
-            var result = new byte[sequence.Length];
-            sequence.CopyTo(result);
-            return result;
-        }
+    [Fact]
+    public void DefaultTaskIdIsRejectedBeforeStagingMessage()
+    {
+        var outbox = new RecordingOutbox();
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
+
+        var exception = Assert.Throws<ArgumentException>(
+            () => transport.SendCancellation(GrainId.Create("caller", "one"), GrainId.Create("target", "one"), default));
+
+        Assert.Equal("taskId", exception.ParamName);
+        Assert.Empty(outbox.Messages);
     }
 
     [Fact]
@@ -434,21 +440,20 @@ public sealed class DurableRpcProtocolTests
 
         var silo = new TestSiloBuilder();
         Assert.DoesNotContain(silo.Services, descriptor => descriptor.ServiceType == typeof(IDurableTaskGrainRuntime));
-        silo.AddDurableTasks(options =>
-        {
-            options.ResultRetentionPeriod = TimeSpan.FromHours(2);
-            options.RecoveryExecutionDrainTimeout = TimeSpan.FromSeconds(5);
-        });
+        silo.AddDurableTasks(options => options.ResultRetentionPeriod = TimeSpan.FromHours(2));
         Assert.Contains(silo.Services, descriptor => descriptor.ServiceType == typeof(IDurableTaskGrainRuntime));
         Assert.Contains(silo.Services, descriptor => descriptor.ServiceType == typeof(IDurableTaskGrainStorage));
-        Assert.Contains(silo.Services, descriptor => descriptor.ServiceType == typeof(IInboxHandler));
+        Assert.Contains(silo.Services, descriptor => descriptor.ServiceType == typeof(DurableTaskMessageHandler));
+        Assert.Contains(silo.Services, descriptor => descriptor.ServiceType == typeof(IInbox));
+        Assert.Contains(silo.Services, descriptor => descriptor.ServiceType == typeof(IOutbox));
+        Assert.Contains(
+            silo.Services,
+            descriptor => descriptor.ServiceType == typeof(IConfigureGrainTypeComponents)
+                && descriptor.ImplementationType == typeof(DurableTaskGrainTypeConfigurator));
         using var provider = silo.Services.BuildServiceProvider();
         Assert.Equal(
             TimeSpan.FromHours(2),
             provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<DurableTaskOptions>>().Value.ResultRetentionPeriod);
-        Assert.Equal(
-            TimeSpan.FromSeconds(5),
-            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<DurableTaskOptions>>().Value.RecoveryExecutionDrainTimeout);
     }
 
     [Fact]
@@ -601,55 +606,11 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(1, grain.SubscribeOrPollCallCount);
     }
 
-    private sealed class RecordingOutbox : IDurableOutbox
-    {
-        private readonly List<DurableEnvelope> _messages = [];
-        public int Count => _messages.Count;
-        public IEnumerable<DurableEnvelope> Messages => _messages;
-        public void Send(DurableEnvelope envelope) => _messages.Add(envelope);
-        public bool TryGetMessage(Guid messageId, out DurableEnvelope envelope)
-        {
-            foreach (var candidate in _messages)
-            {
-                if (candidate.MessageId == messageId)
-                {
-                    envelope = candidate;
-                    return true;
-                }
-            }
-
-            envelope = default;
-            return false;
-        }
-    }
-
     private static Serializer CreateSerializer()
     {
         var services = new ServiceCollection();
         services.AddSerializer(builder => builder.AddAssembly(typeof(DurableRpcProtocolTests).Assembly));
         return services.BuildServiceProvider().GetRequiredService<Serializer>();
-    }
-
-    private sealed class RecordingJobManager : ILocalDurableJobManager
-    {
-        public List<ScheduleJobRequest> Requests { get; } = [];
-
-        public Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
-        {
-            Requests.Add(request);
-            return Task.FromResult(new DurableJob
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = request.JobName,
-                DueTime = request.DueTime,
-                TargetGrainId = request.Target,
-                ShardId = "test",
-                Metadata = request.Metadata,
-            });
-        }
-
-        public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
-            Task.FromResult(true);
     }
 
     private sealed class TestClientBuilder : IClientBuilder
