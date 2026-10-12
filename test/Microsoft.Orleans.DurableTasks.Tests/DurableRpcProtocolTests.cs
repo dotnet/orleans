@@ -457,6 +457,29 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void SiloStartupRejectsJournalFormatWhichCannotStoreTaskState()
+    {
+        var silo = new TestSiloBuilder();
+        silo.AddDurableTasks();
+        using var provider = silo.Services.BuildServiceProvider();
+
+        // Hosts run startup validators before starting the silo, so the default JSON format fails before any activation.
+        var exception = Assert.Throws<Microsoft.Extensions.Options.OptionsValidationException>(
+            () => provider.GetRequiredService<Microsoft.Extensions.Options.IStartupValidator>().Validate());
+
+        Assert.Equal("json", new JournaledStateManagerOptions().JournalFormatKey);
+        var failure = Assert.Single(exception.Failures);
+        Assert.Contains("requires the Orleans binary journal format", failure, StringComparison.Ordinal);
+        Assert.Contains("JournaledStateManagerOptions.JournalFormatKey to \"orleans-binary\"", failure, StringComparison.Ordinal);
+
+        var binarySilo = new TestSiloBuilder();
+        binarySilo.AddDurableTasks();
+        binarySilo.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
+        using var binaryProvider = binarySilo.Services.BuildServiceProvider();
+        binaryProvider.GetRequiredService<Microsoft.Extensions.Options.IStartupValidator>().Validate();
+    }
+
+    [Fact]
     public void VolatileTaskStorageIsSharedWithinAnActivationScope()
     {
         var silo = new TestSiloBuilder();
