@@ -6,8 +6,8 @@
 > the integration is evaluated.
 
 `Microsoft.Orleans.DurableTasks` executes grain interface methods which return
-`Orleans.DurableTasks.DurableTask` over Orleans Durable Messaging. It owns the
-request protocol, runtime adapter, storage integration, code-generation mapping,
+`Orleans.DurableTasks.DurableTask` over Orleans Messaging. It owns the request
+protocol, runtime adapter, storage integration, code-generation mapping,
 diagnostics, cancellation propagation, completion acknowledgement, and delayed
 resume jobs.
 
@@ -18,12 +18,22 @@ calling a durable grain interface:
 
 ```csharp
 clientBuilder.AddDurableTasks();
+
+siloBuilder.AddJournaling();
+siloBuilder.Services.Configure<JournaledStateManagerOptions>(
+    options => options.JournalFormatKey = "orleans-binary");
 siloBuilder.AddDurableTasks();
 ```
 
-The silo registration composes Durable Messaging, Durable Jobs, and Journaling.
-Configure a durable Journaling provider for production. Tests can register
-volatile task storage through `AddVolatileDurableTaskStorage`.
+The silo registration composes Messaging and Durable Jobs. Configure Journaling
+with a durable journal storage provider and a Durable Jobs provider for
+production. Task state uses Orleans serialization, so the Orleans binary journal
+format is required. Tests can register volatile task storage through
+`AddVolatileDurableTaskStorage`.
+
+Durable grains derive from `DurableGrain` or implement `IMessagingGrain`. During
+activation setup, before journal recovery, the adapter binds its runtime to the
+grain's journal, inbox, and Durable Jobs handlers.
 
 Existing retained tasks can be observed without scheduling a new execution:
 
@@ -45,17 +55,25 @@ validation disabled until its first published version establishes a baseline.
 - `(target GrainId, TaskId)` identifies one execution. A stable request
   fingerprint detects reuse with a different interface, method, argument type,
   or argument value.
-- Request identity, task state, caller subscription, inbox acceptance, and
+- Request identity, task state, caller subscription, inbox completion, and
   recovery ownership commit before execution begins.
-- Task state and Durable Messaging mutations share the grain's Journaling
-  commit boundary.
+- Task state and outbox messages share the grain's Journaling commit boundary.
+  Operations validate before staging and stage only changes which are safe to
+  commit; a failed journal write deactivates the grain, and the next activation
+  recovers from committed state.
+- Inbox messages are staged and completed synchronously, so the inbox commits
+  each batch with the changes it caused. Execution starts, local completions,
+  and cancellation propagation follow that commit.
 - Terminal responses and completion notifications commit together. Durable
   callers acknowledge completion idempotently; external clients poll retained
   results.
 - Cancellation is monotonic, duplicates are idempotent, and the first durable
   terminal result wins a race.
-- Delays persist their logical due time and generation. Durable Jobs resumes
-  use stable job identities and are generation-fenced.
+- Delays persist their logical due time and generation. Their Durable Jobs
+  resumes are scheduled before the delay commits and are generation-fenced, so
+  duplicate and stale resumes are harmless.
+- Messages use stable identities derived from the sender, receiver, task, and
+  subject, so replayed sends coalesce and redeliveries are deduplicated.
 - Recovery precedes new execution. Child identifiers, selection decisions, and
   outbound durable messages remain replay-stable. Each execution's logical UTC
   time is persisted before its effects commit and reused during replay.
@@ -63,5 +81,5 @@ validation disabled until its first published version establishes a baseline.
   drains active execution, and leaves committed work available for replay.
 
 Durability covers state and messages participating in Orleans Journaling and
-Durable Messaging commits. Direct external side effects require their own
-idempotency guarantees.
+Messaging commits. Direct external side effects require their own idempotency
+guarantees.
