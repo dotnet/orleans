@@ -5,65 +5,62 @@ using System.Security.Cryptography;
 using System.Text;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableJobs;
-using Orleans.DurableMessaging;
 using Orleans.DurableTasks;
+using Orleans.Messaging;
 using Orleans.Runtime;
-using Orleans.Serialization.Session;
 
 namespace Orleans.DurableTasks.Runtime;
 
+/// <summary>
+/// Stages durable grain RPC messages in the grain's outbox and schedules delay resumes on Durable Jobs.
+/// </summary>
+/// <remarks>
+/// The outbox is resolved on first use so that activations which never send messages do not require messaging state.
+/// Each message identity is derived from its sender, receiver, task, and subject, so replaying a send coalesces with the
+/// pending message and the receiver deduplicates a redelivery. Resume jobs carry the task and delay generation;
+/// the runtime derives readiness from journaled state, so duplicate and stale resumes are harmless.
+/// </remarks>
 internal sealed class DurableTaskMessageTransport(
-    IDurableOutbox outbox,
+    Lazy<IOutbox> outbox,
     ILocalDurableJobManager jobManager,
-    SerializerSessionPool sessionPool) : IDurableTaskMessageTransport
+    DurableTaskMessageTypes messageTypes) : IDurableTaskMessageTransport
 {
-    internal const string InvocationRoute = "durable-rpc/invoke";
-    internal const string CompletionRoute = "durable-rpc/complete";
-    internal const string CompletionAckRoute = "durable-rpc/complete-ack";
-    internal const string CancellationRoute = "durable-rpc/cancel";
+    internal const string MessageIdRoot = "durable-rpc";
     internal const string ResumeJobName = "orleans.durable-rpc.resume";
     internal const string ResumeTaskIdMetadata = "orleans.durable-rpc.task-id";
     internal const string ResumeGenerationMetadata = "orleans.durable-rpc.generation";
 
     public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
         Send(
+            messageTypes.Invocation,
             sender,
             target,
             taskId,
-            InvocationRoute,
-            new DurableTaskInvocationMessage { TaskId = taskId, Request = request },
-            replyTo: sender,
-            messageId: CreateStableMessageId(sender, target, taskId, InvocationRoute));
+            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender });
 
     public void SendCompletion(GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) =>
         Send(
+            messageTypes.Completion,
             sender,
             target,
             taskId,
-            CompletionRoute,
-            new DurableTaskCompletionMessage { TaskId = taskId, Response = response },
-            replyTo: null,
-            messageId: CreateStableMessageId(sender, target, taskId, CompletionRoute));
+            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
 
     public void SendCompletionAck(GrainId sender, GrainId target, TaskId taskId) =>
         Send(
+            messageTypes.CompletionAck,
             sender,
             target,
             taskId,
-            CompletionAckRoute,
-            new DurableTaskCompletionAckMessage { TaskId = taskId },
-            replyTo: null,
-            messageId: CreateStableMessageId(sender, target, taskId, CompletionAckRoute));
+            new DurableTaskCompletionAckMessage { TaskId = taskId, Sender = sender });
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId) =>
         Send(
+            messageTypes.Cancellation,
             sender,
             target,
             taskId,
-            CancellationRoute,
-            new DurableTaskCancellationMessage { TaskId = taskId },
-            replyTo: null,
-            messageId: CreateStableMessageId(sender, target, taskId, CancellationRoute));
+            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender });
 
     public async ValueTask ScheduleResumeAsync(
         GrainId target,
@@ -75,7 +72,6 @@ internal sealed class DurableTaskMessageTransport(
         await jobManager.ScheduleJobAsync(
             new ScheduleJobRequest
             {
-                JobId = CreateStableResumeJobId(target, taskId, generation),
                 Target = target,
                 JobName = ResumeJobName,
                 DueTime = dueTime,
@@ -88,87 +84,37 @@ internal sealed class DurableTaskMessageTransport(
             cancellationToken);
     }
 
-    private void Send<T>(
-        GrainId sender,
-        GrainId target,
-        TaskId taskId,
-        string route,
-        T body,
-        GrainId? replyTo,
-        Guid? messageId = null)
+    private void Send<T>(MessageType<T> messageType, GrainId sender, GrainId target, TaskId taskId, T body)
     {
-        outbox.Send(CreateEnvelope(sender, target, taskId, route, body, replyTo, messageId));
-    }
-
-    private DurableEnvelope CreateEnvelope<T>(
-        GrainId sender,
-        GrainId target,
-        TaskId taskId,
-        string route,
-        T body,
-        GrainId? replyTo,
-        Guid? messageId)
-    {
-        // Validate the task id and compute the correlation key before serializing the body: several message body
-        // types (see DurableTaskMessages.cs) embed the same TaskId, whose surrogate converter throws
-        // ArgumentOutOfRangeException for a default TaskId. Without this ordering, that lower-level exception would
-        // pre-empt the more specific ArgumentException below, since WithBody() executes eagerly.
-        var correlationKey = taskId.ToHierarchicalKey() ?? throw new ArgumentException("The task id must not be empty.", nameof(taskId));
-        var builder = new DurableEnvelopeBuilder(sessionPool, sender)
-            .To(target, route)
-            .WithCorrelationKey(correlationKey)
-            .WithBody(body);
-
-        if (replyTo is { } address)
+        // Validate the task id before serializing the body: the TaskId surrogate converter rejects a default TaskId
+        // with a less specific exception.
+        if (taskId.IsDefault)
         {
-            builder.WithReplyTo(address);
+            throw new ArgumentException("The task id must not be empty.", nameof(taskId));
         }
 
-        var envelope = builder.Build();
-        return messageId is not { } id
-            ? envelope
-            : new DurableEnvelope
-            {
-                MessageId = id,
-                SenderId = envelope.SenderId,
-                ReceiverId = envelope.ReceiverId,
-                RouteKey = envelope.RouteKey,
-                CorrelationKey = envelope.CorrelationKey,
-                ReplyTo = envelope.ReplyTo,
-                Data = envelope.Data,
-                CreatedAt = envelope.CreatedAt,
-            };
+        var message = messageType.Create(CreateMessageId(sender, target, taskId, messageType.Subject), target, body);
+        outbox.Value.Send(message);
     }
 
-    private static Guid CreateStableMessageId(GrainId sender, GrainId target, TaskId taskId, string route)
+    internal static HierarchicalKey CreateMessageId(GrainId sender, GrainId target, TaskId taskId, string subject)
     {
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        Append(sender.ToString());
-        Append(target.ToString());
-        Append(taskId.ToString());
-        Append(route);
-        return new Guid(hash.GetHashAndReset().AsSpan(0, 16));
-
-        void Append(string value)
+        if (!subject.StartsWith(DurableTaskMessageTypes.SubjectPrefix, StringComparison.Ordinal))
         {
-            var bytes = Encoding.UTF8.GetBytes(value);
-            Span<byte> length = stackalloc byte[sizeof(int)];
-            BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
-            hash.AppendData(length);
-            hash.AppendData(bytes);
+            throw new ArgumentException($"Unsupported durable task message subject '{subject}'.", nameof(subject));
         }
-    }
 
-    internal static string CreateStableResumeJobId(GrainId target, TaskId taskId, long generation)
-    {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        Append(target.ToString());
-        Append(taskId.ToString());
-        Append(generation.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        Append(ResumeJobName);
-        return $"durable-rpc-resume-{Convert.ToHexString(hash.GetHashAndReset())}";
+        Append(hash, sender.ToString());
+        Append(hash, target.ToString());
+        Append(hash, taskId.ToString());
+        Append(hash, subject);
+        return HierarchicalKey.Create(
+            MessageIdRoot,
+            subject[DurableTaskMessageTypes.SubjectPrefix.Length..],
+            Convert.ToHexString(hash.GetHashAndReset()));
 
-        void Append(string value)
+        static void Append(IncrementalHash hash, string value)
         {
             var bytes = Encoding.UTF8.GetBytes(value);
             Span<byte> length = stackalloc byte[sizeof(int)];
