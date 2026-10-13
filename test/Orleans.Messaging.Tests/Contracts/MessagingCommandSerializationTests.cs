@@ -59,7 +59,7 @@ public sealed class MessagingCommandSerializationTests
 
     private static Envelope Envelope(string id, DateTimeOffset? deliverAt = null) => new()
     {
-        MessageId = HierarchicalKey.Create("orders", id),
+        MessageId = MessageId.Create("orders", id),
         Payload = [1, 2, 3],
         Subject = "orders.v1",
         Headers = new(StringComparer.Ordinal) { ["trace"] = [4, 5] },
@@ -73,16 +73,16 @@ public sealed class MessagingCommandSerializationTests
         [
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("accept"), State = new() },
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", Now), State = new() },
-            new() { Kind = InboxCommandKind.Retry, MessageId = HierarchicalKey.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom" } },
-            new() { Kind = InboxCommandKind.Complete, MessageId = HierarchicalKey.Create("orders", "done"), ProcessedAt = Now, DeadLetter = deadLetter },
-            new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [HierarchicalKey.Create("orders", "dead")] },
+            new() { Kind = InboxCommandKind.Retry, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom" } },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), ProcessedAt = Now, DeadLetter = deadLetter },
+            new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [MessageId.Create("orders", "dead")] },
             new()
             {
                 Kind = InboxCommandKind.Snapshot,
                 Snapshot = new()
                 {
                     Messages = [new() { Message = InboxMessage("pending"), State = new() { AttemptCount = 1 } }, new() { Message = InboxMessage("scheduled", Now), State = new() }],
-                    Processed = [new() { MessageId = HierarchicalKey.Create("orders", "done"), ProcessedAt = Now }],
+                    Processed = [new() { MessageId = MessageId.Create("orders", "done"), ProcessedAt = Now }],
                     DeadLetters = [deadLetter]
                 }
             }

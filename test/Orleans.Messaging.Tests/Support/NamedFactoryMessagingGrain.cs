@@ -43,7 +43,7 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
 {
     private readonly IJournaledStateManager _owner;
     private readonly IOutbox _outbox;
-    private readonly IDurableDictionary<HierarchicalKey, MessageEffect> _effects;
+    private readonly IDurableDictionary<MessageId, MessageEffect> _effects;
     private readonly SerializerSessionPool _sessions;
     private readonly NamedFactoryMessagingProbe _probe;
     private readonly Guid _activationId = Guid.NewGuid();
@@ -52,7 +52,7 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
         IJournaledStateManager owner,
         IInbox inbox,
         IOutbox outbox,
-        [FromKeyedServices("cutover-effects")] IDurableDictionary<HierarchicalKey, MessageEffect> effects,
+        [FromKeyedServices("cutover-effects")] IDurableDictionary<MessageId, MessageEffect> effects,
         SerializerSessionPool sessions,
         NamedFactoryMessagingProbe probe)
     {
@@ -92,7 +92,7 @@ public sealed class NamedFactoryMessagingGrain : Grain, INamedFactoryMessagingGr
         var message = Assert.IsType<TestMessage>(TestApplicationProtocol.Read(_sessions, context.Message).Body);
         var outgoing = message.ForwardTo is { } target
             ? TestApplicationProtocol.Create(_sessions, this.GetGrainId(), target, "messages/forwarded",
-                message with { ForwardTo = null }, context.Message.Envelope.MessageId.CreateChildKey("forwarded"))
+                message with { ForwardTo = null }, new MessageId(context.Message.Envelope.MessageId.Key.CreateChildKey("forwarded")))
             : (OutboxMessage?)null;
 
         cancellationToken.ThrowIfCancellationRequested();

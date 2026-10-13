@@ -23,7 +23,7 @@ public interface IMessagingDiagnostics
     /// <remarks>
     /// The removal becomes durable with the grain's next journal write.
     /// </remarks>
-    bool RemoveInboxDeadLetter(HierarchicalKey messageId);
+    bool RemoveInboxDeadLetter(MessageId messageId);
 }
 
 /// <summary>
@@ -73,5 +73,5 @@ internal sealed class MessagingDiagnostics(Inbox inbox) : IMessagingDiagnostics
             AttemptCount = entry.AttemptCount
         }).ToList();
 
-    public bool RemoveInboxDeadLetter(HierarchicalKey messageId) => inbox.RemoveDeadLetter(messageId);
+    public bool RemoveInboxDeadLetter(MessageId messageId) => inbox.RemoveDeadLetter(messageId);
 }
