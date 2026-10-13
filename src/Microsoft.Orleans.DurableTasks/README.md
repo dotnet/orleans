@@ -85,6 +85,13 @@ validation disabled until its first published version establishes a baseline.
   `DurableTaskOptions.ResultRetentionPeriod` after completion; when the completion
   is dead-lettered, for that period after the dead letter. External clients poll
   retained results.
+- A completion whose stored result no longer decodes, for example after a later
+  deployment removes the result type, can't be materialized. The outbox
+  dead-letters that completion, recording the decoding error as the reason, and the
+  runtime retires it like any dead-lettered completion, without decoding the result.
+  Activation doesn't decode stored results, so the grain keeps processing other
+  work; operations which read that result, such as polling it, surface the decoding
+  error to their caller.
 - Cancellation is monotonic, duplicates are idempotent, and the first durable
   terminal result wins a race.
 - Delays persist their logical due time and generation. Each delay sends a
