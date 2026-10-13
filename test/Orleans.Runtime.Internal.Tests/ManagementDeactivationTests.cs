@@ -74,6 +74,9 @@ public class ManagementDeactivationTests(ManagementDeactivationTests.Fixture fix
         Assert.Same(otherContext, Assert.Single(Contexts(other.GetGrainId())));
         Assert.Equal(1, Lifecycles(grainId).Sum(lifecycle => lifecycle.Activations));
         Assert.Equal(1, Lifecycles(grainId).Sum(lifecycle => lifecycle.Deactivations));
+        var lifecycle = Assert.Single(Lifecycles(grainId), item => item.Deactivations == 1);
+        Assert.Equal(DeactivationReasonCode.ApplicationRequested, lifecycle.DeactivationReason.ReasonCode);
+        Assert.Equal("Application requested deactivation", lifecycle.DeactivationReason.Description);
 
         await grain.Ping();
         Assert.NotSame(context, Assert.Single(Contexts(grainId)));
@@ -125,6 +128,11 @@ public class ManagementDeactivationTests(ManagementDeactivationTests.Fixture fix
         Assert.Empty(Contexts(grainId));
         Assert.Equal(2, Lifecycles(grainId).Sum(lifecycle => lifecycle.Activations));
         Assert.Equal(2, Lifecycles(grainId).Sum(lifecycle => lifecycle.Deactivations));
+        Assert.All(Lifecycles(grainId), lifecycle =>
+        {
+            Assert.Equal(DeactivationReasonCode.ApplicationRequested, lifecycle.DeactivationReason.ReasonCode);
+            Assert.Equal("Application requested deactivation", lifecycle.DeactivationReason.Description);
+        });
     }
 }
 
@@ -147,7 +155,7 @@ public class ManagementDeactivationTestGrain(ManagementDeactivationTracker track
         return Task.CompletedTask;
     }
     public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) =>
-        tracker.DeactivateAsync(this.GetGrainId(), cancellationToken);
+        tracker.DeactivateAsync(this.GetGrainId(), reason, cancellationToken);
 }
 
 [StatelessWorker(1)]
@@ -160,7 +168,7 @@ public class ManagementDeactivationTestWorker(ManagementDeactivationTracker trac
         return Task.CompletedTask;
     }
     public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) =>
-        tracker.DeactivateAsync(this.GetGrainId(), cancellationToken);
+        tracker.DeactivateAsync(this.GetGrainId(), reason, cancellationToken);
 }
 
 public class ManagementDeactivationTracker
@@ -168,9 +176,10 @@ public class ManagementDeactivationTracker
     private readonly ConcurrentDictionary<GrainId, Lifecycle> lifecycles = new();
     public Lifecycle Get(GrainId grainId) => lifecycles.GetOrAdd(grainId, static _ => new());
 
-    public async Task DeactivateAsync(GrainId grainId, CancellationToken cancellationToken)
+    public async Task DeactivateAsync(GrainId grainId, DeactivationReason reason, CancellationToken cancellationToken)
     {
         var lifecycle = Get(grainId);
+        lifecycle.DeactivationReason = reason;
         lifecycle.DeactivationStarted.TrySetResult();
         if (lifecycle.BlockDeactivation)
         {
@@ -183,6 +192,7 @@ public class ManagementDeactivationTracker
     {
         public int Activations;
         public int Deactivations;
+        public DeactivationReason DeactivationReason;
         public volatile bool BlockDeactivation;
         public TaskCompletionSource DeactivationStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleaseDeactivation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

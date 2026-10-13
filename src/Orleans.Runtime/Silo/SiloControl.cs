@@ -109,8 +109,8 @@ namespace Orleans.Runtime
                 return;
             }
 
-            activation.Deactivate(new DeactivationReason(DeactivationReasonCode.RuntimeRequested,
-                "Deactivation requested by the management grain."), CancellationToken.None);
+            activation.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested,
+                "Application requested deactivation"), CancellationToken.None);
             await activation.Deactivated.WaitAsync(cancellationToken);
         }
 
