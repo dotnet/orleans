@@ -93,6 +93,18 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
             .SubscribeOrPollAsync(childId, new SubscribeOrPollOptions { PollTimeout = TimeSpan.Zero }, cancellationToken).AsTask());
         Assert.Contains(FragileResultHooks.Error, error.ToString(), StringComparison.Ordinal);
         Assert.Equal(2, probe.CalleeActivations);
+
+        // Diagnostics report the undecodable result and keep listing the other tasks.
+        var diagnostics = new Dictionary<TaskId, DurableTaskDiagnosticState>();
+        await foreach (var (taskId, state) in callee.AsReference<IDurableTaskGrainExtension>().GetTasksAsync(cancellationToken))
+        {
+            diagnostics[taskId] = state;
+        }
+
+        Assert.Equal("Unreadable", diagnostics[childId].Status);
+        Assert.Contains(FragileResultHooks.Error, diagnostics[childId].Response, StringComparison.Ordinal);
+        Assert.Equal("Completed", diagnostics[TaskId.CreateRoot("later")].Status);
+        Assert.Equal("42", diagnostics[TaskId.CreateRoot("later")].Response);
     }
 
     /// <summary>Observes outbox delivery outcomes recorded by the cluster's silos.</summary>

@@ -41,7 +41,7 @@ public sealed class DurableRpcProtocolTests
 
         Assert.Null(roundTripped.Status);
         Assert.Null(roundTripped.Waiters);
-        Assert.Equal("[, Created: , Completed: , Request: , Response: , Waiters: ]", roundTripped.ToString());
+        Assert.Equal("[, Created: , Completed: , Due: , Request: , Remote: , Response: , Waiters: ]", roundTripped.ToString());
     }
 
     [Fact]

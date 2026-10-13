@@ -56,6 +56,12 @@ namespace Orleans.DurableTasks.Protocol
         [Id(0)]
         public System.DateTimeOffset? CreatedAt { get { throw null; } set { } }
 
+        [Id(6)]
+        public System.DateTimeOffset? DueTime { get { throw null; } set { } }
+
+        [Id(7)]
+        public string? RemoteTarget { get { throw null; } set { } }
+
         [Id(3)]
         public string? Request { get { throw null; } set { } }
 
@@ -215,7 +221,7 @@ namespace Orleans.DurableTasks.Protocol
         void RequestCancellation(TaskId taskId, IDurableTaskState state);
         void RetainResult(TaskId taskId, IDurableTaskState state);
         void SetCallerId(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId callerId);
-        void SetDelay(TaskId taskId, IDurableTaskState state, System.DateTimeOffset dueTime, System.TimeSpan duration, long generation);
+        void SetDelay(TaskId taskId, IDurableTaskState state, System.DateTimeOffset dueTime, long generation);
         void SetRemoteRequest(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId target, string fingerprint);
         void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
         void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint);
@@ -262,8 +268,6 @@ namespace Orleans.DurableTasks.Protocol
         System.Collections.Generic.IReadOnlySet<Orleans.Runtime.GrainId> CompletionDestinations { get; }
 
         System.DateTimeOffset CreatedAt { get; }
-
-        System.TimeSpan? DelayDuration { get; }
 
         System.DateTimeOffset? DueTime { get; }
 
@@ -317,9 +321,6 @@ namespace Orleans.DurableTasks.Runtime
 
         [Id(4)]
         public System.DateTimeOffset CreatedAt { get { throw null; } set { } }
-
-        [Id(14)]
-        public System.TimeSpan? DelayDuration { get { throw null; } set { } }
 
         [Id(7)]
         public System.DateTimeOffset? DueTime { get { throw null; } set { } }
@@ -389,7 +390,7 @@ namespace Orleans.DurableTasks.Runtime
 
         public void SetCallerId(TaskId taskId, Protocol.IDurableTaskState state, Orleans.Runtime.GrainId callerId) { }
 
-        public void SetDelay(TaskId taskId, Protocol.IDurableTaskState state, System.DateTimeOffset dueTime, System.TimeSpan duration, long generation) { }
+        public void SetDelay(TaskId taskId, Protocol.IDurableTaskState state, System.DateTimeOffset dueTime, long generation) { }
 
         public void SetRemoteRequest(TaskId taskId, Protocol.IDurableTaskState state, Orleans.Runtime.GrainId target, string fingerprint) { }
 

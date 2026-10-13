@@ -67,7 +67,7 @@ Diagnostics endpoints expose the durable task runtime:
 | Projection | `StatusChanged` messages carry a version; the buyer keeps the highest. | `RecordOrderAsync` durable calls, one per version; the buyer keeps the highest because the workflow and the cancel and ship tasks record independently. |
 | Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | Task IDs derived from the order ID, such as `place-order-{orderId}/reserve-{productId}`; `(grain, task ID)` identifies one execution, and a reused ID with different arguments fails. |
 | Recovery | The inbox and outbox resume pending messages; each handler runs from the state it finds. | The next activation replays pending tasks from the start; completed children return their recorded results, so the workflow resumes where it stopped. Durable Jobs wakes the order when the delay is due or a completion arrives. |
-| Observability | Order state and the dashboard. | Order state, the dashboard, and per-grain task lists with each child task's status and timestamps. |
+| Observability | Order state and the dashboard. | Order state, the dashboard, and per-grain task lists with each task's status, timestamps, due time, remote target, and result. |
 | Lines of code | Grains 380, contracts 106, host 49. | Grains 340, contracts 82, host 88, including the diagnostics endpoints. |
 
 Both samples produce the same outcomes for a successful order, a cancellation during the grace period, a rejected line,
@@ -75,8 +75,7 @@ and a declined card, including statuses, versions, descriptions, and stock level
 
 ## Configuration
 
-`Ordering:GracePeriod` in `appsettings.json` sets the delay before stock validation. A replayed delay requests the
-duration it recorded, so keep the setting unchanged while orders are in their grace period. Journals and Durable Jobs use
-volatile in-memory storage, and
+`Ordering:GracePeriod` in `appsettings.json` sets the delay before stock validation. A changed setting applies to new
+orders; a replayed delay keeps the due time it recorded. Journals and Durable Jobs use volatile in-memory storage, and
 journaled state uses the JSON journal format with the source-generated `DurableOrderProcessingJsonContext`; durable task
 arguments and results use the Orleans serializer.

@@ -190,7 +190,7 @@ public sealed class DurableTaskStorageTests
             storage.SetRemoteRequest(taskId, state, remoteTarget, "remote-fingerprint-v2");
             storage.SetCallerId(taskId, state, caller);
             storage.AddCompletionDestination(taskId, state, completionDestination);
-            storage.SetDelay(taskId, state, createdAt.AddMinutes(10), TimeSpan.FromMinutes(10), generation: 3);
+            storage.SetDelay(taskId, state, createdAt.AddMinutes(10), generation: 3);
             await storage.WriteAsync(cancellationToken);
             clock.Advance(TimeSpan.FromMinutes(3));
             storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(terminalResult));
@@ -209,7 +209,6 @@ public sealed class DurableTaskStorageTests
         Assert.Equal(createdAt.AddMinutes(8), recovered.RetainedSince);
         Assert.Null(recovered.CancellationRequestedAt);
         Assert.Null(recovered.DueTime);
-        Assert.Null(recovered.DelayDuration);
         Assert.Equal(4, recovered.ResumeGeneration);
         Assert.Equal("request-fingerprint-v1", recovered.RequestFingerprint);
         Assert.Null(recovered.TombstonedAt);

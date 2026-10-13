@@ -109,7 +109,7 @@ static async Task<object[]> ListTasksAsync(IAddressable grain)
     var tasks = new List<object>();
     await foreach (var (taskId, state) in grain.AsReference<IDurableTaskGrainExtension>().GetTasksAsync())
     {
-        tasks.Add(new { taskId = taskId.ToString(), state.Status, state.CreatedAt, state.CompletedAt, state.Request, state.Response });
+        tasks.Add(new { taskId = taskId.ToString(), state.Status, state.CreatedAt, state.CompletedAt, state.DueTime, state.Request, state.RemoteTarget, state.Response });
     }
 
     return [.. tasks];
