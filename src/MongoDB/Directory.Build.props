@@ -7,5 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+    <Compile Include="..\Shared\**\*.cs" LinkBase="Shared" />
+    <PackageReference Include="MongoDB.Driver" />
   </ItemGroup>
 </Project>

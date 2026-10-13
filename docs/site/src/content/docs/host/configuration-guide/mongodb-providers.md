@@ -14,15 +14,17 @@ Orleans provides MongoDB integrations for these capabilities:
 | Cluster membership and external-client gateway discovery | `Microsoft.Orleans.Clustering.MongoDB` |
 | Grain state persistence | `Microsoft.Orleans.Persistence.MongoDB` |
 | Durable reminders | `Microsoft.Orleans.Reminders.MongoDB` |
-| Shared client configuration, included by each provider | `Microsoft.Orleans.MongoDB` |
 
 Install the capability packages used by the application. Configure a reusable
 MongoDB client with a connection string supplied through application configuration
-or a secret store. The settings-factory overload of
-<xref:Orleans.Hosting.MongoDBSiloBuilderExtensions.UseMongoDBClient*> supports
-MongoDB credentials, TLS, connection pools, and timeouts. Applications can also
-register an <xref:Orleans.Providers.MongoDB.Utils.IMongoClientFactory> and select
-clients using each provider's `ClientName` option.
+or a secret store. Register the driver's `IMongoClient` as a singleton to share
+its connection pool across the providers. Use `MongoClientSettings` to configure
+credentials, TLS, connection pools, and timeouts.
+
+Options are in `Orleans.Clustering.MongoDB`, `Orleans.Persistence.MongoDB`, and
+`Orleans.Reminders.MongoDB`. Each provider's `ClientName` selects a keyed
+`IMongoClient` registration; an unset or whitespace value uses the unkeyed client.
+The application or dependency injection container owns client disposal.
 
 ## Configure a silo
 
@@ -40,8 +42,8 @@ accessing an existing deployment.
 ## Configure providers from application configuration
 
 The packages register `MongoDB` as the `ProviderType` for silo/client clustering,
-grain storage, and reminders. Register a shared MongoDB client with
-`AddMongoDBClient` or through the host's Aspire MongoDB integration, then supply
+grain storage, and reminders. Register a shared MongoDB `IMongoClient` directly
+or through the host's Aspire MongoDB integration, then supply
 the provider options under the corresponding Orleans configuration sections:
 
 :::code language="csharp" source="../snippets/mongodb/MongoDBConfiguration.cs" id="mongodb_configuration":::
@@ -49,6 +51,35 @@ the provider options under the corresponding Orleans configuration sections:
 Named grain-storage sections select storage provider names; use `Default` for
 default grain storage. Configuration binding supports database names, collection
 prefixes, client names, membership strategies, and reminder index management.
+
+## Use Aspire
+
+Aspire provides MongoDB hosting resources and a MongoDB client integration with
+health checks and tracing. The following AppHost references one MongoDB database
+for clustering, grain storage, and reminders:
+
+:::code language="csharp" source="../snippets/mongodb/AppHost/Program.cs" id="mongodb_aspire_apphost":::
+
+The silo uses the `Aspire.MongoDB.Driver` package and registers the client under
+the database resource's name:
+
+:::code language="csharp" source="../snippets/mongodb/MongoDBConfiguration.cs" id="mongodb_aspire_silo":::
+
+An external client uses the same registration:
+
+:::code language="csharp" source="../snippets/mongodb/MongoDBConfiguration.cs" id="mongodb_aspire_client":::
+
+The AppHost emits `ProviderType=MongoDBDatabase` and `ServiceKey=orders`.
+The provider packages recognize both `MongoDB` and `MongoDBDatabase`. `ServiceKey`
+selects the keyed `IMongoClient`; when `DatabaseName` is omitted, it is derived
+from the matching registered `IMongoDatabase`. An explicit database name takes
+precedence. If `ClientName` and `ServiceKey` are both configured, they must match.
+
+Aspire's `AddMongoDBClient` registration also works with the unkeyed providers.
+The example uses the default single-document membership strategy, which runs
+against Aspire's local MongoDB server. Configure a transaction-capable deployment
+when selecting `Multiple`. Keep resource names aligned between AppHost references
+and client registrations.
 
 ## Configure an external client
 
@@ -61,7 +92,7 @@ prefix, and membership strategy.
 
 ## Choose a membership strategy
 
-<xref:Orleans.Providers.MongoDB.Configuration.MongoDBMembershipStrategy> controls
+<xref:Orleans.Clustering.MongoDB.MongoDBMembershipStrategy> controls
 the membership collection format:
 
 | Strategy | Runtime behavior | Deployment requirement |
@@ -80,7 +111,7 @@ propagate cancellation to MongoDB commands, cursor reads, and transactions.
 
 ## Select a persistence format
 
-<xref:Orleans.Providers.MongoDB.Configuration.MongoDBGrainStorageOptions.GrainStateSerializer>
+<xref:Orleans.Persistence.MongoDB.MongoDBGrainStorageOptions.GrainStateSerializer>
 selects the MongoDB state serializer:
 
 | Serializer | Stored state |
@@ -116,9 +147,16 @@ these outcomes.
 
 Replace the `Orleans.Providers.MongoDB` package reference with the capability
 packages listed above. The provider retains the `Orleans.Providers.MongoDB.*`
-namespaces, builder method names, collection names, and stored document formats.
+implementation and serializer namespaces, provider builder method names, collection names, and stored document formats.
 Keep database names, collection prefixes, membership strategies, serializers,
 and key generators unchanged to access existing data.
+
+Update option imports to the provider-specific namespaces listed above. Replace
+`UseMongoDBClient`, `AddMongoDBClient` service-collection calls, and custom
+`IMongoClientFactory` implementations with registered driver clients. Register
+named clients using keyed DI services and select them with `ClientName`.
+Aspire's host-builder `AddMongoDBClient` and `AddKeyedMongoDBClient` methods remain
+the client-registration APIs for Aspire applications.
 
 Persistence writes and clears enforce the supplied ETag. Applications should
 retain the ETag returned by the most recent read or write when clearing state.
@@ -129,7 +167,7 @@ representative existing documents before deployment.
 
 Reminders use the `<CollectionPrefix>OrleansReminderV2` collection. The provider
 creates a service-ID/grain-hash index and removes obsolete hash indexes.
-<xref:Orleans.Providers.MongoDB.Configuration.MongoDBRemindersOptions.CreateIndexes>
+<xref:Orleans.Reminders.MongoDB.MongoDBRemindersOptions.CreateIndexes>
 defaults to `true`. Set it to `false` when administrators manage indexes or the
 application identity has data-only permissions. Administrators should provision
 the compound index `{ ServiceId: 1, GrainHash: 1 }` for reminder range queries;

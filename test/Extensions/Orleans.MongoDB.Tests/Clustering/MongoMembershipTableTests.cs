@@ -1,5 +1,5 @@
 using Orleans.Clustering.TestKit;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Clustering.MongoDB;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Xunit;

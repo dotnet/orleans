@@ -6,9 +6,10 @@
     <PackageTags>$(PackageTags) MongoDB Clustering</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>$(DefineConstants);ORLEANS_CLUSTERING</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Orleans.MongoDB\Orleans.MongoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.MongoDB.Tests" />

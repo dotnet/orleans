@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.2.4" />
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.2.4" />
+    <PackageReference Include="Aspire.Hosting.Orleans" Version="13.2.4" />
+    <PackageReference Include="Aspire.Hosting.MongoDB" Version="13.2.4" />
+    <PackageReference Include="MongoDB.Driver" Version="3.12.0" />
+    <PackageReference Include="MessagePack" Version="3.1.7" />
+    <ProjectReference Include="..\MongoDB.csproj" />
+  </ItemGroup>
+</Project>

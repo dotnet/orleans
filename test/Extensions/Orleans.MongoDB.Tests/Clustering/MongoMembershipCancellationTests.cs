@@ -3,7 +3,7 @@ using System.Net;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Core.Events;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Clustering.MongoDB;
 using Orleans.Runtime;
 using Xunit;
 

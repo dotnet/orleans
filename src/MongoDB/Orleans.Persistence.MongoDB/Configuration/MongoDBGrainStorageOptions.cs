@@ -1,7 +1,7 @@
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
 using Orleans.Runtime;
 
-namespace Orleans.Providers.MongoDB.Configuration;
+namespace Orleans.Persistence.MongoDB;
 
 /// <summary>
 /// Option to configure MongoDB Storage.

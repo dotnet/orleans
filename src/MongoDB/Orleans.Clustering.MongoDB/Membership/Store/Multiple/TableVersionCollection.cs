@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using MongoDB.Driver;
-using Orleans.Providers.MongoDB.Utils;
+using Orleans.Clustering.MongoDB;
 
 namespace Orleans.Providers.MongoDB.Membership.Store.Multiple;
 

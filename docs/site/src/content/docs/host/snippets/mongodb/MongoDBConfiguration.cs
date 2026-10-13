@@ -1,10 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using MongoDB.Driver;
 using Orleans;
+using Orleans.Clustering.MongoDB;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Orleans.Providers.MongoDB.Configuration;
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
 
 namespace MongoDBDocumentation;
@@ -15,6 +16,7 @@ public static class MongoDBConfiguration
     {
         var builder = Host.CreateApplicationBuilder();
         // <mongodb_silo>
+        builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(connectionString));
         builder.UseOrleans(silo =>
         {
             silo.Configure<ClusterOptions>(options =>
@@ -22,7 +24,6 @@ public static class MongoDBConfiguration
                 options.ClusterId = "orders-production";
                 options.ServiceId = "orders";
             });
-            silo.UseMongoDBClient(connectionString);
             silo.UseMongoDBClustering(options =>
             {
                 options.DatabaseName = "orders";
@@ -42,6 +43,7 @@ public static class MongoDBConfiguration
     {
         var builder = Host.CreateApplicationBuilder();
         // <mongodb_client>
+        builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(connectionString));
         builder.UseOrleansClient(client =>
         {
             client.Configure<ClusterOptions>(options =>
@@ -49,7 +51,6 @@ public static class MongoDBConfiguration
                 options.ClusterId = "orders-production";
                 options.ServiceId = "orders";
             });
-            client.UseMongoDBClient(connectionString);
             client.UseMongoDBClustering(options =>
             {
                 options.DatabaseName = "orders";
@@ -71,7 +72,7 @@ public static class MongoDBConfiguration
     {
         // <mongodb_configuration>
         var builder = Host.CreateApplicationBuilder();
-        builder.Services.AddMongoDBClient(connectionString);
+        builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(connectionString));
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Orleans:ClusterId"] = "orders-production",
@@ -87,5 +88,25 @@ public static class MongoDBConfiguration
         });
         builder.UseOrleans();
         // </mongodb_configuration>
+    }
+
+    public static IHost ConfigureAspireSilo(string[] args)
+    {
+        // <mongodb_aspire_silo>
+        var builder = Host.CreateApplicationBuilder(args);
+        builder.AddKeyedMongoDBClient("orders");
+        builder.UseOrleans();
+        // </mongodb_aspire_silo>
+        return builder.Build();
+    }
+
+    public static IHost ConfigureAspireClient(string[] args)
+    {
+        // <mongodb_aspire_client>
+        var builder = Host.CreateApplicationBuilder(args);
+        builder.AddKeyedMongoDBClient("orders");
+        builder.UseOrleansClient();
+        // </mongodb_aspire_client>
+        return builder.Build();
     }
 }

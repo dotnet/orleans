@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
 using System;
 
-namespace Orleans.Providers.MongoDB.Configuration;
+namespace Orleans.Persistence.MongoDB;
 
 internal class MongoDBGrainStorageConfigurator : IPostConfigureOptions<MongoDBGrainStorageOptions>
 {

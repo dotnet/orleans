@@ -9,16 +9,20 @@ included in each provider package.
 
 | Capability | Package |
 |---|---|
-| Shared MongoDB client configuration | Microsoft.Orleans.MongoDB |
 | Membership and gateway discovery | Microsoft.Orleans.Clustering.MongoDB |
 | Grain state persistence | Microsoft.Orleans.Persistence.MongoDB |
 | Durable reminders | Microsoft.Orleans.Reminders.MongoDB |
 
-Existing `Orleans.Providers.MongoDB.*` namespaces, collection names, document
-fields, and serializer formats are retained. Replace the contributed package
+Collection names, document fields, and serializer formats are retained. Replace the contributed package
 reference with the capability packages used by the application and keep database
 names, collection prefixes, membership strategy, grain keys, and serialization
 configuration unchanged.
+
+Each provider compiles its internal infrastructure from `Shared` and exposes its
+options in `Orleans.Clustering.MongoDB`, `Orleans.Persistence.MongoDB`, or
+`Orleans.Reminders.MongoDB`. Register one `MongoDB.Driver.IMongoClient` for all
+providers, or select keyed clients with `ClientName`. The service container or
+application owns client disposal.
 
 ## Provider tests
 

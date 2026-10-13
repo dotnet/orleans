@@ -4,9 +4,8 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Orleans.Hosting;
 using Orleans.Persistence.TestKit;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Persistence.MongoDB;
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
-using Orleans.Providers.MongoDB.Utils;
 using Orleans.Runtime;
 using Orleans.Serialization.Activators;
 using Orleans.Serialization.Configuration;
@@ -72,7 +71,7 @@ public abstract class MongoGrainStorageTestsBase : IAsyncLifetime
         {
             host = MongoTestHost.Create(silo =>
             {
-                silo.Services.AddSingleton<IMongoClientFactory>(database.ClientFactory);
+                silo.Services.AddSingleton<IMongoClient>(database.Client);
                 silo.Services.AddSingleton<MongoActivatedStateActivator>();
                 silo.Services.Configure<TypeManifestOptions>(options =>
                     options.AddActivator(typeof(MongoActivatedStateActivator), typeof(MongoActivatedState)));

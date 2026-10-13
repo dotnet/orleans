@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using MongoDB.Driver;
 using Orleans.Hosting;
 using Orleans.Runtime;
 using Xunit;
@@ -11,9 +12,12 @@ public sealed class MongoReminderArgumentTests
     [Fact]
     public async Task DefaultGrainId_PointOperationsRejectClientCallsBeforeAccessingDatabase()
     {
-        using var host = MongoTestHost.Create(silo => silo
-            .UseMongoDBClient("mongodb://localhost:27017")
-            .UseMongoDBReminders(options => options.DatabaseName = "unused"));
+        using var client = new MongoClient("mongodb://localhost:27017");
+        using var host = MongoTestHost.Create(silo =>
+        {
+            silo.Services.AddSingleton<IMongoClient>(client);
+            silo.UseMongoDBReminders(options => options.DatabaseName = "unused");
+        });
         var table = host.Services.GetRequiredService<IReminderTable>();
         // Deliberately do not StartAsync: guards must run before touching the collection or server.
         var token = TestContext.Current.CancellationToken;
@@ -32,9 +36,12 @@ public sealed class MongoReminderArgumentTests
     [InlineData("")]
     public async Task InvalidReminderName_PointOperationsRejectBeforeAccessingDatabase(string? name)
     {
-        using var host = MongoTestHost.Create(silo => silo
-            .UseMongoDBClient("mongodb://localhost:27017")
-            .UseMongoDBReminders(options => options.DatabaseName = "unused"));
+        using var client = new MongoClient("mongodb://localhost:27017");
+        using var host = MongoTestHost.Create(silo =>
+        {
+            silo.Services.AddSingleton<IMongoClient>(client);
+            silo.UseMongoDBReminders(options => options.DatabaseName = "unused");
+        });
         var table = host.Services.GetRequiredService<IReminderTable>();
         var id = GrainId.Create("account", "name-validation");
         var token = TestContext.Current.CancellationToken;
@@ -57,9 +64,12 @@ public sealed class MongoReminderArgumentTests
     [Fact]
     public async Task NullReminderEntry_RejectsBeforeAccessingDatabase()
     {
-        using var host = MongoTestHost.Create(silo => silo
-            .UseMongoDBClient("mongodb://localhost:27017")
-            .UseMongoDBReminders(options => options.DatabaseName = "unused"));
+        using var client = new MongoClient("mongodb://localhost:27017");
+        using var host = MongoTestHost.Create(silo =>
+        {
+            silo.Services.AddSingleton<IMongoClient>(client);
+            silo.UseMongoDBReminders(options => options.DatabaseName = "unused");
+        });
         var error = await Assert.ThrowsAsync<ArgumentNullException>(() =>
             host.Services.GetRequiredService<IReminderTable>().UpsertRow(null!, TestContext.Current.CancellationToken));
         Assert.Equal("entry", error.ParamName);

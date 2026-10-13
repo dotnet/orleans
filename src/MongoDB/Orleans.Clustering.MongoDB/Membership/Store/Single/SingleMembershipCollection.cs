@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MongoDB.Driver;
-using Orleans.Providers.MongoDB.Utils;
+using Orleans.Clustering.MongoDB;
 using Orleans.Runtime;
 
 namespace Orleans.Providers.MongoDB.Membership.Store.Single;

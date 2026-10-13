@@ -5,8 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Messaging;
 using Orleans.Providers.MongoDB.Membership.Store;
-using Orleans.Providers.MongoDB.Configuration;
-using Orleans.Providers.MongoDB.Utils;
+using Orleans.Clustering.MongoDB;
 using Orleans.Configuration;
 using MongoDB.Driver;
 
@@ -34,13 +33,13 @@ public sealed class MongoGatewayListProvider : IGatewayListProvider
     /// Initializes gateway discovery using the silo membership format and client cluster identity.
     /// </summary>
     public MongoGatewayListProvider(
-        IMongoClientFactory mongoClientFactory,
+        IMongoClient mongoClient,
         ILogger<MongoGatewayListProvider> logger,
         IOptions<ClusterOptions> clusterOptions,
         IOptions<GatewayOptions> gatewayOptions,
         IOptions<MongoDBGatewayListProviderOptions> options)
     {
-        this.mongoClient = mongoClientFactory.Create(options.Value, "Membership");
+        this.mongoClient = mongoClient;
         this.logger = logger;
         this.options = options.Value;
         this.clusterId = clusterOptions.Value.ClusterId;

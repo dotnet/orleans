@@ -12,29 +12,15 @@ namespace Orleans
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGatewayListProvider(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGatewayListProvider(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Providers.MongoDB.Configuration.MongoDBGatewayListProviderOptions>? configurator = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGatewayListProvider(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Clustering.MongoDB.MongoDBGatewayListProviderOptions>? configurator = null) { throw null; }
 
         public static Hosting.IClientBuilder UseMongoDBClustering(this Hosting.IClientBuilder builder, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
 
-        public static Hosting.IClientBuilder UseMongoDBClustering(this Hosting.IClientBuilder builder, System.Action<Providers.MongoDB.Configuration.MongoDBGatewayListProviderOptions>? configurator = null) { throw null; }
+        public static Hosting.IClientBuilder UseMongoDBClustering(this Hosting.IClientBuilder builder, System.Action<Clustering.MongoDB.MongoDBGatewayListProviderOptions>? configurator = null) { throw null; }
     }
 }
 
-namespace Orleans.Hosting
-{
-    public static partial class MongoDBClusteringSiloBuilderExtensions
-    {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBMembershipTable(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
-
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBMembershipTable(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Providers.MongoDB.Configuration.MongoDBMembershipTableOptions>? configurator = null) { throw null; }
-
-        public static ISiloBuilder UseMongoDBClustering(this ISiloBuilder builder, System.Action<Providers.MongoDB.Configuration.MongoDBMembershipTableOptions>? configurator = null) { throw null; }
-
-        public static ISiloBuilder UseMongoDBMembershipTable(this ISiloBuilder builder, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
-    }
-}
-
-namespace Orleans.Providers.MongoDB.Configuration
+namespace Orleans.Clustering.MongoDB
 {
     public sealed partial class MongoDBGatewayListProviderOptions : MongoDBOptions
     {
@@ -52,13 +38,40 @@ namespace Orleans.Providers.MongoDB.Configuration
     {
         public MongoDBMembershipStrategy Strategy { get { throw null; } set { } }
     }
+
+    public partial class MongoDBOptions
+    {
+        public string? ClientName { get { throw null; } set { } }
+
+        public System.Action<global::MongoDB.Driver.MongoCollectionSettings>? CollectionConfigurator { get { throw null; } set { } }
+
+        public string? CollectionPrefix { get { throw null; } set { } }
+
+        public bool CreateShardKeyForCosmos { get { throw null; } set { } }
+
+        public string DatabaseName { get { throw null; } set { } }
+    }
+}
+
+namespace Orleans.Hosting
+{
+    public static partial class MongoDBClusteringSiloBuilderExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBMembershipTable(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBMembershipTable(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Clustering.MongoDB.MongoDBMembershipTableOptions>? configurator = null) { throw null; }
+
+        public static ISiloBuilder UseMongoDBClustering(this ISiloBuilder builder, System.Action<Clustering.MongoDB.MongoDBMembershipTableOptions>? configurator = null) { throw null; }
+
+        public static ISiloBuilder UseMongoDBMembershipTable(this ISiloBuilder builder, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
+    }
 }
 
 namespace Orleans.Providers.MongoDB.Membership
 {
     public sealed partial class MongoGatewayListProvider : Messaging.IGatewayListProvider
     {
-        public MongoGatewayListProvider(Utils.IMongoClientFactory mongoClientFactory, Microsoft.Extensions.Logging.ILogger<MongoGatewayListProvider> logger, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GatewayOptions> gatewayOptions, Microsoft.Extensions.Options.IOptions<Configuration.MongoDBGatewayListProviderOptions> options) { }
+        public MongoGatewayListProvider(global::MongoDB.Driver.IMongoClient mongoClient, Microsoft.Extensions.Logging.ILogger<MongoGatewayListProvider> logger, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<Configuration.GatewayOptions> gatewayOptions, Microsoft.Extensions.Options.IOptions<Clustering.MongoDB.MongoDBGatewayListProviderOptions> options) { }
 
         public bool IsUpdatable { get { throw null; } }
 
@@ -71,7 +84,7 @@ namespace Orleans.Providers.MongoDB.Membership
 
     public sealed partial class MongoMembershipTable : IMembershipTable
     {
-        public MongoMembershipTable(Utils.IMongoClientFactory mongoClientFactory, Microsoft.Extensions.Logging.ILogger<MongoMembershipTable> logger, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<Configuration.MongoDBMembershipTableOptions> options) { }
+        public MongoMembershipTable(global::MongoDB.Driver.IMongoClient mongoClient, Microsoft.Extensions.Logging.ILogger<MongoMembershipTable> logger, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<Clustering.MongoDB.MongoDBMembershipTableOptions> options) { }
 
         [System.Obsolete("Use CleanupDefunctSiloEntriesAsync instead.")]
         public System.Threading.Tasks.Task CleanupDefunctSiloEntries(System.DateTimeOffset beforeDate) { throw null; }

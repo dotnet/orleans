@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Persistence.MongoDB;
 using Orleans.Providers.MongoDB.StorageProviders;
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
 using Orleans.Runtime.Hosting;

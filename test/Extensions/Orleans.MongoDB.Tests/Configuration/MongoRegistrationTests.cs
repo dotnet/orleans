@@ -1,18 +1,21 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using MongoDB.Driver.Core.Events;
+using Orleans.Clustering.MongoDB;
 using Orleans.Hosting;
 using Orleans.Messaging;
+using Orleans.Persistence.MongoDB;
 using Orleans.Providers;
-using Orleans.Providers.MongoDB.Configuration;
 using Orleans.Providers.MongoDB.Membership;
 using Orleans.Providers.MongoDB.Reminders;
 using Orleans.Providers.MongoDB.StorageProviders;
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
-using Orleans.Providers.MongoDB.Utils;
+using Orleans.Reminders.MongoDB;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Xunit;
@@ -23,41 +26,48 @@ namespace Orleans.MongoDB.Tests.Configuration;
 public sealed class MongoRegistrationTests
 {
     [Fact]
-    public void ConfigurationDiscovery_SiloBindsAllProvidersAndReusesHostRegisteredClient()
+    public async Task ConfigurationDiscovery_SiloBindsAllProvidersAndReusesHostRegisteredClient()
     {
-        using var client = new MongoClient("mongodb://localhost:27017");
+        var commands = new ConcurrentQueue<CapturedMongoCommand>();
+        await using var database = await MongoDatabase.CreateAsync(settings =>
+            settings.ClusterConfigurator = cluster => cluster.Subscribe<CommandStartedEvent>(e => commands.Enqueue(new(e))));
+        var client = database.Client;
         using var host = ConfiguredHost(new Dictionary<string, string?>
         {
             ["Orleans:Clustering:ProviderType"] = "MongoDB",
-            ["Orleans:Clustering:DatabaseName"] = "configured-membership",
+            ["Orleans:Clustering:DatabaseName"] = database.Name,
             ["Orleans:Clustering:CollectionPrefix"] = "members_",
             ["Orleans:Clustering:Strategy"] = "Multiple",
             ["Orleans:Reminders:ProviderType"] = "MongoDB",
-            ["Orleans:Reminders:DatabaseName"] = "configured-reminders",
+            ["Orleans:Reminders:DatabaseName"] = database.Name,
             ["Orleans:Reminders:CollectionPrefix"] = "timers_",
             ["Orleans:Reminders:CreateIndexes"] = "false",
             ["Orleans:GrainStorage:Accounts:ProviderType"] = "MongoDB",
-            ["Orleans:GrainStorage:Accounts:DatabaseName"] = "configured-accounts",
+            ["Orleans:GrainStorage:Accounts:DatabaseName"] = database.Name,
             ["Orleans:GrainStorage:Accounts:CollectionPrefix"] = "accounts_",
             ["Orleans:GrainStorage:Accounts:ClientName"] = "host-client",
             ["Orleans:GrainStorage:Archive:ProviderType"] = "MongoDB",
-            ["Orleans:GrainStorage:Archive:DatabaseName"] = "configured-archive"
-        }, services => services.AddSingleton<IMongoClient>(client));
+            ["Orleans:GrainStorage:Archive:DatabaseName"] = database.Name
+        }, services =>
+        {
+            services.AddSingleton<IMongoClient>(client);
+            services.AddKeyedSingleton<IMongoClient>("host-client", client);
+        });
         Assert.IsType<MongoMembershipTable>(host.Services.GetRequiredService<IMembershipTable>());
         Assert.IsType<MongoReminderTable>(host.Services.GetRequiredService<IReminderTable>());
         var membership = host.Services.GetRequiredService<IOptions<MongoDBMembershipTableOptions>>().Value;
-        Assert.Equal("configured-membership", membership.DatabaseName);
+        Assert.Equal(database.Name, membership.DatabaseName);
         Assert.Equal("members_", membership.CollectionPrefix);
         Assert.Equal(MongoDBMembershipStrategy.Multiple, membership.Strategy);
         var reminders = host.Services.GetRequiredService<IOptions<MongoDBRemindersOptions>>().Value;
-        Assert.Equal("configured-reminders", reminders.DatabaseName);
+        Assert.Equal(database.Name, reminders.DatabaseName);
         Assert.Equal("timers_", reminders.CollectionPrefix);
         Assert.False(reminders.CreateIndexes);
         var monitor = host.Services.GetRequiredService<IOptionsMonitor<MongoDBGrainStorageOptions>>();
-        Assert.Equal("configured-accounts", monitor.Get("Accounts").DatabaseName);
+        Assert.Equal(database.Name, monitor.Get("Accounts").DatabaseName);
         Assert.Equal("accounts_", monitor.Get("Accounts").CollectionPrefix);
         Assert.Equal("host-client", monitor.Get("Accounts").ClientName);
-        Assert.Equal("configured-archive", monitor.Get("Archive").DatabaseName);
+        Assert.Equal(database.Name, monitor.Get("Archive").DatabaseName);
         Assert.Equal("Grains", monitor.Get("Archive").CollectionPrefix);
         Assert.IsType<JsonGrainStateSerializer>(monitor.Get("Accounts").GrainStateSerializer);
         var accounts = host.Services.GetRequiredKeyedService<IGrainStorage>("Accounts");
@@ -65,59 +75,68 @@ public sealed class MongoRegistrationTests
         Assert.IsType<MongoGrainStorage>(accounts);
         Assert.IsType<MongoGrainStorage>(archive);
         Assert.NotSame(accounts, archive);
-        Assert.Same(client, host.Services.GetRequiredService<IMongoClientFactory>().Create("Membership"));
-        Assert.Same(client, host.Services.GetRequiredService<IMongoClientFactory>().Create(monitor.Get("Accounts"), "Storage"));
+        commands.Clear();
+        await MongoClientSharingTests.ExerciseSiloProviders(host.Services, "Accounts");
+        await MongoClientSharingTests.ExerciseStorage(archive, "ArchiveState");
+        MongoClientSharingTests.AssertCommands(commands, database.Name, "members_", "timers_", "accounts_Account");
+        Assert.Contains(commands, command => command.CommandName == "update"
+            && command.Command["update"].AsString == "GrainsArchiveState");
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ConfigurationDiscovery_ClientBindsGatewayOptionsAndUsesConfiguredClient(bool explicitClient)
+    [Fact]
+    public async Task ConfigurationDiscovery_ClientBindsGatewayOptionsAndUsesConfiguredClient()
     {
-        using var client = new MongoClient("mongodb://localhost:27017");
+        var commands = new ConcurrentQueue<CapturedMongoCommand>();
+        await using var database = await MongoDatabase.CreateAsync(settings =>
+            settings.ClusterConfigurator = cluster => cluster.Subscribe<CommandStartedEvent>(e => commands.Enqueue(new(e))));
         var builder = new HostBuilder().ConfigureAppConfiguration(config => config.AddInMemoryCollection(
             new Dictionary<string, string?>
             {
                 ["Orleans:Clustering:ProviderType"] = "MongoDB",
-                ["Orleans:Clustering:DatabaseName"] = "configured-gateway",
+                ["Orleans:Clustering:DatabaseName"] = database.Name,
                 ["Orleans:Clustering:CollectionPrefix"] = "gateway_",
                 ["Orleans:Clustering:Strategy"] = "MultipleDeprecated"
             }));
-        if (!explicitClient) builder.ConfigureServices(services => services.AddSingleton<IMongoClient>(client));
-        builder.UseOrleansClient(orleans =>
-        {
-            if (explicitClient) orleans.UseMongoDBClient("mongodb://localhost:27017");
-        });
+        builder.ConfigureServices(services => services.AddSingleton<IMongoClient>(database.Client));
+        builder.UseOrleansClient();
         using var host = builder.Build();
         Assert.IsType<MongoGatewayListProvider>(host.Services.GetRequiredService<IGatewayListProvider>());
         var options = host.Services.GetRequiredService<IOptions<MongoDBGatewayListProviderOptions>>().Value;
-        Assert.Equal("configured-gateway", options.DatabaseName);
+        Assert.Equal(database.Name, options.DatabaseName);
         Assert.Equal("gateway_", options.CollectionPrefix);
         Assert.Equal(MongoDBMembershipStrategy.MultipleDeprecated, options.Strategy);
-        var resolved = host.Services.GetRequiredService<IMongoClient>();
-        Assert.Same(resolved, host.Services.GetRequiredService<IMongoClientFactory>().Create(options, "Gateway"));
-        if (!explicitClient) Assert.Same(client, resolved);
+        Assert.Same(database.Client, host.Services.GetRequiredService<IMongoClient>());
+        commands.Clear();
+        await MongoClientSharingTests.ExerciseGateway(host.Services, database.Client, database.Name, "gateway_",
+            MongoDBMembershipStrategy.MultipleDeprecated);
+        Assert.Contains(commands, command => command.CommandName == "find"
+            && command.DatabaseName == database.Name);
     }
 
     [Fact]
-    public void ConfigurationDiscovery_DefaultNamedStoragePreservesDefaultsAndExplicitClient()
+    public async Task ConfigurationDiscovery_DefaultNamedStoragePreservesDefaultsAndExplicitClient()
     {
+        var commands = new ConcurrentQueue<CapturedMongoCommand>();
+        await using var database = await MongoDatabase.CreateAsync(settings =>
+            settings.ClusterConfigurator = cluster => cluster.Subscribe<CommandStartedEvent>(e => commands.Enqueue(new(e))));
         using var host = ConfiguredHost(new Dictionary<string, string?>
         {
             [$"Orleans:GrainStorage:{ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME}:ProviderType"] = "MongoDB",
-            [$"Orleans:GrainStorage:{ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME}:DatabaseName"] = "default-config"
-        }, configureSilo: silo => silo
-            .UseLocalhostClustering()
-            .UseMongoDBClient("mongodb://localhost:27017"));
+            [$"Orleans:GrainStorage:{ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME}:DatabaseName"] = database.Name
+        }, services => services.AddSingleton<IMongoClient>(database.Client),
+            configureSilo: silo => silo.UseLocalhostClustering());
         var name = ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME;
         Assert.IsType<MongoGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(name));
         var options = host.Services.GetRequiredService<IOptionsMonitor<MongoDBGrainStorageOptions>>().Get(name);
-        Assert.Equal("default-config", options.DatabaseName);
+        Assert.Equal(database.Name, options.DatabaseName);
         Assert.Equal("Grains", options.CollectionPrefix);
         Assert.False(options.CreateShardKeyForCosmos);
         Assert.IsType<JsonGrainStateSerializer>(options.GrainStateSerializer);
-        Assert.Same(host.Services.GetRequiredService<IMongoClient>(),
-            host.Services.GetRequiredService<IMongoClientFactory>().Create(options, "Storage"));
+        commands.Clear();
+        await MongoClientSharingTests.ExerciseStorage(host.Services.GetRequiredKeyedService<IGrainStorage>(name), "DefaultState");
+        Assert.Contains(commands, command => command.CommandName == "update"
+            && command.Command["update"].AsString == "GrainsDefaultState"
+            && command.DatabaseName == database.Name);
     }
 
     [Fact]
@@ -132,7 +151,7 @@ public sealed class MongoRegistrationTests
         }).Build();
         using var host = MongoTestHost.Create(silo =>
         {
-            silo.UseMongoDBClient("mongodb://localhost:27017");
+            silo.Services.AddSingleton<IMongoClient>(_ => new MongoClient("mongodb://localhost:27017"));
             var provider = Assert.IsAssignableFrom<IProviderBuilder<ISiloBuilder>>(Activator.CreateInstance(registration.Type));
             provider.Configure(silo, null, configuration.GetSection("Storage"));
         });
@@ -186,7 +205,7 @@ public sealed class MongoRegistrationTests
     {
         using var host = MongoTestHost.Create(silo =>
         {
-            silo.UseMongoDBClient("mongodb://localhost:27017");
+            silo.Services.AddSingleton<IMongoClient>(_ => new MongoClient("mongodb://localhost:27017"));
             silo.Services.AddKeyedSingleton<IGrainStateSerializer, BsonGrainStateSerializer>("Bson");
             silo.Services.AddKeyedSingleton<IGrainStateSerializer, BinaryGrainStateSerializer>("Binary");
             silo.AddMongoDBGrainStorage("Json", (MongoDBGrainStorageOptions options) => options.DatabaseName = "json");
@@ -234,7 +253,7 @@ public sealed class MongoRegistrationTests
     {
         using var host = MongoTestHost.Create(silo =>
         {
-            silo.UseMongoDBClient("mongodb://localhost:27017");
+            silo.Services.AddSingleton<IMongoClient>(_ => new MongoClient("mongodb://localhost:27017"));
             silo.AddMongoDBGrainStorageAsDefault((MongoDBGrainStorageOptions options) => options.DatabaseName = "default");
         });
         Assert.IsType<MongoGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
@@ -249,7 +268,7 @@ public sealed class MongoRegistrationTests
     {
         using var host = MongoTestHost.Create(silo =>
         {
-            silo.UseMongoDBClient("mongodb://localhost:27017");
+            silo.Services.AddSingleton<IMongoClient>(_ => new MongoClient("mongodb://localhost:27017"));
             silo.Services.Configure<MongoDBGrainStorageOptions>(
                 ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME,
                 options =>
@@ -274,9 +293,10 @@ public sealed class MongoRegistrationTests
     [Fact]
     public void SiloRegistration_ResolvesMembershipAndRemindersWithConfiguredOptions()
     {
-        using var host = MongoTestHost.Create(silo => silo
-            .UseMongoDBClient("mongodb://localhost:27017")
-            .UseMongoDBClustering(options =>
+        using var host = MongoTestHost.Create(silo =>
+        {
+            silo.Services.AddSingleton<IMongoClient>(_ => new MongoClient("mongodb://localhost:27017"));
+            silo.UseMongoDBClustering(options =>
             {
                 options.DatabaseName = "membership";
                 options.CollectionPrefix = "cluster_";
@@ -286,7 +306,8 @@ public sealed class MongoRegistrationTests
             {
                 options.DatabaseName = "reminders";
                 options.CollectionPrefix = "timer_";
-            }));
+            });
+        });
         Assert.IsType<MongoMembershipTable>(host.Services.GetRequiredService<IMembershipTable>());
         Assert.IsType<MongoReminderTable>(host.Services.GetRequiredService<IReminderTable>());
         var membership = host.Services.GetRequiredService<IOptions<MongoDBMembershipTableOptions>>().Value;
@@ -301,49 +322,21 @@ public sealed class MongoRegistrationTests
     [Fact]
     public void ClientRegistration_ResolvesGatewayAndConfiguredStrategy()
     {
-        using var host = new HostBuilder().UseOrleansClient(client => client
-            .UseMongoDBClient("mongodb://localhost:27017")
-            .UseMongoDBClustering(options =>
+        using var host = new HostBuilder().UseOrleansClient(client =>
+        {
+            client.Services.AddSingleton<IMongoClient>(_ => new MongoClient("mongodb://localhost:27017"));
+            client.UseMongoDBClustering(options =>
             {
                 options.DatabaseName = "gateway";
                 options.Strategy = MongoDBMembershipStrategy.SingleDocument;
                 options.CollectionPrefix = "client_";
-            })).Build();
+            });
+        }).Build();
         Assert.IsType<MongoGatewayListProvider>(host.Services.GetRequiredService<IGatewayListProvider>());
         var options = host.Services.GetRequiredService<IOptions<MongoDBGatewayListProviderOptions>>().Value;
         Assert.Equal("gateway", options.DatabaseName);
         Assert.Equal("client_", options.CollectionPrefix);
         Assert.Equal(MongoDBMembershipStrategy.SingleDocument, options.Strategy);
-    }
-
-    [Fact]
-    public void ClientRegistration_IsLazyAndReusesSingleClient()
-    {
-        var calls = 0;
-        var services = new ServiceCollection();
-        services.AddMongoDBClient(_ =>
-        {
-            calls++;
-            return MongoClientSettings.FromConnectionString("mongodb://localhost:27017");
-        });
-        services.AddMongoDBClient(_ => throw new InvalidOperationException("Duplicate registration should not replace the client."));
-        Assert.Equal(0, calls);
-        using var provider = services.BuildServiceProvider();
-        var factory = provider.GetRequiredService<IMongoClientFactory>();
-        var first = factory.Create("Membership");
-        Assert.Same(first, factory.Create("Storage"));
-        Assert.Same(first, provider.GetRequiredService<IMongoClient>());
-        Assert.Equal(1, calls);
-    }
-
-    [Fact]
-    public void ClientRegistration_RejectsNullSettingsFactoryBeforeRegistration()
-    {
-        var services = new ServiceCollection();
-        var exception = Assert.Throws<ArgumentNullException>(() =>
-            services.AddMongoDBClient((Func<IServiceProvider, MongoClientSettings>)null!));
-        Assert.Equal("settingsFactory", exception.ParamName);
-        Assert.Empty(services);
     }
 
     [Theory]
@@ -354,9 +347,9 @@ public sealed class MongoRegistrationTests
     {
         IConfigurationValidator[] validators =
         [
-            new MongoDBOptionsValidator<MongoDBMembershipTableOptions>(Options.Create(new MongoDBMembershipTableOptions { DatabaseName = database! })),
-            new MongoDBOptionsValidator<MongoDBGatewayListProviderOptions>(Options.Create(new MongoDBGatewayListProviderOptions { DatabaseName = database! })),
-            new MongoDBOptionsValidator<MongoDBRemindersOptions>(Options.Create(new MongoDBRemindersOptions { DatabaseName = database! })),
+            new Orleans.Clustering.MongoDB.MongoDBOptionsValidator<MongoDBMembershipTableOptions>(Options.Create(new MongoDBMembershipTableOptions { DatabaseName = database! })),
+            new Orleans.Clustering.MongoDB.MongoDBOptionsValidator<MongoDBGatewayListProviderOptions>(Options.Create(new MongoDBGatewayListProviderOptions { DatabaseName = database! })),
+            new Orleans.Reminders.MongoDB.MongoDBOptionsValidator<MongoDBRemindersOptions>(Options.Create(new MongoDBRemindersOptions { DatabaseName = database! })),
             new MongoDBGrainStorageOptionsValidator(new MongoDBGrainStorageOptions { DatabaseName = database! }, "TestStorage")
         ];
         foreach (var validator in validators)
@@ -385,8 +378,111 @@ public sealed class MongoRegistrationTests
         var id = GrainId.Create("account", "42");
         Assert.Equal(id.ToString(), options.KeyGenerator(id));
         Assert.Equal("Grains", options.CollectionPrefix);
-        new MongoDBOptionsValidator<MongoDBMembershipTableOptions>(Options.Create(new MongoDBMembershipTableOptions { DatabaseName = "valid" })).ValidateConfiguration();
-        new MongoDBOptionsValidator<MongoDBGatewayListProviderOptions>(Options.Create(new MongoDBGatewayListProviderOptions { DatabaseName = "valid" })).ValidateConfiguration();
-        new MongoDBOptionsValidator<MongoDBRemindersOptions>(Options.Create(new MongoDBRemindersOptions { DatabaseName = "valid" })).ValidateConfiguration();
+        new Orleans.Clustering.MongoDB.MongoDBOptionsValidator<MongoDBMembershipTableOptions>(Options.Create(new MongoDBMembershipTableOptions { DatabaseName = "valid" })).ValidateConfiguration();
+        new Orleans.Clustering.MongoDB.MongoDBOptionsValidator<MongoDBGatewayListProviderOptions>(Options.Create(new MongoDBGatewayListProviderOptions { DatabaseName = "valid" })).ValidateConfiguration();
+        new Orleans.Reminders.MongoDB.MongoDBOptionsValidator<MongoDBRemindersOptions>(Options.Create(new MongoDBRemindersOptions { DatabaseName = "valid" })).ValidateConfiguration();
+    }
+
+    [Theory]
+    [InlineData("Clustering")]
+    [InlineData("ClientClustering")]
+    [InlineData("Reminders")]
+    [InlineData("GrainStorage:Accounts")]
+    public void ConfigurationDiscovery_MatchingServiceKeyAndClientNameInferOnlyKeyedDatabase(string section)
+    {
+        using var client = new MongoClient("mongodb://localhost:27017");
+        using var host = CreateConfigurationHost(section, "selected", services =>
+        {
+            services.AddKeyedSingleton<IMongoClient>("selected", client);
+            services.AddKeyedSingleton<IMongoDatabase>("selected", client.GetDatabase("keyed-database"));
+            services.AddSingleton<IMongoDatabase>(client.GetDatabase("wrong-global-database"));
+        });
+        var options = ReadProviderOptions(host.Services, section);
+        Assert.Equal("selected", options.ClientName);
+        Assert.Equal("keyed-database", options.DatabaseName);
+    }
+
+    [Theory]
+    [InlineData("Clustering")]
+    [InlineData("ClientClustering")]
+    [InlineData("Reminders")]
+    [InlineData("GrainStorage:Accounts")]
+    public void ConfigurationDiscovery_ConflictingServiceKeyAndClientNameFailExplicitly(string section)
+    {
+        var error = Assert.Throws<OrleansConfigurationException>(() =>
+        {
+            using var host = CreateConfigurationHost(section, "different-client");
+            _ = ReadProviderOptions(host.Services, section);
+        });
+        Assert.Contains("ClientName", error.Message);
+        Assert.Contains("ServiceKey", error.Message);
+    }
+
+    [Theory]
+    [InlineData("Clustering")]
+    [InlineData("ClientClustering")]
+    [InlineData("Reminders")]
+    [InlineData("GrainStorage:Accounts")]
+    public void ConfigurationDiscovery_MissingKeyedDatabaseDoesNotInferGlobalAndStillRequiresDatabaseName(string section)
+    {
+        using var client = new MongoClient("mongodb://localhost:27017");
+        using var host = CreateConfigurationHost(section, "selected", services =>
+        {
+            services.AddKeyedSingleton<IMongoClient>("selected", client);
+            services.AddSingleton<IMongoDatabase>(client.GetDatabase("wrong-global-database"));
+        });
+        var options = ReadProviderOptions(host.Services, section);
+        Assert.Equal("selected", options.ClientName);
+        Assert.Equal("", options.DatabaseName);
+        var providerNamespace = section switch
+        {
+            "Clustering" or "ClientClustering" => "Orleans.Clustering.MongoDB",
+            "Reminders" => "Orleans.Reminders.MongoDB",
+            _ => "Orleans.Persistence.MongoDB"
+        };
+        var validator = Assert.Single(host.Services.GetServices<IConfigurationValidator>(),
+            validator => validator.GetType().Namespace == providerNamespace);
+        var error = Assert.Throws<OrleansConfigurationException>(validator.ValidateConfiguration);
+        Assert.Contains("DatabaseName", error.Message);
+        Assert.Contains("required", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IHost CreateConfigurationHost(string section, string clientName,
+        Action<IServiceCollection>? configureServices = null)
+    {
+        var path = section == "ClientClustering" ? "Clustering" : section;
+        var values = new Dictionary<string, string?>
+        {
+            [$"Orleans:{path}:ProviderType"] = "MongoDBDatabase",
+            [$"Orleans:{path}:ServiceKey"] = "selected",
+            [$"Orleans:{path}:ClientName"] = clientName
+        };
+        var builder = new HostBuilder().ConfigureAppConfiguration(config => config.AddInMemoryCollection(values));
+        if (configureServices is not null) builder.ConfigureServices(configureServices);
+        return section == "ClientClustering" ? builder.UseOrleansClient().Build() : builder.UseOrleans(silo =>
+        {
+            if (section != "Clustering") silo.UseLocalhostClustering();
+        }).Build();
+    }
+
+    private static (string DatabaseName, string? ClientName) ReadProviderOptions(IServiceProvider services, string section)
+    {
+        if (section == "Clustering")
+        {
+            var options = services.GetRequiredService<IOptions<MongoDBMembershipTableOptions>>().Value;
+            return (options.DatabaseName, options.ClientName);
+        }
+        if (section == "ClientClustering")
+        {
+            var options = services.GetRequiredService<IOptions<MongoDBGatewayListProviderOptions>>().Value;
+            return (options.DatabaseName, options.ClientName);
+        }
+        if (section == "Reminders")
+        {
+            var options = services.GetRequiredService<IOptions<MongoDBRemindersOptions>>().Value;
+            return (options.DatabaseName, options.ClientName);
+        }
+        var storage = services.GetRequiredService<IOptionsMonitor<MongoDBGrainStorageOptions>>().Get("Accounts");
+        return (storage.DatabaseName, storage.ClientName);
     }
 }

@@ -1,7 +1,7 @@
 
 using System;
 
-namespace Orleans.Providers.MongoDB.Configuration;
+namespace Orleans.Reminders.MongoDB;
 
 /// <summary>
 /// Configures MongoDB Reminders Options.

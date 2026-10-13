@@ -84,6 +84,9 @@
   <Folder Name="/site/src/content/docs/host/snippets/mongodb/">
     <Project Path="site\src\content\docs\host\snippets\mongodb\MongoDB.csproj" />
   </Folder>
+  <Folder Name="/site/src/content/docs/host/snippets/mongodb/AppHost/">
+    <Project Path="site\src\content\docs\host\snippets\mongodb\AppHost\MongoDBAppHost.csproj" />
+  </Folder>
   <Folder Name="/site/src/content/docs/host/snippets/transport-layer-security/" />
   <Folder Name="/site/src/content/docs/host/snippets/transport-layer-security/csharp/">
     <Project Path="site/src/content/docs/host/snippets/transport-layer-security/csharp/ClientExample/ClientExample.csproj" />

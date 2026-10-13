@@ -10,9 +10,11 @@
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.Azure.EventHubs" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.MongoDB" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.6.5" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.6.5" />
+    <PackageVersion Include="Aspire.MongoDB.Driver" Version="13.6.5" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.6.5" />
     <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageVersion Include="AwesomeAssertions" Version="9.3.0" />

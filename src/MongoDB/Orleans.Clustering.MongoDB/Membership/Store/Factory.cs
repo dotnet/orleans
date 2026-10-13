@@ -1,5 +1,5 @@
 using MongoDB.Driver;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Clustering.MongoDB;
 using Orleans.Providers.MongoDB.Membership.Store.Multiple;
 using Orleans.Providers.MongoDB.Membership.Store.MultipleDeprecated;
 using Orleans.Providers.MongoDB.Membership.Store.Single;

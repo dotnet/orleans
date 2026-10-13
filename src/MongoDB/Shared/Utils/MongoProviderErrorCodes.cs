@@ -1,4 +1,12 @@
-namespace Orleans.Providers.MongoDB.Utils;
+#if ORLEANS_CLUSTERING
+namespace Orleans.Clustering.MongoDB;
+#elif ORLEANS_PERSISTENCE
+namespace Orleans.Persistence.MongoDB;
+#elif ORLEANS_REMINDERS
+namespace Orleans.Reminders.MongoDB;
+#else
+#error Define a MongoDB provider namespace.
+#endif
 
 internal enum MongoProviderErrorCode
 {
