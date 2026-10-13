@@ -20,15 +20,16 @@ calling a durable grain interface:
 clientBuilder.AddDurableTasks();
 
 siloBuilder.AddJournaling();
-siloBuilder.Services.Configure<JournaledStateManagerOptions>(
-    options => options.JournalFormatKey = "orleans-binary");
 siloBuilder.AddDurableTasks();
 ```
 
 The silo registration composes Messaging and Durable Jobs. Configure Journaling
 with a durable journal storage provider and a Durable Jobs provider for
-production. Task state uses Orleans serialization, so the Orleans binary journal
-format is required; silo startup fails with any other journal format. Tests can register volatile task storage through
+production. Task state can be stored in any journal format, including the
+default JSON format and the Orleans binary format. Requests and responses are
+stored as Orleans-serialized payloads, so their types need Orleans serializers
+but no JSON metadata; `AddDurableTasks` registers the JSON metadata for the
+remaining task state. Tests can register volatile task storage through
 `AddVolatileDurableTaskStorage`.
 
 Durable grains derive from `DurableGrain` or implement `IMessagingGrain`. During

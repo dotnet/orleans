@@ -9,6 +9,8 @@ using Orleans.DurableJobs;
 using Orleans.DurableTasks;
 using Orleans.Hosting;
 using Orleans.Journaling;
+using Orleans.Journaling.Json;
+using Orleans.DurableTasks.Storage;
 using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization.Configuration;
@@ -17,8 +19,6 @@ namespace Orleans.Hosting;
 
 public static class DurableTaskHostingExtensions
 {
-    private const string OrleansBinaryJournalFormatKey = "orleans-binary";
-
     /// <summary>Adds the client-side durable grain RPC adapter.</summary>
     public static IClientBuilder AddDurableTasks(this IClientBuilder clientBuilder)
     {
@@ -36,20 +36,19 @@ public static class DurableTaskHostingExtensions
     /// <summary>Adds the silo-side durable grain RPC runtime over Orleans Messaging and Durable Jobs.</summary>
     /// <remarks>
     /// Grains deriving from <see cref="Orleans.Journaling.DurableGrain"/> or implementing <see cref="IMessagingGrain"/>
-    /// bind the runtime during activation setup, before journal recovery. Task state uses Orleans serialization, so silo
-    /// startup fails unless <see cref="JournaledStateManagerOptions.JournalFormatKey"/> selects the Orleans binary journal format.
+    /// bind the runtime during activation setup, before journal recovery. Task state can be stored in any journal format;
+    /// this method registers the source-generated JSON metadata which the JSON journal format requires.
     /// </remarks>
     public static ISiloBuilder AddDurableTasks(
         this ISiloBuilder siloBuilder,
         Action<DurableTaskOptions>? configureOptions = null)
     {
         siloBuilder.AddMessaging();
-        siloBuilder.Services.AddOptions<JournaledStateManagerOptions>()
-            .Validate(
-                static options => string.Equals(options.JournalFormatKey, OrleansBinaryJournalFormatKey, StringComparison.Ordinal),
-                $"Durable Tasks stores task state with Orleans serialization and requires the Orleans binary journal format. "
-                + $"Set {nameof(JournaledStateManagerOptions)}.{nameof(JournaledStateManagerOptions.JournalFormatKey)} to \"{OrleansBinaryJournalFormatKey}\".")
-            .ValidateOnStart();
+        siloBuilder.Services.Configure<JsonJournalOptions>(static options =>
+        {
+            options.AddTypeInfoResolver(TaskIdJsonTypeInfoResolver.Instance);
+            options.AddTypeInfoResolver(DurableTaskJsonContext.Default);
+        });
         var options = siloBuilder.Services.AddOptions<DurableTaskOptions>();
         if (configureOptions is not null)
         {
