@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
@@ -181,6 +182,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     public void CreateTombstone(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(taskId, state);
+        Debug.Assert(typedState.CompletionDestinations.Count == 0, "A pending completion retains its task's result.");
         typedState.SetRequest(null);
         typedState.SetResult(null);
         typedState.TombstonedAt = _timeProvider.GetUtcNow();
@@ -205,6 +207,9 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     public bool RemoveTask(TaskId taskId)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        Debug.Assert(
+            !_items.TryGetValue(taskId, out var removed) || removed.CompletionDestinations.Count == 0,
+            "A pending completion retains its task's result.");
         _requests.Remove(taskId);
         _results.Remove(taskId);
         return _items.Remove(taskId);

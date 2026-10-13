@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.DurableTasks.Protocol;
@@ -39,6 +40,9 @@ public class VolatileDurableTaskGrainStorage(
     public bool RemoveTask(TaskId taskId)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        Debug.Assert(
+            !_workingCopy.TryGetValue(taskId, out var removed) || removed.CompletionDestinations.Count == 0,
+            "A pending completion retains its task's result.");
         return _workingCopy.Remove(taskId);
     }
 
@@ -166,6 +170,7 @@ public class VolatileDurableTaskGrainStorage(
     public void CreateTombstone(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(taskId, state);
+        Debug.Assert(typedState.CompletionDestinations.Count == 0, "A pending completion retains its task's result.");
         typedState.SetRequest(null);
         typedState.SetResult(null);
         typedState.TombstonedAt = _timeProvider.GetUtcNow();
