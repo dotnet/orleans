@@ -113,6 +113,30 @@ public sealed class DurableTaskStorageTests
         Assert.Same(decoded, typedState.Result);
     }
 
+    [Fact]
+    public void RetiringACompletionDoesNotDecodeItsResult()
+    {
+        var storage = CreateStorage();
+        var taskId = TaskId.Parse("root/undecodable");
+        var destination = GrainId.Create("caller", "undecodable");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
+        storage.AddCompletionDestination(taskId, state, destination);
+
+        // A stored result which no longer decodes, such as one whose type was removed.
+        var typedState = Assert.IsType<DurableTaskState>(state);
+        typedState.ResultPayload = [0xFF, 0xFF, 0xFF, 0xFF];
+
+        // The outbox dead-letters the completion which it can't materialize, and the runtime retires it.
+        storage.RemoveCompletionDestination(taskId, state, destination);
+        storage.RetainResult(taskId, state);
+
+        Assert.Empty(state.CompletionDestinations);
+        Assert.NotNull(state.RetainedSince);
+        Assert.NotNull(state.CompletedAt);
+        Assert.ThrowsAny<Exception>(() => state.Result);
+    }
+
     [Theory]
     [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
     public async Task RemoteIdentityTombstoneRecoversFromJournal(string journalFormatKey)
