@@ -226,7 +226,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
         return true;
     }
 
-    public async Task<bool> RemoveOutboxDeadLetterAsync(HierarchicalKey messageId)
+    public async Task<bool> RemoveOutboxDeadLetterAsync(MessageId messageId)
     {
         if (!_diagnostics.RemoveOutboxDeadLetter(messageId))
         {

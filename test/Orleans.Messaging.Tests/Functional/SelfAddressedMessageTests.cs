@@ -311,7 +311,7 @@ public sealed class SelfAddressedMessageTests() : MessagingBehaviorTestBase(new 
     private MessagingTestGrain GetInstance(IMessagingTestGrain grain) =>
         Assert.IsType<MessagingTestGrain>(Fixture.GetGrainContext(grain).GrainInstance);
 
-    private OutboxMessage SelfMessage(IMessagingTestGrain grain, TestMessage message, string route, HierarchicalKey messageId = default) =>
+    private OutboxMessage SelfMessage(IMessagingTestGrain grain, TestMessage message, string route, MessageId messageId = default) =>
         TestApplicationProtocol.Create(Sessions, grain.GetGrainId(), grain.GetGrainId(), route, message, messageId);
 
     private static OutboxMessage WithDeliverAt(OutboxMessage message, DateTimeOffset? deliverAt) =>

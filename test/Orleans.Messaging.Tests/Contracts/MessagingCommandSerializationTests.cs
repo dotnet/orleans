@@ -92,7 +92,7 @@ public sealed class MessagingCommandSerializationTests
         foreach (var recovered in new[] { fromJson, fromBinary })
         {
             Assert.Null(recovered.Message);
-            Assert.Equal(HierarchicalKey.Create("orders", "reference"), recovered.Reference!.Value.MessageId);
+            Assert.Equal(MessageId.Create("orders", "reference"), recovered.Reference!.Value.MessageId);
         }
     }
 
@@ -100,7 +100,7 @@ public sealed class MessagingCommandSerializationTests
 
     private static OutboxMessage OutboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt), ReceiverId = Receiver };
 
-    private static OutboxMessageReference Reference(string id) => new() { MessageId = HierarchicalKey.Create("orders", id) };
+    private static OutboxMessageReference Reference(string id) => new() { MessageId = MessageId.Create("orders", id) };
 
     private static Envelope Envelope(string id, DateTimeOffset? deliverAt = null) => new()
     {
@@ -148,9 +148,9 @@ public sealed class MessagingCommandSerializationTests
             new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("enqueue"), State = new() { EnqueuedAt = Now } },
             new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("scheduled", Now), State = new() { EnqueuedAt = Now } },
             new() { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() { EnqueuedAt = Now } },
-            new() { Kind = OutboxCommandKind.Delivery, MessageId = HierarchicalKey.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", EnqueuedAt = Now } },
-            new() { Kind = OutboxCommandKind.Delivery, MessageId = HierarchicalKey.Create("orders", "dead"), DeadLetter = deadLetter },
-            new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [HierarchicalKey.Create("orders", "dead")] },
+            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", EnqueuedAt = Now } },
+            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "dead"), DeadLetter = deadLetter },
+            new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [MessageId.Create("orders", "dead")] },
             new()
             {
                 Kind = OutboxCommandKind.Snapshot,

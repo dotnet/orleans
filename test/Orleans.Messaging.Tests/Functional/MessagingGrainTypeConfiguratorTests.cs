@@ -460,7 +460,7 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
 
     private InboxMessage CreateEnvelope(IAddressable grain) =>
         OutboxTestMessages.CreateApplication(Fixture.Client.ServiceProvider,
-            HierarchicalKey.Create("test", grain.GetGrainId().ToString(), "command", (++_commandSequence).ToString(CultureInfo.InvariantCulture)),
+            MessageId.Create("test", grain.GetGrainId().ToString(), "command", (++_commandSequence).ToString(CultureInfo.InvariantCulture)),
             GrainId.Create("bootstrap-sender", "external"), grain.GetGrainId(), BootstrapState.Route, 1).ToInboxMessage();
 
     private static int GetProcessedCount(BootstrapObservation observation) =>

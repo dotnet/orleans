@@ -24,7 +24,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
     {
         var sender = Cluster.Client.GetGrain<IJsonMessagingGrain>(Guid.NewGuid());
         var receiver = Cluster.Client.GetGrain<IJsonMessagingGrain>(Guid.NewGuid());
-        var messageId = HierarchicalKey.Create("json", Guid.NewGuid().ToString("N"));
+        var messageId = MessageId.Create("json", Guid.NewGuid().ToString("N"));
 
         // The sender deactivates after committing the send, so delivery runs from the outbox recovered from the JSON journal.
         await sender.SendAndDeactivateAsync(receiver.GetGrainId(), messageId, 42);
@@ -52,7 +52,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         var receiver = Cluster.Client.GetGrain<ICustomHandlerGrain>(Guid.NewGuid());
         var message = new InboxMessage
         {
-            Envelope = new Envelope { MessageId = HierarchicalKey.Create("custom", Guid.NewGuid().ToString("N")), Payload = [7], Subject = "custom" }
+            Envelope = new Envelope { MessageId = MessageId.Create("custom", Guid.NewGuid().ToString("N")), Payload = [7], Subject = "custom" }
         };
 
         var result = await receiver.AsReference<IInboxExtension>().DeliverAsync(message, Token);
@@ -65,7 +65,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
     public async Task JsonJournal_RecoversScheduledInboxMessageWithItsDeliverAt()
     {
         var receiver = Cluster.Client.GetGrain<IJsonMessagingGrain>(Guid.NewGuid());
-        var messageId = HierarchicalKey.Create("json", "scheduled", Guid.NewGuid().ToString("N"));
+        var messageId = MessageId.Create("json", "scheduled", Guid.NewGuid().ToString("N"));
         var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
         var deliverAt = new DateTimeOffset(DateTime.UtcNow.AddDays(1).Ticks, TimeSpan.Zero).ToOffset(TimeSpan.FromHours(5));
         var scheduled = type.Create(messageId, receiver.GetGrainId(), 7, deliverAt).ToInboxMessage();
@@ -93,8 +93,8 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
     public async Task JsonJournal_RecoversSelfSentMessagesFromTheInbox()
     {
         var grain = Cluster.Client.GetGrain<IJsonMessagingGrain>(Guid.NewGuid());
-        var scheduledId = HierarchicalKey.Create("json", "self-scheduled", Guid.NewGuid().ToString("N"));
-        var immediateId = HierarchicalKey.Create("json", "self", Guid.NewGuid().ToString("N"));
+        var scheduledId = MessageId.Create("json", "self-scheduled", Guid.NewGuid().ToString("N"));
+        var immediateId = MessageId.Create("json", "self", Guid.NewGuid().ToString("N"));
         var deliverAt = new DateTimeOffset(DateTime.UtcNow.AddDays(1).Ticks, TimeSpan.Zero);
 
         // Each send commits the acceptance in the grain's own inbox; the outbox never holds the message.
@@ -171,8 +171,8 @@ public sealed class CustomHandlerGrain : Grain, ICustomHandlerGrain, IMessagingG
 }
 public interface IJsonMessagingGrain : IGrainWithGuidKey
 {
-    Task SendAsync(GrainId destination, HierarchicalKey messageId, int value, DateTimeOffset? deliverAt = null);
-    Task SendAndDeactivateAsync(GrainId destination, HierarchicalKey messageId, int value);
+    Task SendAsync(GrainId destination, MessageId messageId, int value, DateTimeOffset? deliverAt = null);
+    Task SendAndDeactivateAsync(GrainId destination, MessageId messageId, int value);
     Task<int> GetOutboxCountAsync();
     Task DeactivateAsync();
 }
@@ -219,13 +219,13 @@ public sealed class JsonMessagingGrain : Grain, IJsonMessagingGrain, IMessagingG
         });
     }
 
-    public async Task SendAsync(GrainId destination, HierarchicalKey messageId, int value, DateTimeOffset? deliverAt = null)
+    public async Task SendAsync(GrainId destination, MessageId messageId, int value, DateTimeOffset? deliverAt = null)
     {
         _outbox.Send(_type, messageId, destination, value, deliverAt);
         await _manager.WriteStateAsync(CancellationToken.None);
     }
 
-    public async Task SendAndDeactivateAsync(GrainId destination, HierarchicalKey messageId, int value)
+    public async Task SendAndDeactivateAsync(GrainId destination, MessageId messageId, int value)
     {
         await SendAsync(destination, messageId, value);
         DeactivateOnIdle();

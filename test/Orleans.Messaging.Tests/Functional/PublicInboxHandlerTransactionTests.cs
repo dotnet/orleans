@@ -34,7 +34,7 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
         var bytes = System.Text.Encoding.UTF8.GetBytes("raw application bytes\0\u03c0/forward").Concat(new byte[] { 0xff, 0x80, 0x01 }).ToArray();
         var envelope = new Envelope
         {
-            MessageId = HierarchicalKey.Create("raw", Guid.NewGuid().ToString("N")),
+            MessageId = MessageId.Create("raw", Guid.NewGuid().ToString("N")),
             Payload = bytes,
             Headers = new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["attachment"] = [0xff, 0x80, 0x01] }
         };
@@ -126,8 +126,8 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
     public async Task CaptureProbeSnapshot_RemainsStableAcrossLaterWrites()
     {
         var receiver = NewGrain();
-        var first = new MessageEffect(HierarchicalKey.Create("capture", "first"), 1, 1, "first");
-        var second = new MessageEffect(HierarchicalKey.Create("capture", "second"), 1, 2, "second");
+        var first = new MessageEffect(MessageId.Create("capture", "first"), 1, 1, "first");
+        var second = new MessageEffect(MessageId.Create("capture", "second"), 1, 2, "second");
         await receiver.StageEffectAsync(first);
         await receiver.RetryWriteStateAsync();
         var grain = Assert.IsType<MessagingTestGrain>(Fixture.GetGrainContext(receiver).GrainInstance);
@@ -157,7 +157,7 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
     {
         var receiver = NewGrain();
         var sink = NewGrain();
-        var logicalId = HierarchicalKey.Create("atomic", Guid.NewGuid().ToString("N"));
+        var logicalId = MessageId.Create("atomic", Guid.NewGuid().ToString("N"));
         var envelope = CreateEnvelope(
             receiver,
             new TestMessage(logicalId, 7, "atomic", sink.GetGrainId()));
@@ -187,7 +187,7 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
         var sink = NewGrain();
         var envelope = CreateEnvelope(
             receiver,
-            new TestMessage(HierarchicalKey.Create("preparation", "failure"), 9, "preparation-failure", sink.GetGrainId(), ThrowDuringPreparation: true));
+            new TestMessage(MessageId.Create("preparation", "failure"), 9, "preparation-failure", sink.GetGrainId(), ThrowDuringPreparation: true));
 
         var accepted = await DeliverAsync(receiver, envelope);
         var state = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
@@ -213,7 +213,7 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
         var manager = context.ActivationServices.GetRequiredService<IJournaledStateManager>();
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/admitted-outgoing");
         var envelope = CreateEnvelope(receiver,
-            new TestMessage(HierarchicalKey.Create("preparation", "admitted"), 91, "admitted", sink.GetGrainId()), "messages/admitted-outgoing");
+            new TestMessage(MessageId.Create("preparation", "admitted"), 91, "admitted", sink.GetGrainId()), "messages/admitted-outgoing");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
         var localPreparation = grain.GetSnapshotForTest();
@@ -281,7 +281,7 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
         var oldContext = Fixture.GetGrainContext(receiver);
         var oldGrain = Assert.IsType<MessagingTestGrain>(oldContext.GrainInstance);
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/completion-outcome");
-        var message = new TestMessage(HierarchicalKey.Create("completion", "outcome"), 92, "completion-outcome", sink.GetGrainId());
+        var message = new TestMessage(MessageId.Create("completion", "outcome"), 92, "completion-outcome", sink.GetGrainId());
         var envelope = CreateEnvelope(receiver, message, "messages/completion-outcome");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();

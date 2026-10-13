@@ -20,8 +20,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 {
     private readonly MessagingPump _pump;
     private JournalStreamWriter _writer;
-    private readonly Dictionary<HierarchicalKey, OutboxEntry> _messages = [];
-    private readonly Dictionary<HierarchicalKey, OutboxDeadLetter> _deadLetters = [];
+    private readonly Dictionary<MessageId, OutboxEntry> _messages = [];
+    private readonly Dictionary<MessageId, OutboxDeadLetter> _deadLetters = [];
     private readonly List<IOutboxMessageSource> _sources = [];
     private Task<DeliveryOutcome[]>? _deliveries;
 
@@ -39,8 +39,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private TimeProvider TimeProvider => _pump.Shared.JobTimeProvider;
     private GrainId GrainId => _pump.GrainContext.GrainId;
 
-    internal IReadOnlyDictionary<HierarchicalKey, OutboxEntry> MessageState => _messages;
-    internal IReadOnlyDictionary<HierarchicalKey, OutboxDeadLetter> DeadLetterState => _deadLetters;
+    internal IReadOnlyDictionary<MessageId, OutboxEntry> MessageState => _messages;
+    internal IReadOnlyDictionary<MessageId, OutboxDeadLetter> DeadLetterState => _deadLetters;
     internal int Count => _messages.Count;
 
     public IOutbox Register(IOutboxMessageSource source)
@@ -83,7 +83,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
     }
 
-    public void Send(HierarchicalKey messageId)
+    public void Send(MessageId messageId)
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         EnvelopeValidation.ValidateMessageId(messageId);
@@ -121,7 +121,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     }
 
     /// <summary>Returns the first registered source which provides the message, and its validated message.</summary>
-    private IOutboxMessageSource? FindSource(HierarchicalKey messageId, out OutboxMessage message)
+    private IOutboxMessageSource? FindSource(MessageId messageId, out OutboxMessage message)
     {
         foreach (var source in _sources)
         {
@@ -149,7 +149,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         return entry.Source is not null;
     }
 
-    private bool TryGetSourceMessage(IOutboxMessageSource source, HierarchicalKey messageId, out OutboxMessage message)
+    private bool TryGetSourceMessage(IOutboxMessageSource source, MessageId messageId, out OutboxMessage message)
     {
         if (!source.TryGetMessage(messageId, out message)) return false;
         EnvelopeValidation.Validate(message);
@@ -356,7 +356,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     private async ValueTask ApplyDeliveriesAsync(DeliveryOutcome[] outcomes)
     {
-        Dictionary<HierarchicalKey, OutboxDeadLetter>? deadLetters = null;
+        Dictionary<MessageId, OutboxDeadLetter>? deadLetters = null;
         int applied = 0, delivered = 0, backpressured = 0;
         try
         {
@@ -421,7 +421,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         await PersistAsync().ConfigureAwait(true);
     }
 
-    private void ApplyDeadLetters(Dictionary<HierarchicalKey, OutboxDeadLetter> entries)
+    private void ApplyDeadLetters(Dictionary<MessageId, OutboxDeadLetter> entries)
     {
         foreach (var key in _deadLetters.Keys.Where(key => !entries.ContainsKey(key)).ToArray())
         {
@@ -438,7 +438,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     private (OutboxMessageState? Retry, OutboxDeadLetter? DeadLetter) PrepareRetry(
         DeliveryOutcome outcome,
-        ref Dictionary<HierarchicalKey, OutboxDeadLetter>? deadLetters)
+        ref Dictionary<MessageId, OutboxDeadLetter>? deadLetters)
     {
         var previous = outcome.Entry.State;
         var status = outcome.Result?.Status;
@@ -586,25 +586,25 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private static partial void LogDeliveringMessages(ILogger logger, int count);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Delivered message {MessageId} to {ReceiverId} (Status: {Status})")]
-    private static partial void LogMessageDelivered(ILogger logger, HierarchicalKey messageId, GrainId receiverId, DeliveryStatus status);
+    private static partial void LogMessageDelivered(ILogger logger, MessageId messageId, GrainId receiverId, DeliveryStatus status);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "No inbox handler for message {MessageId} to {ReceiverId}: {Message}")]
-    private static partial void LogDeliveryHandlerNotFound(ILogger logger, HierarchicalKey messageId, GrainId receiverId, string? message);
+    private static partial void LogDeliveryHandlerNotFound(ILogger logger, MessageId messageId, GrainId receiverId, string? message);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Backpressured delivering message {MessageId} to {ReceiverId}, will retry later")]
-    private static partial void LogDeliveryBackpressured(ILogger logger, HierarchicalKey messageId, GrainId receiverId);
+    private static partial void LogDeliveryBackpressured(ILogger logger, MessageId messageId, GrainId receiverId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Unexpected delivery status {Status} for message {MessageId} to {ReceiverId}")]
-    private static partial void LogUnexpectedDeliveryStatus(ILogger logger, DeliveryStatus status, HierarchicalKey messageId, GrainId receiverId);
+    private static partial void LogUnexpectedDeliveryStatus(ILogger logger, DeliveryStatus status, MessageId messageId, GrainId receiverId);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error delivering message {MessageId} to {ReceiverId}")]
-    private static partial void LogDeliveryError(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId receiverId);
+    private static partial void LogDeliveryError(ILogger logger, Exception exception, MessageId messageId, GrainId receiverId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Removed outbox message {MessageId}, which its source withdrew")]
-    private static partial void LogMessageWithdrawn(ILogger logger, HierarchicalKey messageId);
+    private static partial void LogMessageWithdrawn(ILogger logger, MessageId messageId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Removed outbox message {MessageId}, which no registered outbox message source provides")]
-    private static partial void LogMessageUnprovided(ILogger logger, HierarchicalKey messageId);
+    private static partial void LogMessageUnprovided(ILogger logger, MessageId messageId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining")]
     private static partial void LogDeliveryComplete(ILogger logger, int deliveredCount, int backpressuredCount, int failedCount, int remainingCount);

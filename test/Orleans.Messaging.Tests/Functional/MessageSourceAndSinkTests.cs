@@ -232,7 +232,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         }));
         Assert.Contains("no outbox message source is registered", error.Message, StringComparison.Ordinal);
 
-        void ApplyReference(Outbox outbox, HierarchicalKey messageId) =>
+        void ApplyReference(Outbox outbox, MessageId messageId) =>
             ((IDurableValueCommandHandler<OutboxCommand>)outbox).ApplySet(new OutboxCommand
             {
                 Kind = OutboxCommandKind.Enqueue,
@@ -577,11 +577,11 @@ public sealed class SourceSinkProbe
 
 public interface ISourceSinkGrain : IGrainWithGuidKey
 {
-    Task StageFromSourceAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload, bool write);
-    Task StageFromSourceAndDeactivateAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload);
-    Task SendFromSourceAsync(HierarchicalKey messageId);
-    Task WithdrawAsync(HierarchicalKey messageId);
-    Task SendAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload, bool write);
+    Task StageFromSourceAsync(GrainId receiver, MessageId messageId, byte[] payload, bool write);
+    Task StageFromSourceAndDeactivateAsync(GrainId receiver, MessageId messageId, byte[] payload);
+    Task SendFromSourceAsync(MessageId messageId);
+    Task WithdrawAsync(MessageId messageId);
+    Task SendAsync(GrainId receiver, MessageId messageId, byte[] payload, bool write);
     Task WriteAsync();
     Task<int> GetOutboxCountAsync();
     Task DeactivateAsync();
@@ -625,7 +625,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
     internal (Dictionary<string, byte[]> Outgoing, Dictionary<string, byte[]> Received, Dictionary<string, string> Retired) GetState() =>
         (new(_outgoing), new(_received), new(_retired));
 
-    public async Task StageFromSourceAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload, bool write)
+    public async Task StageFromSourceAsync(GrainId receiver, MessageId messageId, byte[] payload, bool write)
     {
         _outgoing[messageId.ToString()] = payload;
         _receivers[messageId.ToString()] = receiver.ToString();
@@ -633,26 +633,26 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         if (write) await _manager.WriteStateAsync(CancellationToken.None);
     }
 
-    public async Task StageFromSourceAndDeactivateAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload)
+    public async Task StageFromSourceAndDeactivateAsync(GrainId receiver, MessageId messageId, byte[] payload)
     {
         await StageFromSourceAsync(receiver, messageId, payload, write: true);
         DeactivateOnIdle();
     }
 
-    public Task SendFromSourceAsync(HierarchicalKey messageId)
+    public Task SendFromSourceAsync(MessageId messageId)
     {
         _outbox.Send(messageId);
         return Task.CompletedTask;
     }
 
-    public Task WithdrawAsync(HierarchicalKey messageId)
+    public Task WithdrawAsync(MessageId messageId)
     {
         Assert.True(_outgoing.Remove(messageId.ToString()));
         Assert.True(_receivers.Remove(messageId.ToString()));
         return Task.CompletedTask;
     }
 
-    public async Task SendAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload, bool write)
+    public async Task SendAsync(GrainId receiver, MessageId messageId, byte[] payload, bool write)
     {
         _outbox.Send(new OutboxMessage
         {
@@ -672,7 +672,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         return Task.CompletedTask;
     }
 
-    bool IOutboxMessageSource.TryGetMessage(HierarchicalKey messageId, out OutboxMessage message)
+    bool IOutboxMessageSource.TryGetMessage(MessageId messageId, out OutboxMessage message)
     {
         var key = messageId.ToString();
         if (!_outgoing.TryGetValue(key, out var payload))
@@ -690,7 +690,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         return true;
     }
 
-    void IOutboxMessageSource.OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement)
+    void IOutboxMessageSource.OnRetired(MessageId messageId, OutboxMessageRetirement retirement)
     {
         var key = messageId.ToString();
         Assert.True(_outgoing.Remove(key));

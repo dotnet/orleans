@@ -14,7 +14,7 @@ public interface IRawPayloadTestGrain : IGrainWithGuidKey
 }
 
 [GenerateSerializer]
-public sealed record RawPayloadEffect([property: Id(0)] HierarchicalKey MessageId, [property: Id(1)] string Bytes, [property: Id(2)] int Count);
+public sealed record RawPayloadEffect([property: Id(0)] MessageId MessageId, [property: Id(1)] string Bytes, [property: Id(2)] int Count);
 
 [GenerateSerializer]
 public sealed record RawPayloadSnapshot([property: Id(0)] Guid ActivationId, [property: Id(1)] int InboxCount,
@@ -27,7 +27,7 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
     public const string HandlerBarrier = "raw-payload";
     private readonly Inbox _inbox;
     private readonly IOutbox _outbox;
-    private readonly IDurableDictionary<HierarchicalKey, RawPayloadEffect> _effects;
+    private readonly IDurableDictionary<MessageId, RawPayloadEffect> _effects;
     private readonly IDurableValue<GrainId> _forward;
     private readonly IDurableValue<int> _forwardCopies;
     internal int ExpectedAcknowledgedEffects { get; set; } = 1;
@@ -37,7 +37,7 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
     internal Task<RawPayloadSnapshot> Acknowledged => _acknowledged.Task;
 
     public RawPayloadTestGrain(IGrainContext context, IOutbox outbox, IJournaledStateManager manager,
-        [FromKeyedServices("raw-effects")] IDurableDictionary<HierarchicalKey, RawPayloadEffect> effects,
+        [FromKeyedServices("raw-effects")] IDurableDictionary<MessageId, RawPayloadEffect> effects,
         [FromKeyedServices("raw-forward")] IDurableValue<GrainId> forward,
         [FromKeyedServices("raw-forward-copies")] IDurableValue<int> forwardCopies,
         HandlerProbe handlers)
@@ -91,7 +91,7 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
             {
                 Envelope = index == 0
                     ? input
-                    : input with { MessageId = input.MessageId.CreateChildKey(index.ToString(CultureInfo.InvariantCulture)) },
+                    : input with { MessageId = new MessageId(input.MessageId.Key.CreateChildKey(index.ToString(CultureInfo.InvariantCulture))) },
                 ReceiverId = _forward.Value
             }).ToArray();
         _effects.TryGetValue(input.MessageId, out var prior);
