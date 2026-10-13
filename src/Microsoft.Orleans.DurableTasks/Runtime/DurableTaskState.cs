@@ -135,6 +135,11 @@ public class DurableTaskState : IDurableTaskState
     [Id(14)]
     public TimeSpan? DelayDuration { get; set; }
 
+    /// <inheritdoc cref="IDurableTaskState.RetainedSince"/>
+    [Id(17)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? RetainedSince { get; set; }
+
     IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
 
     /// <summary>
