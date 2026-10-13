@@ -30,6 +30,7 @@ public interface IMessagingDiagnostics
 /// Describes a dead-lettered durable message.
 /// </summary>
 /// <typeparam name="TMessage">The incoming or outgoing message type.</typeparam>
+[GenerateSerializer, Alias("Orleans.Messaging.DeadLetter`1")]
 public sealed class DeadLetter<TMessage>
 {
     /// <summary>
@@ -39,21 +40,25 @@ public sealed class DeadLetter<TMessage>
     /// Treat the message's encoded headers as immutable. Application diagnostic DTOs use
     /// ordinary RPC copying when returning message buffers.
     /// </remarks>
+    [Id(0)]
     public required TMessage Message { get; init; }
 
     /// <summary>
     /// Gets when the message was dead-lettered.
     /// </summary>
+    [Id(1)]
     public DateTimeOffset DeadLetteredAt { get; init; }
 
     /// <summary>
     /// Gets the terminal failure reason.
     /// </summary>
+    [Id(2)]
     public required string Reason { get; init; }
 
     /// <summary>
     /// Gets the number of attempts made.
     /// </summary>
+    [Id(3)]
     public int AttemptCount { get; init; }
 }
 
