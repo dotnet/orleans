@@ -75,7 +75,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         var schedules = Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, context.GrainId);
         await OnTurnAsync(context, async () =>
         {
-            IInboxExtension extension = context.ActivationServices.GetRequiredService<Inbox>();
+            IMessagingExtension extension = context.ActivationServices.GetRequiredService<Inbox>();
             Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(changed)).Status);
             var retained = Assert.Single(pending.Messages()).Envelope;
             Assert.Same(first.Payload, retained.Payload);
@@ -189,7 +189,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         var writes = Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(context.GrainId));
         await OnTurnAsync(context, async () =>
         {
-            IInboxExtension extension = context.ActivationServices.GetRequiredService<Inbox>();
+            IMessagingExtension extension = context.ActivationServices.GetRequiredService<Inbox>();
             await Assert.ThrowsAsync<ArgumentException>(() => extension.DeliverAsync(message, TestContext.Current.CancellationToken).AsTask());
         });
         Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(JournalId.FromGrainId(context.GrainId)));
