@@ -357,7 +357,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
             if (_handlerProbe.TryGet(this.GetGrainId(), TestApplicationProtocol.Read(_sessions, context.Message).Route, out var gate))
             {
                 gate.Entered.TrySetResult();
-                await gate.Continue.Task.WaitAsync(cancellationToken);
+                await gate.WaitAsync(cancellationToken);
             }
 
             if (_handlerProbe.TryGet(this.GetGrainId(), TestApplicationProtocol.Read(_sessions, context.Message).Route + "/application-preparation", out var preparation))

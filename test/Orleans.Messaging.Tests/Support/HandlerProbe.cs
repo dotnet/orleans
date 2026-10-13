@@ -8,9 +8,9 @@ public sealed class HandlerProbe
 {
     private readonly ConcurrentDictionary<(GrainId GrainId, string Route), Barrier> _barriers = new();
 
-    public Barrier Arm(GrainId grainId, string route)
+    public Barrier Arm(GrainId grainId, string route, bool observeCancellation = true)
     {
-        var barrier = new Barrier(this, (grainId, route));
+        var barrier = new Barrier(this, (grainId, route), observeCancellation);
         if (!_barriers.TryAdd((grainId, route), barrier))
         {
             throw new InvalidOperationException($"A handler barrier is already armed for '{grainId}' and route '{route}'.");
@@ -29,11 +29,13 @@ public sealed class HandlerProbe
     {
         private readonly HandlerProbe _owner;
         private readonly (GrainId GrainId, string Route) _key;
+        private readonly bool _observeCancellation;
 
-        internal Barrier(HandlerProbe owner, (GrainId GrainId, string Route) key)
+        internal Barrier(HandlerProbe owner, (GrainId GrainId, string Route) key, bool observeCancellation)
         {
             _owner = owner;
             _key = key;
+            _observeCancellation = observeCancellation;
         }
 
         internal TaskCompletionSource Entered { get; } =
@@ -43,6 +45,10 @@ public sealed class HandlerProbe
 
         public Task WaitUntilEnteredAsync() => Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
         public void Release() => Continue.TrySetResult();
+
+        // A barrier that ignores cancellation holds the handler until Release, even after shutdown.
+        internal Task WaitAsync(CancellationToken cancellationToken) =>
+            _observeCancellation ? Continue.Task.WaitAsync(cancellationToken) : Continue.Task;
 
         public void Dispose()
         {
