@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Messaging.Configuration;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Polly;
 
 namespace Orleans.Messaging;
 
@@ -336,7 +337,30 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         try
         {
             var target = Shared.GrainFactory.GetGrain<IMessagingExtension>(message.ReceiverId);
-            var result = await target.DeliverAsync(message.ToInboxMessage(), cancellationToken).ConfigureAwait(true);
+            var inboxMessage = message.ToInboxMessage();
+            var pipeline = Shared.DeliveryPipeline;
+            DeliveryResult result;
+            if (ReferenceEquals(pipeline, ResiliencePipeline.Empty))
+            {
+                result = await target.DeliverAsync(inboxMessage, cancellationToken).ConfigureAwait(true);
+            }
+            else
+            {
+                // Continue on the activation's scheduler so each try calls the receiver from this grain.
+                var context = ResilienceContextPool.Shared.Get(continueOnCapturedContext: true, cancellationToken);
+                try
+                {
+                    result = await pipeline.ExecuteAsync(
+                        static (context, state) => state.target.DeliverAsync(state.inboxMessage, context.CancellationToken),
+                        context,
+                        (target, inboxMessage)).ConfigureAwait(true);
+                }
+                finally
+                {
+                    ResilienceContextPool.Shared.Return(context);
+                }
+            }
+
             return new(entry, message, result, null, Stopwatch.GetElapsedTime(start), false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -537,14 +561,16 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         var previous = outcome.Entry.State;
         var status = outcome.Result?.Status;
         var now = TimeProvider.GetUtcNow();
-        var attemptCount = outcome.Expired ? previous.AttemptCount : checked(previous.AttemptCount + 1);
+        // Receivers answer counted attempts; failed calls, such as those during an outage, retry until the message expires.
+        var answered = outcome.Result is not null;
+        var attemptCount = answered ? checked(previous.AttemptCount + 1) : previous.AttemptCount;
         var error = outcome.Error ?? status switch
         {
             DeliveryStatus.Backpressured => "The receiver is backpressured.",
             DeliveryStatus.HandlerNotFound => outcome.Result?.Message ?? "The receiver has no registered inbox handler.",
             _ => $"Unexpected delivery status '{status}'."
         };
-        if (outcome.Expired || attemptCount >= Options.MaxDeliveryAttempts
+        if (outcome.Expired || answered && attemptCount >= Options.MaxDeliveryAttempts
             || MessagingTime.IsExpired(now, previous.EnqueuedAt!.Value, Options.MaxOutboxRetryAge))
         {
             var letter = new OutboxDeadLetter
@@ -557,7 +583,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             AddDeadLetter(ref deadLetters, letter);
             return (null, letter);
         }
-        var exponent = Math.Min(attemptCount - 1, DurableMessagingOptions.MaximumBackoffExponent);
+        var exponent = answered ? Math.Min(attemptCount - 1, DurableMessagingOptions.MaximumBackoffExponent) : DurableMessagingOptions.MaximumBackoffExponent;
         return (new OutboxMessageState
         {
             AttemptCount = attemptCount,
