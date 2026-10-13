@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Concurrency;
 using Orleans.DurableTasks;
 using Orleans.Runtime;
 
@@ -23,7 +24,9 @@ public interface IDurableTaskServer : IGrainExtension
 
     // API used by ScheduledTask/<T> to check for a result for a task.
     // The ScheduledTask does not have access to the original request, so it cannot submit a sensible IDurableTaskRequest.
-    [Alias("SubscribeOrPollAsync")]
+    // A poll waits for the result without changing state, so it interleaves: the grain keeps processing the requests and
+    // messages which complete the task.
+    [Alias("SubscribeOrPollAsync"), AlwaysInterleave]
     ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, CancellationToken cancellationToken = default);
 
     [Alias("CancelAsync")]

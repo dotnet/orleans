@@ -56,6 +56,31 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
     }
 
     [Fact]
+    public async Task PollingInterleavesWithOtherRequestsToTheGrain()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var workerKey = Guid.NewGuid();
+        var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey);
+        var started = _fixture.MessagingProbe.WaitForStartedAsync(workerKey, 1);
+        var waiting = await worker.WaitForCancellationAsync(1).ScheduleAsync("long-poll", cancellationToken);
+        await started.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+        // The poll outlasts the test, so a request sent after it completes only if the grain interleaves them. A waiting
+        // client must not stall the grain whose requests and inbox messages complete the task.
+        var poll = worker.AsReference<IDurableTaskGrainExtension>().SubscribeOrPollAsync(
+            waiting.Id,
+            new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromMinutes(5) },
+            cancellationToken).AsTask();
+        var echo = await worker.EchoAsync(21).ScheduleAsync("echo", cancellationToken)
+            .WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        Assert.Equal(42, await echo.WaitAsync(cancellationToken));
+        Assert.False(poll.IsCompleted);
+
+        await waiting.CancelAsync(cancellationToken);
+        var response = await poll.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+    }
+    [Fact]
     public async Task CancellationFansOutToRemoteChildrenAndCompletesThroughInbox()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
