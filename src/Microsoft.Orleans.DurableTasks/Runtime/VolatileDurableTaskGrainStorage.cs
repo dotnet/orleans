@@ -26,6 +26,7 @@ public class VolatileDurableTaskGrainStorage(
     private readonly ConditionalWeakTable<DurableTaskState, StateOwnership> _stateOwnership = [];
     private Dictionary<TaskId, DurableTaskState> _workingCopy = [];
     private Dictionary<TaskId, DurableTaskState> _persistedCopy = [];
+    private DurableTaskHierarchy _hierarchy = new();
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, (IDurableTaskState)pair.Value));
 
@@ -34,7 +35,12 @@ public class VolatileDurableTaskGrainStorage(
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ArgumentNullException.ThrowIfNull(state);
         TrackState(taskId, state);
+        var added = !_workingCopy.ContainsKey(taskId);
         _workingCopy[taskId] = TrackState(taskId, CopyState(state));
+        if (added)
+        {
+            _hierarchy.Add(taskId);
+        }
     }
 
     public bool RemoveTask(TaskId taskId)
@@ -43,7 +49,13 @@ public class VolatileDurableTaskGrainStorage(
         Debug.Assert(
             !_workingCopy.TryGetValue(taskId, out var removed) || removed.CompletionDestinations.Count == 0,
             "A pending completion retains its task's result.");
-        return _workingCopy.Remove(taskId);
+        if (!_workingCopy.Remove(taskId))
+        {
+            return false;
+        }
+
+        _hierarchy.Remove(taskId, IsStored);
+        return true;
     }
 
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
@@ -67,6 +79,7 @@ public class VolatileDurableTaskGrainStorage(
             TrackState(taskId, state);
         }
 
+        _hierarchy = DurableTaskHierarchy.Create(_workingCopy.Keys);
         return default;
     }
 
@@ -166,16 +179,6 @@ public class VolatileDurableTaskGrainStorage(
         AddOrUpdateTask(taskId, typedState);
     }
 
-    public void CreateTombstone(TaskId taskId, IDurableTaskState state)
-    {
-        var typedState = GetState(taskId, state);
-        Debug.Assert(typedState.CompletionDestinations.Count == 0, "A pending completion retains its task's result.");
-        typedState.SetRequest(null);
-        typedState.SetResult(null);
-        typedState.TombstonedAt = _timeProvider.GetUtcNow();
-        AddOrUpdateTask(taskId, typedState);
-    }
-
     private DurableTaskState GetState(TaskId taskId, IDurableTaskState state)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
@@ -237,6 +240,7 @@ public class VolatileDurableTaskGrainStorage(
     public void Clear()
     {
         _workingCopy.Clear();
+        _hierarchy.Clear();
     }
 
     public void RequestCancellation(TaskId taskId, IDurableTaskState state)
@@ -262,5 +266,10 @@ public class VolatileDurableTaskGrainStorage(
         AddOrUpdateTask(taskId, typedState);
     }
 
-    public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId parentId) => Tasks.Where(task => parentId.IsParentOf(task.Id));
+    public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId parentId) =>
+        _hierarchy
+            .GetNearestStoredDescendants(parentId, IsStored)
+            .Select(id => (id, (IDurableTaskState)_workingCopy[id]));
+
+    private bool IsStored(TaskId taskId) => _workingCopy.ContainsKey(taskId);
 }

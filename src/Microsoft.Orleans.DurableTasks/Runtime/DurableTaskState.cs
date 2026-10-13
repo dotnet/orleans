@@ -117,9 +117,6 @@ public class DurableTaskState : IDurableTaskState
     [Id(9)]
     public string? RequestFingerprint { get; set; }
 
-    [Id(10)]
-    public DateTimeOffset? TombstonedAt { get; set; }
-
     [Id(11)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public GrainId RemoteTarget { get; set; }

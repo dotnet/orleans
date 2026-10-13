@@ -25,7 +25,7 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
     public ValueTask DisposeAsync() => _fixture.DisposeAsync();
 
     [Fact]
-    public async Task RemoteCallJournalsEachPayloadOncePerGrainAndPrunesDeliveredResult()
+    public async Task RemoteCallJournalsEachPayloadOncePerGrainAndDeletesDeliveredResult()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var caller = _fixture.Client.GetGrain<IPayloadCallerGrain>(Guid.NewGuid());
@@ -39,9 +39,9 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
         Assert.True(response.GetResult<bool>());
 
-        // The caller's inbox accepted the completion, so the callee's outbox retires it and prunes the task.
+        // The caller's inbox accepted the completion, so the callee's outbox retires it and deletes the task.
         var childId = TaskId.CreateRoot("payload-call").Child(PayloadCallerGrain.CallId);
-        await WaitUntilPrunedAsync(worker, childId);
+        await WaitUntilDeletedAsync(worker, childId);
 
         var callerJournal = await ReadJournalAsync(caller.GetGrainId());
         var workerJournal = await ReadJournalAsync(worker.GetGrainId());
@@ -76,7 +76,7 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
         Assert.Equal(1, CountPayload(workerJournal, output));
     }
 
-    private async Task WaitUntilPrunedAsync(IAddressable grain, TaskId taskId)
+    private async Task WaitUntilDeletedAsync(IAddressable grain, TaskId taskId)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var extension = grain.AsReference<IDurableTaskGrainExtension>();
@@ -95,7 +95,7 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
 
             if (DateTime.UtcNow > deadline)
             {
-                throw new TimeoutException($"Durable task '{taskId}' was not pruned after its completion was delivered.");
+                throw new TimeoutException($"Durable task '{taskId}' was not deleted after its completion was delivered.");
             }
 
             await Task.Delay(10, cancellationToken);

@@ -17,8 +17,8 @@ public interface IDurableTaskState
     /// </summary>
     /// <remarks>
     /// Each destination has a completion pending in the outbox until the outbox retires it. A task whose completions were
-    /// all delivered is pruned at once; otherwise the terminal result is retained for the configured retention period.
-    /// Local nested tasks typically have no external completion destinations.
+    /// all delivered is deleted with its execution tree at once; otherwise the terminal result is retained for the
+    /// configured retention period. Local nested tasks have no completion destinations.
     /// </remarks>
     public IReadOnlySet<GrainId> CompletionDestinations { get; }
 
@@ -47,8 +47,6 @@ public interface IDurableTaskState
     public long ResumeGeneration { get; }
 
     public string? RequestFingerprint { get; }
-
-    public DateTimeOffset? TombstonedAt { get; }
 
     /// <summary>
     /// Gets when the terminal result's retention restarted because its completion was dead-lettered, or

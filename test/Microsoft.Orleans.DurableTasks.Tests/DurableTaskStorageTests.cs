@@ -137,38 +137,75 @@ public sealed class DurableTaskStorageTests
         Assert.ThrowsAny<Exception>(() => state.Result);
     }
 
+    [Fact]
+    public void GetChildrenReturnsNearestStoredDescendants()
+    {
+        var storage = CreateStorage();
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/child");
+        var grandchildId = TaskId.Parse("root/child/grandchild");
+        var operationChildId = TaskId.Parse("root/$when-any-1/0");
+        var nestedOperationChildId = TaskId.Parse("root/$when-all-2/0/leaf");
+        foreach (var taskId in new[] { grandchildId, rootId, childId, operationChildId, nestedOperationChildId, TaskId.Parse("other") })
+        {
+            storage.GetOrCreateTask(taskId, request: null);
+        }
+
+        // Identifiers between a task and its nearest stored descendants, such as a combinator's operation, aren't stored.
+        Assert.Equal(
+            new HashSet<TaskId> { childId, operationChildId, nestedOperationChildId },
+            storage.GetChildren(rootId).Select(child => child.Id).ToHashSet());
+        Assert.Equal([grandchildId], storage.GetChildren(childId).Select(child => child.Id));
+
+        // A removed task's stored descendants become children of its nearest stored ancestor.
+        Assert.True(storage.RemoveTask(childId));
+        Assert.Equal(
+            new HashSet<TaskId> { grandchildId, operationChildId, nestedOperationChildId },
+            storage.GetChildren(rootId).Select(child => child.Id).ToHashSet());
+
+        Assert.True(storage.RemoveTask(grandchildId));
+        Assert.True(storage.RemoveTask(nestedOperationChildId));
+        Assert.Equal([operationChildId], storage.GetChildren(rootId).Select(child => child.Id));
+        Assert.Empty(storage.GetChildren(TaskId.Parse("root/$when-all-2")));
+    }
+
     [Theory]
     [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
-    public async Task RemoteIdentityTombstoneRecoversFromJournal(string journalFormatKey)
+    public async Task DeletedTaskAndHierarchyRecoverFromJournal(string journalFormatKey)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var harness = new DurableTaskJournalHarness(journalFormatKey);
-        var taskId = TaskId.Parse("root/remote/tombstone");
-        var remoteTarget = GrainId.Create("remote-target", "tombstone");
+        var rootId = TaskId.Parse("root");
+        var deletedId = TaskId.Parse("root/remote/deleted");
+        var retainedId = TaskId.Parse("root/$when-any-1/0");
+        var remoteTarget = GrainId.Create("remote-target", "deleted");
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
             var storage = activation.Storage;
-            var state = storage.GetOrCreateTask(taskId, CreateRequest());
-            storage.SetRemoteRequest(taskId, state, remoteTarget, "remote-fingerprint");
-            storage.SetResponse(taskId, state, DurableTaskResponse.Completed);
-            storage.CreateTombstone(taskId, state);
+            storage.GetOrCreateTask(rootId, request: null);
+            storage.GetOrCreateTask(retainedId, request: null);
+            var state = storage.GetOrCreateTask(deletedId, CreateRequest());
+            storage.SetRemoteRequest(deletedId, state, remoteTarget, "remote-fingerprint");
+            storage.SetResponse(deletedId, state, DurableTaskResponse.Completed);
+            await storage.WriteAsync(cancellationToken);
+        }
+
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            // The hierarchy index is built from the recovered tasks.
+            var storage = activation.Storage;
+            Assert.Equal(
+                new HashSet<TaskId> { deletedId, retainedId },
+                storage.GetChildren(rootId).Select(child => child.Id).ToHashSet());
+            Assert.True(storage.RemoveTask(deletedId));
+            Assert.Equal([retainedId], storage.GetChildren(rootId).Select(child => child.Id));
             await storage.WriteAsync(cancellationToken);
         }
 
         await using var recovery = await harness.ActivateAsync(cancellationToken);
-        Assert.True(recovery.Storage.TryGetTask(taskId, out var recovered));
-
-        Assert.NotNull(recovered.TombstonedAt);
-        Assert.Equal(remoteTarget, recovered.RemoteTarget);
-        Assert.Equal("remote-fingerprint", recovered.RemoteRequestFingerprint);
-        Assert.Null(recovered.RequestFingerprint);
-        Assert.Null(recovered.Request);
-        Assert.Null(recovered.Result);
-        var typedState = Assert.IsType<DurableTaskState>(recovered);
-        Assert.Null(typedState.RequestPayload);
-        Assert.Null(typedState.ResultPayload);
+        Assert.False(recovery.Storage.TryGetTask(deletedId, out _));
+        Assert.Equal([retainedId], recovery.Storage.GetChildren(rootId).Select(child => child.Id));
     }
-
     [Theory]
     [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
     public async Task FullTerminalStateRecoversFromJournal(string journalFormatKey)
@@ -211,7 +248,6 @@ public sealed class DurableTaskStorageTests
         Assert.Null(recovered.DueTime);
         Assert.Equal(4, recovered.ResumeGeneration);
         Assert.Equal("request-fingerprint-v1", recovered.RequestFingerprint);
-        Assert.Null(recovered.TombstonedAt);
         Assert.Equal(remoteTarget, recovered.RemoteTarget);
         Assert.Equal("remote-fingerprint-v2", recovered.RemoteRequestFingerprint);
         Assert.Equal(caller, recovered.CallerId);
@@ -326,15 +362,14 @@ public sealed class DurableTaskStorageTests
             Assert.Equal(caller, Assert.IsType<TestDurableTaskRequest>(recovered.Request).Context!.CallerId);
             Assert.Equal("payload result", recovered.Result!.GetResult<string>());
             Assert.Empty(recovered.CompletionDestinations);
-            recovery.Storage.CreateTombstone(taskId, recovered);
+            Assert.True(recovery.Storage.RemoveTask(taskId));
             await recovery.Storage.WriteAsync(cancellationToken);
         }
 
-        await using var tombstoned = await harness.ActivateAsync(cancellationToken);
-        Assert.True(tombstoned.Storage.TryGetTask(taskId, out var tombstone));
-        Assert.Null(tombstone.Request);
-        Assert.Null(tombstone.Result);
-        Assert.NotNull(tombstone.TombstonedAt);
+        // The deletion is journaled.
+        await using var deleted = await harness.ActivateAsync(cancellationToken);
+        Assert.False(deleted.Storage.TryGetTask(taskId, out _));
+        Assert.Empty(deleted.Storage.Tasks);
     }
 
     private static async Task<byte[]> ReadJournalAsync(DurableTaskJournalHarness harness, CancellationToken cancellationToken)

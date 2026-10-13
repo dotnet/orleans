@@ -67,7 +67,7 @@ public struct DurableTaskDiagnosticState
     /// </summary>
     /// <remarks>
     /// A task with a stored result is <c>Completed</c>, <c>Faulted</c>, <c>Canceled</c>, or <c>Unreadable</c> when the result
-    /// no longer decodes. A task without one is <c>Tombstoned</c>, <c>Canceling</c>, <c>Delayed</c>, or <c>Pending</c>.
+    /// no longer decodes. A task without one is <c>Canceling</c>, <c>Delayed</c>, or <c>Pending</c>.
     /// </remarks>
     [Id(2)]
     public string? Status { get; set; }

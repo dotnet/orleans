@@ -73,7 +73,7 @@ api.MapGet("/orders/{orderId:guid}/workflow", async (Guid orderId, IGrainFactory
     }
     catch (DurableTaskNotFoundException)
     {
-        // The order prunes the workflow once the basket which scheduled it has accepted its result.
+        // The order deletes the workflow once the basket which scheduled it has accepted its result.
         return Results.NotFound();
     }
 });
