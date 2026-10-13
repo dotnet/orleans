@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Orleans.Messaging;
 
-/// <summary>Contains a command identity, payload, subject, and optional application headers.</summary>
+/// <summary>Contains a command identity, payload, subject, optional application headers, and an optional delivery time.</summary>
 /// <remarks>
 /// Message identity and payload are required; an empty payload is valid. Raw protocols can omit
 /// subject and headers. Prepare the payload and headers before publishing a message and keep them
@@ -28,4 +30,21 @@ public readonly struct Envelope
     /// <remarks>Use an ordinal dictionary for case-sensitive header names. Keys are nonempty and arrays are non-null.</remarks>
     [Id(3)]
     public Dictionary<string, byte[]>? Headers { get; init; }
+
+    /// <summary>Gets the optional earliest time at which the receiving inbox processes the message.</summary>
+    /// <remarks>
+    /// <para>
+    /// The outbox delivers the message immediately. The receiving inbox accepts, deduplicates, and persists it
+    /// as usual, then holds it until this time is reached on the Durable Jobs clock, and one durable wake-up
+    /// resumes the grain when the message becomes due. <see langword="null"/> processes the message as soon as
+    /// its acceptance is durable.
+    /// </para>
+    /// <para>
+    /// The time is part of the command: reusing a pending message ID with a different value is a conflicting command.
+    /// A message with a value does not count toward the inbox <c>MaxCapacity</c>, including after it becomes due.
+    /// </para>
+    /// </remarks>
+    [Id(4)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? DeliverAt { get; init; }
 }

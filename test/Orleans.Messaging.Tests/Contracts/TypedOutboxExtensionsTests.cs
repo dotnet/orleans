@@ -183,6 +183,29 @@ public sealed class TypedOutboxExtensionsTests
         AssertEnvelopeFields(staged.Envelope);
         Assert.True(outbox.TryGetMessage(CommandId, out var found));
         Assert.Same(staged.Envelope.Payload, found.Envelope.Payload);
+        Assert.Null(staged.Envelope.DeliverAt);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Send_CarriesOptionalDeliverAt(bool addressable)
+    {
+        using var services = CreateServices();
+        var type = new MessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
+        var outbox = new StoringOutbox();
+        var deliverAt = new DateTimeOffset(2040, 1, 2, 3, 4, 5, TimeSpan.FromHours(1));
+
+        if (addressable) outbox.Send(type, CommandId, new AddressableDestination(Destination), "scheduled", deliverAt);
+        else outbox.Send(type, CommandId, Destination, "scheduled", deliverAt);
+
+        var staged = Assert.Single(outbox.Messages);
+        Assert.Equal(deliverAt, staged.Envelope.DeliverAt);
+        Assert.Equal(deliverAt.Offset, staged.Envelope.DeliverAt!.Value.Offset);
+        Assert.Equal(Destination, staged.ReceiverId);
+        Assert.Equal("scheduled", type.Decode(staged));
+        Assert.Equal(deliverAt, type.Create(CommandId, Destination, "scheduled", deliverAt).Envelope.DeliverAt);
+        Assert.Null(type.Create(CommandId, Destination, "scheduled").Envelope.DeliverAt);
     }
 
     [Theory]

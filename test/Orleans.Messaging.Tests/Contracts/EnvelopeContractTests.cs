@@ -180,7 +180,7 @@ public sealed class EnvelopeContractTests
     [Fact]
     public void SimpleEnvelopeSurfaceUsesGeneratedOrdinaryFields()
     {
-        AssertIds(typeof(Envelope), ("MessageId", 0u), ("Payload", 1u), ("Subject", 2u), ("Headers", 3u));
+        AssertIds(typeof(Envelope), ("MessageId", 0u), ("Payload", 1u), ("Subject", 2u), ("Headers", 3u), ("DeliverAt", 4u));
         AssertIds(typeof(InboxMessage), ("Envelope", 0u));
         AssertIds(typeof(OutboxMessage), ("Envelope", 0u), ("ReceiverId", 1u));
         Assert.Equal(typeof(Dictionary<string, byte[]>), typeof(Envelope).GetProperty("Headers")!.PropertyType);
@@ -188,7 +188,8 @@ public sealed class EnvelopeContractTests
         Assert.Null(typeof(Envelope).GetCustomAttribute<ImmutableAttribute>());
         Assert.Single(typeof(Envelope).GetCustomAttributes<GenerateSerializerAttribute>());
         Assert.Equal("Orleans.Messaging.Envelope", typeof(Envelope).GetCustomAttribute<AliasAttribute>()!.Alias);
-        Assert.Equal(new[] { "Headers", "MessageId", "Payload", "Subject" }, typeof(Envelope).GetProperties().Select(p => p.Name).Order(StringComparer.Ordinal));
+        Assert.Equal(typeof(DateTimeOffset?), typeof(Envelope).GetProperty("DeliverAt")!.PropertyType);
+        Assert.Equal(new[] { "DeliverAt", "Headers", "MessageId", "Payload", "Subject" }, typeof(Envelope).GetProperties().Select(p => p.Name).Order(StringComparer.Ordinal));
         Assert.Null(typeof(Envelope).Assembly.GetType("Orleans.Messaging.PackedEnvelopeHeaders"));
         Assert.Null(typeof(Envelope).Assembly.GetType("Orleans.Messaging.EnvelopeBuilder"));
         Assert.Equal(typeof(void), typeof(IInboxHandlerContext).GetMethod("Fail")!.ReturnType);
@@ -215,9 +216,13 @@ public sealed class EnvelopeContractTests
     [InlineData("no-subject", false, false)]
     [InlineData("payload", false, false)]
     [InlineData("payload-length", false, false)]
+    [InlineData("deliver-at-offset", true, true)]
+    [InlineData("deliver-at", false, false)]
+    [InlineData("no-deliver-at", false, false)]
     public void PendingCommandEqualityIgnoresExtraHeadersAndSender(string change, bool outbox, bool inbox)
     {
-        var envelope = Create([0, 255, 128]) with { Subject = "subject.v1", Headers = new() { ["custom"] = "first"u8.ToArray() } };
+        var deliverAt = new DateTimeOffset(2040, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var envelope = Create([0, 255, 128]) with { Subject = "subject.v1", Headers = new() { ["custom"] = "first"u8.ToArray() }, DeliverAt = deliverAt };
         var original = new OutboxMessage { Envelope = envelope, ReceiverId = Receiver };
         var repeated = new OutboxMessage
         {
@@ -227,7 +232,14 @@ public sealed class EnvelopeContractTests
                 MessageId = change == "id" ? HierarchicalKey.Create("other") : change == "child" ? Id.CreateChildKey("child") : Id,
                 Payload = change == "payload" ? [0, 255, 129] : change == "payload-length" ? [0, 255] : [0, 255, 128],
                 Subject = change == "subject" ? "other" : change == "subject-case" ? "Subject.v1" : change == "no-subject" ? null : "subject.v1",
-                Headers = new() { ["custom"] = Encoding.UTF8.GetBytes(change == "headers" ? "second" : "first"), ["sender"] = change == "sender" ? [2] : [1] }
+                Headers = new() { ["custom"] = Encoding.UTF8.GetBytes(change == "headers" ? "second" : "first"), ["sender"] = change == "sender" ? [2] : [1] },
+                DeliverAt = change switch
+                {
+                    "deliver-at-offset" => deliverAt.ToOffset(TimeSpan.FromHours(2)),
+                    "deliver-at" => deliverAt.AddTicks(1),
+                    "no-deliver-at" => null,
+                    _ => deliverAt
+                }
             }
         };
         Assert.Equal(outbox, Invoke<bool>("EnvelopeEquivalence", "AreEquivalent", original, repeated));

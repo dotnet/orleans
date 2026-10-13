@@ -13,5 +13,6 @@ internal static class EnvelopeEquivalence
         left.MessageId == right.MessageId
         && left.Payload.Length == right.Payload.Length
         && string.Equals(left.Subject, right.Subject, StringComparison.Ordinal)
+        && left.DeliverAt == right.DeliverAt
         && left.Payload.AsSpan().SequenceEqual(right.Payload);
 }
