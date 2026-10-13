@@ -3,9 +3,8 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Persistence.MongoDB;
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
-using Orleans.Providers.MongoDB.Utils;
 using Orleans.Runtime;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
@@ -27,17 +26,17 @@ public class MongoGrainStorage : IGrainStorage
     /// <summary>
     /// Initializes storage with validated and post-configured provider options.
     /// </summary>
-    /// <param name="mongoClientFactory">The factory supplying the provider's reusable MongoDB client.</param>
+    /// <param name="mongoClient">The reusable MongoDB client owned by the application or its service container.</param>
     /// <param name="logger">The provider logger.</param>
     /// <param name="options">The validated storage options and configured serializer.</param>
     /// <param name="activatorProvider">The Orleans activators used to recreate missing or cleared grain state.</param>
     public MongoGrainStorage(
-        IMongoClientFactory mongoClientFactory,
+        IMongoClient mongoClient,
         ILogger<MongoGrainStorage> logger,
         MongoDBGrainStorageOptions options,
         IActivatorProvider activatorProvider)
     {
-        this.mongoClient = mongoClientFactory.Create(options, "Storage");
+        this.mongoClient = mongoClient;
         this.logger = logger;
         this.options = options;
         this.serializer = options.GrainStateSerializer;

@@ -10,25 +10,25 @@ namespace Orleans.Hosting
 {
     public static partial class MongoDBGrainStorageSiloBuilderExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Providers.MongoDB.Configuration.MongoDBGrainStorageOptions>>? configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.MongoDB.MongoDBGrainStorageOptions>>? configureOptions = null) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Providers.MongoDB.Configuration.MongoDBGrainStorageOptions>? configureOptions) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGrainStorage(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string name, System.Action<Persistence.MongoDB.MongoDBGrainStorageOptions>? configureOptions) { throw null; }
 
-        public static ISiloBuilder AddMongoDBGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Providers.MongoDB.Configuration.MongoDBGrainStorageOptions>>? configureOptions = null) { throw null; }
+        public static ISiloBuilder AddMongoDBGrainStorage(this ISiloBuilder builder, string name, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.MongoDB.MongoDBGrainStorageOptions>>? configureOptions = null) { throw null; }
 
-        public static ISiloBuilder AddMongoDBGrainStorage(this ISiloBuilder builder, string name, System.Action<Providers.MongoDB.Configuration.MongoDBGrainStorageOptions>? configureOptions) { throw null; }
+        public static ISiloBuilder AddMongoDBGrainStorage(this ISiloBuilder builder, string name, System.Action<Persistence.MongoDB.MongoDBGrainStorageOptions>? configureOptions) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Providers.MongoDB.Configuration.MongoDBGrainStorageOptions>>? configureOptions = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.MongoDB.MongoDBGrainStorageOptions>>? configureOptions = null) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Providers.MongoDB.Configuration.MongoDBGrainStorageOptions>? configureOptions) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBGrainStorageAsDefault(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Persistence.MongoDB.MongoDBGrainStorageOptions>? configureOptions) { throw null; }
 
-        public static ISiloBuilder AddMongoDBGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Providers.MongoDB.Configuration.MongoDBGrainStorageOptions>>? configureOptions = null) { throw null; }
+        public static ISiloBuilder AddMongoDBGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Persistence.MongoDB.MongoDBGrainStorageOptions>>? configureOptions = null) { throw null; }
 
-        public static ISiloBuilder AddMongoDBGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Providers.MongoDB.Configuration.MongoDBGrainStorageOptions>? configureOptions) { throw null; }
+        public static ISiloBuilder AddMongoDBGrainStorageAsDefault(this ISiloBuilder builder, System.Action<Persistence.MongoDB.MongoDBGrainStorageOptions>? configureOptions) { throw null; }
     }
 }
 
-namespace Orleans.Providers.MongoDB.Configuration
+namespace Orleans.Persistence.MongoDB
 {
     public delegate string GrainStorageKeyGenerator(Runtime.GrainId grainId);
     public partial class JsonGrainStateSerializerOptions
@@ -38,9 +38,22 @@ namespace Orleans.Providers.MongoDB.Configuration
 
     public partial class MongoDBGrainStorageOptions : MongoDBOptions
     {
-        public StorageProviders.Serializers.IGrainStateSerializer GrainStateSerializer { get { throw null; } set { } }
+        public Providers.MongoDB.StorageProviders.Serializers.IGrainStateSerializer GrainStateSerializer { get { throw null; } set { } }
 
         public GrainStorageKeyGenerator KeyGenerator { get { throw null; } set { } }
+    }
+
+    public partial class MongoDBOptions
+    {
+        public string? ClientName { get { throw null; } set { } }
+
+        public System.Action<global::MongoDB.Driver.MongoCollectionSettings>? CollectionConfigurator { get { throw null; } set { } }
+
+        public string? CollectionPrefix { get { throw null; } set { } }
+
+        public bool CreateShardKeyForCosmos { get { throw null; } set { } }
+
+        public string DatabaseName { get { throw null; } set { } }
     }
 }
 
@@ -48,7 +61,7 @@ namespace Orleans.Providers.MongoDB.StorageProviders
 {
     public partial class MongoGrainStorage : Storage.IGrainStorage
     {
-        public MongoGrainStorage(Utils.IMongoClientFactory mongoClientFactory, Microsoft.Extensions.Logging.ILogger<MongoGrainStorage> logger, Configuration.MongoDBGrainStorageOptions options, Serialization.Serializers.IActivatorProvider activatorProvider) { }
+        public MongoGrainStorage(global::MongoDB.Driver.IMongoClient mongoClient, Microsoft.Extensions.Logging.ILogger<MongoGrainStorage> logger, Persistence.MongoDB.MongoDBGrainStorageOptions options, Serialization.Serializers.IActivatorProvider activatorProvider) { }
 
         public System.Threading.Tasks.Task ClearStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 
@@ -86,7 +99,7 @@ namespace Orleans.Providers.MongoDB.StorageProviders.Serializers
 
     public partial class JsonGrainStateSerializer : IGrainStateSerializer
     {
-        public JsonGrainStateSerializer(Microsoft.Extensions.Options.IOptions<Configuration.JsonGrainStateSerializerOptions> options, System.IServiceProvider serviceProvider) { }
+        public JsonGrainStateSerializer(Microsoft.Extensions.Options.IOptions<Persistence.MongoDB.JsonGrainStateSerializerOptions> options, System.IServiceProvider serviceProvider) { }
 
         public T Deserialize<T>(global::MongoDB.Bson.BsonValue value) { throw null; }
 

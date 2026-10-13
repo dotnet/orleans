@@ -4,8 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Providers.MongoDB.Membership.Store;
-using Orleans.Providers.MongoDB.Configuration;
-using Orleans.Providers.MongoDB.Utils;
+using Orleans.Clustering.MongoDB;
 using Orleans.Runtime;
 using Orleans.Configuration;
 using MongoDB.Driver;
@@ -31,12 +30,12 @@ public sealed class MongoMembershipTable : IMembershipTable
     /// Initializes the provider using the configured client, database, and cluster identity.
     /// </summary>
     public MongoMembershipTable(
-        IMongoClientFactory mongoClientFactory,
+        IMongoClient mongoClient,
         ILogger<MongoMembershipTable> logger,
         IOptions<ClusterOptions> clusterOptions,
         IOptions<MongoDBMembershipTableOptions> options)
     {
-        this.mongoClient = mongoClientFactory.Create(options.Value, "Membership");
+        this.mongoClient = mongoClient;
         this.logger = logger;
         this.options = options.Value;
         this.clusterId = clusterOptions.Value.ClusterId;

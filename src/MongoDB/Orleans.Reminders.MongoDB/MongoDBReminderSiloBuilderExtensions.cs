@@ -1,7 +1,8 @@
 using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Providers.MongoDB.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Reminders.MongoDB;
 using Orleans.Providers.MongoDB.Reminders;
 using Orleans.Runtime;
 
@@ -40,7 +41,8 @@ public static class MongoDBReminderSiloBuilderExtensions
         {
             services.Configure(configurator);
         }
-        services.AddSingleton<IReminderTable, MongoReminderTable>();
+        services.AddSingleton<IReminderTable>(sp => ActivatorUtilities.CreateInstance<MongoReminderTable>(
+            sp, sp.GetMongoClient(sp.GetRequiredService<IOptions<MongoDBRemindersOptions>>().Value)));
         services.AddSingleton<IConfigurationValidator, MongoDBOptionsValidator<MongoDBRemindersOptions>>();
 
         return services;
@@ -52,8 +54,10 @@ public static class MongoDBReminderSiloBuilderExtensions
         IConfiguration configuration)
     {
         services.AddReminders();
-        services.Configure<MongoDBRemindersOptions>(configuration);
-        services.AddSingleton<IReminderTable, MongoReminderTable>();
+        services.AddOptions<MongoDBRemindersOptions>()
+            .Configure<IServiceProvider>((options, sp) => options.ConfigureMongoDBOptions(sp, configuration));
+        services.AddSingleton<IReminderTable>(sp => ActivatorUtilities.CreateInstance<MongoReminderTable>(
+            sp, sp.GetMongoClient(sp.GetRequiredService<IOptions<MongoDBRemindersOptions>>().Value)));
         services.AddSingleton<IConfigurationValidator, MongoDBOptionsValidator<MongoDBRemindersOptions>>();
 
         return services;

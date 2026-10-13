@@ -5,8 +5,12 @@
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageReference Include="Aspire.MongoDB.Driver" />
+    <PackageReference Include="Aspire.Hosting.MongoDB" />
+    <PackageReference Include="Aspire.Hosting.Orleans" />
+  </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.MongoDB\Orleans.MongoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.Clustering.MongoDB\Orleans.Clustering.MongoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.Persistence.MongoDB\Orleans.Persistence.MongoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.Reminders.MongoDB\Orleans.Reminders.MongoDB.csproj" />

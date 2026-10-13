@@ -5,7 +5,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Core.Events;
 using Orleans.Configuration;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Reminders.MongoDB;
 using Orleans.Providers.MongoDB.Reminders;
 using Orleans.Reminders.TestKit;
 using Orleans.Runtime;
@@ -179,7 +179,7 @@ public sealed class MongoReminderTableTests : IAsyncLifetime
 #pragma warning restore CS0618
         if (createIndexes is { } value) options.CreateIndexes = value;
         else Assert.True(options.CreateIndexes);
-        IReminderTable table = new MongoReminderTable(owned.ClientFactory, NullLogger<MongoReminderTable>.Instance,
+        IReminderTable table = new MongoReminderTable(owned.Client, NullLogger<MongoReminderTable>.Instance,
             Options.Create(options), Options.Create(new ClusterOptions { ServiceId = "index-policy", ClusterId = "tests" }));
         await table.StartAsync(Token);
         try

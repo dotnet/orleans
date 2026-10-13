@@ -12,22 +12,11 @@ namespace Orleans.Hosting
     {
         public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBReminders(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBReminders(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Providers.MongoDB.Configuration.MongoDBRemindersOptions>? configurator = null) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection AddMongoDBReminders(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Reminders.MongoDB.MongoDBRemindersOptions>? configurator = null) { throw null; }
 
         public static ISiloBuilder UseMongoDBReminders(this ISiloBuilder builder, Microsoft.Extensions.Configuration.IConfiguration configuration) { throw null; }
 
-        public static ISiloBuilder UseMongoDBReminders(this ISiloBuilder builder, System.Action<Providers.MongoDB.Configuration.MongoDBRemindersOptions>? configurator = null) { throw null; }
-    }
-}
-
-namespace Orleans.Providers.MongoDB.Configuration
-{
-    public sealed partial class MongoDBRemindersOptions : MongoDBOptions
-    {
-        public bool CreateIndexes { get { throw null; } set { } }
-
-        [System.Obsolete("This will be removed in future version")]
-        public bool PurgeLegacyIndexes { get { throw null; } set { } }
+        public static ISiloBuilder UseMongoDBReminders(this ISiloBuilder builder, System.Action<Reminders.MongoDB.MongoDBRemindersOptions>? configurator = null) { throw null; }
     }
 }
 
@@ -35,7 +24,7 @@ namespace Orleans.Providers.MongoDB.Reminders
 {
     public sealed partial class MongoReminderTable : IReminderTable
     {
-        public MongoReminderTable(Utils.IMongoClientFactory mongoClientFactory, Microsoft.Extensions.Logging.ILogger<MongoReminderTable> logger, Microsoft.Extensions.Options.IOptions<Configuration.MongoDBRemindersOptions> options, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions) { }
+        public MongoReminderTable(global::MongoDB.Driver.IMongoClient mongoClient, Microsoft.Extensions.Logging.ILogger<MongoReminderTable> logger, Microsoft.Extensions.Options.IOptions<Orleans.Reminders.MongoDB.MongoDBRemindersOptions> options, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions) { }
 
         public System.Threading.Tasks.Task<ReminderEntry?> ReadRow(Runtime.GrainId grainId, string reminderName) { throw null; }
 
@@ -50,5 +39,29 @@ namespace Orleans.Providers.MongoDB.Reminders
         public System.Threading.Tasks.Task TestOnlyClearTable() { throw null; }
 
         public System.Threading.Tasks.Task<string?> UpsertRow(ReminderEntry entry) { throw null; }
+    }
+}
+
+namespace Orleans.Reminders.MongoDB
+{
+    public partial class MongoDBOptions
+    {
+        public string? ClientName { get { throw null; } set { } }
+
+        public System.Action<global::MongoDB.Driver.MongoCollectionSettings>? CollectionConfigurator { get { throw null; } set { } }
+
+        public string? CollectionPrefix { get { throw null; } set { } }
+
+        public bool CreateShardKeyForCosmos { get { throw null; } set { } }
+
+        public string DatabaseName { get { throw null; } set { } }
+    }
+
+    public sealed partial class MongoDBRemindersOptions : MongoDBOptions
+    {
+        public bool CreateIndexes { get { throw null; } set { } }
+
+        [System.Obsolete("This will be removed in future version")]
+        public bool PurgeLegacyIndexes { get { throw null; } set { } }
     }
 }

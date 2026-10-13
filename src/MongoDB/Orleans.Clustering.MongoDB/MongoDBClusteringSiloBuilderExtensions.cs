@@ -1,7 +1,8 @@
 using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Providers.MongoDB.Configuration;
+using Microsoft.Extensions.Options;
+using Orleans.Clustering.MongoDB;
 using Orleans.Providers.MongoDB.Membership;
 using Orleans.Runtime;
 
@@ -39,7 +40,8 @@ public static class MongoDBClusteringSiloBuilderExtensions
         {
             services.Configure(configurator);
         }
-        services.AddSingleton<IMembershipTable, MongoMembershipTable>();
+        services.AddSingleton<IMembershipTable>(sp => ActivatorUtilities.CreateInstance<MongoMembershipTable>(
+            sp, sp.GetMongoClient(sp.GetRequiredService<IOptions<MongoDBMembershipTableOptions>>().Value)));
         services.AddSingleton<IConfigurationValidator, MongoDBOptionsValidator<MongoDBMembershipTableOptions>>();
 
         return services;
@@ -50,8 +52,10 @@ public static class MongoDBClusteringSiloBuilderExtensions
     public static IServiceCollection AddMongoDBMembershipTable(this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.Configure<MongoDBMembershipTableOptions>(configuration);
-        services.AddSingleton<IMembershipTable, MongoMembershipTable>();
+        services.AddOptions<MongoDBMembershipTableOptions>()
+            .Configure<IServiceProvider>((options, sp) => options.ConfigureMongoDBOptions(sp, configuration));
+        services.AddSingleton<IMembershipTable>(sp => ActivatorUtilities.CreateInstance<MongoMembershipTable>(
+            sp, sp.GetMongoClient(sp.GetRequiredService<IOptions<MongoDBMembershipTableOptions>>().Value)));
         services.AddSingleton<IConfigurationValidator, MongoDBOptionsValidator<MongoDBMembershipTableOptions>>();
 
         return services;

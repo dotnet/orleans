@@ -82,10 +82,6 @@ Memory persistence distributes records across cluster storage grains but isn't d
 
 Use reminders for recurring durable callbacks and durable jobs for scheduled one-time work. Grain timers are activation-scoped and use the core runtime rather than a provider package.
 
-| Shared provider infrastructure | Purpose |
-| --- | --- |
-| `Microsoft.Orleans.MongoDB` | Shared MongoDB client registration and configuration, included by each MongoDB provider package. |
-
 ## Streams and broadcast channels
 
 | Package | Purpose |

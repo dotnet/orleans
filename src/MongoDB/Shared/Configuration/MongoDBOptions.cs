@@ -3,7 +3,15 @@ using Orleans.Runtime;
 using System;
 
 
-namespace Orleans.Providers.MongoDB.Configuration;
+#if ORLEANS_CLUSTERING
+namespace Orleans.Clustering.MongoDB;
+#elif ORLEANS_PERSISTENCE
+namespace Orleans.Persistence.MongoDB;
+#elif ORLEANS_REMINDERS
+namespace Orleans.Reminders.MongoDB;
+#else
+#error Define a MongoDB provider namespace.
+#endif
 
 /// <summary>
 /// Options to configure MongoDB for Orleans
@@ -11,12 +19,14 @@ namespace Orleans.Providers.MongoDB.Configuration;
 public class MongoDBOptions
 {
     /// <summary>
-    /// Database name.
+    /// Gets or sets the database name.
+    /// Configuration-based registration derives an omitted name from the matching registered <see cref="IMongoDatabase"/>.
     /// </summary>
     public string DatabaseName { get; set; } = string.Empty;
 
     /// <summary>
-    /// The mongo client name.
+    /// Gets or sets the key of a registered <see cref="IMongoClient"/>.
+    /// An unset or whitespace value selects the unkeyed client.
     /// </summary>
     public string? ClientName { get; set; }
 

@@ -1,7 +1,7 @@
 using System;
 using Newtonsoft.Json;
 
-namespace Orleans.Providers.MongoDB.Configuration;
+namespace Orleans.Persistence.MongoDB;
 
 /// <summary>
 /// Configures JSON settings used to produce MongoDB grain-state documents.

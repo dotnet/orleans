@@ -3,9 +3,13 @@
 MongoDB grain state persistence for Orleans, with optimistic concurrency using
 ETags and document-based or binary serialization.
 
-Register a MongoDB client using `UseMongoDBClient`, then call
+Register a singleton `MongoDB.Driver.IMongoClient`, then call
 `AddMongoDBGrainStorage("name", options => options.DatabaseName = "database")`.
 Use `AddMongoDBGrainStorageAsDefault` for the default storage provider.
+
+Options are in `Orleans.Persistence.MongoDB`. `ClientName` selects a keyed
+`IMongoClient`; leave it unset to use the unkeyed client. Client lifetime is owned
+by the application or service container.
 
 `JsonGrainStateSerializer` is the default and stores Newtonsoft.Json state as a
 BSON document. `BsonGrainStateSerializer` uses MongoDB's BSON serializer and class
@@ -21,6 +25,10 @@ the serializer stable when accessing existing data.
 
 Missing reads and successful clears recreate the state through the registered
 Orleans activator and reset the ETag and existence metadata.
+
+Aspire's MongoDB database resources configure the `MongoDBDatabase` provider.
+Register the matching client with `AddKeyedMongoDBClient`; Orleans consumes
+`ServiceKey` and derives the database name from Aspire's registered `IMongoDatabase`.
 
 See [MongoDB providers](https://dotnet.github.io/orleans/host/configuration-guide/mongodb-providers)
 for format, isolation, and migration guidance.
