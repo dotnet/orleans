@@ -111,13 +111,13 @@ namespace Orleans.DurableTasks
         public static DurableTask<TResult> Run<TState, TResult>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> function, TState state) { throw null; }
 
         protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
-        public static DurableTask<System.Collections.Generic.IReadOnlyList<TaskId>> WhenAll(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
+        public static DurableTask WhenAll(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
 
-        public static DurableTask<System.Collections.Generic.IReadOnlyList<TaskId>> WhenAll<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+        public static DurableTask<System.Collections.Generic.IReadOnlyList<TResult>> WhenAll<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
 
-        public static DurableTask<TaskId> WhenAny(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
+        public static DurableTask<int> WhenAny(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
 
-        public static DurableTask<TaskId> WhenAny<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+        public static DurableTask<(int Index, TResult Result)> WhenAny<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
     }
 
     public readonly partial struct DurableTaskAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
