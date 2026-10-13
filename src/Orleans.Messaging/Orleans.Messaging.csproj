@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans Messaging</Title>
     <Description>Inbox and outbox messaging for Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Messaging Inbox Outbox</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
