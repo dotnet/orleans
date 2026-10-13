@@ -73,7 +73,10 @@ construction or activation setup, before journal recovery.
   state. The first source whose `TryGetMessage` returns the message owns it, and
   returns the same `OutboxMessage` while it provides the message. A source withdraws
   a pending message by returning `false`. When the message retires, `OnRetired`
-  reports `OutboxMessageRetirement.Delivered` or `DeadLettered`.
+  reports `OutboxMessageRetirement.Delivered` or `DeadLettered`. After the send, a
+  source that throws or returns an invalid message dead-letters that entry alone,
+  with `OnRetired(DeadLettered)` in the same journal write; an exception during
+  `Send` propagates without staging anything.
 - `IInbox.Register(IInboxMessageSink)` adds a sink. A sink whose `TryAccept` returns
   `true` has staged the message in its own journaled state. Sinks are idempotent.
 

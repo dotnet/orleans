@@ -43,7 +43,9 @@ public interface IOutbox
     /// The outbox journals the message ID and delivery state, while the source holds the payload and receiver, and
     /// delivers the message like one staged through <see cref="Send(OutboxMessage)"/>. Stage the message in the source's
     /// state before this call: the outbox resolves the source now, reads and validates its message, and fails when none
-    /// provides it. Sending a pending ID again coalesces with the pending message. A message which a source addresses to
+    /// provides it; an exception from the source propagates and nothing is staged. After the send, a source which fails
+    /// to provide a valid message dead-letters the entry instead; see <see cref="IOutboxMessageSource"/>. Sending a
+    /// pending ID again coalesces with the pending message. A message which a source addresses to
     /// the sending grain is rejected; send it through <see cref="Send(OutboxMessage)"/>, which stages it in the grain's
     /// own inbox.
     /// </remarks>
