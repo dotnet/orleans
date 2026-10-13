@@ -52,6 +52,12 @@ public interface IDurableTaskState
 
     public DateTimeOffset? TombstonedAt { get; }
 
+    /// <summary>
+    /// Gets when the terminal result's retention restarted because its completion was dead-lettered, or
+    /// <see langword="null"/> when retention starts at <see cref="CompletedAt"/>.
+    /// </summary>
+    public DateTimeOffset? RetainedSince { get; }
+
     public GrainId RemoteTarget { get; }
 
     public string? RemoteRequestFingerprint { get; }

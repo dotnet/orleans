@@ -156,6 +156,13 @@ public class VolatileDurableTaskGrainStorage(
         AddOrUpdateTask(taskId, typedState);
     }
 
+    public void RetainResult(TaskId taskId, IDurableTaskState state)
+    {
+        var typedState = GetState(taskId, state);
+        typedState.RetainedSince = _timeProvider.GetUtcNow();
+        AddOrUpdateTask(taskId, typedState);
+    }
+
     public void CreateTombstone(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(taskId, state);

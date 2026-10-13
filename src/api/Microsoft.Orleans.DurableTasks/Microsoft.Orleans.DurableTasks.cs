@@ -213,6 +213,7 @@ namespace Orleans.DurableTasks.Protocol
         void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId destination);
         bool RemoveTask(TaskId taskId);
         void RequestCancellation(TaskId taskId, IDurableTaskState state);
+        void RetainResult(TaskId taskId, IDurableTaskState state);
         void SetCallerId(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId callerId);
         void SetDelay(TaskId taskId, IDurableTaskState state, System.DateTimeOffset dueTime, System.TimeSpan duration, long generation);
         void SetRemoteRequest(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId target, string fingerprint);
@@ -276,6 +277,8 @@ namespace Orleans.DurableTasks.Protocol
         DurableTaskResponse? Result { get; }
 
         long ResumeGeneration { get; }
+
+        System.DateTimeOffset? RetainedSince { get; }
 
         System.DateTimeOffset? TombstonedAt { get; }
     }
@@ -347,6 +350,10 @@ namespace Orleans.DurableTasks.Runtime
         [Id(8)]
         public long ResumeGeneration { get { throw null; } set { } }
 
+        [Id(17)]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public System.DateTimeOffset? RetainedSince { get { throw null; } set { } }
+
         [Id(10)]
         public System.DateTimeOffset? TombstonedAt { get { throw null; } set { } }
     }
@@ -376,6 +383,8 @@ namespace Orleans.DurableTasks.Runtime
         public bool RemoveTask(TaskId taskId) { throw null; }
 
         public void RequestCancellation(TaskId taskId, Protocol.IDurableTaskState state) { }
+
+        public void RetainResult(TaskId taskId, Protocol.IDurableTaskState state) { }
 
         public void SetCallerId(TaskId taskId, Protocol.IDurableTaskState state, Orleans.Runtime.GrainId callerId) { }
 
