@@ -36,7 +36,7 @@ public sealed class TypedOutboxExtensionsTests
             Assert.Equal(1, ++enumerations);
             yield return (CommandId, Destination, "first");
             Assert.Equal(1, outbox.RawSendCalls);
-            Assert.Equal("first", type.Decode(Assert.Single(outbox.Messages)));
+            Assert.Equal("first", type.Decode(Assert.Single(outbox.Messages).Envelope));
             yield return (new MessageId(CommandId.Key.CreateChildKey("second")), ReceivedSender, "second");
         }
 
@@ -47,7 +47,7 @@ public sealed class TypedOutboxExtensionsTests
         Assert.Equal(new[] { CommandId, new MessageId(CommandId.Key.CreateChildKey("second")) }, outbox.Messages.Select(value => value.Envelope.MessageId));
         Assert.Equal(new[] { Destination, ReceivedSender }, outbox.Messages.Select(value => value.ReceiverId));
         Assert.All(outbox.Messages, value => Assert.Equal(Subject, GetSubject(value.Envelope)));
-        Assert.Equal(new[] { "first", "second" }, outbox.Messages.Select(type.Decode));
+        Assert.Equal(new[] { "first", "second" }, outbox.Messages.Select(message => type.Decode(message.Envelope)));
     }
 
     [Theory]
@@ -76,10 +76,10 @@ public sealed class TypedOutboxExtensionsTests
         Assert.Equal(Destination, earlier.ReceiverId);
         Assert.Equal(Subject, GetSubject(earlier.Envelope));
         var earlierPayload = earlier.Envelope.Payload.ToArray();
-        Assert.Equal("first", type.Decode(earlier));
+        Assert.Equal("first", type.Decode(earlier.Envelope));
         Assert.Equal(encodingFailure ? 2 : 1, codec.Writes);
         outbox.Send(type, new MessageId(CommandId.Key.CreateChildKey("second")), Destination, "recovered");
-        Assert.Equal(new[] { "first", "recovered" }, outbox.Messages.Select(type.Decode));
+        Assert.Equal(new[] { "first", "recovered" }, outbox.Messages.Select(message => type.Decode(message.Envelope)));
         Assert.Equal(2, outbox.RawSendCalls);
         var retained = outbox.Messages.First();
         Assert.Equal(earlierPayload, retained.Envelope.Payload);
@@ -203,7 +203,7 @@ public sealed class TypedOutboxExtensionsTests
         Assert.Equal(deliverAt, staged.Envelope.DeliverAt);
         Assert.Equal(deliverAt.Offset, staged.Envelope.DeliverAt!.Value.Offset);
         Assert.Equal(Destination, staged.ReceiverId);
-        Assert.Equal("scheduled", type.Decode(staged));
+        Assert.Equal("scheduled", type.Decode(staged.Envelope));
         Assert.Equal(deliverAt, type.Create(CommandId, Destination, "scheduled", deliverAt).Envelope.DeliverAt);
         Assert.Null(type.Create(CommandId, Destination, "scheduled").Envelope.DeliverAt);
     }

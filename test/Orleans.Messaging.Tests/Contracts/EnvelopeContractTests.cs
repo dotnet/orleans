@@ -148,7 +148,7 @@ public sealed class EnvelopeContractTests
             Assert.Equal(deliverAt, actual.Envelope.DeliverAt);
             Assert.Equal(deliverAt.Offset, actual.Envelope.DeliverAt!.Value.Offset);
             Assert.Equal(Receiver, actual.ReceiverId);
-            Assert.Equal("scheduled", type.Decode(actual));
+            Assert.Equal("scheduled", type.Decode(actual.Envelope));
             Assert.True(Invoke<bool>("EnvelopeEquivalence", "AreEquivalent", outgoing, actual));
         }
     }
