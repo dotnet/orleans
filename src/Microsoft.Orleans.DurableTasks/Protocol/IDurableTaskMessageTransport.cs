@@ -29,4 +29,8 @@ internal interface IDurableTaskMessageTransport
 
     void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime);
 
+    /// <summary>Stages a signal for the invoked task <paramref name="taskId"/> on <paramref name="target"/>.</summary>
+    /// <param name="payloadFingerprint">The fingerprint of <paramref name="value"/>, which the message identity covers.</param>
+    void SendSignal(GrainId sender, GrainId target, TaskId taskId, string name, DurableTaskResponse value, string payloadFingerprint);
+
 }

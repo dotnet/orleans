@@ -26,7 +26,7 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 /// A recording fake for the internal <see cref="IDurableTaskMessageTransport"/> interface. Records every call so that
 /// tests can assert on the exact arguments passed by <see cref="Orleans.DurableTasks.Runtime.DurableTaskGrainRuntime"/>.
 /// </summary>
-internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessageTransport
+internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTaskMessageTransport
 {
     private readonly TaskCompletionSource _resumeSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Dictionary<MessageId, (GrainId Sender, GrainId Target, TaskId TaskId)> _completionIds = [];

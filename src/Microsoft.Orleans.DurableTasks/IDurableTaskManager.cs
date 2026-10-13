@@ -57,4 +57,22 @@ public interface IDurableTaskManager
     /// this grain doesn't retain, is unchanged.
     /// </remarks>
     ValueTask AbortAsync(TaskId taskId, string reason, CancellationToken cancellationToken = default);
+
+    /// <summary>Delivers <paramref name="signal"/> with <paramref name="value"/> to an invoked task of this grain.</summary>
+    /// <typeparam name="T">The signal's value type.</typeparam>
+    /// <param name="taskId">The identifier of a task which a client or another grain invoked on this grain.</param>
+    /// <param name="signal">The signal descriptor which the task's waits share.</param>
+    /// <param name="value">The signal's value.</param>
+    /// <param name="cancellationToken">A token which abandons waiting for the signal to commit.</param>
+    /// <returns>An operation which completes once the signal commits with this grain's pending state changes.</returns>
+    /// <remarks>
+    /// The task records the first value for each signal name. A signal with an equal value leaves the task unchanged.
+    /// Within a durable execution, the send is recorded in the execution's tree, so a replay leaves the task unchanged;
+    /// sends begin in deterministic order, like unnamed children.
+    /// </remarks>
+    /// <exception cref="DurableTaskNotFoundException">This grain retains no invoked task <paramref name="taskId"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The task holds a different value for the signal, or it is terminal and holds no value for the signal.
+    /// </exception>
+    ValueTask SignalAsync<T>(TaskId taskId, DurableSignal<T> signal, T value, CancellationToken cancellationToken = default);
 }

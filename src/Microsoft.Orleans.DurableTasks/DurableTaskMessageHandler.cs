@@ -10,10 +10,10 @@ namespace Orleans.DurableTasks.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// As an <see cref="IInboxMessageSink"/>, it accepts invocations, completions, and cancellations directly into task
-/// state, so the request or result payload is journaled once, in task state, and the inbox journals only the message's
-/// processed record in the same write. Each message is decoded and validated before any change is staged; a message
-/// which fails validation throws, so the inbox dead-letters it.
+/// As an <see cref="IInboxMessageSink"/>, it accepts invocations, completions, cancellations, and signals directly into
+/// task state, so the request, result, or signal payload is journaled once, in task state, and the inbox journals only
+/// the message's processed record in the same write. Each message is decoded and validated before any change is
+/// staged; a message which fails validation throws, so the inbox dead-letters it.
 /// </para>
 /// <para>
 /// As an <see cref="IInboxHandler"/>, it handles the delay resumes the grain schedules for itself, which the inbox holds
@@ -61,6 +61,18 @@ internal sealed class DurableTaskMessageHandler(
                 else
                 {
                     runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender));
+                }
+
+                return true;
+            case DurableTaskMessageTypes.SignalSubject:
+                var signal = messageTypes.Signal.Decode(message);
+                _ = GetSender(signal.Sender);
+
+                // A rejected signal, such as one for an unknown or terminal task or with a conflicting value, is
+                // dead-lettered with the rejection as its reason.
+                if (runtime.StageSignalFromInbox(signal.TaskId, signal.Name, signal.Value) is { } rejection)
+                {
+                    throw rejection;
                 }
 
                 return true;

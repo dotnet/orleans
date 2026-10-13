@@ -29,6 +29,8 @@ namespace Orleans.DurableTasks
     public static partial class DurableTaskGrainExtensions
     {
         public static ScheduledTask<TResult> GetDurableTask<TResult>(this Orleans.Runtime.IAddressable target, string rootId) { throw null; }
+
+        public static System.Threading.Tasks.ValueTask SignalDurableTaskAsync<T>(this Orleans.Runtime.IAddressable target, TaskId taskId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     [GenerateSerializer]
@@ -47,6 +49,7 @@ namespace Orleans.DurableTasks
         System.Threading.Tasks.ValueTask CancelAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken = default);
         ScheduledTask GetTask(TaskId taskId);
         ScheduledTask<TResult> GetTask<TResult>(TaskId taskId);
+        System.Threading.Tasks.ValueTask SignalAsync<T>(TaskId taskId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default);
     }
 }
 
@@ -216,6 +219,8 @@ namespace Orleans.DurableTasks.Protocol
         System.Collections.Generic.IAsyncEnumerable<TaskId> GetRunningTasksAsync(System.Threading.CancellationToken cancellationToken = default);
         [Alias("GetTasksAsync")]
         System.Collections.Generic.IAsyncEnumerable<(TaskId TaskId, DurableTaskDiagnosticState State)> GetTasksAsync(System.Threading.CancellationToken cancellationToken = default);
+        [Alias("SignalAsync")]
+        System.Threading.Tasks.ValueTask SignalAsync(TaskId taskId, string name, DurableTaskResponse value, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IDurableTaskGrainStorage
@@ -597,6 +602,24 @@ namespace OrleansCodeGen.Orleans.DurableTasks.Protocol
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4 instance) { }
+
+        public Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IDurableTaskGrainExtension_GrainReference_Ext_DFDB64A5 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IDurableTaskGrainExtension_GrainReference_Ext_DFDB64A5>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_Invokable_IDurableTaskGrainExtension_GrainReference_Ext_DFDB64A5(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -825,6 +848,16 @@ namespace OrleansCodeGen.Orleans.DurableTasks.Protocol
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4 DeepCopy(Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IDurableTaskGrainExtension_GrainReference_Ext_DFDB64A5 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IDurableTaskGrainExtension_GrainReference_Ext_DFDB64A5>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IDurableTaskGrainExtension_GrainReference_Ext_DFDB64A5(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -1017,6 +1050,47 @@ namespace OrleansCodeGen.Orleans.DurableTasks.Protocol
         public global::Orleans.DurableTasks.TaskId arg0;
         public string arg1;
         public System.Threading.CancellationToken arg2;
+        public override bool IsCancellable { get { throw null; } }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.ValueTask InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+
+        public override bool TryCancel() { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.DurableTasks.Protocol.IDurableTaskGrainExtension), typeof(global::Orleans.DurableTasks.Protocol.IDurableTaskGrainExtension), "SignalAsync" })]
+    public sealed partial class Invokable_IDurableTaskGrainExtension_GrainReference_Ext_A33D5CC4 : global::Orleans.Runtime.Request
+    {
+        public global::Orleans.DurableTasks.TaskId arg0;
+        public string arg1;
+        public global::Orleans.DurableTasks.DurableTaskResponse arg2;
+        public System.Threading.CancellationToken arg3;
         public override bool IsCancellable { get { throw null; } }
 
         public override void Dispose() { }
