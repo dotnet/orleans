@@ -14,9 +14,11 @@ namespace Orleans.DurableTasks.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every persisted member is a primitive, timestamp, string, <see cref="GrainId"/>, set of grain identities, or byte
-/// array, so every journal format can store the state. The request and the result are polymorphic Orleans-serializable values, so they are
-/// persisted as opaque Orleans-serialized payloads in <see cref="RequestPayload"/> and <see cref="ResultPayload"/>.
+/// Every persisted member is a primitive, timestamp, string, <see cref="GrainId"/>, or set of grain identities, so every
+/// journal format can store the state. The request and the result are polymorphic Orleans-serializable values, held as
+/// opaque Orleans-serialized payloads in <see cref="RequestPayload"/> and <see cref="ResultPayload"/>. The payloads are
+/// not serialized with the state: the state is rewritten on every update, so the owning storage persists each payload
+/// separately, once, and attaches it to the state it exposes.
 /// </para>
 /// <para>
 /// The owning storage binds each state to its <see cref="Serializer"/> before exposing it. <see cref="Request"/> and
@@ -24,8 +26,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// every payload and later updates reuse the stored payloads.
 /// </para>
 /// <para>
-/// JSON journals omit absent payloads and unset grain identities, so they recover as <see langword="null"/> and
-/// <see langword="default"/> rather than as empty values.
+/// JSON journals omit unset grain identities, so they recover as <see langword="default"/>.
 /// </para>
 /// </remarks>
 [GenerateSerializer, SuppressReferenceTracking]
@@ -42,12 +43,14 @@ public class DurableTaskState : IDurableTaskState
     private IDurableTaskRequest? _request;
     [NonSerialized]
     private DurableTaskResponse? _result;
+    [NonSerialized]
+    private bool _payloadsAttached;
 
     /// <summary>
     /// Gets or sets the Orleans-serialized <see cref="IDurableTaskRequest"/>, or <see langword="null"/> when the task has no stored request.
     /// </summary>
-    [Id(15)]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    /// <remarks>The owning storage persists the payload separately from the state.</remarks>
+    [JsonIgnore]
     public byte[]? RequestPayload
     {
         get => _requestPayload;
@@ -61,8 +64,8 @@ public class DurableTaskState : IDurableTaskState
     /// <summary>
     /// Gets or sets the Orleans-serialized terminal <see cref="DurableTaskResponse"/>, or <see langword="null"/> when the task has no stored result.
     /// </summary>
-    [Id(16)]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    /// <remarks>The owning storage persists the payload separately from the state.</remarks>
+    [JsonIgnore]
     public byte[]? ResultPayload
     {
         get => _resultPayload;
@@ -144,6 +147,27 @@ public class DurableTaskState : IDurableTaskState
         return this;
     }
 
+    /// <summary>Gets whether the payloads which the owning storage persists separately are attached.</summary>
+    internal bool PayloadsAttached => _payloadsAttached;
+
+    /// <summary>Attaches the payloads which the owning storage persists separately from a recovered state.</summary>
+    internal void AttachPayloads(byte[]? request, byte[]? result)
+    {
+        Debug.Assert(!_payloadsAttached, "A state's payloads are attached once.");
+        RequestPayload = request;
+        ResultPayload = result;
+        _payloadsAttached = true;
+    }
+
+    /// <summary>
+    /// Shares the payloads of the state this instance was copied from. The payloads are immutable once stored.
+    /// </summary>
+    internal void CopyPayloadsFrom(DurableTaskState source)
+    {
+        RequestPayload = source._requestPayload;
+        ResultPayload = source._resultPayload;
+    }
+
     /// <summary>
     /// Stores <paramref name="request"/> as an Orleans-serialized payload and caches it as the decoded value.
     /// </summary>
@@ -151,6 +175,7 @@ public class DurableTaskState : IDurableTaskState
     {
         _requestPayload = request is null ? null : GetSerializer().SerializeToArray(request);
         _request = request;
+        _payloadsAttached = true;
     }
 
     /// <summary>

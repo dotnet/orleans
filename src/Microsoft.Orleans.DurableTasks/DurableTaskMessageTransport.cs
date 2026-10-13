@@ -15,7 +15,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// <remarks>
 /// The outbox is resolved on first use so that activations which never send messages do not require messaging state.
 /// Each message identity is derived from its sender, receiver, task, and subject, so replaying a send coalesces with the
-/// pending message and the receiver deduplicates a redelivery. A delay resume is a message the grain sends to itself
+/// pending message and the receiver deduplicates a redelivery. A completion is a reference send: the runtime provides
+/// the message from the task's stored result as an <see cref="IOutboxMessageSource"/>, so the result is journaled once.
+/// A delay resume is a message the grain sends to itself
 /// with <see cref="Envelope.DeliverAt"/> set to the delay's due time, which the grain's own inbox accepts in the delay's
 /// journal write; its identity also covers the delay generation and due time. The runtime derives readiness from
 /// journaled state, so duplicate and stale resumes are harmless.
@@ -34,21 +36,21 @@ internal sealed class DurableTaskMessageTransport(
             taskId,
             new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender });
 
-    public void SendCompletion(GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) =>
-        Send(
-            messageTypes.Completion,
-            sender,
-            target,
-            taskId,
-            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
+    public void SendCompletion(HierarchicalKey messageId) => outbox.Value.Send(messageId);
 
-    public void SendCompletionAck(GrainId sender, GrainId target, TaskId taskId) =>
-        Send(
-            messageTypes.CompletionAck,
-            sender,
+    public HierarchicalKey GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId) =>
+        CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject);
+
+    public OutboxMessage CreateCompletionMessage(
+        HierarchicalKey messageId,
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        DurableTaskResponse response) =>
+        messageTypes.Completion.Create(
+            messageId,
             target,
-            taskId,
-            new DurableTaskCompletionAckMessage { TaskId = taskId, Sender = sender });
+            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId) =>
         Send(

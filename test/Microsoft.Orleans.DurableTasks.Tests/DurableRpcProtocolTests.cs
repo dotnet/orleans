@@ -131,7 +131,7 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void CompletionWaiterRemainsUntilAcknowledgedAndTombstoneRetainsIdentity()
+    public void CompletionWaiterRemainsUntilRetiredAndTombstoneRetainsIdentity()
     {
         var destination = GrainId.Create("caller", "one");
         var serializer = new ServiceCollection()
@@ -239,7 +239,6 @@ public sealed class DurableRpcProtocolTests
     [Theory]
     [InlineData(DurableTaskMessageTypes.InvocationSubject, "invoke")]
     [InlineData(DurableTaskMessageTypes.CompletionSubject, "complete")]
-    [InlineData(DurableTaskMessageTypes.CompletionAckSubject, "complete-ack")]
     [InlineData(DurableTaskMessageTypes.CancellationSubject, "cancel")]
     [InlineData(DurableTaskMessageTypes.ResumeSubject, "resume")]
     public void MessageIdIsBoundedHierarchicalKeyScopedBySubject(string subject, string leaf)
@@ -261,42 +260,20 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void CompletionAcknowledgementUsesDedicatedSubject()
+    public void DurableRpcSubjectsHaveNoCompletionAcknowledgement()
     {
-        var outbox = new RecordingOutbox();
-        var transport = MessagingTestHelpers.CreateTransport(outbox);
-        var sender = GrainId.Create("caller", "one");
-        var target = GrainId.Create("target", "one");
-
-        transport.SendCompletionAck(sender, target, TaskId.Parse("root"));
-
-        var message = Assert.Single(outbox.Messages);
-        Assert.Equal(DurableTaskMessageTypes.CompletionAckSubject, message.Envelope.Subject);
-        Assert.Equal(target, message.ReceiverId);
-        var body = MessagingTestHelpers.MessageTypes.CompletionAck.Decode(message);
-        Assert.Equal(TaskId.Parse("root"), body.TaskId);
-        Assert.Equal(sender, body.Sender);
-    }
-
-    [Fact]
-    public void CompletionAcknowledgementReplayUsesStableMessageIdentity()
-    {
-        var outbox = new RecordingOutbox();
-        var transport = MessagingTestHelpers.CreateTransport(outbox);
-        var sender = GrainId.Create("caller", "one");
-        var target = GrainId.Create("target", "one");
-        var taskId = TaskId.Parse("root");
-
-        transport.SendCompletionAck(sender, target, taskId);
-        transport.SendCompletionAck(sender, target, taskId);
-
-        var messages = outbox.Messages.ToArray();
-        Assert.Equal(2, messages.Length);
-        Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
-        Assert.Equal(messages[0].Envelope.Payload, messages[1].Envelope.Payload);
         Assert.Equal(
-            DurableTaskMessageTransport.CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionAckSubject),
-            messages[0].Envelope.MessageId);
+            [
+                DurableTaskMessageTypes.CancellationSubject,
+                DurableTaskMessageTypes.CompletionSubject,
+                DurableTaskMessageTypes.InvocationSubject,
+                DurableTaskMessageTypes.ResumeSubject,
+            ],
+            typeof(DurableTaskMessageTypes)
+                .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                .Where(static field => field.IsLiteral && field.Name.EndsWith("Subject", StringComparison.Ordinal))
+                .Select(static field => (string)field.GetRawConstantValue()!)
+                .Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -348,7 +325,10 @@ public sealed class DurableRpcProtocolTests
 
         transport.SendCancellation(sender, target, taskId);
         transport.SendCancellation(sender, target, taskId);
-        transport.SendCompletionAck(sender, target, taskId);
+        transport.SendInvocation(sender, target, taskId, new TestDurableTaskRequest
+        {
+            Context = new DurableTaskRequestContext { CallerId = sender, TargetId = target, SupportsDurableCompletion = true },
+        });
 
         var messages = outbox.Messages.ToArray();
         Assert.Equal(3, messages.Length);
@@ -361,7 +341,7 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void CompletionReplayUsesStableMessageIdentity()
+    public void CompletionIsStagedAsReferenceWithStableMessageIdentity()
     {
         var outbox = new RecordingOutbox();
         var transport = MessagingTestHelpers.CreateTransport(outbox);
@@ -370,16 +350,26 @@ public sealed class DurableRpcProtocolTests
         var taskId = TaskId.Parse("root");
         var response = DurableTaskResponse.FromResult(42);
 
-        transport.SendCompletion(sender, target, taskId, response);
-        transport.SendCompletion(sender, target, taskId, response);
+        var messageId = transport.GetCompletionMessageId(sender, target, taskId);
+        transport.SendCompletion(messageId);
+        transport.SendCompletion(transport.GetCompletionMessageId(sender, target, taskId));
 
-        var messages = outbox.Messages.ToArray();
-        Assert.Equal(2, messages.Length);
-        Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
-        Assert.Equal(messages[0].Envelope.Payload, messages[1].Envelope.Payload);
-        var body = MessagingTestHelpers.MessageTypes.Completion.Decode(messages[0]);
+        // The outbox journals only the reference; the runtime provides the message from the stored result.
+        Assert.Empty(outbox.Messages);
+        Assert.Equal([messageId, messageId], outbox.SourceMessages);
+        Assert.Equal(
+            DurableTaskMessageTransport.CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject),
+            messageId);
+        var message = transport.CreateCompletionMessage(messageId, sender, target, taskId, response);
+        Assert.Equal(target, message.ReceiverId);
+        var envelope = message.Envelope;
+        Assert.Equal(messageId, envelope.MessageId);
+        Assert.Equal(DurableTaskMessageTypes.CompletionSubject, envelope.Subject);
+        Assert.Null(envelope.DeliverAt);
+        var body = MessagingTestHelpers.MessageTypes.Completion.Decode(envelope);
         Assert.Equal(42, body.Response.GetResult<int>());
         Assert.Equal(sender, body.Sender);
+        Assert.Equal(taskId, body.TaskId);
     }
 
     [Fact]

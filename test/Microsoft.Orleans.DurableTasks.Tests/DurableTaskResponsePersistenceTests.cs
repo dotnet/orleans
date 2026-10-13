@@ -198,12 +198,12 @@ public sealed class DurableTaskResponsePersistenceTests
         var sender = GrainId.Create("sender", "one");
         var receiver = GrainId.Create("receiver", "one");
 
-        transport.SendCompletion(sender, receiver, taskId, CreateCanceledResponse());
+        var messageId = transport.GetCompletionMessageId(sender, receiver, taskId);
+        var envelope = transport.CreateCompletionMessage(messageId, sender, receiver, taskId, CreateCanceledResponse()).Envelope;
 
-        var sent = Assert.Single(outbox.Messages);
-        Assert.Equal(DurableTaskMessageTypes.CompletionSubject, sent.Envelope.Subject);
-        Assert.Equal(receiver, sent.ReceiverId);
-        var message = MessagingTestHelpers.MessageTypes.Completion.Decode(sent);
+        Assert.Empty(outbox.Messages);
+        Assert.Equal(DurableTaskMessageTypes.CompletionSubject, envelope.Subject);
+        var message = MessagingTestHelpers.MessageTypes.Completion.Decode(envelope);
         Assert.Equal(taskId, message.TaskId);
         Assert.Equal(sender, message.Sender);
         AssertCancellation(Assert.IsType<CanceledDurableTaskResponse>(message.Response));

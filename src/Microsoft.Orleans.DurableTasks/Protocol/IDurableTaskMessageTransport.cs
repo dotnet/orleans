@@ -1,6 +1,7 @@
 using Orleans.Runtime;
 
 using Orleans.DurableTasks;
+using Orleans.Messaging;
 
 namespace Orleans.DurableTasks.Protocol;
 
@@ -8,8 +9,15 @@ internal interface IDurableTaskMessageTransport
 {
     void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request);
 
-    void SendCompletion(GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response);
-    void SendCompletionAck(GrainId sender, GrainId target, TaskId taskId);
+    /// <summary>Stages a completion which the runtime provides from the task's stored result.</summary>
+    /// <param name="messageId">The completion's message ID, from <see cref="GetCompletionMessageId"/>.</param>
+    void SendCompletion(HierarchicalKey messageId);
+
+    /// <summary>Gets the stable ID of the completion of a task sent from <paramref name="sender"/> to <paramref name="target"/>.</summary>
+    HierarchicalKey GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId);
+
+    /// <summary>Encodes a completion message addressed to <paramref name="target"/>.</summary>
+    OutboxMessage CreateCompletionMessage(HierarchicalKey messageId, GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response);
 
     void SendCancellation(GrainId sender, GrainId target, TaskId taskId);
 

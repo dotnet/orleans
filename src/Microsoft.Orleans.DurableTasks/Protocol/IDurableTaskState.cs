@@ -16,7 +16,8 @@ public interface IDurableTaskState
     /// The set of grains which must receive the result of this task.
     /// </summary>
     /// <remarks>
-    /// A task cannot be retired until every destination has acknowledged its terminal result.
+    /// Each destination has a completion pending in the outbox until the outbox retires it. A task whose completions were
+    /// all delivered is pruned at once; otherwise the terminal result is retained for the configured retention period.
     /// Local nested tasks typically have no external completion destinations.
     /// </remarks>
     public IReadOnlySet<GrainId> CompletionDestinations { get; }

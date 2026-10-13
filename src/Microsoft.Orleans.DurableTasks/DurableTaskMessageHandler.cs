@@ -9,23 +9,27 @@ namespace Orleans.DurableTasks.Runtime;
 /// Applies durable grain RPC messages delivered to the grain's inbox.
 /// </summary>
 /// <remarks>
-/// Each message is decoded and validated, then its runtime changes are staged and the message is completed in one
-/// synchronous block. The inbox persists the staged changes with the message outcome in its batch write, and the
-/// runtime runs acknowledgement-dependent effects after that write completes. Handling never waits for a journal write,
-/// so later messages in the same batch cannot wait on the batch's own write.
+/// <para>
+/// As an <see cref="IInboxMessageSink"/>, it accepts invocations, completions, and cancellations directly into task
+/// state, so the request or result payload is journaled once, in task state, and the inbox journals only the message's
+/// processed record in the same write. Each message is decoded and validated before any change is staged; a message
+/// which fails validation throws, so the inbox dead-letters it.
+/// </para>
+/// <para>
+/// As an <see cref="IInboxHandler"/>, it handles the delay resumes the grain schedules for itself, which the inbox holds
+/// until they are due. The handler stages the resume's changes and completes the message in one synchronous block.
+/// </para>
+/// <para>
+/// The runtime runs acknowledgement-dependent effects, such as starting requests, completing handles, and propagating
+/// cancellation, after the write which commits the staged changes. Neither path waits for a journal write.
+/// </para>
 /// </remarks>
 internal sealed class DurableTaskMessageHandler(
     DurableTaskGrainRuntime runtime,
-    DurableTaskMessageTypes messageTypes) : IInboxHandler
+    DurableTaskMessageTypes messageTypes) : IInboxMessageSink, IInboxHandler
 {
-    public bool CanHandle(IInboxHandlerContext context) =>
-        context.Message.Envelope.Subject is { } subject
-        && subject.StartsWith(DurableTaskMessageTypes.SubjectPrefix, StringComparison.Ordinal);
-
-    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    public bool TryAccept(InboxMessage message)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var message = context.Message;
         switch (message.Envelope.Subject)
         {
             case DurableTaskMessageTypes.InvocationSubject:
@@ -38,29 +42,30 @@ internal sealed class DurableTaskMessageHandler(
                 requestContext.CallerId = sender;
                 requestContext.SupportsDurableCompletion = true;
                 runtime.ScheduleFromInbox(invocation.TaskId, request);
-                break;
+                return true;
             case DurableTaskMessageTypes.CompletionSubject:
                 var completion = messageTypes.Completion.Decode(message);
                 var response = completion.Response
                     ?? throw new InvalidOperationException("The durable task completion response is missing.");
                 runtime.AcceptResponseFromInbox(completion.TaskId, response, GetSender(completion.Sender));
-                break;
-            case DurableTaskMessageTypes.CompletionAckSubject:
-                var acknowledgement = messageTypes.CompletionAck.Decode(message);
-                runtime.AcknowledgeCompletionFromInbox(acknowledgement.TaskId, GetSender(acknowledgement.Sender));
-                break;
+                return true;
             case DurableTaskMessageTypes.CancellationSubject:
                 var cancellation = messageTypes.Cancellation.Decode(message);
                 runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender));
-                break;
-            case DurableTaskMessageTypes.ResumeSubject:
-                var resume = messageTypes.Resume.Decode(message);
-                runtime.ResumeDelayFromInbox(resume.TaskId, resume.Generation, GetSender(resume.Sender));
-                break;
+                return true;
             default:
-                throw new InvalidOperationException($"Unsupported durable task message subject '{message.Envelope.Subject}'.");
+                return false;
         }
+    }
 
+    public bool CanHandle(IInboxHandlerContext context) =>
+        string.Equals(context.Message.Envelope.Subject, DurableTaskMessageTypes.ResumeSubject, StringComparison.Ordinal);
+
+    public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var resume = messageTypes.Resume.Decode(context.Message);
+        runtime.ResumeDelayFromInbox(resume.TaskId, resume.Generation, GetSender(resume.Sender));
         context.Complete();
         return ValueTask.CompletedTask;
     }

@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
@@ -28,10 +29,10 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessageTransport
 {
     private readonly TaskCompletionSource _resumeSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly Dictionary<HierarchicalKey, (GrainId Sender, GrainId Target, TaskId TaskId)> _completionIds = [];
 
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
-    public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> Completions { get; } = [];
-    public List<(GrainId Sender, GrainId Target, TaskId TaskId)> CompletionAcknowledgements { get; } = [];
+    public List<RecordedCompletion> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
     public List<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime)> Resumes { get; } = [];
     public Task ResumeSent => _resumeSent.Task;
@@ -44,9 +45,24 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
         Invocations.Add((sender, target, taskId, request));
     }
 
-    public void SendCompletion(GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) => Completions.Add((sender, target, taskId, response));
-    public void SendCompletionAck(GrainId sender, GrainId target, TaskId taskId) =>
-        CompletionAcknowledgements.Add((sender, target, taskId));
+    public HierarchicalKey GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId)
+    {
+        var messageId = DurableTaskMessageTransport.CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject);
+        _completionIds[messageId] = (sender, target, taskId);
+        return messageId;
+    }
+
+    public void SendCompletion(HierarchicalKey messageId)
+    {
+        var (sender, target, taskId) = _completionIds[messageId];
+        Completions.Add(new(sender, target, taskId, messageId));
+    }
+
+    public OutboxMessage CreateCompletionMessage(HierarchicalKey messageId, GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) =>
+        MessagingTestHelpers.MessageTypes.Completion.Create(
+            messageId,
+            target,
+            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId)
     {
@@ -58,6 +74,19 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
     {
         Resumes.Add((grainId, taskId, generation, dueTime));
         _resumeSent.TrySetResult();
+    }
+}
+
+/// <summary>A completion the runtime sent as a reference to its stored result.</summary>
+internal sealed record RecordedCompletion(GrainId Sender, GrainId Target, TaskId TaskId, HierarchicalKey MessageId)
+{
+    /// <summary>Materializes the completion from the runtime, as the outbox does for a delivery attempt.</summary>
+    public DurableTaskCompletionMessage Materialize(DurableTaskGrainRuntime runtime)
+    {
+        Xunit.Assert.True(((IOutboxMessageSource)runtime).TryGetMessage(MessageId, out var message));
+        Xunit.Assert.Equal(MessageId, message.Envelope.MessageId);
+        Xunit.Assert.Equal(Target, message.ReceiverId);
+        return MessagingTestHelpers.MessageTypes.Completion.Decode(message);
     }
 }
 

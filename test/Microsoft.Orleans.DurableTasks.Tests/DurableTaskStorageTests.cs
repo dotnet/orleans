@@ -263,6 +263,91 @@ public sealed class DurableTaskStorageTests
         Assert.Equal(journalFormatKey, await harness.GetStoredJournalFormatKeyAsync(cancellationToken));
     }
 
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task MetadataUpdatesJournalEachPayloadOnce(string journalFormatKey)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
+        var taskId = TaskId.Parse("root/payloads");
+        var caller = GrainId.Create("caller", "payloads");
+        byte[] requestPayload;
+        byte[] resultPayload;
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var storage = activation.Storage;
+            var state = storage.GetOrCreateTask(taskId, CreateRequest(caller, GrainId.Create("target", "payloads")));
+            storage.SetCallerId(taskId, state, caller);
+            storage.SetRequestFingerprint(taskId, state, "fingerprint");
+            storage.AddCompletionDestination(taskId, state, caller);
+            await storage.WriteAsync(cancellationToken);
+            storage.SetResponse(taskId, state, DurableTaskResponse.FromResult("payload result"));
+            storage.RemoveCompletionDestination(taskId, state, caller);
+            await storage.WriteAsync(cancellationToken);
+            var typedState = Assert.IsType<DurableTaskState>(state);
+            requestPayload = typedState.RequestPayload!;
+            resultPayload = typedState.ResultPayload!;
+        }
+
+        var journal = await ReadJournalAsync(harness, cancellationToken);
+        Assert.Equal(1, CountPayload(journal, requestPayload));
+        Assert.Equal(1, CountPayload(journal, resultPayload));
+
+        await using (var recovery = await harness.ActivateAsync(cancellationToken))
+        {
+            Assert.True(recovery.Storage.TryGetTask(taskId, out var recovered));
+            Assert.Equal(caller, Assert.IsType<TestDurableTaskRequest>(recovered.Request).Context!.CallerId);
+            Assert.Equal("payload result", recovered.Result!.GetResult<string>());
+            Assert.Empty(recovered.CompletionDestinations);
+            recovery.Storage.CreateTombstone(taskId, recovered);
+            await recovery.Storage.WriteAsync(cancellationToken);
+        }
+
+        await using var tombstoned = await harness.ActivateAsync(cancellationToken);
+        Assert.True(tombstoned.Storage.TryGetTask(taskId, out var tombstone));
+        Assert.Null(tombstone.Request);
+        Assert.Null(tombstone.Result);
+        Assert.NotNull(tombstone.TombstonedAt);
+    }
+
+    private static async Task<byte[]> ReadJournalAsync(DurableTaskJournalHarness harness, CancellationToken cancellationToken)
+    {
+        var consumer = new JournalBytes();
+        await harness.StorageProvider.CreateStorage(harness.JournalId).ReadAsync(consumer, cancellationToken);
+        return consumer.Bytes.ToArray();
+    }
+
+    // The JSON journal format writes a byte array as a base64 string.
+    private static int CountPayload(byte[] journal, byte[] payload) =>
+        CountOccurrences(journal, payload) + CountOccurrences(journal, System.Text.Encoding.UTF8.GetBytes(Convert.ToBase64String(payload)));
+
+    private static int CountOccurrences(ReadOnlySpan<byte> data, ReadOnlySpan<byte> value)
+    {
+        var count = 0;
+        for (var index = data.IndexOf(value); index >= 0; index = data.IndexOf(value))
+        {
+            count++;
+            data = data[(index + value.Length)..];
+        }
+
+        return count;
+    }
+
+    private sealed class JournalBytes : IJournalStorageConsumer
+    {
+        public MemoryStream Bytes { get; } = new();
+
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
+        {
+            while (buffer.Length > 0)
+            {
+                var chunk = new byte[buffer.Length];
+                buffer.Read(chunk);
+                Bytes.Write(chunk);
+            }
+        }
+    }
+
     private const InvokeMethodOptions InvokeMethodOptionsForRequest = InvokeMethodOptions.ReadOnly;
 
     private static TestDurableTaskRequest CreateRequest(GrainId caller = default, GrainId target = default)
@@ -284,6 +369,8 @@ public sealed class DurableTaskStorageTests
     private static DurableTaskGrainStorage CreateStorage() =>
         new(
             new TestDurableDictionary<TaskId, DurableTaskState>(),
+            new TestDurableDictionary<TaskId, byte[]>(),
+            new TestDurableDictionary<TaskId, byte[]>(),
             new TestStateManager(),
             TimeProvider.System,
             CreateSerializer());
