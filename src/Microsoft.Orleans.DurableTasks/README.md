@@ -8,7 +8,7 @@
 `Microsoft.Orleans.DurableTasks` executes grain interface methods which return
 `Orleans.DurableTasks.DurableTask` over Orleans Messaging. It owns the request
 protocol, runtime adapter, storage integration, code-generation mapping,
-diagnostics, cancellation propagation, completion delivery, and durable delays,
+diagnostics, cancellation propagation, completion delivery, signals, and durable delays,
 which resume through scheduled inbox messages.
 
 ## Configuration
@@ -85,6 +85,44 @@ grain is an invocation in the outbox. The starter stores no state for the detach
 Its target retains it like a client-scheduled root, which `GetDurableTask<T>(rootId)`
 polls, and sends its result to no grain.
 
+A `DurableSignal<T>` carries an external event, such as a shipment notice or a human
+approval, into an invoked task. The task's execution waits with `WaitAsync()`, and senders
+deliver a value to `(grain, task ID, signal name)`:
+
+```csharp
+static readonly DurableSignal<Shipment> Shipped = new("shipped");
+
+// In the workflow, which a client or another grain invoked under its task ID.
+var shipment = await Shipped.WaitAsync();
+
+// From a client, or from a durable task on another grain.
+await order.SignalDurableTaskAsync(TaskId.CreateRoot(workflowId), Shipped, shipment);
+
+// From the grain's own methods.
+await tasks.SignalAsync(TaskId.CreateRoot(workflowId), Shipped, shipment);
+```
+
+- The invoked task records the first value for each name as a terminal record in its
+  execution tree, `{taskId}/$signal:{name}`, together with the change which delivered it.
+  Every wait in the tree for that name, including waits during replay, returns the recorded
+  value, and the record is deleted with the tree. A signal which arrives before its wait
+  completes the wait immediately.
+- A repeated signal with an equal serialized value succeeds and leaves the task unchanged. A
+  signal with a different value, a signal for a terminal task which holds no value for that
+  name, and a signal for a task which the grain doesn't retain as an invoked task are rejected:
+  callers receive `InvalidOperationException` or `DurableTaskNotFoundException`, and the inbox
+  dead-letters a rejected signal message with the rejection as its reason.
+- In a durable task, the send and a marker in the execution's tree commit in one journal write,
+  like `DetachAsync`, so a replay which reaches the marker doesn't send it again. A signal to
+  another grain is a `durable-rpc/signal` message in the outbox, whose identity covers the
+  sender, target, task, name, and value; the target's inbox records the value directly in task
+  state. A signal to the grain itself is recorded in the same write.
+- From a client or an ordinary grain method, `SignalDurableTaskAsync` calls the target, which
+  completes once the task durably holds the value. A grain signals its own tasks through
+  `IDurableTaskManager.SignalAsync`, which commits with the grain's pending state changes.
+- A wait advances its execution's logical time to when the signal was recorded. A deadline is
+  a `WhenAny` race between the wait and `DurableTask.DelayUntil`.
+
 Repository consumers which need a preview package can opt this project into
 packing with `-p:PackDurableTaskAdapter=true`. The project keeps package
 validation disabled until its first published version establishes a baseline.
@@ -102,8 +140,8 @@ validation disabled until its first published version establishes a baseline.
   commit; a failed journal write deactivates the grain, and the next activation
   recovers from committed state.
 - Inbox messages are staged synchronously, so the inbox commits each message
-  with the changes it caused. Invocations, completions, and cancellations are
-  accepted when they are delivered; scheduled delay resumes are processed when
+  with the changes it caused. Invocations, completions, cancellations, and signals
+  are accepted when they are delivered; scheduled delay resumes are processed when
   due. Execution starts, local completions, and cancellation propagation follow
   the commit.
 - Each request and result payload is journaled once per grain. The callee's inbox

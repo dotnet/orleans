@@ -61,6 +61,19 @@ public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServe
 
     [Alias("GetRunningTasksAsync")]
     IAsyncEnumerable<TaskId> GetRunningTasksAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Delivers a signal to the invoked task <paramref name="taskId"/> of this grain.</summary>
+    /// <param name="taskId">The invoked task's identifier.</param>
+    /// <param name="name">The signal name.</param>
+    /// <param name="value">A successful response which holds the signal's value.</param>
+    /// <param name="cancellationToken">A token which abandons waiting for the signal to commit.</param>
+    /// <returns>An operation which completes once the task durably holds the signal's value.</returns>
+    /// <exception cref="DurableTaskNotFoundException">The grain retains no invoked task <paramref name="taskId"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The task is terminal and has no value for the signal, or it holds a different value for the signal.
+    /// </exception>
+    [Alias("SignalAsync")]
+    ValueTask SignalAsync(TaskId taskId, string name, DurableTaskResponse value, CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer]
@@ -134,5 +147,28 @@ internal interface IDurableTaskGrainRuntime
 
     /// <summary>Returns when a task's terminal result was recorded, or <see langword="null"/> when it has none.</summary>
     DateTimeOffset? GetCompletedAt(TaskId taskId);
+
+    /// <summary>
+    /// Waits for the signal <paramref name="name"/> of the invoked task whose execution tree contains
+    /// <paramref name="executionId"/>, and returns its committed value and the time it was recorded.
+    /// </summary>
+    ValueTask<(DurableTaskResponse Value, DateTimeOffset RecordedAt)> WaitForSignalAsync(
+        TaskId executionId,
+        string name,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("The durable task runtime does not support signals.");
+
+    /// <summary>
+    /// Sends a signal to the invoked task <paramref name="taskId"/> on <paramref name="target"/>, recording the send under
+    /// <paramref name="markerId"/>, and waits for the journal write which commits both.
+    /// </summary>
+    ValueTask SendSignalAsync(
+        TaskId markerId,
+        GrainId target,
+        TaskId taskId,
+        string name,
+        DurableTaskResponse value,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException("The durable task runtime does not support signals.");
     //IScheduledTaskHandle OnCreateScheduledTaskHandle(IScheduledTaskHandle handle);
 }
