@@ -23,7 +23,7 @@ public sealed class TypedMessageHelperTests
     private const string Subject = "orders.reserve";
     private static GrainId Sender => GrainId.Create("sender", "typed-helper");
     private static GrainId Receiver => GrainId.Create("receiver", "warehouse");
-    private static HierarchicalKey MessageKey => HierarchicalKey.Create("orders", "42", "reserve");
+    private static MessageId MessageKey => MessageId.Create("orders", "42", "reserve");
 
     [Fact]
     public void MessageType_RejectsNullSerializer()
@@ -345,8 +345,8 @@ public sealed class TypedMessageHelperTests
         var key = invalidIdentity switch
         {
             "messageId" => default,
-            "key-ascii-bytes" => HierarchicalKey.Create(new string('k', 1025)),
-            "key-multibyte-bytes" => HierarchicalKey.Create(new string('\u20ac', 341) + "ab"),
+            "key-ascii-bytes" => MessageId.Create(new string('k', 1025)),
+            "key-multibyte-bytes" => MessageId.Create(new string('\u20ac', 341) + "ab"),
             _ => MessageKey
         };
         OutboxMessage? result = null;
@@ -369,7 +369,7 @@ public sealed class TypedMessageHelperTests
         using var services = CreateServices();
         var serializer = services.GetRequiredService<Serializer<string>>();
         var messageType = new MessageType<string>(Subject, serializer);
-        var key = HierarchicalKey.Create("orders", "42", "reserve");
+        var key = MessageId.Create("orders", "42", "reserve");
         var first = messageType.Create(key, Receiver, "reserve first");
         var otherReceiver = GrainId.Create("receiver", "other-warehouse");
         var second = messageType.Create(key, otherReceiver, "reserve second");
@@ -378,8 +378,8 @@ public sealed class TypedMessageHelperTests
         AssertEnvelopeIdentity(second, key, otherReceiver, Subject);
         Assert.Equal("orders/42/reserve", first.Envelope.MessageId.ToString());
         Assert.Equal("orders/42/reserve", second.Envelope.MessageId.ToString());
-        Assert.Equal(3, first.Envelope.MessageId.CountSegments());
-        Assert.Equal(3, second.Envelope.MessageId.CountSegments());
+        Assert.Equal(3, first.Envelope.MessageId.Key.CountSegments());
+        Assert.Equal(3, second.Envelope.MessageId.Key.CountSegments());
         Assert.Equal("reserve first", serializer.Deserialize(first.Envelope.Payload));
         Assert.Equal("reserve second", serializer.Deserialize(second.Envelope.Payload));
     }
@@ -395,9 +395,9 @@ public sealed class TypedMessageHelperTests
         var messageType = new MessageType<string>(Subject, serializer);
         var key = variation switch
         {
-            "segments" => HierarchicalKey.Create(Enumerable.Repeat("s", 32).ToArray()),
-            "ascii-bytes" => HierarchicalKey.Create(new string('k', 1024)),
-            "multibyte-bytes" => HierarchicalKey.Create(new string('\u20ac', 341) + "a"),
+            "segments" => MessageId.Create(Enumerable.Repeat("s", 32).ToArray()),
+            "ascii-bytes" => MessageId.Create(new string('k', 1024)),
+            "multibyte-bytes" => MessageId.Create(new string('\u20ac', 341) + "a"),
             _ => throw new ArgumentOutOfRangeException(nameof(variation))
         };
 
@@ -407,7 +407,7 @@ public sealed class TypedMessageHelperTests
         AssertEnvelopeIdentity(envelope, key, Receiver, Subject);
         if (variation == "segments")
         {
-            Assert.Equal(32, envelope.Envelope.MessageId.CountSegments());
+            Assert.Equal(32, envelope.Envelope.MessageId.Key.CountSegments());
         }
         else
         {
@@ -534,13 +534,13 @@ public sealed class TypedMessageHelperTests
         Assert.Same(original.Envelope.Payload, surviving.Envelope.Payload);
         var expected = original.Envelope.Payload.ToArray();
         original = default;
-        var subsequent = messageType.Create(MessageKey.CreateChildKey("next"), Receiver, "new reserve");
+        var subsequent = messageType.Create(new MessageId(MessageKey.Key.CreateChildKey("next")), Receiver, "new reserve");
 
         Assert.Equal(2, probe.WriteCount);
         Assert.NotSame(surviving.Envelope.Payload, subsequent.Envelope.Payload);
         Assert.Equal(expected, surviving.Envelope.Payload.ToArray());
         Assert.Equal(MessageKey, surviving.Envelope.MessageId);
-        Assert.Equal(MessageKey.CreateChildKey("next"), subsequent.Envelope.MessageId);
+        Assert.Equal(new MessageId(MessageKey.Key.CreateChildKey("next")), subsequent.Envelope.MessageId);
         Assert.Equal("surviving reserve", services.GetRequiredService<Serializer<string>>().Deserialize(surviving.Envelope.Payload));
         Assert.Equal("new reserve", services.GetRequiredService<Serializer<string>>().Deserialize(subsequent.Envelope.Payload));
     }
@@ -1765,7 +1765,7 @@ public sealed class TypedMessageHelperTests
     }
 
     private static void AssertEnvelopeIdentity(
-        OutboxMessage message, HierarchicalKey key, GrainId receiver, string subject)
+        OutboxMessage message, MessageId key, GrainId receiver, string subject)
     {
         Assert.Equal(key, message.Envelope.MessageId);
         Assert.Equal(receiver, message.ReceiverId);
@@ -1941,7 +1941,7 @@ public sealed class TypedMessageHelperTests
         {
             calls++;
             stock--;
-            outbox.Send(type, MessageKey.CreateChildKey("result"), Receiver, body);
+            outbox.Send(type, new MessageId(MessageKey.Key.CreateChildKey("result")), Receiver, body);
             caller.Complete();
         }
         if (asynchronous)

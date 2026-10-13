@@ -25,7 +25,7 @@ public static class OutboxExtensions
     /// </remarks>
     public static void Send<T>(
         this IOutbox outbox, MessageType<T> messageType,
-        HierarchicalKey messageId, GrainId destination, T body, DateTimeOffset? deliverAt = null)
+        MessageId messageId, GrainId destination, T body, DateTimeOffset? deliverAt = null)
     {
         ArgumentNullException.ThrowIfNull(outbox);
         ArgumentNullException.ThrowIfNull(messageType);
@@ -46,7 +46,7 @@ public static class OutboxExtensions
     /// </param>
     public static void Send<T>(
         this IOutbox outbox, MessageType<T> messageType,
-        HierarchicalKey messageId, IAddressable destination, T body, DateTimeOffset? deliverAt = null)
+        MessageId messageId, IAddressable destination, T body, DateTimeOffset? deliverAt = null)
     {
         ArgumentNullException.ThrowIfNull(destination);
         outbox.Send(messageType, messageId, destination.GetGrainId(), body, deliverAt);
@@ -66,7 +66,7 @@ public static class OutboxExtensions
     /// </remarks>
     public static void Send<T>(
         this IOutbox outbox, MessageType<T> messageType,
-        IEnumerable<(HierarchicalKey MessageId, GrainId Destination, T Body)> messages)
+        IEnumerable<(MessageId MessageId, GrainId Destination, T Body)> messages)
     {
         ArgumentNullException.ThrowIfNull(outbox);
         ArgumentNullException.ThrowIfNull(messageType);
@@ -84,13 +84,13 @@ public static class OutboxExtensions
     /// <param name="context">The current received message and completion context.</param>
     /// <param name="destination">The application-selected reply destination.</param>
     /// <param name="body">The reply body.</param>
-    /// <remarks>The reply identity is <c>context.Message.Envelope.MessageId.CreateChildKey("result")</c>.</remarks>
+    /// <remarks>The reply identity is <c>context.Message.Envelope.MessageId.Key.CreateChildKey("result")</c>.</remarks>
     public static void SendReply<T>(
         this IOutbox outbox, MessageType<T> messageType,
         IInboxHandlerContext context, GrainId destination, T body)
     {
         ArgumentNullException.ThrowIfNull(context);
-        outbox.Send(messageType, context.Message.Envelope.MessageId.CreateChildKey("result"), destination, body);
+        outbox.Send(messageType, new MessageId(context.Message.Envelope.MessageId.Key.CreateChildKey("result")), destination, body);
     }
 
     /// <summary>Encodes and stages a deterministic result reply to a grain reference.</summary>

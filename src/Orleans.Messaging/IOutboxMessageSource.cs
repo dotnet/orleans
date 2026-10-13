@@ -5,7 +5,7 @@ namespace Orleans.Messaging;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <see cref="IOutbox.Send(HierarchicalKey)"/> stages a reference entry which carries the message ID and delivery
+/// <see cref="IOutbox.Send(MessageId)"/> stages a reference entry which carries the message ID and delivery
 /// state, but no payload or receiver, so the payload is journaled once, in the application's state. The outbox keeps
 /// every delivery semantic of an ordinary message: delivery after the sending write is durable, retries with backoff,
 /// dead-lettering after <c>MaxDeliveryAttempts</c> or <c>MaxOutboxRetryAge</c>, wake-ups, and metrics.
@@ -41,11 +41,11 @@ public interface IOutboxMessageSource
     /// message or has withdrawn it.
     /// </returns>
     /// <remarks>
-    /// The outbox validates the message. During <see cref="IOutbox.Send(HierarchicalKey)"/>, an invalid message fails the
+    /// The outbox validates the message. During <see cref="IOutbox.Send(MessageId)"/>, an invalid message fails the
     /// send. Afterwards, an exception or an invalid message breaks the source's contract and fails the activation's
     /// messaging, which deactivates the grain.
     /// </remarks>
-    bool TryGetMessage(HierarchicalKey messageId, out OutboxMessage message);
+    bool TryGetMessage(MessageId messageId, out OutboxMessage message);
 
     /// <summary>Notifies the source that the outbox retired a message, so the source can release its payload.</summary>
     /// <param name="messageId">The ID of the retired reference entry.</param>
@@ -55,7 +55,7 @@ public interface IOutboxMessageSource
     /// A dead-lettered message is materialized into the outbox dead letter before this call.
     /// An exception fails the activation's messaging, which deactivates the grain.
     /// </remarks>
-    void OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement);
+    void OnRetired(MessageId messageId, OutboxMessageRetirement retirement);
 }
 
 /// <summary>Describes how an outbox message retired.</summary>

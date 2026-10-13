@@ -9,8 +9,8 @@ typed message bindings, delivery results, and options.
 
 `Envelope` carries:
 
-- `MessageId`: a `HierarchicalKey` supplied by the application, at most 1,024 UTF-8
-  bytes. It identifies one command at the receiver.
+- `MessageId`: an application-supplied `HierarchicalKey` wrapped in a `MessageId`, at
+  most 1,024 UTF-8 bytes. It identifies one command at the receiver.
 - `Payload`: opaque bytes; an empty payload is valid.
 - `Subject`: an optional ordinal name, at most 256 UTF-8 bytes, that selects a typed
   handler.
@@ -19,10 +19,12 @@ typed message bindings, delivery results, and options.
 `OutboxMessage` pairs an envelope with its receiver. `InboxMessage` carries the same
 envelope at the receiver. Keep published payload and header arrays unchanged.
 
-`HierarchicalKey` wraps its canonical escaped path. Equality and hashing compare that
-path ordinally. Use `Create`, `CreateChildKey`, and `Append` to build keys, and
-`GetParent`, `IsParentOf`, `IsChildOf`, `IsAncestorOf`, and the segment enumerator to
-navigate them.
+`MessageId` wraps a `HierarchicalKey`. Create one with `new MessageId(key)` or
+`MessageId.Create(segments)`, and read the key through `Key`. `HierarchicalKey` wraps
+its canonical escaped path, and equality and hashing of both types compare that path
+ordinally. Use `HierarchicalKey.Create`, `CreateChildKey`, and `Append` to build keys,
+and `GetParent`, `IsParentOf`, `IsChildOf`, `IsAncestorOf`, and the segment enumerator
+to navigate them.
 
 ## Handle messages
 

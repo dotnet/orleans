@@ -54,9 +54,9 @@ public interface IOutbox
     /// The ID is pending as an ordinary message, no registered source provides it, the source returned a different ID,
     /// or the outbox is unavailable.
     /// </exception>
-    void Send(HierarchicalKey messageId);
+    void Send(MessageId messageId);
 
-    /// <summary>Registers a source which provides messages sent through <see cref="Send(HierarchicalKey)"/>.</summary>
+    /// <summary>Registers a source which provides messages sent through <see cref="Send(MessageId)"/>.</summary>
     /// <param name="source">The source.</param>
     /// <returns>This outbox.</returns>
     /// <remarks>
