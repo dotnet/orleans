@@ -201,15 +201,14 @@ namespace Orleans.Messaging
     public partial interface IOutbox
     {
         IOutbox Register(IOutboxMessageSource source);
+        void Send(HierarchicalKey messageId);
         void Send(OutboxMessage message);
-        void SendFromSource(HierarchicalKey messageId, Runtime.GrainId receiverId);
     }
 
     public partial interface IOutboxMessageSource
     {
-        bool CanProvide(HierarchicalKey messageId);
-        Envelope GetEnvelope(HierarchicalKey messageId);
         void OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement);
+        bool TryGetMessage(HierarchicalKey messageId, out OutboxMessage message);
     }
 
     public sealed partial class MessageType<T>

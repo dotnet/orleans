@@ -1,5 +1,4 @@
 using System;
-using Orleans.Runtime;
 
 namespace Orleans.Messaging;
 
@@ -36,25 +35,28 @@ public interface IOutbox
     void Send(OutboxMessage message);
 
     /// <summary>
-    /// Synchronously stages, for the grain's next journal write, a message whose envelope a registered
+    /// Synchronously stages, for the grain's next journal write, a message which a registered
     /// <see cref="IOutboxMessageSource"/> provides.
     /// </summary>
     /// <param name="messageId">The message ID, which a registered source provides.</param>
-    /// <param name="receiverId">The receiving grain, which must not be the sending grain.</param>
     /// <remarks>
-    /// The outbox journals the message ID, receiver, and delivery state, but not the payload, and delivers the message
-    /// like one staged through <see cref="Send(OutboxMessage)"/>. Stage the payload in the source's state before this
-    /// call: the outbox resolves the source now and fails when none provides the message. Sending a pending ID again
-    /// with the same receiver coalesces with the pending message. A message addressed to the sending grain is rejected;
-    /// send it through <see cref="Send(OutboxMessage)"/>, which stages it in the grain's own inbox.
+    /// The outbox journals the message ID and delivery state, while the source holds the payload and receiver, and
+    /// delivers the message like one staged through <see cref="Send(OutboxMessage)"/>. Stage the message in the source's
+    /// state before this call: the outbox resolves the source now, reads and validates its message, and fails when none
+    /// provides it. Sending a pending ID again coalesces with the pending message. A message which a source addresses to
+    /// the sending grain is rejected; send it through <see cref="Send(OutboxMessage)"/>, which stages it in the grain's
+    /// own inbox.
     /// </remarks>
-    /// <exception cref="ArgumentException">The ID is unset or too long, or the receiver is default or the sending grain.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// The ID is pending as a different message, no registered source provides it, or the outbox is unavailable.
+    /// <exception cref="ArgumentException">
+    /// The ID is unset or too long, or the source's message is invalid or addressed to the sending grain.
     /// </exception>
-    void SendFromSource(HierarchicalKey messageId, GrainId receiverId);
+    /// <exception cref="InvalidOperationException">
+    /// The ID is pending as an ordinary message, no registered source provides it, the source returned a different ID,
+    /// or the outbox is unavailable.
+    /// </exception>
+    void Send(HierarchicalKey messageId);
 
-    /// <summary>Registers a source which provides the envelopes of messages sent through <see cref="SendFromSource"/>.</summary>
+    /// <summary>Registers a source which provides messages sent through <see cref="Send(HierarchicalKey)"/>.</summary>
     /// <param name="source">The source.</param>
     /// <returns>This outbox.</returns>
     /// <remarks>

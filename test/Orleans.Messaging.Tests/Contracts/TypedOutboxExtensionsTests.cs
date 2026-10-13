@@ -569,7 +569,7 @@ public sealed class TypedOutboxExtensionsTests
             _messages.Add(message);
         }
 
-        public void SendFromSource(HierarchicalKey messageId, GrainId receiverId) => throw new NotSupportedException();
+        public void Send(HierarchicalKey messageId) => throw new NotSupportedException();
 
         public IOutbox Register(IOutboxMessageSource source) => throw new NotSupportedException();
 
