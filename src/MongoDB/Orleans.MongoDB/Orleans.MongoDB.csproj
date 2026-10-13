@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.MongoDB</PackageId>
+    <Title>Microsoft Orleans MongoDB Provider Infrastructure</Title>
+    <Description>Shared MongoDB client configuration and infrastructure for Microsoft Orleans providers.</Description>
+    <PackageTags>$(PackageTags) MongoDB</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Clustering.MongoDB" />
+    <InternalsVisibleTo Include="Orleans.Persistence.MongoDB" />
+    <InternalsVisibleTo Include="Orleans.Reminders.MongoDB" />
+    <InternalsVisibleTo Include="Orleans.MongoDB.Tests" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

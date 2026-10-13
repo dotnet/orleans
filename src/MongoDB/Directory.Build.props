@@ -1,0 +1,11 @@
+<Project>
+  <Import Project="..\Directory.Build.props" />
+  <PropertyGroup>
+    <!-- These packages are being published under their Microsoft.Orleans names for the first time. -->
+    <OrleansPackageValidationBaselineVersion />
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>
