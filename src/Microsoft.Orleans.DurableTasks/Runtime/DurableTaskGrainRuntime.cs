@@ -171,6 +171,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         while (true)
         {
+            // When several candidates have completed, the first in candidate order wins.
             foreach (var candidate in candidates)
             {
                 var response = await GetScheduledTaskHandle(candidate).PollAsync(
@@ -187,7 +188,30 @@ internal sealed partial class DurableTaskGrainRuntime(
                 return candidate;
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(10), _shared.TimeProvider, cancellationToken);
+            await WaitForAnyAsync(candidates, cancellationToken);
+        }
+    }
+
+    /// <summary>Waits until any candidate's handle completes, then cancels and drains the other waits.</summary>
+    private async Task WaitForAnyAsync(IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
+    {
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var waits = new Task<DurableTaskResponse>[candidates.Count];
+        for (var index = 0; index < waits.Length; index++)
+        {
+            waits[index] = GetScheduledTaskHandle(candidates[index]).WaitAsync(waitCancellation.Token).AsTask();
+        }
+
+        try
+        {
+            // A failed wait propagates, as a failed poll does.
+            await await Task.WhenAny(waits);
+        }
+        finally
+        {
+            waitCancellation.Cancel();
+            await ((Task)Task.WhenAll(waits)).ConfigureAwait(
+                ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
         }
     }
 
