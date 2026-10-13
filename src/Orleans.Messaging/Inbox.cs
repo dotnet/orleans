@@ -83,11 +83,12 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
                 return DeliveryResult.Duplicate();
             }
 
-            // Sink-accepted messages never occupy inbox capacity and need no handler.
-            if (message.Envelope.DeliverAt is null && StageSinkAcceptance(message) is { } accepted)
+            // Sink-owned messages never occupy inbox capacity and need no handler. A sink's duplicate can still be staged,
+            // so every outcome except backpressure is reported once the write is durable.
+            if (StageSinkAcceptance(message) is { } sinkResult)
             {
-                await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
-                return accepted;
+                if (sinkResult.Status != DeliveryStatus.Backpressured) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
+                return sinkResult;
             }
 
             // Scheduled messages never count toward capacity, so they are not backpressured either.
@@ -118,38 +119,53 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
     }
 
     /// <summary>
-    /// Offers a message to the registered sinks and stages the outcome of the first sink which accepts or rejects it.
+    /// Offers a message to the registered sinks and stages the outcome which the first sink to take the message reports.
     /// </summary>
     /// <returns>The delivery result, or <see langword="null"/> when every sink declines the message.</returns>
     /// <remarks>
     /// An accepted message journals only its processed record, in the write which commits the sink's staged changes.
-    /// A sink which throws stages nothing, so the message is dead-lettered with its payload and recorded as processed.
+    /// A duplicate or backpressured message stages nothing. A sink which dead-letters the message, throws, or reports
+    /// another status stages nothing itself, so the message is dead-lettered with its payload and recorded as processed.
     /// </remarks>
     private DeliveryResult? StageSinkAcceptance(InboxMessage message)
     {
         var key = message.Envelope.MessageId;
         foreach (var sink in _sinks)
         {
+            DeliveryResult result;
             Exception? error = null;
             try
             {
-                if (!sink.TryAccept(message)) continue;
+                if (!sink.TryAccept(message, out result)) continue;
+                if (result.Status is not (DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.Backpressured or DeliveryStatus.DeadLettered))
+                {
+                    throw new InvalidOperationException($"The inbox message sink reported the unsupported delivery status '{result.Status}'.");
+                }
             }
             catch (Exception exception)
             {
                 error = exception;
+                result = DeliveryResult.DeadLettered(exception.Message);
             }
 
+            if (result.Status is DeliveryStatus.Duplicate or DeliveryStatus.Backpressured)
+            {
+                Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, result.Status == DeliveryStatus.Duplicate ? "duplicate" : "backpressured");
+                return result;
+            }
+
+            var accepted = result.Status == DeliveryStatus.Accepted;
+            var reason = result.Message ?? "The inbox message sink dead-lettered the message.";
             try
             {
-                if (error is null)
+                if (accepted)
                 {
                     StageCompletion(key, deadLetter: null);
                 }
                 else
                 {
-                    LogSinkRejected(Logger, error, key, GrainContext.GrainId);
-                    StageDeadLetter(message, error.Message, attemptCount: 1);
+                    LogSinkDeadLettered(Logger, error, key, GrainContext.GrainId, reason);
+                    StageDeadLetter(message, reason, attemptCount: 1);
                 }
             }
             catch (Exception exception)
@@ -161,8 +177,8 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
             }
 
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
-            Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, error is null ? "success" : "dead_lettered");
-            if (error is not null) return DeliveryResult.DeadLettered(error.Message);
+            Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, accepted ? "success" : "dead_lettered");
+            if (!accepted) return DeliveryResult.DeadLettered(reason);
             LogMessageAccepted(Logger, key, GrainContext.GrainId);
             return DeliveryResult.Accepted();
         }
@@ -540,6 +556,6 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
     [LoggerMessage(Level = LogLevel.Error, Message = "Handler threw exception for message {MessageId} to {ReceiverId}")]
     private static partial void LogHandlerException(ILogger logger, Exception exception, MessageId messageId, GrainId receiverId);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Inbox message sink rejected message {MessageId} to {ReceiverId}; the message is dead-lettered")]
-    private static partial void LogSinkRejected(ILogger logger, Exception exception, MessageId messageId, GrainId receiverId);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Inbox message sink dead-lettered message {MessageId} to {ReceiverId}: {Reason}")]
+    private static partial void LogSinkDeadLettered(ILogger logger, Exception? exception, MessageId messageId, GrainId receiverId, string reason);
 }
