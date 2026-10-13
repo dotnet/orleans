@@ -113,5 +113,8 @@ internal interface IDurableTaskGrainRuntime
     ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, CancellationToken cancellationToken);
     ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);
+
+    /// <summary>Returns when a task's terminal result was recorded, or <see langword="null"/> when it has none.</summary>
+    DateTimeOffset? GetCompletedAt(TaskId taskId);
     //IScheduledTaskHandle OnCreateScheduledTaskHandle(IScheduledTaskHandle handle);
 }
