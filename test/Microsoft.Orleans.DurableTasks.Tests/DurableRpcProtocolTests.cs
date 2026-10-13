@@ -136,7 +136,7 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void CompletionWaiterRemainsUntilRetiredAndTombstoneRetainsIdentity()
+    public void CompletionWaiterRemainsUntilRetired()
     {
         var destination = GrainId.Create("caller", "one");
         var serializer = new ServiceCollection()
@@ -153,16 +153,11 @@ public sealed class DurableRpcProtocolTests
 
         Assert.Contains(destination, state.CompletionDestinations);
         state.CompletionDestinations.Remove(destination);
-        state.SetRequest(null);
-        state.SetResult(null);
-        state.TombstonedAt = DateTimeOffset.UtcNow;
 
         Assert.Empty(state.CompletionDestinations);
         Assert.Equal("fingerprint", state.RequestFingerprint);
-        Assert.NotNull(state.TombstonedAt);
-        Assert.Null(state.ResultPayload);
+        Assert.NotNull(state.ResultPayload);
     }
-
     [Fact]
     public void ResumeIsScheduledSelfMessageCarryingTaskIdentityAndGeneration()
     {
@@ -530,10 +525,10 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public async Task PollAsync_TombstonedTask_ThrowsTypedNotFound()
+    public async Task PollAsync_DeletedTask_ThrowsTypedNotFound()
     {
         var taskId = TaskId.Parse("root/expired-client-poll");
-        var grain = new TombstoneResponseDurableTaskServer(taskId);
+        var grain = new NotFoundDurableTaskServer(taskId);
         var handle = new GrainScheduledTaskHandle(
             taskId,
             new RuntimeTestDurableTaskRequest(),
@@ -556,10 +551,10 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public async Task WaitAsync_TombstonedTask_ThrowsTypedNotFoundWithoutRepolling()
+    public async Task WaitAsync_DeletedTask_ThrowsTypedNotFoundWithoutRepolling()
     {
         var taskId = TaskId.Parse("root/expired-client-wait");
-        var grain = new TombstoneResponseDurableTaskServer(taskId);
+        var grain = new NotFoundDurableTaskServer(taskId);
         var handle = new GrainScheduledTaskHandle(
             taskId,
             new RuntimeTestDurableTaskRequest(),
@@ -583,7 +578,7 @@ public sealed class DurableRpcProtocolTests
     public async Task AttachedDurableTask_MissingTaskReturnsTypedNotFoundWithoutScheduling()
     {
         var taskId = TaskId.Parse("root/attached-missing");
-        var grain = new TombstoneResponseDurableTaskServer(taskId);
+        var grain = new NotFoundDurableTaskServer(taskId);
         ScheduledTask<int> task = new AttachedScheduledTask<int>(taskId, grain);
 
         var failure = await Assert.ThrowsAsync<DurableTaskNotFoundException>(
@@ -629,7 +624,7 @@ public sealed class DurableRpcProtocolTests
         var failureTaskId = useChildTaskId
             ? TaskId.Parse("root/attached-failed/child")
             : rootId;
-        var grain = new TombstoneResponseDurableTaskServer(
+        var grain = new NotFoundDurableTaskServer(
             rootId,
             failureTaskId,
             returnFailureResponse: true);
