@@ -48,6 +48,43 @@ An absent root or a root whose result retention has expired throws
 `DurableTaskNotFoundException`. A returned failed response remains an execution
 failure, including when the stored user exception has that same type.
 
+A durable grain observes and cancels its own tasks through `IDurableTaskManager`, which
+it injects from its activation services. The manager runs against the activation's
+runtime, without a grain call to the grain itself:
+
+```csharp
+public sealed class OrderGrain(IDurableTaskManager tasks) : DurableGrain, IOrderGrain
+{
+    public async Task<bool> CancelAsync()
+    {
+        await tasks.CancelAsync(TaskId.CreateRoot(PlaceOrderTaskId(this.GetPrimaryKey())));
+        return true;
+    }
+}
+```
+
+`DetachAsync` starts a durable grain call as a detached root task on its target, for
+fire-and-forget work, cleanup which outlives a canceled workflow, and durable calls from
+ordinary grain methods:
+
+```csharp
+await buyer.RecordOrderAsync(summary).DetachAsync($"order-{orderId:N}-v{summary.Version}");
+```
+
+- In a durable task, the call and a marker in the execution's tree commit in one journal
+  write. A replay which reaches the marker doesn't send the call again, and the marker is
+  deleted with the tree.
+- In an ordinary method of a durable grain, the call is staged with the grain's pending
+  state changes, and `DetachAsync` completes once the journal write which commits them
+  completes.
+- From a client, or code outside a durable grain, `DetachAsync` completes once the target
+  has scheduled the root.
+
+A call to the grain itself starts as a local root after the commit; a call to another
+grain is an invocation in the outbox. The starter stores no state for the detached task.
+Its target retains it like a client-scheduled root, which `GetDurableTask<T>(rootId)`
+polls, and sends its result to no grain.
+
 Repository consumers which need a preview package can opt this project into
 packing with `-p:PackDurableTaskAdapter=true`. The project keeps package
 validation disabled until its first published version establishes a baseline.
@@ -112,6 +149,12 @@ validation disabled until its first published version establishes a baseline.
   error to their caller.
 - Cancellation is monotonic, duplicates are idempotent, and the first durable
   terminal result wins a race.
+- A detached task is a root on its target with no caller. Durable cancellation of its
+  starter doesn't reach it, and deleting the starter's execution tree deletes only the
+  marker which recorded the start. Detaching the same request under the same root ID
+  again leaves the task unchanged. Another request under that ID fails like other task
+  ID reuse; when the call to another grain is delivered through the outbox, the target's
+  inbox dead-letters it.
 - Delays persist their logical due time and generation. Each delay sends a
   `durable-rpc/resume` message to its own grain, with `Envelope.DeliverAt` set to
   the due time. The grain's own inbox accepts the message in the delay's journal

@@ -36,7 +36,8 @@ public static class DurableTaskHostingExtensions
     /// <remarks>
     /// Messaging requires Durable Jobs, which wakes grains with pending messages, including scheduled delay resumes.
     /// Grains deriving from <see cref="Orleans.Journaling.DurableGrain"/> or implementing <see cref="IMessagingGrain"/>
-    /// bind the runtime during activation setup, before journal recovery. Task state can be stored in any journal format;
+    /// bind the runtime during activation setup, before journal recovery, and can inject its
+    /// <see cref="IDurableTaskManager"/>. Task state can be stored in any journal format;
     /// this method registers the source-generated JSON metadata which the JSON journal format requires.
     /// </remarks>
     public static ISiloBuilder AddDurableTasks(
@@ -69,6 +70,7 @@ public static class DurableTaskHostingExtensions
         siloBuilder.Services.TryAddSingleton<DurableTaskMessageTypes>();
         siloBuilder.Services.AddScoped<DurableTaskGrainRuntime>();
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainRuntime, DurableTaskGrainRuntime>();
+        siloBuilder.Services.AddFromExisting<IDurableTaskManager, DurableTaskGrainRuntime>();
         siloBuilder.Services.AddScoped(static services => new DurableTaskMessageTransport(
             new Lazy<IOutbox>(services.GetRequiredService<IOutbox>),
             services.GetRequiredService<DurableTaskMessageTypes>()));
