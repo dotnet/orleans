@@ -26,9 +26,9 @@ public abstract class DurableExecutionContext
     /// <param name="taskId">The stable identifier of this execution.</param>
     /// <param name="executionAbortToken">The host-owned token for aborting this execution attempt.</param>
     /// <remarks>
-    /// Delegate and delay operations observe both durable cancellation and host execution abort.
-    /// <see cref="CancellationToken"/> and durable cancellation callbacks continue to observe the
-    /// durable request. The host owns the abort source for this execution's lifetime, drains
+    /// <see cref="CancellationToken"/>, and the delegate and delay operations which receive it, observe both durable
+    /// cancellation and host execution abort. <see cref="IsCancellationRequested"/> and durable cancellation callbacks
+    /// observe the durable request only. The host owns the abort source for this execution's lifetime, drains
     /// the aborted attempt, discards its response, and replays it in a new context.
     /// </remarks>
     protected DurableExecutionContext(TaskId taskId, CancellationToken executionAbortToken)
@@ -69,13 +69,19 @@ public abstract class DurableExecutionContext
     }
 
     /// <summary>
-    /// Gets the durable cancellation token for this execution.
+    /// Gets the token which is canceled when durable cancellation is requested or the host aborts this execution attempt.
     /// </summary>
     /// <remarks>
+    /// <see cref="IsCancellationRequested"/> reports durable cancellation only, so code which decides a durable outcome,
+    /// such as whether to compensate, checks it rather than this token. An aborted attempt's response is discarded and the
+    /// task replays in a new context.
+    ///
+    /// <para>
     /// Registrations on this token are ordinary synchronous .NET cleanup observers only. They follow
     /// standard <see cref="CancellationToken"/> behavior, including registration-time
     /// <see cref="ExecutionContext"/> capture, optional <see cref="SynchronizationContext"/> dispatch,
     /// and current execution-context behavior for unsafe registrations.
+    /// </para>
     ///
     /// <para>
     /// These observers must return promptly. They must not call, block on, await, or otherwise
@@ -86,9 +92,7 @@ public abstract class DurableExecutionContext
     /// cycle handling, or participates in durable failure aggregation.
     /// </para>
     /// </remarks>
-    public CancellationToken CancellationToken => _cancellationSource.Token;
-
-    internal CancellationToken ExecutionCancellationToken => _executionCancellationSource?.Token ?? CancellationToken;
+    public CancellationToken CancellationToken => _executionCancellationSource?.Token ?? _cancellationSource.Token;
 
     /// <summary>Schedules or reattaches to a child definition under an exact identifier.</summary>
     protected internal abstract ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
