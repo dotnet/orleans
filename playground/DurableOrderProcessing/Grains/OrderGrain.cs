@@ -12,9 +12,9 @@ public interface IOrderGrain : IGrainWithGuidKey
     // The order workflow, which basket checkout schedules under PlaceOrderTaskId(orderId).
     DurableTask<OrderResult> PlaceOrderAsync(SubmitOrder request);
 
-    DurableTask<bool> CancelAsync();
+    Task<bool> CancelAsync();
 
-    DurableTask<bool> ShipAsync();
+    Task<bool> ShipAsync();
 }
 
 // The order process manager, following eShop's ordering flow:
@@ -23,16 +23,19 @@ public interface IOrderGrain : IGrainWithGuidKey
 // PlaceOrder is one durable task. After a deactivation, the runtime replays it from the start: completed child tasks
 // return their recorded results, so the workflow resumes where it stopped. Each state transition is a durable task
 // method which the workflow awaits as an identified child, so its state change commits once with its recorded result,
-// which a replay returns without running the transition again.
+// which a replay returns without running the transition again. Cancel and ship are ordinary methods, so the order
+// retains no task for either command.
 public sealed class OrderGrain : DurableGrain, IOrderGrain
 {
     private readonly OrderingOptions _options;
+    private readonly IDurableTaskManager _tasks;
     private readonly IDurableValue<OrderState> _order;
     private readonly IDurableDictionary<int, StockLineStatus> _stock;
 
-    public OrderGrain(IOptions<OrderingOptions> options)
+    public OrderGrain(IOptions<OrderingOptions> options, IDurableTaskManager tasks)
     {
         _options = options.Value;
+        _tasks = tasks;
         _order = StateManager.GetOrAddValue<OrderState>("order");
         _stock = StateManager.GetOrAddDictionary<int, StockLineStatus>("stock");
     }
@@ -95,28 +98,29 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         return Result(summary);
     }
 
-    // The endpoint schedules each cancel request as its own task, which records its decision once.
-    public async DurableTask<bool> CancelAsync()
+    // The order records the buyer's decision and detaches the projection update, which commit in one journal write.
+    public async Task<bool> CancelAsync()
     {
-        if (await CancelByBuyer().WithId("cancel") is not { } summary)
+        if (_order.Value?.Status is not OrderStatus.Submitted)
         {
             return false;
         }
 
+        await DetachRecordAsync(SetStatus(OrderStatus.Cancelled, "Cancelled by the buyer."));
+
         // Durable cancellation ends the workflow's grace period.
-        await this.GetDurableTask<OrderResult>(PlaceOrderTaskId(OrderId)).CancelAsync();
-        await RecordAsync(_order.Value!.BuyerId, summary);
+        await _tasks.CancelAsync(TaskId.CreateRoot(PlaceOrderTaskId(OrderId)));
         return true;
     }
 
-    public async DurableTask<bool> ShipAsync()
+    public async Task<bool> ShipAsync()
     {
-        if (await Ship().WithId("ship") is not { } summary)
+        if (_order.Value?.Status is not OrderStatus.Paid)
         {
             return false;
         }
 
-        await RecordAsync(_order.Value!.BuyerId, summary);
+        await DetachRecordAsync(SetStatus(OrderStatus.Shipped));
         return true;
     }
 
@@ -195,12 +199,6 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         return SetStatus(OrderStatus.Cancelled, reason);
     }
 
-    private async DurableTask<OrderSummary?> CancelByBuyer() =>
-        _order.Value?.Status is OrderStatus.Submitted ? SetStatus(OrderStatus.Cancelled, "Cancelled by the buyer.") : null;
-
-    private async DurableTask<OrderSummary?> Ship() =>
-        _order.Value?.Status is OrderStatus.Paid ? SetStatus(OrderStatus.Shipped) : null;
-
     private OrderSummary SetStatus(OrderStatus status, string? description = null)
     {
         var order = _order.Value!;
@@ -211,6 +209,11 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     // Delivery order across tasks is unspecified; the buyer keeps the summary with the highest version.
     private ConfiguredDurableTask RecordAsync(string buyerId, OrderSummary summary) =>
         GrainFactory.GetGrain<IBuyerGrain>(buyerId).RecordOrderAsync(summary).WithId($"buyer-{summary.Version}");
+
+    // A detached task under a root ID derived from the order and version, which the buyer retains, not the order.
+    private ValueTask DetachRecordAsync(OrderSummary summary) =>
+        GrainFactory.GetGrain<IBuyerGrain>(_order.Value!.BuyerId).RecordOrderAsync(summary)
+            .DetachAsync($"order-{OrderId:N}-v{summary.Version}");
 
     private ICatalogItemGrain Catalog(int productId) => GrainFactory.GetGrain<ICatalogItemGrain>(productId);
 
