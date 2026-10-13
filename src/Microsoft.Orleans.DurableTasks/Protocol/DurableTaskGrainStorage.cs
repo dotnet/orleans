@@ -24,6 +24,9 @@ public interface IDurableTaskGrainStorage
 
     void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination);
     void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination);
+
+    /// <summary>Restarts the retention period of a terminal result, now.</summary>
+    void RetainResult(TaskId taskId, IDurableTaskState state);
     void CreateTombstone(TaskId taskId, IDurableTaskState state);
 
     bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state);

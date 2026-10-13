@@ -171,6 +171,13 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         }
     }
 
+    public void RetainResult(TaskId taskId, IDurableTaskState state)
+    {
+        var typedState = GetState(taskId, state);
+        typedState.RetainedSince = _timeProvider.GetUtcNow();
+        _items[taskId] = typedState;
+    }
+
     public void CreateTombstone(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(taskId, state);
