@@ -230,7 +230,10 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         DurableTaskRequestShared shared,
         [NotNullWhen(true)] out IDurableTaskGrainRuntime? runtime)
     {
-        if (shared.GrainContextAccessor.GrainContext.GetComponent<IDurableTaskGrainRuntime>() is not { } localProxy)
+        // Outside a grain, a silo resolves the hosted client, whose components come from the silo's root services and
+        // can't construct the activation-scoped runtime; that caller schedules like an external client.
+        var context = shared.GrainContextAccessor.GrainContext;
+        if (context.GrainId.IsClient() || context.GetComponent<IDurableTaskGrainRuntime>() is not { } localProxy)
         {
             runtime = null;
             return false;
