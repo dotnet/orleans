@@ -145,10 +145,13 @@ write completes. Each receiver returns a `DeliveryResult`:
 - `Backpressured`: the inbox holds `MaxCapacity` pending messages without `DeliverAt`.
   The inbox admits scheduled messages regardless of `MaxCapacity`.
 - `HandlerNotFound`: the receiver has no registered handlers.
+- `DeadLettered`: the receiver moved the message to its dead-letter store.
 
-The outbox removes accepted and duplicate messages, and retries other outcomes with
-exponential backoff. It dead-letters a message after `MaxDeliveryAttempts` or once it
-is older than `MaxOutboxRetryAge`. Delivery order is unspecified.
+`Accepted`, `Duplicate`, and `DeadLettered` are terminal: the outbox removes the
+message. The outbox retries `Backpressured`, `HandlerNotFound`, and transport
+failures with exponential backoff. It dead-letters a message after
+`MaxDeliveryAttempts` or once it is older than `MaxOutboxRetryAge`. Delivery order
+is unspecified.
 
 Each activation runs one messaging pump on its scheduler, processing inbox batches
 and delivering outbox batches. One durable job per grain wakes the pump while either
