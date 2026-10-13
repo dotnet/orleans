@@ -2244,7 +2244,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         await WaitUntilAsync(() => transport.Completions.Count == 1);
         await WaitUntilIdleAsync(runtime);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var canceled = new TaskCompletionSource<Exception?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var childHandle = await runtime.ScheduleChildAsync(childId, DurableTask.Run(async cancellationToken =>
             {
                 started.TrySetResult();
@@ -2254,7 +2254,8 @@ public sealed class DurableTaskRuntimeInvariantTests
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    canceled.TrySetResult();
+                    // A deleted attempt can't schedule durable work, which would outlive its tree.
+                    canceled.TrySetResult(await Record.ExceptionAsync(async () => await DurableTask.Delay(TimeSpan.FromDays(1))));
                     throw new InvalidOperationException("The deleted attempt fails after cancellation.");
                 }
             }), TestContext.Current.CancellationToken);
@@ -2269,7 +2270,8 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         // The running attempt is signaled once the deletion commits.
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await canceled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.IsAssignableFrom<OperationCanceledException>(await canceled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.Empty(storage.Tasks);
         var writes = manager.WriteCount;
 
         // Deactivation drains the attempt, whose result is discarded without restoring state.
