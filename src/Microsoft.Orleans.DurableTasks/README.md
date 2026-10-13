@@ -97,7 +97,8 @@ validation disabled until its first published version establishes a baseline.
   completes the task.
 - Deleting an execution tree cancels its unfinished tasks: the deletion's journal
   write sends a cancellation to each pending call to another grain, and each
-  running execution is signaled after that write and its result discarded.
+  running execution is signaled after that write and its result discarded. A
+  deleted execution's further scheduling throws `OperationCanceledException`.
   Completions and delay resumes which arrive for deleted tasks are ignored. A
   cancellation which arrives before its invocation is recorded, so the invocation
   terminalizes as canceled when it arrives; the record is deleted once Messaging's
