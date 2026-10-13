@@ -83,7 +83,7 @@ public static class InboxExtensions
         {
             cancellationToken.ThrowIfCancellationRequested();
             // The delegate owns the decoded body, including when cancellation arrives during decoding.
-            var body = messageType.Decode(context.Message);
+            var body = messageType.Decode(context.Message.Envelope);
             return Invoke(body, context, cancellationToken);
         }
 

@@ -47,7 +47,7 @@ public sealed class TypedMessageHelperTests
 
         Assert.Equal(Subject, messageType.Subject);
         Assert.Equal(Subject, message.Envelope.Subject);
-        Assert.Equal("payload", messageType.Decode(message));
+        Assert.Equal("payload", messageType.Decode(message.Envelope));
     }
 
     [Fact]
@@ -577,7 +577,7 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(0, body.DisposeCount);
         Assert.Equal(MessageKey, retained.Envelope.MessageId);
         Assert.Equal(services.GetRequiredService<Serializer<string>>().SerializeToArray(body.Name), retained.Envelope.Payload.ToArray());
-        using var decoded = type.Decode(retained);
+        using var decoded = type.Decode(retained.Envelope);
         Assert.NotSame(body, decoded);
         Assert.Same(codec.LastDecoded, decoded);
         Assert.Equal("resource €42", decoded.Name);
@@ -1623,8 +1623,8 @@ public sealed class TypedMessageHelperTests
         var envelope = first.Create(MessageKey, Receiver, body);
         var other = second.Create(MessageKey, Receiver, body);
         Assert.Equal(serializer.SerializeToArray(body), envelope.Envelope.Payload.ToArray());
-        Assert.Equal(body, first.Decode(envelope));
-        Assert.Equal(body, second.Decode(other));
+        Assert.Equal(body, first.Decode(envelope.Envelope));
+        Assert.Equal(body, second.Decode(other.Envelope));
         AssertEnvelopeIdentity(envelope, MessageKey, Receiver, Subject);
         AssertEnvelopeIdentity(other, MessageKey, Receiver, "orders.cancel");
         Assert.NotSame(first, second);
@@ -1662,8 +1662,8 @@ public sealed class TypedMessageHelperTests
         var other = second.Create(MessageKey, Receiver, body);
         Assert.Equal(2, probe.WriteCount);
         Assert.Equal(codecServices.GetRequiredService<Serializer<T>>().SerializeToArray(body), envelope.Envelope.Payload.ToArray());
-        Assert.Equal(body, first.Decode(envelope));
-        Assert.Equal(body, second.Decode(other));
+        Assert.Equal(body, first.Decode(envelope.Envelope));
+        Assert.Equal(body, second.Decode(other.Envelope));
         Assert.Equal(2, probe.ReadCount);
         Assert.Equal(factory ? 1 : 0, factoryCalls);
         AssertEnvelopeIdentity(envelope, MessageKey, Receiver, Subject);
@@ -1894,17 +1894,8 @@ public sealed class TypedMessageHelperTests
         probe.ReadFailure = new InvalidDataException("payload codec must not run");
         var type = new MessageType<string>(Subject, serializer);
         var envelope = new Envelope { MessageId = MessageKey, Payload = direct.SerializeToArray("unrouted €42") };
-        var outgoing = new OutboxMessage { Envelope = envelope, ReceiverId = Receiver };
 
-        foreach (var decode in new Func<string>[]
-        {
-            () => type.Decode(envelope),
-            () => type.Decode(outgoing),
-            () => type.Decode(outgoing.ToInboxMessage())
-        })
-        {
-            Assert.Equal("envelope", Assert.Throws<ArgumentException>(() => decode()).ParamName);
-        }
+        Assert.Equal("envelope", Assert.Throws<ArgumentException>(() => type.Decode(envelope)).ParamName);
         Assert.Equal(0, probe.ReadCount);
         Assert.Equal(0, probe.WriteCount);
         Assert.Equal("unrouted €42", direct.Deserialize(envelope.Payload));
@@ -2022,8 +2013,7 @@ public sealed class TypedMessageHelperTests
         Assert.Same(envelope.Subject, incoming.Envelope.Subject);
         Assert.Null(incoming.Envelope.Headers);
         Assert.Equal("shared payload € / 東京", type.Decode(envelope));
-        Assert.Equal("shared payload € / 東京", type.Decode(outgoing));
-        Assert.Equal("shared payload € / 東京", type.Decode(incoming));
+        Assert.Equal("shared payload € / 東京", type.Decode(incoming.Envelope));
     }
 
     [Theory]
@@ -2051,10 +2041,10 @@ public sealed class TypedMessageHelperTests
         var context = new CountingInboxHandlerContext(outgoing);
         var state = new HandlerState();
         var dispatcher = new TestInbox().Register(type, state, ObserveState);
-        for (var i = 0; i < 64; i++) type.Decode(outgoing);
+        for (var i = 0; i < 64; i++) type.Decode(outgoing.Envelope);
         MeasureDispatchAllocations(dispatcher, context, 64);
         var before = GC.GetAllocatedBytesForCurrentThread();
-        for (var i = 0; i < 256; i++) type.Decode(outgoing);
+        for (var i = 0; i < 256; i++) type.Decode(outgoing.Envelope);
         var decodeBytes = GC.GetAllocatedBytesForCurrentThread() - before;
 
         var dispatchBytes = MeasureDispatchAllocations(dispatcher, context, 256);
@@ -2067,7 +2057,7 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(0, context.CompletionCount);
         Assert.Equal(SubjectAtLimit(multibyte: true), GetSubject(outgoing.Envelope));
         Assert.Equal(MessageKey, outgoing.Envelope.MessageId);
-        Assert.Equal("allocation control", type.Decode(context.Message));
+        Assert.Equal("allocation control", type.Decode(context.Message.Envelope));
     }
 
     [Fact]
@@ -2157,7 +2147,7 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(2, probe.WriteCount);
         Assert.Equal(Receiver, outgoing.ReceiverId);
         Assert.Equal(MessageKey, outgoing.Envelope.MessageId);
-        Assert.Equal(Receiver, customBinding.Decode(outgoing));
+        Assert.Equal(Receiver, customBinding.Decode(outgoing.Envelope));
         Assert.Null(outgoing.Envelope.Headers);
         Assert.Equal(2, probe.ReadCount);
         Assert.Equal(1, factoryCalls);

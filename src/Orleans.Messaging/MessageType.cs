@@ -64,16 +64,6 @@ public sealed class MessageType<T>
             ?? throw new ArgumentException($"Message subject '{Subject}' requires a nonnull payload.", nameof(envelope));
     }
 
-    /// <summary>Decodes the payload of a received message.</summary>
-    /// <param name="message">The received message.</param>
-    /// <returns>The nonnull decoded payload.</returns>
-    public T Decode(InboxMessage message) => Decode(message.Envelope);
-
-    /// <summary>Decodes the payload of an outgoing message.</summary>
-    /// <param name="message">The outgoing message.</param>
-    /// <returns>The nonnull decoded payload.</returns>
-    public T Decode(OutboxMessage message) => Decode(message.Envelope);
-
     /// <summary>Encodes a typed body into an outgoing message.</summary>
     /// <param name="messageId">The stable application command identity.</param>
     /// <param name="receiverId">The destination inbox.</param>
