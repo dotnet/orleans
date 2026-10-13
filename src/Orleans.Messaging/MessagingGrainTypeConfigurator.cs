@@ -20,7 +20,7 @@ internal sealed class MessagingGrainTypeConfigurator(GrainClassMap grainClasses,
                 MessagingActivationValidator.Validate(grainClass, placementStrategy);
                 var activationServices = context.ActivationServices;
                 var inbox = activationServices.GetRequiredService<Inbox>();
-                context.GetComponent<IGrainExtensionBinder>()!.GetOrSetExtension<Inbox, IInboxExtension>(() => inbox);
+                context.GetComponent<IGrainExtensionBinder>()!.GetOrSetExtension<Inbox, IMessagingExtension>(() => inbox);
             });
         }
     }

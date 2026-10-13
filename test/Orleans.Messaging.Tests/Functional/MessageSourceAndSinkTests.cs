@@ -31,7 +31,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     {
         var receiver = NewGrain();
         var message = NewInboxMessage("deduplicated", NewPayload());
-        var extension = receiver.AsReference<IInboxExtension>();
+        var extension = receiver.AsReference<IMessagingExtension>();
 
         Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(message, Token)).Status);
         Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
@@ -57,7 +57,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Probe.For(receiver).Mode = mode;
         var payload = NewPayload();
         var message = NewInboxMessage("rejected", payload);
-        var extension = receiver.AsReference<IInboxExtension>();
+        var extension = receiver.AsReference<IMessagingExtension>();
 
         var result = await extension.DeliverAsync(message, Token);
 
@@ -88,7 +88,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Probe.For(receiver).Mode = SinkMode.Backpressure;
         var payload = NewPayload();
         var message = NewInboxMessage("backpressured", payload);
-        var extension = receiver.AsReference<IInboxExtension>();
+        var extension = receiver.AsReference<IMessagingExtension>();
 
         Assert.Equal(DeliveryStatus.Backpressured, (await extension.DeliverAsync(message, Token)).Status);
         var (count, letters) = await OnGrainAsync(receiver, context => (
@@ -109,7 +109,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     public async Task ScheduledMessage_IsOfferedToTheSinkBeforeItIsDue()
     {
         var receiver = NewGrain();
-        var extension = receiver.AsReference<IInboxExtension>();
+        var extension = receiver.AsReference<IMessagingExtension>();
         var payload = NewPayload();
         var scheduled = NewInboxMessage("scheduled", payload, DateTimeOffset.UtcNow.AddDays(1));
 
@@ -126,7 +126,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     public async Task DeclinedMessages_UseInboxAcceptanceAndHandlers()
     {
         var receiver = NewGrain();
-        var extension = receiver.AsReference<IInboxExtension>();
+        var extension = receiver.AsReference<IMessagingExtension>();
         Probe.For(receiver).Mode = SinkMode.Decline;
 
         var scheduled = NewInboxMessage("scheduled", NewPayload(), DateTimeOffset.UtcNow.AddDays(1));
