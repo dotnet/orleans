@@ -318,8 +318,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <remarks>
-    /// The runtime never withdraws a completion: a pending completion's task retains its result until the outbox retires
-    /// the completion, so a missing result breaks that invariant rather than withdrawing the message.
+    /// The runtime never withdraws a completion. A pending completion's destination keeps its task and result: only
+    /// <see cref="IOutboxMessageSource.OnRetired"/> removes the destination, and tasks with destinations are neither
+    /// pruned nor tombstoned.
     /// </remarks>
     bool IOutboxMessageSource.TryGetMessage(HierarchicalKey messageId, out OutboxMessage message)
     {
@@ -329,13 +330,9 @@ internal sealed partial class DurableTaskGrainRuntime(
             return false;
         }
 
-        if (!_storage.TryGetTask(completion.TaskId, out var state) || state.Result is not { IsCompleted: true } result)
-        {
-            throw new InvalidOperationException(
-                $"Durable task '{completion.TaskId}' does not retain the result of its pending completion.");
-        }
-
-        message = MessageTransport.CreateCompletionMessage(messageId, GrainId, completion.Destination, completion.TaskId, result);
+        var found = _storage.TryGetTask(completion.TaskId, out var state);
+        Debug.Assert(found && state!.Result is { IsCompleted: true }, "A pending completion retains its task's result.");
+        message = MessageTransport.CreateCompletionMessage(messageId, GrainId, completion.Destination, completion.TaskId, state!.Result!);
         return true;
     }
 
