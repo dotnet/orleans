@@ -65,7 +65,7 @@ on this abstractions assembly.
   started, or waits for an active callback to finish, including when that callback fails. A callback
   can dispose its own registration without blocking.
 - Delays use `DurableExecutionContext.UtcNow`, supplied by the host, so replay observes the
-  same logical time.
+  same logical time. `DurableTask.DelayUntil` waits for an absolute due time.
 
 ### Cancellation completion and cycles
 
