@@ -26,10 +26,11 @@ on this abstractions assembly.
 - Scheduling the same definition under an existing ID reattaches to the response recorded
   for that ID. Hosts preserve the first definition associated with an ID.
 - A host can supply an execution-abort token when constructing `DurableExecutionContext`.
-  Delegate and delay operations receive a token combining host abort and durable cancellation.
-  Host abort lets the host drain an execution attempt before replaying it in a new context;
-  the public context token, durable cancellation state, and durable callbacks retain their
-  durable-request semantics. Hosts discard responses from aborted attempts and retain the
+  `DurableExecutionContext.CancellationToken`, which delegate and delay operations receive,
+  combines host abort and durable cancellation. Host abort lets the host drain an execution attempt
+  before replaying it in a new context; `IsCancellationRequested` and durable callbacks report the
+  durable request only. An `async DurableTask` method reads the token from
+  `DurableExecutionContext.Current`. Hosts discard responses from aborted attempts and retain the
   task's durable state for replay.
 - A wait cancellation token abandons that scheduling, polling, or wait operation. It does
   not request durable task cancellation.
