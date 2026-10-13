@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Messaging.Tests.Support;
 using Orleans.Serialization;
@@ -28,6 +29,72 @@ public class HierarchicalKeyTests
         var field = Assert.Single(type.GetFields(BindingFlags.Instance | BindingFlags.NonPublic));
         Assert.True(field.IsInitOnly);
         Assert.Equal(typeof(string), field.FieldType);
+    }
+
+    [Fact]
+    public void Json_ValueRoundTripsCanonicalEscapedPath()
+    {
+        var key = HierarchicalKey.Create("orders", "a/b", @"c\d");
+
+        var json = JsonSerializer.Serialize(key);
+
+        Assert.Equal(JsonSerializer.Serialize(@"orders/a\/b/c\\d"), json);
+        var decoded = JsonSerializer.Deserialize<HierarchicalKey>(json);
+        Assert.Equal(key, decoded);
+        Assert.Equal(3, decoded.CountSegments());
+    }
+
+    [Fact]
+    public void Json_DefaultValueRoundTripsAsNull()
+    {
+        Assert.Equal("null", JsonSerializer.Serialize(default(HierarchicalKey)));
+        Assert.True(JsonSerializer.Deserialize<HierarchicalKey>("null").IsDefault);
+    }
+
+    [Fact]
+    public void Json_DictionaryKeyRoundTripsCanonicalEscapedPath()
+    {
+        var key = HierarchicalKey.Create("orders", "a/b", @"c\d");
+        var values = new Dictionary<HierarchicalKey, int> { [key] = 42, [HierarchicalKey.Create("other")] = 7 };
+
+        var json = JsonSerializer.Serialize(values);
+        var decoded = JsonSerializer.Deserialize<Dictionary<HierarchicalKey, int>>(json)!;
+
+        Assert.Equal(JsonSerializer.Serialize(new Dictionary<string, int> { [key.ToString()] = 42, ["other"] = 7 }), json);
+        Assert.Equal(2, decoded.Count);
+        Assert.Equal(42, decoded[key]);
+        Assert.Equal(7, decoded[HierarchicalKey.Create("other")]);
+    }
+
+    [Fact]
+    public void Json_DefaultDictionaryKeyIsRejected()
+    {
+        var values = new Dictionary<HierarchicalKey, int> { [default] = 1 };
+
+        Assert.Throws<JsonException>(() => JsonSerializer.Serialize(values));
+    }
+
+    [Theory]
+    [InlineData("\"\"")]
+    [InlineData("\"a//b\"")]
+    [InlineData("\"/a\"")]
+    [InlineData("\"a/\"")]
+    [InlineData(@"""a\\x""")]
+    [InlineData(@"""a\\""")]
+    [InlineData("42")]
+    [InlineData("{}")]
+    public void Json_MalformedValueIsRejected(string json)
+    {
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<HierarchicalKey>(json));
+    }
+
+    [Theory]
+    [InlineData("{\"\":1}")]
+    [InlineData("{\"a//b\":1}")]
+    [InlineData(@"{""a\\x"":1}")]
+    public void Json_MalformedDictionaryKeyIsRejected(string json)
+    {
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<Dictionary<HierarchicalKey, int>>(json));
     }
 
     [Fact]
