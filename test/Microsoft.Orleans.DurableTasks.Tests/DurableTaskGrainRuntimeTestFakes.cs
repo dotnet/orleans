@@ -29,7 +29,7 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessageTransport
 {
     private readonly TaskCompletionSource _resumeSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly Dictionary<HierarchicalKey, (GrainId Sender, GrainId Target, TaskId TaskId)> _completionIds = [];
+    private readonly Dictionary<MessageId, (GrainId Sender, GrainId Target, TaskId TaskId)> _completionIds = [];
 
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<RecordedCompletion> Completions { get; } = [];
@@ -45,20 +45,20 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
         Invocations.Add((sender, target, taskId, request));
     }
 
-    public HierarchicalKey GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId)
+    public MessageId GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId)
     {
         var messageId = DurableTaskMessageTransport.CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject);
         _completionIds[messageId] = (sender, target, taskId);
         return messageId;
     }
 
-    public void SendCompletion(HierarchicalKey messageId)
+    public void SendCompletion(MessageId messageId)
     {
         var (sender, target, taskId) = _completionIds[messageId];
         Completions.Add(new(sender, target, taskId, messageId));
     }
 
-    public OutboxMessage CreateCompletionMessage(HierarchicalKey messageId, GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) =>
+    public OutboxMessage CreateCompletionMessage(MessageId messageId, GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) =>
         MessagingTestHelpers.MessageTypes.Completion.Create(
             messageId,
             target,
@@ -78,7 +78,7 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
 }
 
 /// <summary>A completion the runtime sent as a reference to its stored result.</summary>
-internal sealed record RecordedCompletion(GrainId Sender, GrainId Target, TaskId TaskId, HierarchicalKey MessageId)
+internal sealed record RecordedCompletion(GrainId Sender, GrainId Target, TaskId TaskId, MessageId MessageId)
 {
     /// <summary>Materializes the completion from the runtime, as the outbox does for a delivery attempt.</summary>
     public DurableTaskCompletionMessage Materialize(DurableTaskGrainRuntime runtime)
