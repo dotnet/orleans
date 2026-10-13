@@ -66,23 +66,10 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
         await RecordAsync(request.BuyerId, validating);
 
-        // Reserve each line's stock concurrently.
+        // Reserve each line's stock concurrently; the results arrive in line order.
         var lines = request.Lines;
-        var reservations = new ScheduledTask<bool>[lines.Length];
-        for (var i = 0; i < lines.Length; i++)
-        {
-            reservations[i] = await Catalog(lines[i].ProductId)
-                .ReserveAsync(OrderId, lines[i].Units)
-                .WithId($"reserve-{lines[i].ProductId}")
-                .ScheduleAsync();
-        }
-
-        await ScheduledTask.WhenAll(reservations);
-        var confirmed = new bool[lines.Length];
-        for (var i = 0; i < lines.Length; i++)
-        {
-            confirmed[i] = await reservations[i];
-        }
+        var confirmed = (await DurableTask.WhenAll(
+            lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units)).ToArray())).ToArray();
 
         var reserved = lines.Where((_, i) => confirmed[i]).Select(line => line.ProductId).ToArray();
         if (Array.IndexOf(confirmed, false) is var rejected and >= 0)
@@ -104,13 +91,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
         summary = await MarkPaid().WithId("pay");
         await RecordAsync(request.BuyerId, summary);
-        var commits = new ScheduledTask[reserved.Length];
-        for (var i = 0; i < reserved.Length; i++)
-        {
-            commits[i] = await Catalog(reserved[i]).CommitAsync(OrderId).WithId($"commit-{reserved[i]}").ScheduleAsync();
-        }
-
-        await ScheduledTask.WhenAll(commits);
+        await DurableTask.WhenAll(reserved.Select(productId => Catalog(productId).CommitAsync(OrderId)).ToArray());
         return Result(summary);
     }
 

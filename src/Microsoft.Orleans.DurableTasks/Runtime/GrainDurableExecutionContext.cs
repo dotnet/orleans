@@ -12,9 +12,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// Executes one attempt of a durable task within a grain activation.
 /// </summary>
 /// <remarks>
-/// The activation shutdown token is the attempt's host execution-abort token: delegate and delay operations observe it,
-/// while <see cref="DurableExecutionContext.CancellationToken"/> observes durable cancellation only. Shutdown drains the
-/// aborted attempt, discards its response, and the next activation replays the task in a new context.
+/// The activation shutdown token is the attempt's host execution-abort token: <see cref="DurableExecutionContext.CancellationToken"/>
+/// observes it, while <see cref="DurableExecutionContext.IsCancellationRequested"/> reports durable cancellation only.
+/// Shutdown drains the aborted attempt, discards its response, and the next activation replays the task in a new context.
 /// </remarks>
 internal sealed class GrainDurableExecutionContext(
     TaskId taskId,
