@@ -1,10 +1,13 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Messaging.Configuration;
+using Orleans.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Xunit;
 
@@ -116,6 +119,21 @@ public sealed class PublicMessagingRegistrationTests
 
         var failure = Assert.Single(failures, failure => failure.OptionsType == typeof(DurableMessagingOptions));
         Assert.Contains("MaxCapacity must be greater than zero.", failure.Message, StringComparison.Ordinal);
+    }
+    [Fact]
+    public async Task AddMessaging_BindsInboxContractToDeliveredInboxOverEarlierRegistration()
+    {
+        var services = new ServiceCollection();
+        services.AddScoped<IInbox, TestInbox>();
+        services.AddMessaging();
+
+        // Inbox construction needs an activation, so substitute an uninitialized scoped instance to observe the binding.
+        services.Replace(ServiceDescriptor.Scoped(static _ => (Inbox)RuntimeHelpers.GetUninitializedObject(typeof(Inbox))));
+        await using var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+
+        Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IInbox));
+        Assert.Same(scope.ServiceProvider.GetRequiredService<Inbox>(), scope.ServiceProvider.GetRequiredService<IInbox>());
     }
 
     [Fact]
