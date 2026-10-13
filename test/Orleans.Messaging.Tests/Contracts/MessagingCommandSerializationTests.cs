@@ -31,14 +31,39 @@ public sealed class MessagingCommandSerializationTests
         Assert.Equal(json, JsonSerializer.Serialize(fromBinary!, InboxJsonContext.Default.InboxCommand));
     }
 
-    private static InboxMessage InboxMessage(string id) => new() { Envelope = Envelope(id) };
+    [Fact]
+    public void DeliverAt_RoundTripsThroughJsonAndOrleansSerializationAndIsOmittedWhenUnset()
+    {
+        var deliverAt = new DateTimeOffset(2040, 1, 2, 3, 4, 5, TimeSpan.FromHours(2));
+        var scheduled = new InboxCommand { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", deliverAt) };
+        var immediate = new InboxCommand { Kind = InboxCommandKind.Accept, Message = InboxMessage("immediate") };
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<InboxCommand>>();
 
-    private static Envelope Envelope(string id) => new()
+        var json = JsonSerializer.Serialize(scheduled, InboxJsonContext.Default.InboxCommand);
+        var fromJson = JsonSerializer.Deserialize(json, InboxJsonContext.Default.InboxCommand)!.Message!.Value.Envelope.DeliverAt;
+        var fromBinary = serializer.Deserialize(serializer.SerializeToArray(scheduled))!.Message!.Value.Envelope.DeliverAt;
+        var immediateJson = JsonSerializer.Serialize(immediate, InboxJsonContext.Default.InboxCommand);
+
+        Assert.Contains("\"DeliverAt\":", json, StringComparison.Ordinal);
+        Assert.Equal(deliverAt, fromJson);
+        Assert.Equal(deliverAt.Offset, fromJson!.Value.Offset);
+        Assert.Equal(deliverAt, fromBinary);
+        Assert.Equal(deliverAt.Offset, fromBinary!.Value.Offset);
+        Assert.DoesNotContain("DeliverAt", immediateJson, StringComparison.Ordinal);
+        Assert.Null(JsonSerializer.Deserialize(immediateJson, InboxJsonContext.Default.InboxCommand)!.Message!.Value.Envelope.DeliverAt);
+        Assert.Null(serializer.Deserialize(serializer.SerializeToArray(immediate))!.Message!.Value.Envelope.DeliverAt);
+    }
+
+    private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt) };
+
+    private static Envelope Envelope(string id, DateTimeOffset? deliverAt = null) => new()
     {
         MessageId = HierarchicalKey.Create("orders", id),
         Payload = [1, 2, 3],
         Subject = "orders.v1",
-        Headers = new(StringComparer.Ordinal) { ["trace"] = [4, 5] }
+        Headers = new(StringComparer.Ordinal) { ["trace"] = [4, 5] },
+        DeliverAt = deliverAt
     };
 
     private static InboxCommand[] CreateInboxCommands()
@@ -47,6 +72,7 @@ public sealed class MessagingCommandSerializationTests
         return
         [
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("accept"), State = new() },
+            new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", Now), State = new() },
             new() { Kind = InboxCommandKind.Retry, MessageId = HierarchicalKey.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom" } },
             new() { Kind = InboxCommandKind.Complete, MessageId = HierarchicalKey.Create("orders", "done"), ProcessedAt = Now, DeadLetter = deadLetter },
             new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [HierarchicalKey.Create("orders", "dead")] },
@@ -55,7 +81,7 @@ public sealed class MessagingCommandSerializationTests
                 Kind = InboxCommandKind.Snapshot,
                 Snapshot = new()
                 {
-                    Messages = [new() { Message = InboxMessage("pending"), State = new() { AttemptCount = 1 } }],
+                    Messages = [new() { Message = InboxMessage("pending"), State = new() { AttemptCount = 1 } }, new() { Message = InboxMessage("scheduled", Now), State = new() }],
                     Processed = [new() { MessageId = HierarchicalKey.Create("orders", "done"), ProcessedAt = Now }],
                     DeadLetters = [deadLetter]
                 }

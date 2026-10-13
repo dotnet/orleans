@@ -18,7 +18,8 @@ namespace Orleans.Messaging;
 /// </summary>
 /// <remarks>
 /// All state transitions run on the activation scheduler, so each check-then-emit sequence is atomic.
-/// Accepted messages are processed only after their acceptance is durable.
+/// Accepted messages are processed only after their acceptance is durable and their <see cref="Envelope.DeliverAt"/>,
+/// if any, has passed.
 /// </remarks>
 internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, IDurableValueCommandHandler<InboxCommand>
 {
@@ -85,7 +86,8 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
                 return DeliveryResult.Duplicate();
             }
 
-            if (_messages.Count >= Options.MaxCapacity)
+            // Scheduled messages never count toward capacity, so they are not backpressured either.
+            if (message.Envelope.DeliverAt is null && _messages.Count - _scheduledCount >= Options.MaxCapacity)
             {
                 Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "backpressured");
                 return DeliveryResult.Backpressured();
@@ -122,10 +124,11 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
         }
 
         var now = TimeProvider.GetUtcNow();
+        var jobNow = Shared.JobTimeProvider.GetUtcNow();
         var batch = new List<InboxEntry>(Math.Min(Options.InboxBatchSize, _messages.Count));
         foreach (var entry in _messages.Values)
         {
-            if (IsDurable(entry) && (entry.State.NextAttemptAt is not { } at || at <= now))
+            if (IsDurable(entry) && GetDelay(entry, now, jobNow) == TimeSpan.Zero)
             {
                 batch.Add(entry);
                 if (batch.Count == Options.InboxBatchSize) break;
@@ -285,18 +288,29 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
     /// <summary>
     /// Returns the delay until the next message is due, or <see langword="null"/> when the inbox is empty.
     /// </summary>
-    internal TimeSpan? GetNextWakeupDelay()
+    /// <param name="jobNow">The current Durable Jobs time, which the caller uses to schedule the wake-up.</param>
+    internal TimeSpan? GetNextWakeupDelay(DateTimeOffset jobNow)
     {
         if (_messages.Count == 0) return null;
         var now = TimeProvider.GetUtcNow();
-        var next = DateTimeOffset.MaxValue;
+        var next = TimeSpan.MaxValue;
         foreach (var entry in _messages.Values)
         {
-            if (entry.State.NextAttemptAt is not { } at || at <= now) return TimeSpan.Zero;
-            if (at < next) next = at;
+            var delay = GetDelay(entry, now, jobNow);
+            if (delay == TimeSpan.Zero) return delay;
+            if (delay < next) next = delay;
         }
 
-        return next - now;
+        return next;
+    }
+
+    // DeliverAt is in the Durable Jobs time domain, which schedules wake-ups; retry backoff follows the grain clock.
+    private static TimeSpan GetDelay(InboxEntry entry, DateTimeOffset now, DateTimeOffset jobNow)
+    {
+        var delay = TimeSpan.Zero;
+        if (entry.Message.Envelope.DeliverAt is { } deliverAt && deliverAt > jobNow) delay = deliverAt - jobNow;
+        if (entry.State.NextAttemptAt is { } retryAt && retryAt > now && retryAt - now > delay) delay = retryAt - now;
+        return delay;
     }
 
     internal async Task StartAsync(CancellationToken cancellationToken)
