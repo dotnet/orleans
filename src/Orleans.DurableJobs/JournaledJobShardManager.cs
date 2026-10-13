@@ -15,6 +15,7 @@ using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Providers;
 using Orleans.Runtime;
+using Orleans.Runtime.Internal;
 using Orleans.Storage;
 
 namespace Orleans.DurableJobs;
@@ -590,9 +591,16 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
             manager.RegisterStateMachine(JournaledJobShardState.StateName, state);
             manager.RegisterStateMachine(JournaledJobShardOwnershipFence.StateName, fence);
 
-            // The manager processes its journal on the initializing scheduler. Initialize from the thread pool so
-            // the shard runs independently of its caller, which may be a grain activation scheduling a job.
-            await Task.Run(() => manager.InitializeAsync(cancellationToken).AsTask(), CancellationToken.None).ConfigureAwait(false);
+            // The manager processes its journal on the initializing scheduler. Initialize from the thread pool, without
+            // the caller's execution context, so the shard runs independently of its caller, which may be a grain
+            // activation scheduling a job.
+            Task initializeTask;
+            using (new ExecutionContextSuppressor())
+            {
+                initializeTask = Task.Run(() => manager.InitializeAsync(cancellationToken).AsTask(), CancellationToken.None);
+            }
+
+            await initializeTask.ConfigureAwait(false);
 
             if (!isNew)
             {
