@@ -29,8 +29,9 @@ public class DurableMessagingOptions
             / MaximumBackoffMultiplier);
 
     /// <summary>
-    /// Gets or sets the maximum number of pending messages in the inbox.
-    /// When this limit is reached, new message deliveries will return <c>DeliveryResult.Backpressured()</c>.
+    /// Gets or sets the maximum number of pending inbox messages without <see cref="Envelope.DeliverAt"/>.
+    /// When this limit is reached, new deliveries without <see cref="Envelope.DeliverAt"/> return <c>DeliveryResult.Backpressured()</c>.
+    /// The inbox admits scheduled messages regardless of this limit.
     /// </summary>
     /// <remarks>
     /// <para>

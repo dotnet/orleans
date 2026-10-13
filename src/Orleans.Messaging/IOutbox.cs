@@ -21,7 +21,7 @@ public interface IOutbox
     /// <remarks>
     /// Direct sends share the payload array, header dictionary, and header value arrays. Keep these objects unchanged after publication.
     /// Equivalent repeated identities retain the original message and headers; payload, optional subject,
-    /// and destination must match. Custom headers do not change pending intent equality. Conflicts fail explicitly.
+    /// optional <see cref="Envelope.DeliverAt"/>, and destination must match. Custom headers do not change pending intent equality. Conflicts fail explicitly.
     /// Inbox handlers stage outgoing
     /// messages in their synchronous final block before calling <see cref="IInboxHandlerContext.Complete"/>
     /// or <see cref="IInboxHandlerContext.Fail"/>.

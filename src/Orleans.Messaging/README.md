@@ -66,7 +66,8 @@ Each receiver returns a `DeliveryResult`:
 
 - `Accepted`: the message is durable in the inbox.
 - `Duplicate`: the message ID is pending or completed within `DeduplicationWindow`.
-- `Backpressured`: the inbox holds `MaxCapacity` pending messages.
+- `Backpressured`: the inbox holds `MaxCapacity` pending messages without `DeliverAt`.
+  The inbox admits scheduled messages regardless of `MaxCapacity`.
 - `HandlerNotFound`: the receiver has no registered handlers.
 - `DeadLettered`: the message moved to the receiver's dead letters.
 
