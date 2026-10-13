@@ -113,7 +113,7 @@ public sealed class InboxAdmissionTests : MessagingBehaviorTestBase
         var context = Fixture.GetGrainContext(receiver);
         var outbox = (JournaledTestOutbox)context.ActivationServices.GetRequiredService<IOutbox>();
         var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
-        var durable = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, OutboxMessage>>("test-handler-output");
+        var durable = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<MessageId, OutboxMessage>>("test-handler-output");
         var sessions = Fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var first = TestApplicationProtocol.Create(sessions, receiver.GetGrainId(), receiver.GetGrainId(), "messages/output", 1);
         var late = TestApplicationProtocol.Create(sessions, receiver.GetGrainId(), receiver.GetGrainId(), "messages/output", 2);
@@ -204,7 +204,7 @@ public sealed class InboxAdmissionTests : MessagingBehaviorTestBase
         Assert.Same(services.GetRequiredService<Inbox>(), inbox);
         Assert.True(manager.TryGetStateMachine("test-handler-output", out var output));
         Assert.Same(((JournaledTestOutbox)services.GetRequiredService<IOutbox>()).StoredMessages, output);
-        Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, OutboxMessage>>("test-handler-output"), output);
+        Assert.Same(services.GetRequiredKeyedService<IDurableDictionary<MessageId, OutboxMessage>>("test-handler-output"), output);
     }
 
     [Fact]
