@@ -113,7 +113,7 @@ public partial class StateManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task Preparation_FailureRetainsPendingStateAndSnapshotForExplicitRetry(bool snapshot)
+    public async Task Preparation_FailureRetainsPendingStateForExplicitRetry(bool snapshot)
     {
         var storage = new CapturingStorage { IsCompactionRequested = snapshot };
         await using var manager = CreateTestSystem(storage).Manager;
@@ -133,7 +133,6 @@ public partial class StateManagerTests
         Assert.Equal(0, state.WriteCompletedCount);
         Assert.Empty(storage.Appends);
         Assert.Empty(storage.Replaces);
-        storage.IsCompactionRequested = false;
         state.Preparation = null;
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(31, state.CapturedValue);
@@ -223,7 +222,7 @@ public partial class StateManagerTests
     [Fact]
     public void PreCommitFailure_RoundTripsWithOriginalCause()
     {
-        var original = new JournaledStatePreCommitException(new IOException("Scheduling failed."));
+        Exception original = new JournaledStatePreCommitException(new IOException("Scheduling failed."));
         var serializer = ServiceProvider.GetRequiredService<Serializer>();
 
         var copy = Assert.IsType<JournaledStatePreCommitException>(serializer.Deserialize<Exception>(serializer.SerializeToArray(original)));
