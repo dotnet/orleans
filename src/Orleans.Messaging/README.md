@@ -67,10 +67,11 @@ an inbox sink keeps that state as its only journaled copy. Register both during
 construction or activation setup, before journal recovery.
 
 - `IOutbox.Register(IOutboxMessageSource)` adds a source, and
-  `IOutbox.SendFromSource(messageId, receiverId)` stages a reference entry with the
-  message ID, receiver, and delivery state, but no payload. The source provides each
-  envelope through `GetEnvelope`, and `OnRetired` reports
-  `OutboxMessageRetirement.Delivered` or `DeadLettered`.
+  `IOutbox.Send(messageId)` stages a reference entry with the message ID and delivery
+  state. The first source whose `TryGetMessage` returns the message owns it, and
+  returns the same `OutboxMessage` while it provides the message. A source withdraws
+  a pending message by returning `false`. When the message retires, `OnRetired`
+  reports `OutboxMessageRetirement.Delivered` or `DeadLettered`.
 - `IInbox.Register(IInboxMessageSink)` adds a sink. A sink whose `TryAccept` returns
   `true` has staged the message in its own journaled state. Sinks are idempotent.
 
