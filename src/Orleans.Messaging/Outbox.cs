@@ -134,7 +134,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     /// <summary>
     /// Returns the entry's message, materializing a reference entry's message from its owning source, or returns
-    /// <see langword="false"/> when the source has withdrawn the message.
+    /// <see langword="false"/> when the source has withdrawn the message. Throws when the source throws or returns an
+    /// invalid message.
     /// </summary>
     private bool TryGetMessage(OutboxEntry entry, out OutboxMessage message)
     {
@@ -145,8 +146,18 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
 
         if (entry.Source is { } owner) return TryGetSourceMessage(owner, entry.MessageId, out message);
-        entry.Source = FindSource(entry.MessageId, out message);
-        return entry.Source is not null;
+
+        // A recovered entry's owner is the first source which doesn't decline it, including one which fails to provide
+        // it, so that source is notified when the entry is dead-lettered.
+        foreach (var source in _sources)
+        {
+            entry.Source = source;
+            if (TryGetSourceMessage(source, entry.MessageId, out message)) return true;
+        }
+
+        entry.Source = null;
+        message = default;
+        return false;
     }
 
     private bool TryGetSourceMessage(IOutboxMessageSource source, MessageId messageId, out OutboxMessage message)
@@ -174,6 +185,17 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     {
         if (entry.Reference is not null) entry.Source!.OnRetired(entry.MessageId, retirement);
     }
+
+    /// <summary>
+    /// Creates the message of a dead letter whose source failed to provide it: the message ID with an empty payload and
+    /// a default receiver, which no valid outgoing message has.
+    /// </summary>
+    private static OutboxMessage CreateUnmaterializedMessage(MessageId messageId) =>
+        new() { Envelope = new() { MessageId = messageId, Payload = [] }, ReceiverId = default };
+
+    private static bool IsUnmaterialized(OutboxMessage message) =>
+        message.ReceiverId.IsDefault
+        && message.Envelope is { Payload.Length: 0, Subject: null, Headers: null, DeliverAt: null };
 
     private void OnRecoveryCompleted()
     {
@@ -214,7 +236,15 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
         foreach (var (key, letter) in _deadLetters)
         {
-            EnvelopeValidation.Validate(letter.Message);
+            if (IsUnmaterialized(letter.Message))
+            {
+                EnvelopeValidation.ValidateMessageId(letter.Message.Envelope.MessageId);
+            }
+            else
+            {
+                EnvelopeValidation.Validate(letter.Message);
+            }
+
             if (key != letter.Message.Envelope.MessageId)
             {
                 throw new InvalidOperationException("The recovered outbox dead-letter key does not match its message identity.");
@@ -256,7 +286,9 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
     }
 
-    private List<(OutboxEntry Entry, OutboxMessage Message)>? SelectMessages(ref List<OutboxEntry>? withdrawn)
+    private List<(OutboxEntry Entry, OutboxMessage Message)>? SelectMessages(
+        ref List<OutboxEntry>? withdrawn,
+        ref List<(OutboxEntry Entry, Exception Error)>? failed)
     {
         var now = TimeProvider.GetUtcNow();
         List<(OutboxEntry Entry, OutboxMessage Message)>? candidates = null;
@@ -264,10 +296,19 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         {
             if (entry.Sequence <= _durableSequence && IsReadyForAttempt(entry.State, now))
             {
-                // An invalid source message fails the pass before any attempt starts.
-                if (!TryGetMessage(entry, out var message))
+                OutboxMessage message;
+                try
                 {
-                    (withdrawn ??= []).Add(entry);
+                    if (!TryGetMessage(entry, out message))
+                    {
+                        (withdrawn ??= []).Add(entry);
+                        continue;
+                    }
+                }
+                catch (Exception exception)
+                {
+                    // The entry is durable, so a source which can't provide a valid message dead-letters only that entry.
+                    (failed ??= []).Add((entry, exception));
                     continue;
                 }
 
@@ -325,9 +366,11 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
 
         List<OutboxEntry>? withdrawn = null;
-        var candidates = SelectMessages(ref withdrawn);
-        if (withdrawn is not null) await RemoveWithdrawnAsync(withdrawn).ConfigureAwait(true);
-        if (candidates is null) return withdrawn is not null;
+        List<(OutboxEntry Entry, Exception Error)>? failed = null;
+        var candidates = SelectMessages(ref withdrawn, ref failed);
+        var removed = withdrawn is not null || failed is not null;
+        if (removed) await RemoveUnavailableAsync(withdrawn, failed).ConfigureAwait(true);
+        if (candidates is null) return removed;
         var attempts = new Task<DeliveryOutcome>[candidates.Count];
         for (var index = 0; index < attempts.Length; index++)
         {
@@ -394,24 +437,32 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         LogDeliveryComplete(Logger, delivered, backpressured, applied - delivered - backpressured, Count);
     }
 
-    /// <summary>Removes reference entries whose sources withdrew their messages, without delivering or retiring them.</summary>
-    private async ValueTask RemoveWithdrawnAsync(List<OutboxEntry> withdrawn)
+    /// <summary>
+    /// Removes reference entries whose sources withdrew their messages, without delivering or retiring them, and
+    /// dead-letters entries whose sources failed to provide a valid message.
+    /// </summary>
+    private async ValueTask RemoveUnavailableAsync(List<OutboxEntry>? withdrawn, List<(OutboxEntry Entry, Exception Error)>? failed)
     {
         try
         {
-            foreach (var entry in withdrawn)
+            if (withdrawn is not null)
             {
-                Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = entry.MessageId });
-                Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "withdrawn");
-                if (entry.Source is null)
+                foreach (var entry in withdrawn)
                 {
-                    LogMessageUnprovided(Logger, entry.MessageId);
-                }
-                else
-                {
-                    LogMessageWithdrawn(Logger, entry.MessageId);
+                    Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = entry.MessageId });
+                    Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "withdrawn");
+                    if (entry.Source is null)
+                    {
+                        LogMessageUnprovided(Logger, entry.MessageId);
+                    }
+                    else
+                    {
+                        LogMessageWithdrawn(Logger, entry.MessageId);
+                    }
                 }
             }
+
+            if (failed is not null) DeadLetterSourceFailures(failed);
         }
         catch (Exception exception)
         {
@@ -419,6 +470,49 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
 
         await PersistAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Dead-letters reference entries whose owning sources threw or returned an invalid message, and retires them with
+    /// their sources in the same journal write.
+    /// </summary>
+    /// <remarks>
+    /// No valid message exists, so each dead letter carries only the message ID; see <see cref="CreateUnmaterializedMessage"/>.
+    /// The failed materialization counts as a delivery attempt.
+    /// </remarks>
+    private void DeadLetterSourceFailures(List<(OutboxEntry Entry, Exception Error)> failed)
+    {
+        var now = TimeProvider.GetUtcNow();
+        Dictionary<MessageId, OutboxDeadLetter>? deadLetters = null;
+        foreach (var (entry, error) in failed)
+        {
+            var id = entry.MessageId;
+            LogSourceFailed(Logger, error, id);
+            var letter = new OutboxDeadLetter
+            {
+                Message = CreateUnmaterializedMessage(id),
+                DeadLetteredAt = now,
+                Reason = $"The outbox message source failed to provide the message: {error}",
+                AttemptCount = checked(entry.State.AttemptCount + 1)
+            };
+            AddDeadLetter(ref deadLetters, letter);
+            Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id, DeadLetter = letter });
+            Retire(entry, OutboxMessageRetirement.DeadLettered);
+            Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "source_error");
+        }
+
+        ApplyDeadLetters(deadLetters!);
+    }
+
+    /// <summary>Adds a dead letter to the retained dead letters, compacting them to make room.</summary>
+    private void AddDeadLetter(ref Dictionary<MessageId, OutboxDeadLetter>? deadLetters, OutboxDeadLetter letter)
+    {
+        var key = letter.Message.Envelope.MessageId;
+        deadLetters ??= _deadLetters.ToDictionary(static pair => pair.Key, static pair => pair.Value);
+        DeadLetterRetention.Compact(deadLetters, letter.DeadLetteredAt, Options.DeadLetterRetentionPeriod,
+            Options.MaxRetainedDeadLetters, static entry => entry.DeadLetteredAt,
+            reservedCapacity: deadLetters.ContainsKey(key) ? 0 : 1);
+        deadLetters[key] = letter;
     }
 
     private void ApplyDeadLetters(Dictionary<MessageId, OutboxDeadLetter> entries)
@@ -460,11 +554,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 Reason = error,
                 AttemptCount = attemptCount
             };
-            deadLetters ??= _deadLetters.ToDictionary(static pair => pair.Key, static pair => pair.Value);
-            DeadLetterRetention.Compact(deadLetters, now, Options.DeadLetterRetentionPeriod,
-                Options.MaxRetainedDeadLetters, static entry => entry.DeadLetteredAt,
-                reservedCapacity: deadLetters.ContainsKey(letter.Message.Envelope.MessageId) ? 0 : 1);
-            deadLetters[letter.Message.Envelope.MessageId] = letter;
+            AddDeadLetter(ref deadLetters, letter);
             return (null, letter);
         }
         var exponent = Math.Min(attemptCount - 1, DurableMessagingOptions.MaximumBackoffExponent);
@@ -605,6 +695,9 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Removed outbox message {MessageId}, which no registered outbox message source provides")]
     private static partial void LogMessageUnprovided(ILogger logger, MessageId messageId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "The outbox message source failed to provide message {MessageId}; the message is dead-lettered")]
+    private static partial void LogSourceFailed(ILogger logger, Exception exception, MessageId messageId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining")]
     private static partial void LogDeliveryComplete(ILogger logger, int deliveredCount, int backpressuredCount, int failedCount, int remainingCount);
