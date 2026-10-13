@@ -132,9 +132,6 @@ public class DurableTaskState : IDurableTaskState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public GrainId CallerId { get; set; }
 
-    [Id(14)]
-    public TimeSpan? DelayDuration { get; set; }
-
     /// <inheritdoc cref="IDurableTaskState.RetainedSince"/>
     [Id(17)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
