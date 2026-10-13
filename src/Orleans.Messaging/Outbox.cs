@@ -370,10 +370,10 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     /// <summary>
     /// Returns the delay until the next delivery attempt is due, or <see langword="null"/> when the outbox is empty.
     /// </summary>
-    internal TimeSpan? GetNextWakeupDelay()
+    /// <param name="now">The current Durable Jobs time.</param>
+    internal TimeSpan? GetNextWakeupDelay(DateTimeOffset now)
     {
         if (Count == 0) return null;
-        var now = TimeProvider.GetUtcNow();
         var next = DateTimeOffset.MaxValue;
         foreach (var entry in _messages.Values)
         {
