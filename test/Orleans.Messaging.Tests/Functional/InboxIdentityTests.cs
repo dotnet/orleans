@@ -399,7 +399,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
             try
             {
                 Assert.Same(rig.Context, ReceiverTestServices.CurrentGrainContext);
-                IInboxExtension extension = rig.Context.ActivationServices.GetRequiredService<Inbox>();
+                IMessagingExtension extension = rig.Context.ActivationServices.GetRequiredService<Inbox>();
                 started.SetResult(extension.DeliverAsync(envelope, TestContext.Current.CancellationToken).AsTask());
             }
             catch (Exception exception) { started.SetException(exception); }

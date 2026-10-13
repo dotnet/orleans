@@ -19,7 +19,7 @@ public sealed class MessagingMetricCardinalityTests : MessagingBehaviorTestBase
         await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var services = context.ActivationServices;
-        IInboxExtension extension = services.GetRequiredService<Inbox>();
+        IMessagingExtension extension = services.GetRequiredService<Inbox>();
         // The pump runs alongside grain calls, so holding the handler keeps the accepted message pending.
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/metric-pending");
         var envelope = CreateEnvelope(receiver, NewMessage(451, "duplicate-receipts"), "messages/metric-pending");

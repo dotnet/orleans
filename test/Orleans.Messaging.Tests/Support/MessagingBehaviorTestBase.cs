@@ -46,7 +46,7 @@ public abstract class MessagingBehaviorTestBase : IAsyncLifetime
         IMessagingTestGrain receiver,
         InboxMessage envelope,
         CancellationToken cancellationToken) =>
-        await receiver.AsReference<IInboxExtension>().DeliverAsync(envelope, cancellationToken);
+        await receiver.AsReference<IMessagingExtension>().DeliverAsync(envelope, cancellationToken);
 
     protected static async Task WaitForBarrierAsync(
         IMessagingTestGrain receiver,

@@ -65,7 +65,7 @@ public sealed class InboxAdmissionTests : MessagingBehaviorTestBase
     public async Task HandlerStorageFailure_DeactivatesAndFailsQueuedWritesAfterPriorAcknowledgement()
     {
         using var attempt = await PrepareAttemptAsync("fault-ordering");
-        IInboxExtension extension = attempt.Context.ActivationServices.GetRequiredService<Inbox>();
+        IMessagingExtension extension = attempt.Context.ActivationServices.GetRequiredService<Inbox>();
         await OnTurnAsync(attempt.Context, () =>
         {
             attempt.Context.ActivationServices.GetRequiredKeyedService<IDurableValue<string>>("inbox").Value = "prior-captured";
@@ -148,7 +148,7 @@ public sealed class InboxAdmissionTests : MessagingBehaviorTestBase
 
         // The pump runs alongside grain calls, so holding the seed's handler keeps it pending in the inbox.
         using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/cutoff");
-        IInboxExtension extension = context.ActivationServices.GetRequiredService<Inbox>();
+        IMessagingExtension extension = context.ActivationServices.GetRequiredService<Inbox>();
         Task<DeliveryResult> initial = null!;
         await OnTurnAsync(context, () => initial = extension.DeliverAsync(seed, TestContext.Current.CancellationToken).AsTask());
         Assert.Equal(DeliveryStatus.Accepted, (await initial).Status);

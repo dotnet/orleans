@@ -21,7 +21,7 @@ namespace Orleans.Messaging;
 /// Accepted messages are processed only after their acceptance is durable and their <see cref="Envelope.DeliverAt"/>,
 /// if any, has passed.
 /// </remarks>
-internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, IDurableValueCommandHandler<InboxCommand>
+internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine, IDurableValueCommandHandler<InboxCommand>
 {
     private readonly MessagingPump _pump;
     private readonly InboxDispatcher _handlers = new([]);

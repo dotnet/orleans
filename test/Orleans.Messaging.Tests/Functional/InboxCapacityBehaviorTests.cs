@@ -76,5 +76,5 @@ public sealed class InboxCapacityBehaviorTests(InboxCapacityClusterFixture fixtu
     private static async Task<DeliveryResult> DeliverAsync(
         IMessagingTestGrain receiver,
         InboxMessage envelope) =>
-        await receiver.AsReference<IInboxExtension>().DeliverAsync(envelope);
+        await receiver.AsReference<IMessagingExtension>().DeliverAsync(envelope);
 }
