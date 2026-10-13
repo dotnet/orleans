@@ -131,14 +131,15 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             throw;
         }
 
-        if (Inbox.GetNextWakeupDelay() is not { } delay)
+        var now = Shared.JobTimeProvider.GetUtcNow();
+        if (Inbox.GetNextWakeupDelay(now) is not { } delay)
         {
             ClearWakeup();
             return DurableJobRunResult.Completed;
         }
 
         return DurableJobRunResult.RescheduleAt(
-            MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), delay > TimeSpan.Zero ? delay : RecheckDelay));
+            MessagingTime.AddClamped(now, delay > TimeSpan.Zero ? delay : RecheckDelay));
     }
 
     private void ClearWakeup()
