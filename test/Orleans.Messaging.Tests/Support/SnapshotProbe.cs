@@ -6,6 +6,7 @@ namespace Orleans.Messaging.Tests.Support;
 public sealed class SnapshotProbe
 {
     private readonly ConcurrentDictionary<GrainId, EndpointSnapshot> _latest = new();
+    private readonly ConcurrentDictionary<GrainId, ConcurrentQueue<string>> _history = new();
     private readonly ConcurrentDictionary<GrainId, List<Waiter>> _waiters = new();
 
     internal int WaiterListCount => _waiters.Count;
@@ -48,6 +49,11 @@ public sealed class SnapshotProbe
         {
             return await waiter.Completion.Task.WaitAsync(timeout ?? TimeSpan.FromSeconds(30));
         }
+        catch (TimeoutException exception)
+        {
+            var published = _history.TryGetValue(grainId, out var history) ? string.Join(" | ", history) : "none";
+            throw new TimeoutException($"Snapshot wait for '{grainId}' timed out. Published (oldest first): {published}", exception);
+        }
         finally
         {
             lock (waiters)
@@ -61,6 +67,9 @@ public sealed class SnapshotProbe
     public void Publish(GrainId grainId, EndpointSnapshot snapshot)
     {
         _latest[grainId] = snapshot;
+        var history = _history.GetOrAdd(grainId, static _ => new());
+        history.Enqueue(Describe(snapshot));
+        while (history.Count > 8) history.TryDequeue(out _);
         if (!_waiters.TryGetValue(grainId, out var waiters))
         {
             return;
@@ -70,7 +79,19 @@ public sealed class SnapshotProbe
         {
             foreach (var waiter in waiters.ToArray())
             {
-                if (waiter.Predicate(snapshot))
+                bool matched;
+                try
+                {
+                    matched = waiter.Predicate(snapshot);
+                }
+                catch (Exception exception)
+                {
+                    waiters.Remove(waiter);
+                    waiter.Completion.TrySetException(exception);
+                    continue;
+                }
+
+                if (matched)
                 {
                     waiters.Remove(waiter);
                     waiter.Completion.TrySetResult(snapshot);
@@ -80,6 +101,11 @@ public sealed class SnapshotProbe
             RemoveWaiterListIfEmpty(grainId, waiters);
         }
     }
+
+    internal static string Describe(EndpointSnapshot snapshot) =>
+        $"activation={snapshot.ActivationId}, inbox={snapshot.InboxCount}, outbox={snapshot.OutboxCount}, " +
+        $"effects={snapshot.Effects.Sum(static effect => effect.Count)}, processed={snapshot.ProcessedMessageCount}, " +
+        $"inboxDeadLetters={snapshot.InboxDeadLetters.Count}, outboxDeadLetters={snapshot.OutboxDeadLetters.Count}";
 
     private void RemoveWaiterListIfEmpty(GrainId grainId, List<Waiter> waiters)
     {
