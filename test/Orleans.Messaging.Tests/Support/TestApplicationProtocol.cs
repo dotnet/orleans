@@ -16,10 +16,10 @@ public sealed record TestApplicationMessage(
 
 internal static class TestApplicationProtocol
 {
-    public static HierarchicalKey NewMessageId() => HierarchicalKey.Create("tests", Guid.NewGuid().ToString("N"));
+    public static MessageId NewMessageId() => MessageId.Create("tests", Guid.NewGuid().ToString("N"));
 
     public static OutboxMessage Create(SerializerSessionPool sessions, GrainId sender, GrainId receiver,
-        string route, object? body, HierarchicalKey messageId = default) =>
+        string route, object? body, MessageId messageId = default) =>
         new()
         {
             ReceiverId = receiver,
@@ -27,7 +27,7 @@ internal static class TestApplicationProtocol
         };
 
     public static InboxMessage CreateInbox(SerializerSessionPool sessions, GrainId sender,
-        string route, object? body, HierarchicalKey messageId = default)
+        string route, object? body, MessageId messageId = default)
     {
         var key = messageId.IsDefault
             ? body is TestMessage message ? message.LogicalId : NewMessageId()
@@ -79,7 +79,7 @@ internal static class TestApplicationProtocol
         envelope.Subject;
 
     public static InboxMessage With(InboxMessage message, SerializerSessionPool sessions,
-        HierarchicalKey? messageId = null, GrainId? sender = null, string? subject = null,
+        MessageId? messageId = null, GrainId? sender = null, string? subject = null,
         byte[]? payload = null, bool removeSender = false, bool removeSubject = false)
     {
         var headers = message.Envelope.Headers is { } existing
