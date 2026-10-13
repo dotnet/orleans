@@ -513,6 +513,45 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
+    public async Task ShardCreatedWithCallerAsyncLocal_ProcessesOperationsWithoutCallerExecutionContext()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: false);
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5046), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+        var callerValue = new object();
+        var callerAsyncLocal = new AsyncLocal<object?>();
+        var processorValues = new ConcurrentQueue<object?>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == "Microsoft.Orleans" && instrument.Name == "orleans-durablejobs-storage-batch-size")
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, _, _, _) => processorValues.Enqueue(callerAsyncLocal.Value));
+        listener.Start();
+
+        var shard = await Task.Run(
+            () =>
+            {
+                callerAsyncLocal.Value = callerValue;
+                return manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), cancellationToken);
+            },
+            cancellationToken);
+        await ScheduleJobAsync(shard, "caller-async-local-job", cancellationToken);
+
+        Assert.NotEmpty(processorValues);
+        Assert.All(processorValues, Assert.Null);
+        await DrainAndUnregisterAsync(manager, shard, cancellationToken, expectedJobs: 1);
+    }
+
+    [Fact]
     public async Task ActiveRemoteOwnerShard_IsNotClaimedUntilOwnerDies()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
