@@ -76,7 +76,7 @@ public static class MessagingExtensions
         services.TryAddSingleton<MessagingInstruments>();
         services.TryAddScoped<MessagingPump>();
         services.TryAddScoped<Inbox>();
-        services.TryAddScoped<IInbox>(static sp => sp.GetRequiredService<Inbox>());
+        services.Replace(ServiceDescriptor.Scoped<IInbox>(static sp => sp.GetRequiredService<Inbox>()));
         services.TryAddScoped<IMessagingDiagnostics, MessagingDiagnostics>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<Orleans.Runtime.IConfigureGrainTypeComponents, MessagingGrainTypeConfigurator>());
