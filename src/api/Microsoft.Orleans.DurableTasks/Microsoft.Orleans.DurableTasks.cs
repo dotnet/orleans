@@ -247,6 +247,7 @@ namespace Orleans.DurableTasks.Protocol
         [Alias("ScheduleAsync")]
         System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, IDurableTaskRequest request, System.Threading.CancellationToken cancellationToken = default);
         [Alias("SubscribeOrPollAsync")]
+        [Concurrency.AlwaysInterleave]
         System.Threading.Tasks.ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, System.Threading.CancellationToken cancellationToken = default);
     }
 

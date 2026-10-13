@@ -45,14 +45,19 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void DurableTaskExtensionOperationsDoNotAlwaysInterleaveWithGrainTurns()
+    public void DurableTaskExtensionOperationsWhichChangeStateDoNotAlwaysInterleaveWithGrainTurns()
     {
+        var poll = typeof(IDurableTaskServer).GetMethod(nameof(IDurableTaskServer.SubscribeOrPollAsync))!;
         var methods = typeof(IDurableTaskServer).GetMethods()
-            .Concat(typeof(IDurableTaskObserver).GetMethods());
+            .Concat(typeof(IDurableTaskObserver).GetMethods())
+            .Where(method => method != poll);
 
         Assert.All(
             methods,
             method => Assert.Null(method.GetCustomAttribute<AlwaysInterleaveAttribute>()));
+
+        // A poll changes no state and waits, so it interleaves with the turns which complete the task.
+        Assert.NotNull(poll.GetCustomAttribute<AlwaysInterleaveAttribute>());
     }
 
     [Fact]
