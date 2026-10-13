@@ -150,6 +150,7 @@ namespace Orleans.Messaging
     public partial interface IInbox
     {
         IInbox Register(IInboxHandler handler);
+        IInbox Register(IInboxMessageSink sink);
     }
 
     [Alias("IInboxExtension")]
@@ -173,6 +174,11 @@ namespace Orleans.Messaging
         void Fail(string reason);
     }
 
+    public partial interface IInboxMessageSink
+    {
+        bool TryAccept(InboxMessage message);
+    }
+
     public static partial class InboxExtensions
     {
         public static IInbox Register<T>(this IInbox inbox, MessageType<T> messageType, System.Action<T, IInboxHandlerContext> handler) { throw null; }
@@ -194,7 +200,16 @@ namespace Orleans.Messaging
 
     public partial interface IOutbox
     {
+        IOutbox Register(IOutboxMessageSource source);
         void Send(OutboxMessage message);
+        void SendFromSource(HierarchicalKey messageId, Runtime.GrainId receiverId);
+    }
+
+    public partial interface IOutboxMessageSource
+    {
+        bool CanProvide(HierarchicalKey messageId);
+        Envelope GetEnvelope(HierarchicalKey messageId);
+        void OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement);
     }
 
     public sealed partial class MessageType<T>
@@ -238,6 +253,12 @@ namespace Orleans.Messaging
         public required Runtime.GrainId ReceiverId { get { throw null; } init { } }
 
         public readonly InboxMessage ToInboxMessage() { throw null; }
+    }
+
+    public enum OutboxMessageRetirement
+    {
+        Delivered = 1,
+        DeadLettered = 2
     }
 }
 
