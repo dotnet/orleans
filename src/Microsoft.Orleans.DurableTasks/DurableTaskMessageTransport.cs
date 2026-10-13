@@ -36,13 +36,13 @@ internal sealed class DurableTaskMessageTransport(
             taskId,
             new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender });
 
-    public void SendCompletion(HierarchicalKey messageId) => outbox.Value.Send(messageId);
+    public void SendCompletion(MessageId messageId) => outbox.Value.Send(messageId);
 
-    public HierarchicalKey GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId) =>
+    public MessageId GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId) =>
         CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject);
 
     public OutboxMessage CreateCompletionMessage(
-        HierarchicalKey messageId,
+        MessageId messageId,
         GrainId sender,
         GrainId target,
         TaskId taskId,
@@ -79,14 +79,14 @@ internal sealed class DurableTaskMessageTransport(
     /// time keeps the identity distinct if a removed delay's task ID is reused while its earlier resume is still
     /// recorded as processed.
     /// </remarks>
-    internal static HierarchicalKey CreateResumeMessageId(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime) =>
-        CreateMessageId(
-            grainId,
-            grainId,
-            taskId,
-            DurableTaskMessageTypes.ResumeSubject,
-            dueTime.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture))
-        .CreateChildKey(generation.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    internal static MessageId CreateResumeMessageId(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime) =>
+        new(CreateMessageId(
+                grainId,
+                grainId,
+                taskId,
+                DurableTaskMessageTypes.ResumeSubject,
+                dueTime.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            .Key.CreateChildKey(generation.ToString(System.Globalization.CultureInfo.InvariantCulture)));
 
     private void Send<T>(MessageType<T> messageType, GrainId sender, GrainId target, TaskId taskId, T body) =>
         Send(messageType, sender, target, taskId, body, messageId: default, deliverAt: null);
@@ -97,7 +97,7 @@ internal sealed class DurableTaskMessageTransport(
         GrainId target,
         TaskId taskId,
         T body,
-        HierarchicalKey messageId,
+        MessageId messageId,
         DateTimeOffset? deliverAt)
     {
         // Validate the task id before serializing the body: the TaskId surrogate converter rejects a default TaskId
@@ -115,7 +115,7 @@ internal sealed class DurableTaskMessageTransport(
         outbox.Value.Send(messageType.Create(messageId, target, body, deliverAt));
     }
 
-    internal static HierarchicalKey CreateMessageId(
+    internal static MessageId CreateMessageId(
         GrainId sender,
         GrainId target,
         TaskId taskId,
@@ -137,7 +137,7 @@ internal sealed class DurableTaskMessageTransport(
             Append(hash, discriminator);
         }
 
-        return HierarchicalKey.Create(
+        return MessageId.Create(
             MessageIdRoot,
             subject[DurableTaskMessageTypes.SubjectPrefix.Length..],
             Convert.ToHexString(hash.GetHashAndReset()));

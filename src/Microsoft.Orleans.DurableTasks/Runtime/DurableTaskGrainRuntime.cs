@@ -94,7 +94,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     // The completions pending in the outbox, by message ID. The outbox resolves recovered completions before the runtime
     // observes recovery, so the index is built from task state on first use, then maintained as completions are sent and
     // retire.
-    private Dictionary<HierarchicalKey, PendingCompletion>? _pendingCompletions;
+    private Dictionary<MessageId, PendingCompletion>? _pendingCompletions;
 
     internal GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
 
@@ -291,7 +291,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         transport.SendCompletion(messageId);
     }
 
-    private Dictionary<HierarchicalKey, PendingCompletion> PendingCompletions
+    private Dictionary<MessageId, PendingCompletion> PendingCompletions
     {
         get
         {
@@ -325,7 +325,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// pruned nor tombstoned. An exception from decoding the stored result propagates, so the outbox dead-letters the
     /// completion.
     /// </remarks>
-    bool IOutboxMessageSource.TryGetMessage(HierarchicalKey messageId, out OutboxMessage message)
+    bool IOutboxMessageSource.TryGetMessage(MessageId messageId, out OutboxMessage message)
     {
         if (!PendingCompletions.TryGetValue(messageId, out var completion))
         {
@@ -350,7 +350,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// metadata, so it succeeds when the stored result no longer decodes; polling such a result surfaces the decoding
     /// error to the poller.
     /// </remarks>
-    void IOutboxMessageSource.OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement)
+    void IOutboxMessageSource.OnRetired(MessageId messageId, OutboxMessageRetirement retirement)
     {
         var removed = PendingCompletions.Remove(messageId, out var completion);
         Debug.Assert(removed, "The outbox retires only the completions which the runtime provides.");
