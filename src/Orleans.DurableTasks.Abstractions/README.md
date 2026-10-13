@@ -99,10 +99,10 @@ cancellation or failure.
 ## Combinators
 
 `WhenAll` and `WhenAny` assign child IDs from input indexes, preserving identity across
-replay when the input order is stable. Their durable results contain task IDs rather than
-runtime handles. `WhenAny` asks the host to persist its selected winner under a deterministic
-decision ID, then leaves all other scheduled tasks running. A host can obtain a handle for a
-returned ID when cancellation or further observation is required.
+replay when the input order is stable. `WhenAll<T>` returns the inputs' results in input order.
+`WhenAny` returns the winner's input index, and `WhenAny<T>` also returns its result; a winner
+which failed or was canceled fails the combinator. `WhenAny` asks the host to persist its
+selected winner under a deterministic decision ID, then leaves all other scheduled tasks running.
 
 `ScheduledTask.WhenAny` returns the first task whose durable response arrives, including a
 failed or canceled response. It captures its candidates when called, preserving the selected
