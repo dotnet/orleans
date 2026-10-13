@@ -176,7 +176,7 @@ namespace Orleans.Messaging
 
     public partial interface IInboxMessageSink
     {
-        bool TryAccept(InboxMessage message);
+        bool TryAccept(InboxMessage message, out DeliveryResult result);
     }
 
     public static partial class InboxExtensions
