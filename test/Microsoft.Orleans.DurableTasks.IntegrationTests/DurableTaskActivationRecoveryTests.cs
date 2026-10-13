@@ -132,9 +132,16 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         var attached = grain.GetDurableTask<int>(rootId);
         Assert.False(await attached.IsCompletedAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, cancellationToken));
 
-        // Once the Durable Jobs clock passes the due time, the next activation processes the scheduled resume.
+        // Once the Durable Jobs clock passes the due time, the next activation processes the scheduled resume. The clock
+        // advances only after the activation holding the delay has fully deactivated, so that activation can't process
+        // the resume, and the next activation replays the task.
+        Assert.True(_fixture.Cluster.TryGetGrainContext(grainId, out var activation));
+        var activations = _fixture.Probe.GetActivationCount(grainId);
+        await grain.RequestDeactivationAsync();
+        await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         _fixture.JobClock.Advance(TimeSpan.FromHours(2));
-        await DeactivateAsync(grain, cancellationToken);
+        _ = await grain.GetActivationIdAsync();
+        await _fixture.Probe.WaitForActivationCountAsync(grainId, activations + 1, cancellationToken);
         var response = await attached.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
