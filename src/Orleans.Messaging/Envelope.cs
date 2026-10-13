@@ -16,7 +16,7 @@ public readonly struct Envelope
 {
     /// <summary>Gets the exact application-defined command identity within the receiving inbox.</summary>
     [Id(0)]
-    public required HierarchicalKey MessageId { get; init; }
+    public required MessageId MessageId { get; init; }
 
     /// <summary>Gets the required application payload bytes, including an empty payload.</summary>
     [Id(1)]
