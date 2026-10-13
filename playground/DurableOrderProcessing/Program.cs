@@ -92,17 +92,13 @@ api.MapGet("/catalog/{productId:int}/tasks", (int productId, IGrainFactory grain
 api.MapPost("/orders/{orderId:guid}/deactivate", async (Guid orderId, IGrainFactory grains) =>
     await grains.GetGrain<IOrderGrain>(orderId).AsReference<IGrainManagementExtension>().DeactivateOnIdle());
 
-// Each request runs as its own durable task, which records its decision once.
 api.MapPost("/orders/{orderId:guid}/cancel", async (Guid orderId, IGrainFactory grains) =>
-    await RunAsync(grains.GetGrain<IOrderGrain>(orderId).CancelAsync(), "cancel") ? Results.Ok() : Results.Conflict());
+    await grains.GetGrain<IOrderGrain>(orderId).CancelAsync() ? Results.Ok() : Results.Conflict());
 
 api.MapPost("/orders/{orderId:guid}/ship", async (Guid orderId, IGrainFactory grains) =>
-    await RunAsync(grains.GetGrain<IOrderGrain>(orderId).ShipAsync(), "ship") ? Results.Ok() : Results.Conflict());
+    await grains.GetGrain<IOrderGrain>(orderId).ShipAsync() ? Results.Ok() : Results.Conflict());
 
 app.Run();
-
-static async Task<T> RunAsync<T>(DurableTask<T> command, string name) =>
-    await await command.ScheduleAsync($"{name}-{Guid.NewGuid():N}");
 
 static async Task<object[]> ListTasksAsync(IAddressable grain)
 {
