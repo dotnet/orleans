@@ -1,4 +1,4 @@
-namespace Orleans.Providers.MongoDB.Configuration;
+namespace Orleans.Clustering.MongoDB;
 
 /// <summary>
 /// Selects the collection format and atomicity mechanism used for MongoDB membership.

@@ -1,5 +1,5 @@
 
-namespace Orleans.Providers.MongoDB.Configuration;
+namespace Orleans.Clustering.MongoDB;
 
 /// <summary>
 /// Configures MongoDB Membership.

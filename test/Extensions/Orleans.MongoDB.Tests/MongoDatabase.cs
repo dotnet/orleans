@@ -6,11 +6,11 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Clustering.MongoDB;
 using Orleans.Hosting;
-using Orleans.Providers.MongoDB.Configuration;
 using Orleans.Providers.MongoDB.Membership;
 using Orleans.Providers.MongoDB.Reminders;
-using Orleans.Providers.MongoDB.Utils;
+using Orleans.Reminders.MongoDB;
 using Xunit;
 using Xunit.Sdk;
 
@@ -32,13 +32,11 @@ internal sealed class MongoDatabase : IAsyncDisposable
         client = new MongoClient(settings);
         Name = $"orleans_mongo_test_{Guid.NewGuid():N}";
         Database = client.GetDatabase(Name);
-        ClientFactory = new DefaultMongoClientFactory(client);
     }
 
     public string Name { get; }
     public IMongoDatabase Database { get; }
     public IMongoClient Client => client;
-    public IMongoClientFactory ClientFactory { get; }
 
     public static void RequireConnection()
     {
@@ -67,12 +65,12 @@ internal sealed class MongoDatabase : IAsyncDisposable
     }
 
     public IMembershipTable CreateMembershipTable(string clusterId, MongoDBMembershipStrategy strategy)
-        => new MongoMembershipTable(ClientFactory, NullLogger<MongoMembershipTable>.Instance,
+        => new MongoMembershipTable(Client, NullLogger<MongoMembershipTable>.Instance,
             Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = "mongo-test" }),
             Options.Create(new MongoDBMembershipTableOptions { DatabaseName = Name, Strategy = strategy }));
 
     public IReminderTable CreateReminderTable(string serviceId)
-        => new MongoReminderTable(ClientFactory, NullLogger<MongoReminderTable>.Instance,
+        => new MongoReminderTable(Client, NullLogger<MongoReminderTable>.Instance,
             Options.Create(new MongoDBRemindersOptions { DatabaseName = Name }),
             Options.Create(new ClusterOptions { ServiceId = serviceId, ClusterId = "mongo-test" }));
 

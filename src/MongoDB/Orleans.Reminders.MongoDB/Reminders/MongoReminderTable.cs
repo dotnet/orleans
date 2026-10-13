@@ -6,9 +6,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using Orleans.Configuration;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Reminders.MongoDB;
 using Orleans.Providers.MongoDB.Reminders.Store;
-using Orleans.Providers.MongoDB.Utils;
 using Orleans.Runtime;
 
 
@@ -29,12 +28,12 @@ public sealed class MongoReminderTable : IReminderTable
     /// Initializes reminder storage using the configured MongoDB client and service identity.
     /// </summary>
     public MongoReminderTable(
-        IMongoClientFactory mongoClientFactory,
+        IMongoClient mongoClient,
         ILogger<MongoReminderTable> logger,
         IOptions<MongoDBRemindersOptions> options,
         IOptions<ClusterOptions> clusterOptions)
     {
-        this.mongoClient = mongoClientFactory.Create(options.Value, "Reminder");
+        this.mongoClient = mongoClient;
         this.logger = logger;
         this.options = options.Value;
         this.serviceId = clusterOptions.Value.ServiceId;

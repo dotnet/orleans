@@ -1,9 +1,10 @@
 using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Messaging;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Clustering.MongoDB;
 using Orleans.Providers.MongoDB.Membership;
 
 namespace Orleans;
@@ -40,7 +41,8 @@ public static class MongoDBClusteringClientBuilderExtensions
         {
             services.Configure(configurator);
         }
-        services.AddSingleton<IGatewayListProvider, MongoGatewayListProvider>();
+        services.AddSingleton<IGatewayListProvider>(sp => ActivatorUtilities.CreateInstance<MongoGatewayListProvider>(
+            sp, sp.GetMongoClient(sp.GetRequiredService<IOptions<MongoDBGatewayListProviderOptions>>().Value)));
         services.AddSingleton<IConfigurationValidator, MongoDBOptionsValidator<MongoDBGatewayListProviderOptions>>();
 
         return services;
@@ -51,8 +53,10 @@ public static class MongoDBClusteringClientBuilderExtensions
     public static IServiceCollection AddMongoDBGatewayListProvider(this IServiceCollection services,
         IConfiguration configuration)
     {
-        services.Configure<MongoDBGatewayListProviderOptions>(configuration);
-        services.AddSingleton<IGatewayListProvider, MongoGatewayListProvider>();
+        services.AddOptions<MongoDBGatewayListProviderOptions>()
+            .Configure<IServiceProvider>((options, sp) => options.ConfigureMongoDBOptions(sp, configuration));
+        services.AddSingleton<IGatewayListProvider>(sp => ActivatorUtilities.CreateInstance<MongoGatewayListProvider>(
+            sp, sp.GetMongoClient(sp.GetRequiredService<IOptions<MongoDBGatewayListProviderOptions>>().Value)));
         services.AddSingleton<IConfigurationValidator, MongoDBOptionsValidator<MongoDBGatewayListProviderOptions>>();
 
         return services;

@@ -1,6 +1,14 @@
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Providers.MongoDB.Configuration;
+#if ORLEANS_CLUSTERING
+namespace Orleans.Clustering.MongoDB;
+#elif ORLEANS_PERSISTENCE
+namespace Orleans.Persistence.MongoDB;
+#elif ORLEANS_REMINDERS
+namespace Orleans.Reminders.MongoDB;
+#else
+#error Define a MongoDB provider namespace.
+#endif
 
 internal sealed class MongoDBOptionsValidator<T> : IConfigurationValidator where T : MongoDBOptions, new()
 {

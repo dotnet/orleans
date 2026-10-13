@@ -6,7 +6,7 @@ using MongoDB.Driver;
 using MongoDB.Driver.Core.Events;
 using Orleans.Configuration;
 using Orleans.Messaging;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Clustering.MongoDB;
 using Orleans.Providers.MongoDB.Membership;
 using Orleans.Runtime;
 using Xunit;
@@ -98,7 +98,7 @@ public sealed class MongoMembershipRegressionTests
         await Insert(table, Entry(4, SiloStatus.Active, 0), token);
         await Insert(table, Entry(6, SiloStatus.Active, -1), token);
         await Insert(other, Entry(5, SiloStatus.Active, 30005), token);
-        IGatewayListProvider gateway = new MongoGatewayListProvider(database.ClientFactory,
+        IGatewayListProvider gateway = new MongoGatewayListProvider(database.Client,
             NullLogger<MongoGatewayListProvider>.Instance,
             Options.Create(new ClusterOptions { ClusterId = "primary", ServiceId = "mongo-test" }),
             Options.Create(new GatewayOptions { GatewayListRefreshPeriod = TimeSpan.FromSeconds(19) }),

@@ -9,6 +9,8 @@
     <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.0.0" />
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.1" />
+    <PackageVersion Include="Aspire.Hosting.MongoDB" Version="13.2.4" />
+    <PackageVersion Include="Aspire.MongoDB.Driver" Version="13.2.4" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.1" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.1.1" />
     <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />

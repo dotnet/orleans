@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using Orleans.MongoDB.Tests.Persistence;
-using Orleans.Providers.MongoDB.Configuration;
+using Orleans.Persistence.MongoDB;
 using Orleans.Providers.MongoDB.StorageProviders;
 using Orleans.Providers.MongoDB.StorageProviders.Serializers;
 using Orleans.Serialization;
