@@ -3124,6 +3124,31 @@ public class SchedulingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task CombinatorsScheduleTheirInputsConcurrently(bool whenAny)
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var host = new TestHost(DateTimeOffset.UnixEpoch) { ScheduleGate = gate.Task };
+        DurableTask<int>[] inputs = [DurableTask.Run(static _ => 1), DurableTask.Run(static _ => 2), DurableTask.Run(static _ => 3)];
+        var root = host.CreateRootDefinition<int>(async _ => DurableTaskResponse.FromResult(
+            whenAny ? (await DurableTask.WhenAny(inputs)).Result : (await DurableTask.WhenAll(inputs)).Sum()));
+        var scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+
+        // Every input's scheduling begins before any of it completes, so a host can commit the batch together.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (host.ScheduleRequestCount < inputs.Length && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10, Xunit.TestContext.Current.CancellationToken);
+        }
+
+        Assert.Equal(inputs.Length, host.ScheduleRequestCount);
+        gate.SetResult();
+        int[] expected = whenAny ? [1, 2, 3] : [6];
+        Assert.Contains(await scheduled, expected);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task WhenAnyFailsWhenTheWinnerFails(bool generic)
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -5118,7 +5143,14 @@ internal sealed class TestHost(DateTimeOffset utcNow)
     private readonly ConcurrentDictionary<TaskId, TaskId> _decisions = new();
     private readonly ConcurrentQueue<TaskId> _decisionIds = new();
     private int _activeWaitCount;
+    private int _scheduleRequestCount;
     public int ExecutionCount;
+
+    /// <summary>Gets the number of child scheduling requests, counted when each request begins.</summary>
+    public int ScheduleRequestCount => Volatile.Read(ref _scheduleRequestCount);
+
+    /// <summary>Gets a task which child scheduling waits for before it schedules.</summary>
+    public Task? ScheduleGate { get; init; }
 
     public DateTimeOffset? LastDelayDueTime { get; private set; }
 
@@ -5164,9 +5196,26 @@ internal sealed class TestHost(DateTimeOffset utcNow)
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        Interlocked.Increment(ref _scheduleRequestCount);
+        if (ScheduleGate is { IsCompleted: false } gate)
+        {
+            return ScheduleAfterGateAsync(gate, id, definition);
+        }
+
+        return new(ScheduleChild(id, definition));
+    }
+
+    private async ValueTask<IScheduledTaskHandle> ScheduleAfterGateAsync(Task gate, TaskId id, DurableTask definition)
+    {
+        await gate;
+        return ScheduleChild(id, definition);
+    }
+
+    private Entry ScheduleChild(TaskId id, DurableTask definition)
+    {
         var entry = _entries.GetOrAdd(id, static (taskId, state) => state.CreateEntry(taskId), this);
         entry.StartOnce(() => RunDefinitionAsync(definition, id));
-        return new(entry);
+        return entry;
     }
 
     internal async Task<DurableTaskResponse> RunDefinitionAsync(DurableTask definition, TaskId id)
