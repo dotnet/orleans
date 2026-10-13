@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.Journaling;
@@ -34,6 +35,24 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
         Assert.Equal(Enumerable.Range(0, FanOut).Sum(static value => value * 2), response.GetResult<int>());
         Assert.Equal(FanOut, _fixture.MessagingProbe.GetStartedCount(workerKey));
+    }
+
+    [Fact]
+    public async Task SiloHostedCallerOutsideGrainSchedulesAndCancelsRootTasks()
+    {
+        // Code which runs in the silo's host but outside a grain, such as a co-hosted web endpoint, schedules through
+        // the silo's grain factory like an external client.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grainFactory = _fixture.Cluster.GetSiloServiceProvider().GetRequiredService<IGrainFactory>();
+        var worker = grainFactory.GetGrain<IDurableTaskWorkerGrain>(Guid.NewGuid());
+
+        var echo = await worker.EchoAsync(21).ScheduleAsync("silo-hosted-echo", cancellationToken);
+        var wait = await worker.WaitForCancellationAsync(1).ScheduleAsync("silo-hosted-wait", cancellationToken);
+        await wait.CancelAsync(cancellationToken);
+        var canceled = await wait.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+        Assert.Equal(42, await echo.WaitAsync(cancellationToken));
+        Assert.Equal(DurableTaskStatus.Canceled, canceled.Status);
     }
 
     [Fact]
