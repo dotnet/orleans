@@ -196,7 +196,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         {
             Envelope = new Envelope
             {
-                MessageId = HierarchicalKey.Create("other", "one"),
+                MessageId = MessageId.Create("other", "one"),
                 Payload = [],
                 Subject = "orders/reserve",
             },
@@ -205,7 +205,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         {
             Envelope = new Envelope
             {
-                MessageId = HierarchicalKey.Create("raw", "one"),
+                MessageId = MessageId.Create("raw", "one"),
                 Payload = [],
             },
         };
