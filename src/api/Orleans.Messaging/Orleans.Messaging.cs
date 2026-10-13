@@ -54,6 +54,10 @@ namespace Orleans.Messaging
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
+        [Id(4)]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public System.DateTimeOffset? DeliverAt { get { throw null; } init { } }
+
         [Id(3)]
         public System.Collections.Generic.Dictionary<string, byte[]>? Headers { get { throw null; } init { } }
 
@@ -201,7 +205,7 @@ namespace Orleans.Messaging
 
         public string Subject { get { throw null; } }
 
-        public OutboxMessage Create(HierarchicalKey messageId, Runtime.GrainId receiverId, T body) { throw null; }
+        public OutboxMessage Create(HierarchicalKey messageId, Runtime.GrainId receiverId, T body, System.DateTimeOffset? deliverAt = null) { throw null; }
 
         public T Decode(Envelope envelope) { throw null; }
 
@@ -212,9 +216,9 @@ namespace Orleans.Messaging
 
     public static partial class OutboxExtensions
     {
-        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, HierarchicalKey messageId, Runtime.GrainId destination, T body) { }
+        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, HierarchicalKey messageId, Runtime.GrainId destination, T body, System.DateTimeOffset? deliverAt = null) { }
 
-        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, HierarchicalKey messageId, Runtime.IAddressable destination, T body) { }
+        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, HierarchicalKey messageId, Runtime.IAddressable destination, T body, System.DateTimeOffset? deliverAt = null) { }
 
         public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, System.Collections.Generic.IEnumerable<(HierarchicalKey MessageId, Runtime.GrainId Destination, T Body)> messages) { }
 
