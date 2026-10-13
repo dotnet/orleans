@@ -48,7 +48,7 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, Ou
         StoredMessages.Add(envelope.Envelope.MessageId, envelope);
     }
 
-    public void SendFromSource(HierarchicalKey messageId, GrainId receiverId) =>
+    public void Send(HierarchicalKey messageId) =>
         throw new NotSupportedException("The test outbox stores complete envelopes only.");
 
     public IOutbox Register(IOutboxMessageSource source) =>
