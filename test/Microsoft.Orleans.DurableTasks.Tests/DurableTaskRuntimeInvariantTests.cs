@@ -1634,6 +1634,49 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task WhenAnyAwaitsItsCandidatesWithoutPolling()
+    {
+        // The clock never advances, so only awaiting the candidates can select a winner.
+        var time = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
+        var (runtime, storage, _, _) = CreateRuntime(timeProvider: time);
+        var rootId = TaskId.Parse("root");
+        var first = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            var (index, result) = await DurableTask.WhenAny(
+            [
+                DurableTask.Run(async _ =>
+                {
+                    started.TrySetResult();
+                    return await first.Task;
+                }),
+                DurableTask.Run(async cancellationToken =>
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                    return 0;
+                }),
+            ]);
+            return index * 100 + result;
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Complete the first candidate only once the selection has found no winner and waits.
+        await WaitUntilAsync(() => storage.Tasks.Any(task => task.Id.ToString().EndsWith("/$winner", StringComparison.Ordinal)));
+        await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
+        first.SetResult(7);
+        var response = await runtime.GetScheduledTaskHandle(rootId)
+            .WaitAsync(TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(7, response.GetResult<int>());
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task ExecutionContextDispatchesRuntimeOperationsToCapturedScheduler()
     {
         var schedulerPair = new ConcurrentExclusiveSchedulerPair();
