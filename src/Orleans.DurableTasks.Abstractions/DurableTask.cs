@@ -255,13 +255,13 @@ internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask
 internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-        => context.ScheduleDelayAsync(context.TaskId, context.UtcNow + duration, context.ExecutionCancellationToken);
+        => context.ScheduleDelayAsync(context.TaskId, context.UtcNow + duration, context.CancellationToken);
 }
 
 internal sealed class DelayUntilDurableTask(DateTimeOffset dueTime) : DurableTask
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-        => context.ScheduleDelayAsync(context.TaskId, dueTime, context.ExecutionCancellationToken);
+        => context.ScheduleDelayAsync(context.TaskId, dueTime, context.CancellationToken);
 }
 
 internal abstract class DelegateDurableTaskBase : DurableTask
@@ -275,7 +275,7 @@ internal abstract class DelegateDurableTaskBase : DurableTask
 
         try
         {
-            return await callback(context.ExecutionCancellationToken).ConfigureAwait(false);
+            return await callback(context.CancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception)
         {
@@ -303,7 +303,7 @@ internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResu
 
         try
         {
-            return new(DurableTaskResponse.FromResult(function(context.ExecutionCancellationToken)));
+            return new(DurableTaskResponse.FromResult(function(context.CancellationToken)));
         }
         catch (Exception exception)
         {
@@ -331,7 +331,7 @@ internal class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, Task<TR
 
         try
         {
-            return DurableTaskResponse.FromResult(await function(context.ExecutionCancellationToken).ConfigureAwait(false));
+            return DurableTaskResponse.FromResult(await function(context.CancellationToken).ConfigureAwait(false));
         }
         catch (Exception exception)
         {
