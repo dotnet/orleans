@@ -27,11 +27,14 @@ public interface IOrderGrain : IGrainWithGuidKey
 // PlaceOrder is one durable task. After a deactivation, the runtime replays it from the start: completed child tasks
 // return their recorded results, so the workflow resumes where it stopped. Each state transition is a durable task
 // method which the workflow awaits as an identified child, so its state change commits once with its recorded result,
-// which a replay returns without running the transition again. Cancel and ship are ordinary methods, so the order
-// retains no task for either command. Cancellation is cooperative: the workflow observes it, and releases the stock it
-// reserved through a detached task.
+// which a replay returns without running the transition again. Cancel and ship are ordinary methods. Cancel records the
+// buyer's decision and cancels the workflow, which observes the cancellation and releases the stock it reserved through
+// a detached task. Ship sends the workflow its Shipped signal.
 public sealed class OrderGrain : DurableGrain, IOrderGrain
 {
+    // A paid order's workflow waits for this signal, which ShipAsync sends.
+    private static readonly DurableSignal<Shipment> Shipped = new("shipped");
+
     private readonly OrderingOptions _options;
     private readonly IDurableTaskManager _tasks;
     private readonly IDurableValue<OrderState> _order;
@@ -115,6 +118,11 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         summary = await MarkPaid().WithId("pay");
         await RecordAsync(request.BuyerId, summary);
         await DurableTask.WhenAll(reserved.Select(productId => Catalog(productId).CommitAsync(OrderId)).ToArray());
+
+        // The order ships when ShipAsync signals it; the wait returns at once for a shipment which arrived earlier.
+        await Shipped.WaitAsync();
+        summary = await MarkShipped().WithId("ship");
+        await RecordAsync(request.BuyerId, summary);
         return Result(summary);
     }
 
@@ -133,6 +141,8 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         return true;
     }
 
+    // The workflow records the first shipment, so shipping again conflicts with it, including before the workflow has
+    // recorded the Shipped status.
     public async Task<bool> ShipAsync()
     {
         if (_order.Value?.Status is not OrderStatus.Paid)
@@ -140,8 +150,15 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             return false;
         }
 
-        await DetachRecordAsync(SetStatus(OrderStatus.Shipped));
-        return true;
+        try
+        {
+            await _tasks.SignalAsync(TaskId.CreateRoot(PlaceOrderTaskId(OrderId)), Shipped, new Shipment(DateTimeOffset.UtcNow));
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     // Releases reserved stock in reverse order of reservation, then cancels the order.
@@ -219,6 +236,8 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
         return SetStatus(OrderStatus.Paid);
     }
+
+    private async DurableTask<OrderSummary> MarkShipped() => SetStatus(OrderStatus.Shipped);
 
     private async DurableTask<OrderSummary> Cancel(int[] released, string? reason)
     {
