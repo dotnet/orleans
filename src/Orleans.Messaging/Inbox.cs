@@ -42,9 +42,9 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
 
     internal int Count => _messages.Count;
 
-    internal IReadOnlyDictionary<HierarchicalKey, InboxEntry> MessageState => _messages;
+    internal IReadOnlyDictionary<MessageId, InboxEntry> MessageState => _messages;
 
-    internal IReadOnlyDictionary<HierarchicalKey, InboxDeadLetter> DeadLetterState => _deadLetters;
+    internal IReadOnlyDictionary<MessageId, InboxDeadLetter> DeadLetterState => _deadLetters;
 
     internal InboxDispatcher Handlers => _handlers;
 
@@ -323,7 +323,7 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
     private bool IsCurrent(InboxEntry entry) =>
         _messages.TryGetValue(entry.Message.Envelope.MessageId, out var current) && ReferenceEquals(current, entry);
 
-    private void StageCompletion(HierarchicalKey messageId, InboxDeadLetter? deadLetter) =>
+    private void StageCompletion(MessageId messageId, InboxDeadLetter? deadLetter) =>
         Emit(new()
         {
             Kind = InboxCommandKind.Complete,
@@ -349,7 +349,7 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
     private bool CompactDeadLetters(DateTimeOffset now, int reservedCapacity = 0)
     {
         if (_deadLetters.Count == 0) return false;
-        var retained = new Dictionary<HierarchicalKey, InboxDeadLetter>(_deadLetters);
+        var retained = new Dictionary<MessageId, InboxDeadLetter>(_deadLetters);
         if (!DeadLetterRetention.Compact(retained, now, Options.DeadLetterRetentionPeriod, Options.MaxRetainedDeadLetters,
             static entry => entry.DeadLetteredAt, reservedCapacity))
         {
@@ -364,7 +364,7 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
         return true;
     }
 
-    internal bool RemoveDeadLetter(HierarchicalKey messageId)
+    internal bool RemoveDeadLetter(MessageId messageId)
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         if (!_deadLetters.ContainsKey(messageId)) return false;
@@ -526,20 +526,20 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
 
     [LoggerMessage(Level = LogLevel.Error, EventName = "DeliveryOperationFailed",
         Message = "Inbox delivery of message {MessageId} to {GrainId} failed")]
-    private static partial void LogDeliveryOperationFailed(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId grainId);
+    private static partial void LogDeliveryOperationFailed(ILogger logger, Exception exception, MessageId messageId, GrainId grainId);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Inbox command staging failed.")]
     private static partial void LogStagingFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "No inbox handler registered for message {MessageId} to {ReceiverId}")]
-    private static partial void LogHandlerNotFound(ILogger logger, HierarchicalKey messageId, GrainId receiverId);
+    private static partial void LogHandlerNotFound(ILogger logger, MessageId messageId, GrainId receiverId);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Accepted message {MessageId} to {ReceiverId}")]
-    private static partial void LogMessageAccepted(ILogger logger, HierarchicalKey messageId, GrainId receiverId);
+    private static partial void LogMessageAccepted(ILogger logger, MessageId messageId, GrainId receiverId);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Handler threw exception for message {MessageId} to {ReceiverId}")]
-    private static partial void LogHandlerException(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId receiverId);
+    private static partial void LogHandlerException(ILogger logger, Exception exception, MessageId messageId, GrainId receiverId);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Inbox message sink rejected message {MessageId} to {ReceiverId}; the message is dead-lettered")]
-    private static partial void LogSinkRejected(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId receiverId);
+    private static partial void LogSinkRejected(ILogger logger, Exception exception, MessageId messageId, GrainId receiverId);
 }
