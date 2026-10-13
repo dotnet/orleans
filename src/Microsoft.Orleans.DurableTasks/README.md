@@ -84,7 +84,8 @@ validation disabled until its first published version establishes a baseline.
   identity. For tasks scheduled by clients, the result remains available for
   `DurableTaskOptions.ResultRetentionPeriod` after completion; when the completion
   is dead-lettered, for that period after the dead letter. External clients poll
-  retained results.
+  retained results. Polls interleave with the grain's other requests and
+  messages, so a waiting client doesn't delay the work which completes the task.
 - A completion whose stored result no longer decodes, for example after a later
   deployment removes the result type, can't be materialized. The outbox
   dead-letters that completion, recording the decoding error as the reason, and the
