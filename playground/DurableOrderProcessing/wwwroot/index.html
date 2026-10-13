@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Orleans durable order processing</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #222; }
+    h1 { margin-top: 0; }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+    section { border: 1px solid #ddd; border-radius: 6px; padding: 1rem; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: .25rem .5rem; border-bottom: 1px solid #eee; }
+    td.num, th.num { text-align: right; }
+    input { padding: .2rem; }
+    .status { font-weight: 600; }
+    .Cancelled { color: #b00020; }
+    .Paid, .Shipped { color: #1b7f3b; }
+    .muted { color: #777; font-size: .9em; }
+  </style>
+</head>
+<body>
+  <h1>Durable order processing</h1>
+  <p>
+    Buyer <input id="buyer" value="alice" size="10" />
+    <span class="muted">Orders wait <code>Ordering:GracePeriod</code> before stock validation. <a href="/dashboard">Dashboard</a></span>
+  </p>
+  <main>
+    <div>
+      <section>
+        <h2>Catalog</h2>
+        <table>
+          <thead><tr><th>Item</th><th class="num">Price</th><th class="num">Available</th><th class="num">Reserved</th><th class="num">Sold</th><th></th></tr></thead>
+          <tbody id="catalog"></tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Basket</h2>
+        <table>
+          <thead><tr><th>Item</th><th class="num">Price</th><th class="num">Quantity</th></tr></thead>
+          <tbody id="basket"></tbody>
+        </table>
+        <p>
+          Card <input id="card" value="4111111111111111" size="18" />
+          <span class="muted">Cards ending in 0002 are declined.</span>
+        </p>
+        <button id="checkout">Checkout</button> <span id="checkout-result" class="muted"></span>
+      </section>
+    </div>
+    <section>
+      <h2>Orders</h2>
+      <table>
+        <thead><tr><th>Order</th><th>Date</th><th class="num">Total</th><th>Status</th><th></th></tr></thead>
+        <tbody id="orders"></tbody>
+      </table>
+    </section>
+  </main>
+  <script>
+    const statuses = ["Submitted", "AwaitingValidation", "StockConfirmed", "Paid", "Shipped", "Cancelled"];
+    const buyer = () => encodeURIComponent(document.getElementById("buyer").value.trim() || "alice");
+    const money = value => value.toFixed(2);
+    const escape = text => String(text ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+    async function api(path, method = "GET", body) {
+      const response = await fetch(`/api${path}`, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!response.ok) throw new Error(await response.text() || response.statusText);
+      return response.headers.get("content-type")?.includes("json") ? response.json() : null;
+    }
+
+    async function setQuantity(productId, quantity) {
+      await api(`/buyers/${buyer()}/basket/${productId}`, "PUT", { quantity });
+      await refresh();
+    }
+
+    async function addToBasket(productId) {
+      const basket = await api(`/buyers/${buyer()}/basket`);
+      const current = basket.find(item => item.productId === productId)?.quantity ?? 0;
+      await setQuantity(productId, current + 1);
+    }
+
+    async function orderAction(orderId, action) {
+      try { await api(`/orders/${orderId}/${action}`, "POST"); }
+      catch { alert(`The order cannot be ${action === "ship" ? "shipped" : "cancelled"} in its current status.`); }
+      await refresh();
+    }
+
+    document.getElementById("checkout").onclick = async () => {
+      const result = document.getElementById("checkout-result");
+      try {
+        const { orderId } = await api(`/buyers/${buyer()}/checkout`, "POST", {
+          requestId: crypto.randomUUID(),
+          cardNumber: document.getElementById("card").value.trim(),
+          address: { street: "15703 NE 61st Ct", city: "Redmond", state: "WA", country: "U.S.", zipCode: "98052" },
+        }) ?? {};
+        result.textContent = orderId ? `Submitted order ${orderId.slice(0, 8)}.` : "";
+      } catch (error) {
+        result.textContent = error.message;
+      }
+      await refresh();
+    };
+
+    async function refresh() {
+      const [catalog, basket, orders] = await Promise.all([
+        api("/catalog"),
+        api(`/buyers/${buyer()}/basket`),
+        api(`/buyers/${buyer()}/orders`),
+      ]);
+
+      document.getElementById("catalog").innerHTML = catalog.map(item => `
+        <tr><td>${escape(item.name)}<br><span class="muted">${escape(item.brand)}</span></td>
+        <td class="num">${money(item.price)}</td><td class="num">${item.availableStock}</td>
+        <td class="num">${item.reservedStock}</td><td class="num">${item.soldStock}</td>
+        <td><button onclick="addToBasket(${item.id})">Add</button></td></tr>`).join("");
+
+      document.getElementById("basket").innerHTML = basket.length === 0
+        ? `<tr><td colspan="3" class="muted">The basket is empty.</td></tr>`
+        : basket.map(item => `
+          <tr><td>${escape(item.productName)}</td><td class="num">${money(item.unitPrice)}</td>
+          <td class="num"><input type="number" min="0" value="${item.quantity}" style="width:4em"
+            onchange="setQuantity(${item.productId}, this.valueAsNumber || 0)" /></td></tr>`).join("");
+
+      document.getElementById("orders").innerHTML = orders.length === 0
+        ? `<tr><td colspan="5" class="muted">No orders yet.</td></tr>`
+        : orders.map(order => {
+          const status = typeof order.status === "number" ? statuses[order.status] : order.status;
+          return `
+          <tr><td><a href="/api/orders/${order.orderId}/tasks"><code>${order.orderId.slice(0, 8)}</code></a></td>
+          <td>${new Date(order.orderDate).toLocaleTimeString()}</td><td class="num">${money(order.total)}</td>
+          <td><span class="status ${status}">${status}</span><br><span class="muted">${escape(order.description)}</span></td>
+          <td><button onclick="orderAction('${order.orderId}', 'cancel')">Cancel</button>
+          <button onclick="orderAction('${order.orderId}', 'ship')">Ship</button></td></tr>`;
+        }).join("");
+    }
+
+    refresh();
+    setInterval(() => refresh().catch(() => { }), 1000);
+  </script>
+</body>
+</html>

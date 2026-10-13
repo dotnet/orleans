@@ -30,6 +30,9 @@
   <Folder Name="/playground/OrderProcessing/">
     <Project Path="playground/OrderProcessing/OrderProcessing.csproj" />
   </Folder>
+  <Folder Name="/playground/DurableOrderProcessing/">
+    <Project Path="playground/DurableOrderProcessing/DurableOrderProcessing.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="Directory.Build.props" />
