@@ -86,7 +86,7 @@ public sealed class MessageType<T>
     /// <remarks>
     /// Serialization completes before publication. Keep the published payload bytes unchanged.
     /// </remarks>
-    public OutboxMessage Create(HierarchicalKey messageId, GrainId receiverId, T body, DateTimeOffset? deliverAt = null)
+    public OutboxMessage Create(MessageId messageId, GrainId receiverId, T body, DateTimeOffset? deliverAt = null)
     {
         if (body is null) throw new ArgumentNullException(nameof(body));
         if (receiverId.IsDefault)
