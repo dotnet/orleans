@@ -9,6 +9,12 @@ namespace Orleans.DurableTasks.Protocol;
 
 public interface IDurableTaskGrainStorage
 {
+    /// <summary>Gets the stored tasks whose nearest stored ancestor is <paramref name="task"/>.</summary>
+    /// <remarks>
+    /// A stored task can descend from <paramref name="task"/> through identifiers which are not stored themselves, such
+    /// as a combinator's operation identifier. The storage indexes the hierarchy, so the cost is proportional to the
+    /// returned tasks rather than to every stored task.
+    /// </remarks>
     IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task);
 
     IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks { get; }
@@ -27,10 +33,6 @@ public interface IDurableTaskGrainStorage
 
     /// <summary>Restarts the retention period of a terminal result, now.</summary>
     void RetainResult(TaskId taskId, IDurableTaskState state);
-
-    /// <summary>Replaces a task's request and result with a tombstone which retains its identity.</summary>
-    /// <remarks>The task has no completion destinations: each pending completion retains its task's result.</remarks>
-    void CreateTombstone(TaskId taskId, IDurableTaskState state);
 
     bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state);
 

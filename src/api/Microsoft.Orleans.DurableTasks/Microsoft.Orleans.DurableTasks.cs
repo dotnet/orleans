@@ -212,7 +212,6 @@ namespace Orleans.DurableTasks.Protocol
 
         void AddCompletionDestination(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId destination);
         void Clear();
-        void CreateTombstone(TaskId taskId, IDurableTaskState state);
         System.Collections.Generic.IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task);
         IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request);
         System.Threading.Tasks.ValueTask ReadAsync(System.Threading.CancellationToken cancellationToken);
@@ -284,8 +283,6 @@ namespace Orleans.DurableTasks.Protocol
         long ResumeGeneration { get; }
 
         System.DateTimeOffset? RetainedSince { get; }
-
-        System.DateTimeOffset? TombstonedAt { get; }
     }
 
     [GenerateSerializer]
@@ -355,9 +352,6 @@ namespace Orleans.DurableTasks.Runtime
         [Id(17)]
         [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
         public System.DateTimeOffset? RetainedSince { get { throw null; } set { } }
-
-        [Id(10)]
-        public System.DateTimeOffset? TombstonedAt { get { throw null; } set { } }
     }
 
     public partial class VolatileDurableTaskGrainStorage : Protocol.IDurableTaskGrainStorage
@@ -371,8 +365,6 @@ namespace Orleans.DurableTasks.Runtime
         public void AddOrUpdateTask(TaskId taskId, DurableTaskState state) { }
 
         public void Clear() { }
-
-        public void CreateTombstone(TaskId taskId, Protocol.IDurableTaskState state) { }
 
         public System.Collections.Generic.IEnumerable<(TaskId Id, Protocol.IDurableTaskState State)> GetChildren(TaskId parentId) { throw null; }
 

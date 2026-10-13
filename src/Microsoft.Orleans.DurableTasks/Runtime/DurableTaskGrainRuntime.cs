@@ -7,7 +7,6 @@ using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -43,11 +42,22 @@ namespace Orleans.DurableTasks.Runtime;
 /// <para>
 /// The runtime is the <see cref="IOutboxMessageSource"/> of its completion messages: the outbox journals a reference to
 /// each completion, and the runtime materializes the message from the task's stored result, so the result is journaled
-/// once. When the outbox retires a delivered completion, its destination durably holds the result, so the runtime
-/// prunes the task in the same write once no destination remains. A dead-lettered completion removes its destination
-/// and retains the result for <see cref="Orleans.Configuration.DurableTaskOptions.ResultRetentionPeriod"/> from then.
-/// A stored result which no longer decodes fails only the operations which read it: the outbox dead-letters its
+/// once. A stored result which no longer decodes fails only the operations which read it: the outbox dead-letters its
 /// completion, whose retirement doesn't decode the result, and activation never decodes stored results.
+/// </para>
+/// <para>
+/// An invoked task, which was scheduled as a request, owns an execution tree: the task and its descendants which are not
+/// invoked tasks themselves, such as local children, delays, completion decisions, and remote-child stubs. Task
+/// identifiers are chosen by callers, so an invoked descendant keeps its own lifecycle. Once an invoked task is terminal
+/// and no completion is pending, the runtime deletes its execution tree: in the write which retires its last completion
+/// as delivered, because that destination durably holds the result, or otherwise once
+/// <see cref="Orleans.Configuration.DurableTaskOptions.ResultRetentionPeriod"/> has elapsed since completion or since a
+/// completion was dead-lettered. A task without a stored ancestor, such as a remote child scheduled outside a durable
+/// execution, is deleted on the same retention schedule. Deleting a tree cancels its non-terminal tasks: it stages a
+/// cancellation to each pending remote child and signals each running execution, whose result is then discarded.
+/// Completions and resumes which arrive for a deleted task are ignored. A cancellation which arrives before its
+/// invocation is recorded until <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.MaxOutboxRetryAge"/>
+/// has elapsed, after which the invocation can no longer arrive.
 /// </para>
 /// </remarks>
 internal sealed partial class DurableTaskGrainRuntime(
@@ -96,6 +106,11 @@ internal sealed partial class DurableTaskGrainRuntime(
     // retire.
     private Dictionary<MessageId, PendingCompletion>? _pendingCompletions;
 
+    // The earliest time at which a retained result or a cancellation record can expire. It is unknown after activation,
+    // so the first check scans every task; afterwards every change which starts a retention period or records a
+    // cancellation lowers it, and each scan recomputes it from the remaining tasks.
+    private DateTimeOffset _nextExpiry = DateTimeOffset.MinValue;
+
     internal GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
 
     public DateTimeOffset UtcNow => _shared.TimeProvider.GetUtcNow();
@@ -117,12 +132,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         var fingerprint = GetCompletionDecisionFingerprint(candidates);
         if (_storage.TryGetTask(decisionId, out var decision))
         {
-            if (decision.TombstonedAt.HasValue)
-            {
-                throw new InvalidOperationException(
-                    $"Durable completion decision '{decisionId}' completed and its retained result has expired.");
-            }
-
             if (decision.Request is not null
                 || !decision.RemoteTarget.IsDefault
                 || decision.RemoteRequestFingerprint is not null
@@ -173,7 +182,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 }
 
                 decision = _storage.GetOrCreateTask(decisionId, request: null);
-                _storage.SetResponse(decisionId, decision, DurableTaskResponse.FromResult(candidate));
+                StoreResult(decisionId, decision, DurableTaskResponse.FromResult(candidate));
                 await WriteStateAsync(cancellationToken);
                 return candidate;
             }
@@ -181,6 +190,9 @@ internal sealed partial class DurableTaskGrainRuntime(
             await Task.Delay(TimeSpan.FromMilliseconds(10), _shared.TimeProvider, cancellationToken);
         }
     }
+
+    // A request fingerprint is a hexadecimal hash, so it never has this prefix.
+    private const string CompletionDecisionFingerprintPrefix = "$completion-decision:";
 
     private static string GetCompletionDecisionFingerprint(IReadOnlyList<TaskId> candidates)
     {
@@ -194,7 +206,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             hash.AppendData(value);
         }
 
-        return $"$completion-decision:{Convert.ToHexString(hash.GetHashAndReset())}";
+        return $"{CompletionDecisionFingerprintPrefix}{Convert.ToHexString(hash.GetHashAndReset())}";
     }
 
     /// <summary>
@@ -306,7 +318,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             var transport = MessageTransport;
             foreach (var (taskId, state) in _storage.Tasks)
             {
-                if (state.CompletedAt.HasValue && !state.TombstonedAt.HasValue)
+                if (state.CompletedAt.HasValue)
                 {
                     foreach (var destination in state.CompletionDestinations)
                     {
@@ -321,9 +333,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <remarks>
     /// The runtime never withdraws a completion. A pending completion's destination keeps its task and result: only
-    /// <see cref="IOutboxMessageSource.OnRetired"/> removes the destination, and tasks with destinations are neither
-    /// pruned nor tombstoned. An exception from decoding the stored result propagates, so the outbox dead-letters the
-    /// completion.
+    /// <see cref="IOutboxMessageSource.OnRetired"/> removes the destination, and tasks with destinations are never
+    /// deleted. An exception from decoding the stored result propagates, so the outbox dead-letters the completion.
     /// </remarks>
     bool IOutboxMessageSource.TryGetMessage(MessageId messageId, out OutboxMessage message)
     {
@@ -340,15 +351,15 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>
-    /// Removes a retired completion's destination, pruning the task once its result has been delivered to every
-    /// destination.
+    /// Removes a retired completion's destination, deleting the task with its execution tree once its result has been
+    /// delivered to every destination.
     /// </summary>
     /// <remarks>
-    /// The outbox stages the completion's removal in the same journal write. A delivered destination durably holds the
-    /// result, so the task needs no retention for it. A dead-lettered completion restarts the result's retention period,
-    /// so a poller, or a caller which invokes the task again, can still observe it. Retirement updates only the task's
-    /// metadata, so it succeeds when the stored result no longer decodes; polling such a result surfaces the decoding
-    /// error to the poller.
+    /// The outbox stages the completion's removal in the same journal write, so the deletion commits with the retirement.
+    /// A delivered destination durably holds the result, so the task needs no retention for it. A dead-lettered completion
+    /// restarts the result's retention period, so a poller, or a caller which invokes the task again, can still observe
+    /// it; the task is then deleted when that period ends. Retirement updates only the task's metadata, so it succeeds
+    /// when the stored result no longer decodes; polling such a result surfaces the decoding error to the poller.
     /// </remarks>
     void IOutboxMessageSource.OnRetired(MessageId messageId, OutboxMessageRetirement retirement)
     {
@@ -360,6 +371,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
+        Debug.Assert(IsInvoked(state), "Only invoked tasks have completion destinations.");
         _storage.RemoveCompletionDestination(completion.TaskId, state, completion.Destination);
         if (retirement == OutboxMessageRetirement.DeadLettered)
         {
@@ -367,9 +379,19 @@ internal sealed partial class DurableTaskGrainRuntime(
             // available to a poller or a re-invocation for the full retention period.
             _storage.RetainResult(completion.TaskId, state);
         }
-        else if (state.CompletionDestinations.Count == 0)
+
+        if (state.CompletionDestinations.Count > 0)
         {
-            PruneDeliveredTask(completion.TaskId, state);
+            return;
+        }
+
+        if (state.RetainedSince.HasValue)
+        {
+            TrackExpiry(GetRetentionExpiry(state));
+        }
+        else
+        {
+            DeleteTree(completion.TaskId, state);
         }
     }
 
@@ -408,12 +430,6 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 throw new InvalidOperationException(
                     $"Durable task '{taskId}' is already associated with a different request.");
-            }
-
-            if (state.TombstonedAt.HasValue)
-            {
-                throw new InvalidOperationException(
-                    $"Durable task '{taskId}' completed and its retained result has expired.");
             }
 
             if (state.Result is { IsCompleted: true } completed)
@@ -565,16 +581,11 @@ internal sealed partial class DurableTaskGrainRuntime(
         _pendingHandleResponses[taskId] = StageResponse(taskId, DurableTaskResponse.Completed);
     }
 
-    private DurableTaskResponse StageAcceptedResponse(TaskId taskId, DurableTaskResponse response)
+    private DurableTaskResponse StageAcceptedResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
         if (!response.IsCompleted)
         {
             throw new InvalidOperationException("Only terminal durable task responses can be accepted.");
-        }
-
-        if (!_storage.TryGetTask(taskId, out var state))
-        {
-            state = _storage.GetOrCreateTask(taskId, request: null);
         }
 
         if (state.Result is { IsCompleted: true } terminal)
@@ -582,7 +593,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return terminal;
         }
 
-        _storage.SetResponse(taskId, state, response);
+        StoreResult(taskId, state, response);
         return response;
     }
 
@@ -591,14 +602,19 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </summary>
     /// <remarks>
     /// The inbox accepts the completion directly into task state, so this stored response is its only journaled copy.
-    /// The child retains its result until the inbox reports this acceptance to the child's outbox.
+    /// The child retains its result until the inbox reports this acceptance to the child's outbox. A completion for a
+    /// task which no longer exists is accepted without changing state: the task was deleted with its execution tree,
+    /// which canceled it, and nothing awaits its result.
     /// </remarks>
     internal void AcceptResponseFromInbox(TaskId taskId, DurableTaskResponse response, GrainId sender)
     {
         ThrowIfStopping();
-        if (!_storage.TryGetTask(taskId, out var state)
-            || state.TombstonedAt.HasValue
-            || state.RemoteTarget.IsDefault
+        if (!_storage.TryGetTask(taskId, out var state))
+        {
+            return;
+        }
+
+        if (state.RemoteTarget.IsDefault
             || state.RemoteRequestFingerprint is null
             || state.RemoteTarget != sender)
         {
@@ -606,7 +622,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Durable task '{taskId}' does not accept completions from grain '{sender}'.");
         }
 
-        _pendingHandleResponses[taskId] = StageAcceptedResponse(taskId, response);
+        _pendingHandleResponses[taskId] = StageAcceptedResponse(taskId, state, response);
     }
 
     internal async Task ResumePendingTasksAsync(CancellationToken cancellationToken)
@@ -624,11 +640,11 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>Returns whether the task stores its terminal result, without decoding the result.</summary>
     /// <remarks>
-    /// Storage stamps <see cref="IDurableTaskState.CompletedAt"/> with every stored result, which is always terminal,
-    /// and a tombstone removes the result. Activation checks completion this way, so a stored result which no longer
-    /// decodes fails only the operations which read it, such as materializing its completion or polling it.
+    /// Storage stamps <see cref="IDurableTaskState.CompletedAt"/> with every stored result, which is always terminal.
+    /// Activation checks completion this way, so a stored result which no longer decodes fails only the operations which
+    /// read it, such as materializing its completion or polling it.
     /// </remarks>
-    private static bool HasStoredResult(IDurableTaskState state) => state.CompletedAt.HasValue && !state.TombstonedAt.HasValue;
+    private static bool HasStoredResult(IDurableTaskState state) => state.CompletedAt.HasValue;
 
     private async Task ResumePendingTasksCoreAsync(CancellationToken cancellationToken)
     {
@@ -680,6 +696,11 @@ internal sealed partial class DurableTaskGrainRuntime(
             state.Request.SetTarget(_shared.GrainContextAccessor.GrainContext);
             StartInvocation(taskId, static request => request.CreateTask(), state.Request, executionContext);
         }
+
+        if (DeleteExpiredTasks())
+        {
+            await WriteStateAsync(cancellationToken);
+        }
     }
 
     /// <summary>
@@ -700,7 +721,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (scheduled.CompletedResponse is { } completed)
         {
             CompleteTaskHandle(taskId, completed);
-            if (PruneCompletedTasks())
+            if (DeleteExpiredTasks())
             {
                 await WriteStateAsync(cancellationToken);
             }
@@ -804,12 +825,6 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Durable task '{taskId}' is already associated with a different request.");
         }
 
-        if (state.TombstonedAt.HasValue)
-        {
-            throw new InvalidOperationException(
-                $"Durable task '{taskId}' completed and its retained result has expired.");
-        }
-
         StageCaller(taskId, state, requestContext.CallerId);
         if (state.RequestFingerprint is null)
         {
@@ -876,7 +891,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         if (!_storage.TryGetTask(taskId, out var state)
-            || state.TombstonedAt.HasValue
             || state.Result is { IsCompleted: true })
         {
             return;
@@ -911,6 +925,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         _pendingCancellationPropagations.Clear();
         _preStagedCancellations.Clear();
         _pendingCompletions = null;
+        _nextExpiry = DateTimeOffset.MinValue;
         _committingStarts = [];
         _committingHandleResponses = [];
         _committingCancellationPropagations = [];
@@ -958,11 +973,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (!_stopping)
         {
-            if (!_pendingHandleResponses.IsEmpty)
-            {
-                QueueBackgroundWrite();
-            }
-            else if (handleResponses.Length > 0 && PruneCompletedTasks())
+            // Checking for expired tasks is cheap until the earliest expiry passes.
+            if (!_pendingHandleResponses.IsEmpty || DeleteExpiredTasks())
             {
                 QueueBackgroundWrite();
             }
@@ -1108,7 +1120,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                     await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, cancellationToken));
             }
 
-            if (committed.Result is { IsCompleted: true } || committed.TombstonedAt.HasValue)
+            if (committed.Result is { IsCompleted: true })
             {
                 return GetScheduledTaskHandle(taskId);
             }
@@ -1282,7 +1294,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
             else if (schedulingResponse.IsCompleted)
             {
-                _storage.SetResponse(taskId, state, schedulingResponse);
+                StoreResult(taskId, state, schedulingResponse);
                 await WriteStateAsync(cancellationToken);
                 resultHandle = new CompletedTaskHandle(taskId, schedulingResponse);
             }
@@ -1381,7 +1393,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
         catch (Exception exception)
         {
-            if (exception is not OperationCanceledException)
+            if (exception is not OperationCanceledException && !IsDiscarded(context))
             {
                 _shared.Logger.LogWarning(exception, "{Id} error invoking durable task '{DurableTask}'.", GrainId, createTask);
             }
@@ -1401,7 +1413,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         try
         {
-            if (response.IsCompleted && !_stopping)
+            if (response.IsCompleted && !_stopping && !IsDiscarded(context))
             {
                 await SetResponseAsync(context.TaskId, response, CancellationToken.None);
             }
@@ -1426,6 +1438,13 @@ internal sealed partial class DurableTaskGrainRuntime(
     private sealed record RunningRequest(
         Task Task,
         GrainDurableExecutionContext Context);
+
+    /// <summary>
+    /// Returns whether an attempt's task was deleted with its execution tree, which unregisters the attempt's context,
+    /// so the attempt's result is discarded.
+    /// </summary>
+    private bool IsDiscarded(GrainDurableExecutionContext context) =>
+        !_executionContexts.TryGetValue(context.TaskId, out var registered) || !ReferenceEquals(registered, context);
 
     private sealed record CancellationPropagation(
         List<GrainDurableExecutionContext> Contexts,
@@ -1456,7 +1475,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var winningResponse = StageResponse(taskId, response);
         await WriteStateAsync(cancellationToken);
         CompleteTaskHandle(taskId, winningResponse);
-        if (PruneCompletedTasks())
+        if (DeleteExpiredTasks())
         {
             await WriteStateAsync(cancellationToken);
         }
@@ -1492,13 +1511,25 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         // The outbox reads each completion from the stored result, so the result is staged first.
-        _storage.SetResponse(taskId, state, response);
+        StoreResult(taskId, state, response);
         foreach (var destination in state.CompletionDestinations)
         {
             SendCompletion(taskId, destination);
         }
 
         return response;
+    }
+
+    /// <summary>
+    /// Stores a task's terminal result. Without completion destinations, the result's retention period starts now.
+    /// </summary>
+    private void StoreResult(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
+    {
+        _storage.SetResponse(taskId, state, response);
+        if (state.CompletionDestinations.Count == 0)
+        {
+            TrackExpiry(GetRetentionExpiry(state));
+        }
     }
 
     private void QueueBackgroundWrite()
@@ -1563,136 +1594,197 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
-    private bool PruneCompletedTasks()
+    /// <summary>
+    /// Deletes the execution trees whose retention has ended and the cancellation records which can no longer match an
+    /// invocation, once the earliest expiry has passed.
+    /// </summary>
+    /// <returns><see langword="true"/> if a deletion was staged.</returns>
+    /// <remarks>
+    /// The check costs nothing until the earliest expiry passes; the scan which follows recomputes it. A task with a
+    /// pending completion has no expiry: the completion's retirement deletes the task or starts its retention.
+    /// </remarks>
+    private bool DeleteExpiredTasks()
     {
-        // Prune all tasks which:
-        // * Have a response
-        // * Have no remaining clients to notify
-        // * Have no parents waiting on them within this context
-        // * Have been completed for more than a configured period of time
-        var allTasks = _storage.Tasks.ToDictionary(static task => task.Id, static task => task.State);
-        HashSet<TaskId>? completedTaskIds = default;
-        Dictionary<TaskId, HashSet<TaskId>>? waitingOnParent = default;
-        var now = _shared.TimeProvider.GetUtcNow();
-        foreach (var (taskId, state) in allTasks)
+        var now = UtcNow;
+        if (now < _nextExpiry)
         {
-            if (state.Result is not { IsCompleted: true })
-            {
-                // The task is incomplete.
-                continue;
-            }
+            return false;
+        }
 
+        var nextExpiry = DateTimeOffset.MaxValue;
+        List<(TaskId Id, IDurableTaskState State)>? expired = null;
+        foreach (var (taskId, state) in _storage.Tasks)
+        {
             if (state.CompletionDestinations.Count > 0)
             {
-                // Completions are still pending in the outbox.
                 continue;
             }
 
-            // Retention starts at completion, or later when a dead-lettered completion restarted it.
-            if (state.CompletedAt is not { } completedAt
-                || now.Subtract(state.RetainedSince is { } retainedSince && retainedSince > completedAt ? retainedSince : completedAt)
-                    < _shared.Options.ResultRetentionPeriod)
+            var isCancellationRecord = IsCancellationRecord(state);
+            if ((!state.CompletedAt.HasValue && !isCancellationRecord)
+                || (!IsInvoked(state) && HasStoredAncestor(taskId)))
             {
-                // The task is being retained for at least the specified period of time.
+                // A pending task has no expiry, and a task in another task's execution tree is deleted with it.
                 continue;
             }
 
-            var parent = taskId.Parent();
-            while (!parent.IsDefault
-                && parent != TaskId.None
-                && (!allTasks.TryGetValue(parent, out var parentState)
-                    || parentState.TombstonedAt.HasValue))
+            var expiry = state.CompletedAt.HasValue ? GetRetentionExpiry(state) : DateTimeOffset.MinValue;
+            if (isCancellationRecord)
             {
-                parent = parent.Parent();
+                // The invocation which the cancellation precedes is delivered within the sender's retry age, or never.
+                var recordExpiry = AddSaturating(state.CreatedAt, _shared.MaxOutboxRetryAge);
+                expiry = recordExpiry > expiry ? recordExpiry : expiry;
             }
 
-            if (!parent.IsDefault
-                && parent != TaskId.None
-                && allTasks.TryGetValue(parent, out var retainedParent)
-                && !retainedParent.TombstonedAt.HasValue)
+            if (expiry <= now)
             {
-                // There is a local parent task which this task is waiting on, and that is the last thing keeping this task alive.
-                waitingOnParent ??= [];
-                ref var waiters = ref CollectionsMarshal.GetValueRefOrAddDefault(waitingOnParent, parent, out var exists);
-                waiters ??= [];
-                waiters.Add(taskId);
-                continue;
+                (expired ??= []).Add((taskId, state));
             }
-
-            completedTaskIds ??= [];
-            completedTaskIds.Add(taskId);
-        }
-
-        if (completedTaskIds is not null)
-        {
-            foreach (var taskId in completedTaskIds)
+            else if (expiry < nextExpiry)
             {
-                PruneTaskTree(taskId);
+                nextExpiry = expiry;
             }
         }
 
-        return completedTaskIds is not null;
-
-        void PruneTaskTree(TaskId taskId)
+        _nextExpiry = nextExpiry;
+        if (expired is null)
         {
-            if (waitingOnParent is not null && waitingOnParent.TryGetValue(taskId, out var childTaskIds))
-            {
-                foreach (var childTaskId in childTaskIds)
-                {
-                    PruneTaskTree(childTaskId);
-                }
-            }
+            return false;
+        }
 
-            PruneTask(taskId, allTasks[taskId]);
+        // Execution trees are disjoint: each one ends at the invoked tasks below it.
+        foreach (var (taskId, state) in expired)
+        {
+            DeleteTree(taskId, state);
+        }
+
+        return true;
+    }
+
+    /// <summary>Returns when a terminal result's retention ends.</summary>
+    /// <remarks>Retention starts at completion, or later when a dead-lettered completion restarted it.</remarks>
+    private DateTimeOffset GetRetentionExpiry(IDurableTaskState state)
+    {
+        var completedAt = state.CompletedAt!.Value;
+        var retainedSince = state.RetainedSince is { } restarted && restarted > completedAt ? restarted : completedAt;
+        return AddSaturating(retainedSince, _shared.Options.ResultRetentionPeriod);
+    }
+
+    private static DateTimeOffset AddSaturating(DateTimeOffset time, TimeSpan duration) =>
+        duration >= DateTimeOffset.MaxValue - time ? DateTimeOffset.MaxValue : time + duration;
+
+    private void TrackExpiry(DateTimeOffset expiry)
+    {
+        if (expiry < _nextExpiry)
+        {
+            _nextExpiry = expiry;
         }
     }
 
+    /// <summary>Returns whether a task was scheduled as a request, so it owns its execution tree.</summary>
+    /// <remarks>A completion decision records a fingerprint of its candidates, but it is part of its parent's tree.</remarks>
+    private static bool IsInvoked(IDurableTaskState state) =>
+        state.RequestFingerprint is { } fingerprint
+        && !fingerprint.StartsWith(CompletionDecisionFingerprintPrefix, StringComparison.Ordinal);
+
+    /// <summary>Returns whether a task records only a cancellation which arrived before its invocation.</summary>
+    private static bool IsCancellationRecord(IDurableTaskState state) =>
+        state.CancellationRequestedAt.HasValue
+        && state.RequestFingerprint is null
+        && state.RemoteRequestFingerprint is null
+        && state.DueTime is null
+        && state.Request is null;
+
+    private bool HasStoredAncestor(TaskId taskId)
+    {
+        for (var ancestorId = taskId.Parent(); !ancestorId.IsDefault; ancestorId = ancestorId.Parent())
+        {
+            if (_storage.TryGetTask(ancestorId, out _))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
-    /// Prunes a task whose result has been delivered to every completion destination, unless a retained local ancestor
-    /// still awaits it, in which case it is pruned with that ancestor's tree.
+    /// Deletes a task which owns its lifecycle, together with its execution tree: its descendants which are not invoked
+    /// tasks themselves.
     /// </summary>
     /// <remarks>
-    /// Walks the task's ancestors rather than scanning every task. Local descendants remain until the retention policy
-    /// prunes them.
+    /// Costs time proportional to the size of the tree. Each non-terminal task in the tree is canceled: a pending remote
+    /// child's cancellation is staged with the deletion, and a running execution is signaled after the deletion commits;
+    /// its result is then discarded.
     /// </remarks>
-    private void PruneDeliveredTask(TaskId taskId, IDurableTaskState state)
+    private void DeleteTree(TaskId taskId, IDurableTaskState state)
     {
-        for (var parent = taskId.Parent(); !parent.IsDefault && parent != TaskId.None; parent = parent.Parent())
+        Debug.Assert(state.CompletionDestinations.Count == 0, "A pending completion retains its task's result.");
+        List<GrainDurableExecutionContext>? contexts = null;
+        List<IScheduledTaskHandle>? handles = null;
+        DeleteTreeCore(taskId, state, ref contexts, ref handles);
+        if (contexts is not null || handles is not null)
         {
-            if (_storage.TryGetTask(parent, out var parentState) && !parentState.TombstonedAt.HasValue)
+            _pendingCancellationPropagations[Interlocked.Increment(ref _cancellationPropagationId)] =
+                new(contexts ?? [], handles ?? []);
+        }
+    }
+
+    private void DeleteTreeCore(
+        TaskId taskId,
+        IDurableTaskState state,
+        ref List<GrainDurableExecutionContext>? contexts,
+        ref List<IScheduledTaskHandle>? handles)
+    {
+        foreach (var (childId, child) in _storage.GetChildren(taskId).ToList())
+        {
+            if (!IsInvoked(child))
             {
-                return;
+                DeleteTreeCore(childId, child, ref contexts, ref handles);
             }
         }
 
-        PruneTask(taskId, state);
-    }
-
-    /// <summary>
-    /// Removes a completed task, keeping a tombstone when its identity is bound to a request so a conflicting reuse is
-    /// rejected.
-    /// </summary>
-    private void PruneTask(TaskId taskId, IDurableTaskState state)
-    {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
-            _shared.Logger.LogTrace("{Id} pruning completed task {TaskId}", GrainId, taskId);
+            _shared.Logger.LogTrace("{Id} deleting task {TaskId}", GrainId, taskId);
         }
 
-        if (state.RequestFingerprint is not null || state.RemoteRequestFingerprint is not null)
+        var terminal = state.CompletedAt.HasValue;
+        if (!terminal && !state.RemoteTarget.IsDefault)
         {
-            _storage.CreateTombstone(taskId, state);
-        }
-        else
-        {
-            _storage.RemoveTask(taskId);
+            StageCancellation(taskId, state.RemoteTarget);
+            _preStagedCancellations.TryRemove((taskId, state.RemoteTarget), out _);
         }
 
-        _executionContexts.TryRemove(taskId, out _);
-        _taskHandles.TryRemove(taskId, out _);
+        if (_executionContexts.TryRemove(taskId, out var context) && !terminal)
+        {
+            (contexts ??= []).Add(context);
+        }
+
+        if (_runningRequests.TryRemove(taskId, out var running))
+        {
+            // Deactivation still drains the discarded attempt.
+            TrackBackgroundTask(running.Task, "running a deleted durable task");
+        }
+
+        if (_taskHandles.TryRemove(taskId, out var handle))
+        {
+            if (handle is TaskHandle { ResponseTask.IsCompleted: false } localHandle)
+            {
+                localHandle.TrySetResponse(terminal ? state.Result! : DurableTaskResponse.Canceled);
+            }
+            else if (!terminal && handle is not TaskHandle and not CompletedTaskHandle)
+            {
+                // A custom scheduler owns the child's work.
+                (handles ??= []).Add(handle);
+            }
+        }
+
+        _pendingStarts.TryRemove(taskId, out _);
+        _pendingHandleResponses.TryRemove(taskId, out _);
         _logicalTimes.Remove(taskId);
+        _storage.RemoveTask(taskId);
     }
-
     /// <inheritdoc/>
     public async ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, CancellationToken cancellationToken)
     {
@@ -1702,8 +1794,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             _shared.Logger.LogTrace("{Id} received polling request for task {TaskId}", GrainId, taskId);
         }
 
-        if (!_storage.TryGetTask(taskId, out var taskState)
-            || taskState.TombstonedAt.HasValue)
+        if (!_storage.TryGetTask(taskId, out _))
         {
             throw new DurableTaskNotFoundException(taskId);
         }
@@ -1754,7 +1845,6 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 var status = taskState switch
                 {
-                    { TombstonedAt: not null } => "Tombstoned",
                     { CancellationRequestedAt: not null } => "Canceling",
                     { DueTime: not null } => "Delayed",
                     _ => "Pending",
@@ -1849,9 +1939,11 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (!_storage.TryGetTask(taskId, out var taskState))
         {
+            // The cancellation can precede its invocation, which this record cancels on arrival.
             taskState = _storage.GetOrCreateTask(taskId, request: null);
             StageCaller(taskId, taskState, callerId);
             _storage.RequestCancellation(taskId, taskState);
+            TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.MaxOutboxRetryAge));
             return (true, [], []);
         }
 
@@ -1943,12 +2035,6 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (_storage.TryGetTask(taskId, out var taskState))
         {
-            if (taskState.TombstonedAt.HasValue)
-            {
-                handle = new CompletedTaskHandle(taskId, DurableTaskNotFoundException.CreateResponse(taskId));
-                return true;
-            }
-
             if (_pendingHandleResponses.ContainsKey(taskId))
             {
                 handle = new TaskHandle(taskId, this, taskState.RemoteTarget);

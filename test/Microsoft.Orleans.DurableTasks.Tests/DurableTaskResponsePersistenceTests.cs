@@ -180,13 +180,13 @@ public sealed class DurableTaskResponsePersistenceTests
         storage.GetOrCreateTask(otherTaskId, request: null);
 
         var exception = Assert.Throws<ArgumentException>(
-            () => storage.CreateTombstone(otherTaskId, state));
+            () => storage.RetainResult(otherTaskId, state));
 
         Assert.Equal("state", exception.ParamName);
         Assert.True(storage.TryGetTask(otherTaskId, out var otherState));
-        Assert.Null(otherState.TombstonedAt);
+        Assert.Null(otherState.RetainedSince);
         Assert.True(storage.TryGetTask(ownerTaskId, out var ownerState));
-        Assert.Null(ownerState.TombstonedAt);
+        Assert.Null(ownerState.RetainedSince);
     }
 
     [Fact]

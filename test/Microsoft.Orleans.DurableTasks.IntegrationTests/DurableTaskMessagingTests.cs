@@ -101,7 +101,7 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         for (var index = 0; index < FanOut; index++)
         {
             // The worker retains each canceled child's terminal state under the caller's child identity until the
-            // caller's inbox accepts its completion, then prunes it to a tombstone.
+            // caller's inbox accepts its completion, then deletes it.
             var childId = TaskId.CreateRoot("fan-out").Child($"wait-{index}");
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
             while (true)
@@ -119,7 +119,7 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
                     break;
                 }
 
-                Assert.True(DateTime.UtcNow < deadline, $"Durable task '{childId}' was not pruned after its completion was delivered.");
+                Assert.True(DateTime.UtcNow < deadline, $"Durable task '{childId}' was not deleted after its completion was delivered.");
                 await Task.Delay(10, cancellationToken);
             }
         }

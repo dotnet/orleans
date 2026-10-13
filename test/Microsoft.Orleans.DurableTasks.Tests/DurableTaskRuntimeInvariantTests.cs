@@ -14,6 +14,7 @@ using Orleans.Configuration;
 using Orleans.Invocation;
 using Orleans.Journaling;
 using Orleans.Messaging;
+using Orleans.Messaging.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
@@ -537,28 +538,6 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task RootRemoteScheduleRejectsExpiredTombstoneWithoutResending()
-    {
-        var (runtime, storage, manager, transport) = CreateRuntime();
-        var taskId = TaskId.Parse("root/remote");
-        var request = CreateRemoteRequest(1);
-        var state = storage.GetOrCreate(taskId);
-        storage.SetRemoteRequest(
-            taskId,
-            state,
-            request.Context!.TargetId,
-            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
-        state.TombstonedAt = runtime.UtcNow;
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => runtime.ScheduleRemoteAsync(taskId, request, TestContext.Current.CancellationToken).AsTask());
-
-        Assert.Contains("retained result has expired", exception.Message, StringComparison.Ordinal);
-        Assert.Empty(transport.Invocations);
-        Assert.Equal(0, manager.WriteCount);
-    }
-
-    [Fact]
     public async Task CompletionHandleAdvancesOnlyAfterCommit()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
@@ -599,15 +578,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.True(
             await pruningWriteCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken) >= 2);
 
-        var tombstone = storage.Get(taskId);
-        Assert.Same(state, tombstone);
-        Assert.Null(tombstone.RequestFingerprint);
-        Assert.Equal("fingerprint", tombstone.RemoteRequestFingerprint);
-        Assert.Equal(target, tombstone.RemoteTarget);
-        Assert.NotNull(tombstone.TombstonedAt);
-        Assert.Null(tombstone.Request);
-        Assert.Null(tombstone.Result);
-        Assert.Empty(tombstone.CompletionDestinations);
+        Assert.False(storage.Contains(taskId));
         Assert.Empty(transport.Invocations);
         Assert.Equal(2, manager.WriteCount);
     }
@@ -660,7 +631,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         var pruningWriteCompleted = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         manager.AfterWriteCompleted = writeCount =>
         {
-            if (writeCount == 2 && second.TombstonedAt.HasValue)
+            if (writeCount == 2 && !storage.Contains(secondId))
             {
                 pruningWriteCompleted.TrySetResult(writeCount);
             }
@@ -681,14 +652,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(
             2,
             await pruningWriteCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
-        Assert.NotNull(second.TombstonedAt);
-        Assert.Same(second, storage.Get(secondId));
-        Assert.Null(second.RequestFingerprint);
-        Assert.Equal("second", second.RemoteRequestFingerprint);
-        Assert.Equal(target, second.RemoteTarget);
-        Assert.Null(second.Request);
-        Assert.Null(second.Result);
-        Assert.Empty(second.CompletionDestinations);
+        Assert.False(storage.Contains(secondId));
+        Assert.False(storage.Contains(firstId));
     }
 
     [Fact]
@@ -1052,11 +1017,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         Stage("root/canceling", (id, state) => storage.RequestCancellation(id, state));
         Stage("root/delayed", (id, state) => storage.SetDelay(id, state, dueTime, generation: 1));
         Stage("root/remote", (id, state) => storage.SetRemoteRequest(id, state, target, "fingerprint"));
-        Stage("root/tombstoned", (id, state) =>
-        {
-            storage.SetResponse(id, state, DurableTaskResponse.FromResult(1));
-            storage.CreateTombstone(id, state);
-        });
 
         var diagnostics = new Dictionary<string, DurableTaskDiagnosticState>();
         await foreach (var (taskId, state) in ((IDurableTaskGrainExtension)runtime).GetTasksAsync(TestContext.Current.CancellationToken))
@@ -1072,7 +1032,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal("Canceling", diagnostics["root/canceling"].Status);
         Assert.Equal(("Delayed", dueTime), (diagnostics["root/delayed"].Status, diagnostics["root/delayed"].DueTime));
         Assert.Equal(("Pending", target.ToString()), (diagnostics["root/remote"].Status, diagnostics["root/remote"].RemoteTarget));
-        Assert.Equal(("Tombstoned", null), (diagnostics["root/tombstoned"].Status, diagnostics["root/tombstoned"].Response));
+        Assert.Equal(6, diagnostics.Count);
     }
 
     [Fact]
@@ -1759,23 +1719,6 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task CompletionDecisionRejectsExpiredTombstoneBeforePolling()
-    {
-        var (runtime, storage, _, _) = CreateRuntime();
-        var decisionId = TaskId.Parse("root/decision");
-        var candidateId = TaskId.Parse("root/candidate");
-        var decision = storage.GetOrCreate(decisionId);
-        decision.RequestFingerprint = "$completion-decision:expired";
-        decision.TombstonedAt = runtime.UtcNow;
-        storage.GetOrCreate(candidateId);
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => runtime.SelectCompletionAsync(decisionId, [candidateId], TestContext.Current.CancellationToken).AsTask());
-
-        Assert.Contains("retained result has expired", exception.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public async Task CompletionDecisionRejectsExistingChildOperation()
     {
         var (runtime, _, _, _) = CreateRuntime();
@@ -1933,6 +1876,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         var other = GrainId.Create("caller", "two");
         var state = storage.GetOrCreate(taskId);
         storage.SetRemoteRequest(taskId, state, target, "fingerprint");
+        state.RequestFingerprint = "invocation";
         state.CompletionDestinations.Add(waiter);
         state.CompletionDestinations.Add(other);
         var handle = runtime.GetScheduledTaskHandle(taskId);
@@ -1948,7 +1892,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(7, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
         Assert.DoesNotContain(waiter, storage.Get(taskId).CompletionDestinations);
         Assert.Contains(other, storage.Get(taskId).CompletionDestinations);
-        Assert.Null(storage.Get(taskId).TombstonedAt);
         Assert.False(((IOutboxMessageSource)runtime).TryGetMessage(waiterCompletion, out _));
         Assert.Empty(transport.Completions);
     }
@@ -2079,84 +2022,88 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task CleanupRecursivelyPrunesDescendantsBeforeTombstoningParent()
+    public async Task RetentionDeletesEachExpiredInvokedTaskWithItsExecutionTree()
     {
         var (runtime, storage, manager, _) = CreateRuntime(TimeSpan.Zero);
         var rootId = TaskId.Parse("root");
         var childId = TaskId.Parse("root/child");
         var grandchildId = TaskId.Parse("root/child/grandchild");
         var triggerId = TaskId.Parse("trigger");
-        var completedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
-
         var root = storage.GetOrCreate(rootId);
-        root.Result = DurableTaskResponse.Completed;
-        root.CompletedAt = completedAt;
+        storage.SetResponse(rootId, root, DurableTaskResponse.Completed);
         root.RequestFingerprint = "root";
         var child = storage.GetOrCreate(childId);
-        child.Result = DurableTaskResponse.Completed;
-        child.CompletedAt = completedAt;
+        storage.SetResponse(childId, child, DurableTaskResponse.Completed);
         child.RequestFingerprint = "child";
         var grandchild = storage.GetOrCreate(grandchildId);
-        grandchild.Result = DurableTaskResponse.Completed;
-        grandchild.CompletedAt = completedAt;
-        var observedPrunedWrite = false;
-        manager.BeforeWrite = () =>
-        {
-            // The third write persists the cleanup which follows the trigger task's completion.
-            if (manager.WriteCount == 2)
-            {
-                observedPrunedWrite = storage.Get(rootId).TombstonedAt is not null
-                    && storage.Get(childId).TombstonedAt is not null
-                    && !storage.Contains(grandchildId);
-            }
-        };
+        storage.SetResponse(grandchildId, grandchild, DurableTaskResponse.Completed);
+        var observedDeletionWrite = false;
+        manager.BeforeWrite = () => observedDeletionWrite |=
+            !storage.Contains(rootId) && !storage.Contains(childId) && !storage.Contains(grandchildId);
 
         var handle = await runtime.ScheduleChildAsync(triggerId, DurableTask.Run(_ => { }), TestContext.Current.CancellationToken);
         await handle.WaitAsync(TestContext.Current.CancellationToken);
-        await WaitUntilAsync(() => manager.WriteCount >= 3);
+        await WaitUntilAsync(() => Volatile.Read(ref observedDeletionWrite));
 
-        Assert.True(observedPrunedWrite);
-        Assert.NotNull(storage.Get(rootId).TombstonedAt);
-        Assert.NotNull(storage.Get(childId).TombstonedAt);
+        // The invoked child owns its own tree, which holds the grandchild, and each tree is deleted once it expires.
+        Assert.False(storage.Contains(rootId));
+        Assert.False(storage.Contains(childId));
         Assert.False(storage.Contains(grandchildId));
     }
 
     [Fact]
-    public async Task DeliveredCompletionPrunesItsTaskWithoutRetention()
+    public async Task DeliveredCompletionDeletesTaskWithItsExecutionTreeInTheRetirementWrite()
     {
         var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.FromDays(1));
         var taskId = TaskId.Parse("root");
         var childId = TaskId.Parse("root/child");
+        var loserId = TaskId.Parse("root/$when-any-1/0");
+        var decisionId = TaskId.Parse("root/$when-any-1/$winner");
+        var nestedId = TaskId.Parse("root/nested-invocation");
+        var target = GrainId.Create("target", "one");
         var request = CreateRequest(1);
         var caller = request.Context!.CallerId;
         runtime.ScheduleFromInbox(taskId, request);
-        var child = storage.GetOrCreate(childId);
-        child.Result = DurableTaskResponse.Completed;
-        child.CompletedAt = DateTimeOffset.UtcNow;
+        storage.SetResponse(childId, storage.GetOrCreate(childId), DurableTaskResponse.Completed);
+        storage.SetRemoteRequest(loserId, storage.GetOrCreate(loserId), target, "loser");
+        var decision = storage.GetOrCreate(decisionId);
+        decision.RequestFingerprint = "$completion-decision:winner";
+        storage.SetResponse(decisionId, decision, DurableTaskResponse.FromResult(childId));
+        storage.GetOrCreate(nestedId).RequestFingerprint = "nested";
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => transport.Completions.Count == 1 && manager.WriteCount >= 2);
+        await WaitUntilIdleAsync(runtime);
         var completion = Assert.Single(transport.Completions);
         Assert.Equal(caller, completion.Target);
         Assert.Equal(0, completion.Materialize(runtime).Response.GetResult<int>());
+        Assert.True(storage.LogicalTimes.ContainsKey(taskId));
         var writes = manager.WriteCount;
+        var enumerations = storage.TasksEnumerationCount;
 
         // The outbox stages the completion's removal and calls the source in the same synchronous block.
         ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.Delivered);
 
-        var pruned = storage.Get(taskId);
-        Assert.NotNull(pruned.TombstonedAt);
-        Assert.Null(pruned.Result);
-        Assert.Null(pruned.Request);
-        Assert.Empty(pruned.CompletionDestinations);
+        Assert.False(storage.Contains(taskId));
+        Assert.False(storage.Contains(childId));
+        Assert.False(storage.Contains(loserId));
+        Assert.False(storage.Contains(decisionId));
         Assert.False(storage.LogicalTimes.ContainsKey(taskId));
         Assert.False(((IOutboxMessageSource)runtime).TryGetMessage(completion.MessageId, out _));
-
-        // Local descendants follow the retention policy.
-        Assert.Null(storage.Get(childId).TombstonedAt);
+        Assert.Equal((runtime.GrainId, target, loserId), Assert.Single(transport.Cancellations));
         Assert.Equal(writes, manager.WriteCount);
 
-        // The tombstone rejects a conflicting reuse of the identity.
-        Assert.Throws<InvalidOperationException>(() => runtime.ScheduleFromInbox(taskId, CreateRequest(2)));
+        // An invocation nested under the task's identifier keeps its own lifecycle.
+        Assert.True(storage.Contains(nestedId));
+
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(writes + 1, manager.WriteCount);
+
+        // Deletion follows the tree rather than scanning every task.
+        Assert.Equal(enumerations, storage.TasksEnumerationCount);
+
+        // A late completion of the canceled remote child is accepted without changing state.
+        Accept(CreateHandler(runtime), CompletionMessage(target, runtime.GrainId, loserId, DurableTaskResponse.FromResult(5)));
+        Assert.False(storage.Contains(loserId));
     }
 
     [Fact]
@@ -2173,7 +2120,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.DeadLettered);
 
         var retained = storage.Get(taskId);
-        Assert.Null(retained.TombstonedAt);
         Assert.Equal(0, retained.Result!.GetResult<int>());
         Assert.Empty(retained.CompletionDestinations);
         Assert.Equal(0, (await runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken)).GetResult<int>());
@@ -2192,14 +2138,13 @@ public sealed class DurableTaskRuntimeInvariantTests
         var retention = TimeSpan.FromHours(1);
         var (runtime, storage, manager, transport) = CreateRuntime(retention, timeProvider: clock);
         var taskId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/child");
         runtime.ScheduleFromInbox(taskId, CreateRequest(1));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => transport.Completions.Count == 1 && manager.WriteCount >= 2);
-        await runtime.GetScheduledTaskHandle(taskId).WaitAsync(TestContext.Current.CancellationToken);
+        await WaitUntilIdleAsync(runtime);
+        storage.SetResponse(childId, storage.GetOrCreate(childId), DurableTaskResponse.Completed);
         var completion = Assert.Single(transport.Completions);
-
-        // The test storage stamps completion from the system clock; align it with the runtime's clock.
-        storage.Get(taskId).CompletedAt = clock.GetUtcNow();
 
         // The outbox dead-letters the completion after MaxOutboxRetryAge, which exceeds the retention period.
         clock.Advance(TimeSpan.FromDays(1));
@@ -2207,40 +2152,173 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(clock.GetUtcNow(), storage.Get(taskId).RetainedSince);
 
         clock.Advance(retention - TimeSpan.FromTicks(1));
-        Assert.False(InvokePruneCompletedTasks(runtime));
-        Assert.Null(storage.Get(taskId).TombstonedAt);
+        Assert.False(InvokeDeleteExpiredTasks(runtime));
+        Assert.True(storage.Contains(taskId));
         Assert.Equal(0, (await runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken)).GetResult<int>());
 
         clock.Advance(TimeSpan.FromTicks(1));
-        Assert.True(InvokePruneCompletedTasks(runtime));
-        Assert.NotNull(storage.Get(taskId).TombstonedAt);
-        Assert.Null(storage.Get(taskId).Result);
+        Assert.True(InvokeDeleteExpiredTasks(runtime));
+        Assert.False(storage.Contains(taskId));
+        Assert.False(storage.Contains(childId));
         await Assert.ThrowsAsync<DurableTaskNotFoundException>(
             async () => await runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken));
     }
 
-    private static bool InvokePruneCompletedTasks(DurableTaskGrainRuntime runtime) =>
-        (bool)typeof(DurableTaskGrainRuntime)
-            .GetMethod("PruneCompletedTasks", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(runtime, null)!;
+    [Fact]
+    public async Task ClientScheduledTaskIsDeletedWithItsExecutionTreeOnceItsRetentionEnds()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var retention = TimeSpan.FromHours(1);
+        var (runtime, storage, _, _) = CreateRuntime(retention, timeProvider: clock);
+        var taskId = TaskId.Parse("client-root");
+        var childId = TaskId.Parse("client-root/child");
+        var request = CreateRequest(1);
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request, TestContext.Current.CancellationToken);
+        Assert.Equal(0, (await runtime.GetScheduledTaskHandle(taskId).WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        await WaitUntilIdleAsync(runtime);
+        storage.SetResponse(childId, storage.GetOrCreate(childId), DurableTaskResponse.Completed);
+
+        clock.Advance(retention - TimeSpan.FromTicks(1));
+        Assert.False(InvokeDeleteExpiredTasks(runtime));
+        Assert.Equal(0, (await runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken)).GetResult<int>());
+
+        clock.Advance(TimeSpan.FromTicks(1));
+        Assert.True(InvokeDeleteExpiredTasks(runtime));
+        Assert.False(storage.Contains(taskId));
+        Assert.False(storage.Contains(childId));
+        Assert.False(storage.LogicalTimes.ContainsKey(taskId));
+        var failure = await Assert.ThrowsAsync<DurableTaskNotFoundException>(
+            async () => await runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken));
+        Assert.Equal(taskId, failure.TaskId);
+
+        // The task identifier deduplicates schedules only while the result is retained.
+        var again = CreateRequest(1);
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, again, TestContext.Current.CancellationToken);
+        Assert.Equal(0, (await runtime.GetScheduledTaskHandle(taskId).WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        Assert.Equal(1, request.CreateTaskCallCount);
+        Assert.Equal(1, again.CreateTaskCallCount);
+    }
 
     [Fact]
-    public async Task DeliveredCompletionOfTaskAwaitedByLocalParentIsPrunedWithParent()
+    public async Task InvokedTaskNestedUnderAnotherTaskKeepsItsOwnLifecycle()
     {
-        var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.FromDays(1));
-        var parentId = TaskId.Parse("root");
-        var taskId = TaskId.Parse("root/remote-call");
-        storage.GetOrCreate(parentId);
-        runtime.ScheduleFromInbox(taskId, CreateRequest(1));
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var retention = TimeSpan.FromHours(1);
+        var (runtime, storage, manager, transport) = CreateRuntime(retention, timeProvider: clock);
+        var outerId = TaskId.Parse("outer");
+        var localId = TaskId.Parse("outer/local");
+        var nestedId = TaskId.Parse("outer/nested");
+        var nestedChildId = TaskId.Parse("outer/nested/child");
+        var outer = storage.GetOrCreate(outerId);
+        outer.RequestFingerprint = "outer";
+        storage.SetResponse(outerId, outer, DurableTaskResponse.Completed);
+        storage.SetResponse(localId, storage.GetOrCreate(localId), DurableTaskResponse.Completed);
+
+        // Task identifiers are chosen by callers, so another grain can invoke a task under the outer task's identifier.
+        runtime.ScheduleFromInbox(nestedId, CreateRequest(1));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await WaitUntilAsync(() => transport.Completions.Count == 1 && manager.WriteCount >= 2);
+        await WaitUntilAsync(() => transport.Completions.Count == 1);
+        await WaitUntilIdleAsync(runtime);
+        storage.SetResponse(nestedChildId, storage.GetOrCreate(nestedChildId), DurableTaskResponse.Completed);
+
+        clock.Advance(retention);
+        Assert.True(InvokeDeleteExpiredTasks(runtime));
+        Assert.False(storage.Contains(outerId));
+        Assert.False(storage.Contains(localId));
+        Assert.True(storage.Contains(nestedId));
+        Assert.True(storage.Contains(nestedChildId));
 
         ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
 
-        Assert.Null(storage.Get(taskId).TombstonedAt);
-        Assert.Equal(0, storage.Get(taskId).Result!.GetResult<int>());
-        Assert.Empty(storage.Get(taskId).CompletionDestinations);
+        Assert.False(storage.Contains(nestedId));
+        Assert.False(storage.Contains(nestedChildId));
     }
+
+    [Fact]
+    public async Task DeletingTreeCancelsRunningLocalChildAndDiscardsItsResult()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.FromDays(1));
+        var rootId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/child");
+        runtime.ScheduleFromInbox(rootId, CreateRequest(1));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => transport.Completions.Count == 1);
+        await WaitUntilIdleAsync(runtime);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var childHandle = await runtime.ScheduleChildAsync(childId, DurableTask.Run(async cancellationToken =>
+            {
+                started.TrySetResult();
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    canceled.TrySetResult();
+                    throw new InvalidOperationException("The deleted attempt fails after cancellation.");
+                }
+            }), TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+
+        Assert.False(storage.Contains(rootId));
+        Assert.False(storage.Contains(childId));
+        Assert.Equal(DurableTaskStatus.Canceled, (await childHandle.WaitAsync(TestContext.Current.CancellationToken)).Status);
+        Assert.False(canceled.Task.IsCompleted);
+
+        // The running attempt is signaled once the deletion commits.
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await canceled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var writes = manager.WriteCount;
+
+        // Deactivation drains the attempt, whose result is discarded without restoring state.
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(storage.Contains(childId));
+        Assert.Equal(writes, manager.WriteCount);
+        Assert.Empty(transport.Cancellations);
+    }
+
+    [Fact]
+    public async Task LateCancellationRecordIsDeletedOnceTheOutboxRetryAgeEnds()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var retryAge = TimeSpan.FromHours(2);
+        var (runtime, storage, manager, _) = CreateRuntime(
+            TimeSpan.FromHours(1),
+            timeProvider: clock,
+            maxOutboxRetryAge: retryAge);
+        var taskId = TaskId.Parse("root");
+        var caller = GrainId.Create("caller", "one");
+
+        // A cancellation for a task which is unknown, for example because it was deleted, records the cancellation in
+        // case its invocation is still in flight.
+        Accept(CreateHandler(runtime), CancellationMessage(caller, runtime.GrainId, taskId));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var record = storage.Get(taskId);
+        Assert.NotNull(record.CancellationRequestedAt);
+        Assert.Null(record.Result);
+
+        clock.Advance(retryAge - TimeSpan.FromTicks(1));
+        Assert.False(InvokeDeleteExpiredTasks(runtime));
+        Assert.True(storage.Contains(taskId));
+
+        clock.Advance(TimeSpan.FromTicks(1));
+        Assert.True(InvokeDeleteExpiredTasks(runtime));
+        Assert.False(storage.Contains(taskId));
+    }
+
+    private static bool InvokeDeleteExpiredTasks(DurableTaskGrainRuntime runtime) =>
+        (bool)typeof(DurableTaskGrainRuntime)
+            .GetMethod("DeleteExpiredTasks", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(runtime, null)!;
+
+    private static Task WaitUntilIdleAsync(DurableTaskGrainRuntime runtime) =>
+        WaitUntilAsync(() => !((IDurableTaskGrainExtension)runtime)
+            .GetRunningTasksAsync(CancellationToken.None)
+            .ToBlockingEnumerable()
+            .Any());
 
     [Fact]
     public async Task CompletionPruningIsPersistedAfterHandleCompletion()
@@ -2356,35 +2434,6 @@ public sealed class DurableTaskRuntimeInvariantTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal(42, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
-        Assert.Empty(transport.Invocations);
-    }
-
-    [Fact]
-    public async Task ScheduleChildAsync_CanceledAncestorPreservesTombstonedChildFailure()
-    {
-        var (runtime, storage, _, transport) = CreateRuntime();
-        var rootId = TaskId.Parse("root");
-        var childId = TaskId.Parse("root/tombstoned-child");
-        var request = CreateRemoteRequest(17);
-        var childTask = new TestStateManager.TestRemoteDurableTask(request);
-        var child = storage.GetOrCreate(childId);
-        storage.SetRemoteRequest(
-            childId,
-            child,
-            request.Context!.TargetId,
-            IDurableTaskRequest.GetFingerprint(childTask, CreateSerializer()));
-        storage.CreateTombstone(childId, child);
-        storage.RequestCancellation(rootId, storage.GetOrCreate(rootId));
-
-        var handle = await runtime.ScheduleChildAsync(
-            childId,
-            childTask,
-            TestContext.Current.CancellationToken);
-        var response = Assert.IsType<ExceptionDurableTaskResponse>(
-            await handle.WaitAsync(TestContext.Current.CancellationToken));
-
-        var failure = Assert.IsType<DurableTaskNotFoundException>(response.Exception);
-        Assert.Equal(childId, failure.TaskId);
         Assert.Empty(transport.Invocations);
     }
 
@@ -2670,19 +2719,18 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task RemoteTaskIdReuseAfterPruning_IsRejectedWithoutSendingInvocation()
+    public async Task RemoteTaskIdReuseAfterDeletionSendsNewInvocation()
     {
         var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.Zero);
         var taskId = TaskId.Parse("root/remote-reuse");
         var originalRequest = CreateRemoteRequest(17);
         var target = originalRequest.Context!.TargetId;
-        var originalFingerprint = IDurableTaskRequest.GetFingerprint(originalRequest, CreateSerializer());
-        var pruningWriteCompleted = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var deletionWriteCompleted = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         manager.AfterWriteCompleted = writeCount =>
         {
             if (writeCount == 3)
             {
-                pruningWriteCompleted.TrySetResult(writeCount);
+                deletionWriteCompleted.TrySetResult(writeCount);
             }
         };
 
@@ -2691,72 +2739,27 @@ public sealed class DurableTaskRuntimeInvariantTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(
             3,
-            await pruningWriteCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+            await deletionWriteCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.False(storage.Contains(taskId));
 
-        var tombstone = storage.Get(taskId);
-        var tombstonedAt = Assert.IsType<DateTimeOffset>(tombstone.TombstonedAt);
-        Assert.Null(tombstone.RequestFingerprint);
-        Assert.Equal(originalFingerprint, tombstone.RemoteRequestFingerprint);
-        Assert.Equal(target, tombstone.RemoteTarget);
-        Assert.Null(tombstone.Request);
-        Assert.Null(tombstone.Result);
-        Assert.Empty(tombstone.CompletionDestinations);
-        var originalInvocation = Assert.Single(transport.Invocations);
-        Assert.Equal(taskId, originalInvocation.TaskId);
-        Assert.Equal(target, originalInvocation.Target);
-        Assert.Same(originalRequest, originalInvocation.Request);
-        Assert.Equal(3, manager.WriteCount);
+        // A task without a stored ancestor is deleted when its retention ends, which frees its identifier.
+        var replacementRequest = CreateRemoteRequest(18);
+        var response = await runtime.ScheduleRemoteAsync(taskId, replacementRequest, TestContext.Current.CancellationToken);
 
-        var incompatibleRequest = CreateRemoteRequest(18);
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => runtime.ScheduleRemoteAsync(
-                taskId,
-                incompatibleRequest,
-                TestContext.Current.CancellationToken).AsTask());
-
+        Assert.False(response.IsCompleted);
+        Assert.Collection(
+            transport.Invocations,
+            invocation => Assert.Same(originalRequest, invocation.Request),
+            invocation =>
+            {
+                Assert.Same(replacementRequest, invocation.Request);
+                Assert.Equal(taskId, invocation.TaskId);
+                Assert.Equal(target, invocation.Target);
+            });
         Assert.Equal(
-            $"Durable task '{taskId}' is already associated with a different request.",
-            exception.Message);
-        Assert.Same(tombstone, storage.Get(taskId));
-        Assert.Null(tombstone.RequestFingerprint);
-        Assert.Equal(originalFingerprint, tombstone.RemoteRequestFingerprint);
-        Assert.Equal(target, tombstone.RemoteTarget);
-        Assert.Equal(tombstonedAt, tombstone.TombstonedAt);
-        Assert.Null(tombstone.Request);
-        Assert.Null(tombstone.Result);
-        Assert.Empty(tombstone.CompletionDestinations);
-        var currentInvocation = Assert.Single(transport.Invocations);
-        Assert.Equal(originalInvocation.Sender, currentInvocation.Sender);
-        Assert.Equal(originalInvocation.Target, currentInvocation.Target);
-        Assert.Equal(originalInvocation.TaskId, currentInvocation.TaskId);
-        Assert.Same(originalInvocation.Request, currentInvocation.Request);
-        Assert.Equal(3, manager.WriteCount);
-    }
-
-    [Fact]
-    public async Task SubscribeOrPollAsync_TombstonedTask_ThrowsTypedNotFound()
-    {
-        var (runtime, storage, manager, transport) = CreateRuntime();
-        var taskId = TaskId.Parse("root/expired-poll");
-        var tombstone = storage.GetOrCreate(taskId);
-        tombstone.RemoteRequestFingerprint = "stable-remote-fingerprint";
-        storage.CreateTombstone(taskId, tombstone);
-
-        var failure = await Assert.ThrowsAsync<DurableTaskNotFoundException>(
-            () => ((IDurableTaskServer)runtime).SubscribeOrPollAsync(
-                taskId,
-                new SubscribeOrPollOptions { PollTimeout = TimeSpan.Zero },
-                TestContext.Current.CancellationToken).AsTask());
-
-        Assert.Equal(taskId, failure.TaskId);
-        Assert.Equal(
-            $"Durable task '{taskId}' was not found or its retained state has expired.",
-            failure.Message);
-        Assert.Same(tombstone, storage.Get(taskId));
-        Assert.NotNull(tombstone.TombstonedAt);
-        Assert.Null(tombstone.Result);
-        Assert.Equal(0, manager.WriteCount);
-        Assert.Empty(transport.Invocations);
+            IDurableTaskRequest.GetFingerprint(replacementRequest, CreateSerializer()),
+            storage.Get(taskId).RemoteRequestFingerprint);
+        Assert.Null(storage.Get(taskId).Result);
     }
 
     [Fact]
@@ -2914,7 +2917,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         RecordingDurableTaskMessageTransport Transport) CreateRuntime(
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
-            TimeProvider? timeProvider = null)
+            TimeProvider? timeProvider = null,
+            TimeSpan? maxOutboxRetryAge = null)
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager, timeProvider);
@@ -2923,7 +2927,8 @@ public sealed class DurableTaskRuntimeInvariantTests
             manager,
             resultRetentionPeriod,
             initialize,
-            timeProvider);
+            timeProvider,
+            maxOutboxRetryAge);
     }
 
     /// <summary>
@@ -2939,7 +2944,8 @@ public sealed class DurableTaskRuntimeInvariantTests
             TestStateManager manager,
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
-            TimeProvider? timeProvider = null)
+            TimeProvider? timeProvider = null,
+            TimeSpan? maxOutboxRetryAge = null)
     {
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(GrainId.Create("test", "one"));
@@ -2952,6 +2958,10 @@ public sealed class DurableTaskRuntimeInvariantTests
             Options.Create(new DurableTaskOptions
             {
                 ResultRetentionPeriod = resultRetentionPeriod ?? TimeSpan.FromHours(1),
+            }),
+            Options.Create(new DurableMessagingOptions
+            {
+                MaxOutboxRetryAge = maxOutboxRetryAge ?? TimeSpan.FromDays(1),
             }),
             CreateSerializer());
         var transport = new RecordingDurableTaskMessageTransport();
@@ -3141,18 +3151,31 @@ public sealed class DurableTaskRuntimeInvariantTests
     private sealed class TestStorage(TestStateManager manager, TimeProvider? timeProvider = null) : IDurableTaskGrainStorage
     {
         private readonly Dictionary<TaskId, TestTaskState> _states = [];
+        private readonly DurableTaskHierarchy _hierarchy = new();
+        private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
 
         public TestDurableDictionary<TaskId, DateTimeOffset> LogicalTimes { get; } = [];
 
-        public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks =>
-            _states.Select(entry => (entry.Key, (IDurableTaskState)entry.Value));
+        /// <summary>Gets how many times <see cref="Tasks"/> has been enumerated.</summary>
+        public int TasksEnumerationCount { get; private set; }
+
+        public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks
+        {
+            get
+            {
+                TasksEnumerationCount++;
+                return _states.Select(entry => (entry.Key, (IDurableTaskState)entry.Value));
+            }
+        }
 
         public TestTaskState Get(TaskId id) => _states[id];
         public bool Contains(TaskId id) => _states.ContainsKey(id);
         public TestTaskState GetOrCreate(TaskId id) => (TestTaskState)GetOrCreateTask(id, null);
 
         public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task) =>
-            Tasks.Where(entry => task.IsParentOf(entry.Id));
+            _hierarchy
+                .GetNearestStoredDescendants(task, _states.ContainsKey)
+                .Select(id => (id, (IDurableTaskState)_states[id]));
 
         public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
         {
@@ -3161,9 +3184,10 @@ public sealed class DurableTaskRuntimeInvariantTests
                 state = new TestTaskState
                 {
                     Request = request,
-                    CreatedAt = DateTimeOffset.UtcNow,
+                    CreatedAt = _timeProvider.GetUtcNow(),
                 };
                 _states.Add(taskId, state);
+                _hierarchy.Add(taskId);
             }
 
             return state;
@@ -3187,7 +3211,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
         {
             ((TestTaskState)state).Result = response;
-            ((TestTaskState)state).CompletedAt = DateTimeOffset.UtcNow;
+            ((TestTaskState)state).CompletedAt = _timeProvider.GetUtcNow();
             ((TestTaskState)state).DueTime = null;
             if (((TestTaskState)state).ResumeGeneration > 0)
             {
@@ -3196,7 +3220,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         }
 
         public void RequestCancellation(TaskId taskId, IDurableTaskState state) =>
-            ((TestTaskState)state).CancellationRequestedAt ??= DateTimeOffset.UtcNow;
+            ((TestTaskState)state).CancellationRequestedAt ??= _timeProvider.GetUtcNow();
 
         public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation)
         {
@@ -3211,14 +3235,7 @@ public sealed class DurableTaskRuntimeInvariantTests
             ((TestTaskState)state).CompletionDestinations.Remove(destination);
 
         public void RetainResult(TaskId taskId, IDurableTaskState state) =>
-            ((TestTaskState)state).RetainedSince = (timeProvider ?? TimeProvider.System).GetUtcNow();
-
-        public void CreateTombstone(TaskId taskId, IDurableTaskState state)
-        {
-            ((TestTaskState)state).Request = null;
-            ((TestTaskState)state).Result = null;
-            ((TestTaskState)state).TombstonedAt = DateTimeOffset.UtcNow;
-        }
+            ((TestTaskState)state).RetainedSince = _timeProvider.GetUtcNow();
 
         public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
         {
@@ -3227,8 +3244,22 @@ public sealed class DurableTaskRuntimeInvariantTests
             return found;
         }
 
-        public bool RemoveTask(TaskId taskId) => _states.Remove(taskId);
-        public void Clear() => _states.Clear();
+        public bool RemoveTask(TaskId taskId)
+        {
+            if (!_states.Remove(taskId))
+            {
+                return false;
+            }
+
+            _hierarchy.Remove(taskId, _states.ContainsKey);
+            return true;
+        }
+
+        public void Clear()
+        {
+            _states.Clear();
+            _hierarchy.Clear();
+        }
         public ValueTask WriteAsync(CancellationToken cancellationToken) => manager.WriteStateAsync(cancellationToken);
         public ValueTask ReadAsync(CancellationToken cancellationToken) => default;
     }
@@ -3248,7 +3279,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         public DateTimeOffset? DueTime { get; set; }
         public long ResumeGeneration { get; set; }
         public string? RequestFingerprint { get; set; }
-        public DateTimeOffset? TombstonedAt { get; set; }
         public DateTimeOffset? RetainedSince { get; set; }
         public GrainId RemoteTarget { get; set; }
         public string? RemoteRequestFingerprint { get; set; }

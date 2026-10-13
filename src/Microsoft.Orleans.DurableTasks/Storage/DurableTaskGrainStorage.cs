@@ -14,9 +14,15 @@ namespace Orleans.DurableTasks.Storage;
 /// Stores durable task state in the grain's journal.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Task state is rewritten on every update, so request and result payloads are journaled separately: each payload is
-/// written once when it is stored, and removed when the task is pruned. A recovered state's payloads are attached the
+/// written once when it is stored, and removed when the task is deleted. A recovered state's payloads are attached the
 /// first time the storage exposes it.
+/// </para>
+/// <para>
+/// The task hierarchy is indexed in memory. The index is built from the recovered tasks on first use, then maintained
+/// as tasks are created and removed; the journal recovers once per activation, before the runtime uses the storage.
+/// </para>
 /// </remarks>
 internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
 {
@@ -26,6 +32,8 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     private readonly IJournaledStateManager _stateManager;
     private readonly TimeProvider _timeProvider;
     private readonly Serializer _serializer;
+    private readonly Func<TaskId, bool> _isStored;
+    private DurableTaskHierarchy? _hierarchy;
 
     public DurableTaskGrainStorage(
         [FromKeyedServices("$tasks")] IDurableDictionary<TaskId, DurableTaskState> items,
@@ -48,15 +56,16 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _stateManager = stateManager;
         _timeProvider = timeProvider;
         _serializer = serializer;
+        _isStored = items.ContainsKey;
     }
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks =>
         _items.Select(pair => (pair.Key, (IDurableTaskState)Expose(pair.Key, pair.Value)));
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId parentId) =>
-        _items
-            .Where(pair => parentId.IsParentOf(pair.Key))
-            .Select(pair => (pair.Key, (IDurableTaskState)Expose(pair.Key, pair.Value)));
+        (_hierarchy ??= DurableTaskHierarchy.Create(_items.Keys))
+            .GetNearestStoredDescendants(parentId, _isStored)
+            .Select(id => (id, (IDurableTaskState)Expose(id, _items[id])));
 
     public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
     {
@@ -74,6 +83,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         result = new DurableTaskState { CreatedAt = _timeProvider.GetUtcNow() }.Bind(_serializer);
         result.SetRequest(request);
         _items.Add(taskId, result);
+        _hierarchy?.Add(taskId);
         if (result.RequestPayload is { } payload)
         {
             _requests[taskId] = payload;
@@ -177,18 +187,6 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
-    public void CreateTombstone(TaskId taskId, IDurableTaskState state)
-    {
-        var typedState = GetState(taskId, state);
-        Debug.Assert(typedState.CompletionDestinations.Count == 0, "A pending completion retains its task's result.");
-        typedState.SetRequest(null);
-        typedState.SetResult(null);
-        typedState.TombstonedAt = _timeProvider.GetUtcNow();
-        _items[taskId] = typedState;
-        _requests.Remove(taskId);
-        _results.Remove(taskId);
-    }
-
     public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
@@ -210,7 +208,13 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
             "A pending completion retains its task's result.");
         _requests.Remove(taskId);
         _results.Remove(taskId);
-        return _items.Remove(taskId);
+        if (!_items.Remove(taskId))
+        {
+            return false;
+        }
+
+        _hierarchy?.Remove(taskId, _isStored);
+        return true;
     }
 
     public void Clear()
@@ -218,13 +222,17 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items.Clear();
         _requests.Clear();
         _results.Clear();
+        _hierarchy = null;
     }
 
     public ValueTask WriteAsync(CancellationToken cancellationToken) =>
         _stateManager.WriteStateAsync(cancellationToken);
 
-    public ValueTask ReadAsync(CancellationToken cancellationToken) =>
-        _stateManager.InitializeAsync(cancellationToken);
+    public ValueTask ReadAsync(CancellationToken cancellationToken)
+    {
+        _hierarchy = null;
+        return _stateManager.InitializeAsync(cancellationToken);
+    }
 
     private static void ValidateRequest(IDurableTaskRequest request)
     {

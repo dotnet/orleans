@@ -28,7 +28,4 @@ public sealed class DurableTaskNotFoundException : Exception
     /// </summary>
     [Id(0)]
     public TaskId TaskId { get; private set; }
-
-    internal static DurableTaskResponse CreateResponse(TaskId taskId) =>
-        DurableTaskResponse.FromException(new DurableTaskNotFoundException(taskId));
 }
