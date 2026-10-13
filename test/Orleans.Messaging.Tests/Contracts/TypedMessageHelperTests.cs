@@ -1025,6 +1025,44 @@ public sealed class TypedMessageHelperTests
     }
 
     [Fact]
+    public async Task InboxDispatcher_CancellationDuringDecodeDeliversDecodedResourceToHandler()
+    {
+        using var services = CreateServices();
+        var codec = new ResourceCodec();
+        var serializer = new Serializer<OwnedResource>(codec, services.GetRequiredService<SerializerSessionPool>());
+        using var original = new OwnedResource("canceled resource €42");
+        var envelope = DirectEnvelope(serializer, Subject, original);
+        var context = new CountingInboxHandlerContext(envelope);
+        using var cancellation = new CancellationTokenSource();
+        codec.OnRead = cancellation.Cancel;
+        OwnedResource? captured = null;
+        var observedToken = CancellationToken.None;
+        var dispatcher = new TestInbox();
+        dispatcher.Register(new MessageType<OwnedResource>(Subject, serializer), (body, _, token) =>
+        {
+            captured = body;
+            observedToken = token;
+            return ValueTask.CompletedTask;
+        });
+        try
+        {
+            await dispatcher.HandleAsync(context, cancellation.Token);
+
+            var decoded = Assert.IsType<OwnedResource>(captured);
+            Assert.Same(codec.LastDecoded, decoded);
+            Assert.Equal(1, codec.ReadCount);
+            Assert.Equal(cancellation.Token, observedToken);
+            Assert.True(observedToken.IsCancellationRequested);
+            Assert.Equal(0, decoded.DisposeCount);
+            Assert.Equal(0, context.CompletionCount);
+        }
+        finally
+        {
+            codec.LastDecoded?.Dispose();
+        }
+    }
+
+    [Fact]
     public async Task InboxDispatcher_HandleAsyncRejectsSerializedNullBeforeHandler()
     {
         using var services = CreateServices();
@@ -1113,17 +1151,14 @@ public sealed class TypedMessageHelperTests
         Assert.Equal(0, context.CompletionCount);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void RegisterAction_CancellationBeforeEntryLeavesHandlerAndCompletionUntouched(bool cancelDuringDecode)
+    [Fact]
+    public void RegisterAction_CancellationBeforeEntryLeavesHandlerAndCompletionUntouched()
     {
         using var services = CreateServices();
         var direct = services.GetRequiredService<Serializer<string>>();
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         using var cancellation = new CancellationTokenSource();
-        if (cancelDuringDecode) probe.OnRead = cancellation.Cancel;
-        else cancellation.Cancel();
+        cancellation.Cancel();
         var envelope = DirectEnvelope(direct, Subject, "cancellation");
         var context = new CountingInboxHandlerContext(envelope);
         var calls = 0;
@@ -1134,7 +1169,7 @@ public sealed class TypedMessageHelperTests
             dispatcher.HandleAsync(context, cancellation.Token));
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.Equal(cancelDuringDecode ? 1 : 0, probe.ReadCount);
+        Assert.Equal(0, probe.ReadCount);
         Assert.Equal(0, calls);
         Assert.Equal(0, context.CompletionCount);
     }
@@ -1349,18 +1384,15 @@ public sealed class TypedMessageHelperTests
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void RegisterState_CancellationBeforeOrDuringDecodePreventsAllDelegateEffects(bool asynchronous, bool duringDecode)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RegisterState_CancellationBeforeDecodePreventsAllDelegateEffects(bool asynchronous)
     {
         using var services = CreateServices();
         var direct = services.GetRequiredService<Serializer<string>>();
         var (serializer, probe) = CreateProbedSerializer<string>(services);
         using var cancellation = new CancellationTokenSource();
-        if (duringDecode) probe.OnRead = cancellation.Cancel;
-        else cancellation.Cancel();
+        cancellation.Cancel();
         var envelope = DirectEnvelope(direct, Subject, "canceled state");
         var context = new CountingInboxHandlerContext(envelope);
         var state = new HandlerState { Complete = true };
@@ -1372,7 +1404,7 @@ public sealed class TypedMessageHelperTests
         var exception = Assert.Throws<OperationCanceledException>(() => dispatcher.HandleAsync(context, cancellation.Token));
 
         Assert.Equal(cancellation.Token, exception.CancellationToken);
-        Assert.Equal(duringDecode ? 1 : 0, probe.ReadCount);
+        Assert.Equal(0, probe.ReadCount);
         Assert.Equal(0, state.Calls);
         Assert.Null(state.Body);
         Assert.Null(state.Context);
@@ -1829,6 +1861,7 @@ public sealed class TypedMessageHelperTests
     {
         public OwnedResource? LastDecoded { get; private set; }
         public int ReadCount { get; private set; }
+        public Action? OnRead { get; set; }
 
         public void WriteField<TBufferWriter>(
             ref Writer<TBufferWriter> writer, uint fieldIdDelta, [AllowNull] Type expectedType,
@@ -1846,7 +1879,9 @@ public sealed class TypedMessageHelperTests
             ReadCount++;
             var name = StringCodec.ReadValue(ref reader, field)
                 ?? throw new InvalidDataException("Resource name must not be null.");
-            return LastDecoded = new OwnedResource(name);
+            LastDecoded = new OwnedResource(name);
+            OnRead?.Invoke();
+            return LastDecoded;
         }
     }
 
