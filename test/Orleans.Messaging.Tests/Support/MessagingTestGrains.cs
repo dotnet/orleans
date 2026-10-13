@@ -96,7 +96,8 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
     private readonly Guid _activationId = Guid.NewGuid();
     private int _activeHandlers;
     private int _maxConcurrentHandlers;
-    private readonly HashSet<HierarchicalKey> _failedOnce = [];
+    // Spans activations so a replayed message does not fail again after recovery.
+    private static readonly ConcurrentDictionary<HierarchicalKey, byte> FailedOnce = new();
 
     public MessagingTestGrain(
         IGrainContext grainContext,
@@ -370,7 +371,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
             {
                 await WriteStateAsync(cancellationToken);
             }
-            if (message.ThrowDuringPreparation || (message.ThrowOnceDuringPreparation && _failedOnce.Add(message.LogicalId)))
+            if (message.ThrowDuringPreparation || (message.ThrowOnceDuringPreparation && FailedOnce.TryAdd(message.LogicalId, 0)))
             {
                 throw new InvalidOperationException($"Injected handler preparation failure for {message.LogicalId}.");
             }
