@@ -46,6 +46,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// once. When the outbox retires a delivered completion, its destination durably holds the result, so the runtime
 /// prunes the task in the same write once no destination remains. A dead-lettered completion removes its destination
 /// and retains the result for <see cref="Orleans.Configuration.DurableTaskOptions.ResultRetentionPeriod"/> from then.
+/// A stored result which no longer decodes fails only the operations which read it: the outbox dead-letters its
+/// completion, whose retirement doesn't decode the result, and activation never decodes stored results.
 /// </para>
 /// </remarks>
 internal sealed partial class DurableTaskGrainRuntime(
@@ -320,7 +322,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>
     /// The runtime never withdraws a completion. A pending completion's destination keeps its task and result: only
     /// <see cref="IOutboxMessageSource.OnRetired"/> removes the destination, and tasks with destinations are neither
-    /// pruned nor tombstoned.
+    /// pruned nor tombstoned. An exception from decoding the stored result propagates, so the outbox dead-letters the
+    /// completion.
     /// </remarks>
     bool IOutboxMessageSource.TryGetMessage(HierarchicalKey messageId, out OutboxMessage message)
     {
@@ -343,7 +346,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>
     /// The outbox stages the completion's removal in the same journal write. A delivered destination durably holds the
     /// result, so the task needs no retention for it. A dead-lettered completion restarts the result's retention period,
-    /// so a poller, or a caller which invokes the task again, can still observe it.
+    /// so a poller, or a caller which invokes the task again, can still observe it. Retirement updates only the task's
+    /// metadata, so it succeeds when the stored result no longer decodes; polling such a result surfaces the decoding
+    /// error to the poller.
     /// </remarks>
     void IOutboxMessageSource.OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement)
     {
@@ -629,14 +634,22 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
+    /// <summary>Returns whether the task stores its terminal result, without decoding the result.</summary>
+    /// <remarks>
+    /// Storage stamps <see cref="IDurableTaskState.CompletedAt"/> with every stored result, which is always terminal,
+    /// and a tombstone removes the result. Activation checks completion this way, so a stored result which no longer
+    /// decodes fails only the operations which read it, such as materializing its completion or polling it.
+    /// </remarks>
+    private static bool HasStoredResult(IDurableTaskState state) => state.CompletedAt.HasValue && !state.TombstonedAt.HasValue;
+
     private async Task ResumePendingTasksCoreAsync(CancellationToken cancellationToken)
     {
         ThrowIfStopping();
         var tasks = _storage.Tasks.ToList();
         foreach (var (taskId, state) in tasks)
         {
-            if (state.Request is not null
-                && state.Result is not { IsCompleted: true }
+            if (!HasStoredResult(state)
+                && state.Request is not null
                 && !state.CancellationRequestedAt.HasValue
                 && state.DueTime is null)
             {
@@ -646,7 +659,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         foreach (var (taskId, state) in tasks)
         {
-            if (state.Result is { IsCompleted: true })
+            if (HasStoredResult(state))
             {
                 continue;
             }
