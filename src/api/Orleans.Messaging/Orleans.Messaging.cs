@@ -214,7 +214,7 @@ namespace Orleans.Messaging
     {
         System.Collections.Generic.IReadOnlyList<DeadLetter<InboxMessage>> InboxDeadLetters { get; }
 
-        bool RemoveInboxDeadLetter(HierarchicalKey messageId);
+        bool RemoveInboxDeadLetter(MessageId messageId);
     }
 
     public partial interface IMessagingGrain

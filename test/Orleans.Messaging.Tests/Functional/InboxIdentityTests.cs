@@ -19,7 +19,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        var key = HierarchicalKey.Create("tenant", "orders", "1042", "reserve");
+        var key = MessageId.Create("tenant", "orders", "1042", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         var repeated = TestApplicationProtocol.With(original, Sessions, sender: GrainId.Create("forwarder", "second"));
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
@@ -57,7 +57,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        var key = HierarchicalKey.Create("tenant", "orders", "1043", "reserve");
+        var key = MessageId.Create("tenant", "orders", "1043", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         var conflictingSubject = difference switch
         {
@@ -110,7 +110,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        var key = HierarchicalKey.Create("tenant", "orders", "1044", "reserve");
+        var key = MessageId.Create("tenant", "orders", "1044", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         var repeated = Create(rig, key, "completely.changed.subject.v2", "different-body",
             GrainId.Create("forwarder", "new-owner"));
@@ -143,8 +143,8 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         handler.Release.TrySetResult();
-        var parent = HierarchicalKey.Create("tenant", "orders", "1045");
-        var keys = new[] { parent, parent.CreateChildKey("reserve"), parent.CreateChildKey("release") };
+        var parent = MessageId.Create("tenant", "orders", "1045");
+        var keys = new[] { parent, new MessageId(parent.Key.CreateChildKey("reserve")), new MessageId(parent.Key.CreateChildKey("release")) };
         for (var index = 0; index < keys.Length; index++)
         {
             var command = Create(rig, keys[index], "inventory.command.v1", $"command-{index}");
@@ -169,7 +169,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         using var secondHandler = second.Handler;
         firstHandler.Release.TrySetResult();
         secondHandler.Release.TrySetResult();
-        var key = HierarchicalKey.Create("tenant", "orders", "1049", "reserve");
+        var key = MessageId.Create("tenant", "orders", "1049", "reserve");
         var one = Create(first, key, "inventory.reserve.v1", "first-receiver");
         var two = Create(second, key, "inventory.reserve.v1", "second-receiver");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(first.Receiver, one)).Status);
@@ -191,7 +191,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        var key = HierarchicalKey.Create("tenant", "orders", "1046", "reserve");
+        var key = MessageId.Create("tenant", "orders", "1046", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(rig.Receiver, original)).Status);
         await WaitAsync(handler.Entered.Task);
@@ -233,7 +233,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     public async Task DeadLetterInspectionAndRemovalUseReceiverLocalKeyAcrossReplay()
     {
         var receiver = NewGrain();
-        var key = HierarchicalKey.Create("tenant", "orders", "1048", "invalid-command");
+        var key = MessageId.Create("tenant", "orders", "1048", "invalid-command");
         var body = new TestMessage(key, 611, "poison", ThrowDuringPreparation: true);
         var original = CreateEnvelope(receiver, body);
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, original)).Status);
@@ -263,7 +263,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     {
         var rig = await CreateAsync();
         using var handler = rig.Handler;
-        var key = HierarchicalKey.Create("tenant", "invalid-subject", "command");
+        var key = MessageId.Create("tenant", "invalid-subject", "command");
         var envelope = Create(rig, key, "valid.subject.v1", "missing-subject");
         var raw = TestApplicationProtocol.With(envelope, Sessions, removeSubject: true, removeSender: removeSender);
         var bytes = envelope.Envelope.Payload.ToArray();
@@ -290,9 +290,9 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         using var handler = rig.Handler;
         var key = field switch
         {
-            "key-bytes" => HierarchicalKey.Create(new string('x', 1025)),
-            "key-utf8" => HierarchicalKey.Create(new string('\u00e9', 513)),
-            _ => HierarchicalKey.Create("tenant", "bounded", "command")
+            "key-bytes" => MessageId.Create(new string('x', 1025)),
+            "key-utf8" => MessageId.Create(new string('\u00e9', 513)),
+            _ => MessageId.Create("tenant", "bounded", "command")
         };
         var subject = field switch
         {
@@ -325,10 +325,10 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         handler.Release.TrySetResult();
         var key = field switch
         {
-            "key-bytes" => HierarchicalKey.Create(new string('x', 1024)),
-            "key-utf8" => HierarchicalKey.Create(new string('\u00e9', 512)),
-            "key-depth" => HierarchicalKey.Create(Enumerable.Repeat("segment", 32).ToArray()),
-            _ => HierarchicalKey.Create("tenant", "bounded", "command")
+            "key-bytes" => MessageId.Create(new string('x', 1024)),
+            "key-utf8" => MessageId.Create(new string('\u00e9', 512)),
+            "key-depth" => MessageId.Create(Enumerable.Repeat("segment", 32).ToArray()),
+            _ => MessageId.Create("tenant", "bounded", "command")
         };
         var subject = field switch
         {
@@ -351,7 +351,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         var rig = await CreateAsync();
         using var handler = rig.Handler;
         handler.Release.TrySetResult();
-        var key = HierarchicalKey.Create("tenant", "orders", "1047", "reserve");
+        var key = MessageId.Create("tenant", "orders", "1047", "reserve");
         var original = Create(rig, key, "inventory.reserve.v1", "original");
         var repeated = Create(rig, key, "inventory.reserve.v2", "changed",
             GrainId.Create("forwarder", "new"));
@@ -384,7 +384,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
             context.ActivationServices.GetRequiredService<IJournaledStateManager>(),
             context.ActivationServices.GetRequiredService<Inbox>());
 
-    private InboxMessage Create(Rig rig, HierarchicalKey key, string subject, string value, GrainId sender = default) =>
+    private InboxMessage Create(Rig rig, MessageId key, string subject, string value, GrainId sender = default) =>
         TestApplicationProtocol.CreateInbox(Sessions,
             sender.IsDefault ? GrainId.Create("producer", "first") : sender,
             subject, new TestMessage(key, 610, value), key);
@@ -431,8 +431,8 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
     private sealed record Rig(IMessagingTestGrain Receiver, IGrainContext Context,
         MessagingTestGrain Grain, IdentityHandler Handler, IJournaledStateManager Manager, Inbox Inbox)
     {
-        public IReadOnlyDictionary<HierarchicalKey, InboxEntry> Pending => InboxTestAccess.GetPendingMessages(Inbox);
-        public IReadOnlyDictionary<HierarchicalKey, DateTimeOffset> Processed => InboxTestAccess.GetProcessedMessages(Inbox);
+        public IReadOnlyDictionary<MessageId, InboxEntry> Pending => InboxTestAccess.GetPendingMessages(Inbox);
+        public IReadOnlyDictionary<MessageId, DateTimeOffset> Processed => InboxTestAccess.GetProcessedMessages(Inbox);
     }
 
     private sealed class IdentityHandler : IInboxHandler, IDisposable
@@ -445,7 +445,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
             var services = ReceiverTestServices.CurrentGrainContext!.ActivationServices;
-            var effects = services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, MessageEffect>>("test-effects");
+            var effects = services.GetRequiredKeyedService<IDurableDictionary<MessageId, MessageEffect>>("test-effects");
             var application = TestApplicationProtocol.Read(services.GetRequiredService<SerializerSessionPool>(), context.Message);
             var body = Assert.IsType<TestMessage>(application.Body);
             Calls++;

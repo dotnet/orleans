@@ -57,7 +57,7 @@ public sealed class ProcessedRetentionMaintenanceTests : MessagingBehaviorTestBa
         await Fixture.WaitForEffectCountAsync(receiver, 2);
     }
 
-    private Task<HashSet<HierarchicalKey>> GetProcessedAsync(IMessagingTestGrain receiver)
+    private Task<HashSet<MessageId>> GetProcessedAsync(IMessagingTestGrain receiver)
     {
         var inbox = Fixture.GetInbox(receiver);
         return Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetProcessedKeys(inbox));

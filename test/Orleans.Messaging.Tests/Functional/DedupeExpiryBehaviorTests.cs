@@ -92,7 +92,7 @@ public sealed class DedupeExpiryBehaviorTests(DedupeExpiryClusterFixture fixture
     private InboxMessage CreateEnvelope(
         IMessagingTestGrain receiver,
         TestMessage message,
-        HierarchicalKey? messageId = null)
+        MessageId? messageId = null)
     {
         var sessions = fixture.Client.ServiceProvider.GetRequiredService<SerializerSessionPool>();
         var sender = GrainId.Create("expiry-test-sender", "stable");

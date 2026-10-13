@@ -556,7 +556,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var services = context.ActivationServices;
-        var effects = services.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, MessageEffect>>("test-effects");
+        var effects = services.GetRequiredKeyedService<IDurableDictionary<MessageId, MessageEffect>>("test-effects");
         var handler = new TestHandler(effects, context);
         var rig = new Rig(receiver, context, Assert.IsType<MessagingTestGrain>(context.GrainInstance),
             services.GetRequiredService<IJournaledStateManager>(), (JournaledTestOutbox)services.GetRequiredService<IOutbox>(),
@@ -675,16 +675,16 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
     private static Task WaitAsync(Task task) => task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
     private static Task<T> WaitAsync<T>(Task<T> task) => task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
     private sealed record Rig(IMessagingTestGrain Receiver, IGrainContext Context, MessagingTestGrain Grain,
-        IJournaledStateManager Manager, JournaledTestOutbox Outbox, IDurableDictionary<HierarchicalKey, MessageEffect> Effects,
+        IJournaledStateManager Manager, JournaledTestOutbox Outbox, IDurableDictionary<MessageId, MessageEffect> Effects,
         TestHandler Handler, Inbox InboxState)
     {
-        public IReadOnlyDictionary<HierarchicalKey, InboxEntry> Inbox => InboxTestAccess.GetPendingMessages(InboxState);
-        public IReadOnlyDictionary<HierarchicalKey, DateTimeOffset> Processed => InboxTestAccess.GetProcessedMessages(InboxState);
+        public IReadOnlyDictionary<MessageId, InboxEntry> Inbox => InboxTestAccess.GetPendingMessages(InboxState);
+        public IReadOnlyDictionary<MessageId, DateTimeOffset> Processed => InboxTestAccess.GetProcessedMessages(InboxState);
 
         public JournalId Journal => JournalId.FromGrainId(Receiver.GetGrainId());
     }
 
-    private sealed class TestHandler(IDurableDictionary<HierarchicalKey, MessageEffect> effects, IGrainContext grainContext) : IInboxHandler, IDisposable
+    private sealed class TestHandler(IDurableDictionary<MessageId, MessageEffect> effects, IGrainContext grainContext) : IInboxHandler, IDisposable
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

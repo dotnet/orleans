@@ -22,6 +22,6 @@ internal static class ReceiverTestServices
         services.RemoveAll<IOutbox>();
         services.AddScoped<IOutbox>(static sp =>
             new JournaledTestOutbox(
-                sp.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, OutboxMessage>>("test-handler-output")));
+                sp.GetRequiredKeyedService<IDurableDictionary<MessageId, OutboxMessage>>("test-handler-output")));
     }
 }

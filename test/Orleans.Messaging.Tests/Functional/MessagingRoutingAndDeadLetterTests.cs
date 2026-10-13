@@ -18,7 +18,7 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
     public async Task InboxDeadLettersRetainNewestEntriesWithinConfiguredCapacity()
     {
         var receiver = NewGrain();
-        var messageIds = new List<HierarchicalKey>();
+        var messageIds = new List<MessageId>();
         for (var sequence = 0; sequence < 3; sequence++)
         {
             var envelope = CreateEnvelope(

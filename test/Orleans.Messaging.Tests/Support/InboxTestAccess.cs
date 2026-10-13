@@ -21,24 +21,24 @@ internal static class InboxTestAccess
 
     public static int GetProcessedCount(Inbox inbox) => GetProcessed(inbox).Count;
 
-    public static HashSet<HierarchicalKey> GetProcessedKeys(Inbox inbox) => [.. GetProcessed(inbox).Keys];
+    public static HashSet<MessageId> GetProcessedKeys(Inbox inbox) => [.. GetProcessed(inbox).Keys];
 
-    public static bool TryGetProcessedAt(Inbox inbox, HierarchicalKey messageId, out DateTimeOffset processedAt) =>
+    public static bool TryGetProcessedAt(Inbox inbox, MessageId messageId, out DateTimeOffset processedAt) =>
         GetProcessed(inbox).TryGetValue(messageId, out processedAt);
 
-    public static void SetProcessedAt(Inbox inbox, HierarchicalKey messageId, DateTimeOffset processedAt) =>
+    public static void SetProcessedAt(Inbox inbox, MessageId messageId, DateTimeOffset processedAt) =>
         GetProcessed(inbox)[messageId] = processedAt;
 
-    public static IReadOnlyDictionary<HierarchicalKey, InboxEntry> GetPendingMessages(Inbox inbox) => inbox.MessageState;
+    public static IReadOnlyDictionary<MessageId, InboxEntry> GetPendingMessages(Inbox inbox) => inbox.MessageState;
 
-    public static IReadOnlyDictionary<HierarchicalKey, DateTimeOffset> GetProcessedMessages(Inbox inbox) => GetProcessed(inbox);
+    public static IReadOnlyDictionary<MessageId, DateTimeOffset> GetProcessedMessages(Inbox inbox) => GetProcessed(inbox);
 
-    public static InboxMessageState GetMessageState(Inbox inbox, HierarchicalKey messageId) =>
+    public static InboxMessageState GetMessageState(Inbox inbox, MessageId messageId) =>
         inbox.MessageState[messageId].State;
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_messages")]
-    private static extern ref Dictionary<HierarchicalKey, InboxEntry> GetMessages(Inbox inbox);
+    private static extern ref Dictionary<MessageId, InboxEntry> GetMessages(Inbox inbox);
 
     [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_processed")]
-    private static extern ref Dictionary<HierarchicalKey, DateTimeOffset> GetProcessed(Inbox inbox);
+    private static extern ref Dictionary<MessageId, DateTimeOffset> GetProcessed(Inbox inbox);
 }
