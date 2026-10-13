@@ -1677,6 +1677,49 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task LogicalTimeAdvancesToObservedChildCompletionsAndReplays()
+    {
+        var time = new FakeTimeProvider(new DateTimeOffset(2040, 1, 1, 0, 0, 0, TimeSpan.Zero));
+        var start = time.GetUtcNow();
+        var manager = new TestStateManager();
+        var storage = new TestStorage(manager, time);
+        var (runtime, _, _, _) = CreateRuntime(storage, manager, timeProvider: time);
+        var rootId = TaskId.Parse("root");
+        var observations = new ConcurrentQueue<(DateTimeOffset Before, DateTimeOffset After)>();
+        var attempts = 0;
+        var firstAttemptObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
+        {
+            var context = DurableExecutionContext.Current!;
+            var before = context.UtcNow;
+            await DurableTask.Run(_ => time.Advance(TimeSpan.FromHours(1))).WithId("step");
+            observations.Enqueue((before, context.UtcNow));
+            if (Interlocked.Increment(ref attempts) == 1)
+            {
+                // The first attempt stops here and is aborted, so the next activation replays it.
+                firstAttemptObserved.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            }
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await firstAttemptObserved.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        time.Advance(TimeSpan.FromHours(4));
+
+        var (replacement, _, _, _) = CreateRuntime(storage, manager, timeProvider: time);
+        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.GetScheduledTaskHandle(rootId)
+            .WaitAsync(TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            [(start, start.AddHours(1)), (start, start.AddHours(1))],
+            observations.ToArray());
+    }
+
+    [Fact]
     public async Task ExecutionContextDispatchesRuntimeOperationsToCapturedScheduler()
     {
         var schedulerPair = new ConcurrentExclusiveSchedulerPair();
@@ -3079,6 +3122,8 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
+        public DateTimeOffset? GetCompletedAt(TaskId taskId) => null;
+
         private static async ValueTask<DurableTaskResponse> WaitForCancellationAsync(
             CancellationToken cancellationToken)
         {
@@ -3136,6 +3181,8 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId) =>
             new SchedulerProbeHandle(taskId);
+
+        public DateTimeOffset? GetCompletedAt(TaskId taskId) => null;
 
         private void AssertScheduler()
         {

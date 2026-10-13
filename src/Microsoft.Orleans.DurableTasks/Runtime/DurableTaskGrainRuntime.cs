@@ -2101,6 +2101,9 @@ internal sealed partial class DurableTaskGrainRuntime(
         return handle;
     }
 
+    public DateTimeOffset? GetCompletedAt(TaskId taskId) =>
+        _storage.TryGetTask(taskId, out var state) ? state.CompletedAt : null;
+
     internal Task StopAsync(CancellationToken _)
     {
         lock (_stopLock)
