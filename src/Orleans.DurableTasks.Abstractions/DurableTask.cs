@@ -173,14 +173,17 @@ public abstract class DurableTask
     {
         var context = GetCurrentContext(operation);
         var operationId = context.CreateOperationId(operationName);
-        var scheduled = new ScheduledTask[tasks.Count];
+
+        // Inputs are scheduled concurrently, so a host can commit the whole batch together. Their indexed identifiers
+        // keep them replay-stable in any scheduling order.
+        var scheduling = new Task<ScheduledTask>[tasks.Count];
         for (var index = 0; index < tasks.Count; index++)
         {
-            scheduled[index] = await new ConfiguredDurableTask(tasks[index], CreateCombinatorChildId(operationId, index))
-                .ScheduleAsync(cancellationToken).ConfigureAwait(false);
+            scheduling[index] = new ConfiguredDurableTask(tasks[index], CreateCombinatorChildId(operationId, index))
+                .ScheduleAsync(cancellationToken);
         }
 
-        return (context, operationId, scheduled);
+        return (context, operationId, await Task.WhenAll(scheduling).ConfigureAwait(false));
     }
 
     private static async Task<(DurableExecutionContext Context, TaskId OperationId, ScheduledTask<TResult>[] Tasks)> ScheduleCombinatorInputsAsync<TResult>(
@@ -191,15 +194,15 @@ public abstract class DurableTask
     {
         var context = GetCurrentContext(operation);
         var operationId = context.CreateOperationId(operationName);
-        var scheduled = new ScheduledTask<TResult>[tasks.Count];
+        var scheduling = new Task<ScheduledTask<TResult>>[tasks.Count];
         for (var index = 0; index < tasks.Count; index++)
         {
-            scheduled[index] = await new ConfiguredDurableTask<TResult>(
+            scheduling[index] = new ConfiguredDurableTask<TResult>(
                 tasks[index],
-                CreateCombinatorChildId(operationId, index)).ScheduleAsync(cancellationToken).ConfigureAwait(false);
+                CreateCombinatorChildId(operationId, index)).ScheduleAsync(cancellationToken);
         }
 
-        return (context, operationId, scheduled);
+        return (context, operationId, await Task.WhenAll(scheduling).ConfigureAwait(false));
     }
 
     private static async Task<int> SelectWinnerAsync(
