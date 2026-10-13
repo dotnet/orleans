@@ -112,6 +112,27 @@ task's identity when the caller subsequently reuses or changes the input collect
 cancellation and host wait failures are propagated. After selection, it cancels and drains the
 losing wait operations without canceling the durable tasks.
 
+## Detached tasks
+
+`DetachAsync(rootId)` starts a definition as a new root task, for fire-and-forget work, cleanup
+which outlives its starter, and durable calls from code which doesn't await their results:
+
+```csharp
+await buyer.RecordOrderAsync(summary).DetachAsync($"order-{orderId:N}-v{summary.Version}");
+```
+
+- The detached task has the caller-chosen root ID, so it is independent of the starter: durable
+  cancellation of the starter doesn't cancel it, and the starter's lifecycle doesn't delete it.
+- `DetachAsync` completes once the host has durably accepted the schedule. The starter receives no
+  result; the host retains the result for polling by root ID as it does for other roots which no
+  caller observes.
+- Detaching the same definition under the same root ID again leaves the task unchanged. Another
+  definition under that ID fails like other ID reuse.
+- Within a durable execution, the host records each detach under a generated child ID of the
+  execution and commits the record with the start, so a replay doesn't start the task again.
+  Detach calls begin in deterministic order, like unnamed children. Outside a durable execution,
+  the definition starts through `ISchedulableTask.DetachAsync`.
+
 ## Writing replay-safe workflows
 
 A host replays an execution which didn't finish, for example after its grain is deactivated: the
@@ -143,4 +164,5 @@ A host derives from `DurableExecutionContext`, implements `ISchedulableTask` def
 and `IScheduledTaskHandle` handles, and persists the mapping from `TaskId` to definition,
 response, and cancellation state. The host returns the recorded response when an existing
 ID is scheduled again, records `SelectCompletionAsync` decisions, and supplies
-replay-consistent `UtcNow` values.
+replay-consistent `UtcNow` values. Hosts which support detached tasks override
+`DurableExecutionContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`.

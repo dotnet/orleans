@@ -11,6 +11,18 @@ public interface ISchedulableTask
 
     /// <summary>Gets a handle for a scheduled identifier.</summary>
     IScheduledTaskHandle GetHandle(TaskId taskId);
+
+    /// <summary>
+    /// Starts this definition as a detached root task under <paramref name="taskId"/>, which no caller observes.
+    /// </summary>
+    /// <remarks>
+    /// The returned operation completes once the host has durably accepted the schedule. The host sends the scheduler no
+    /// result, and it retains the task's result for polling as it does for other roots without an observing caller.
+    /// Detaching an existing identifier with the same definition leaves the task unchanged. Hosts which don't support
+    /// detached tasks keep this default implementation, which throws <see cref="NotSupportedException"/>.
+    /// </remarks>
+    ValueTask DetachAsync(TaskId taskId, CancellationToken cancellationToken)
+        => throw new NotSupportedException("The durable task definition does not support detached scheduling.");
 }
 
 /// <summary>Controls and observes one scheduled durable task.</summary>
