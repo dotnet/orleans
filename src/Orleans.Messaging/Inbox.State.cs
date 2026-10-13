@@ -63,7 +63,15 @@ internal sealed partial class Inbox
             }
         }
 
-        foreach (var letter in _deadLetters.Values) EnvelopeValidation.Validate(letter.Message);
+        foreach (var (key, letter) in _deadLetters)
+        {
+            EnvelopeValidation.Validate(letter.Message);
+            if (key != letter.Message.Envelope.MessageId)
+            {
+                throw new InvalidOperationException("The recovered inbox dead-letter key does not match its command identity.");
+            }
+        }
+
         _capturedSequence = _durableSequence = _lastSequence;
     }
 
