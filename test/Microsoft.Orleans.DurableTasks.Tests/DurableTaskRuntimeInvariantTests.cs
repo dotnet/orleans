@@ -11,7 +11,6 @@ using System.Reflection;
 using NSubstitute;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
-using Orleans.DurableJobs;
 using Orleans.Invocation;
 using Orleans.Journaling;
 using Orleans.Messaging;
@@ -155,7 +154,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Empty(transport.Invocations);
         Assert.Empty(transport.Completions);
         Assert.Empty(transport.Cancellations);
-        Assert.Empty(transport.ScheduledResumes);
+        Assert.Empty(transport.Resumes);
     }
 
     [Fact]
@@ -781,20 +780,143 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task DelayStagesScheduledSelfResumeInItsWrite()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/scheduled-delay");
+        manager.BeforeWrite = () =>
+        {
+            // The delay state and its resume message are staged before the write which commits both.
+            var resume = Assert.Single(transport.Resumes);
+            Assert.Equal(storage.Get(taskId).ResumeGeneration, resume.Generation);
+            Assert.Equal(storage.Get(taskId).DueTime, resume.DueTime);
+        };
+
+        Assert.Same(
+            DurableTaskResponse.Pending,
+            await runtime.ScheduleDelayAsync(taskId, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken));
+
+        var state = storage.Get(taskId);
+        var sent = Assert.Single(transport.Resumes);
+        Assert.Equal(runtime.GrainId, sent.GrainId);
+        Assert.Equal(taskId, sent.TaskId);
+        Assert.Equal(1, sent.Generation);
+        Assert.Equal(1, state.ResumeGeneration);
+        Assert.Equal(state.DueTime, sent.DueTime);
+        Assert.Equal(TimeSpan.FromMinutes(1), state.DelayDuration);
+        Assert.Equal(1, manager.WriteCount);
+        Assert.Null(state.Result);
+    }
+
+    [Fact]
+    public async Task DelayCompletesWhenItsResumeMessageIsHandled()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/delay");
+        await runtime.ScheduleDelayAsync(taskId, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
+        var handle = runtime.GetScheduledTaskHandle(taskId);
+        var resume = Assert.Single(transport.Resumes);
+
+        var context = ResumeContext(runtime, taskId, resume.Generation, resume.DueTime);
+        await HandleAsync(CreateHandler(runtime), context);
+
+        // The completion is staged with the inbox outcome and the handle completes only after their write.
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(taskId).Result!.Status);
+        Assert.Null(storage.Get(taskId).DueTime);
+        Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
+        Assert.Equal(1, manager.WriteCount);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, (await handle.WaitAsync(TestContext.Current.CancellationToken)).Status);
+        Assert.Single(transport.Resumes);
+    }
+
+    [Fact]
     public async Task StaleResumeGenerationCannotCompleteDelay()
     {
-        var (runtime, storage, _, _) = CreateRuntime();
+        var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/delay");
         await runtime.ScheduleDelayAsync(taskId, TimeSpan.Zero, TestContext.Current.CancellationToken);
-        var state = storage.Get(taskId);
+        var generation = storage.Get(taskId).ResumeGeneration;
+        var dueTime = storage.Get(taskId).DueTime!.Value;
+        var handler = CreateHandler(runtime);
 
-        var stale = CreateRunContext(taskId, state.ResumeGeneration + 1);
-        Assert.Same(DurableJobRunResult.Completed, await runtime.ExecuteJobAsync(stale, TestContext.Current.CancellationToken));
+        await HandleAsync(handler, ResumeContext(runtime, taskId, generation + 1, dueTime));
+        await HandleAsync(handler, ResumeContext(runtime, taskId, generation - 1, dueTime));
         Assert.Null(storage.Get(taskId).Result);
+        Assert.Equal(1, manager.WriteCount);
 
-        var current = CreateRunContext(taskId, state.ResumeGeneration);
-        Assert.Same(DurableJobRunResult.Completed, await runtime.ExecuteJobAsync(current, TestContext.Current.CancellationToken));
+        await HandleAsync(handler, ResumeContext(runtime, taskId, generation, dueTime));
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(taskId).Result!.Status);
+
+        // A duplicate resume of the completed delay is harmless.
+        await HandleAsync(handler, ResumeContext(runtime, taskId, generation, dueTime));
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(taskId).Result!.Status);
+    }
+
+    [Fact]
+    public async Task DelayCanceledBeforeDueTimeTerminalizesAsCanceledAndLaterResumeIsNoOp()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/delay");
+        await runtime.ScheduleDelayAsync(taskId, TimeSpan.FromMinutes(5), TestContext.Current.CancellationToken);
+        var handle = runtime.GetScheduledTaskHandle(taskId);
+        var resume = Assert.Single(transport.Resumes);
+
+        await handle.CancelAsync(TestContext.Current.CancellationToken);
+
+        var canceled = storage.Get(taskId);
+        Assert.Equal(DurableTaskStatus.Canceled, canceled.Result!.Status);
+        Assert.Null(canceled.DueTime);
+        Assert.True(canceled.ResumeGeneration > resume.Generation);
+        Assert.Equal(DurableTaskStatus.Canceled, (await handle.WaitAsync(TestContext.Current.CancellationToken)).Status);
+        var writes = manager.WriteCount;
+
+        await HandleAsync(CreateHandler(runtime), ResumeContext(runtime, taskId, resume.Generation, resume.DueTime));
+
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(taskId).Result!.Status);
+        Assert.Equal(canceled.CompletedAt, storage.Get(taskId).CompletedAt);
+        Assert.Equal(writes, manager.WriteCount);
+        Assert.Empty(transport.Completions);
+        Assert.Single(transport.Resumes);
+    }
+
+    [Fact]
+    public async Task ResumeOfDelayWithRequestedCancellationTerminalizesAsCanceled()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/delay");
+        await runtime.ScheduleDelayAsync(taskId, TimeSpan.FromMinutes(5), TestContext.Current.CancellationToken);
+        var handle = runtime.GetScheduledTaskHandle(taskId);
+        var resume = Assert.Single(transport.Resumes);
+        storage.Get(taskId).CancellationRequestedAt = runtime.UtcNow;
+
+        await HandleAsync(CreateHandler(runtime), ResumeContext(runtime, taskId, resume.Generation, resume.DueTime));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(taskId).Result!.Status);
+        Assert.Equal(DurableTaskStatus.Canceled, (await handle.WaitAsync(TestContext.Current.CancellationToken)).Status);
+    }
+
+    [Fact]
+    public async Task ResumeFromAnotherGrainIsRejectedBeforeChangingState()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/delay");
+        await runtime.ScheduleDelayAsync(taskId, TimeSpan.Zero, TestContext.Current.CancellationToken);
+        var resume = Assert.Single(transport.Resumes);
+        var forged = GrainId.Create("forged", "grain");
+        var context = MessagingTestHelpers.CreateHandlerContext(MessagingTestHelpers.MessageTypes.Resume.Create(
+            DurableTaskMessageTransport.CreateResumeMessageId(forged, taskId, resume.Generation, resume.DueTime),
+            runtime.GrainId,
+            new DurableTaskResumeMessage { TaskId = taskId, Generation = resume.Generation, Sender = forged },
+            resume.DueTime).ToInboxMessage());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await CreateHandler(runtime).HandleAsync(context, CancellationToken.None));
+
+        context.DidNotReceive().Complete();
+        Assert.Null(storage.Get(taskId).Result);
+        Assert.Equal(1, manager.WriteCount);
     }
 
     [Fact]
@@ -819,7 +941,9 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Same(DurableTaskResponse.Pending, replay);
         Assert.Equal(persistedDueTime, storage.Get(taskId).DueTime);
         Assert.Equal(duration, storage.Get(taskId).DelayDuration);
-        Assert.Single(transport.ScheduledResumes);
+
+        // The resume message committed with the delay, so a replay sends nothing new.
+        Assert.Single(transport.Resumes);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => runtime.ScheduleDelayAsync(
@@ -830,78 +954,21 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task FailedResumeSchedulingRetainsStagedDelayForRetry()
-    {
-        var (runtime, storage, manager, transport) = CreateRuntime();
-        var taskId = TaskId.Parse("root/failed-delay");
-        var failure = new InvalidOperationException("Expected scheduling failure.");
-        transport.BeforeScheduleResumeAsync = (_, _, _, _, _) =>
-        {
-            transport.BeforeScheduleResumeAsync = null;
-            return ValueTask.FromException(failure);
-        };
-
-        var exception = await Assert.ThrowsAsync<JournaledStatePreCommitException>(
-            () => runtime.ScheduleDelayAsync(
-                taskId,
-                TimeSpan.FromMinutes(1),
-                TestContext.Current.CancellationToken).AsTask());
-
-        // The delay is staged before preparation, and stays staged for an explicit retry.
-        Assert.Same(failure, exception.InnerException);
-        var state = storage.Get(taskId);
-        Assert.NotNull(state.DueTime);
-        Assert.Equal(1, state.ResumeGeneration);
-        Assert.Empty(transport.ScheduledResumes);
-        Assert.Equal(0, manager.WriteCount);
-
-        Assert.Same(
-            DurableTaskResponse.Pending,
-            await runtime.ScheduleDelayAsync(taskId, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken));
-
-        var resume = Assert.Single(transport.ScheduledResumes);
-        Assert.Equal(taskId, resume.TaskId);
-        Assert.Equal(state.DueTime, resume.DueTime);
-        Assert.Equal(1, manager.WriteCount);
-    }
-
-    [Fact]
-    public async Task ResumeJobIsScheduledBeforeItsDelayCommits()
-    {
-        var (runtime, storage, manager, transport) = CreateRuntime();
-        var taskId = TaskId.Parse("root/scheduled-delay");
-        transport.BeforeScheduleResumeAsync = (_, scheduledTaskId, generation, _, _) =>
-        {
-            Assert.Equal(taskId, scheduledTaskId);
-            Assert.Equal(generation, storage.Get(taskId).ResumeGeneration);
-            Assert.Equal(0, manager.WriteCount);
-            return default;
-        };
-
-        await runtime.ScheduleDelayAsync(taskId, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-
-        Assert.Single(transport.ScheduledResumes);
-        Assert.Equal(2, manager.WriteCount);
-    }
-
-    [Fact]
     public async Task ResumeForMissingTaskCompletesWithoutCreatingState()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/missing");
 
-        var result = await runtime.ExecuteJobAsync(CreateRunContext(taskId, generation: 1), TestContext.Current.CancellationToken);
+        await HandleAsync(CreateHandler(runtime), ResumeContext(runtime, taskId, generation: 1, DateTimeOffset.UtcNow));
 
-        Assert.Same(DurableJobRunResult.Completed, result);
         Assert.False(storage.Contains(taskId));
         Assert.Equal(0, manager.WriteCount);
     }
 
     [Fact]
-    public async Task LocalDelayRemainsPendingUntilResumeAndRecoveryReschedulesIt()
+    public async Task LocalDelayRemainsPendingUntilResumeAndRecoveryDoesNotResendIt()
     {
-        var (runtime, storage, _, transport) = CreateRuntime();
+        var (runtime, storage, manager, transport) = CreateRuntime();
         var localTaskId = TaskId.Parse("root/local");
         var localHandle = await runtime.ScheduleChildAsync(localTaskId, new TestStateManager.PendingDurableTask(), TestContext.Current.CancellationToken);
         Assert.Equal(DurableTaskStatus.Pending, (await localHandle.PollAsync(default, TestContext.Current.CancellationToken)).Status);
@@ -920,40 +987,43 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Null(storage.Get(taskId).Result);
         Assert.Null(storage.Get(taskId).CompletedAt);
 
-        transport.ScheduledResumes.Clear();
+        // The resume message is durable with the delay, so recovery leaves the delay pending without resending it.
+        var writes = manager.WriteCount;
         await runtime.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
-        var resume = Assert.Single(transport.ScheduledResumes);
-        Assert.Equal(taskId, resume.TaskId);
+        Assert.Single(transport.Resumes);
+        Assert.Equal(writes, manager.WriteCount);
         Assert.Null(storage.Get(taskId).CompletedAt);
 
         var state = storage.Get(taskId);
-        Assert.Same(DurableJobRunResult.Completed, await runtime.ExecuteJobAsync(CreateRunContext(taskId, state.ResumeGeneration), TestContext.Current.CancellationToken));
+        await HandleAsync(CreateHandler(runtime), ResumeContext(runtime, taskId, state.ResumeGeneration, state.DueTime!.Value));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, (await handle.WaitAsync(TestContext.Current.CancellationToken)).Status);
         Assert.NotNull(storage.Get(taskId).CompletedAt);
     }
 
     [Fact]
-    public async Task RecoveredCanceledDelayTerminalizesBeforeRescheduleAndStaleResumesAreHarmless()
+    public async Task RecoveredCanceledDelayTerminalizesAndStaleResumesAreHarmless()
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root/delay");
         await runtime.ScheduleDelayAsync(taskId, TimeSpan.FromMinutes(5), TestContext.Current.CancellationToken);
-        var generation = storage.Get(taskId).ResumeGeneration;
+        var resume = Assert.Single(transport.Resumes);
 
         storage.Get(taskId).CancellationRequestedAt = runtime.UtcNow;
-        transport.ScheduledResumes.Clear();
         await runtime.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
 
         var canceled = storage.Get(taskId);
         Assert.Equal(DurableTaskStatus.Canceled, canceled.Result!.Status);
         Assert.NotNull(canceled.CompletedAt);
         Assert.Null(canceled.DueTime);
-        Assert.True(canceled.ResumeGeneration > generation);
-        Assert.Empty(transport.ScheduledResumes);
+        Assert.True(canceled.ResumeGeneration > resume.Generation);
+        Assert.Single(transport.Resumes);
 
-        await runtime.ExecuteJobAsync(CreateRunContext(taskId, generation), TestContext.Current.CancellationToken);
-        await runtime.ExecuteJobAsync(CreateRunContext(taskId, generation), TestContext.Current.CancellationToken);
+        var handler = CreateHandler(runtime);
+        await HandleAsync(handler, ResumeContext(runtime, taskId, resume.Generation, resume.DueTime));
+        await HandleAsync(handler, ResumeContext(runtime, taskId, resume.Generation, resume.DueTime));
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(taskId).Result!.Status);
+        Assert.Equal(canceled.CompletedAt, storage.Get(taskId).CompletedAt);
     }
 
     [Fact]
@@ -1296,7 +1366,7 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request, TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        await transport.ScheduledResume.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await transport.ResumeSent.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var stopping = runtime.StopAsync(TestContext.Current.CancellationToken);
         await stopping.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
@@ -2453,7 +2523,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.False(storage.Contains(taskId));
         Assert.Equal(0, manager.WriteCount);
         Assert.Empty(transport.Invocations);
-        Assert.Empty(transport.ScheduledResumes);
+        Assert.Empty(transport.Resumes);
     }
 
     [Theory]
@@ -2575,25 +2645,13 @@ public sealed class DurableTaskRuntimeInvariantTests
             .GetMethod("CreateChildTaskId", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(context, [name])!;
 
-    private static IJobRunContext CreateRunContext(TaskId taskId, long generation)
-    {
-        var context = Substitute.For<IJobRunContext>();
-        context.Job.Returns(new DurableJob
-        {
-            Id = Guid.NewGuid().ToString(),
-            Name = DurableTaskMessageTransport.ResumeJobName,
-            DueTime = DateTimeOffset.UtcNow,
-            TargetGrainId = GrainId.Create("target", "one"),
-            ShardId = "test",
-            Metadata = new Dictionary<string, string>
-            {
-                [DurableTaskMessageTransport.ResumeTaskIdMetadata] = taskId.ToString(),
-                [DurableTaskMessageTransport.ResumeGenerationMetadata] = generation.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture),
-            },
-        });
-        return context;
-    }
+    private static IInboxHandlerContext ResumeContext(
+        DurableTaskGrainRuntime runtime,
+        TaskId taskId,
+        long generation,
+        DateTimeOffset dueTime) =>
+        MessagingTestHelpers.CreateHandlerContext(
+            MessagingTestHelpers.CreateResumeMessage(runtime.GrainId, taskId, generation, dueTime));
 
     private static (
         DurableTaskGrainRuntime Runtime,

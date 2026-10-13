@@ -53,6 +53,10 @@ internal sealed class DurableTaskMessageHandler(
                 var cancellation = messageTypes.Cancellation.Decode(message);
                 runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender));
                 break;
+            case DurableTaskMessageTypes.ResumeSubject:
+                var resume = messageTypes.Resume.Decode(message);
+                runtime.ResumeDelayFromInbox(resume.TaskId, resume.Generation, GetSender(resume.Sender));
+                break;
             default:
                 throw new InvalidOperationException($"Unsupported durable task message subject '{message.Envelope.Subject}'.");
         }

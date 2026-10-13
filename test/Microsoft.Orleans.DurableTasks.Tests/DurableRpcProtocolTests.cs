@@ -13,7 +13,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using NSubstitute;
 using Orleans.Concurrency;
 using Orleans.Configuration;
-using Orleans.DurableJobs;
 using Orleans.Messaging;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -160,22 +159,43 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public async Task ResumeJobCarriesTaskIdentityAndGeneration()
+    public void ResumeIsScheduledSelfMessageCarryingTaskIdentityAndGeneration()
     {
-        var jobs = new RecordingJobManager();
-        var transport = MessagingTestHelpers.CreateTransport(new RecordingOutbox(), jobs);
-        var target = GrainId.Create("target", "one");
+        var outbox = new RecordingOutbox();
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
+        var grain = GrainId.Create("target", "one");
         var taskId = TaskId.Parse("root/delay");
-        var dueTime = DateTimeOffset.UtcNow.AddMinutes(1);
+        var dueTime = new DateTimeOffset(2040, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
-        await transport.ScheduleResumeAsync(target, taskId, 7, dueTime, TestContext.Current.CancellationToken);
+        transport.SendResume(grain, taskId, 7, dueTime);
+        transport.SendResume(grain, taskId, 7, dueTime);
 
-        var request = Assert.Single(jobs.Requests);
-        Assert.Equal(DurableTaskMessageTransport.ResumeJobName, request.JobName);
-        Assert.Equal(target, request.Target);
-        Assert.Equal(dueTime, request.DueTime);
-        Assert.Equal(taskId.ToString(), request.Metadata![DurableTaskMessageTransport.ResumeTaskIdMetadata]);
-        Assert.Equal("7", request.Metadata[DurableTaskMessageTransport.ResumeGenerationMetadata]);
+        var messages = outbox.Messages.ToArray();
+        Assert.Equal(2, messages.Length);
+        var message = messages[0];
+        Assert.Equal(grain, message.ReceiverId);
+        Assert.Equal(DurableTaskMessageTypes.ResumeSubject, message.Envelope.Subject);
+        Assert.Equal(dueTime, message.Envelope.DeliverAt);
+        var body = MessagingTestHelpers.MessageTypes.Resume.Decode(message);
+        Assert.Equal(taskId, body.TaskId);
+        Assert.Equal(7, body.Generation);
+        Assert.Equal(grain, body.Sender);
+
+        // Replays coalesce: the identity and content are stable for one delay generation.
+        Assert.Equal(message.Envelope.MessageId, messages[1].Envelope.MessageId);
+        Assert.Equal(message.Envelope.Payload, messages[1].Envelope.Payload);
+        Assert.Equal(DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, 7, dueTime), message.Envelope.MessageId);
+        var segments = message.Envelope.MessageId.ToString().Split(HierarchicalKey.SegmentSeparator);
+        Assert.Equal(new[] { DurableTaskMessageTransport.MessageIdRoot, "resume" }, segments[..2]);
+        Assert.Equal(64, segments[2].Length);
+        Assert.Equal("7", segments[3]);
+        Assert.Equal(4, segments.Length);
+
+        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, 8, dueTime));
+        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, 7, dueTime.AddTicks(1)));
+        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(grain, TaskId.Parse("root/other"), 7, dueTime));
+        Assert.NotEqual(message.Envelope.MessageId, DurableTaskMessageTransport.CreateResumeMessageId(GrainId.Create("target", "two"), taskId, 7, dueTime));
+        Assert.Throws<ArgumentOutOfRangeException>(() => transport.SendResume(grain, taskId, 0, dueTime));
     }
 
     [Theory]
@@ -221,6 +241,7 @@ public sealed class DurableRpcProtocolTests
     [InlineData(DurableTaskMessageTypes.CompletionSubject, "complete")]
     [InlineData(DurableTaskMessageTypes.CompletionAckSubject, "complete-ack")]
     [InlineData(DurableTaskMessageTypes.CancellationSubject, "cancel")]
+    [InlineData(DurableTaskMessageTypes.ResumeSubject, "resume")]
     public void MessageIdIsBoundedHierarchicalKeyScopedBySubject(string subject, string leaf)
     {
         var longTaskId = TaskId.Parse(string.Join('/', Enumerable.Repeat(new string('x', 200), 20)));

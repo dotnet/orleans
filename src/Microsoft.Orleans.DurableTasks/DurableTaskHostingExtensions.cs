@@ -5,7 +5,6 @@ using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
-using Orleans.DurableJobs;
 using Orleans.DurableTasks;
 using Orleans.Hosting;
 using Orleans.Journaling;
@@ -33,8 +32,9 @@ public static class DurableTaskHostingExtensions
         return clientBuilder;
     }
 
-    /// <summary>Adds the silo-side durable grain RPC runtime over Orleans Messaging and Durable Jobs.</summary>
+    /// <summary>Adds the silo-side durable grain RPC runtime over Orleans Messaging.</summary>
     /// <remarks>
+    /// Messaging requires Durable Jobs, which wakes grains with pending messages, including scheduled delay resumes.
     /// Grains deriving from <see cref="Orleans.Journaling.DurableGrain"/> or implementing <see cref="IMessagingGrain"/>
     /// bind the runtime during activation setup, before journal recovery. Task state can be stored in any journal format;
     /// this method registers the source-generated JSON metadata which the JSON journal format requires.
@@ -71,7 +71,6 @@ public static class DurableTaskHostingExtensions
         siloBuilder.Services.AddFromExisting<IDurableTaskGrainRuntime, DurableTaskGrainRuntime>();
         siloBuilder.Services.AddScoped(static services => new DurableTaskMessageTransport(
             new Lazy<IOutbox>(services.GetRequiredService<IOutbox>),
-            services.GetRequiredService<ILocalDurableJobManager>(),
             services.GetRequiredService<DurableTaskMessageTypes>()));
         siloBuilder.Services.AddFromExisting<IDurableTaskMessageTransport, DurableTaskMessageTransport>();
         siloBuilder.Services.AddScoped<DurableTaskMessageHandler>();
