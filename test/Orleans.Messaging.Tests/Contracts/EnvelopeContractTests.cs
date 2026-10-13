@@ -130,6 +130,30 @@ public sealed class EnvelopeContractTests
     }
 
     [Fact]
+    public void DeliverAtRoundTripsThroughCreateAndIndependentWire()
+    {
+        using var sending = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var receiving = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var deliverAt = new DateTimeOffset(2040, 1, 2, 3, 4, 5, TimeSpan.FromHours(2));
+        var type = new MessageType<string>("orders.v1", sending.GetRequiredService<Serializer<string>>());
+        var outgoing = type.Create(Id, Receiver, "scheduled", deliverAt);
+        Assert.Equal(deliverAt, outgoing.Envelope.DeliverAt);
+        Validate(outgoing);
+
+        var wire = sending.GetRequiredService<Serializer<OutboxMessage>>().SerializeToArray(outgoing);
+        var decoded = receiving.GetRequiredService<Serializer<OutboxMessage>>().Deserialize(wire);
+        var copied = sending.GetRequiredService<DeepCopier>().Copy(outgoing);
+        foreach (var actual in new[] { decoded, copied })
+        {
+            Assert.Equal(deliverAt, actual.Envelope.DeliverAt);
+            Assert.Equal(deliverAt.Offset, actual.Envelope.DeliverAt!.Value.Offset);
+            Assert.Equal(Receiver, actual.ReceiverId);
+            Assert.Equal("scheduled", type.Decode(actual));
+            Assert.True(Invoke<bool>("EnvelopeEquivalence", "AreEquivalent", outgoing, actual));
+        }
+    }
+
+    [Fact]
     public void PayloadUsesOrdinaryExternallyBoundOrleansSerializer()
     {
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
