@@ -56,13 +56,13 @@ public sealed class MessagingRoutingAndDeadLetterTests : MessagingBehaviorTestBa
         var before = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
 
         Fixture.Clock.Advance(TimeSpan.FromHours(2));
-        await receiver.RequestDeactivationAsync();
-        var after = await Fixture.SnapshotProbe.WaitAsync(
-            receiver.GetGrainId(),
-            snapshot => snapshot.ActivationId != before.ActivationId
-                && snapshot.InboxDeadLetters.Count == 0);
-
+        await ReactivateAsync(receiver);
+        var after = await receiver.GetSnapshotAsync();
+        Assert.NotEqual(before.ActivationId, after.ActivationId);
         Assert.Empty(after.InboxDeadLetters);
+
+        await ReactivateAsync(receiver);
+        Assert.Empty((await receiver.GetSnapshotAsync()).InboxDeadLetters);
     }
 
     [Fact]
