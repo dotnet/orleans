@@ -45,7 +45,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// each completion, and the runtime materializes the message from the task's stored result, so the result is journaled
 /// once. When the outbox retires a delivered completion, its destination durably holds the result, so the runtime
 /// prunes the task in the same write once no destination remains. A dead-lettered completion removes its destination
-/// and leaves the result to <see cref="Orleans.Configuration.DurableTaskOptions.ResultRetentionPeriod"/>.
+/// and retains the result for <see cref="Orleans.Configuration.DurableTaskOptions.ResultRetentionPeriod"/> from then.
 /// </para>
 /// </remarks>
 internal sealed partial class DurableTaskGrainRuntime(
@@ -345,8 +345,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </summary>
     /// <remarks>
     /// The outbox stages the completion's removal in the same journal write. A delivered destination durably holds the
-    /// result, so the task needs no retention for it. A dead-lettered completion leaves the result to the retention
-    /// policy, so a poller, or a caller which invokes the task again, can still observe it.
+    /// result, so the task needs no retention for it. A dead-lettered completion restarts the result's retention period,
+    /// so a poller, or a caller which invokes the task again, can still observe it.
     /// </remarks>
     void IOutboxMessageSource.OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement)
     {
@@ -359,7 +359,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         _storage.RemoveCompletionDestination(completion.TaskId, state, completion.Destination);
-        if (retirement == OutboxMessageRetirement.Delivered && state.CompletionDestinations.Count == 0)
+        if (retirement == OutboxMessageRetirement.DeadLettered)
+        {
+            // Retention starts now: the dead letter can follow a long retry period, and the result must remain
+            // available to a poller or a re-invocation for the full retention period.
+            _storage.RetainResult(completion.TaskId, state);
+        }
+        else if (state.CompletionDestinations.Count == 0)
         {
             PruneDeliveredTask(completion.TaskId, state);
         }
@@ -1574,7 +1580,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 continue;
             }
 
-            if (state.CompletedAt is not { } completedAt || now.Subtract(completedAt) < _shared.Options.ResultRetentionPeriod)
+            // Retention starts at completion, or later when a dead-lettered completion restarted it.
+            if (state.CompletedAt is not { } completedAt
+                || now.Subtract(state.RetainedSince is { } retainedSince && retainedSince > completedAt ? retainedSince : completedAt)
+                    < _shared.Options.ResultRetentionPeriod)
             {
                 // The task is being retained for at least the specified period of time.
                 continue;

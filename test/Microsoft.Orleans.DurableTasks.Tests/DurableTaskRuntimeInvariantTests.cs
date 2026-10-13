@@ -2087,6 +2087,45 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
+    public async Task LateDeadLetteredCompletionRetainsResultForRetentionPeriodAfterDeadLetter()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var retention = TimeSpan.FromHours(1);
+        var (runtime, storage, manager, transport) = CreateRuntime(retention, timeProvider: clock);
+        var taskId = TaskId.Parse("root");
+        runtime.ScheduleFromInbox(taskId, CreateRequest(1));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => transport.Completions.Count == 1 && manager.WriteCount >= 2);
+        await runtime.GetScheduledTaskHandle(taskId).WaitAsync(TestContext.Current.CancellationToken);
+        var completion = Assert.Single(transport.Completions);
+
+        // The test storage stamps completion from the system clock; align it with the runtime's clock.
+        storage.Get(taskId).CompletedAt = clock.GetUtcNow();
+
+        // The outbox dead-letters the completion after MaxOutboxRetryAge, which exceeds the retention period.
+        clock.Advance(TimeSpan.FromDays(1));
+        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.DeadLettered);
+        Assert.Equal(clock.GetUtcNow(), storage.Get(taskId).RetainedSince);
+
+        clock.Advance(retention - TimeSpan.FromTicks(1));
+        Assert.False(InvokePruneCompletedTasks(runtime));
+        Assert.Null(storage.Get(taskId).TombstonedAt);
+        Assert.Equal(0, (await runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken)).GetResult<int>());
+
+        clock.Advance(TimeSpan.FromTicks(1));
+        Assert.True(InvokePruneCompletedTasks(runtime));
+        Assert.NotNull(storage.Get(taskId).TombstonedAt);
+        Assert.Null(storage.Get(taskId).Result);
+        await Assert.ThrowsAsync<DurableTaskNotFoundException>(
+            async () => await runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken));
+    }
+
+    private static bool InvokePruneCompletedTasks(DurableTaskGrainRuntime runtime) =>
+        (bool)typeof(DurableTaskGrainRuntime)
+            .GetMethod("PruneCompletedTasks", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(runtime, null)!;
+
+    [Fact]
     public async Task DeliveredCompletionOfTaskAwaitedByLocalParentIsPrunedWithParent()
     {
         var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.FromDays(1));
@@ -2779,7 +2818,7 @@ public sealed class DurableTaskRuntimeInvariantTests
             TimeProvider? timeProvider = null)
     {
         var manager = new TestStateManager();
-        var storage = new TestStorage(manager);
+        var storage = new TestStorage(manager, timeProvider);
         return CreateRuntime(
             storage,
             manager,
@@ -3000,7 +3039,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         }
     }
 
-    private sealed class TestStorage(TestStateManager manager) : IDurableTaskGrainStorage
+    private sealed class TestStorage(TestStateManager manager, TimeProvider? timeProvider = null) : IDurableTaskGrainStorage
     {
         private readonly Dictionary<TaskId, TestTaskState> _states = [];
 
@@ -3074,6 +3113,9 @@ public sealed class DurableTaskRuntimeInvariantTests
         public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination) =>
             ((TestTaskState)state).CompletionDestinations.Remove(destination);
 
+        public void RetainResult(TaskId taskId, IDurableTaskState state) =>
+            ((TestTaskState)state).RetainedSince = (timeProvider ?? TimeProvider.System).GetUtcNow();
+
         public void CreateTombstone(TaskId taskId, IDurableTaskState state)
         {
             ((TestTaskState)state).Request = null;
@@ -3111,6 +3153,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         public long ResumeGeneration { get; set; }
         public string? RequestFingerprint { get; set; }
         public DateTimeOffset? TombstonedAt { get; set; }
+        public DateTimeOffset? RetainedSince { get; set; }
         public GrainId RemoteTarget { get; set; }
         public string? RemoteRequestFingerprint { get; set; }
         public GrainId CallerId { get; set; }

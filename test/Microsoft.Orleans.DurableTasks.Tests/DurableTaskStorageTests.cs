@@ -171,6 +171,9 @@ public sealed class DurableTaskStorageTests
             clock.Advance(TimeSpan.FromMinutes(3));
             storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(terminalResult));
             await storage.WriteAsync(cancellationToken);
+            clock.Advance(TimeSpan.FromMinutes(5));
+            storage.RetainResult(taskId, state);
+            await storage.WriteAsync(cancellationToken);
         }
 
         await using var recovery = await harness.ActivateAsync(cancellationToken);
@@ -179,6 +182,7 @@ public sealed class DurableTaskStorageTests
         Assert.Null(recovered.Request);
         Assert.Equal(createdAt, recovered.CreatedAt);
         Assert.Equal(createdAt.AddMinutes(3), recovered.CompletedAt);
+        Assert.Equal(createdAt.AddMinutes(8), recovered.RetainedSince);
         Assert.Null(recovered.CancellationRequestedAt);
         Assert.Null(recovered.DueTime);
         Assert.Null(recovered.DelayDuration);

@@ -80,9 +80,10 @@ validation disabled until its first published version establishes a baseline.
   retains the result until the completion retires from its outbox. When the
   calling grain has durably accepted it, the callee prunes the task in the same
   journal write, keeping a tombstone which rejects conflicting reuse of its
-  identity. When the completion is dead-lettered, and for tasks scheduled by
-  clients, the result remains available for `DurableTaskOptions.ResultRetentionPeriod`
-  after completion; external clients poll retained results.
+  identity. For tasks scheduled by clients, the result remains available for
+  `DurableTaskOptions.ResultRetentionPeriod` after completion; when the completion
+  is dead-lettered, for that period after the dead letter. External clients poll
+  retained results.
 - Cancellation is monotonic, duplicates are idempotent, and the first durable
   terminal result wins a race.
 - Delays persist their logical due time and generation. Each delay sends a
