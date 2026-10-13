@@ -47,6 +47,11 @@ public class DurableMessagingOptions
     /// Messages with an <see cref="Envelope.DeliverAt"/> time do not count toward this limit, including after they
     /// become due, and are accepted regardless of it.
     /// </para>
+    /// <para>
+    /// Messages a grain sends to itself are accepted regardless of this limit, because sending is synchronous.
+    /// Those without an <see cref="Envelope.DeliverAt"/> time count toward it until they complete, so they can cause
+    /// deliveries from other grains to be backpressured.
+    /// </para>
     /// </remarks>
     /// <value>
     /// The maximum inbox capacity. Must be greater than zero. Defaults to 1000.

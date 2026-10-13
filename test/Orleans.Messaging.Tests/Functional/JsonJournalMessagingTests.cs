@@ -89,6 +89,37 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         Assert.Empty(Probe.Get(receiver.GetGrainId()));
     }
 
+    [Fact]
+    public async Task JsonJournal_RecoversSelfSentMessagesFromTheInbox()
+    {
+        var grain = Cluster.Client.GetGrain<IJsonMessagingGrain>(Guid.NewGuid());
+        var scheduledId = HierarchicalKey.Create("json", "self-scheduled", Guid.NewGuid().ToString("N"));
+        var immediateId = HierarchicalKey.Create("json", "self", Guid.NewGuid().ToString("N"));
+        var deliverAt = new DateTimeOffset(DateTime.UtcNow.AddDays(1).Ticks, TimeSpan.Zero);
+
+        // Each send commits the acceptance in the grain's own inbox; the outbox never holds the message.
+        await grain.SendAsync(grain.GetGrainId(), scheduledId, 7, deliverAt);
+        await grain.SendAsync(grain.GetGrainId(), immediateId, 8);
+        Assert.Equal(0, await grain.GetOutboxCountAsync());
+        Assert.Equal(new[] { 8 }, await Probe.WaitAsync(grain.GetGrainId(), 1, Token));
+        Assert.True(Cluster.TryGetGrainContext(grain.GetGrainId(), out var context));
+        await grain.DeactivateAsync();
+        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
+
+        // The next activation recovers the pending scheduled message and the completion record from the JSON journal.
+        Assert.Equal(0, await grain.GetOutboxCountAsync());
+        Assert.True(Cluster.TryGetGrainContext(grain.GetGrainId(), out var recoveredContext));
+        Assert.NotSame(context, recoveredContext);
+        var inbox = recoveredContext.ActivationServices.GetRequiredService<Inbox>();
+        var recovered = new TaskCompletionSource<(int Count, DateTimeOffset? DeliverAt)>(TaskCreationOptions.RunContinuationsAsynchronously);
+        recoveredContext.Scheduler.QueueAction(() => recovered.SetResult((inbox.Count, inbox.MessageState[scheduledId].Message.Envelope.DeliverAt)));
+        Assert.Equal((1, deliverAt), await recovered.Task.WaitAsync(TimeSpan.FromSeconds(30), Token));
+        var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
+        var redelivery = type.Create(immediateId, grain.GetGrainId(), 8).ToInboxMessage();
+        Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IInboxExtension>().DeliverAsync(redelivery, Token)).Status);
+        Assert.Equal(new[] { 8 }, Probe.Get(grain.GetGrainId()));
+    }
+
     public sealed class Fixture : IAsyncLifetime
     {
         public JsonMessagingProbe Probe { get; } = new();
@@ -140,6 +171,7 @@ public sealed class CustomHandlerGrain : Grain, ICustomHandlerGrain, IMessagingG
 }
 public interface IJsonMessagingGrain : IGrainWithGuidKey
 {
+    Task SendAsync(GrainId destination, HierarchicalKey messageId, int value, DateTimeOffset? deliverAt = null);
     Task SendAndDeactivateAsync(GrainId destination, HierarchicalKey messageId, int value);
     Task<int> GetOutboxCountAsync();
     Task DeactivateAsync();
@@ -187,10 +219,15 @@ public sealed class JsonMessagingGrain : Grain, IJsonMessagingGrain, IMessagingG
         });
     }
 
+    public async Task SendAsync(GrainId destination, HierarchicalKey messageId, int value, DateTimeOffset? deliverAt = null)
+    {
+        _outbox.Send(_type, messageId, destination, value, deliverAt);
+        await _manager.WriteStateAsync(CancellationToken.None);
+    }
+
     public async Task SendAndDeactivateAsync(GrainId destination, HierarchicalKey messageId, int value)
     {
-        _outbox.Send(_type, messageId, destination, value);
-        await _manager.WriteStateAsync(CancellationToken.None);
+        await SendAsync(destination, messageId, value);
         DeactivateOnIdle();
     }
 
