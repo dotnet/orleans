@@ -173,7 +173,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
         var now = Shared.JobTimeProvider.GetUtcNow();
         var inboxDelay = Inbox.GetNextWakeupDelay(now);
-        var outboxDelay = Outbox.GetNextWakeupDelay();
+        var outboxDelay = Outbox.GetNextWakeupDelay(now);
         if (inboxDelay is null && outboxDelay is null)
         {
             CompleteWakeup(jobId);

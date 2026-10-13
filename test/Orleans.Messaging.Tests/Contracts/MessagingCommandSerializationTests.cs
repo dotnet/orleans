@@ -71,11 +71,15 @@ public sealed class MessagingCommandSerializationTests
         Assert.DoesNotContain("DeliverAt", immediateJson, StringComparison.Ordinal);
         Assert.Null(JsonSerializer.Deserialize(immediateJson, InboxJsonContext.Default.InboxCommand)!.Message!.Value.Envelope.DeliverAt);
         Assert.Null(serializer.Deserialize(serializer.SerializeToArray(immediate))!.Message!.Value.Envelope.DeliverAt);
+        Assert.DoesNotContain("DeliverAt",
+            JsonSerializer.Serialize(new OutboxCommand { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("immediate"), State = new() { EnqueuedAt = Now } },
+                OutboxJsonContext.Default.OutboxCommand),
+            StringComparison.Ordinal);
     }
 
     private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt) };
 
-    private static OutboxMessage OutboxMessage(string id) => new() { Envelope = Envelope(id), ReceiverId = Receiver };
+    private static OutboxMessage OutboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt), ReceiverId = Receiver };
 
     private static Envelope Envelope(string id, DateTimeOffset? deliverAt = null) => new()
     {
@@ -121,6 +125,7 @@ public sealed class MessagingCommandSerializationTests
         return
         [
             new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("enqueue"), State = new() { EnqueuedAt = Now } },
+            new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("scheduled", Now), State = new() { EnqueuedAt = Now } },
             new() { Kind = OutboxCommandKind.Delivery, MessageId = HierarchicalKey.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", EnqueuedAt = Now } },
             new() { Kind = OutboxCommandKind.Delivery, MessageId = HierarchicalKey.Create("orders", "dead"), DeadLetter = deadLetter },
             new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [HierarchicalKey.Create("orders", "dead")] },
@@ -129,7 +134,7 @@ public sealed class MessagingCommandSerializationTests
                 Kind = OutboxCommandKind.Snapshot,
                 Snapshot = new()
                 {
-                    Messages = [new() { Message = OutboxMessage("pending"), State = new() { AttemptCount = 1, EnqueuedAt = Now } }],
+                    Messages = [new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, EnqueuedAt = Now } }],
                     DeadLetters = [deadLetter]
                 }
             }

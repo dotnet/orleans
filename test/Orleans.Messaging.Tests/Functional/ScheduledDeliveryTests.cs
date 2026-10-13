@@ -201,6 +201,34 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
     }
 
     [Fact]
+    public async Task SelfSentScheduledMessage_IsDeliveredImmediatelyAndProcessedWhenDue()
+    {
+        var grain = NewGrain();
+        _ = await grain.GetSnapshotAsync();
+        var deliverAt = JobClock.GetUtcNow() + Delay;
+        var message = NewMessage(40, "self");
+        var outgoing = TestApplicationProtocol.Create(Sessions, grain.GetGrainId(), grain.GetGrainId(), "messages/self", message);
+        outgoing = new OutboxMessage { ReceiverId = outgoing.ReceiverId, Envelope = outgoing.Envelope with { DeliverAt = deliverAt } };
+
+        await grain.StageOutputAsync(outgoing);
+        await grain.RetryWriteStateAsync();
+
+        // The outbox hands the message to its own inbox without waiting for the due time.
+        var delivered = await Fixture.SnapshotProbe.WaitAsync(
+            grain.GetGrainId(), static snapshot => snapshot.InboxCount == 1 && snapshot.OutboxCount == 0);
+        Assert.Empty(delivered.Effects);
+        await AssertWakeupAtAsync(grain, deliverAt);
+        Assert.Empty((await grain.GetSnapshotAsync()).Effects);
+
+        JobClock.Advance(Delay);
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(grain)).Status);
+        var completed = await Fixture.WaitForEffectCountAsync(grain, 1);
+        Assert.Equal("self", Assert.Single(completed.Effects).Value);
+        Assert.Equal(0, completed.InboxCount);
+        Assert.Equal(0, completed.OutboxCount);
+    }
+
+    [Fact]
     public async Task ScheduledMessage_LeavesActivationCollectableUntilDue()
     {
         var receiver = NewGrain();
@@ -232,7 +260,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
     private static InboxMessage Schedule(InboxMessage message, DateTimeOffset? deliverAt) =>
         new() { Envelope = message.Envelope with { DeliverAt = deliverAt } };
 
-    private sealed class ScheduledDeliveryClusterFixture() : MessagingClusterFixture(1, receiverOnly: true)
+    private sealed class ScheduledDeliveryClusterFixture() : MessagingClusterFixture(1, receiverOnly: false)
     {
         public ManualJobClock JobClock { get; } = new(DateTimeOffset.UtcNow);
 

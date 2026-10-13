@@ -61,6 +61,34 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         Assert.Equal(new[] { CustomHandlerGrain.FirstMatch }, await Probe.WaitAsync(receiver.GetGrainId(), 1, Token));
     }
 
+    [Fact]
+    public async Task JsonJournal_RecoversScheduledInboxMessageWithItsDeliverAt()
+    {
+        var receiver = Cluster.Client.GetGrain<IJsonMessagingGrain>(Guid.NewGuid());
+        var messageId = HierarchicalKey.Create("json", "scheduled", Guid.NewGuid().ToString("N"));
+        var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
+        var deliverAt = new DateTimeOffset(DateTime.UtcNow.AddDays(1).Ticks, TimeSpan.Zero).ToOffset(TimeSpan.FromHours(5));
+        var scheduled = type.Create(messageId, receiver.GetGrainId(), 7, deliverAt).ToInboxMessage();
+        var extension = receiver.AsReference<IInboxExtension>();
+
+        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(scheduled, Token)).Status);
+        Assert.True(Cluster.TryGetGrainContext(receiver.GetGrainId(), out var receiverContext));
+        await receiver.DeactivateAsync();
+        await receiverContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
+
+        // Redelivery replays the JSON journal; pending-command equivalence requires the recovered DeliverAt.
+        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(scheduled, Token)).Status);
+        var conflicting = type.Create(messageId, receiver.GetGrainId(), 7, deliverAt.AddSeconds(1)).ToInboxMessage();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => extension.DeliverAsync(conflicting, Token).AsTask());
+        Assert.True(Cluster.TryGetGrainContext(receiver.GetGrainId(), out var recoveredContext));
+        Assert.NotSame(receiverContext, recoveredContext);
+        var inbox = recoveredContext.ActivationServices.GetRequiredService<Inbox>();
+        var recovered = new TaskCompletionSource<DateTimeOffset?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        recoveredContext.Scheduler.QueueAction(() => recovered.SetResult(inbox.MessageState[messageId].Message.Envelope.DeliverAt));
+        Assert.Equal(deliverAt, await recovered.Task.WaitAsync(TimeSpan.FromSeconds(30), Token));
+        Assert.Empty(Probe.Get(receiver.GetGrainId()));
+    }
+
     public sealed class Fixture : IAsyncLifetime
     {
         public JsonMessagingProbe Probe { get; } = new();
