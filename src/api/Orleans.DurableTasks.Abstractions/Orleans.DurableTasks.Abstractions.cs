@@ -77,6 +77,8 @@ namespace Orleans.DurableTasks
 
         protected internal virtual TaskId CreateChildTaskId(string? name) { throw null; }
 
+        protected internal virtual System.Threading.Tasks.ValueTask DetachTaskAsync(TaskId markerId, TaskId rootId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
         public System.Threading.Tasks.ValueTask<System.IAsyncDisposable> RegisterCancellationCallbackAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
@@ -144,6 +146,8 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskExtensions
     {
+        public static System.Threading.Tasks.ValueTask DetachAsync(this DurableTask task, string rootId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public static DurableTaskAwaiter GetAwaiter(this DurableTask task) { throw null; }
 
         public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) { throw null; }
@@ -301,6 +305,7 @@ namespace Orleans.DurableTasks
 
     public partial interface ISchedulableTask
     {
+        System.Threading.Tasks.ValueTask DetachAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken);
         IScheduledTaskHandle GetHandle(TaskId taskId);
         System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken);
     }

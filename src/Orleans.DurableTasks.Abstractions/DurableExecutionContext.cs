@@ -110,6 +110,24 @@ public abstract class DurableExecutionContext
     protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
 
     /// <summary>
+    /// Starts <paramref name="taskDefinition"/> as a detached root task under <paramref name="rootId"/> and records the
+    /// start under <paramref name="markerId"/>, a descendant of this execution.
+    /// </summary>
+    /// <remarks>
+    /// The detached task isn't part of this execution: durable cancellation of this execution doesn't cancel it, and this
+    /// execution doesn't observe its result. The host commits the start together with its record, so a replay which
+    /// reaches the same marker leaves the detached task unchanged. A marker reused for another detached start fails.
+    /// The returned operation completes once the start is durable. Hosts which don't support detached tasks keep this
+    /// default implementation, which throws <see cref="NotSupportedException"/>.
+    /// </remarks>
+    protected internal virtual ValueTask DetachTaskAsync(
+        TaskId markerId,
+        TaskId rootId,
+        DurableTask taskDefinition,
+        CancellationToken cancellationToken)
+        => throw new NotSupportedException("The durable execution host does not support detached tasks.");
+
+    /// <summary>
     /// Returns the first completed candidate and persists that selection under <paramref name="decisionId"/>.
     /// Repeated calls with the same decision identifier return the recorded winner.
     /// </summary>
