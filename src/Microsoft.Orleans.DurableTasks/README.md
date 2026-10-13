@@ -127,7 +127,9 @@ validation disabled until its first published version establishes a baseline.
   subject, so replayed sends coalesce and redeliveries are deduplicated.
 - Recovery precedes new execution. Child identifiers, selection decisions, and
   outbound durable messages remain replay-stable. Each execution's logical UTC
-  time is persisted before its effects commit and reused during replay.
+  time is persisted before its effects commit and reused during replay; it
+  advances to the recorded completion time of each child result the execution
+  observes, so a delay starts when the work before it completed.
 - Activation shutdown stops new execution, signals the attempt-scoped execution-abort
   token observed by delegate and delay operations and adapter-controlled waits,
   drains active execution, discards its results, and leaves committed work
