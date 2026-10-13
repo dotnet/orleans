@@ -62,7 +62,7 @@ namespace Orleans.Messaging
         public System.Collections.Generic.Dictionary<string, byte[]>? Headers { get { throw null; } init { } }
 
         [Id(0)]
-        public required HierarchicalKey MessageId { get { throw null; } init { } }
+        public required MessageId MessageId { get { throw null; } init { } }
 
         [Id(1)]
         public required byte[] Payload { get { throw null; } init { } }
@@ -201,14 +201,65 @@ namespace Orleans.Messaging
     public partial interface IOutbox
     {
         IOutbox Register(IOutboxMessageSource source);
-        void Send(HierarchicalKey messageId);
+        void Send(MessageId messageId);
         void Send(OutboxMessage message);
     }
 
     public partial interface IOutboxMessageSource
     {
-        void OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement);
-        bool TryGetMessage(HierarchicalKey messageId, out OutboxMessage message);
+        void OnRetired(MessageId messageId, OutboxMessageRetirement retirement);
+        bool TryGetMessage(MessageId messageId, out OutboxMessage message);
+    }
+
+    [Immutable]
+    [Alias("Orleans.Messaging.MessageId")]
+    [System.Text.Json.Serialization.JsonConverter(typeof(MessageIdJsonConverter))]
+    public readonly partial struct MessageId : System.ISpanFormattable, System.IFormattable, System.IEquatable<MessageId>, System.IParsable<MessageId>, System.ISpanParsable<MessageId>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public MessageId(HierarchicalKey key) { }
+
+        public bool IsDefault { get { throw null; } }
+
+        public HierarchicalKey Key { get { throw null; } }
+
+        public static MessageId Create(scoped params System.ReadOnlySpan<string> segments) { throw null; }
+
+        public readonly bool Equals(MessageId other) { throw null; }
+
+        public override readonly bool Equals(object? obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool operator ==(MessageId left, MessageId right) { throw null; }
+
+        public static bool operator !=(MessageId left, MessageId right) { throw null; }
+
+        static MessageId System.ISpanParsable<MessageId>.Parse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider) { throw null; }
+
+        static MessageId System.IParsable<MessageId>.Parse(string s, System.IFormatProvider? provider) { throw null; }
+
+        public override readonly string ToString() { throw null; }
+
+        public readonly string ToString(string? format, System.IFormatProvider? formatProvider) { throw null; }
+
+        public readonly bool TryFormat(System.Span<char> destination, out int charsWritten, System.ReadOnlySpan<char> format, System.IFormatProvider? provider) { throw null; }
+
+        static bool System.ISpanParsable<MessageId>.TryParse(System.ReadOnlySpan<char> s, System.IFormatProvider? provider, out MessageId result) { throw null; }
+
+        static bool System.IParsable<MessageId>.TryParse(string? s, System.IFormatProvider? provider, out MessageId result) { throw null; }
+
+        public sealed partial class MessageIdJsonConverter : System.Text.Json.Serialization.JsonConverter<MessageId>
+        {
+            public override MessageId Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+            public override MessageId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+            public override void Write(System.Text.Json.Utf8JsonWriter writer, MessageId value, System.Text.Json.JsonSerializerOptions options) { }
+
+            public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, MessageId value, System.Text.Json.JsonSerializerOptions options) { }
+        }
     }
 
     public sealed partial class MessageType<T>
@@ -219,7 +270,7 @@ namespace Orleans.Messaging
 
         public string Subject { get { throw null; } }
 
-        public OutboxMessage Create(HierarchicalKey messageId, Runtime.GrainId receiverId, T body, System.DateTimeOffset? deliverAt = null) { throw null; }
+        public OutboxMessage Create(MessageId messageId, Runtime.GrainId receiverId, T body, System.DateTimeOffset? deliverAt = null) { throw null; }
 
         public T Decode(Envelope envelope) { throw null; }
 
@@ -230,11 +281,11 @@ namespace Orleans.Messaging
 
     public static partial class OutboxExtensions
     {
-        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, HierarchicalKey messageId, Runtime.GrainId destination, T body, System.DateTimeOffset? deliverAt = null) { }
+        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, MessageId messageId, Runtime.GrainId destination, T body, System.DateTimeOffset? deliverAt = null) { }
 
-        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, HierarchicalKey messageId, Runtime.IAddressable destination, T body, System.DateTimeOffset? deliverAt = null) { }
+        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, MessageId messageId, Runtime.IAddressable destination, T body, System.DateTimeOffset? deliverAt = null) { }
 
-        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, System.Collections.Generic.IEnumerable<(HierarchicalKey MessageId, Runtime.GrainId Destination, T Body)> messages) { }
+        public static void Send<T>(this IOutbox outbox, MessageType<T> messageType, System.Collections.Generic.IEnumerable<(MessageId MessageId, Runtime.GrainId Destination, T Body)> messages) { }
 
         public static void SendReply<T>(this IOutbox outbox, MessageType<T> messageType, IInboxHandlerContext context, Runtime.GrainId destination, T body) { }
 

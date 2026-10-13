@@ -33,7 +33,7 @@ internal static class EnvelopeValidation
         Validate(message.Envelope);
     }
 
-    internal static void ValidateMessageId(HierarchicalKey messageId)
+    internal static void ValidateMessageId(MessageId messageId)
     {
         if (messageId.IsDefault) throw new ArgumentException("The message ID must not be unset.", nameof(messageId));
         if (Utf8.GetByteCount(messageId.ToString()) > MaxMessageIdBytes)

@@ -12,7 +12,7 @@ namespace Orleans.Messaging.Tests.Contracts;
 [TestArea("Messaging")]
 public sealed class EnvelopeContractTests
 {
-    private static HierarchicalKey Id => HierarchicalKey.Create("orders", "123");
+    private static MessageId Id => MessageId.Create("orders", "123");
     private static GrainId Receiver => GrainId.Create("receiver", "123");
 
     [Fact]
@@ -253,7 +253,7 @@ public sealed class EnvelopeContractTests
             ReceiverId = change == "receiver" ? GrainId.Create("receiver", "other") : Receiver,
             Envelope = envelope with
             {
-                MessageId = change == "id" ? HierarchicalKey.Create("other") : change == "child" ? Id.CreateChildKey("child") : Id,
+                MessageId = change == "id" ? MessageId.Create("other") : change == "child" ? new MessageId(Id.Key.CreateChildKey("child")) : Id,
                 Payload = change == "payload" ? [0, 255, 129] : change == "payload-length" ? [0, 255] : [0, 255, 128],
                 Subject = change == "subject" ? "other" : change == "subject-case" ? "Subject.v1" : change == "no-subject" ? null : "subject.v1",
                 Headers = new() { ["custom"] = Encoding.UTF8.GetBytes(change == "headers" ? "second" : "first"), ["sender"] = change == "sender" ? [2] : [1] },
@@ -301,9 +301,9 @@ public sealed class EnvelopeContractTests
         {
             MessageId = field switch
             {
-                "id" => HierarchicalKey.Create(new string('x', length)),
-                "depth" => HierarchicalKey.Create(Enumerable.Repeat("x", length).ToArray()),
-                "unicode-id" => HierarchicalKey.Create(new string('\u00e9', length)),
+                "id" => MessageId.Create(new string('x', length)),
+                "depth" => MessageId.Create(Enumerable.Repeat("x", length).ToArray()),
+                "unicode-id" => MessageId.Create(new string('\u00e9', length)),
                 _ => Id
             },
             Subject = field.Contains("subject", StringComparison.Ordinal) ? new string(field == "subject" ? 's' : '\u00e9', length) : null
