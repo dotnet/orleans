@@ -8,8 +8,8 @@
 `Microsoft.Orleans.DurableTasks` executes grain interface methods which return
 `Orleans.DurableTasks.DurableTask` over Orleans Messaging. It owns the request
 protocol, runtime adapter, storage integration, code-generation mapping,
-diagnostics, cancellation propagation, completion acknowledgement, and durable
-delays, which resume through scheduled inbox messages.
+diagnostics, cancellation propagation, completion delivery, and durable delays,
+which resume through scheduled inbox messages.
 
 ## Configuration
 
@@ -64,13 +64,25 @@ validation disabled until its first published version establishes a baseline.
   Operations validate before staging and stage only changes which are safe to
   commit; a failed journal write deactivates the grain, and the next activation
   recovers from committed state.
-- Inbox messages are staged and completed synchronously, so the inbox commits
-  each batch with the changes it caused. Execution starts, local completions,
-  and cancellation propagation follow that commit.
-- Terminal responses and completion notifications commit together. Durable
-  callers acknowledge completion idempotently, and the callee retains the result
-  until the acknowledgement arrives, independent of messaging dead-letter and
-  deduplication retention; external clients poll retained results.
+- Inbox messages are staged synchronously, so the inbox commits each message
+  with the changes it caused. Invocations, completions, and cancellations are
+  accepted when they are delivered; scheduled delay resumes are processed when
+  due. Execution starts, local completions, and cancellation propagation follow
+  the commit.
+- Each request and result payload is journaled once per grain. The callee's inbox
+  accepts invocations, and the caller's inbox accepts completions, directly into
+  task state, journaling only the message's processed record alongside it. The
+  callee's outbox journals a reference to each completion and materializes its
+  envelope from the stored result for every delivery attempt. Task state persists
+  request and result payloads separately from the task's metadata, so updates to
+  the metadata do not rewrite them.
+- Terminal responses and completion notifications commit together. The callee
+  retains the result until the completion retires from its outbox. When the
+  calling grain has durably accepted it, the callee prunes the task in the same
+  journal write, keeping a tombstone which rejects conflicting reuse of its
+  identity. When the completion is dead-lettered, and for tasks scheduled by
+  clients, the result remains available for `DurableTaskOptions.ResultRetentionPeriod`
+  after completion; external clients poll retained results.
 - Cancellation is monotonic, duplicates are idempotent, and the first durable
   terminal result wins a race.
 - Delays persist their logical due time and generation. Each delay sends a
