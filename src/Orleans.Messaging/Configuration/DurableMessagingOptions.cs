@@ -43,6 +43,10 @@ public class DurableMessagingOptions
     /// The inbox capacity is checked before accepting new messages. Messages are persisted to durable
     /// storage, so capacity limits affect both in-memory state and storage I/O during recovery.
     /// </para>
+    /// <para>
+    /// Messages with an <see cref="Envelope.DeliverAt"/> time do not count toward this limit, including after they
+    /// become due, and are accepted regardless of it.
+    /// </para>
     /// </remarks>
     /// <value>
     /// The maximum inbox capacity. Must be greater than zero. Defaults to 1000.
