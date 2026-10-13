@@ -48,6 +48,12 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, Ou
         StoredMessages.Add(envelope.Envelope.MessageId, envelope);
     }
 
+    public void SendFromSource(HierarchicalKey messageId, GrainId receiverId) =>
+        throw new NotSupportedException("The test outbox stores complete envelopes only.");
+
+    public IOutbox Register(IOutboxMessageSource source) =>
+        throw new NotSupportedException("The test outbox stores complete envelopes only.");
+
     public bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out OutboxMessage envelope) =>
         StoredMessages.TryGetValue(messageId, out envelope);
     public Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;

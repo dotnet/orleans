@@ -25,6 +25,7 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
 {
     private readonly MessagingPump _pump;
     private readonly InboxDispatcher _handlers = new([]);
+    private readonly List<IInboxMessageSink> _sinks = [];
 
     public Inbox(MessagingPump pump)
     {
@@ -53,6 +54,13 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
         return this;
     }
 
+    public IInbox Register(IInboxMessageSink sink)
+    {
+        ArgumentNullException.ThrowIfNull(sink);
+        _sinks.Add(sink);
+        return this;
+    }
+
     public async ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -64,26 +72,22 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
         var key = message.Envelope.MessageId;
         try
         {
-            if (_processed.TryGetValue(key, out var processedAt)
-                && !MessagingTime.IsExpired(TimeProvider.GetUtcNow(), processedAt, Options.DeduplicationWindow))
+            if (IsDuplicate(message, out var pending))
             {
+                // The sender may retire its copy once this returns, so the acceptance must be durable. A sink acceptance
+                // journals only its processed record, which can still be in flight.
+                if (pending is null ? _sinks.Count > 0 : !IsDurable(pending)) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
+                if (pending is not null) _pump.Signal();
+
                 Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
                 return DeliveryResult.Duplicate();
             }
 
-            if (_messages.TryGetValue(key, out var pending))
+            // Sink-accepted messages never occupy inbox capacity and need no handler.
+            if (message.Envelope.DeliverAt is null && StageSinkAcceptance(message) is { } accepted)
             {
-                if (!EnvelopeEquivalence.AreSameCommand(pending.Message, message))
-                {
-                    throw new InvalidOperationException(
-                        $"The inbox already contains a different command with message ID '{key}'.");
-                }
-
-                // The sender may retire its copy once this returns, so the acceptance must be durable.
-                if (!IsDurable(pending)) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
-                _pump.Signal();
-                Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
-                return DeliveryResult.Duplicate();
+                await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
+                return accepted;
             }
 
             // Scheduled messages never count toward capacity, so they are not backpressured either.
@@ -111,6 +115,89 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
             LogDeliveryOperationFailed(Logger, exception, key, GrainContext.GrainId);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Offers a message to the registered sinks and stages the outcome of the first sink which accepts or rejects it.
+    /// </summary>
+    /// <returns>The delivery result, or <see langword="null"/> when every sink declines the message.</returns>
+    /// <remarks>
+    /// An accepted message journals only its processed record, in the write which commits the sink's staged changes.
+    /// A sink which throws stages nothing, so the message is dead-lettered with its payload and recorded as processed.
+    /// </remarks>
+    private DeliveryResult? StageSinkAcceptance(InboxMessage message)
+    {
+        var key = message.Envelope.MessageId;
+        foreach (var sink in _sinks)
+        {
+            Exception? error = null;
+            try
+            {
+                if (!sink.TryAccept(message)) continue;
+            }
+            catch (Exception exception)
+            {
+                error = exception;
+            }
+
+            try
+            {
+                if (error is null)
+                {
+                    StageCompletion(key, deadLetter: null);
+                }
+                else
+                {
+                    LogSinkRejected(Logger, error, key, GrainContext.GrainId);
+                    StageDeadLetter(message, error.Message, attemptCount: 1);
+                }
+            }
+            catch (Exception exception)
+            {
+                // The sink's staged changes cannot commit without the processed record.
+                LogStagingFailed(Logger, exception);
+                _pump.Fail(exception, "Inbox staging failed.");
+                throw;
+            }
+
+            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
+            Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, error is null ? "success" : "dead_lettered");
+            if (error is not null) return DeliveryResult.DeadLettered(error.Message);
+            LogMessageAccepted(Logger, key, GrainContext.GrainId);
+            return DeliveryResult.Accepted();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns whether the message was completed within the deduplication window or is pending, and rejects a pending
+    /// command which differs from it.
+    /// </summary>
+    /// <param name="message">The received message.</param>
+    /// <param name="pending">The pending entry, or <see langword="null"/> when the message was completed or is new.</param>
+    private bool IsDuplicate(InboxMessage message, out InboxEntry? pending)
+    {
+        var key = message.Envelope.MessageId;
+        if (_processed.TryGetValue(key, out var processedAt)
+            && !MessagingTime.IsExpired(TimeProvider.GetUtcNow(), processedAt, Options.DeduplicationWindow))
+        {
+            pending = null;
+            return true;
+        }
+
+        if (_messages.TryGetValue(key, out pending))
+        {
+            if (!EnvelopeEquivalence.AreSameCommand(pending.Message, message))
+            {
+                throw new InvalidOperationException(
+                    $"The inbox already contains a different command with message ID '{key}'.");
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -204,7 +291,7 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
             var attempts = checked(entry.State.AttemptCount + 1);
             if (attempts >= Options.MaxProcessingAttempts)
             {
-                StageDeadLetter(entry, error.Message, attempts);
+                StageDeadLetter(entry.Message, error.Message, attempts);
                 status = "dead_lettered";
             }
             else
@@ -236,23 +323,23 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
     private bool IsCurrent(InboxEntry entry) =>
         _messages.TryGetValue(entry.Message.Envelope.MessageId, out var current) && ReferenceEquals(current, entry);
 
-    private void StageCompletion(InboxEntry entry, InboxDeadLetter? deadLetter) =>
+    private void StageCompletion(HierarchicalKey messageId, InboxDeadLetter? deadLetter) =>
         Emit(new()
         {
             Kind = InboxCommandKind.Complete,
-            MessageId = entry.Message.Envelope.MessageId,
+            MessageId = messageId,
             ProcessedAt = TimeProvider.GetUtcNow(),
             DeadLetter = deadLetter
         });
 
-    private void StageDeadLetter(InboxEntry entry, string reason, int attemptCount)
+    private void StageDeadLetter(InboxMessage message, string reason, int attemptCount)
     {
         var now = TimeProvider.GetUtcNow();
-        var key = entry.Message.Envelope.MessageId;
+        var key = message.Envelope.MessageId;
         CompactDeadLetters(now, reservedCapacity: _deadLetters.ContainsKey(key) ? 0 : 1);
-        StageCompletion(entry, new InboxDeadLetter
+        StageCompletion(key, new InboxDeadLetter
         {
-            Message = entry.Message,
+            Message = message,
             DeadLetteredAt = now,
             Reason = reason,
             AttemptCount = attemptCount
@@ -383,7 +470,7 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
 
             try
             {
-                owner.StageCompletion(entry, deadLetter: null);
+                owner.StageCompletion(entry.Message.Envelope.MessageId, deadLetter: null);
                 Completed = true;
             }
             catch (Exception exception)
@@ -408,7 +495,7 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
 
             try
             {
-                owner.StageDeadLetter(entry, reason, checked(entry.State.AttemptCount + 1));
+                owner.StageDeadLetter(entry.Message, reason, checked(entry.State.AttemptCount + 1));
                 DeadLetterReason = reason;
                 Completed = true;
             }
@@ -441,6 +528,9 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
         Message = "Inbox delivery of message {MessageId} to {GrainId} failed")]
     private static partial void LogDeliveryOperationFailed(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId grainId);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Inbox command staging failed.")]
+    private static partial void LogStagingFailed(ILogger logger, Exception exception);
+
     [LoggerMessage(Level = LogLevel.Warning, Message = "No inbox handler registered for message {MessageId} to {ReceiverId}")]
     private static partial void LogHandlerNotFound(ILogger logger, HierarchicalKey messageId, GrainId receiverId);
 
@@ -449,4 +539,7 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Handler threw exception for message {MessageId} to {ReceiverId}")]
     private static partial void LogHandlerException(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId receiverId);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Inbox message sink rejected message {MessageId} to {ReceiverId}; the message is dead-lettered")]
+    private static partial void LogSinkRejected(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId receiverId);
 }
