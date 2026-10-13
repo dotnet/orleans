@@ -114,6 +114,44 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         Assert.Single(_fixture.Probe.GetLogicalTimes(grainId));
         Assert.Equal((argument * 3) + 7, await grain.GetDurableTask<int>(rootId).WaitAsync(cancellationToken));
     }
+
+    [Fact]
+    public async Task DelayedTaskSurvivesDeactivationAndCompletesWhenDueAfterReactivation()
+    {
+        const string rootId = "delay-across-deactivation";
+        const int argument = 9;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+        var scheduled = await grain.DelayAcrossDeactivationAsync(argument).ScheduleAsync(rootId, cancellationToken);
+        await _fixture.Probe.WaitForLogicalTimeCountAsync(grainId, 1, cancellationToken);
+
+        // The delay is an hour long, so it stays pending across the deactivation and the replay which follows it.
+        await DeactivateAsync(grain, cancellationToken);
+        await _fixture.Probe.WaitForLogicalTimeCountAsync(grainId, 2, cancellationToken);
+        var attached = grain.GetDurableTask<int>(rootId);
+        Assert.False(await attached.IsCompletedAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, cancellationToken));
+
+        // Once the Durable Jobs clock passes the due time, the next activation processes the scheduled resume.
+        _fixture.JobClock.Advance(TimeSpan.FromHours(2));
+        await DeactivateAsync(grain, cancellationToken);
+        var response = await attached.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal((argument * 3) + 7, response.GetResult<int>());
+        Assert.Equal((argument * 3) + 7, await scheduled.WaitAsync(cancellationToken));
+        var observations = _fixture.Probe.GetLogicalTimes(grainId);
+        Assert.True(observations.Count >= 3);
+        Assert.All(observations, observation => Assert.Equal(observations[0], observation));
+    }
+
+    private async Task DeactivateAsync(IDurableTaskRecoveryTestGrain grain, CancellationToken cancellationToken)
+    {
+        var activations = _fixture.Probe.GetActivationCount(grain.GetGrainId());
+        await grain.RequestDeactivationAsync();
+        _ = await grain.GetActivationIdAsync();
+        await _fixture.Probe.WaitForActivationCountAsync(grain.GetGrainId(), activations + 1, cancellationToken);
+    }
 }
 
 public interface IDurableTaskRecoveryTestGrain : IGrainWithGuidKey
@@ -121,6 +159,7 @@ public interface IDurableTaskRecoveryTestGrain : IGrainWithGuidKey
     DurableTask<int> ComputeAsync(int value);
     DurableTask<DateTimeOffset> ObserveLogicalTimeAsync();
     DurableTask<int> DelayThenComputeAsync(int value);
+    DurableTask<int> DelayAcrossDeactivationAsync(int value);
     Task<Guid> GetActivationIdAsync();
     Task RequestDeactivationAsync();
 }
@@ -148,6 +187,8 @@ public sealed class DurableTaskRecoveryProbe
             (_, current) => new DurableTaskInvocationSnapshot(current.Count + 1, activationId, argument));
         SignalChanged();
     }
+
+    public int GetActivationCount(GrainId grainId) => _activations.TryGetValue(grainId, out var count) ? count : 0;
 
     public DurableTaskInvocationSnapshot GetInvocation(GrainId grainId) =>
         _invocations.TryGetValue(grainId, out var snapshot) ? snapshot : default;
@@ -267,6 +308,13 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
         return checked((value * 3) + 7);
     }
 
+    public async DurableTask<int> DelayAcrossDeactivationAsync(int value)
+    {
+        probe.RecordLogicalTime(this.GetGrainId(), DurableExecutionContext.Current!.UtcNow);
+        await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("pause");
+        return checked((value * 3) + 7);
+    }
+
     public Task<Guid> GetActivationIdAsync() => Task.FromResult(_activationId);
 
     public Task RequestDeactivationAsync()
@@ -288,6 +336,7 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
     {
         Probe = new();
         MessagingProbe = new();
+        JobClock = new();
         Storage = new VolatileJournalStorageProvider(
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }));
         var clusterId = $"durable-task-recovery-{Guid.NewGuid():N}";
@@ -312,6 +361,7 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
             siloBuilder.AddJournaling();
             siloBuilder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
             siloBuilder.UseInMemoryDurableJobs();
+            siloBuilder.Services.AddKeyedSingleton<TimeProvider>(DurableJobTimeProviderNames.DurableJobs, JobClock);
             siloBuilder.AddDurableTasks();
             siloBuilder.Services.AddSingleton(Probe);
             siloBuilder.Services.AddSingleton(MessagingProbe);
@@ -330,8 +380,26 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
     public IClusterClient Client => Cluster.Client!;
     public DurableTaskRecoveryProbe Probe { get; }
     public DurableTaskMessagingProbe MessagingProbe { get; }
+
+    /// <summary>Gets the Durable Jobs clock, which decides when scheduled messages such as delay resumes are due.</summary>
+    public AdvanceableTimeProvider JobClock { get; }
     public VolatileJournalStorageProvider Storage { get; }
 
     public ValueTask InitializeAsync() => new(Cluster.DeployAsync());
     public ValueTask DisposeAsync() => Cluster.DisposeAsync();
+}
+
+/// <summary>
+/// A clock which follows real time plus an offset that tests can advance.
+/// </summary>
+/// <remarks>
+/// Timers and timestamps follow real time, so Durable Jobs keeps running; advancing moves due times into the past.
+/// </remarks>
+public sealed class AdvanceableTimeProvider : TimeProvider
+{
+    private long _offsetTicks;
+
+    public override DateTimeOffset GetUtcNow() => base.GetUtcNow().AddTicks(Interlocked.Read(ref _offsetTicks));
+
+    public void Advance(TimeSpan delta) => Interlocked.Add(ref _offsetTicks, delta.Ticks);
 }
