@@ -174,10 +174,14 @@ write completes. Each receiver returns a `DeliveryResult`:
 - `DeadLettered`: the receiver moved the message to its dead-letter store.
 
 `Accepted`, `Duplicate`, and `DeadLettered` are terminal: the outbox removes the
-message. The outbox retries `Backpressured`, `HandlerNotFound`, and transport
-failures with exponential backoff. It dead-letters a message after
-`MaxDeliveryAttempts` or once it is older than `MaxOutboxRetryAge`. Delivery order
-is unspecified.
+message. Each delivery attempt runs through the `DeliveryResiliencePipeline` Polly
+pipeline. By default, it retries failed calls five times with exponential backoff
+within a total timeout of six response timeouts, and a silo-wide circuit breaker
+opens on correlated failures. The outbox retries `Backpressured`, `HandlerNotFound`,
+and calls which fail through the pipeline with exponential backoff. It dead-letters
+a message after `MaxDeliveryAttempts` replies without acceptance, or once it is
+older than `MaxOutboxRetryAge`, so failed calls during an outage retry until that
+age. Delivery order is unspecified.
 
 Each activation runs one messaging pump on its scheduler, processing inbox batches
 and delivering outbox batches. One durable job per grain wakes the pump while either
