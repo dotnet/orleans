@@ -482,8 +482,6 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         ThrowIfStopping();
         var transport = MessageTransport;
-        var logicalUtcNow = GetOrCreateLogicalTime(taskId);
-        var duration = dueTime - logicalUtcNow;
         if (_storage.TryGetTask(taskId, out var state))
         {
             if (state.Result is { IsCompleted: true } completed)
@@ -493,26 +491,16 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             if (state.DueTime is { } existingDueTime)
             {
-                if (state.DelayDuration is { } existingDuration && existingDuration != duration)
-                {
-                    throw new InvalidOperationException(
-                        $"Durable delay '{taskId}' was already scheduled for duration '{existingDuration}', not '{duration}'.");
-                }
-
+                // A durable delay is a commitment: replay keeps the recorded due time, even when the workflow now
+                // requests another one, for example after a configured duration changed.
                 if (existingDueTime != dueTime)
                 {
-                    throw new InvalidOperationException(
-                        $"Durable delay '{taskId}' was already scheduled for '{existingDueTime:O}', not '{dueTime:O}'.");
-                }
-
-                if (state.DelayDuration is null)
-                {
-                    _storage.SetDelay(
+                    _shared.Logger.LogWarning(
+                        "{Id} durable delay '{TaskId}' is due at {RecordedDueTime:O}; its replay requested {RequestedDueTime:O}. The recorded due time is kept.",
+                        GrainId,
                         taskId,
-                        state,
                         existingDueTime,
-                        duration,
-                        state.ResumeGeneration);
+                        dueTime);
                 }
 
                 // A replay can observe a delay staged by an earlier attempt whose write did not complete.
@@ -523,7 +511,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         state ??= _storage.GetOrCreateTask(taskId, request: null);
         var generation = checked(state.ResumeGeneration + 1);
-        _storage.SetDelay(taskId, state, dueTime, duration, generation);
+        _storage.SetDelay(taskId, state, dueTime, generation);
 
         // The grain's own inbox accepts the resume in the same journal write as the delay, so every durable delay has a
         // durable resume.
@@ -1401,6 +1389,16 @@ internal sealed partial class DurableTaskGrainRuntime(
             response = DurableTaskResponse.FromException(exception);
         }
 
+        // A cancellation which arrives while this attempt still runs, for example while a delay's journal write is in
+        // flight, cancels only the attempt's token. The attempt then terminalizes the task, so a pending operation
+        // which it returns, such as a delay, does not outlive the cancellation.
+        if (!response.IsCompleted
+            && _storage.TryGetTask(context.TaskId, out var taskState)
+            && taskState.CancellationRequestedAt.HasValue)
+        {
+            response = DurableTaskResponse.Canceled;
+        }
+
         try
         {
             if (response.IsCompleted && !_stopping)
@@ -1735,21 +1733,65 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         static DurableTaskDiagnosticState GetDiagnosticState(IDurableTaskState taskState)
         {
+            var (status, response) = DescribeResult(taskState);
             return new DurableTaskDiagnosticState
             {
                 CompletedAt = taskState.CompletedAt,
                 CreatedAt = taskState.CreatedAt,
-                Response = taskState.Result?.ToString(),
-                Request = taskState.Request?.ToMethodCallString(),
-                Status = taskState.Result switch
-                {
-                    { } response when response.Exception is null => "Completed",
-                    { } => "Faulted",
-                    null => "Pending",
-                },
+                DueTime = taskState.DueTime,
+                RemoteTarget = taskState.RemoteTarget.IsDefault ? null : taskState.RemoteTarget.ToString(),
+                Response = response,
+                Request = DescribeRequest(taskState),
+                Status = status,
                 Waiters = [.. taskState.CompletionDestinations.Select(static destination => destination.ToString())],
             };
         }
+
+        // Diagnostics decode stored payloads, so a payload which no longer decodes is reported instead of thrown.
+        static (string Status, string? Response) DescribeResult(IDurableTaskState taskState)
+        {
+            if (!HasStoredResult(taskState))
+            {
+                var status = taskState switch
+                {
+                    { TombstonedAt: not null } => "Tombstoned",
+                    { CancellationRequestedAt: not null } => "Canceling",
+                    { DueTime: not null } => "Delayed",
+                    _ => "Pending",
+                };
+                return (status, null);
+            }
+
+            try
+            {
+                var result = taskState.Result!;
+                return result.Status switch
+                {
+                    DurableTaskStatus.CompletedSuccessfully => ("Completed", result.Result?.ToString()),
+                    DurableTaskStatus.Canceled => ("Canceled", null),
+                    _ => ("Faulted", DescribeException(result.Exception)),
+                };
+            }
+            catch (Exception exception)
+            {
+                return ("Unreadable", DescribeException(exception));
+            }
+        }
+
+        static string? DescribeRequest(IDurableTaskState taskState)
+        {
+            try
+            {
+                return taskState.Request?.ToMethodCallString();
+            }
+            catch (Exception exception)
+            {
+                return $"Unreadable request: {DescribeException(exception)}";
+            }
+        }
+
+        static string? DescribeException(Exception? exception) =>
+            exception is null ? null : $"{exception.GetType().Name}: {exception.Message}";
     }
 
     async IAsyncEnumerable<TaskId> IDurableTaskGrainExtension.GetRunningTasksAsync([EnumeratorCancellation] CancellationToken cancellationToken)

@@ -65,12 +65,18 @@ public struct DurableTaskDiagnosticState
     /// Gets or sets the diagnostic status, or <see langword="null"/> when the value was default-initialized
     /// or received from a version which did not provide this member.
     /// </summary>
+    /// <remarks>
+    /// A task with a stored result is <c>Completed</c>, <c>Faulted</c>, <c>Canceled</c>, or <c>Unreadable</c> when the result
+    /// no longer decodes. A task without one is <c>Tombstoned</c>, <c>Canceling</c>, <c>Delayed</c>, or <c>Pending</c>.
+    /// </remarks>
     [Id(2)]
     public string? Status { get; set; }
 
+    /// <summary>Gets or sets the local request, formatted as a method call.</summary>
     [Id(3)]
     public string? Request { get; set; }
 
+    /// <summary>Gets or sets a summary of the stored result: its value, its exception, or its decoding failure.</summary>
     [Id(4)]
     public string? Response { get; set; }
 
@@ -81,7 +87,15 @@ public struct DurableTaskDiagnosticState
     [Id(5)]
     public List<string>? Waiters { get; set; }
 
-    public override readonly string ToString() => $"[{Status}, Created: {CreatedAt}, Completed: {CompletedAt}, Request: {Request}, Response: {Response}, Waiters: {string.Join(", ", Waiters ?? [])}]";
+    /// <summary>Gets or sets the due time of a pending delay.</summary>
+    [Id(6)]
+    public DateTimeOffset? DueTime { get; set; }
+
+    /// <summary>Gets or sets the grain which executes a remote child task.</summary>
+    [Id(7)]
+    public string? RemoteTarget { get; set; }
+
+    public override readonly string ToString() => $"[{Status}, Created: {CreatedAt}, Completed: {CompletedAt}, Due: {DueTime}, Request: {Request}, Remote: {RemoteTarget}, Response: {Response}, Waiters: {string.Join(", ", Waiters ?? [])}]";
 }
 
 // Intermediates requests from clients / grains to DurableTasks.
