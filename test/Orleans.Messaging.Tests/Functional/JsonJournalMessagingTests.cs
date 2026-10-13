@@ -42,7 +42,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
         var redelivery = type.Create(messageId, receiver.GetGrainId(), 42).ToInboxMessage();
 
-        Assert.Equal(DeliveryStatus.Duplicate, (await receiver.AsReference<IInboxExtension>().DeliverAsync(redelivery, Token)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await receiver.AsReference<IMessagingExtension>().DeliverAsync(redelivery, Token)).Status);
         Assert.Equal(new[] { 42 }, Probe.Get(receiver.GetGrainId()));
     }
 
@@ -55,7 +55,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
             Envelope = new Envelope { MessageId = MessageId.Create("custom", Guid.NewGuid().ToString("N")), Payload = [7], Subject = "custom" }
         };
 
-        var result = await receiver.AsReference<IInboxExtension>().DeliverAsync(message, Token);
+        var result = await receiver.AsReference<IMessagingExtension>().DeliverAsync(message, Token);
 
         Assert.Equal(DeliveryStatus.Accepted, result.Status);
         Assert.Equal(new[] { CustomHandlerGrain.FirstMatch }, await Probe.WaitAsync(receiver.GetGrainId(), 1, Token));
@@ -69,7 +69,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
         var deliverAt = new DateTimeOffset(DateTime.UtcNow.AddDays(1).Ticks, TimeSpan.Zero).ToOffset(TimeSpan.FromHours(5));
         var scheduled = type.Create(messageId, receiver.GetGrainId(), 7, deliverAt).ToInboxMessage();
-        var extension = receiver.AsReference<IInboxExtension>();
+        var extension = receiver.AsReference<IMessagingExtension>();
 
         Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(scheduled, Token)).Status);
         Assert.True(Cluster.TryGetGrainContext(receiver.GetGrainId(), out var receiverContext));
@@ -116,7 +116,7 @@ public sealed class JsonJournalMessagingTests(JsonJournalMessagingTests.Fixture 
         Assert.Equal((1, deliverAt), await recovered.Task.WaitAsync(TimeSpan.FromSeconds(30), Token));
         var type = new MessageType<int>(JsonMessagingGrain.Subject, Cluster.Client.ServiceProvider.GetRequiredService<Serializer<int>>());
         var redelivery = type.Create(immediateId, grain.GetGrainId(), 8).ToInboxMessage();
-        Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IInboxExtension>().DeliverAsync(redelivery, Token)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IMessagingExtension>().DeliverAsync(redelivery, Token)).Status);
         Assert.Equal(new[] { 8 }, Probe.Get(grain.GetGrainId()));
     }
 

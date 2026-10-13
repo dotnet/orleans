@@ -335,7 +335,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         var start = Stopwatch.GetTimestamp();
         try
         {
-            var target = Shared.GrainFactory.GetGrain<IInboxExtension>(message.ReceiverId);
+            var target = Shared.GrainFactory.GetGrain<IMessagingExtension>(message.ReceiverId);
             var result = await target.DeliverAsync(message.ToInboxMessage(), cancellationToken).ConfigureAwait(true);
             return new(entry, message, result, null, Stopwatch.GetElapsedTime(start), false);
         }

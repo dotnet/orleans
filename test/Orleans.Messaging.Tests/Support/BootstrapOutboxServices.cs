@@ -37,7 +37,7 @@ public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, ILoggerPr
 
     public async Task Invoke(IOutgoingGrainCallContext context)
     {
-        if (context.TargetId == BootstrapState.OutputTarget && context.MethodName == nameof(IInboxExtension.DeliverAsync))
+        if (context.TargetId == BootstrapState.OutputTarget && context.MethodName == nameof(IMessagingExtension.DeliverAsync))
         {
             await _release.Task.WaitAsync(context.Request.GetCancellationToken());
         }

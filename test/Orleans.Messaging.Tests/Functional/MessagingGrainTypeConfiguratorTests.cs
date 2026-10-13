@@ -39,7 +39,7 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
     [InlineData(typeof(GenericBootstrapGrain<int>))]
     [InlineData(typeof(DurableBootstrapGrain))]
     [InlineData(typeof(MarkedDurableBootstrapGrain))]
-    public async Task SelectedComposition_InstallsInboxExtensionAndReplaysFreshScopedState(Type grainClass)
+    public async Task SelectedComposition_InstallsMessagingExtensionAndReplaysFreshScopedState(Type grainClass)
     {
         var grain = CreateGrain(grainClass);
         Assert.Equal(0, await grain.GetValueAsync());
@@ -53,7 +53,7 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
 
         using var handler = Fixture.HandlerProbe.Arm(grain.GetGrainId(), BootstrapState.Route);
         var envelope = CreateEnvelope(grain);
-        Assert.Equal(DeliveryStatus.Accepted, (await grain.AsReference<IInboxExtension>().DeliverAsync(envelope, Cancellation)).Status);
+        Assert.Equal(DeliveryStatus.Accepted, (await grain.AsReference<IMessagingExtension>().DeliverAsync(envelope, Cancellation)).Status);
         await handler.WaitUntilEnteredAsync();
         Assert.Equal(41, first.Value!.Value);
         Assert.Equal(1, first.Inbox!.Count);
@@ -66,7 +66,7 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
         Assert.Equal(1, GetProcessedCount(first));
         var output = Assert.Single(first.Outbox!.Messages());
         Assert.NotEmpty(Fixture.JobManagerProbe.GetScheduledJobs(MessagingPump.JobName, grain.GetGrainId()));
-        Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IInboxExtension>().DeliverAsync(envelope, Cancellation)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IMessagingExtension>().DeliverAsync(envelope, Cancellation)).Status);
         Assert.Equal(1, state.HandlerCalls);
 
         var other = CreateGrain(grainClass);
@@ -96,7 +96,7 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
         Assert.Same(setup, GetSetup(recovered.Context));
         Assert.Equal(output.Envelope.MessageId, Assert.Single(recovered.Outbox!.Messages()).Envelope.MessageId);
         Assert.Equal(1, GetProcessedCount(recovered));
-        Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IInboxExtension>().DeliverAsync(envelope, Cancellation)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await grain.AsReference<IMessagingExtension>().DeliverAsync(envelope, Cancellation)).Status);
         Assert.Equal(0, recoveredState.HandlerCalls);
         Assert.Equal(2, Fixture.Storage.GetReadCount(journal));
 
@@ -110,7 +110,7 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
         Assert.Empty(recovered.Outbox!.Messages());
         var sink = Fixture.Client.GetGrain<IBootstrapOutputGrain>("capture");
         Assert.Equal(1, await sink.GetMessageCountAsync());
-        Assert.Equal(DeliveryStatus.Duplicate, (await sink.AsReference<IInboxExtension>().DeliverAsync(output.ToInboxMessage(), Cancellation)).Status);
+        Assert.Equal(DeliveryStatus.Duplicate, (await sink.AsReference<IMessagingExtension>().DeliverAsync(output.ToInboxMessage(), Cancellation)).Status);
         Assert.Equal(1, await sink.GetMessageCountAsync());
     }
 
@@ -269,10 +269,10 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
         var observation = Assert.Single(Probe.Get(grain.GetGrainId()));
         Assert.Equal(1, observation.Activations);
         var inbox = observation.Context.ActivationServices.GetRequiredService<Inbox>();
-        Assert.Same(inbox, observation.Context.GetComponent<IGrainExtensionBinder>()!.GetExtension<IInboxExtension>());
+        Assert.Same(inbox, observation.Context.GetComponent<IGrainExtensionBinder>()!.GetExtension<IMessagingExtension>());
 
         // No handler is registered by control grains, so the installed extension reports that explicitly.
-        var result = await grain.AsReference<IInboxExtension>().DeliverAsync(CreateEnvelope(grain), Cancellation);
+        var result = await grain.AsReference<IMessagingExtension>().DeliverAsync(CreateEnvelope(grain), Cancellation);
         Assert.Equal(DeliveryStatus.HandlerNotFound, result.Status);
         Assert.False(observation.Context.Deactivated.IsCompleted);
     }
@@ -446,7 +446,7 @@ public class MessagingGrainTypeConfiguratorTests : MessagingBehaviorTestBase
         Assert.Same(inbox, inboxState);
         Assert.True(observation.Manager.TryGetStateMachine(MessagingStateNames.Outbox, out var outboxState));
         Assert.Same(outbox, outboxState);
-        Assert.Same(inbox, observation.Context.GetComponent<IGrainExtensionBinder>()!.GetExtension<IInboxExtension>());
+        Assert.Same(inbox, observation.Context.GetComponent<IGrainExtensionBinder>()!.GetExtension<IMessagingExtension>());
         Assert.Same(state, services.GetRequiredService<BootstrapState>());
     }
 
