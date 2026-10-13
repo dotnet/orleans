@@ -102,6 +102,10 @@ validation disabled until its first published version establishes a baseline.
   in one write, and the inbox processes the resume once the Durable Jobs clock
   reaches the due time. Resumes are generation-fenced: a resume for a canceled delay
   terminalizes it as canceled, and duplicate and stale resumes are harmless.
+  A delay's due time is a commitment: a replay which requests another due time,
+  for example after a configured duration changed, keeps the recorded one and
+  logs a warning. A delay canceled while its write is in flight terminalizes as
+  canceled when that write completes.
 - Messages use stable identities derived from the sender, receiver, task, and
   subject, so replayed sends coalesce and redeliveries are deduplicated.
 - Recovery precedes new execution. Child identifiers, selection decisions, and

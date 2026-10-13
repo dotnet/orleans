@@ -826,7 +826,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(1, sent.Generation);
         Assert.Equal(1, state.ResumeGeneration);
         Assert.Equal(state.DueTime, sent.DueTime);
-        Assert.Equal(TimeSpan.FromMinutes(1), state.DelayDuration);
         Assert.Equal(1, manager.WriteCount);
         Assert.Null(state.Result);
     }
@@ -943,37 +942,137 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task DelayReplayUsesPersistedDueTimeAndValidatesDuration()
+    public async Task DelayReplayKeepsTheRecordedDueTime()
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root/replayed-delay");
-        var duration = TimeSpan.FromMinutes(5);
 
         await runtime.ScheduleDelayAsync(
             taskId,
-            duration,
+            TimeSpan.FromMinutes(5),
             TestContext.Current.CancellationToken);
-        var persistedDueTime = storage.Get(taskId).DueTime;
-        await Task.Delay(TimeSpan.FromMilliseconds(10), TestContext.Current.CancellationToken);
+        var recordedDueTime = storage.Get(taskId).DueTime;
+        var generation = storage.Get(taskId).ResumeGeneration;
 
+        // A replay which requests another duration, for example after configuration changed, keeps the commitment.
         var replay = await runtime.ScheduleDelayAsync(
             taskId,
-            duration,
+            TimeSpan.FromMinutes(6),
             TestContext.Current.CancellationToken);
 
         Assert.Same(DurableTaskResponse.Pending, replay);
-        Assert.Equal(persistedDueTime, storage.Get(taskId).DueTime);
-        Assert.Equal(duration, storage.Get(taskId).DelayDuration);
+        Assert.Equal(recordedDueTime, storage.Get(taskId).DueTime);
+        Assert.Equal(generation, storage.Get(taskId).ResumeGeneration);
 
         // The resume message committed with the delay, so a replay sends nothing new.
-        Assert.Single(transport.Resumes);
+        var resume = Assert.Single(transport.Resumes);
+        Assert.Equal(recordedDueTime, resume.DueTime);
+        await HandleAsync(CreateHandler(runtime), ResumeContext(runtime, taskId, resume.Generation, resume.DueTime));
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(taskId).Result!.Status);
+    }
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => runtime.ScheduleDelayAsync(
-                taskId,
-                TimeSpan.FromMinutes(6),
-                TestContext.Current.CancellationToken).AsTask());
-        Assert.Contains("duration", exception.Message, StringComparison.Ordinal);
+    [Fact]
+    public async Task CancellationWhileDelayWriteIsInFlightCancelsTheDelayPromptly()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var delayWriteStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseDelayWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.AfterWriteStarted = async () =>
+        {
+            // Hold the write which commits the delay and its resume message.
+            if (transport.Resumes.Count == 1 && delayWriteStarted.TrySetResult())
+            {
+                await releaseDelayWrite.Task;
+            }
+        };
+        var request = CreateRequest(1, () => DurableTask.Run(async _ => await DurableTask.Delay(TimeSpan.FromDays(1))));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await delayWriteStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var canceling = ((IDurableTaskServer)runtime).CancelAsync(rootId, TestContext.Current.CancellationToken).AsTask();
+        releaseDelayWrite.SetResult();
+        await canceling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var response = await runtime.GetScheduledTaskHandle(rootId)
+            .WaitAsync(TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+        var resume = Assert.Single(transport.Resumes);
+        var delay = storage.Get(resume.TaskId);
+        Assert.Equal(DurableTaskStatus.Canceled, delay.Result!.Status);
+        Assert.Null(delay.DueTime);
+
+        // The resume committed with the delay is stale, so it changes nothing.
+        var writes = manager.WriteCount;
+        await HandleAsync(CreateHandler(runtime), ResumeContext(runtime, resume.TaskId, resume.Generation, resume.DueTime));
+        Assert.Equal(writes, manager.WriteCount);
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(resume.TaskId).Result!.Status);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DelayAwaitedWithoutAnIdentifierIsItsOwnChildTask(bool inAsyncMethod)
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        static async DurableTask WaitADay() => await DurableTask.Delay(TimeSpan.FromDays(1));
+        var request = CreateRequest(
+            1,
+            () => inAsyncMethod
+                ? WaitADay()
+                : DurableTask.Run(async _ => await DurableTask.Delay(TimeSpan.FromDays(1))));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await transport.ResumeSent.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Only the delay's own task records a due time; its parent keeps running and replays it by identifier.
+        var resume = Assert.Single(transport.Resumes);
+        Assert.True(rootId.IsParentOf(resume.TaskId));
+        Assert.All(storage.Tasks, task => Assert.Equal(task.Id == resume.TaskId, task.State.DueTime is not null));
+    }
+
+    [Fact]
+    public async Task DiagnosticsDescribeEachTaskStatusAndResult()
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var dueTime = new DateTimeOffset(2040, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        var target = GrainId.Create("target", "one");
+        void Stage(string id, Action<TaskId, TestTaskState> stage)
+        {
+            var taskId = TaskId.Parse(id);
+            stage(taskId, storage.GetOrCreate(taskId));
+        }
+
+        Stage("root/completed", (id, state) => storage.SetResponse(id, state, DurableTaskResponse.FromResult(42)));
+        Stage("root/faulted", (id, state) => storage.SetResponse(id, state, DurableTaskResponse.FromException(new InvalidOperationException("boom"))));
+        Stage("root/canceled", (id, state) => storage.SetResponse(id, state, DurableTaskResponse.Canceled));
+        Stage("root/canceling", (id, state) => storage.RequestCancellation(id, state));
+        Stage("root/delayed", (id, state) => storage.SetDelay(id, state, dueTime, generation: 1));
+        Stage("root/remote", (id, state) => storage.SetRemoteRequest(id, state, target, "fingerprint"));
+        Stage("root/tombstoned", (id, state) =>
+        {
+            storage.SetResponse(id, state, DurableTaskResponse.FromResult(1));
+            storage.CreateTombstone(id, state);
+        });
+
+        var diagnostics = new Dictionary<string, DurableTaskDiagnosticState>();
+        await foreach (var (taskId, state) in ((IDurableTaskGrainExtension)runtime).GetTasksAsync(TestContext.Current.CancellationToken))
+        {
+            diagnostics[taskId.ToString()] = state;
+        }
+
+        Assert.Equal(("Completed", "42"), (diagnostics["root/completed"].Status, diagnostics["root/completed"].Response));
+        Assert.Equal(
+            ("Faulted", "InvalidOperationException: boom"),
+            (diagnostics["root/faulted"].Status, diagnostics["root/faulted"].Response));
+        Assert.Equal(("Canceled", null), (diagnostics["root/canceled"].Status, diagnostics["root/canceled"].Response));
+        Assert.Equal("Canceling", diagnostics["root/canceling"].Status);
+        Assert.Equal(("Delayed", dueTime), (diagnostics["root/delayed"].Status, diagnostics["root/delayed"].DueTime));
+        Assert.Equal(("Pending", target.ToString()), (diagnostics["root/remote"].Status, diagnostics["root/remote"].RemoteTarget));
+        Assert.Equal(("Tombstoned", null), (diagnostics["root/tombstoned"].Status, diagnostics["root/tombstoned"].Response));
     }
 
     [Fact]
@@ -3090,7 +3189,6 @@ public sealed class DurableTaskRuntimeInvariantTests
             ((TestTaskState)state).Result = response;
             ((TestTaskState)state).CompletedAt = DateTimeOffset.UtcNow;
             ((TestTaskState)state).DueTime = null;
-            ((TestTaskState)state).DelayDuration = null;
             if (((TestTaskState)state).ResumeGeneration > 0)
             {
                 ((TestTaskState)state).ResumeGeneration++;
@@ -3100,10 +3198,9 @@ public sealed class DurableTaskRuntimeInvariantTests
         public void RequestCancellation(TaskId taskId, IDurableTaskState state) =>
             ((TestTaskState)state).CancellationRequestedAt ??= DateTimeOffset.UtcNow;
 
-        public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, TimeSpan duration, long generation)
+        public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation)
         {
             ((TestTaskState)state).DueTime = dueTime;
-            ((TestTaskState)state).DelayDuration = duration;
             ((TestTaskState)state).ResumeGeneration = generation;
         }
 
@@ -3149,7 +3246,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         public DateTimeOffset? CancellationRequestedAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? DueTime { get; set; }
-        public TimeSpan? DelayDuration { get; set; }
         public long ResumeGeneration { get; set; }
         public string? RequestFingerprint { get; set; }
         public DateTimeOffset? TombstonedAt { get; set; }
