@@ -56,6 +56,14 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             return;
         }
 
+        if (message.ReceiverId == GrainId)
+        {
+            // The grain's own inbox accepts the message in the caller's journal write, so the outbox never holds it.
+            _pump.Inbox.StageLocal(message.ToInboxMessage());
+            Shared.Instruments.OnOutboxMessageSent(Shared.GrainType);
+            return;
+        }
+
         try
         {
             Emit(new() { Kind = OutboxCommandKind.Enqueue, Message = message, State = new() { EnqueuedAt = TimeProvider.GetUtcNow() } });
@@ -81,6 +89,10 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             {
                 throw new InvalidOperationException("The recovered outbox key does not match its command identity.");
             }
+            if (message.ReceiverId == GrainId)
+            {
+                throw new InvalidOperationException("A recovered outbox message is addressed to its own grain, whose inbox accepts such messages directly.");
+            }
         }
         foreach (var (key, letter) in _deadLetters)
         {
@@ -88,6 +100,10 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             if (key != letter.Message.Envelope.MessageId)
             {
                 throw new InvalidOperationException("The recovered outbox dead-letter key does not match its message identity.");
+            }
+            if (letter.Message.ReceiverId == GrainId)
+            {
+                throw new InvalidOperationException("A recovered outbox dead letter is addressed to its own grain, whose inbox accepts such messages directly.");
             }
         }
         _capturedSequence = _durableSequence = _lastSequence;
@@ -154,9 +170,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         var message = entry.Message;
         try
         {
-            var target = message.ReceiverId == GrainId
-                ? _pump.GrainContext.GetGrainExtension<IInboxExtension>()
-                : Shared.GrainFactory.GetGrain<IInboxExtension>(message.ReceiverId);
+            var target = Shared.GrainFactory.GetGrain<IInboxExtension>(message.ReceiverId);
             var result = await target.DeliverAsync(message.ToInboxMessage(), cancellationToken).ConfigureAwait(true);
             return new(entry, result, null, Stopwatch.GetElapsedTime(start), false);
         }
@@ -191,12 +205,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         var attempts = new Task<DeliveryOutcome>[candidates.Count];
         for (var index = 0; index < attempts.Length; index++)
         {
-            var entry = candidates[index];
-            attempts[index] = DeliverAsync(entry, _pump.ShutdownToken);
-            if (entry.Message.ReceiverId == GrainId)
-            {
-                await attempts[index].ConfigureAwait(true);
-            }
+            attempts[index] = DeliverAsync(candidates[index], _pump.ShutdownToken);
         }
 
         var deliveries = Task.WhenAll(attempts);

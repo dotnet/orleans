@@ -201,7 +201,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
     }
 
     [Fact]
-    public async Task SelfSentScheduledMessage_IsDeliveredImmediatelyAndProcessedWhenDue()
+    public async Task SelfSentScheduledMessage_IsAcceptedWithItsWriteAndProcessedWhenDue()
     {
         var grain = NewGrain();
         _ = await grain.GetSnapshotAsync();
@@ -213,7 +213,7 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         await grain.StageOutputAsync(outgoing);
         await grain.RetryWriteStateAsync();
 
-        // The outbox hands the message to its own inbox without waiting for the due time.
+        // The grain's own inbox accepted the message in that write, without waiting for the due time.
         var delivered = await Fixture.SnapshotProbe.WaitAsync(
             grain.GetGrainId(), static snapshot => snapshot.InboxCount == 1 && snapshot.OutboxCount == 0);
         Assert.Empty(delivered.Effects);

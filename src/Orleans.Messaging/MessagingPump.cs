@@ -76,7 +76,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     internal void Register(Outbox outbox) => _outbox = outbox;
 
-    private Inbox Inbox => _inbox ?? throw new InvalidOperationException("The messaging inbox has not been registered.");
+    internal Inbox Inbox => _inbox ?? throw new InvalidOperationException("The messaging inbox has not been registered.");
 
     private Outbox Outbox => _outbox ?? throw new InvalidOperationException("The messaging outbox has not been registered.");
 

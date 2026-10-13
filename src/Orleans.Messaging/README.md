@@ -4,7 +4,8 @@
 built on Orleans Journaling and Durable Jobs. A grain sends a message by staging it
 in its outbox; the message persists with the grain's other journaled state and is
 delivered to the receiver's inbox, which processes it at least once and deduplicates
-it by message ID.
+it by message ID. A message a grain sends to itself skips the outbox: its own inbox
+accepts it in the same journal write.
 
 ## Setup
 
@@ -90,6 +91,17 @@ then apply state changes, send messages, and complete in one synchronous block.
 inbox delivery. Sending equivalent content with a pending ID coalesces with the
 original message; different content throws `InvalidOperationException`.
 
+When the receiver is the sending grain, `Send` stages the message's acceptance in
+the grain's own inbox instead of the outbox, applying the inbox's identity rules: an
+ID that is pending with equivalent content or completed within `DeduplicationWindow`
+is a duplicate, and a pending ID with different content throws
+`InvalidOperationException`. The acceptance persists in the caller's next journal
+write, atomically with its other staged state, and the inbox processes the message
+once that write completes. Because `Send` is synchronous, the grain's inbox admits the
+message regardless of `MaxCapacity` and of handler registration; an unscheduled
+self-sent message still occupies capacity for other senders until it completes, and
+processing waits for a handler.
+
 ## Journal payloads once
 
 When a payload already lives in the grain's own journaled state, an outbox source or
@@ -143,7 +155,8 @@ write completes. Each receiver returns a `DeliveryResult`:
   A completed message which an inbox sink rejected is answered with its original
   `DeadLettered` result instead.
 - `Backpressured`: the inbox holds `MaxCapacity` pending messages without `DeliverAt`.
-  The inbox admits scheduled messages regardless of `MaxCapacity`.
+  The inbox admits scheduled messages and messages its grain sends to itself
+  regardless of `MaxCapacity`.
 - `HandlerNotFound`: the receiver has no registered handlers.
 - `DeadLettered`: the receiver moved the message to its dead-letter store.
 
@@ -178,6 +191,8 @@ grain's next journal write.
 The `Microsoft.Orleans` meter publishes counters for received, processed, sent, and
 delivered messages tagged by grain type and status; histograms for processing and
 delivery duration; and `orleans-messaging-inbox-depth` and
-`orleans-messaging-outbox-depth` up-down counters for pending work. A message an inbox
-sink accepts counts as received `accepted` and processed `success`; one which the
-sink dead-letters counts as received and processed `dead_lettered`.
+`orleans-messaging-outbox-depth` up-down counters for pending work. A message a grain
+sends to itself counts as sent and as received by its inbox, and never contributes
+to outbox delivery or depth. A message an inbox sink accepts counts as received
+`accepted` and processed `success`; one which the sink dead-letters counts as received
+and processed `dead_lettered`.

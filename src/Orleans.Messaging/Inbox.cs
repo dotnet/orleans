@@ -134,6 +134,48 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     }
 
     /// <summary>
+    /// Stages acceptance of a message which this grain sends to itself, for the caller's next journal write.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Applies the identity rules of <see cref="DeliverAsync"/> synchronously and without writing: a completed or
+    /// equivalent pending message is a duplicate, and a different pending command with the same ID conflicts.
+    /// The acceptance becomes durable atomically with the caller's other staged state, after which the inbox processes
+    /// the message as usual. When the pump is not running yet, the durable wake-up which the write ensures for new
+    /// acceptances starts it once the activation services calls, so handlers never run during activation.
+    /// </para>
+    /// <para>
+    /// A synchronous send cannot report backpressure or a missing handler, so the message is admitted regardless of
+    /// <see cref="DurableMessagingOptions.MaxCapacity"/> and of handler registration. A message without
+    /// <see cref="Envelope.DeliverAt"/> still occupies capacity for deliveries from other grains until it completes,
+    /// and processing waits for a handler to be registered.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The inbox holds a different pending command with the same ID.</exception>
+    internal void StageLocal(InboxMessage message)
+    {
+        if (IsDuplicate(message, out _))
+        {
+            Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
+            return;
+        }
+
+        try
+        {
+            Emit(new() { Kind = InboxCommandKind.Accept, Message = message });
+        }
+        catch (Exception exception)
+        {
+            LogStagingFailed(Logger, exception);
+            _pump.Fail(exception, "Inbox staging failed.");
+            throw;
+        }
+
+        Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
+        LogMessageAccepted(Logger, message.Envelope.MessageId, GrainContext.GrainId);
+    }
+
+    /// <summary>
     /// Offers a message to the registered sinks and stages the outcome which the first sink to take the message reports.
     /// </summary>
     /// <returns>The delivery result, or <see langword="null"/> when every sink declines the message.</returns>
