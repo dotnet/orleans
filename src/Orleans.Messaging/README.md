@@ -2,8 +2,8 @@
 
 `Microsoft.Orleans.Messaging` defines the contracts for grain-scoped durable
 inboxes and outboxes in Microsoft Orleans: envelopes, hierarchical message
-identities, inbox and outbox interfaces, handler registration, typed message
-bindings, delivery results, and options.
+identities, inbox and outbox interfaces, handler, sink, and source registration,
+typed message bindings, delivery results, and options.
 
 ## Messages
 
@@ -60,11 +60,26 @@ A handler finishes each message with `IInboxHandlerContext.Complete()` or
 `MessageType<T>.Create` and `OutboxMessage.ToInboxMessage()` build messages for direct
 inbox delivery.
 
+## Journal payloads once
+
+When a payload already lives in the grain's own journaled state, an outbox source or
+an inbox sink keeps that state as its only journaled copy. Register both during
+construction or activation setup, before journal recovery.
+
+- `IOutbox.Register(IOutboxMessageSource)` adds a source, and
+  `IOutbox.SendFromSource(messageId, receiverId)` stages a reference entry with the
+  message ID, receiver, and delivery state, but no payload. The source provides each
+  envelope through `GetEnvelope`, and `OnRetired` reports
+  `OutboxMessageRetirement.Delivered` or `DeadLettered`.
+- `IInbox.Register(IInboxMessageSink)` adds a sink. A sink whose `TryAccept` returns
+  `true` has staged the message in its own journaled state. Sinks are idempotent.
+
 ## Delivery results
 
 Each receiver returns a `DeliveryResult`:
 
-- `Accepted`: the message is durable in the inbox.
+- `Accepted`: the message is durable in the inbox, or, for a message an inbox sink
+  accepted, in the sink's state together with its processed record.
 - `Duplicate`: the message ID is pending or completed within `DeduplicationWindow`.
 - `Backpressured`: the inbox holds `MaxCapacity` pending messages without `DeliverAt`.
   The inbox admits scheduled messages regardless of `MaxCapacity`.
