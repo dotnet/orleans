@@ -98,7 +98,7 @@ internal sealed partial class Outbox
         }
     }
 
-    internal bool RemoveDeadLetter(HierarchicalKey id)
+    internal bool RemoveDeadLetter(MessageId id)
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         if (!_deadLetters.ContainsKey(id)) return false;
@@ -120,10 +120,10 @@ internal sealed class OutboxCommand
 {
     [Id(0)] public OutboxCommandKind Kind { get; init; }
     [Id(1)] public OutboxMessage? Message { get; init; }
-    [Id(2)] public HierarchicalKey MessageId { get; init; }
+    [Id(2)] public MessageId MessageId { get; init; }
     [Id(3)] public OutboxMessageState? State { get; init; }
     [Id(4)] public OutboxDeadLetter? DeadLetter { get; init; }
-    [Id(5)] public HierarchicalKey[]? RemovedDeadLetters { get; init; }
+    [Id(5)] public MessageId[]? RemovedDeadLetters { get; init; }
     [Id(6)] public OutboxSnapshot? Snapshot { get; init; }
 
     // An enqueue command sets this instead of Message for a message which an IOutboxMessageSource provides.
@@ -136,7 +136,7 @@ internal sealed class OutboxCommand
 [GenerateSerializer, Alias("Orleans.Messaging.OutboxMessageReference")]
 internal readonly struct OutboxMessageReference
 {
-    [Id(0)] public required HierarchicalKey MessageId { get; init; }
+    [Id(0)] public required MessageId MessageId { get; init; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.OutboxSnapshot")]
@@ -168,7 +168,7 @@ internal sealed class OutboxEntry
     [JsonIgnore] public IOutboxMessageSource? Source { get; set; }
 
     [JsonIgnore]
-    public HierarchicalKey MessageId => Message is { } message ? message.Envelope.MessageId
+    public MessageId MessageId => Message is { } message ? message.Envelope.MessageId
         : Reference is { } reference ? reference.MessageId
         : throw new InvalidOperationException("An outbox entry requires its message or message reference.");
 }

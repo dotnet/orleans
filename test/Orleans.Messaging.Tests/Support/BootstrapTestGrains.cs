@@ -83,7 +83,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     {
         var context = Observation.Context;
         var envelope = OutboxTestMessages.CreateApplication(context.ActivationServices,
-            HierarchicalKey.Create("bootstrap", context.GrainId.ToString(), "value", value.ToString(CultureInfo.InvariantCulture)),
+            MessageId.Create("bootstrap", context.GrainId.ToString(), "value", value.ToString(CultureInfo.InvariantCulture)),
             context.GrainId, OutputTarget, "output", value);
         Observation.Value!.Value = value;
         Observation.Outbox!.Send(envelope);
@@ -93,7 +93,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
     {
         var context = Observation.Context;
         var envelope = OutboxTestMessages.CreateApplication(context.ActivationServices,
-            HierarchicalKey.Create("bootstrap", context.GrainId.ToString(), "value", value.ToString(CultureInfo.InvariantCulture)),
+            MessageId.Create("bootstrap", context.GrainId.ToString(), "value", value.ToString(CultureInfo.InvariantCulture)),
             context.GrainId, OutputTarget, "output", value);
         Observation.Value!.Value = value;
         Observation.Outbox!.Send(envelope);
@@ -126,7 +126,7 @@ public sealed class BootstrapState : IInboxHandler, IDisposable
         }
         var value = Observation.Value!.Value + 1;
         var outgoing = OutboxTestMessages.CreateApplication(Observation.Context.ActivationServices,
-            context.Message.Envelope.MessageId.CreateChildKey("output"), Observation.Context.GrainId, OutputTarget, "output", value);
+            new MessageId(context.Message.Envelope.MessageId.Key.CreateChildKey("output")), Observation.Context.GrainId, OutputTarget, "output", value);
         Observation.Value.Value = value;
         Observation.Outbox!.Send(outgoing);
         HandlerCalls++;
@@ -292,7 +292,7 @@ public sealed class BootstrapClusterFixture : MessagingClusterFixture
     public BootstrapDeliveryProbe Delivery { get; } = new();
     protected override void ConfigureServices(IServiceCollection services)
     {
-        services.AddScoped(provider => provider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<HierarchicalKey, int>>("orleans-binary"));
+        services.AddScoped(provider => provider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<MessageId, int>>("orleans-binary"));
         services.AddKeyedSingleton<PlacementStrategy>(StatelessPlacementAlias, new StatelessWorkerAttribute(1).PlacementStrategy);
         services.AddKeyedSingleton<PlacementStrategy>(OrdinaryPlacementAlias, new RandomPlacement());
         services.AddSingleton(Probe);

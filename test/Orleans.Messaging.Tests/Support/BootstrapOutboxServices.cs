@@ -9,7 +9,7 @@ namespace Orleans.Messaging.Tests.Support;
 public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, ILoggerProvider
 {
     private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly ConcurrentDictionary<GrainId, TaskCompletionSource<(HierarchicalKey MessageId, int Value)>> _outputs = new();
+    private readonly ConcurrentDictionary<GrainId, TaskCompletionSource<(MessageId MessageId, int Value)>> _outputs = new();
 
     private readonly ConcurrentDictionary<GrainId, TaskCompletionSource> _drains = new();
 
@@ -45,10 +45,10 @@ public sealed class BootstrapDeliveryProbe : IOutgoingGrainCallFilter, ILoggerPr
     }
 
     public void Release() => _release.TrySetResult();
-    public Task<(HierarchicalKey MessageId, int Value)> WaitForOutputAsync(GrainId sender) =>
+    public Task<(MessageId MessageId, int Value)> WaitForOutputAsync(GrainId sender) =>
         GetOutput(sender).Task.WaitAsync(TimeSpan.FromSeconds(30));
-    public void OnOutput(GrainId sender, HierarchicalKey messageId, int value) => GetOutput(sender).TrySetResult((messageId, value));
-    private TaskCompletionSource<(HierarchicalKey MessageId, int Value)> GetOutput(GrainId sender) =>
+    public void OnOutput(GrainId sender, MessageId messageId, int value) => GetOutput(sender).TrySetResult((messageId, value));
+    private TaskCompletionSource<(MessageId MessageId, int Value)> GetOutput(GrainId sender) =>
         _outputs.GetOrAdd(sender, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
 }
 
@@ -59,18 +59,18 @@ public interface IBootstrapOutputGrain : IGrainWithStringKey
 
 [GrainType("bootstrap-output")]
 public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IMessagingGrain, IInboxHandler,
-    IStateMachine, IDurableDictionaryCommandHandler<HierarchicalKey, int>
+    IStateMachine, IDurableDictionaryCommandHandler<MessageId, int>
 {
-    private readonly Dictionary<HierarchicalKey, int> _values = [];
-    private readonly List<(GrainId Sender, HierarchicalKey MessageId, int Value)> _pending = [];
-    private (GrainId Sender, HierarchicalKey MessageId, int Value)[] _captured = [];
+    private readonly Dictionary<MessageId, int> _values = [];
+    private readonly List<(GrainId Sender, MessageId MessageId, int Value)> _pending = [];
+    private (GrainId Sender, MessageId MessageId, int Value)[] _captured = [];
     private readonly BootstrapDeliveryProbe _probe;
     private readonly Orleans.Serialization.Session.SerializerSessionPool _sessions;
     private readonly Orleans.Serialization.Serializer<GrainId> _senderSerializer;
-    private readonly IDurableDictionaryCommandCodec<HierarchicalKey, int> _codec;
+    private readonly IDurableDictionaryCommandCodec<MessageId, int> _codec;
 
     public BootstrapOutputGrain(IJournaledStateManager manager, IInbox inbox, BootstrapDeliveryProbe probe,
-        IDurableDictionaryCommandCodec<HierarchicalKey, int> codec, Orleans.Serialization.Session.SerializerSessionPool sessions, Orleans.Serialization.Serializer<GrainId> senderSerializer)
+        IDurableDictionaryCommandCodec<MessageId, int> codec, Orleans.Serialization.Session.SerializerSessionPool sessions, Orleans.Serialization.Serializer<GrainId> senderSerializer)
     {
         _sessions = sessions;
         _senderSerializer = senderSerializer;
@@ -126,8 +126,8 @@ public sealed class BootstrapOutputGrain : Grain, IBootstrapOutputGrain, IMessag
     public void ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
-    public void ApplySet(HierarchicalKey key, int value) => _values[key] = value;
-    public void ApplyRemove(HierarchicalKey key) => _values.Remove(key);
+    public void ApplySet(MessageId key, int value) => _values[key] = value;
+    public void ApplyRemove(MessageId key) => _values.Remove(key);
     public void ApplyClear() => _values.Clear();
     public void Reset(int capacityHint) => _values.Clear();
 }

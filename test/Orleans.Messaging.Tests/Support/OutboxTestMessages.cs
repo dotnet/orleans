@@ -7,7 +7,7 @@ namespace Orleans.Messaging.Tests.Support;
 
 internal static class OutboxTestMessages
 {
-    public static OutboxMessage Create(HierarchicalKey messageId, GrainId receiver, ReadOnlyMemory<byte> payload,
+    public static OutboxMessage Create(MessageId messageId, GrainId receiver, ReadOnlyMemory<byte> payload,
         GrainId? sender, string? subject, Serializer<GrainId> senderSerializer) => new()
         {
             ReceiverId = receiver,
@@ -22,7 +22,7 @@ internal static class OutboxTestMessages
             }
         };
 
-    public static OutboxMessage CreateApplication(IServiceProvider services, HierarchicalKey messageId,
+    public static OutboxMessage CreateApplication(IServiceProvider services, MessageId messageId,
         GrainId sender, GrainId receiver, string subject, object? body) => Create(messageId, receiver,
             TestApplicationProtocol.Encode(services.GetRequiredService<SerializerSessionPool>(), new TestApplicationMessage(subject, body)),
             sender, subject, services.GetRequiredService<Serializer<GrainId>>());
