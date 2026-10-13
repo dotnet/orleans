@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
-using Orleans.DurableJobs;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Runtime;
 using Orleans.Messaging;
@@ -27,28 +26,6 @@ internal sealed class RecordingOutbox : IOutbox
     public void Send(OutboxMessage message) => _sends.Add(message);
 }
 
-internal sealed class RecordingJobManager : ILocalDurableJobManager
-{
-    public List<ScheduleJobRequest> Requests { get; } = [];
-
-    public Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
-    {
-        Requests.Add(request);
-        return Task.FromResult(new DurableJob
-        {
-            Id = Guid.NewGuid().ToString(),
-            Name = request.JobName,
-            DueTime = request.DueTime,
-            TargetGrainId = request.Target,
-            ShardId = "test",
-            Metadata = request.Metadata,
-        });
-    }
-
-    public Task<bool> CancelAsync(DurableJob job, CancellationToken cancellationToken) =>
-        Task.FromResult(true);
-}
-
 internal static class MessagingTestHelpers
 {
     private static readonly ServiceProvider Services = new ServiceCollection()
@@ -61,14 +38,21 @@ internal static class MessagingTestHelpers
 
     public static DurableTaskMessageTypes MessageTypes { get; } = new(Services.GetRequiredService<Serializer>());
 
-    public static DurableTaskMessageTransport CreateTransport(RecordingOutbox outbox, ILocalDurableJobManager? jobs = null) =>
-        new(new Lazy<IOutbox>(outbox), jobs ?? new RecordingJobManager(), MessageTypes);
+    public static DurableTaskMessageTransport CreateTransport(RecordingOutbox outbox) =>
+        new(new Lazy<IOutbox>(outbox), MessageTypes);
 
     public static InboxMessage CreateMessage<T>(MessageType<T> messageType, GrainId sender, GrainId receiver, TaskId taskId, T body) =>
         messageType.Create(
             DurableTaskMessageTransport.CreateMessageId(sender, receiver, taskId, messageType.Subject),
             receiver,
             body).ToInboxMessage();
+
+    public static InboxMessage CreateResumeMessage(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime) =>
+        MessageTypes.Resume.Create(
+            DurableTaskMessageTransport.CreateResumeMessageId(grainId, taskId, generation, dueTime),
+            grainId,
+            new DurableTaskResumeMessage { TaskId = taskId, Generation = generation, Sender = grainId },
+            dueTime).ToInboxMessage();
 
     public static IInboxHandlerContext CreateHandlerContext(InboxMessage message)
     {

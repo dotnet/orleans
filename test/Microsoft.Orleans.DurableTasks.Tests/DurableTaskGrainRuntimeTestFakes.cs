@@ -27,17 +27,16 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 /// </summary>
 internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessageTransport
 {
-    private readonly TaskCompletionSource _scheduledResume = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _resumeSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, DurableTaskResponse Response)> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> CompletionAcknowledgements { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
-    public List<(GrainId Target, TaskId TaskId, DateTimeOffset DueTime)> ScheduledResumes { get; } = [];
-    public Task ScheduledResume => _scheduledResume.Task;
+    public List<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime)> Resumes { get; } = [];
+    public Task ResumeSent => _resumeSent.Task;
     public Action<GrainId, GrainId, TaskId, IDurableTaskRequest>? BeforeSendInvocation { get; set; }
     public Action<GrainId, GrainId, TaskId>? BeforeSendCancellation { get; set; }
-    public Func<GrainId, TaskId, long, DateTimeOffset, CancellationToken, ValueTask>? BeforeScheduleResumeAsync { get; set; }
 
     public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request)
     {
@@ -55,15 +54,10 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
         Cancellations.Add((sender, target, taskId));
     }
 
-    public async ValueTask ScheduleResumeAsync(GrainId target, TaskId taskId, long generation, DateTimeOffset dueTime, CancellationToken cancellationToken)
+    public void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime)
     {
-        if (BeforeScheduleResumeAsync is { } beforeScheduleResume)
-        {
-            await beforeScheduleResume(target, taskId, generation, dueTime, cancellationToken);
-        }
-
-        ScheduledResumes.Add((target, taskId, dueTime));
-        _scheduledResume.TrySetResult();
+        Resumes.Add((grainId, taskId, generation, dueTime));
+        _resumeSent.TrySetResult();
     }
 }
 

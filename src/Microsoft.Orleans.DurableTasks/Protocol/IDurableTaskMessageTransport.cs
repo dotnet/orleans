@@ -13,6 +13,6 @@ internal interface IDurableTaskMessageTransport
 
     void SendCancellation(GrainId sender, GrainId target, TaskId taskId);
 
-    ValueTask ScheduleResumeAsync(GrainId target, TaskId taskId, long generation, DateTimeOffset dueTime, CancellationToken cancellationToken);
+    void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime);
 
 }
