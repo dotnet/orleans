@@ -103,16 +103,23 @@ construction or activation setup, before journal recovery.
   source that throws or returns an invalid message dead-letters that entry alone,
   with `OnRetired(DeadLettered)` in the same journal write; an exception during
   `Send` propagates without staging anything.
-- `IInbox.Register(IInboxMessageSink)` adds a sink. The inbox offers each message,
-  including self-sent and scheduled messages, to the sinks in order. The first sink
-  whose `TryAccept` returns `true` reports the `DeliveryResult`:
-  - `Accepted`: the sink staged the message in its own journaled state.
+- `IInbox.Register(IInboxMessageSink)` adds a sink. After validation and
+  deduplication, the inbox offers each message, including self-sent and scheduled
+  messages, to the sinks in order. The first sink whose `TryAccept` returns `true`
+  reports the `DeliveryResult`:
+  - `Accepted`: the sink staged the message in its own state. The inbox journals
+    only the processed record in the same write and returns `Accepted` once it is
+    durable.
   - `Duplicate`: the sink already holds the message.
-  - `Backpressured`: the sink is at capacity. A self-sent message fails its `Send`.
-  - `DeadLettered`: the sink rejects the message with a reason. A sink that throws
-    or reports another status dead-letters the message.
+  - `Backpressured`: the sink is at capacity, so the sender retries. A self-sent
+    message fails its `Send` instead.
+  - `DeadLettered`: the inbox dead-letters the message with the sink's reason. A
+    sink that throws or reports another status is treated the same way.
 
-  A sink that takes a scheduled message honors its `DeliverAt`. Sinks are idempotent.
+  Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
+  sink honors their `DeliverAt`. Declined messages follow the handler path once
+  `DeliverAt` passes. A message is offered again after its processed record leaves
+  `DeduplicationWindow`, so sinks must be idempotent.
 
 ## Delivery and processing
 
