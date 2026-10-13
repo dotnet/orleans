@@ -43,10 +43,14 @@ public sealed class InboxLifecycleBehaviorTests : MessagingBehaviorTestBase
         var receiver = NewGrain();
         var before = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
-        var envelope = CreateEnvelope(receiver, NewMessage(96, "queued"));
+        var envelope = CreateEnvelope(receiver, NewMessage(96, "queued"), "messages/queued");
 
-        Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope)).Status);
-        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        // Deactivation cancels any handler the original activation starts, leaving the message to recovery.
+        using (Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/queued"))
+        {
+            Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(envelope)).Status);
+            await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        }
 
         _ = await receiver.GetSnapshotAsync();
         var recovered = await Fixture.WaitForEffectCountAsync(receiver, 1);

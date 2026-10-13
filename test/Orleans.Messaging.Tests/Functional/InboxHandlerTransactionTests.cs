@@ -116,15 +116,16 @@ public sealed class InboxHandlerTransactionTests : MessagingBehaviorTestBase
         var oldContext = Fixture.GetGrainContext(receiver);
         var oldGrain = Assert.IsType<MessagingTestGrain>(oldContext.GrainInstance);
         var oldManager = oldContext.ActivationServices.GetRequiredService<IJournaledStateManager>();
+        var oldActivationId = oldGrain.GetSnapshotForTest().ActivationId;
         Fixture.Storage.FailWrite(JournalId.FromGrainId(receiver.GetGrainId()));
         handler.Release();
         await oldContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
         await Assert.ThrowsAnyAsync<Exception>(() => oldManager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask());
         _ = await receiver.GetSnapshotAsync();
         var completed = await Fixture.SnapshotProbe.WaitAsync(receiver.GetGrainId(),
-            snapshot => snapshot.ActivationId != oldGrain.GetSnapshotForTest().ActivationId
+            snapshot => snapshot.ActivationId != oldActivationId
                 && snapshot.Effects.Sum(static effect => effect.Count) == 1);
-        Assert.NotEqual(oldGrain.GetSnapshotForTest().ActivationId, completed.ActivationId);
+        Assert.NotEqual(oldActivationId, completed.ActivationId);
         Assert.Equal(1, Assert.Single(completed.Effects).Count);
         Assert.Empty(completed.InboxDeadLetters);
         Assert.Equal(0, completed.InboxCount);
