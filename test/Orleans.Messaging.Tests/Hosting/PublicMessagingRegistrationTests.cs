@@ -51,7 +51,7 @@ public sealed class PublicMessagingRegistrationTests
             Assert.Equal(ServiceLifetime.Scoped, descriptor.Lifetime);
         }
 
-        // The configurator binds the inbox extension at activation; the only keyed grain extension is the durable-jobs receiver.
+        // The configurator binds the messaging extension at activation; the only keyed grain extension is the durable-jobs receiver.
         var extension = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IGrainExtension));
         Assert.Equal(typeof(Orleans.DurableJobs.DurableJob).Assembly, Assert.IsAssignableFrom<Type>(extension.ServiceKey).Assembly);
     }
