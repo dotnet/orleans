@@ -53,6 +53,8 @@ internal sealed class DurableTaskJournalHarness : IAsyncDisposable
 
     public string JournalFormatKey { get; }
 
+    public JournalId JournalId => _journalId;
+
     public VolatileJournalStorageProvider StorageProvider { get; }
 
     public Serializer Serializer => _services.GetRequiredService<Serializer>();

@@ -16,6 +16,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Journaling;
+using Orleans.Messaging;
 
 namespace Orleans.DurableTasks.Runtime;
 
@@ -39,6 +40,13 @@ namespace Orleans.DurableTasks.Runtime;
 /// in the same journal write as the delay, so the resume is durable whenever the delay is, and the inbox processes it
 /// once it is due. The adapter schedules no Durable Jobs of its own.
 /// </para>
+/// <para>
+/// The runtime is the <see cref="IOutboxMessageSource"/> of its completion messages: the outbox journals a reference to
+/// each completion, and the runtime materializes the message from the task's stored result, so the result is journaled
+/// once. When the outbox retires a delivered completion, its destination durably holds the result, so the runtime
+/// prunes the task in the same write once no destination remains. A dead-lettered completion removes its destination
+/// and leaves the result to <see cref="Orleans.Configuration.DurableTaskOptions.ResultRetentionPeriod"/>.
+/// </para>
 /// </remarks>
 internal sealed partial class DurableTaskGrainRuntime(
     IDurableTaskGrainStorage storage,
@@ -47,7 +55,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     IEnumerable<IDurableTaskMessageTransport> messageTransports) :
     IDurableTaskGrainRuntime,
     IDurableTaskGrainExtension,
-    IStateMachine
+    IStateMachine,
+    IOutboxMessageSource
 {
     /// <summary>The journal state machine name of the runtime's commit hook.</summary>
     internal const string StateMachineName = "orleans.durable-tasks.runtime";
@@ -79,6 +88,11 @@ internal sealed partial class DurableTaskGrainRuntime(
     private long _cancellationPropagationId;
     private int _initialized;
     private volatile bool _stopping;
+
+    // The completions pending in the outbox, by message ID. The outbox resolves recovered completions before the runtime
+    // observes recovery, so the index is built from task state on first use, then maintained as completions are sent and
+    // retire.
+    private Dictionary<HierarchicalKey, PendingCompletion>? _pendingCompletions;
 
     internal GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
 
@@ -267,8 +281,91 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
-    private void SendCompletion(TaskId taskId, GrainId destination, DurableTaskResponse response) =>
-        MessageTransport.SendCompletion(GrainId, destination, taskId, response);
+    private void SendCompletion(TaskId taskId, GrainId destination)
+    {
+        var transport = MessageTransport;
+        var messageId = transport.GetCompletionMessageId(GrainId, destination, taskId);
+        PendingCompletions[messageId] = new(taskId, destination);
+        transport.SendCompletion(messageId);
+    }
+
+    private Dictionary<HierarchicalKey, PendingCompletion> PendingCompletions
+    {
+        get
+        {
+            if (_pendingCompletions is { } pending)
+            {
+                return pending;
+            }
+
+            // Every completed task's destination has a completion pending in the outbox: the completion is staged with
+            // the result, and the destination is removed when the outbox retires it.
+            pending = [];
+            var transport = MessageTransport;
+            foreach (var (taskId, state) in _storage.Tasks)
+            {
+                if (state.CompletedAt.HasValue && !state.TombstonedAt.HasValue)
+                {
+                    foreach (var destination in state.CompletionDestinations)
+                    {
+                        pending[transport.GetCompletionMessageId(GrainId, destination, taskId)] = new(taskId, destination);
+                    }
+                }
+            }
+
+            return _pendingCompletions = pending;
+        }
+    }
+
+    /// <remarks>
+    /// The runtime never withdraws a completion: a pending completion's task retains its result until the outbox retires
+    /// the completion, so a missing result breaks that invariant rather than withdrawing the message.
+    /// </remarks>
+    bool IOutboxMessageSource.TryGetMessage(HierarchicalKey messageId, out OutboxMessage message)
+    {
+        if (!PendingCompletions.TryGetValue(messageId, out var completion))
+        {
+            message = default;
+            return false;
+        }
+
+        if (!_storage.TryGetTask(completion.TaskId, out var state) || state.Result is not { IsCompleted: true } result)
+        {
+            throw new InvalidOperationException(
+                $"Durable task '{completion.TaskId}' does not retain the result of its pending completion.");
+        }
+
+        message = MessageTransport.CreateCompletionMessage(messageId, GrainId, completion.Destination, completion.TaskId, result);
+        return true;
+    }
+
+    /// <summary>
+    /// Removes a retired completion's destination, pruning the task once its result has been delivered to every
+    /// destination.
+    /// </summary>
+    /// <remarks>
+    /// The outbox stages the completion's removal in the same journal write. A delivered destination durably holds the
+    /// result, so the task needs no retention for it. A dead-lettered completion leaves the result to the retention
+    /// policy, so a poller, or a caller which invokes the task again, can still observe it.
+    /// </remarks>
+    void IOutboxMessageSource.OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement)
+    {
+        var removed = PendingCompletions.Remove(messageId, out var completion);
+        Debug.Assert(removed, "The outbox retires only the completions which the runtime provides.");
+        if (!_storage.TryGetTask(completion.TaskId, out var state))
+        {
+            Debug.Fail("A pending completion's task is retained until the completion retires.");
+            return;
+        }
+
+        _storage.RemoveCompletionDestination(completion.TaskId, state, completion.Destination);
+        if (retirement == OutboxMessageRetirement.Delivered && state.CompletionDestinations.Count == 0)
+        {
+            PruneDeliveredTask(completion.TaskId, state);
+        }
+    }
+
+    private readonly record struct PendingCompletion(TaskId TaskId, GrainId Destination);
 
     private void StageCancellation(TaskId taskId, GrainId target) =>
         MessageTransport.SendCancellation(GrainId, target, taskId);
@@ -494,8 +591,12 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>
-    /// Stages a remote child's terminal response and its acknowledgement, completing the local handle after commit.
+    /// Stages a remote child's terminal response, completing the local handle after commit.
     /// </summary>
+    /// <remarks>
+    /// The inbox accepts the completion directly into task state, so this stored response is its only journaled copy.
+    /// The child retains its result until the inbox reports this acceptance to the child's outbox.
+    /// </remarks>
     internal void AcceptResponseFromInbox(TaskId taskId, DurableTaskResponse response, GrainId sender)
     {
         ThrowIfStopping();
@@ -509,31 +610,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Durable task '{taskId}' does not accept completions from grain '{sender}'.");
         }
 
-        var transport = MessageTransport;
-        var winningResponse = StageAcceptedResponse(taskId, response);
-
-        // The child retains its result until this acknowledgement arrives, and the acknowledgement commits with the
-        // accepted response. Retention does not depend on outbox dead-lettering or the inbox deduplication window: a
-        // caller which replays after its completion message was dead-lettered can invoke the child again and receive
-        // the result.
-        transport.SendCompletionAck(GrainId, sender, taskId);
-        _pendingHandleResponses[taskId] = winningResponse;
-    }
-
-    /// <summary>
-    /// Stages removal of an acknowledged completion destination and any pruning it enables.
-    /// </summary>
-    internal void AcknowledgeCompletionFromInbox(TaskId taskId, GrainId sender)
-    {
-        ThrowIfStopping();
-        if (!_storage.TryGetTask(taskId, out var state)
-            || !state.CompletionDestinations.Contains(sender))
-        {
-            return;
-        }
-
-        _storage.RemoveCompletionDestination(taskId, state, sender);
-        PruneCompletedTasks();
+        _pendingHandleResponses[taskId] = StageAcceptedResponse(taskId, response);
     }
 
     internal async Task ResumePendingTasksAsync(CancellationToken cancellationToken)
@@ -671,6 +748,12 @@ internal sealed partial class DurableTaskGrainRuntime(
             requestContext.CallerId = default;
             requestContext.SupportsDurableCompletion = false;
         }
+        else if (requestContext.CallerId == GrainId)
+        {
+            // A completion is never addressed to its own grain: ScheduleRemoteAsync rejects self-invocation.
+            throw new InvalidOperationException(
+                $"Durable task '{taskId}' cannot be invoked by its owning grain '{GrainId}' through durable messaging.");
+        }
 
         var fingerprint = IDurableTaskRequest.GetFingerprint(request, _shared.Serializer);
         if (!_storage.TryGetTask(taskId, out var state))
@@ -745,7 +828,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             if (ShouldSendCompletion(taskId, state, requestContext))
             {
-                SendCompletion(taskId, requestContext.CallerId, completed);
+                SendCompletion(taskId, requestContext.CallerId);
             }
 
             return new(completed, Start: false, CompletedResponse: null);
@@ -774,7 +857,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (state.CompletionDestinations.Contains(requestContext.CallerId))
         {
-            return true;
+            // The completion to this destination is still pending in the outbox.
+            return false;
         }
 
         return TryRegisterCompletionDestination(taskId, state, requestContext.CallerId);
@@ -822,6 +906,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         _pendingHandleResponses.Clear();
         _pendingCancellationPropagations.Clear();
         _preStagedCancellations.Clear();
+        _pendingCompletions = null;
         _committingStarts = [];
         _committingHandleResponses = [];
         _committingCancellationPropagations = [];
@@ -1392,16 +1477,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             return terminal;
         }
 
-        if (state.CompletionDestinations.Count > 0)
+        // The outbox reads each completion from the stored result, so the result is staged first.
+        _storage.SetResponse(taskId, state, response);
+        foreach (var destination in state.CompletionDestinations)
         {
-            var transport = MessageTransport;
-            foreach (var destination in state.CompletionDestinations)
-            {
-                transport.SendCompletion(GrainId, destination, taskId, response);
-            }
+            SendCompletion(taskId, destination);
         }
 
-        _storage.SetResponse(taskId, state, response);
         return response;
     }
 
@@ -1488,7 +1570,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             if (state.CompletionDestinations.Count > 0)
             {
-                // There are still unacknowledged clients.
+                // Completions are still pending in the outbox.
                 continue;
             }
 
@@ -1544,25 +1626,54 @@ internal sealed partial class DurableTaskGrainRuntime(
                 }
             }
 
-            if (_shared.Logger.IsEnabled(LogLevel.Trace))
-            {
-                _shared.Logger.LogTrace("{Id} pruning completed task {TaskId}", GrainId, taskId);
-            }
-
-            var completedState = allTasks[taskId];
-            if (completedState.RequestFingerprint is not null || completedState.RemoteRequestFingerprint is not null)
-            {
-                _storage.CreateTombstone(taskId, completedState);
-            }
-            else
-            {
-                _storage.RemoveTask(taskId);
-            }
-
-            _executionContexts.TryRemove(taskId, out _);
-            _taskHandles.TryRemove(taskId, out _);
-            _logicalTimes.Remove(taskId);
+            PruneTask(taskId, allTasks[taskId]);
         }
+    }
+
+    /// <summary>
+    /// Prunes a task whose result has been delivered to every completion destination, unless a retained local ancestor
+    /// still awaits it, in which case it is pruned with that ancestor's tree.
+    /// </summary>
+    /// <remarks>
+    /// Walks the task's ancestors rather than scanning every task. Local descendants remain until the retention policy
+    /// prunes them.
+    /// </remarks>
+    private void PruneDeliveredTask(TaskId taskId, IDurableTaskState state)
+    {
+        for (var parent = taskId.Parent(); !parent.IsDefault && parent != TaskId.None; parent = parent.Parent())
+        {
+            if (_storage.TryGetTask(parent, out var parentState) && !parentState.TombstonedAt.HasValue)
+            {
+                return;
+            }
+        }
+
+        PruneTask(taskId, state);
+    }
+
+    /// <summary>
+    /// Removes a completed task, keeping a tombstone when its identity is bound to a request so a conflicting reuse is
+    /// rejected.
+    /// </summary>
+    private void PruneTask(TaskId taskId, IDurableTaskState state)
+    {
+        if (_shared.Logger.IsEnabled(LogLevel.Trace))
+        {
+            _shared.Logger.LogTrace("{Id} pruning completed task {TaskId}", GrainId, taskId);
+        }
+
+        if (state.RequestFingerprint is not null || state.RemoteRequestFingerprint is not null)
+        {
+            _storage.CreateTombstone(taskId, state);
+        }
+        else
+        {
+            _storage.RemoveTask(taskId);
+        }
+
+        _executionContexts.TryRemove(taskId, out _);
+        _taskHandles.TryRemove(taskId, out _);
+        _logicalTimes.Remove(taskId);
     }
 
     /// <inheritdoc/>

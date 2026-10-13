@@ -33,16 +33,6 @@ internal sealed class DurableTaskCompletionMessage
 }
 
 [GenerateSerializer]
-internal sealed class DurableTaskCompletionAckMessage
-{
-    [Id(0)]
-    public TaskId TaskId { get; init; }
-
-    [Id(1)]
-    public GrainId Sender { get; init; }
-}
-
-[GenerateSerializer]
 internal sealed class DurableTaskCancellationMessage
 {
     [Id(0)]
@@ -79,15 +69,12 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public const string SubjectPrefix = "durable-rpc/";
     public const string InvocationSubject = SubjectPrefix + "invoke";
     public const string CompletionSubject = SubjectPrefix + "complete";
-    public const string CompletionAckSubject = SubjectPrefix + "complete-ack";
     public const string CancellationSubject = SubjectPrefix + "cancel";
     public const string ResumeSubject = SubjectPrefix + "resume";
 
     public MessageType<DurableTaskInvocationMessage> Invocation { get; } = new(InvocationSubject, serializer);
 
     public MessageType<DurableTaskCompletionMessage> Completion { get; } = new(CompletionSubject, serializer);
-
-    public MessageType<DurableTaskCompletionAckMessage> CompletionAck { get; } = new(CompletionAckSubject, serializer);
 
     public MessageType<DurableTaskCancellationMessage> Cancellation { get; } = new(CancellationSubject, serializer);
 

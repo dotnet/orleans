@@ -335,15 +335,13 @@ namespace Orleans.DurableTasks.Runtime
         [Id(9)]
         public string? RequestFingerprint { get { throw null; } set { } }
 
-        [Id(15)]
-        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        [System.Text.Json.Serialization.JsonIgnore]
         public byte[]? RequestPayload { get { throw null; } set { } }
 
         [System.Text.Json.Serialization.JsonIgnore]
         public DurableTaskResponse? Result { get { throw null; } }
 
-        [Id(16)]
-        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        [System.Text.Json.Serialization.JsonIgnore]
         public byte[]? ResultPayload { get { throw null; } set { } }
 
         [Id(8)]
