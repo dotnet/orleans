@@ -10,9 +10,9 @@ namespace Orleans.Messaging;
 
 internal sealed partial class Inbox
 {
-    private readonly Dictionary<HierarchicalKey, InboxEntry> _messages = [];
-    private readonly Dictionary<HierarchicalKey, DateTimeOffset> _processed = [];
-    private readonly Dictionary<HierarchicalKey, InboxDeadLetter> _deadLetters = [];
+    private readonly Dictionary<MessageId, InboxEntry> _messages = [];
+    private readonly Dictionary<MessageId, DateTimeOffset> _processed = [];
+    private readonly Dictionary<MessageId, InboxDeadLetter> _deadLetters = [];
     private JournalStreamWriter _writer;
 
     // Pending messages with a delivery time, which do not count toward MaxCapacity.
@@ -170,11 +170,11 @@ internal sealed class InboxCommand
 {
     [Id(0)] public InboxCommandKind Kind { get; init; }
     [Id(1)] public InboxMessage? Message { get; init; }
-    [Id(2)] public HierarchicalKey MessageId { get; init; }
+    [Id(2)] public MessageId MessageId { get; init; }
     [Id(3)] public InboxMessageState? State { get; init; }
     [Id(4)] public DateTimeOffset ProcessedAt { get; init; }
     [Id(5)] public InboxDeadLetter? DeadLetter { get; init; }
-    [Id(6)] public HierarchicalKey[]? RemovedKeys { get; init; }
+    [Id(6)] public MessageId[]? RemovedKeys { get; init; }
     [Id(7)] public InboxSnapshot? Snapshot { get; init; }
 }
 
@@ -189,7 +189,7 @@ internal sealed class InboxSnapshot
 [GenerateSerializer, Alias("Orleans.Messaging.InboxProcessedEntry")]
 internal sealed class InboxProcessedEntry
 {
-    [Id(0)] public HierarchicalKey MessageId { get; init; }
+    [Id(0)] public MessageId MessageId { get; init; }
     [Id(1)] public DateTimeOffset ProcessedAt { get; init; }
 }
 
