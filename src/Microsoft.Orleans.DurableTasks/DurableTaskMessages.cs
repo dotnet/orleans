@@ -17,6 +17,13 @@ internal sealed class DurableTaskInvocationMessage
 
     [Id(2)]
     public GrainId Sender { get; init; }
+
+    /// <summary>
+    /// Gets whether the invocation starts a detached task, which the receiver retains like a client-scheduled root and
+    /// whose result it sends to no caller.
+    /// </summary>
+    [Id(3)]
+    public bool Detached { get; init; }
 }
 
 [GenerateSerializer]

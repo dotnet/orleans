@@ -39,8 +39,11 @@ internal sealed class DurableTaskMessageHandler(
                 var requestContext = request.Context
                     ?? throw new InvalidOperationException("The durable task invocation request has no context.");
                 var sender = GetSender(invocation.Sender);
-                requestContext.CallerId = sender;
-                requestContext.SupportsDurableCompletion = true;
+
+                // A detached task has no caller: like a client-scheduled root, it's retained for polling and its
+                // result is sent to no grain.
+                requestContext.CallerId = invocation.Detached ? default : sender;
+                requestContext.SupportsDurableCompletion = !invocation.Detached;
                 runtime.ScheduleFromInbox(invocation.TaskId, request);
                 return true;
             case DurableTaskMessageTypes.CompletionSubject:

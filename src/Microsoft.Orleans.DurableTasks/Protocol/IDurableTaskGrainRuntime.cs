@@ -109,6 +109,12 @@ internal interface IDurableTaskGrainRuntime
     DateTimeOffset UtcNow { get; }
     ValueTask<IScheduledTaskHandle> ScheduleChildAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
     ValueTask<DurableTaskResponse> ScheduleRemoteAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Starts <paramref name="request"/> as a detached root task under <paramref name="rootId"/>, recording the start under
+    /// <paramref name="markerId"/> when it is not default, and waits for the journal write which commits both.
+    /// </summary>
+    ValueTask DetachAsync(TaskId rootId, IDurableTaskRequest request, TaskId markerId, CancellationToken cancellationToken);
     ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
     ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, CancellationToken cancellationToken);
     ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken);
