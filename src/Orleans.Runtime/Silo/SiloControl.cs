@@ -100,6 +100,20 @@ namespace Orleans.Runtime
             return Task.CompletedTask;
         }
 
+        public async Task DeactivateGrain(GrainId grainId, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var activation = activationDirectory.FindTarget(grainId);
+            if (activation is null || grainId.Type.IsSystemTarget())
+            {
+                return;
+            }
+
+            activation.Deactivate(new DeactivationReason(DeactivationReasonCode.RuntimeRequested,
+                "Deactivation requested by the management grain."), CancellationToken.None);
+            await activation.Deactivated.WaitAsync(cancellationToken);
+        }
+
         public Task ForceActivationCollection(TimeSpan ageLimit, CancellationToken cancellationToken = default)
         {
             LogInformationForceActivationCollection();
