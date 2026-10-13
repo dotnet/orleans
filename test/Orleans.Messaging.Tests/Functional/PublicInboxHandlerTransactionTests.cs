@@ -38,9 +38,13 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
             Payload = bytes,
             Headers = new Dictionary<string, byte[]>(StringComparer.Ordinal) { ["attachment"] = [0xff, 0x80, 0x01] }
         };
-        Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(
-            new InboxMessage { Envelope = envelope })).Status);
-        await original.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        // Deactivation cancels any handler the original activation starts, leaving the message to recovery.
+        using (Fixture.HandlerProbe.Arm(receiver.GetGrainId(), RawPayloadTestGrain.HandlerBarrier))
+        {
+            Assert.Equal(DeliveryStatus.Accepted, (await receiver.AcceptAndDeactivateAsync(
+                new InboxMessage { Envelope = envelope })).Status);
+            await original.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        }
         var accepted = Assert.IsType<RawPayloadSnapshot>(Assert.IsType<RawPayloadTestGrain>(original.GrainInstance).AcceptedSnapshot);
         Assert.Equal(1, accepted.InboxCount);
         Assert.Empty(accepted.Effects);

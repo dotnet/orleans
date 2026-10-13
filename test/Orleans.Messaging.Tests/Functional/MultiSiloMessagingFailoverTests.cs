@@ -22,7 +22,7 @@ public sealed class MultiSiloMessagingFailoverTests(MultiSiloMessagingClusterFix
         using var barrier = fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/failover");
         var sender = fixture.Client.GetGrain<IMessagingTestGrain>(Guid.NewGuid());
         var logicalId = HierarchicalKey.Create("failover", Guid.NewGuid().ToString("N"));
-        fixture.JobManagerProbe.DuplicateNext(MessagingPump.JobName);
+        fixture.JobManagerProbe.DuplicateNext(MessagingPump.JobName, receiver.GetGrainId());
 
         await sender.SendAsync(
             receiver.GetGrainId(),
