@@ -107,19 +107,26 @@ construction or activation setup, before journal recovery.
   message dead-letters that entry alone, with `OnRetired` in the same journal write; an
   exception during `Send` propagates without staging anything. A recovered entry that
   no source provides is dead-lettered without an owner to notify.
-- `IInbox.Register(IInboxMessageSink)` adds a sink. The inbox offers each message,
-  including self-sent and scheduled messages, to the sinks in order. The first sink
-  whose `TryAccept` returns `true` reports the `DeliveryResult`:
-  - `Accepted`: the sink staged the message in its own journaled state.
+- `IInbox.Register(IInboxMessageSink)` adds a sink. After validation and
+  deduplication, the inbox offers each message, including self-sent and scheduled
+  messages, to the sinks in order. The first sink whose `TryAccept` returns `true`
+  reports the `DeliveryResult`:
+  - `Accepted`: the sink staged the message in its own state. The inbox journals
+    only the processed record in the same write and returns `Accepted` once it is
+    durable.
   - `Duplicate`: the sink already holds the message.
-  - `Backpressured`: the sink is at capacity. A self-sent message fails its `Send`.
+  - `Backpressured`: the sink is at capacity, so the sender retries. A self-sent
+    message fails its `Send` instead.
   - `DeadLettered`: the sink rejects the message with a reason and an optional
     application-defined `Code`. This is the only permanent rejection.
 
   A sink that throws or reports another status leaves the outcome unknown: the inbox
   stages nothing and fails the delivery, so the sender retries it.
 
-  A sink that takes a scheduled message honors its `DeliverAt`. Sinks are idempotent.
+  Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
+  sink honors their `DeliverAt`. Declined messages follow the handler path once
+  `DeliverAt` passes. A message is offered again after its processed record leaves
+  `DeduplicationWindow`, so sinks must be idempotent.
 
 ## Delivery and processing
 
