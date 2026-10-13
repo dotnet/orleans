@@ -1,6 +1,8 @@
 using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
@@ -15,6 +17,7 @@ using Orleans.DurableJobs;
 using Orleans.Messaging;
 using Orleans.Hosting;
 using Orleans.Journaling;
+using Orleans.Journaling.Json;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
@@ -132,23 +135,28 @@ public sealed class DurableRpcProtocolTests
     public void CompletionWaiterRemainsUntilAcknowledgedAndTombstoneRetainsIdentity()
     {
         var destination = GrainId.Create("caller", "one");
+        var serializer = new ServiceCollection()
+            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskState).Assembly))
+            .BuildServiceProvider()
+            .GetRequiredService<Serializer>();
         var state = new DurableTaskState
         {
             RequestFingerprint = "fingerprint",
-            Result = DurableTaskResponse.Completed,
             CompletedAt = DateTimeOffset.UtcNow,
             CompletionDestinations = [destination],
-        };
+        }.Bind(serializer);
+        state.SetResult(DurableTaskResponse.Completed);
 
         Assert.Contains(destination, state.CompletionDestinations);
         state.CompletionDestinations.Remove(destination);
-        state.Request = null;
-        state.Result = null;
+        state.SetRequest(null);
+        state.SetResult(null);
         state.TombstonedAt = DateTimeOffset.UtcNow;
 
         Assert.Empty(state.CompletionDestinations);
         Assert.Equal("fingerprint", state.RequestFingerprint);
         Assert.NotNull(state.TombstonedAt);
+        Assert.Null(state.ResultPayload);
     }
 
     [Fact]
@@ -457,26 +465,20 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void SiloStartupRejectsJournalFormatWhichCannotStoreTaskState()
+    public void SiloRegistrationProvidesJsonJournalMetadataForTaskState()
     {
         var silo = new TestSiloBuilder();
         silo.AddDurableTasks();
         using var provider = silo.Services.BuildServiceProvider();
 
-        // Hosts run startup validators before starting the silo, so the default JSON format fails before any activation.
-        var exception = Assert.Throws<Microsoft.Extensions.Options.OptionsValidationException>(
-            () => provider.GetRequiredService<Microsoft.Extensions.Options.IStartupValidator>().Validate());
-
-        Assert.Equal("json", new JournaledStateManagerOptions().JournalFormatKey);
-        var failure = Assert.Single(exception.Failures);
-        Assert.Contains("requires the Orleans binary journal format", failure, StringComparison.Ordinal);
-        Assert.Contains("JournaledStateManagerOptions.JournalFormatKey to \"orleans-binary\"", failure, StringComparison.Ordinal);
-
-        var binarySilo = new TestSiloBuilder();
-        binarySilo.AddDurableTasks();
-        binarySilo.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
-        using var binaryProvider = binarySilo.Services.BuildServiceProvider();
-        binaryProvider.GetRequiredService<Microsoft.Extensions.Options.IStartupValidator>().Validate();
+        // The resolver chain has no reflection fallback, so every journaled key and value type needs registered metadata.
+        var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<JsonJournalOptions>>().Value.SerializerOptions;
+        Assert.NotNull(options.GetTypeInfo(typeof(DurableTaskState)));
+        Assert.NotNull(options.GetTypeInfo(typeof(DateTimeOffset)));
+        var taskId = TaskId.CreateRoot("root/with\\escapes").Child("child");
+        var json = JsonSerializer.Serialize(taskId, (JsonTypeInfo<TaskId>)options.GetTypeInfo(typeof(TaskId)));
+        Assert.Equal(JsonSerializer.Serialize(taskId.ToString()), json);
+        Assert.Equal(taskId, JsonSerializer.Deserialize(json, (JsonTypeInfo<TaskId>)options.GetTypeInfo(typeof(TaskId))));
     }
 
     [Fact]

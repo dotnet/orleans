@@ -15,11 +15,13 @@ namespace Orleans.DurableTasks.Runtime;
 public class VolatileDurableTaskGrainStorage(
     DeepCopier<Dictionary<TaskId, DurableTaskState>> storageCopier,
     DeepCopier<DurableTaskState> stateCopier,
-    TimeProvider timeProvider) : IDurableTaskGrainStorage
+    TimeProvider timeProvider,
+    Serializer serializer) : IDurableTaskGrainStorage
 {
     private readonly DeepCopier<Dictionary<TaskId, DurableTaskState>> _storageCopier = storageCopier;
     private readonly DeepCopier<DurableTaskState> _stateCopier = stateCopier;
     private readonly TimeProvider _timeProvider = timeProvider;
+    private readonly Serializer _serializer = serializer;
     private readonly ConditionalWeakTable<DurableTaskState, StateOwnership> _stateOwnership = [];
     private Dictionary<TaskId, DurableTaskState> _workingCopy = [];
     private Dictionary<TaskId, DurableTaskState> _persistedCopy = [];
@@ -80,11 +82,9 @@ public class VolatileDurableTaskGrainStorage(
                 throw new InvalidOperationException("The request context must not be null");
             }
 
-            result = new DurableTaskState
-            {
-                Request = request,
-                CreatedAt = _timeProvider.GetUtcNow(),
-            };
+            var created = new DurableTaskState { CreatedAt = _timeProvider.GetUtcNow() }.Bind(_serializer);
+            created.SetRequest(request);
+            result = created;
 
             // Persist the newly-created state immediately so that it is visible to subsequent TryGetTask/SetResponse
             // calls even if no further Set* mutation is made on this instance (e.g. when 'request' is already
@@ -101,7 +101,7 @@ public class VolatileDurableTaskGrainStorage(
     public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request)
     {
         var typedState = GetState(taskId, state);
-        typedState.Request = request;
+        typedState.SetRequest(request);
         AddOrUpdateTask(taskId, typedState);
     }
 
@@ -131,7 +131,7 @@ public class VolatileDurableTaskGrainStorage(
     public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
     {
         var typedState = GetState(taskId, state);
-        typedState.Result = response;
+        typedState.SetResult(response);
         typedState.CompletedAt = _timeProvider.GetUtcNow();
         typedState.DueTime = null;
         typedState.DelayDuration = null;
@@ -159,8 +159,8 @@ public class VolatileDurableTaskGrainStorage(
     public void CreateTombstone(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(taskId, state);
-        typedState.Request = null;
-        typedState.Result = null;
+        typedState.SetRequest(null);
+        typedState.SetResult(null);
         typedState.TombstonedAt = _timeProvider.GetUtcNow();
         AddOrUpdateTask(taskId, typedState);
     }
@@ -182,12 +182,20 @@ public class VolatileDurableTaskGrainStorage(
     }
 
     private DurableTaskState CopyState(DurableTaskState state) =>
-        _stateCopier.Copy(state)
-        ?? throw new InvalidOperationException("The durable task state copier returned null.");
+        (_stateCopier.Copy(state)
+        ?? throw new InvalidOperationException("The durable task state copier returned null.")).Bind(_serializer);
 
-    private Dictionary<TaskId, DurableTaskState> CopyStorage(Dictionary<TaskId, DurableTaskState> storage) =>
-        _storageCopier.Copy(storage)
-        ?? throw new InvalidOperationException("The durable task storage copier returned null.");
+    private Dictionary<TaskId, DurableTaskState> CopyStorage(Dictionary<TaskId, DurableTaskState> storage)
+    {
+        var result = _storageCopier.Copy(storage)
+            ?? throw new InvalidOperationException("The durable task storage copier returned null.");
+        foreach (var state in result.Values)
+        {
+            state.Bind(_serializer);
+        }
+
+        return result;
+    }
 
     private DurableTaskState TrackState(TaskId taskId, DurableTaskState state)
     {

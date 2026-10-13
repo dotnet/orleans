@@ -69,7 +69,7 @@ public sealed class DurableTaskResponsePersistenceTests
         var storage = new VolatileDurableTaskGrainStorage(
             services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
             services.GetRequiredService<DeepCopier<DurableTaskState>>(),
-            TimeProvider.System);
+            TimeProvider.System, services.GetRequiredService<Serializer>());
         var taskId = TaskId.Parse("root/canceled");
         var state = storage.GetOrCreateTask(taskId, request: null);
 
@@ -89,7 +89,7 @@ public sealed class DurableTaskResponsePersistenceTests
         var storage = new VolatileDurableTaskGrainStorage(
             services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
             services.GetRequiredService<DeepCopier<DurableTaskState>>(),
-            TimeProvider.System);
+            TimeProvider.System, services.GetRequiredService<Serializer>());
         var taskId = TaskId.Parse("root/remote");
         var target = GrainId.Create("target", "one");
         var caller = GrainId.Create("caller", "one");
@@ -114,7 +114,7 @@ public sealed class DurableTaskResponsePersistenceTests
         var storage = new VolatileDurableTaskGrainStorage(
             services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
             services.GetRequiredService<DeepCopier<DurableTaskState>>(),
-            TimeProvider.System);
+            TimeProvider.System, services.GetRequiredService<Serializer>());
         var taskId = TaskId.Parse("root/completed");
         var staleState = storage.GetOrCreateTask(taskId, request: null);
         Assert.True(storage.TryGetTask(taskId, out var completionState));
@@ -134,7 +134,7 @@ public sealed class DurableTaskResponsePersistenceTests
         var storage = new VolatileDurableTaskGrainStorage(
             services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
             services.GetRequiredService<DeepCopier<DurableTaskState>>(),
-            TimeProvider.System);
+            TimeProvider.System, services.GetRequiredService<Serializer>());
         var taskId = TaskId.Parse("root/cancel-owned");
         var state = storage.GetOrCreateTask(taskId, request: null);
 
@@ -152,8 +152,8 @@ public sealed class DurableTaskResponsePersistenceTests
         using var services = CreateSerializationServices();
         var storageCopier = services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>();
         var stateCopier = services.GetRequiredService<DeepCopier<DurableTaskState>>();
-        var first = new VolatileDurableTaskGrainStorage(storageCopier, stateCopier, TimeProvider.System);
-        var second = new VolatileDurableTaskGrainStorage(storageCopier, stateCopier, TimeProvider.System);
+        var first = new VolatileDurableTaskGrainStorage(storageCopier, stateCopier, TimeProvider.System, services.GetRequiredService<Serializer>());
+        var second = new VolatileDurableTaskGrainStorage(storageCopier, stateCopier, TimeProvider.System, services.GetRequiredService<Serializer>());
         var taskId = TaskId.Parse("root/owned");
         var state = first.GetOrCreateTask(taskId, request: null);
         second.GetOrCreateTask(taskId, request: null);
@@ -173,7 +173,7 @@ public sealed class DurableTaskResponsePersistenceTests
         var storage = new VolatileDurableTaskGrainStorage(
             services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
             services.GetRequiredService<DeepCopier<DurableTaskState>>(),
-            TimeProvider.System);
+            TimeProvider.System, services.GetRequiredService<Serializer>());
         var ownerTaskId = TaskId.Parse("root/owned");
         var otherTaskId = TaskId.Parse("root/other");
         var state = storage.GetOrCreateTask(ownerTaskId, request: null);

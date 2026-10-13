@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using Orleans.CodeGeneration;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
@@ -18,20 +19,27 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 [TestArea("DurableTasks")]
 public sealed class DurableTaskStorageTests
 {
-    [Fact]
-    public void CanceledResponseRoundTripsThroughOrleansSerialization()
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task CanceledResponseRecoversFromJournal(string journalFormatKey)
     {
-        using var services = CreateSerializationServices();
-        var storage = CreateStorage();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
         var taskId = TaskId.Parse("root/canceled");
         var exception = new OperationCanceledException(
             "Durable cancellation requested.",
             new InvalidOperationException("Cancellation source."));
         exception.Data["task"] = taskId.ToString();
-        var state = storage.GetOrCreateTask(taskId, request: null);
-        storage.SetResponse(taskId, state, new CanceledDurableTaskResponse(exception));
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var storage = activation.Storage;
+            var state = storage.GetOrCreateTask(taskId, request: null);
+            storage.SetResponse(taskId, state, new CanceledDurableTaskResponse(exception));
+            await storage.WriteAsync(cancellationToken);
+        }
 
-        var recovered = RoundTrip(services, Assert.IsType<DurableTaskState>(state));
+        await using var recovery = await harness.ActivateAsync(cancellationToken);
+        Assert.True(recovery.Storage.TryGetTask(taskId, out var recovered));
 
         var response = Assert.IsType<CanceledDurableTaskResponse>(recovered.Result);
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
@@ -40,6 +48,9 @@ public sealed class DurableTaskStorageTests
             "Cancellation source.",
             Assert.IsType<InvalidOperationException>(response.Exception.InnerException).Message);
         Assert.Equal(taskId.ToString(), response.Exception.Data["task"]);
+        Assert.True(recovered.CallerId.IsDefault);
+        Assert.True(recovered.RemoteTarget.IsDefault);
+        Assert.Equal(journalFormatKey, await harness.GetStoredJournalFormatKeyAsync(cancellationToken));
     }
 
     [Fact]
@@ -78,17 +89,50 @@ public sealed class DurableTaskStorageTests
     }
 
     [Fact]
-    public void RemoteIdentityTombstoneRoundTripsThroughOrleansSerialization()
+    public void StoredRequestAndResultAreCachedUntilReplaced()
     {
-        using var services = CreateSerializationServices();
         var storage = CreateStorage();
+        var taskId = TaskId.Parse("root/cached");
+        var request = CreateRequest();
+        var state = storage.GetOrCreateTask(taskId, request);
+        var response = DurableTaskResponse.FromResult(42);
+
+        storage.SetResponse(taskId, state, response);
+
+        var typedState = Assert.IsType<DurableTaskState>(state);
+        Assert.Same(request, typedState.Request);
+        Assert.Same(response, typedState.Result);
+        Assert.NotNull(typedState.RequestPayload);
+        Assert.NotNull(typedState.ResultPayload);
+
+        // Replacing a payload discards the cached value, so the next access decodes the stored payload.
+        typedState.ResultPayload = typedState.ResultPayload;
+        var decoded = Assert.IsType<DurableTaskResponse<int>>(typedState.Result);
+        Assert.NotSame(response, decoded);
+        Assert.Equal(42, decoded.GetResult<int>());
+        Assert.Same(decoded, typedState.Result);
+    }
+
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task RemoteIdentityTombstoneRecoversFromJournal(string journalFormatKey)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
         var taskId = TaskId.Parse("root/remote/tombstone");
         var remoteTarget = GrainId.Create("remote-target", "tombstone");
-        var state = storage.GetOrCreateTask(taskId, request: null);
-        storage.SetRemoteRequest(taskId, state, remoteTarget, "remote-fingerprint");
-        storage.CreateTombstone(taskId, state);
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var storage = activation.Storage;
+            var state = storage.GetOrCreateTask(taskId, CreateRequest());
+            storage.SetRemoteRequest(taskId, state, remoteTarget, "remote-fingerprint");
+            storage.SetResponse(taskId, state, DurableTaskResponse.Completed);
+            storage.CreateTombstone(taskId, state);
+            await storage.WriteAsync(cancellationToken);
+        }
 
-        var recovered = RoundTrip(services, Assert.IsType<DurableTaskState>(state));
+        await using var recovery = await harness.ActivateAsync(cancellationToken);
+        Assert.True(recovery.Storage.TryGetTask(taskId, out var recovered));
 
         Assert.NotNull(recovered.TombstonedAt);
         Assert.Equal(remoteTarget, recovered.RemoteTarget);
@@ -96,65 +140,163 @@ public sealed class DurableTaskStorageTests
         Assert.Null(recovered.RequestFingerprint);
         Assert.Null(recovered.Request);
         Assert.Null(recovered.Result);
+        var typedState = Assert.IsType<DurableTaskState>(recovered);
+        Assert.Null(typedState.RequestPayload);
+        Assert.Null(typedState.ResultPayload);
     }
 
-    [Fact]
-    public void FullTerminalStateRoundTripsThroughOrleansSerialization()
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task FullTerminalStateRecoversFromJournal(string journalFormatKey)
     {
-        using var services = CreateSerializationServices();
+        var cancellationToken = TestContext.Current.CancellationToken;
         var createdAt = new DateTimeOffset(2041, 3, 4, 5, 6, 7, TimeSpan.Zero);
         var clock = new FakeTimeProvider(createdAt);
-        var storage = CreateStorage(clock);
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey, clock);
         var taskId = TaskId.Parse("root/remote/terminal");
         var terminalResult = TaskId.Parse("root/result/42");
         var remoteTarget = GrainId.Create("remote-target", "alpha");
         var caller = GrainId.Create("caller", "beta");
         var completionDestination = GrainId.Create("completion-destination", "gamma");
-        var state = storage.GetOrCreateTask(taskId, request: null);
-        storage.SetRequestFingerprint(taskId, state, "request-fingerprint-v1");
-        storage.SetRemoteRequest(taskId, state, remoteTarget, "remote-fingerprint-v2");
-        storage.SetCallerId(taskId, state, caller);
-        storage.AddCompletionDestination(taskId, state, completionDestination);
-        clock.Advance(TimeSpan.FromMinutes(3));
-        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(terminalResult));
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var storage = activation.Storage;
+            var state = storage.GetOrCreateTask(taskId, request: null);
+            storage.SetRequestFingerprint(taskId, state, "request-fingerprint-v1");
+            storage.SetRemoteRequest(taskId, state, remoteTarget, "remote-fingerprint-v2");
+            storage.SetCallerId(taskId, state, caller);
+            storage.AddCompletionDestination(taskId, state, completionDestination);
+            storage.SetDelay(taskId, state, createdAt.AddMinutes(10), TimeSpan.FromMinutes(10), generation: 3);
+            await storage.WriteAsync(cancellationToken);
+            clock.Advance(TimeSpan.FromMinutes(3));
+            storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(terminalResult));
+            await storage.WriteAsync(cancellationToken);
+        }
 
-        var recovered = RoundTrip(services, Assert.IsType<DurableTaskState>(state));
+        await using var recovery = await harness.ActivateAsync(cancellationToken);
+        Assert.True(recovery.Storage.TryGetTask(taskId, out var recovered));
 
         Assert.Null(recovered.Request);
         Assert.Equal(createdAt, recovered.CreatedAt);
         Assert.Equal(createdAt.AddMinutes(3), recovered.CompletedAt);
         Assert.Null(recovered.CancellationRequestedAt);
         Assert.Null(recovered.DueTime);
-        Assert.Equal(0, recovered.ResumeGeneration);
+        Assert.Null(recovered.DelayDuration);
+        Assert.Equal(4, recovered.ResumeGeneration);
         Assert.Equal("request-fingerprint-v1", recovered.RequestFingerprint);
         Assert.Null(recovered.TombstonedAt);
         Assert.Equal(remoteTarget, recovered.RemoteTarget);
         Assert.Equal("remote-fingerprint-v2", recovered.RemoteRequestFingerprint);
         Assert.Equal(caller, recovered.CallerId);
-        Assert.Empty(recovered.LegacyObservers);
         Assert.Equal(completionDestination, Assert.Single(recovered.CompletionDestinations));
         var response = Assert.IsType<DurableTaskResponse<TaskId>>(recovered.Result);
         Assert.Equal(terminalResult, response.GetResult<TaskId>());
     }
 
-    private static DurableTaskGrainStorage CreateStorage(TimeProvider? timeProvider = null) =>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task RequestsAndTerminalResponsesRecoverFromJournal(string journalFormatKey)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
+        var pendingId = TaskId.CreateRoot("pending").Child("child/with\\escapes");
+        var succeededId = TaskId.Parse("root/succeeded");
+        var failedId = TaskId.Parse("root/failed");
+        var canceledId = TaskId.Parse("root/canceled");
+        var caller = GrainId.Create("caller", "request");
+        var target = GrainId.Create("target", "request");
+        var request = CreateRequest(caller, target);
+        var failure = new InvalidOperationException("The durable operation failed.");
+        failure.Data["attempt"] = 3;
+        var cancellation = new OperationCanceledException("The durable operation was canceled.");
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var storage = activation.Storage;
+            storage.GetOrCreateTask(pendingId, request);
+            var succeeded = storage.GetOrCreateTask(succeededId, request: null);
+            storage.SetRequest(succeededId, succeeded, CreateRequest(caller, target));
+            storage.SetResponse(succeededId, succeeded, DurableTaskResponse.FromResult("typed result"));
+            await storage.WriteAsync(cancellationToken);
+
+            var failed = storage.GetOrCreateTask(failedId, request: null);
+            storage.SetResponse(failedId, failed, DurableTaskResponse.FromException(failure));
+            var canceled = storage.GetOrCreateTask(canceledId, request: null);
+            storage.SetResponse(canceledId, canceled, new CanceledDurableTaskResponse(cancellation));
+            await storage.WriteAsync(cancellationToken);
+        }
+
+        await using var recovery = await harness.ActivateAsync(cancellationToken);
+        var recoveredStorage = recovery.Storage;
+        Assert.Equal(
+            new[] { pendingId, canceledId, failedId, succeededId },
+            recoveredStorage.Tasks.Select(static task => task.Id).OrderBy(static id => id.ToString(), StringComparer.Ordinal));
+
+        Assert.True(recoveredStorage.TryGetTask(pendingId, out var pending));
+        var pendingRequest = Assert.IsType<TestDurableTaskRequest>(pending.Request);
+        Assert.Equal(caller, pendingRequest.Context!.CallerId);
+        Assert.Equal(target, pendingRequest.Context.TargetId);
+        Assert.True(pendingRequest.Context.SupportsDurableCompletion);
+        Assert.Equal(new byte[] { 1, 2, 3 }, pendingRequest.Context.Values!["header"]);
+        Assert.Equal(InvokeMethodOptionsForRequest, pendingRequest.Options);
+        Assert.Null(pending.Result);
+        Assert.Null(pending.CompletedAt);
+
+        Assert.True(recoveredStorage.TryGetTask(succeededId, out var succeededState));
+        Assert.Equal(caller, Assert.IsType<TestDurableTaskRequest>(succeededState.Request).Context!.CallerId);
+        var success = Assert.IsType<DurableTaskResponse<string>>(succeededState.Result);
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, success.Status);
+        Assert.Equal("typed result", success.GetResult<string>());
+        Assert.NotNull(succeededState.CompletedAt);
+
+        Assert.True(recoveredStorage.TryGetTask(failedId, out var failedState));
+        Assert.Null(failedState.Request);
+        var failedResponse = Assert.IsType<ExceptionDurableTaskResponse>(failedState.Result);
+        Assert.Equal(DurableTaskStatus.Failed, failedResponse.Status);
+        var recoveredFailure = Assert.IsType<InvalidOperationException>(failedResponse.Exception);
+        Assert.Equal("The durable operation failed.", recoveredFailure.Message);
+        Assert.Equal(3, recoveredFailure.Data["attempt"]);
+
+        Assert.True(recoveredStorage.TryGetTask(canceledId, out var canceledState));
+        var canceledResponse = Assert.IsType<CanceledDurableTaskResponse>(canceledState.Result);
+        Assert.Equal(DurableTaskStatus.Canceled, canceledResponse.Status);
+        Assert.Equal("The durable operation was canceled.", canceledResponse.Exception.Message);
+        Assert.Equal(journalFormatKey, await harness.GetStoredJournalFormatKeyAsync(cancellationToken));
+    }
+
+    private const InvokeMethodOptions InvokeMethodOptionsForRequest = InvokeMethodOptions.ReadOnly;
+
+    private static TestDurableTaskRequest CreateRequest(GrainId caller = default, GrainId target = default)
+    {
+        var request = new TestDurableTaskRequest
+        {
+            Context = new DurableTaskRequestContext
+            {
+                CallerId = caller,
+                TargetId = target,
+                SupportsDurableCompletion = true,
+                Values = new() { ["header"] = [1, 2, 3] },
+            },
+        };
+        request.AddInvokeMethodOptions(InvokeMethodOptionsForRequest);
+        return request;
+    }
+
+    private static DurableTaskGrainStorage CreateStorage() =>
         new(
             new TestDurableDictionary<TaskId, DurableTaskState>(),
             new TestStateManager(),
-            timeProvider ?? TimeProvider.System);
+            TimeProvider.System,
+            CreateSerializer());
 
-    private static ServiceProvider CreateSerializationServices()
+    private static Serializer CreateSerializer()
     {
         var services = new ServiceCollection();
-        services.AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskStorageTests).Assembly));
-        return services.BuildServiceProvider();
-    }
-
-    private static DurableTaskState RoundTrip(ServiceProvider services, DurableTaskState state)
-    {
-        var serializer = services.GetRequiredService<Serializer>();
-        return serializer.Deserialize<DurableTaskState>(serializer.SerializeToArray(state))
-            ?? throw new InvalidOperationException("The durable task state deserialized as null.");
+        services.AddSerializer(builder =>
+        {
+            builder.AddAssembly(typeof(DurableTaskState).Assembly);
+            builder.AddAssembly(typeof(DurableTaskStorageTests).Assembly);
+        });
+        return services.BuildServiceProvider().GetRequiredService<Serializer>();
     }
 
     private sealed class TestDurableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IDurableDictionary<TKey, TValue>
