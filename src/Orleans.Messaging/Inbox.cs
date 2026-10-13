@@ -79,7 +79,7 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
                 }
 
                 // The sender may retire its copy once this returns, so the acceptance must be durable.
-                if (!IsDurable(pending)) await PersistAsync().ConfigureAwait(true);
+                if (!IsDurable(pending)) await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
                 _pump.Signal();
                 Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "duplicate");
                 return DeliveryResult.Duplicate();
@@ -99,12 +99,12 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
             }
 
             Emit(new() { Kind = InboxCommandKind.Accept, Message = message });
-            await PersistAsync().ConfigureAwait(true);
+            await PersistForCallerAsync(cancellationToken).ConfigureAwait(true);
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
             LogMessageAccepted(Logger, key, GrainContext.GrainId);
             return DeliveryResult.Accepted();
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             LogDeliveryOperationFailed(Logger, exception, key, GrainContext.GrainId);
             throw;
@@ -317,6 +317,21 @@ internal sealed partial class Inbox : IInbox, IInboxExtension, IStateMachine, ID
     internal void ReleaseDepth() => ReportDepth(-_messages.Count);
 
     private void ReportDepth(int delta) => Shared.Instruments.OnInboxDepthChanged(Shared.GrainType, delta);
+
+    /// <summary>Persists staged changes while <paramref name="cancellationToken"/> ends only the caller's wait.</summary>
+    private ValueTask PersistForCallerAsync(CancellationToken cancellationToken)
+    {
+        var write = PersistAsync();
+        if (write.IsCompleted || !cancellationToken.CanBeCanceled)
+        {
+            return write;
+        }
+
+        // The write continues to its outcome after the caller stops waiting; PersistAsync reports failures through the pump.
+        var task = write.AsTask();
+        task.Ignore();
+        return new(task.WaitAsync(cancellationToken));
+    }
 
     private async ValueTask PersistAsync()
     {
