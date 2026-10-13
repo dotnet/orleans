@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using NSubstitute;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Messaging.Configuration;
@@ -131,6 +132,22 @@ public sealed class PublicMessagingRegistrationTests
 
         Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IInbox));
         Assert.Same(scope.ServiceProvider.GetRequiredService<Inbox>(), scope.ServiceProvider.GetRequiredService<IInbox>());
+    }
+
+    [Fact]
+    public async Task AddMessaging_BindsOutboxContractToDeliveredOutboxOverEarlierRegistration()
+    {
+        var services = new ServiceCollection();
+        services.AddScoped(static _ => Substitute.For<IOutbox>());
+        services.AddMessaging();
+
+        // Outbox construction needs an activation, so substitute an uninitialized scoped instance to observe the binding.
+        services.Replace(ServiceDescriptor.Scoped(static _ => (Outbox)RuntimeHelpers.GetUninitializedObject(typeof(Outbox))));
+        await using var provider = services.BuildServiceProvider();
+        await using var scope = provider.CreateAsyncScope();
+
+        Assert.Single(services, static descriptor => descriptor.ServiceType == typeof(IOutbox));
+        Assert.Same(scope.ServiceProvider.GetRequiredService<Outbox>(), scope.ServiceProvider.GetRequiredService<IOutbox>());
     }
 
     [Fact]

@@ -79,7 +79,7 @@ public static class MessagingExtensions
         services.TryAddScoped<Inbox>();
         services.Replace(ServiceDescriptor.Scoped<IInbox>(static sp => sp.GetRequiredService<Inbox>()));
         services.TryAddScoped<Outbox>();
-        services.TryAddScoped<IOutbox>(sp => sp.GetRequiredService<Outbox>());
+        services.Replace(ServiceDescriptor.Scoped<IOutbox>(static sp => sp.GetRequiredService<Outbox>()));
         services.TryAddScoped<IMessagingDiagnostics, MessagingDiagnostics>();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<Orleans.Runtime.IConfigureGrainTypeComponents, MessagingGrainTypeConfigurator>());
