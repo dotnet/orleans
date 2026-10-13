@@ -273,10 +273,6 @@ namespace Orleans.Messaging
         public OutboxMessage Create(MessageId messageId, Runtime.GrainId receiverId, T body, System.DateTimeOffset? deliverAt = null) { throw null; }
 
         public T Decode(Envelope envelope) { throw null; }
-
-        public T Decode(InboxMessage message) { throw null; }
-
-        public T Decode(OutboxMessage message) { throw null; }
     }
 
     public static partial class OutboxExtensions
