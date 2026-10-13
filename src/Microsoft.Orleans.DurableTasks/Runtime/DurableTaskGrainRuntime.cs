@@ -1777,6 +1777,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             localHandle.TrySetResponse(response);
         }
+
+        CompleteSignalWaits(taskId);
     }
 
     /// <summary>
@@ -1868,8 +1870,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>Returns whether a task was scheduled as a request, so it owns its execution tree.</summary>
     /// <remarks>
-    /// Completion decisions and detach markers record fingerprints which begin with <c>$</c>, but they are part of their
-    /// parent's tree; request fingerprints are hexadecimal.
+    /// Completion decisions, detach markers, signal records, and signal send markers record fingerprints which begin with
+    /// <c>$</c>, but they are part of their parent's tree; request fingerprints are hexadecimal.
     /// </remarks>
     private static bool IsInvoked(IDurableTaskState state) =>
         state.RequestFingerprint is { } fingerprint

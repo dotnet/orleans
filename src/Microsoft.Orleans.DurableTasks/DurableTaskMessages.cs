@@ -73,6 +73,26 @@ internal sealed class DurableTaskResumeMessage
 }
 
 /// <summary>
+/// Delivers a signal's value to an invoked task, which records the first value for each signal name.
+/// </summary>
+[GenerateSerializer]
+internal sealed class DurableTaskSignalMessage
+{
+    [Id(0)]
+    public TaskId TaskId { get; init; }
+
+    [Id(1)]
+    public required string Name { get; init; }
+
+    /// <summary>Gets the successful response which holds the signal's value.</summary>
+    [Id(2)]
+    public required DurableTaskResponse Value { get; init; }
+
+    [Id(3)]
+    public GrainId Sender { get; init; }
+}
+
+/// <summary>
 /// The durable grain RPC message subjects and their payload contracts.
 /// </summary>
 /// <remarks>
@@ -85,6 +105,7 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public const string CompletionSubject = SubjectPrefix + "complete";
     public const string CancellationSubject = SubjectPrefix + "cancel";
     public const string ResumeSubject = SubjectPrefix + "resume";
+    public const string SignalSubject = SubjectPrefix + "signal";
 
     public MessageType<DurableTaskInvocationMessage> Invocation { get; } = new(InvocationSubject, serializer);
 
@@ -93,4 +114,6 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public MessageType<DurableTaskCancellationMessage> Cancellation { get; } = new(CancellationSubject, serializer);
 
     public MessageType<DurableTaskResumeMessage> Resume { get; } = new(ResumeSubject, serializer);
+
+    public MessageType<DurableTaskSignalMessage> Signal { get; } = new(SignalSubject, serializer);
 }

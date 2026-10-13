@@ -241,6 +241,7 @@ public sealed class DurableRpcProtocolTests
     [InlineData(DurableTaskMessageTypes.CompletionSubject, "complete")]
     [InlineData(DurableTaskMessageTypes.CancellationSubject, "cancel")]
     [InlineData(DurableTaskMessageTypes.ResumeSubject, "resume")]
+    [InlineData(DurableTaskMessageTypes.SignalSubject, "signal")]
     public void MessageIdIsBoundedHierarchicalKeyScopedBySubject(string subject, string leaf)
     {
         var longTaskId = TaskId.Parse(string.Join('/', Enumerable.Repeat(new string('x', 200), 20)));
@@ -268,6 +269,7 @@ public sealed class DurableRpcProtocolTests
                 DurableTaskMessageTypes.CompletionSubject,
                 DurableTaskMessageTypes.InvocationSubject,
                 DurableTaskMessageTypes.ResumeSubject,
+                DurableTaskMessageTypes.SignalSubject,
             ],
             typeof(DurableTaskMessageTypes)
                 .GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
