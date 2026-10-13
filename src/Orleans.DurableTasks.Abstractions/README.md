@@ -133,6 +133,39 @@ await buyer.RecordOrderAsync(summary).DetachAsync($"order-{orderId:N}-v{summary.
   Detach calls begin in deterministic order, like unnamed children. Outside a durable execution,
   the definition starts through `ISchedulableTask.DetachAsync`.
 
+## Signals
+
+A `DurableSignal<T>` names an event which carries a value into a running task, such as a shipment
+notice or a human approval. Senders and waiters share one descriptor:
+
+```csharp
+static readonly DurableSignal<Approval> Approved = new("approved");
+
+var approval = await Approved.WaitAsync();
+```
+
+- A signal addresses one invoked task: a task which a caller, such as a client, another grain, or
+  `DetachAsync`, started. A wait
+  anywhere in that task's execution observes the task's signals, including a wait in an
+  `async DurableTask` step the task awaits and a wait in a `WhenAny` input. Each invoked task has
+  its own signals.
+- Each name latches one value per task. The host records the first value with the task's state
+  and returns it to every wait for that name, including waits during replay. A repeated signal with
+  an equal value leaves the task unchanged, and a signal with a different value is rejected.
+  `For(suffix)` derives a distinct name, such as `approved/round-2`, for each occurrence of a
+  repeated event.
+- A signal which arrives before its wait is recorded, and the wait returns it immediately.
+- `WaitAsync()` awaited directly runs as part of the awaiting execution, so it creates no child
+  task. As a `WhenAny` input it races other inputs, so a deadline is a race with `DelayUntil`; after
+  the signal wins, awaiting `WaitAsync()` again returns the recorded value:
+
+```csharp
+var index = await DurableTask.WhenAny([Approved.WaitAsync(), DurableTask.DelayUntil(deadline)]);
+var approval = index == 0 ? await Approved.WaitAsync() : null;
+```
+
+- Durable cancellation of the waiting execution cancels its wait.
+
 ## Writing replay-safe workflows
 
 A host replays an execution which didn't finish, for example after its grain is deactivated: the
@@ -165,4 +198,6 @@ and `IScheduledTaskHandle` handles, and persists the mapping from `TaskId` to de
 response, and cancellation state. The host returns the recorded response when an existing
 ID is scheduled again, records `SelectCompletionAsync` decisions, and supplies
 replay-consistent `UtcNow` values. Hosts which support detached tasks override
-`DurableExecutionContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`.
+`DurableExecutionContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`. Hosts which
+support signals override `DurableExecutionContext.WaitForSignalAsync`, record each task's first value
+for each signal name, and deliver signals from senders.
