@@ -10,5 +10,5 @@
 # Review every diff: identity or signature changes can break wire compatibility during rolling upgrades.
 # Details: https://aka.ms/orleans/OrleansContracts.txt
 
-interface [GrainInterfaceType("Orleans.Messaging.IInboxExtension")] Orleans.Messaging.IInboxExtension [Version(0)]
+interface [GrainInterfaceType("Orleans.Messaging.IMessagingExtension")] Orleans.Messaging.IMessagingExtension [Version(0)]
   DeliverAsync: DeliverAsync(Orleans.Messaging.InboxMessage, System.Threading.CancellationToken) -> ValueTask<Orleans.Messaging.DeliveryResult>

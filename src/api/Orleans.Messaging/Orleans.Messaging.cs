@@ -153,13 +153,6 @@ namespace Orleans.Messaging
         IInbox Register(IInboxMessageSink sink);
     }
 
-    [Alias("IInboxExtension")]
-    public partial interface IInboxExtension : Runtime.IGrainExtension, Runtime.IAddressable
-    {
-        [Alias("DeliverAsync")]
-        System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, System.Threading.CancellationToken cancellationToken = default);
-    }
-
     public partial interface IInboxHandler
     {
         bool CanHandle(IInboxHandlerContext context);
@@ -177,6 +170,13 @@ namespace Orleans.Messaging
     public partial interface IInboxMessageSink
     {
         bool TryAccept(InboxMessage message, out DeliveryResult result);
+    }
+
+    [Alias("IMessagingExtension")]
+    public partial interface IMessagingExtension : Runtime.IGrainExtension, Runtime.IAddressable
+    {
+        [Alias("DeliverAsync")]
+        System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public static partial class InboxExtensions
@@ -395,18 +395,18 @@ namespace OrleansCodeGen.Orleans.Messaging
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_Invokable_IInboxExtension_GrainReference_Ext_5F40CF46 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IInboxExtension_GrainReference_Ext_5F40CF46>, global::Orleans.Serialization.Codecs.IFieldCodec
+    public sealed partial class Codec_Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
-        public Codec_Invokable_IInboxExtension_GrainReference_Ext_5F40CF46(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+        public Codec_Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IInboxExtension_GrainReference_Ext_5F40CF46 instance) { }
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 instance) { }
 
-        public Invokable_IInboxExtension_GrainReference_Ext_5F40CF46 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+        public Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
 
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IInboxExtension_GrainReference_Ext_5F40CF46 instance)
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 instance)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IInboxExtension_GrainReference_Ext_5F40CF46 value)
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -451,11 +451,11 @@ namespace OrleansCodeGen.Orleans.Messaging
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_Invokable_IInboxExtension_GrainReference_Ext_5F40CF46 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IInboxExtension_GrainReference_Ext_5F40CF46>, global::Orleans.Serialization.Cloning.IDeepCopier
+    public sealed partial class Copier_Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
-        public Copier_Invokable_IInboxExtension_GrainReference_Ext_5F40CF46(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+        public Copier_Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
-        public Invokable_IInboxExtension_GrainReference_Ext_5F40CF46 DeepCopy(Invokable_IInboxExtension_GrainReference_Ext_5F40CF46 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+        public Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 DeepCopy(Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
@@ -471,8 +471,8 @@ namespace OrleansCodeGen.Orleans.Messaging
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.Messaging.IInboxExtension), typeof(global::Orleans.Messaging.IInboxExtension), "DeliverAsync" })]
-    public sealed partial class Invokable_IInboxExtension_GrainReference_Ext_5F40CF46 : global::Orleans.Runtime.Request<global::Orleans.Messaging.DeliveryResult>
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), "Ext", typeof(global::Orleans.Messaging.IMessagingExtension), typeof(global::Orleans.Messaging.IMessagingExtension), "DeliverAsync" })]
+    public sealed partial class Invokable_IMessagingExtension_GrainReference_Ext_93AB2A04 : global::Orleans.Runtime.Request<global::Orleans.Messaging.DeliveryResult>
     {
         public global::Orleans.Messaging.InboxMessage arg0;
         public System.Threading.CancellationToken arg1;

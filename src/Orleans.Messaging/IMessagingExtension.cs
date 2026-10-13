@@ -8,10 +8,10 @@ using Orleans.Serialization;
 namespace Orleans.Messaging;
 
 /// <summary>
-/// Non-generic grain extension for inbox message delivery.
+/// The grain extension through which other grains exchange durable messages with this grain.
 /// </summary>
-[Alias("IInboxExtension")]
-public interface IInboxExtension : IGrainExtension
+[Alias("IMessagingExtension")]
+public interface IMessagingExtension : IGrainExtension
 {
     /// <summary>
     /// Delivers a message to this grain's inbox.
