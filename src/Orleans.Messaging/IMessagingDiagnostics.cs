@@ -18,6 +18,11 @@ public interface IMessagingDiagnostics
     /// <summary>
     /// Gets messages which could not be delivered from the outbox.
     /// </summary>
+    /// <remarks>
+    /// A message whose <see cref="IOutboxMessageSource"/> failed to provide it has no materialized message: its record
+    /// carries only the <see cref="Envelope.MessageId"/>, with an empty payload and a default
+    /// <see cref="OutboxMessage.ReceiverId"/>, and its reason records the source's failure.
+    /// </remarks>
     IReadOnlyList<DeadLetter<OutboxMessage>> OutboxDeadLetters { get; }
 
     /// <summary>

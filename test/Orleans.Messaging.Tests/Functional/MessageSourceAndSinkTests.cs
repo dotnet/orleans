@@ -200,6 +200,180 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(0, await sender.GetOutboxCountAsync());
     }
 
+    [Theory]
+    [InlineData(SourceFault.Throw)]
+    [InlineData(SourceFault.InvalidMessage)]
+    [InlineData(SourceFault.MismatchedId)]
+    public async Task SourceFailureAfterSend_DeadLettersOnlyThatEntryAndKeepsTheGrainWorking(SourceFault fault)
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var first = NewMessageId("sibling");
+        var failing = NewMessageId("failing");
+        var second = NewMessageId("sibling");
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), first, NewPayload(), write: false);
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), failing, NewPayload(), write: false);
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), second, NewPayload(), write: false);
+        Assert.True(Cluster.TryGetGrainContext(sender.GetGrainId(), out var activation));
+        using var metrics = new MessageMetricListener(activation.ActivationServices.GetRequiredService<OrleansInstruments>().Meter);
+
+        // The source provided every message when it was sent, and fails to provide one for its delivery attempt.
+        Probe.For(sender).Faults[failing] = fault;
+        await sender.WriteAsync();
+
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 3);
+        var (state, deadLetters) = await OnGrainAsync(sender, context => (
+            Grain(context).GetState(),
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
+        Assert.Empty(state.Outgoing);
+        Assert.Equal(nameof(OutboxMessageRetirement.DeadLettered), state.Retired[failing.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), state.Retired[first.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), state.Retired[second.ToString()]);
+        var received = (await OnGrainAsync(receiver, context => Grain(context).GetState())).Received;
+        Assert.Equal(new[] { first.ToString(), second.ToString() }.Order(), received.Keys.Order());
+        AssertSourceFailureDeadLetter(Assert.Single(deadLetters), failing, fault);
+
+        // The dead letter and its retirement commit in one write, before the write which retires the delivered siblings.
+        var writes = Writes(sender);
+        Assert.Equal(3, writes.Length);
+        var deadLettered = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirement.DeadLettered));
+        var delivered = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirement.Delivered));
+        Assert.True(writes[1].AsSpan().IndexOf(deadLettered) >= 0);
+        Assert.True(writes[1].AsSpan().IndexOf(delivered) < 0);
+        Assert.True(writes[2].AsSpan().IndexOf(deadLettered) < 0);
+        Assert.True(writes[2].AsSpan().IndexOf(delivered) >= 0);
+
+        var grainType = sender.GetGrainId().Type.ToString();
+        var outcomes = metrics.Read("outbox-messages-delivered");
+        Assert.Equal(3, outcomes.Length);
+        Assert.Single(outcomes, row => row.Tags.Contains(new("status", "source_error"))).AssertCounter(grainType, "source_error");
+        Assert.Equal(2, outcomes.Count(row => row.Tags.Contains(new("status", "accepted"))));
+
+        // The activation keeps processing messages; the source was called once per send and once per delivery attempt.
+        var later = NewMessageId("later");
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), later, NewPayload(), write: true);
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 4);
+        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), (await OnGrainAsync(sender, context => Grain(context).GetState())).Retired[later.ToString()]);
+        Assert.True(Cluster.TryGetGrainContext(sender.GetGrainId(), out var current));
+        Assert.Same(activation, current);
+        Assert.Equal(1, Probe.For(sender).Activations);
+        Assert.Equal(8, Probe.For(sender).Materializations);
+
+        // The persistent fault never fails a later activation: the dead letter recovers and the source isn't called again.
+        await sender.DeactivateAsync();
+        await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+        var recovered = await OnGrainAsync(sender, context =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters);
+        AssertSourceFailureDeadLetter(Assert.Single(recovered), failing, fault);
+        Assert.Equal(2, Probe.For(sender).Activations);
+        Assert.Equal(8, Probe.For(sender).Materializations);
+    }
+
+    [Fact]
+    public async Task SourceFailureOnRecoveredEntry_DeadLettersItAndRetiresItWithTheFailingSource()
+    {
+        var grain = NewGrain();
+        var receiver = NewGrain().GetGrainId();
+        _ = await grain.GetOutboxCountAsync();
+        var messageId = NewMessageId("recovered-failure");
+        Probe.For(grain).Faults[messageId] = SourceFault.Throw;
+
+        // Replays a reference entry whose source can no longer provide it, then runs a delivery pass.
+        await OnGrainAsync(grain, context =>
+        {
+            Grain(context).StoreOutgoing(receiver, messageId, NewPayload());
+            var outbox = Outbox(context);
+            ApplyReference(outbox, messageId);
+            ((IStateMachine)outbox).OnRecoveryCompleted();
+            var pump = context.ActivationServices.GetRequiredService<MessagingPump>();
+            pump.EnsureStarted();
+            pump.Signal();
+            return true;
+        });
+
+        await WaitUntilAsync(grain, context => Outbox(context).Count == 0);
+        var (state, deadLetters) = await OnGrainAsync(grain, context => (
+            Grain(context).GetState(),
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
+        Assert.Empty(state.Outgoing);
+        Assert.Equal(nameof(OutboxMessageRetirement.DeadLettered), state.Retired[messageId.ToString()]);
+        AssertSourceFailureDeadLetter(Assert.Single(deadLetters), messageId, SourceFault.Throw);
+
+        // The activation keeps processing messages.
+        var later = NewMessageId("after-recovered-failure");
+        await grain.StageFromSourceAsync(receiver, later, NewPayload(), write: true);
+        await WaitUntilAsync(grain, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 2);
+        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), (await OnGrainAsync(grain, context => Grain(context).GetState())).Retired[later.ToString()]);
+        Assert.Equal(1, Probe.For(grain).Activations);
+    }
+
+    [Theory]
+    [InlineData(SourceFault.Throw)]
+    [InlineData(SourceFault.InvalidMessage)]
+    [InlineData(SourceFault.MismatchedId)]
+    public async Task SourceFailureDuringSend_ThrowsToTheCallerAndStagesNothing(SourceFault fault)
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var messageId = NewMessageId("send-failure");
+        Probe.For(sender).Faults[messageId] = fault;
+
+        var stage = sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, NewPayload(), write: false);
+        var error = fault == SourceFault.InvalidMessage
+            ? await Assert.ThrowsAsync<ArgumentException>(() => stage)
+            : (Exception)await Assert.ThrowsAsync<InvalidOperationException>(() => stage);
+        Assert.Contains(ExpectedSourceError(fault), error.Message, StringComparison.Ordinal);
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+
+        var later = NewMessageId("after-send-failure");
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), later, NewPayload(), write: true);
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 1);
+        Assert.Empty(await OnGrainAsync(sender, context =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
+        Assert.Equal(1, Probe.For(sender).Activations);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RecoveredDeadLetterWithoutReceiver_IsValidOnlyWithTheSourceFailureShape(bool withPayload)
+    {
+        var grain = NewGrain();
+        _ = await grain.GetOutboxCountAsync();
+        var messageId = NewMessageId("recovered-dead-letter");
+
+        // Replays a dead letter without a receiver, then validates the recovered state as recovery does.
+        var recovery = OnGrainAsync(grain, context =>
+        {
+            var outbox = Outbox(context);
+            ((IDurableValueCommandHandler<OutboxCommand>)outbox).ApplySet(new OutboxCommand
+            {
+                Kind = OutboxCommandKind.Delivery,
+                MessageId = messageId,
+                DeadLetter = new()
+                {
+                    Message = new() { Envelope = new() { MessageId = messageId, Payload = withPayload ? NewPayload() : [] }, ReceiverId = default },
+                    DeadLetteredAt = DateTimeOffset.UtcNow,
+                    Reason = "The outbox message source failed to provide the message.",
+                    AttemptCount = 1
+                }
+            });
+            ((IStateMachine)outbox).OnRecoveryCompleted();
+            return outbox.DeadLetterState.Count;
+        });
+
+        if (withPayload)
+        {
+            var error = await Assert.ThrowsAsync<ArgumentException>(() => recovery);
+            Assert.Contains("receiver must not be default", error.Message, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Equal(1, await recovery);
+        }
+    }
+
     [Fact]
     public async Task RecoveredReferenceEntry_IsWithdrawnWhenNoSourceProvidesItAndFailsWithoutSources()
     {
@@ -231,15 +405,36 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
             return true;
         }));
         Assert.Contains("no outbox message source is registered", error.Message, StringComparison.Ordinal);
-
-        void ApplyReference(Outbox outbox, MessageId messageId) =>
-            ((IDurableValueCommandHandler<OutboxCommand>)outbox).ApplySet(new OutboxCommand
-            {
-                Kind = OutboxCommandKind.Enqueue,
-                Reference = new() { MessageId = messageId },
-                State = new() { EnqueuedAt = DateTimeOffset.UtcNow }
-            });
     }
+
+    private static void ApplyReference(Outbox outbox, MessageId messageId) =>
+        ((IDurableValueCommandHandler<OutboxCommand>)outbox).ApplySet(new OutboxCommand
+        {
+            Kind = OutboxCommandKind.Enqueue,
+            Reference = new() { MessageId = messageId },
+            State = new() { EnqueuedAt = DateTimeOffset.UtcNow }
+        });
+
+    private static void AssertSourceFailureDeadLetter(DeadLetter<OutboxMessage> letter, MessageId messageId, SourceFault fault)
+    {
+        // No valid message exists, so the dead letter carries only the message ID.
+        Assert.Equal(messageId, letter.Message.Envelope.MessageId);
+        Assert.True(letter.Message.ReceiverId.IsDefault);
+        Assert.Empty(letter.Message.Envelope.Payload);
+        Assert.Null(letter.Message.Envelope.Subject);
+        Assert.Null(letter.Message.Envelope.Headers);
+        Assert.Null(letter.Message.Envelope.DeliverAt);
+        Assert.StartsWith("The outbox message source failed to provide the message: ", letter.Reason, StringComparison.Ordinal);
+        Assert.Contains(ExpectedSourceError(fault), letter.Reason, StringComparison.Ordinal);
+        Assert.Equal(1, letter.AttemptCount);
+    }
+
+    private static string ExpectedSourceError(SourceFault fault) => fault switch
+    {
+        SourceFault.Throw => SourceSinkGrain.SourceFailure,
+        SourceFault.InvalidMessage => "The payload must not be null.",
+        _ => "The outbox message source returned message ID"
+    };
 
     [Fact]
     public async Task SinkAcceptance_DeduplicatesWithinTheWindowAndIsOfferedAgainAfterItExpires()
@@ -543,6 +738,14 @@ public enum SourceFault
     MismatchedId
 }
 
+/// <summary>How the source fails to provide a message which it stores.</summary>
+public enum SourceFault
+{
+    Throw,
+    InvalidMessage,
+    MismatchedId
+}
+
 public sealed class SourceSinkProbe
 {
     private readonly ConcurrentDictionary<GrainId, Counters> _counters = new();
@@ -592,6 +795,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
 {
     internal const string Subject = "source-sink/payload";
     internal const string Rejection = "The sink rejected the message.";
+    internal const string SourceFailure = "The source can't decode the stored message.";
     private readonly IJournaledStateManager _manager;
     private readonly IOutbox _outbox;
     private readonly IDurableDictionary<string, byte[]> _outgoing;
@@ -618,12 +822,20 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         _received = received;
         _retired = retired;
         _probe = probe.For(context.GrainId);
+        _probe.OnActivated();
         outbox.Register(this);
         inbox.Register(this).Register(new Handler(_probe));
     }
 
     internal (Dictionary<string, byte[]> Outgoing, Dictionary<string, byte[]> Received, Dictionary<string, string> Retired) GetState() =>
         (new(_outgoing), new(_received), new(_retired));
+
+    /// <summary>Stores an outgoing message in the source's state without sending it.</summary>
+    internal void StoreOutgoing(GrainId receiver, MessageId messageId, byte[] payload)
+    {
+        _outgoing[messageId.ToString()] = payload;
+        _receivers[messageId.ToString()] = receiver.ToString();
+    }
 
     public async Task StageFromSourceAsync(GrainId receiver, MessageId messageId, byte[] payload, bool write)
     {
@@ -687,6 +899,16 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
             Envelope = new() { MessageId = messageId, Payload = payload, Subject = Subject },
             ReceiverId = GrainId.Parse(_receivers[key])
         };
+        if (_probe.Faults.TryGetValue(messageId, out var fault))
+        {
+            message = fault switch
+            {
+                SourceFault.Throw => throw new InvalidOperationException(SourceFailure),
+                SourceFault.InvalidMessage => message with { Envelope = message.Envelope with { Payload = null! } },
+                _ => message with { Envelope = message.Envelope with { MessageId = new MessageId(messageId.Key.CreateChildKey("other")) } }
+            };
+        }
+
         return true;
     }
 
