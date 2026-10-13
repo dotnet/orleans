@@ -71,9 +71,8 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
 /// A hand-written, real (non-mocked) implementation of <see cref="IDurableTaskRequest"/>.
 /// </summary>
 /// <remarks>
-/// A dynamic-proxy mock (e.g. NSubstitute's <c>Substitute.For&lt;IDurableTaskRequest&gt;()</c>) cannot be used here:
-/// <see cref="Orleans.DurableTasks.Runtime.VolatileDurableTaskGrainStorage"/> stores every <see cref="Orleans.DurableTasks.Runtime.DurableTaskState"/>
-/// through a real Orleans <see cref="DeepCopier{T}"/>, and Orleans' codec provider throws <c>CodecNotFoundException</c> for
+/// A dynamic-proxy mock (e.g. NSubstitute's <c>Substitute.For&lt;IDurableTaskRequest&gt;()</c>) cannot be copied by a real
+/// Orleans <see cref="DeepCopier{T}"/>: Orleans' codec provider throws <c>CodecNotFoundException</c> for
 /// dynamic proxy types it has never seen (confirmed empirically). A plain hand-written class paired with the trivial
 /// <see cref="RuntimeTestDurableTaskRequestCopier"/> below avoids that problem entirely while still letting tests fully control
 /// and observe request behavior.
@@ -132,9 +131,8 @@ internal sealed class RuntimeTestDurableTaskRequest(
 }
 
 /// <summary>
-/// Trivial reference-preserving copier for <see cref="RuntimeTestDurableTaskRequest"/>, registered so that the real Orleans
-/// <see cref="DeepCopier{T}"/> used by <see cref="Orleans.DurableTasks.Runtime.VolatileDurableTaskGrainStorage"/> can copy
-/// <see cref="Orleans.DurableTasks.Runtime.DurableTaskState"/> instances which reference a <see cref="RuntimeTestDurableTaskRequest"/>.
+/// Trivial reference-preserving copier for <see cref="RuntimeTestDurableTaskRequest"/>, registered so that a real Orleans
+/// <see cref="DeepCopier{T}"/> can copy values which reference a <see cref="RuntimeTestDurableTaskRequest"/>.
 /// </summary>
 [RegisterCopier]
 internal sealed class RuntimeTestDurableTaskRequestCopier : IDeepCopier<RuntimeTestDurableTaskRequest>

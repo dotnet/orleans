@@ -2828,16 +2828,16 @@ public sealed class DurableTaskRuntimeInvariantTests
 
     private sealed class TestStorage(TestStateManager manager) : IDurableTaskGrainStorage
     {
-        private readonly Dictionary<TaskId, DurableTaskState> _states = [];
+        private readonly Dictionary<TaskId, TestTaskState> _states = [];
 
         public TestDurableDictionary<TaskId, DateTimeOffset> LogicalTimes { get; } = [];
 
         public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks =>
             _states.Select(entry => (entry.Key, (IDurableTaskState)entry.Value));
 
-        public DurableTaskState Get(TaskId id) => _states[id];
+        public TestTaskState Get(TaskId id) => _states[id];
         public bool Contains(TaskId id) => _states.ContainsKey(id);
-        public DurableTaskState GetOrCreate(TaskId id) => (DurableTaskState)GetOrCreateTask(id, null);
+        public TestTaskState GetOrCreate(TaskId id) => (TestTaskState)GetOrCreateTask(id, null);
 
         public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task) =>
             Tasks.Where(entry => task.IsParentOf(entry.Id));
@@ -2846,7 +2846,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         {
             if (!_states.TryGetValue(taskId, out var state))
             {
-                state = new DurableTaskState
+                state = new TestTaskState
                 {
                     Request = request,
                     CreatedAt = DateTimeOffset.UtcNow,
@@ -2858,53 +2858,53 @@ public sealed class DurableTaskRuntimeInvariantTests
         }
 
         public void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request) =>
-            ((DurableTaskState)state).Request = request;
+            ((TestTaskState)state).Request = request;
 
         public void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint) =>
-            ((DurableTaskState)state).RequestFingerprint = fingerprint;
+            ((TestTaskState)state).RequestFingerprint = fingerprint;
 
         public void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint)
         {
-            ((DurableTaskState)state).RemoteTarget = target;
-            ((DurableTaskState)state).RemoteRequestFingerprint = fingerprint;
+            ((TestTaskState)state).RemoteTarget = target;
+            ((TestTaskState)state).RemoteRequestFingerprint = fingerprint;
         }
 
         public void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId) =>
-            ((DurableTaskState)state).CallerId = callerId;
+            ((TestTaskState)state).CallerId = callerId;
 
         public void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
         {
-            ((DurableTaskState)state).Result = response;
-            ((DurableTaskState)state).CompletedAt = DateTimeOffset.UtcNow;
-            ((DurableTaskState)state).DueTime = null;
-            ((DurableTaskState)state).DelayDuration = null;
-            if (((DurableTaskState)state).ResumeGeneration > 0)
+            ((TestTaskState)state).Result = response;
+            ((TestTaskState)state).CompletedAt = DateTimeOffset.UtcNow;
+            ((TestTaskState)state).DueTime = null;
+            ((TestTaskState)state).DelayDuration = null;
+            if (((TestTaskState)state).ResumeGeneration > 0)
             {
-                ((DurableTaskState)state).ResumeGeneration++;
+                ((TestTaskState)state).ResumeGeneration++;
             }
         }
 
         public void RequestCancellation(TaskId taskId, IDurableTaskState state) =>
-            ((DurableTaskState)state).CancellationRequestedAt ??= DateTimeOffset.UtcNow;
+            ((TestTaskState)state).CancellationRequestedAt ??= DateTimeOffset.UtcNow;
 
         public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, TimeSpan duration, long generation)
         {
-            ((DurableTaskState)state).DueTime = dueTime;
-            ((DurableTaskState)state).DelayDuration = duration;
-            ((DurableTaskState)state).ResumeGeneration = generation;
+            ((TestTaskState)state).DueTime = dueTime;
+            ((TestTaskState)state).DelayDuration = duration;
+            ((TestTaskState)state).ResumeGeneration = generation;
         }
 
         public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination) =>
-            ((DurableTaskState)state).CompletionDestinations.Add(destination);
+            ((TestTaskState)state).CompletionDestinations.Add(destination);
 
         public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination) =>
-            ((DurableTaskState)state).CompletionDestinations.Remove(destination);
+            ((TestTaskState)state).CompletionDestinations.Remove(destination);
 
         public void CreateTombstone(TaskId taskId, IDurableTaskState state)
         {
-            ((DurableTaskState)state).Request = null;
-            ((DurableTaskState)state).Result = null;
-            ((DurableTaskState)state).TombstonedAt = DateTimeOffset.UtcNow;
+            ((TestTaskState)state).Request = null;
+            ((TestTaskState)state).Result = null;
+            ((TestTaskState)state).TombstonedAt = DateTimeOffset.UtcNow;
         }
 
         public bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state)
@@ -2918,6 +2918,29 @@ public sealed class DurableTaskRuntimeInvariantTests
         public void Clear() => _states.Clear();
         public ValueTask WriteAsync(CancellationToken cancellationToken) => manager.WriteStateAsync(cancellationToken);
         public ValueTask ReadAsync(CancellationToken cancellationToken) => default;
+    }
+
+    /// <summary>
+    /// In-memory task state for <see cref="TestStorage"/>. It holds decoded requests and responses directly, so runtime
+    /// tests can use requests which have no Orleans codec.
+    /// </summary>
+    private sealed class TestTaskState : IDurableTaskState
+    {
+        public DurableTaskResponse? Result { get; set; }
+        public HashSet<GrainId> CompletionDestinations { get; set; } = [];
+        public IDurableTaskRequest? Request { get; set; }
+        public DateTimeOffset? CompletedAt { get; set; }
+        public DateTimeOffset? CancellationRequestedAt { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset? DueTime { get; set; }
+        public TimeSpan? DelayDuration { get; set; }
+        public long ResumeGeneration { get; set; }
+        public string? RequestFingerprint { get; set; }
+        public DateTimeOffset? TombstonedAt { get; set; }
+        public GrainId RemoteTarget { get; set; }
+        public string? RemoteRequestFingerprint { get; set; }
+        public GrainId CallerId { get; set; }
+        IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     }
 
     private sealed class TestDurableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IDurableDictionary<TKey, TValue>

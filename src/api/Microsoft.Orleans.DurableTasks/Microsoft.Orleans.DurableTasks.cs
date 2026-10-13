@@ -299,6 +299,7 @@ namespace Orleans.DurableTasks.Runtime
     public partial class DurableTaskState : Protocol.IDurableTaskState
     {
         [Id(13)]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
         public Orleans.Runtime.GrainId CallerId { get { throw null; } set { } }
 
         [Id(5)]
@@ -319,31 +320,31 @@ namespace Orleans.DurableTasks.Runtime
         [Id(7)]
         public System.DateTimeOffset? DueTime { get { throw null; } set { } }
 
-        [Id(1)]
-        public System.Collections.Generic.HashSet<Protocol.IDurableTaskObserver> LegacyObservers { get { throw null; } set { } }
-
-        System.DateTimeOffset? Protocol.IDurableTaskState.CompletedAt { get { throw null; } }
-
         System.Collections.Generic.IReadOnlySet<Orleans.Runtime.GrainId> Protocol.IDurableTaskState.CompletionDestinations { get { throw null; } }
-
-        System.DateTimeOffset Protocol.IDurableTaskState.CreatedAt { get { throw null; } }
-
-        Protocol.IDurableTaskRequest? Protocol.IDurableTaskState.Request { get { throw null; } }
 
         [Id(12)]
         public string? RemoteRequestFingerprint { get { throw null; } set { } }
 
         [Id(11)]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
         public Orleans.Runtime.GrainId RemoteTarget { get { throw null; } set { } }
 
-        [Id(2)]
-        public Protocol.IDurableTaskRequest? Request { get { throw null; } set { } }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public Protocol.IDurableTaskRequest? Request { get { throw null; } }
 
         [Id(9)]
         public string? RequestFingerprint { get { throw null; } set { } }
 
-        [Id(0)]
-        public DurableTaskResponse? Result { get { throw null; } set { } }
+        [Id(15)]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public byte[]? RequestPayload { get { throw null; } set { } }
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public DurableTaskResponse? Result { get { throw null; } }
+
+        [Id(16)]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public byte[]? ResultPayload { get { throw null; } set { } }
 
         [Id(8)]
         public long ResumeGeneration { get { throw null; } set { } }
@@ -354,7 +355,7 @@ namespace Orleans.DurableTasks.Runtime
 
     public partial class VolatileDurableTaskGrainStorage : Protocol.IDurableTaskGrainStorage
     {
-        public VolatileDurableTaskGrainStorage(Serialization.DeepCopier<System.Collections.Generic.Dictionary<TaskId, DurableTaskState>> storageCopier, Serialization.DeepCopier<DurableTaskState> stateCopier, System.TimeProvider timeProvider) { }
+        public VolatileDurableTaskGrainStorage(Serialization.DeepCopier<System.Collections.Generic.Dictionary<TaskId, DurableTaskState>> storageCopier, Serialization.DeepCopier<DurableTaskState> stateCopier, System.TimeProvider timeProvider, Serialization.Serializer serializer) { }
 
         public System.Collections.Generic.IEnumerable<(TaskId Id, Protocol.IDurableTaskState State)> Tasks { get { throw null; } }
 

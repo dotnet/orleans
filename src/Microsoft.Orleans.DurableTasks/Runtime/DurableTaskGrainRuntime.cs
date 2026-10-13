@@ -1419,11 +1419,6 @@ internal sealed partial class DurableTaskGrainRuntime(
             return terminal;
         }
 
-        if (state is DurableTaskState durableState)
-        {
-            durableState.MigrateLegacyObservers();
-        }
-
         if (state.CompletionDestinations.Count > 0)
         {
             var transport = MessageTransport;

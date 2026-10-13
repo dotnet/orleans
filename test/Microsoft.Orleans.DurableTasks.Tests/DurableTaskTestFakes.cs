@@ -23,10 +23,9 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 
 /// <summary>
 /// Minimal concrete <see cref="IDurableTaskRequest"/> implementation which is genuinely serializable
-/// (via <c>[GenerateSerializer]</c> code generation), unlike an NSubstitute-based proxy, which cannot be
-/// deep-copied by the Orleans serializer (there is no registered codec/copier for a dynamically-generated
-/// proxy type). This allows exercising storage code paths (e.g. <c>SetRequest</c>) which perform a real
-/// deep-copy of the containing <c>DurableTaskState</c>.
+/// (via <c>[GenerateSerializer]</c> code generation), unlike an NSubstitute-based proxy, which the Orleans
+/// serializer cannot encode (there is no registered codec for a dynamically-generated proxy type). This allows
+/// exercising storage code paths (e.g. <c>SetRequest</c>) which persist the request as an Orleans-serialized payload.
 /// </summary>
 [GenerateSerializer]
 [Alias("Microsoft.Orleans.DurableTasks.Tests.TestDurableTaskRequest")]
@@ -69,38 +68,6 @@ internal sealed class TestDurableTaskRequest : IDurableTaskRequest
     }
 
     public DurableTask CreateTask() => DurableTask.Run(static _ => { });
-}
-
-/// <summary>
-/// A <see cref="GrainReference"/> subclass which also implements <see cref="IDurableTaskObserver"/>,
-/// used to exercise <c>DurableTaskState.MigrateLegacyObservers</c>'s <c>observer is GrainReference</c> branch
-/// without requiring the full Orleans grain-reference-proxy code generation pipeline.
-/// </summary>
-internal sealed class FakeGrainReferenceObserver(GrainReferenceShared shared, IdSpan key) : GrainReference(shared, key), IDurableTaskObserver
-{
-    public ValueTask OnResponseAsync(TaskId taskId, DurableTaskResponse response, CancellationToken cancellationToken = default) => default;
-
-    /// <summary>
-    /// Creates a new <see cref="FakeGrainReferenceObserver"/> whose <see cref="GrainReference.GrainId"/> is
-    /// derived from <paramref name="grainType"/> and <paramref name="key"/>, backed by real serializer
-    /// infrastructure resolved from <paramref name="serviceProvider"/>.
-    /// </summary>
-    public static FakeGrainReferenceObserver Create(IServiceProvider serviceProvider, string grainType, string key)
-    {
-        var runtime = NSubstitute.Substitute.For<IGrainReferenceRuntime>();
-        var codecProvider = serviceProvider.GetRequiredService<CodecProvider>();
-        var copyContextPool = serviceProvider.GetRequiredService<CopyContextPool>();
-        var shared = new GrainReferenceShared(
-            GrainType.Create(grainType),
-            GrainInterfaceType.Create("Microsoft.Orleans.DurableTasks.Tests.IDurableTaskObserverGrainExtension"),
-            interfaceVersion: 0,
-            runtime,
-            InvokeMethodOptions.None,
-            codecProvider,
-            copyContextPool,
-            serviceProvider);
-        return new FakeGrainReferenceObserver(shared, IdSpan.Create(key));
-    }
 }
 
 internal sealed class TombstoneResponseDurableTaskServer(

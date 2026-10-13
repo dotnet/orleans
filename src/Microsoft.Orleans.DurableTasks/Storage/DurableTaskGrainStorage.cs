@@ -5,6 +5,7 @@ using Orleans.DurableTasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using Orleans.Serialization;
 
 namespace Orleans.DurableTasks.Storage;
 
@@ -13,40 +14,39 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     private readonly IDurableDictionary<TaskId, DurableTaskState> _items;
     private readonly IJournaledStateManager _stateManager;
     private readonly TimeProvider _timeProvider;
+    private readonly Serializer _serializer;
 
     public DurableTaskGrainStorage(
         [FromKeyedServices("$tasks")] IDurableDictionary<TaskId, DurableTaskState> items,
         IJournaledStateManager stateManager,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        Serializer serializer)
     {
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(stateManager);
         ArgumentNullException.ThrowIfNull(timeProvider);
+        ArgumentNullException.ThrowIfNull(serializer);
 
         _items = items;
         _stateManager = stateManager;
         _timeProvider = timeProvider;
+        _serializer = serializer;
     }
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks =>
-        _items.Select(static pair => (pair.Key, (IDurableTaskState)pair.Value));
+        _items.Select(pair => (pair.Key, (IDurableTaskState)pair.Value.Bind(_serializer)));
 
     public IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId parentId) =>
         _items
             .Where(pair => parentId.IsParentOf(pair.Key))
-            .Select(static pair => (pair.Key, (IDurableTaskState)pair.Value));
+            .Select(pair => (pair.Key, (IDurableTaskState)pair.Value.Bind(_serializer)));
 
     public IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (_items.TryGetValue(taskId, out var result))
         {
-            if (result.MigrateLegacyObservers())
-            {
-                _items[taskId] = result;
-            }
-
-            return result;
+            return result.Bind(_serializer);
         }
 
         if (request is not null)
@@ -54,11 +54,8 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
             ValidateRequest(request);
         }
 
-        result = new DurableTaskState
-        {
-            Request = request,
-            CreatedAt = _timeProvider.GetUtcNow(),
-        };
+        result = new DurableTaskState { CreatedAt = _timeProvider.GetUtcNow() }.Bind(_serializer);
+        result.SetRequest(request);
         _items.Add(taskId, result);
 
         return result;
@@ -69,7 +66,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         ArgumentNullException.ThrowIfNull(request);
         ValidateRequest(request);
         var typedState = GetState(taskId, state);
-        typedState.Request = request;
+        typedState.SetRequest(request);
         _items[taskId] = typedState;
     }
 
@@ -103,7 +100,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     {
         ArgumentNullException.ThrowIfNull(response);
         var typedState = GetState(taskId, state);
-        typedState.Result = response;
+        typedState.SetResult(response);
         typedState.CompletedAt = _timeProvider.GetUtcNow();
         typedState.DueTime = null;
         typedState.DelayDuration = null;
@@ -156,8 +153,8 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     public void CreateTombstone(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(taskId, state);
-        typedState.Request = null;
-        typedState.Result = null;
+        typedState.SetRequest(null);
+        typedState.SetResult(null);
         typedState.TombstonedAt = _timeProvider.GetUtcNow();
         _items[taskId] = typedState;
     }
@@ -167,12 +164,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         if (_items.TryGetValue(taskId, out var result))
         {
-            if (result.MigrateLegacyObservers())
-            {
-                _items[taskId] = result;
-            }
-
-            state = result;
+            state = result.Bind(_serializer);
             return true;
         }
 
@@ -212,11 +204,6 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
             || !ReferenceEquals(current, result))
         {
             throw new ArgumentException("The provided value does not belong to this storage provider.", nameof(state));
-        }
-
-        if (result.MigrateLegacyObservers())
-        {
-            _items[taskId] = result;
         }
 
         return result;
