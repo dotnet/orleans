@@ -1,50 +1,58 @@
 namespace Orleans.Messaging;
 
 /// <summary>
-/// Provides the envelopes of outgoing messages whose payload the application stores in its own journaled state.
+/// Provides outgoing messages whose payload and receiver the application stores in its own journaled state.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <see cref="IOutbox.SendFromSource"/> stages a reference entry which carries the message ID, receiver, and delivery
-/// state, but no payload, so the payload is journaled once, in the application's state. The outbox keeps every
-/// delivery semantic of an ordinary message: delivery after the sending write is durable, retries with backoff,
+/// <see cref="IOutbox.Send(HierarchicalKey)"/> stages a reference entry which carries the message ID and delivery
+/// state, but no payload or receiver, so the payload is journaled once, in the application's state. The outbox keeps
+/// every delivery semantic of an ordinary message: delivery after the sending write is durable, retries with backoff,
 /// dead-lettering after <c>MaxDeliveryAttempts</c> or <c>MaxOutboxRetryAge</c>, wake-ups, and metrics.
 /// </para>
 /// <para>
-/// The outbox resolves each reference entry to the first registered source whose <see cref="CanProvide"/> returns
-/// <see langword="true"/>, when the message is sent and when the outbox recovers it, and calls
-/// <see cref="GetEnvelope"/> on every delivery attempt. When the entry retires, the outbox calls
-/// <see cref="OnRetired"/> exactly once, synchronously, while it stages the entry's removal, so changes the source
-/// stages in its journaled state commit in the same journal write as that removal. Register sources during activation
-/// setup, before journal recovery: a recovered reference entry which no source can provide fails the activation.
+/// The outbox calls <see cref="TryGetMessage"/> when the message is sent and before every delivery attempt. The first
+/// registered source which returns the message owns it for the activation's lifetime. When the entry retires, the
+/// outbox calls the owner's <see cref="OnRetired"/> exactly once, synchronously, while it stages the entry's removal, so
+/// changes the source stages in its journaled state commit in the same journal write as that removal.
 /// </para>
 /// <para>
-/// All calls run on the activation scheduler. The source keeps the message available from the send until
-/// <see cref="OnRetired"/>, and returns the same command for every call.
+/// A source withdraws a pending message by returning <see langword="false"/> from <see cref="TryGetMessage"/>, for
+/// example after the application times it out or an administrator removes it. Before its next delivery attempt, the
+/// outbox removes the withdrawn entry without delivering it or calling <see cref="OnRetired"/>. An attempt already in
+/// flight still completes, so a source can receive <see cref="OnRetired"/> for a message it withdrew.
+/// </para>
+/// <para>
+/// All calls run on the activation scheduler. Register sources during activation setup, before journal recovery: a
+/// recovered reference entry fails the activation when no source is registered. While a source provides a message, it
+/// returns the same message, envelope and receiver alike, for every call.
 /// </para>
 /// </remarks>
 public interface IOutboxMessageSource
 {
-    /// <summary>Determines whether this source provides the message.</summary>
+    /// <summary>Materializes a message for its send or a delivery attempt.</summary>
     /// <param name="messageId">The ID of a reference entry.</param>
-    /// <returns><see langword="true"/> when this source provides the message.</returns>
-    bool CanProvide(HierarchicalKey messageId);
-
-    /// <summary>Materializes the envelope of a message for a delivery attempt or a dead letter.</summary>
-    /// <param name="messageId">The ID of a reference entry which this source provides.</param>
-    /// <returns>A valid envelope whose <see cref="Envelope.MessageId"/> is <paramref name="messageId"/>.</returns>
+    /// <param name="message">
+    /// When this method returns <see langword="true"/>, a valid message whose envelope's <see cref="Envelope.MessageId"/>
+    /// is <paramref name="messageId"/> and whose receiver is another grain.
+    /// </param>
+    /// <returns>
+    /// <see langword="true"/> when this source provides the message; <see langword="false"/> when it doesn't provide the
+    /// message or has withdrawn it.
+    /// </returns>
     /// <remarks>
-    /// The outbox validates the envelope. An exception or an invalid envelope breaks the source's contract and fails the
-    /// activation's messaging, which deactivates the grain.
+    /// The outbox validates the message. During <see cref="IOutbox.Send(HierarchicalKey)"/>, an invalid message fails the
+    /// send. Afterwards, an exception or an invalid message breaks the source's contract and fails the activation's
+    /// messaging, which deactivates the grain.
     /// </remarks>
-    Envelope GetEnvelope(HierarchicalKey messageId);
+    bool TryGetMessage(HierarchicalKey messageId, out OutboxMessage message);
 
     /// <summary>Notifies the source that the outbox retired a message, so the source can release its payload.</summary>
     /// <param name="messageId">The ID of the retired reference entry.</param>
     /// <param name="retirement">Whether the receiver retired the message or the message was dead-lettered.</param>
     /// <remarks>
     /// Stage the release synchronously in journaled state; it commits in the journal write which removes the entry.
-    /// A dead-lettered message's envelope is materialized into the outbox dead letter before this call.
+    /// A dead-lettered message is materialized into the outbox dead letter before this call.
     /// An exception fails the activation's messaging, which deactivates the grain.
     /// </remarks>
     void OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement);
