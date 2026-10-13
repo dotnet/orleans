@@ -196,18 +196,18 @@ namespace Orleans.Messaging
         bool TryAccept(InboxMessage message, out DeliveryResult result);
     }
 
-    [Alias("IMessagingExtension")]
-    public partial interface IMessagingExtension : Runtime.IGrainExtension, Runtime.IAddressable
-    {
-        [Alias("DeliverAsync")]
-        System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, System.Threading.CancellationToken cancellationToken = default);
-    }
-
     public partial interface IMessagingDiagnostics
     {
         System.Collections.Generic.IReadOnlyList<DeadLetter<InboxMessage>> InboxDeadLetters { get; }
 
         bool RemoveInboxDeadLetter(MessageId messageId);
+    }
+
+    [Alias("IMessagingExtension")]
+    public partial interface IMessagingExtension : Runtime.IGrainExtension, Runtime.IAddressable
+    {
+        [Alias("DeliverAsync")]
+        System.Threading.Tasks.ValueTask<DeliveryResult> DeliverAsync(InboxMessage message, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IMessagingGrain
