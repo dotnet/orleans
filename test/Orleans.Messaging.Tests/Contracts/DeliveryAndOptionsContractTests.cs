@@ -35,7 +35,8 @@ public sealed class DeliveryAndOptionsContractTests
                 DeliveryStatus.DeadLettered
             ],
             Enum.GetValues<DeliveryStatus>());
-        Assert.Equal([0, 1, 2, 3, 4], Enum.GetValues<DeliveryStatus>().Select(static value => (int)value));
+        Assert.Equal([1, 2, 3, 4, 5], Enum.GetValues<DeliveryStatus>().Select(static value => (int)value));
+        Assert.False(Enum.IsDefined(default(DeliveryResult).Status));
     }
 
     [Fact]
