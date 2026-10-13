@@ -27,11 +27,15 @@ public interface IDurableTaskGrainStorage
 
     /// <summary>Restarts the retention period of a terminal result, now.</summary>
     void RetainResult(TaskId taskId, IDurableTaskState state);
+
+    /// <summary>Replaces a task's request and result with a tombstone which retains its identity.</summary>
+    /// <remarks>The task has no completion destinations: each pending completion retains its task's result.</remarks>
     void CreateTombstone(TaskId taskId, IDurableTaskState state);
 
     bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state);
 
-    // Removes a request and its state
+    /// <summary>Removes a task and its state.</summary>
+    /// <remarks>The task has no completion destinations: each pending completion retains its task's result.</remarks>
     bool RemoveTask(TaskId taskId);
     void Clear();
 
