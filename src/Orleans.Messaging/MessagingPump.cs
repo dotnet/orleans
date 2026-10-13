@@ -28,6 +28,11 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     private Task<DurableJob>? _scheduling;
     private bool _wakeupScheduled;
 
+    // Advances whenever a job run stops guaranteeing a future wake-up. A schedule requested in an earlier epoch may
+    // belong to a job which has already run and completed, so it no longer guarantees a wake-up.
+    private int _wakeupEpoch;
+    private int _schedulingEpoch;
+
     public MessagingPump(IGrainContext grainContext, IJournaledStateManager stateManager, IDurableJobHandlerRegistry jobHandlers)
     {
         GrainContext = grainContext;
@@ -79,16 +84,23 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     public async ValueTask EnsureWakeupAsync(CancellationToken cancellationToken)
     {
         if (_wakeupScheduled) return;
-        var scheduling = _scheduling ??= Shared.JobManager.ScheduleJobAsync(new ScheduleJobRequest
+        if (_scheduling is null || _schedulingEpoch != _wakeupEpoch)
         {
-            Target = GrainContext.GrainId,
-            JobName = JobName,
-            DueTime = Shared.JobTimeProvider.GetUtcNow()
-        }, _shutdown.Token);
+            _schedulingEpoch = _wakeupEpoch;
+            _scheduling = Shared.JobManager.ScheduleJobAsync(new ScheduleJobRequest
+            {
+                Target = GrainContext.GrainId,
+                JobName = JobName,
+                DueTime = Shared.JobTimeProvider.GetUtcNow()
+            }, _shutdown.Token);
+        }
+
+        var scheduling = _scheduling;
+        var epoch = _schedulingEpoch;
         try
         {
             await scheduling.WaitAsync(cancellationToken).ConfigureAwait(true);
-            _wakeupScheduled = true;
+            if (epoch == _wakeupEpoch) _wakeupScheduled = true;
         }
         finally
         {
@@ -110,7 +122,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         catch
         {
             // This attempt no longer guarantees a future wake-up.
-            _wakeupScheduled = false;
+            ClearWakeup();
             if (!_shutdown.IsCancellationRequested && Inbox.Count > 0)
             {
                 RepairWakeupAsync().Ignore();
@@ -121,12 +133,18 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
         if (Inbox.GetNextWakeupDelay() is not { } delay)
         {
-            _wakeupScheduled = false;
+            ClearWakeup();
             return DurableJobRunResult.Completed;
         }
 
         return DurableJobRunResult.RescheduleAt(
             MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), delay > TimeSpan.Zero ? delay : RecheckDelay));
+    }
+
+    private void ClearWakeup()
+    {
+        _wakeupScheduled = false;
+        _wakeupEpoch++;
     }
 
     private async Task RepairWakeupAsync()

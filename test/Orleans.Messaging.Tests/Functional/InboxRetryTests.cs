@@ -122,6 +122,31 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
     }
 
+    [Fact]
+    public async Task WakeupWhoseJobCompletesBeforeSchedulingReturns_DoesNotSuppressLaterWakeups()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var pump = Fixture.GetPump(receiver);
+        var target = receiver.GetGrainId();
+
+        // The scheduled job runs and completes, with no work remaining, before the scheduling call returns.
+        Fixture.JobManagerProbe.SkipNext(MessagingPump.JobName);
+        using var schedule = Fixture.JobManagerProbe.BlockNext(MessagingPump.JobName);
+        var scheduling = await Fixture.OnGrainAsync(receiver, () => pump.EnsureWakeupAsync(TestContext.Current.CancellationToken).AsTask());
+        await schedule.WaitUntilEnteredAsync();
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
+        schedule.Continue();
+        await scheduling.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+
+        // Later work schedules its own wake-up.
+        var attempts = Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, target);
+        var envelope = CreateEnvelope(receiver, NewMessage(195, "later-work"));
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        Assert.Equal(attempts + 1, Fixture.JobManagerProbe.GetAttemptCount(MessagingPump.JobName, target));
+        Assert.Equal(1, Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Count);
+    }
+
     private sealed class RetryFixture : MessagingClusterFixture
     {
         protected override void ConfigureOptions(DurableMessagingOptions options)

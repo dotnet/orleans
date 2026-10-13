@@ -12,6 +12,7 @@ public sealed class DurableJobManagerProbe
     private readonly ConcurrentDictionary<string, int> _failures = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, int> _postScheduleFailures = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<(string JobName, GrainId Target), int> _duplicates = [];
+    private readonly ConcurrentDictionary<string, int> _skips = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<(string JobName, GrainId Target), ConcurrentQueue<DurableJob>> _scheduledJobs = [];
     private readonly ConcurrentDictionary<string, ScheduleBarrier> _scheduleBarriers = new(StringComparer.Ordinal);
 
@@ -20,6 +21,10 @@ public sealed class DurableJobManagerProbe
 
     public void FailAfterNext(string jobName) =>
         _postScheduleFailures.AddOrUpdate(jobName, 1, static (_, count) => count + 1);
+
+    /// <summary>Returns the next schedule without storing its job, modeling a job which has already run.</summary>
+    public void SkipNext(string jobName) =>
+        _skips.AddOrUpdate(jobName, 1, static (_, count) => count + 1);
 
     public void DuplicateNext(string jobName, GrainId target) =>
         _duplicates.AddOrUpdate((jobName, target), 1, static (_, count) => count + 1);
@@ -58,6 +63,9 @@ public sealed class DurableJobManagerProbe
 
     internal bool ShouldFailAfterSchedule(string jobName)
         => TryConsumeFailure(_postScheduleFailures, jobName);
+
+    internal bool ShouldSkip(string jobName)
+        => TryConsumeFailure(_skips, jobName);
 
     internal bool ShouldDuplicate(ScheduleJobRequest request)
         => TryConsumeFailure(_duplicates, (request.JobName, request.Target));
@@ -117,6 +125,18 @@ internal sealed class ControlledDurableJobManager(
         }
 
         await probe.WaitIfBlockedAsync(request.JobName, cancellationToken);
+        if (probe.ShouldSkip(request.JobName))
+        {
+            return new DurableJob
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Name = request.JobName,
+                ShardId = "skipped",
+                TargetGrainId = request.Target,
+                DueTime = request.DueTime
+            };
+        }
+
         var result = await inner.ScheduleJobAsync(request, cancellationToken);
         probe.OnScheduled(request, result);
         if (probe.ShouldDuplicate(request))
