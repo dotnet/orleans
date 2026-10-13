@@ -16,11 +16,6 @@
     <PackageReference Include="Microsoft.Testing.Platform.MSBuild" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
-    <!-- net8.0 tests run the generator on the oldest supported Roslyn. net10.0 tests use Roslyn 5.9, which parses closed types and unions with LangVersion=preview. -->
-    <PackageReference Update="Microsoft.CodeAnalysis.CSharp.Workspaces" VersionOverride="5.9.0" />
-  </ItemGroup>
-
   <ItemGroup>
     <!-- due to Verify.XunitV3 requiring newer versions of these libraries -->
     <Compile Include="..\Orleans.NativeAotSmoke\Contexts.Contracts.cs" Link="Contexts.Contracts.cs" />
