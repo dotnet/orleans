@@ -78,14 +78,30 @@ validation disabled until its first published version establishes a baseline.
   request and result payloads separately from the task's metadata, so updates to
   the metadata do not rewrite them.
 - Terminal responses and completion notifications commit together. The callee
-  retains the result until the completion retires from its outbox. When the
-  calling grain has durably accepted it, the callee prunes the task in the same
-  journal write, keeping a tombstone which rejects conflicting reuse of its
-  identity. For tasks scheduled by clients, the result remains available for
-  `DurableTaskOptions.ResultRetentionPeriod` after completion; when the completion
-  is dead-lettered, for that period after the dead letter. External clients poll
-  retained results. Polls interleave with the grain's other requests and
-  messages, so a waiting client doesn't delay the work which completes the task.
+  retains the result until the completion retires from its outbox.
+- An invoked task, which a client or another grain scheduled as a request, owns
+  an execution tree: the task and its descendants which aren't invoked tasks
+  themselves, such as local children, delays, combinator decisions, and calls to
+  other grains. Callers choose task identifiers, so an invoked task nested under
+  another task's identifier keeps its own lifecycle. Once an invoked task is
+  terminal, the grain deletes its execution tree: in the journal write which
+  retires its completion when the calling grain has durably accepted it, or
+  `DurableTaskOptions.ResultRetentionPeriod` after completion when it has no
+  grain caller, such as a task scheduled by a client; when the completion is
+  dead-lettered, for that period after the dead letter. A task identifier
+  therefore deduplicates schedules for `ResultRetentionPeriod` after completion,
+  and scheduling it after the deletion executes the request again. External
+  clients poll retained results, and a poll after the deletion throws
+  `DurableTaskNotFoundException`. Polls interleave with the grain's other
+  requests and messages, so a waiting client doesn't delay the work which
+  completes the task.
+- Deleting an execution tree cancels its unfinished tasks: the deletion's journal
+  write sends a cancellation to each pending call to another grain, and each
+  running execution is signaled after that write and its result discarded.
+  Completions and delay resumes which arrive for deleted tasks are ignored. A
+  cancellation which arrives before its invocation is recorded, so the invocation
+  terminalizes as canceled when it arrives; the record is deleted once Messaging's
+  `MaxOutboxRetryAge` has elapsed, after which the invocation can no longer arrive.
 - A completion whose stored result no longer decodes, for example after a later
   deployment removes the result type, can't be materialized. The outbox
   dead-letters that completion, recording the decoding error as the reason, and the

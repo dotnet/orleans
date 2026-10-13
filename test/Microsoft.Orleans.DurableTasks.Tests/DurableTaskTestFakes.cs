@@ -70,7 +70,7 @@ internal sealed class TestDurableTaskRequest : IDurableTaskRequest
     public DurableTask CreateTask() => DurableTask.Run(static _ => { });
 }
 
-internal sealed class TombstoneResponseDurableTaskServer(
+internal sealed class NotFoundDurableTaskServer(
     TaskId expectedTaskId,
     TaskId? responseTaskId = null,
     bool returnFailureResponse = false) : IDurableTaskServer
