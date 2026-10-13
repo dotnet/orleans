@@ -87,7 +87,7 @@ public sealed class HandlerRoutingContractTests : IDisposable
     private static FakeContext CreateContext(MessageType<string> type, string body) =>
         new(new InboxMessage
         {
-            Envelope = type.Create(HierarchicalKey.Create(Guid.NewGuid().ToString("N")), GrainId.Create("test", "receiver"), body).Envelope
+            Envelope = type.Create(MessageId.Create(Guid.NewGuid().ToString("N")), GrainId.Create("test", "receiver"), body).Envelope
         });
 
     private sealed class FakeContext(InboxMessage message) : IInboxHandlerContext
