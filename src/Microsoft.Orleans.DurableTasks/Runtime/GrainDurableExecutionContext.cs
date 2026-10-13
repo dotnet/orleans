@@ -28,6 +28,7 @@ internal sealed class GrainDurableExecutionContext(
     private readonly DateTimeOffset _utcNow = utcNow ?? runtime.UtcNow;
     private readonly CancellationToken _shutdownToken = shutdownToken;
     private HashSet<string>? _childNames;
+    private bool _deleted;
 #if NET9_0_OR_GREATER
     private readonly Lock _idLock = new();
 #else
@@ -35,6 +36,20 @@ internal sealed class GrainDurableExecutionContext(
 #endif
 
     public override DateTimeOffset UtcNow => _utcNow;
+
+    /// <summary>
+    /// Marks this attempt's task as deleted with its execution tree, so the attempt can no longer schedule durable work.
+    /// </summary>
+    /// <remarks>The runtime deletes tasks on the activation scheduler, where this attempt schedules its work.</remarks>
+    internal void MarkDeleted() => _deleted = true;
+
+    private void ThrowIfDeleted()
+    {
+        if (_deleted)
+        {
+            throw new OperationCanceledException($"Durable task '{TaskId}' was deleted with its execution tree.");
+        }
+    }
 
     protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
         TaskId taskId,
@@ -51,6 +66,7 @@ internal sealed class GrainDurableExecutionContext(
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ThrowIfNotChildTaskId(taskId);
+        ThrowIfDeleted();
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         var handle = await _runtime.ScheduleChildAsync(taskId, task, executionCts.Token);
         return new ExecutionTaskHandle(
@@ -76,6 +92,8 @@ internal sealed class GrainDurableExecutionContext(
         {
             ThrowIfNotChildTaskId(taskId);
         }
+
+        ThrowIfDeleted();
 
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         return await _runtime.ScheduleDelayAsync(taskId, dueTime, executionCts.Token);
@@ -113,6 +131,8 @@ internal sealed class GrainDurableExecutionContext(
         {
             ThrowIfNotChildTaskId(candidate);
         }
+
+        ThrowIfDeleted();
 
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         return await _runtime.SelectCompletionAsync(decisionId, candidates, executionCts.Token);

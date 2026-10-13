@@ -1756,9 +1756,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             _preStagedCancellations.TryRemove((taskId, state.RemoteTarget), out _);
         }
 
-        if (_executionContexts.TryRemove(taskId, out var context) && !terminal)
+        if (_executionContexts.TryRemove(taskId, out var context))
         {
-            (contexts ??= []).Add(context);
+            context.MarkDeleted();
+            if (!terminal)
+            {
+                (contexts ??= []).Add(context);
+            }
         }
 
         if (_runningRequests.TryRemove(taskId, out var running))
@@ -1785,6 +1789,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         _logicalTimes.Remove(taskId);
         _storage.RemoveTask(taskId);
     }
+
     /// <inheritdoc/>
     public async ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, CancellationToken cancellationToken)
     {
