@@ -129,6 +129,36 @@ internal sealed class GrainDurableExecutionContext(
             _scheduler,
             () => GetChildTaskHandleCore(taskId));
 
+    /// <remarks>
+    /// Only durable grain calls can be detached: the target recovers a root task from its serialized request. Durable
+    /// cancellation of this execution doesn't abandon the start; host abort does.
+    /// </remarks>
+    protected override ValueTask DetachTaskAsync(
+        TaskId markerId,
+        TaskId rootId,
+        DurableTask taskDefinition,
+        CancellationToken cancellationToken) =>
+        RunOnScheduler(
+            _scheduler,
+            () => DetachTaskCoreAsync(markerId, rootId, taskDefinition, cancellationToken));
+
+    private async ValueTask DetachTaskCoreAsync(
+        TaskId markerId,
+        TaskId rootId,
+        DurableTask taskDefinition,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfNotChildTaskId(markerId);
+        ThrowIfDeleted();
+        if (taskDefinition is not IDurableTaskRequest request)
+        {
+            throw new NotSupportedException("Only durable grain calls can be detached.");
+        }
+
+        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
+        await _runtime.DetachAsync(rootId, request, markerId, executionCts.Token);
+    }
+
     private IScheduledTaskHandle GetChildTaskHandleCore(TaskId taskId)
     {
         ThrowIfNotChildTaskId(taskId);

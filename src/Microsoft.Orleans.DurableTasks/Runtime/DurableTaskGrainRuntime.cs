@@ -47,7 +47,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// </para>
 /// <para>
 /// An invoked task, which was scheduled as a request, owns an execution tree: the task and its descendants which are not
-/// invoked tasks themselves, such as local children, delays, completion decisions, and remote-child stubs. Task
+/// invoked tasks themselves, such as local children, delays, completion decisions, detach markers, and remote-child stubs. Task
 /// identifiers are chosen by callers, so an invoked descendant keeps its own lifecycle. Once an invoked task is terminal
 /// and no completion is pending, the runtime deletes its execution tree: in the write which retires its last completion
 /// as delivered, because that destination durably holds the result, or otherwise once
@@ -67,6 +67,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     IEnumerable<IDurableTaskMessageTransport> messageTransports) :
     IDurableTaskGrainRuntime,
     IDurableTaskGrainExtension,
+    IDurableTaskManager,
     IStateMachine,
     IOutboxMessageSource
 {
@@ -475,6 +476,85 @@ internal sealed partial class DurableTaskGrainRuntime(
         return DurableTaskResponse.Pending;
     }
 
+    /// <summary>
+    /// Starts a request as a detached root task and waits for the journal write which commits it, together with this
+    /// grain's other pending changes.
+    /// </summary>
+    /// <remarks>
+    /// A detached task has no caller: its target retains it like a client-scheduled root and sends its result to no grain,
+    /// so this grain stores no state for it. A task for this grain is staged locally and starts after the commit; a task
+    /// for another grain is an invocation staged in the outbox. Within a durable execution, a terminal marker in the
+    /// execution's tree records the start in the same write, so a replay which reaches the marker doesn't start the task
+    /// again, and the marker is deleted with that tree. The marker is terminal, so canceling or deleting its tree doesn't
+    /// reach the detached task.
+    /// </remarks>
+    public async ValueTask DetachAsync(
+        TaskId rootId,
+        IDurableTaskRequest request,
+        TaskId markerId,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfStopping();
+        cancellationToken.ThrowIfCancellationRequested();
+        Debug.Assert(!rootId.IsDefault && rootId.Parent().IsDefault, "A detached task is a root task.");
+        var context = request.Context ?? throw new InvalidOperationException("The durable task request has no context.");
+        string? markerFingerprint = null;
+        if (!markerId.IsDefault)
+        {
+            markerFingerprint = GetDetachMarkerFingerprint(rootId, context.TargetId, request);
+            if (_storage.TryGetTask(markerId, out var recorded))
+            {
+                if (!string.Equals(recorded.RequestFingerprint, markerFingerprint, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Durable task '{markerId}' is already associated with another operation.");
+                }
+
+                // The marker commits with the start, possibly in a write which an earlier attempt is still awaiting.
+                await WriteStateAsync(cancellationToken);
+                return;
+            }
+        }
+
+        if (context.TargetId == GrainId)
+        {
+            StageScheduleWithCommitEffects(rootId, request, fromInbox: false);
+        }
+        else
+        {
+            context.CallerId = default;
+            context.SupportsDurableCompletion = false;
+            MessageTransport.SendDetachedInvocation(GrainId, context.TargetId, rootId, request);
+        }
+
+        if (markerFingerprint is not null)
+        {
+            var marker = _storage.GetOrCreateTask(markerId, request: null);
+            _storage.SetRequestFingerprint(markerId, marker, markerFingerprint);
+            _storage.SetResponse(markerId, marker, DurableTaskResponse.Completed);
+        }
+
+        await WriteStateAsync(cancellationToken);
+    }
+
+    // Fingerprints of operations in an execution tree begin with '$', so they never equal a hexadecimal request fingerprint.
+    private const string DetachMarkerFingerprintPrefix = "$detach:";
+
+    private string GetDetachMarkerFingerprint(TaskId rootId, GrainId target, IDurableTaskRequest request)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Span<byte> length = stackalloc byte[sizeof(int)];
+        foreach (var value in (ReadOnlySpan<string>)[rootId.ToString(), target.ToString(), IDurableTaskRequest.GetFingerprint(request, _shared.Serializer)])
+        {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
+            hash.AppendData(length);
+            hash.AppendData(bytes);
+        }
+
+        return $"{DetachMarkerFingerprintPrefix}{Convert.ToHexString(hash.GetHashAndReset())}";
+    }
+
     public async ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, CancellationToken cancellationToken)
     {
         ThrowIfStopping();
@@ -762,9 +842,15 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>
     /// Stages a request received through the inbox, starting it after the inbox batch commits.
     /// </summary>
-    internal DurableTaskResponse ScheduleFromInbox(TaskId taskId, IDurableTaskRequest request)
+    internal DurableTaskResponse ScheduleFromInbox(TaskId taskId, IDurableTaskRequest request) =>
+        StageScheduleWithCommitEffects(taskId, request, fromInbox: true);
+
+    /// <summary>
+    /// Stages a request, starting it or completing its handle after the write which commits the staged changes.
+    /// </summary>
+    private DurableTaskResponse StageScheduleWithCommitEffects(TaskId taskId, IDurableTaskRequest request, bool fromInbox)
     {
-        var scheduled = StageSchedule(taskId, request, fromInbox: true);
+        var scheduled = StageSchedule(taskId, request, fromInbox);
         if (scheduled.CompletedResponse is { } completed)
         {
             _pendingHandleResponses[taskId] = completed;
@@ -1706,10 +1792,13 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>Returns whether a task was scheduled as a request, so it owns its execution tree.</summary>
-    /// <remarks>A completion decision records a fingerprint of its candidates, but it is part of its parent's tree.</remarks>
+    /// <remarks>
+    /// Completion decisions and detach markers record fingerprints which begin with <c>$</c>, but they are part of their
+    /// parent's tree; request fingerprints are hexadecimal.
+    /// </remarks>
     private static bool IsInvoked(IDurableTaskState state) =>
         state.RequestFingerprint is { } fingerprint
-        && !fingerprint.StartsWith(CompletionDecisionFingerprintPrefix, StringComparison.Ordinal);
+        && !fingerprint.StartsWith('$');
 
     /// <summary>Returns whether a task records only a cancellation which arrived before its invocation.</summary>
     private static bool IsCancellationRecord(IDurableTaskState state) =>
@@ -2054,6 +2143,19 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         await SignalCancellationAsync(taskId, cancellationToken);
     }
+
+    // The base constructor of ScheduledTask is internal to the abstractions, so an untyped handle uses an object result.
+    ScheduledTask IDurableTaskManager.GetTask(TaskId taskId) => ((IDurableTaskManager)this).GetTask<object?>(taskId);
+
+    // The runtime serves the handle's polls and cancellation directly, as it serves them for a grain call.
+    ScheduledTask<TResult> IDurableTaskManager.GetTask<TResult>(TaskId taskId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        return new AttachedScheduledTask<TResult>(taskId, this);
+    }
+
+    ValueTask IDurableTaskManager.CancelAsync(TaskId taskId, CancellationToken cancellationToken) =>
+        SignalCancellationAsync(taskId, cancellationToken);
 
     private bool TryGetScheduledTaskHandle(TaskId taskId, [NotNullWhen(true)] out IScheduledTaskHandle? handle)
     {

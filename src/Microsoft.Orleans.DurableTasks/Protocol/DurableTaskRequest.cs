@@ -167,6 +167,33 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
     }
 
+    ValueTask ISchedulableTask.DetachAsync(TaskId taskId, CancellationToken cancellationToken) =>
+        DetachCoreAsync(_shared, this, taskId, cancellationToken);
+
+    /// <summary>Starts a request as a detached root task.</summary>
+    /// <remarks>
+    /// A durable grain stages the start with its pending changes and waits for the journal write which commits them.
+    /// Other callers schedule the root like a client, which neither subscribes to nor polls the task.
+    /// </remarks>
+    internal static async ValueTask DetachCoreAsync(
+        DurableTaskRequestShared shared,
+        IDurableTaskRequest request,
+        TaskId taskId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        Debug.Assert(request.Context is not null);
+        if (TryGetRuntime(shared, out var runtime))
+        {
+            await runtime.DetachAsync(taskId, request, markerId: default, cancellationToken);
+            return;
+        }
+
+        PrepareClientContext(request.Context);
+        var targetGrain = shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(request.Context.TargetId);
+        _ = await targetGrain.ScheduleAsync(taskId, request, cancellationToken);
+    }
+
     /// <inheritdoc/>
     protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
     {
@@ -354,6 +381,9 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
         return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
     }
+
+    ValueTask ISchedulableTask.DetachAsync(TaskId taskId, CancellationToken cancellationToken) =>
+        DurableTaskRequest.DetachCoreAsync(_shared, this, taskId, cancellationToken);
 
     /// <inheritdoc/>
     protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
