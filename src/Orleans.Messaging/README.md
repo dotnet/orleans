@@ -77,8 +77,16 @@ construction or activation setup, before journal recovery.
   source that throws or returns an invalid message dead-letters that entry alone,
   with `OnRetired(DeadLettered)` in the same journal write; an exception during
   `Send` propagates without staging anything.
-- `IInbox.Register(IInboxMessageSink)` adds a sink. A sink whose `TryAccept` returns
-  `true` has staged the message in its own journaled state. Sinks are idempotent.
+- `IInbox.Register(IInboxMessageSink)` adds a sink. The inbox offers each message,
+  including self-sent and scheduled messages, to the sinks in order. The first sink
+  whose `TryAccept` returns `true` reports the `DeliveryResult`:
+  - `Accepted`: the sink staged the message in its own journaled state.
+  - `Duplicate`: the sink already holds the message.
+  - `Backpressured`: the sink is at capacity. A self-sent message fails its `Send`.
+  - `DeadLettered`: the sink rejects the message with a reason. A sink that throws
+    or reports another status dead-letters the message.
+
+  A sink that takes a scheduled message honors its `DeliverAt`. Sinks are idempotent.
 
 ## Delivery results
 
