@@ -3082,23 +3082,77 @@ public class SchedulingTests
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var slowCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var root = host.CreateRootDefinition<TaskId>(async context =>
+        var root = host.CreateRootDefinition<int>(async context =>
         {
-            var winnerId = await DurableTask.WhenAny(
+            var winner = await DurableTask.WhenAny(
             [
                 DurableTask.Run(async _ => await slowCompletion.Task),
                 DurableTask.Run(static _ => Task.CompletedTask),
             ]);
-            return DurableTaskResponse.FromResult(winnerId);
+            return DurableTaskResponse.FromResult(winner);
         });
 
         var scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        var winningId = await scheduled;
+        var winnerIndex = await scheduled;
 
-        Assert.Equal(TaskId.Parse("root/$when-any-1/1"), winningId);
+        Assert.Equal(1, winnerIndex);
+        Assert.True(host.Contains(TaskId.Parse("root/$when-any-1/1")));
         Assert.True(host.Contains(TaskId.Parse("root/$when-any-1/0")));
         Assert.False(host.IsCancellationRequested(TaskId.Parse("root/$when-any-1/0")));
         slowCompletion.SetResult();
+    }
+
+    [Fact]
+    public async Task WhenAllReturnsResultsInInputOrder()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var first = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var root = host.CreateRootDefinition<IReadOnlyList<int>>(async _ =>
+            DurableTaskResponse.FromResult(await DurableTask.WhenAll(
+            [
+                DurableTask.Run(async _ => await first.Task),
+                DurableTask.Run(static _ => 2),
+                DurableTask.Run(static _ => 3),
+            ])));
+
+        var scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        first.SetResult(1);
+
+        Assert.Equal([1, 2, 3], await scheduled);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WhenAnyFailsWhenTheWinnerFails(bool generic)
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var loser = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var root = host.CreateRootDefinition<int>(async _ =>
+        {
+            var index = generic
+                ? (await DurableTask.WhenAny<int>(
+                [
+                    DurableTask.Run((Func<CancellationToken, int>)(static _ => throw new InvalidOperationException("winner failed"))),
+                    DurableTask.Run(async _ =>
+                    {
+                        await loser.Task;
+                        return 2;
+                    }),
+                ])).Index
+                : await DurableTask.WhenAny(
+                [
+                    DurableTask.Run((Action<CancellationToken>)(static _ => throw new InvalidOperationException("winner failed"))),
+                    DurableTask.Run(async _ => await loser.Task),
+                ]);
+            return DurableTaskResponse.FromResult(index);
+        });
+
+        var scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await scheduled);
+
+        Assert.Equal("winner failed", exception.Message);
+        loser.SetResult();
     }
 
     [Fact]
@@ -3109,7 +3163,7 @@ public class SchedulingTests
         var whenAll = DurableTask.WhenAll(inputs);
         var whenAny = DurableTask.WhenAny(inputs);
         inputs.Clear();
-        var root = host.CreateRootDefinition<(IReadOnlyList<TaskId> All, TaskId Any)>(async _ =>
+        var root = host.CreateRootDefinition<(IReadOnlyList<int> All, (int Index, int Result) Any)>(async _ =>
         {
             var all = await whenAll;
             var any = await whenAny;
@@ -3119,31 +3173,34 @@ public class SchedulingTests
         var scheduled = await root.ScheduleAsync("snapshot", cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var result = await scheduled;
 
-        Assert.Equal(TaskId.Parse("snapshot/$when-all-1/0"), Assert.Single(result.All));
-        Assert.Equal(TaskId.Parse("snapshot/$when-any-2/0"), result.Any);
+        Assert.Equal(1, Assert.Single(result.All));
+        Assert.Equal((0, 1), result.Any);
+        Assert.True(host.Contains(TaskId.Parse("snapshot/$when-all-1/0")));
+        Assert.True(host.Contains(TaskId.Parse("snapshot/$when-any-2/0")));
     }
 
     [Fact]
     public async Task RepeatedCombinatorsAllocateDistinctOperationAndChildIds()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
-        var root = host.CreateRootDefinition<IReadOnlyList<TaskId>>(async _ =>
+        var root = host.CreateRootDefinition<IReadOnlyList<int>>(async _ =>
         {
             var first = await DurableTask.WhenAll(
             [
-                DurableTask.Run(static _ => { }),
-                DurableTask.Run(static _ => { }),
+                DurableTask.Run(static _ => 1),
+                DurableTask.Run(static _ => 2),
             ]);
             var second = await DurableTask.WhenAll(
             [
-                DurableTask.Run(static _ => { }),
-                DurableTask.Run(static _ => { }),
+                DurableTask.Run(static _ => 3),
+                DurableTask.Run(static _ => 4),
             ]);
-            return DurableTaskResponse.FromResult<IReadOnlyList<TaskId>>([.. first, .. second]);
+            return DurableTaskResponse.FromResult<IReadOnlyList<int>>([.. first, .. second]);
         });
 
         var result = await await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
+        Assert.Equal([1, 2, 3, 4], result);
         Assert.Equal(
         [
             TaskId.Parse("root/$when-all-1/0"),
@@ -3151,18 +3208,16 @@ public class SchedulingTests
             TaskId.Parse("root/$when-all-2/0"),
             TaskId.Parse("root/$when-all-2/1"),
         ],
-            result);
-        Assert.Equal(4, result.Distinct().Count());
-        Assert.All(result, id => Assert.IsType<TaskId>(id));
+            host.EntryIds.Where(id => !id.Equals(TaskId.CreateRoot("root"))));
     }
 
     [Fact]
     public async Task NestedCombinatorsAllocateChildrenBeneathTheirScheduledOperation()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
-        var root = host.CreateRootDefinition<IReadOnlyList<TaskId>>(async _ =>
+        var root = host.CreateRootDefinition<object?>(async _ =>
         {
-            var ids = await DurableTask.WhenAll(
+            await DurableTask.WhenAll(
             [
                 DurableTask.WhenAll(
                 [
@@ -3174,17 +3229,14 @@ public class SchedulingTests
                     DurableTask.Run(static _ => { }),
                 ]),
             ]);
-            return DurableTaskResponse.FromResult(ids);
+            return DurableTaskResponse.Completed;
         });
 
-        var result = await await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        await scheduled.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
-        Assert.Equal(
-        [
-            TaskId.Parse("root/$when-all-1/0"),
-            TaskId.Parse("root/$when-all-1/1"),
-        ],
-            result);
+        Assert.True(host.Contains(TaskId.Parse("root/$when-all-1/0")));
+        Assert.True(host.Contains(TaskId.Parse("root/$when-all-1/1")));
         Assert.True(host.Contains(TaskId.Parse("root/$when-all-1/0/$when-all-1/0")));
         Assert.True(host.Contains(TaskId.Parse("root/$when-all-1/0/$when-all-1/1")));
         Assert.True(host.Contains(TaskId.Parse("root/$when-all-1/1/$when-all-1/0")));
@@ -3196,14 +3248,14 @@ public class SchedulingTests
         var first = await ExecuteAsync(new TestHost(DateTimeOffset.UnixEpoch));
         var replay = await ExecuteAsync(new TestHost(DateTimeOffset.UnixEpoch));
 
-        Assert.Equal(TaskId.Parse("root/$when-any-1/1"), first.Winner);
+        Assert.Equal(1, first.Winner);
         Assert.Equal(first.Winner, replay.Winner);
         Assert.Equal(first.Ids, replay.Ids);
 
-        static async Task<(TaskId Winner, IReadOnlyList<TaskId> Ids)> ExecuteAsync(TestHost host)
+        static async Task<(int Winner, IReadOnlyList<TaskId> Ids)> ExecuteAsync(TestHost host)
         {
             var loser = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var root = host.CreateRootDefinition<TaskId>(async _ =>
+            var root = host.CreateRootDefinition<int>(async _ =>
             {
                 var winner = await DurableTask.WhenAny(
                 [
@@ -3696,31 +3748,38 @@ public class SchedulingTests
         _ = await host.GetEntry(TaskId.Parse("replay/$when-any-1/0")).WaitAsync(Xunit.TestContext.Current.CancellationToken);
         var replayedWinner = await ExecuteAsync();
 
-        var expectedWinner = TaskId.Parse("replay/$when-any-1/1");
         var expectedDecisionId = TaskId.Parse("replay/$when-any-1/$winner");
-        Assert.Equal(expectedWinner, firstWinner);
-        Assert.Equal(expectedWinner, replayedWinner);
+        Assert.Equal(1, firstWinner);
+        Assert.Equal(1, replayedWinner);
         Assert.Equal([expectedDecisionId, expectedDecisionId], host.DecisionIds);
 
-        async Task<TaskId> ExecuteAsync()
+        async Task<int> ExecuteAsync()
         {
-            DurableTask<TaskId> definition = generic
-                ? DurableTask.WhenAny(
-                [
-                    DurableTask.Run(async _ =>
-                    {
-                        await firstCompletion.Task;
-                        return 17;
-                    }),
-                    DurableTask.Run(static _ => 42),
-                ])
-                : DurableTask.WhenAny(
+            if (generic)
+            {
+                var response = await DurableTaskRuntimeHelper.RunAsync(
+                    DurableTask.WhenAny(
+                    [
+                        DurableTask.Run(async _ =>
+                        {
+                            await firstCompletion.Task;
+                            return 17;
+                        }),
+                        DurableTask.Run(static _ => 42),
+                    ]),
+                    host.CreateContext(rootId));
+                var (index, result) = response.GetResult<(int Index, int Result)>();
+                Assert.Equal(42, result);
+                return index;
+            }
+
+            return (await DurableTaskRuntimeHelper.RunAsync(
+                DurableTask.WhenAny(
                 [
                     DurableTask.Run(async _ => await firstCompletion.Task),
                     DurableTask.Run(static _ => { }),
-                ]);
-            var response = await DurableTaskRuntimeHelper.RunAsync(definition, host.CreateContext(rootId));
-            return response.GetResult<TaskId>();
+                ]),
+                host.CreateContext(rootId))).GetResult<int>();
         }
     }
 
