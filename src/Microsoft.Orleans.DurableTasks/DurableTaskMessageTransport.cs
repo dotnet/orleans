@@ -36,6 +36,14 @@ internal sealed class DurableTaskMessageTransport(
             taskId,
             new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender });
 
+    public void SendDetachedInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
+        Send(
+            messageTypes.Invocation,
+            sender,
+            target,
+            taskId,
+            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender, Detached = true });
+
     public void SendCompletion(MessageId messageId) => outbox.Value.Send(messageId);
 
     public MessageId GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId) =>

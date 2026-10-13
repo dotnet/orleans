@@ -45,6 +45,11 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
         Invocations.Add((sender, target, taskId, request));
     }
 
+    public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> DetachedInvocations { get; } = [];
+
+    public void SendDetachedInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
+        DetachedInvocations.Add((sender, target, taskId, request));
+
     public MessageId GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId)
     {
         var messageId = DurableTaskMessageTransport.CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject);

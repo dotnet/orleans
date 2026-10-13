@@ -9,6 +9,9 @@ internal interface IDurableTaskMessageTransport
 {
     void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request);
 
+    /// <summary>Stages an invocation which starts a detached task on <paramref name="target"/>.</summary>
+    void SendDetachedInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request);
+
     /// <summary>Stages a completion which the runtime provides from the task's stored result.</summary>
     /// <param name="messageId">The completion's message ID, from <see cref="GetCompletionMessageId"/>.</param>
     void SendCompletion(MessageId messageId);

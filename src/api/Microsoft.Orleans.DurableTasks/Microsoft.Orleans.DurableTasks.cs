@@ -40,6 +40,13 @@ namespace Orleans.DurableTasks
         [Id(0)]
         public TaskId TaskId { get { throw null; } }
     }
+
+    public partial interface IDurableTaskManager
+    {
+        System.Threading.Tasks.ValueTask CancelAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken = default);
+        ScheduledTask GetTask(TaskId taskId);
+        ScheduledTask<TResult> GetTask<TResult>(TaskId taskId);
+    }
 }
 
 namespace Orleans.DurableTasks.Protocol
@@ -110,6 +117,8 @@ namespace Orleans.DurableTasks.Protocol
         public DurableTask InitializeRequest(Orleans.Runtime.GrainReference targetGrainReference) { throw null; }
 
         protected abstract DurableTask InvokeInner();
+        System.Threading.Tasks.ValueTask ISchedulableTask.DetachAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         System.Threading.Tasks.ValueTask<DurableTaskResponse> ISchedulableTask.ScheduleAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         DurableTask IDurableTaskRequest.CreateTask() { throw null; }
@@ -183,6 +192,8 @@ namespace Orleans.DurableTasks.Protocol
         public DurableTask<TResult> InitializeRequest(Orleans.Runtime.GrainReference targetGrainReference) { throw null; }
 
         protected abstract DurableTask<TResult> InvokeInner();
+        System.Threading.Tasks.ValueTask ISchedulableTask.DetachAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         DurableTask IDurableTaskRequest.CreateTask() { throw null; }
 
         System.Threading.Tasks.ValueTask<Serialization.Invocation.Response> Serialization.Invocation.IInvokable.Invoke() { throw null; }
