@@ -100,7 +100,8 @@ cancellation or failure.
 ## Combinators
 
 `WhenAll` and `WhenAny` assign child IDs from input indexes, preserving identity across
-replay when the input order is stable. `WhenAll<T>` returns the inputs' results in input order.
+replay when the input order is stable. They schedule their inputs concurrently, so a host can
+commit the batch together. `WhenAll<T>` returns the inputs' results in input order.
 `WhenAny` returns the winner's input index, and `WhenAny<T>` also returns its result; a winner
 which failed or was canceled fails the combinator. `WhenAny` asks the host to persist its
 selected winner under a deterministic decision ID, then leaves all other scheduled tasks running.
