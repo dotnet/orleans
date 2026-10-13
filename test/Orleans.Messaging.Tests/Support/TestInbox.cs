@@ -13,6 +13,8 @@ internal sealed class TestInbox : IInbox
         return this;
     }
 
+    public IInbox Register(IInboxMessageSink sink) => throw new NotSupportedException("The test inbox dispatches to handlers only.");
+
     public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken) =>
         _dispatcher.HandleAsync(context, cancellationToken);
 }

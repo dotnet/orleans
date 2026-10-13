@@ -569,6 +569,10 @@ public sealed class TypedOutboxExtensionsTests
             _messages.Add(message);
         }
 
+        public void SendFromSource(HierarchicalKey messageId, GrainId receiverId) => throw new NotSupportedException();
+
+        public IOutbox Register(IOutboxMessageSource source) => throw new NotSupportedException();
+
         public bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out OutboxMessage envelope)
         {
             foreach (var message in _messages)
