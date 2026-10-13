@@ -631,6 +631,8 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
     /// </summary>
     private Task FinishedAsync(Rig rig)
     {
+        // Resolve the pump now: a failed write deactivates the grain and disposes its activation services.
+        var shutdown = rig.Context.ActivationServices.GetRequiredService<MessagingPump>().ShutdownToken;
         return RunAsync();
 
         async Task RunAsync()
@@ -639,7 +641,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
             {
                 await Fixture.RunPumpAsync(rig.Receiver);
             }
-            catch (OperationCanceledException) when (rig.Context.ActivationServices.GetRequiredService<MessagingPump>().ShutdownToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
             {
                 // A failed write stops the pump; callers assert the failure explicitly.
             }
