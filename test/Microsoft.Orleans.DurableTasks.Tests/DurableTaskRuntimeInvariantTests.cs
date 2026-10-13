@@ -1388,7 +1388,7 @@ public sealed class DurableTaskRuntimeInvariantTests
                 {
                     // Host abort reaches the delegate token, but it is not durable cancellation.
                     var context = DurableExecutionContext.Current!;
-                    aborted.TrySetResult((executionToken.IsCancellationRequested, context.CancellationToken.IsCancellationRequested));
+                    aborted.TrySetResult((executionToken.IsCancellationRequested, context.IsCancellationRequested));
                 }
 
                 return 42;
@@ -1650,10 +1650,10 @@ public sealed class DurableTaskRuntimeInvariantTests
             scheduler);
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.WhenAny<int>([DurableTask.FromResult(1)]),
+            DurableTask.WhenAny([DurableTask.Run(static _ => { })]),
             context);
 
-        Assert.Equal(TaskId.Parse("root/$when-any-1/0"), response.GetResult<TaskId>());
+        Assert.Equal(0, response.GetResult<int>());
         Assert.Equal(2, runtime.SchedulerInvocationCount);
         schedulerPair.Complete();
         await schedulerPair.Completion;
@@ -1752,7 +1752,8 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
         Assert.True(executionCancellation.IsCancellationRequested);
-        Assert.False(context.CancellationToken.IsCancellationRequested);
+        Assert.True(context.CancellationToken.IsCancellationRequested);
+        Assert.False(context.IsCancellationRequested);
     }
 
     [Fact]
