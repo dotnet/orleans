@@ -146,12 +146,15 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// </para>
     /// <para>
     /// A synchronous send cannot report backpressure or a missing handler, so the message is admitted regardless of
-    /// <see cref="DurableMessagingOptions.MaxCapacity"/> and of handler registration. A message without
+    /// <see cref="DurableMessagingOptions.MaxCapacity"/> and of handler registration, and a sink which backpressures
+    /// it fails the send. A message without
     /// <see cref="Envelope.DeliverAt"/> still occupies capacity for deliveries from other grains until it completes,
     /// and processing waits for a handler to be registered.
     /// </para>
     /// </remarks>
-    /// <exception cref="InvalidOperationException">The inbox holds a different pending command with the same ID.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The inbox holds a different pending command with the same ID, or an inbox sink backpressured the message.
+    /// </exception>
     internal void StageLocal(InboxMessage message)
     {
         if (IsDuplicate(message, out _))
@@ -160,8 +163,14 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             return;
         }
 
-        if (message.Envelope.DeliverAt is null && StageSinkAcceptance(message) is not null)
+        if (StageSinkAcceptance(message) is { } sinkResult)
         {
+            if (sinkResult.Status == DeliveryStatus.Backpressured)
+            {
+                throw new InvalidOperationException(
+                    $"An inbox message sink backpressured message '{message.Envelope.MessageId}', which the grain sent to itself.");
+            }
+
             return;
         }
 

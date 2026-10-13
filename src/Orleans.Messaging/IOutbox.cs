@@ -30,7 +30,8 @@ public interface IOutbox
     /// A message addressed to the sending grain bypasses the outbox: the grain's own inbox stages its acceptance
     /// for the same journal write, applying the inbox identity rules, so a completed ID is a duplicate and a different
     /// pending command with the ID conflicts. The inbox admits such a message regardless of its capacity and of handler
-    /// registration.
+    /// registration, and the send fails when an <see cref="IInboxMessageSink"/> reports
+    /// <see cref="DeliveryStatus.Backpressured"/> for it.
     /// </remarks>
     /// <exception cref="ArgumentException">The envelope has an unset identity, invalid subject or destination, or exceeds identity/subject limits.</exception>
     /// <exception cref="InvalidOperationException">

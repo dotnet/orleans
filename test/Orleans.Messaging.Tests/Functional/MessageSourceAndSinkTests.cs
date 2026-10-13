@@ -437,7 +437,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     };
 
     [Fact]
-    public async Task SinkAcceptance_DeduplicatesWithinTheWindowAndIsOfferedAgainAfterItExpires()
+    public async Task SinkAcceptance_DeduplicatesWithinTheWindowAndTheSinkReportsLaterDuplicates()
     {
         var receiver = NewGrain();
         var message = NewInboxMessage("deduplicated", NewPayload());
@@ -596,6 +596,24 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(grain), payload));
     }
 
+    [Fact]
+    public async Task SelfSentMessage_FailsTheSendWhenTheSinkBackpressures()
+    {
+        var grain = NewGrain();
+        _ = await grain.GetOutboxCountAsync();
+        Probe.For(grain).Mode = SinkMode.Backpressure;
+        var writes = Writes(grain).Length;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => grain.SendAsync(grain.GetGrainId(), NewMessageId("self-backpressured"), NewPayload(), write: true));
+
+        var (state, inboxCount, outboxCount) = await OnGrainAsync(grain, context => (Grain(context).GetState(), Inbox(context).Count, Outbox(context).Count));
+        Assert.Empty(state.Received);
+        Assert.Equal(0, inboxCount);
+        Assert.Equal(0, outboxCount);
+        Assert.Equal(writes, Writes(grain).Length);
+    }
+
     private ISourceSinkGrain NewGrain() => Cluster.Client.GetGrain<ISourceSinkGrain>(Guid.NewGuid());
 
     private static MessageId NewMessageId(string name) => MessageId.Create("source-sink", name, Guid.NewGuid().ToString("N"));
@@ -728,14 +746,6 @@ public enum SinkMode
     DeadLetter,
     Backpressure,
     UnsupportedStatus
-}
-
-/// <summary>How the source fails to provide a message which it stores.</summary>
-public enum SourceFault
-{
-    Throw,
-    InvalidMessage,
-    MismatchedId
 }
 
 /// <summary>How the source fails to provide a message which it stores.</summary>
@@ -920,7 +930,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         _retired[key] = retirement.ToString();
     }
 
-    bool IInboxMessageSink.TryAccept(InboxMessage message)
+    bool IInboxMessageSink.TryAccept(InboxMessage message, out DeliveryResult result)
     {
         result = default;
         if (message.Envelope.Subject != Subject) return false;
