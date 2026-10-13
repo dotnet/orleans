@@ -82,7 +82,14 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 throw new InvalidOperationException("The recovered outbox key does not match its command identity.");
             }
         }
-        foreach (var letter in _deadLetters.Values) EnvelopeValidation.Validate(letter.Message);
+        foreach (var (key, letter) in _deadLetters)
+        {
+            EnvelopeValidation.Validate(letter.Message);
+            if (key != letter.Message.Envelope.MessageId)
+            {
+                throw new InvalidOperationException("The recovered outbox dead-letter key does not match its message identity.");
+            }
+        }
         _capturedSequence = _durableSequence = _lastSequence;
     }
 
