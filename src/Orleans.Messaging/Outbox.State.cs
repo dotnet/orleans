@@ -67,9 +67,9 @@ internal sealed partial class Outbox
         switch (command.Kind)
         {
             case OutboxCommandKind.Enqueue:
-                var message = command.Message ?? throw new InvalidOperationException("An enqueue command requires its message.");
                 var state = command.State ?? throw new InvalidOperationException("An enqueue command requires its delivery state.");
-                _messages.Add(message.Envelope.MessageId, new OutboxEntry { Message = message, State = state, Sequence = ++_lastSequence });
+                var entry = new OutboxEntry { Message = command.Message, Reference = command.Reference, State = state, Sequence = ++_lastSequence };
+                _messages.Add(entry.MessageId, entry);
                 ReportDepth(1);
                 break;
             case OutboxCommandKind.Delivery:
@@ -89,7 +89,7 @@ internal sealed partial class Outbox
                 var previousCount = _messages.Count;
                 _messages.Clear();
                 _deadLetters.Clear();
-                foreach (var restored in snapshot.Messages) _messages.Add(restored.Message.Envelope.MessageId, restored);
+                foreach (var restored in snapshot.Messages) _messages.Add(restored.MessageId, restored);
                 foreach (var restored in snapshot.DeadLetters) _deadLetters.Add(restored.Message.Envelope.MessageId, restored);
                 ReportDepth(_messages.Count - previousCount);
                 break;
@@ -125,6 +125,18 @@ internal sealed class OutboxCommand
     [Id(4)] public OutboxDeadLetter? DeadLetter { get; init; }
     [Id(5)] public HierarchicalKey[]? RemovedDeadLetters { get; init; }
     [Id(6)] public OutboxSnapshot? Snapshot { get; init; }
+
+    // An enqueue command sets this instead of Message for a message which an IOutboxMessageSource provides.
+    [Id(7)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OutboxMessageReference? Reference { get; init; }
+}
+
+/// <summary>Identifies a message which an <see cref="IOutboxMessageSource"/> provides.</summary>
+[GenerateSerializer, Alias("Orleans.Messaging.OutboxMessageReference")]
+internal readonly struct OutboxMessageReference
+{
+    [Id(0)] public required HierarchicalKey MessageId { get; init; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.OutboxSnapshot")]
@@ -137,10 +149,28 @@ internal sealed class OutboxSnapshot
 [GenerateSerializer, Alias("Orleans.Messaging.OutboxEntry")]
 internal sealed class OutboxEntry
 {
-    [Id(0)] public required OutboxMessage Message { get; init; }
+    // Exactly one of Message and Reference is set. A reference entry journals no payload or receiver: its source provides the message.
+    [Id(0)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OutboxMessage? Message { get; init; }
+
     [Id(1)] public required OutboxMessageState State { get; set; }
+
+    [Id(2)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OutboxMessageReference? Reference { get; init; }
+
     [field: NonSerialized]
     [JsonIgnore] public long Sequence { get; init; }
+
+    /// <summary>Gets the source which owns a reference entry's message, resolved when it is sent or first materialized after recovery.</summary>
+    [field: NonSerialized]
+    [JsonIgnore] public IOutboxMessageSource? Source { get; set; }
+
+    [JsonIgnore]
+    public HierarchicalKey MessageId => Message is { } message ? message.Envelope.MessageId
+        : Reference is { } reference ? reference.MessageId
+        : throw new InvalidOperationException("An outbox entry requires its message or message reference.");
 }
 
 [JsonSerializable(typeof(OutboxCommand))]
