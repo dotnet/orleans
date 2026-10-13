@@ -15,7 +15,7 @@ validated at startup. Register typed subjects with `AddMessageType<T>(subject)`.
 
 Messaging grains derive from `DurableGrain` or implement `IMessagingGrain`, and
 constructor-inject `IInbox`. During activation, the messaging grain-type
-configurator installs the grain's inbox extension. Stateless worker grains are
+configurator installs the grain's messaging extension. Stateless worker grains are
 rejected; reentrant and interleaving grains are supported, and the grain's code is
 responsible for correctness when calls interleave.
 
@@ -123,7 +123,7 @@ construction or activation setup, before journal recovery.
 
 ## Delivery and processing
 
-`IInboxExtension.DeliverAsync` delivers a message to a grain's inbox. Accepted inbox
+`IMessagingExtension.DeliverAsync` delivers a message to a grain's inbox. Accepted inbox
 messages are processed only after the receiver's journal write completes. Each
 receiver returns a `DeliveryResult`:
 

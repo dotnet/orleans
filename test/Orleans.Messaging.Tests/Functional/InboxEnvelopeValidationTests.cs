@@ -32,7 +32,7 @@ public sealed class InboxEnvelopeValidationTests : MessagingBehaviorTestBase
 
         var exception = await Assert.ThrowsAsync<ArgumentException>(() => DeliverAsync(receiver, malformed));
 
-        IInboxExtension extension = Fixture.GetInbox(receiver);
+        IMessagingExtension extension = Fixture.GetInbox(receiver);
         await OnTurnAsync(context, () =>
         {
             var direct = extension.DeliverAsync(malformed, TestContext.Current.CancellationToken);
