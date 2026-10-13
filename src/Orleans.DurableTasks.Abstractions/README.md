@@ -112,6 +112,31 @@ task's identity when the caller subsequently reuses or changes the input collect
 cancellation and host wait failures are propagated. After selection, it cancels and drains the
 losing wait operations without canceling the durable tasks.
 
+## Writing replay-safe workflows
+
+A host replays an execution which didn't finish, for example after its grain is deactivated: the
+method body runs again from the start, and every child which already completed returns its
+recorded result. A workflow resumes correctly when each replay
+schedules the same children, with the same identifiers and arguments, in the same order.
+
+- Put each side effect in a child: a durable call to another grain, a `DurableTask.Run`
+  delegate, or an `async DurableTask` method awaited with `WithId`. The child runs once, and a
+  replay returns its recorded result. Code between children runs on every replay, so it
+  computes values from the method's arguments, the results of earlier children, and other
+  values which are the same on every replay.
+- Read time from `DurableExecutionContext.UtcNow`, and produce random values and identifiers
+  inside children, so a replay observes the values the first execution recorded.
+- Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
+  or concurrently outside a combinator. Generated identifiers are stable only when unnamed
+  children are created in the same order.
+- Scheduling an existing identifier with different arguments fails, so a replay which diverges
+  from the recorded execution surfaces as an error.
+  When a deployment changes a workflow while executions are pending, keep the existing steps
+  and identifiers, and give new steps new identifiers.
+- An `async DurableTask` method which completes without awaiting is a normal step, for example
+  a state transition whose result the parent records. Compilers which report CS1998 for such
+  methods can suppress it.
+
 ## Host responsibilities
 
 A host derives from `DurableExecutionContext`, implements `ISchedulableTask` definitions
