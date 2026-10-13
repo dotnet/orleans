@@ -114,7 +114,7 @@ public sealed class PublicInboxHandlerTransactionTests : MessagingBehaviorTestBa
         Assert.Equal(acknowledged.Effects, recovered.Effects);
         Assert.Equal(1, recovered.ProcessedCount);
         Assert.Equal(0, recovered.OutboxCount);
-        Assert.Equal(DeliveryStatus.Duplicate, (await receiver.AsReference<IInboxExtension>().DeliverAsync(
+        Assert.Equal(DeliveryStatus.Duplicate, (await receiver.AsReference<IMessagingExtension>().DeliverAsync(
             new InboxMessage { Envelope = envelope }, TestContext.Current.CancellationToken)).Status);
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
         var sinkState = await sink.GetSnapshotAsync();

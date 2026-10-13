@@ -67,7 +67,7 @@ public sealed class RawPayloadTestGrain : DurableGrain, IRawPayloadTestGrain, II
 
     public async Task<DeliveryResult> AcceptAndDeactivateAsync(InboxMessage message)
     {
-        var result = await ((IInboxExtension)_inbox).DeliverAsync(message);
+        var result = await ((IMessagingExtension)_inbox).DeliverAsync(message);
         AcceptedSnapshot = GetSnapshotForTest();
         DeactivateOnIdle();
         return result;
