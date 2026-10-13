@@ -20,4 +20,13 @@ public interface IInbox
     /// <param name="handler">The handler.</param>
     /// <returns>This inbox.</returns>
     IInbox Register(IInboxHandler handler);
+
+    /// <summary>Registers a sink which accepts messages directly into application-owned journaled state.</summary>
+    /// <param name="sink">The sink.</param>
+    /// <returns>This inbox.</returns>
+    /// <remarks>
+    /// Messages are offered to sinks before inbox acceptance and handler dispatch; see <see cref="IInboxMessageSink"/>.
+    /// Register sinks during construction or activation setup, before the grain receives messages.
+    /// </remarks>
+    IInbox Register(IInboxMessageSink sink);
 }

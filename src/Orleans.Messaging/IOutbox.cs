@@ -1,4 +1,5 @@
 using System;
+using Orleans.Runtime;
 
 namespace Orleans.Messaging;
 
@@ -33,4 +34,32 @@ public interface IOutbox
     /// The identity conflicts, or the outbox is unavailable.
     /// </exception>
     void Send(OutboxMessage message);
+
+    /// <summary>
+    /// Synchronously stages, for the grain's next journal write, a message whose envelope a registered
+    /// <see cref="IOutboxMessageSource"/> provides.
+    /// </summary>
+    /// <param name="messageId">The message ID, which a registered source provides.</param>
+    /// <param name="receiverId">The receiving grain, which must not be the sending grain.</param>
+    /// <remarks>
+    /// The outbox journals the message ID, receiver, and delivery state, but not the payload, and delivers the message
+    /// like one staged through <see cref="Send(OutboxMessage)"/>. Stage the payload in the source's state before this
+    /// call: the outbox resolves the source now and fails when none provides the message. Sending a pending ID again
+    /// with the same receiver coalesces with the pending message. A message addressed to the sending grain is rejected;
+    /// send it through <see cref="Send(OutboxMessage)"/>, which stages it in the grain's own inbox.
+    /// </remarks>
+    /// <exception cref="ArgumentException">The ID is unset or too long, or the receiver is default or the sending grain.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The ID is pending as a different message, no registered source provides it, or the outbox is unavailable.
+    /// </exception>
+    void SendFromSource(HierarchicalKey messageId, GrainId receiverId);
+
+    /// <summary>Registers a source which provides the envelopes of messages sent through <see cref="SendFromSource"/>.</summary>
+    /// <param name="source">The source.</param>
+    /// <returns>This outbox.</returns>
+    /// <remarks>
+    /// Register sources during construction or activation setup, before journal recovery; see
+    /// <see cref="IOutboxMessageSource"/>.
+    /// </remarks>
+    IOutbox Register(IOutboxMessageSource source);
 }
