@@ -78,11 +78,15 @@ public sealed class MessageType<T>
     /// <param name="messageId">The stable application command identity.</param>
     /// <param name="receiverId">The destination inbox.</param>
     /// <param name="body">The nonnull body to serialize.</param>
+    /// <param name="deliverAt">
+    /// The optional earliest time, on the Durable Jobs clock, at which the receiving inbox processes the message.
+    /// See <see cref="Envelope.DeliverAt"/>.
+    /// </param>
     /// <returns>An outgoing message with the encoded payload.</returns>
     /// <remarks>
     /// Serialization completes before publication. Keep the published payload bytes unchanged.
     /// </remarks>
-    public OutboxMessage Create(HierarchicalKey messageId, GrainId receiverId, T body)
+    public OutboxMessage Create(HierarchicalKey messageId, GrainId receiverId, T body, DateTimeOffset? deliverAt = null)
     {
         if (body is null) throw new ArgumentNullException(nameof(body));
         if (receiverId.IsDefault)
@@ -97,7 +101,8 @@ public sealed class MessageType<T>
             {
                 MessageId = messageId,
                 Subject = Subject,
-                Payload = payload
+                Payload = payload,
+                DeliverAt = deliverAt
             },
             ReceiverId = receiverId
         };
