@@ -318,6 +318,8 @@ namespace Orleans.Messaging.Configuration
 
         public System.TimeSpan DeduplicationWindow { get { throw null; } set { } }
 
+        public Polly.ResiliencePipeline? DeliveryResiliencePipeline { get { throw null; } set { } }
+
         public int InboxBatchSize { get { throw null; } set { } }
 
         public int MaxCapacity { get { throw null; } set { } }

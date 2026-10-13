@@ -1,4 +1,5 @@
 using System;
+using Polly;
 
 namespace Orleans.Messaging.Configuration;
 
@@ -102,8 +103,12 @@ public class DurableMessagingOptions
     public int MaxProcessingAttempts { get; set; } = 5;
 
     /// <summary>
-    /// Gets or sets the maximum number of attempts before an outbox message is dead-lettered.
+    /// Gets or sets the maximum number of delivery attempts which receivers answer without taking an outbox message
+    /// before the message is dead-lettered.
     /// </summary>
+    /// <remarks>
+    /// Attempts which fail with an exception retry until <see cref="MaxOutboxRetryAge"/> elapses.
+    /// </remarks>
     public int MaxDeliveryAttempts { get; set; } = 100;
 
     /// <summary>
@@ -131,6 +136,31 @@ public class DurableMessagingOptions
     /// </summary>
     public int OutboxBatchSize { get; set; } = 32;
 
+    /// <summary>
+    /// Gets or sets the resilience pipeline which runs each outbox delivery attempt.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The outbox calls each receiver through this pipeline, so its strategies, such as timeouts, retries, and circuit
+    /// breakers, act within one delivery attempt. When an exception leaves the pipeline, the outbox retries the
+    /// delivery durably after the maximum <see cref="BackpressureRetryDelay"/> backoff until
+    /// <see cref="MaxOutboxRetryAge"/> elapses, so an infrastructure outage delays messages rather than
+    /// dead-lettering them. Receiving inboxes deduplicate by message ID, so retrying a delivery whose outcome is
+    /// unknown is safe.
+    /// </para>
+    /// <para>
+    /// One pipeline instance serves every outbox delivery in the silo, so a stateful strategy such as a circuit
+    /// breaker observes correlated failures across all receivers.
+    /// </para>
+    /// <para>
+    /// When this property is <see langword="null"/>, messaging uses a default pipeline built from the silo's
+    /// response timeout, timed by the durable jobs clock. The default retries a failed call five times with jittered exponential
+    /// backoff from one second, limits the attempt to six response timeouts, and opens a circuit breaker for one
+    /// response timeout when at least half of 20 or more calls within 30 seconds fail.
+    /// <see cref="ResiliencePipeline.Empty"/> calls the receiver directly.
+    /// </para>
+    /// </remarks>
+    public ResiliencePipeline? DeliveryResiliencePipeline { get; set; }
 
     /// <summary>
     /// Validates the configuration values and throws if any are invalid.
