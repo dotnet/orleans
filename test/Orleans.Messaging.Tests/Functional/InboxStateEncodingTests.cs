@@ -47,6 +47,33 @@ public sealed class InboxStateEncodingTests : MessagingBehaviorTestBase
         Assert.Empty(completed.InboxDeadLetters);
     }
 
+    [Fact]
+    public async Task HandlerErrorOutcomeCodecFailure_DeactivatesAndReplaysAcceptedMessage()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var context = Fixture.GetGrainContext(receiver);
+        var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/error-codec-fault");
+        var message = NewMessage(205, "error-codec-fault") with { ThrowOnceDuringPreparation = true };
+        var envelope = CreateEnvelope(receiver, message, "messages/error-codec-fault");
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        await handler.WaitUntilEnteredAsync();
+        var journal = JournalId.FromGrainId(receiver.GetGrainId());
+        var writes = Fixture.Storage.GetSuccessfulWriteCount(journal);
+        var failure = new IOException("Handler error outcome command failed.");
+        ((FaultingInboxCodecFixture)Fixture).NextFailure = failure;
+        handler.Release();
+        Assert.Same(failure, await grain.DeactivationFailure.Task.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        await context.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
+        Assert.Equal(writes, Fixture.Storage.GetSuccessfulWriteCount(journal));
+        _ = await receiver.GetSnapshotAsync();
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(1, Assert.Single(completed.Effects).Count);
+        Assert.Equal(1, completed.ProcessedMessageCount);
+        Assert.Empty(completed.InboxDeadLetters);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

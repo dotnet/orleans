@@ -113,7 +113,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             _wakeupScheduled = false;
             if (!_shutdown.IsCancellationRequested && Inbox.Count > 0)
             {
-                EnsureWakeupAsync(CancellationToken.None).AsTask().Ignore();
+                RepairWakeupAsync().Ignore();
             }
 
             throw;
@@ -127,6 +127,19 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
         return DurableJobRunResult.RescheduleAt(
             MessagingTime.AddClamped(Shared.JobTimeProvider.GetUtcNow(), delay > TimeSpan.Zero ? delay : RecheckDelay));
+    }
+
+    private async Task RepairWakeupAsync()
+    {
+        try
+        {
+            await EnsureWakeupAsync(CancellationToken.None).ConfigureAwait(true);
+        }
+        catch (Exception exception) when (!_shutdown.IsCancellationRequested)
+        {
+            // Recovery re-establishes the wake-up for remaining work.
+            Fail(exception, "Scheduling the messaging wake-up failed.");
+        }
     }
 
     private async Task RunAsync()
@@ -149,8 +162,10 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             }
             catch (Exception exception)
             {
+                // Expected failures are handled within the pass, so an escaping exception leaves state inconsistent with the journal.
                 progress = false;
                 LogPassFailed(Shared.PumpLogger, exception, GrainContext.GrainId);
+                Fail(exception, "Messaging processing pass failed.");
             }
 
             pass?.TrySetResult();
