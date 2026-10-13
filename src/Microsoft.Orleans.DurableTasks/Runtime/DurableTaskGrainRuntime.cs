@@ -35,8 +35,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// </para>
 /// <para>
 /// A delay stages a resume message to its own grain together with its delay state, scheduled with
-/// <see cref="Orleans.Messaging.Envelope.DeliverAt"/> for the delay's due time. The message is durable whenever the
-/// delay is, and the inbox processes it once it is due, so the adapter schedules no Durable Jobs of its own.
+/// <see cref="Orleans.Messaging.Envelope.DeliverAt"/> for the delay's due time. The grain's own inbox accepts the message
+/// in the same journal write as the delay, so the resume is durable whenever the delay is, and the inbox processes it
+/// once it is due. The adapter schedules no Durable Jobs of its own.
 /// </para>
 /// </remarks>
 internal sealed partial class DurableTaskGrainRuntime(
@@ -419,7 +420,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         var generation = checked(state.ResumeGeneration + 1);
         _storage.SetDelay(taskId, state, dueTime, duration, generation);
 
-        // The resume commits in the same journal write as the delay, so every durable delay has a durable resume.
+        // The grain's own inbox accepts the resume in the same journal write as the delay, so every durable delay has a
+        // durable resume.
         transport.SendResume(GrainId, taskId, generation, dueTime);
         await WriteStateAsync(cancellationToken);
         return DurableTaskResponse.Pending;

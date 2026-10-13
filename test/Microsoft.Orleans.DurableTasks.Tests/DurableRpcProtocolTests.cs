@@ -181,7 +181,7 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(7, body.Generation);
         Assert.Equal(grain, body.Sender);
 
-        // Replays coalesce: the identity and content are stable for one delay generation.
+        // Replays coalesce in the grain's own inbox: the identity and content are stable for one delay generation.
         Assert.Equal(message.Envelope.MessageId, messages[1].Envelope.MessageId);
         Assert.Equal(message.Envelope.Payload, messages[1].Envelope.Payload);
         Assert.Equal(DurableTaskMessageTransport.CreateResumeMessageId(grain, taskId, 7, dueTime), message.Envelope.MessageId);

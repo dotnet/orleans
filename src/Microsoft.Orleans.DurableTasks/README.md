@@ -59,7 +59,8 @@ validation disabled until its first published version establishes a baseline.
   or argument value.
 - Request identity, task state, caller subscription, inbox completion, and
   recovery ownership commit before execution begins.
-- Task state and outbox messages share the grain's Journaling commit boundary.
+- Task state and outgoing messages share the grain's Journaling commit boundary,
+  including messages a grain sends to itself, which its own inbox accepts.
   Operations validate before staging and stage only changes which are safe to
   commit; a failed journal write deactivates the grain, and the next activation
   recovers from committed state.
@@ -72,12 +73,13 @@ validation disabled until its first published version establishes a baseline.
   deduplication retention; external clients poll retained results.
 - Cancellation is monotonic, duplicates are idempotent, and the first durable
   terminal result wins a race.
-- Delays persist their logical due time and generation. Each delay stages a
-  `durable-rpc/resume` message to its own grain in the same journal write, with
-  `Envelope.DeliverAt` set to the due time, so the resume is durable whenever the
-  delay is and the inbox processes it once the Durable Jobs clock reaches the due
-  time. Resumes are generation-fenced: a resume for a canceled delay terminalizes
-  it as canceled, and duplicate and stale resumes are harmless.
+- Delays persist their logical due time and generation. Each delay sends a
+  `durable-rpc/resume` message to its own grain, with `Envelope.DeliverAt` set to
+  the due time. The grain's own inbox accepts the message in the delay's journal
+  write, without an outbox round trip, so the delay and its resume commit together
+  in one write, and the inbox processes the resume once the Durable Jobs clock
+  reaches the due time. Resumes are generation-fenced: a resume for a canceled delay
+  terminalizes it as canceled, and duplicate and stale resumes are harmless.
 - Messages use stable identities derived from the sender, receiver, task, and
   subject, so replayed sends coalesce and redeliveries are deduplicated.
 - Recovery precedes new execution. Child identifiers, selection decisions, and

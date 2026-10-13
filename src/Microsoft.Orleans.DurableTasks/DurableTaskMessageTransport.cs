@@ -10,14 +10,15 @@ using Orleans.Runtime;
 namespace Orleans.DurableTasks.Runtime;
 
 /// <summary>
-/// Stages durable grain RPC messages, including delay resumes, in the grain's outbox.
+/// Stages durable grain RPC messages, including delay resumes, through the grain's outbox.
 /// </summary>
 /// <remarks>
 /// The outbox is resolved on first use so that activations which never send messages do not require messaging state.
 /// Each message identity is derived from its sender, receiver, task, and subject, so replaying a send coalesces with the
 /// pending message and the receiver deduplicates a redelivery. A delay resume is a message the grain sends to itself
-/// with <see cref="Envelope.DeliverAt"/> set to the delay's due time; its identity also covers the delay generation
-/// and due time. The runtime derives readiness from journaled state, so duplicate and stale resumes are harmless.
+/// with <see cref="Envelope.DeliverAt"/> set to the delay's due time, which the grain's own inbox accepts in the delay's
+/// journal write; its identity also covers the delay generation and due time. The runtime derives readiness from
+/// journaled state, so duplicate and stale resumes are harmless.
 /// </remarks>
 internal sealed class DurableTaskMessageTransport(
     Lazy<IOutbox> outbox,
