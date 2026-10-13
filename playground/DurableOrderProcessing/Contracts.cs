@@ -87,6 +87,10 @@ public sealed record PaymentResult(bool Succeeded, string? Reason);
 [GenerateSerializer, Immutable]
 public sealed record OrderResult(OrderStatus Status, string? Description);
 
+// The value of an order's Shipped signal. The workflow records the first shipment; another one conflicts with it.
+[GenerateSerializer, Immutable]
+public sealed record Shipment(DateTimeOffset ShippedAt);
+
 public sealed class OrderingOptions
 {
     // eShop's GracePeriodManager waits one minute; a shorter default keeps the demo responsive.
