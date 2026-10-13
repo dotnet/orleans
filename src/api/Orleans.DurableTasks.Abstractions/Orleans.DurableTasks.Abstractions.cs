@@ -85,6 +85,20 @@ namespace Orleans.DurableTasks
         protected internal abstract System.Threading.Tasks.ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken);
         protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken);
         protected internal abstract System.Threading.Tasks.ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, System.Collections.Generic.IReadOnlyList<TaskId> candidates, System.Threading.CancellationToken cancellationToken);
+        protected internal virtual System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    public sealed partial class DurableSignal<T>
+    {
+        public DurableSignal(string name) { }
+
+        public string Name { get { throw null; } }
+
+        public DurableSignal<T> For(string suffix) { throw null; }
+
+        public override string ToString() { throw null; }
+
+        public DurableTask<T> WaitAsync() { throw null; }
     }
 
     [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
