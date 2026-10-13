@@ -22,6 +22,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private JournalStreamWriter _writer;
     private readonly Dictionary<HierarchicalKey, OutboxEntry> _messages = [];
     private readonly Dictionary<HierarchicalKey, OutboxDeadLetter> _deadLetters = [];
+    private readonly List<IOutboxMessageSource> _sources = [];
     private Task<DeliveryOutcome[]>? _deliveries;
 
     public Outbox(MessagingPump pump)
@@ -42,13 +43,20 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     internal IReadOnlyDictionary<HierarchicalKey, OutboxDeadLetter> DeadLetterState => _deadLetters;
     internal int Count => _messages.Count;
 
+    public IOutbox Register(IOutboxMessageSource source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        _sources.Add(source);
+        return this;
+    }
+
     public void Send(OutboxMessage message)
     {
         _pump.ShutdownToken.ThrowIfCancellationRequested();
         EnvelopeValidation.Validate(message);
         if (_messages.TryGetValue(message.Envelope.MessageId, out var existing))
         {
-            if (!EnvelopeEquivalence.AreEquivalent(existing.Message, message))
+            if (existing.Message is not { } pending || !EnvelopeEquivalence.AreEquivalent(pending, message))
             {
                 throw new InvalidOperationException(
                     $"The outbox already contains a different envelope with message ID '{message.Envelope.MessageId}'.");
@@ -75,21 +83,131 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
     }
 
+    public void Send(HierarchicalKey messageId)
+    {
+        _pump.ShutdownToken.ThrowIfCancellationRequested();
+        EnvelopeValidation.ValidateMessageId(messageId);
+        if (_messages.TryGetValue(messageId, out var existing))
+        {
+            // The source is authoritative for a pending reference entry's message, so a repeated send coalesces.
+            if (existing.Reference is null)
+            {
+                throw new InvalidOperationException(
+                    $"The outbox already contains a different message with message ID '{messageId}'.");
+            }
+            return;
+        }
+
+        if (FindSource(messageId, out _) is not { } source)
+        {
+            throw new InvalidOperationException($"No registered outbox message source provides message '{messageId}'.");
+        }
+
+        try
+        {
+            Emit(new()
+            {
+                Kind = OutboxCommandKind.Enqueue,
+                Reference = new() { MessageId = messageId },
+                State = new() { EnqueuedAt = TimeProvider.GetUtcNow() }
+            });
+            _messages[messageId].Source = source;
+            Shared.Instruments.OnOutboxMessageSent(Shared.GrainType);
+        }
+        catch (Exception exception)
+        {
+            FailStaging(exception);
+        }
+    }
+
+    /// <summary>Returns the first registered source which provides the message, and its validated message.</summary>
+    private IOutboxMessageSource? FindSource(HierarchicalKey messageId, out OutboxMessage message)
+    {
+        foreach (var source in _sources)
+        {
+            if (TryGetSourceMessage(source, messageId, out message)) return source;
+        }
+
+        message = default;
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the entry's message, materializing a reference entry's message from its owning source, or returns
+    /// <see langword="false"/> when the source has withdrawn the message.
+    /// </summary>
+    private bool TryGetMessage(OutboxEntry entry, out OutboxMessage message)
+    {
+        if (entry.Message is { } ordinary)
+        {
+            message = ordinary;
+            return true;
+        }
+
+        if (entry.Source is { } owner) return TryGetSourceMessage(owner, entry.MessageId, out message);
+        entry.Source = FindSource(entry.MessageId, out message);
+        return entry.Source is not null;
+    }
+
+    private bool TryGetSourceMessage(IOutboxMessageSource source, HierarchicalKey messageId, out OutboxMessage message)
+    {
+        if (!source.TryGetMessage(messageId, out message)) return false;
+        EnvelopeValidation.Validate(message);
+        if (message.Envelope.MessageId != messageId)
+        {
+            throw new InvalidOperationException(
+                $"The outbox message source returned message ID '{message.Envelope.MessageId}' for message '{messageId}'.");
+        }
+        if (message.ReceiverId == GrainId)
+        {
+            // The grain's own inbox would hold the payload, so a source cannot keep it as the single copy.
+            throw new ArgumentException(
+                $"The outbox message source addressed message '{messageId}' to the sending grain; send its message with Send(OutboxMessage) instead.",
+                nameof(messageId));
+        }
+
+        return true;
+    }
+
+    /// <summary>Notifies the source of a retired reference entry, so its release commits with the entry's removal.</summary>
+    private static void Retire(OutboxEntry entry, OutboxMessageRetirement retirement)
+    {
+        if (entry.Reference is not null) entry.Source!.OnRetired(entry.MessageId, retirement);
+    }
+
     private void OnRecoveryCompleted()
     {
+        if (_sources.Count == 0 && _messages.Values.Any(static entry => entry.Reference is not null))
+        {
+            throw new InvalidOperationException(
+                "The outbox recovered messages which a source provides, but no outbox message source is registered. Register outbox message sources during activation setup, before journal recovery.");
+        }
+
         foreach (var (key, entry) in _messages)
         {
-            var message = entry.Message;
-            EnvelopeValidation.Validate(message);
+            if (entry.Message is { } message)
+            {
+                if (entry.Reference is not null)
+                {
+                    throw new InvalidOperationException("A recovered outbox entry has both a message and a message reference.");
+                }
+
+                EnvelopeValidation.Validate(message);
+            }
+            else
+            {
+                EnvelopeValidation.ValidateMessageId(key);
+            }
+
             if (entry.State.EnqueuedAt is null)
             {
                 throw new InvalidOperationException("A recovered outbox message requires its enqueue time.");
             }
-            if (key != message.Envelope.MessageId)
+            if (key != entry.MessageId)
             {
                 throw new InvalidOperationException("The recovered outbox key does not match its command identity.");
             }
-            if (message.ReceiverId == GrainId)
+            if (entry.Message?.ReceiverId == GrainId)
             {
                 throw new InvalidOperationException("A recovered outbox message is addressed to its own grain, whose inbox accepts such messages directly.");
             }
@@ -138,15 +256,22 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
     }
 
-    private List<OutboxEntry>? SelectMessages()
+    private List<(OutboxEntry Entry, OutboxMessage Message)>? SelectMessages(ref List<OutboxEntry>? withdrawn)
     {
         var now = TimeProvider.GetUtcNow();
-        List<OutboxEntry>? candidates = null;
+        List<(OutboxEntry Entry, OutboxMessage Message)>? candidates = null;
         foreach (var entry in _messages.Values)
         {
             if (entry.Sequence <= _durableSequence && IsReadyForAttempt(entry.State, now))
             {
-                (candidates ??= []).Add(entry);
+                // An invalid source message fails the pass before any attempt starts.
+                if (!TryGetMessage(entry, out var message))
+                {
+                    (withdrawn ??= []).Add(entry);
+                    continue;
+                }
+
+                (candidates ??= []).Add((entry, message));
                 if (candidates.Count == Options.OutboxBatchSize) break;
             }
         }
@@ -159,24 +284,23 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         return candidates;
     }
 
-    private async Task<DeliveryOutcome> DeliverAsync(OutboxEntry entry, CancellationToken cancellationToken)
+    private async Task<DeliveryOutcome> DeliverAsync(OutboxEntry entry, OutboxMessage message, CancellationToken cancellationToken)
     {
         if (entry.State.EnqueuedAt is { } enqueuedAt
             && MessagingTime.IsExpired(TimeProvider.GetUtcNow(), enqueuedAt, Options.MaxOutboxRetryAge))
         {
-            return new(entry, null, $"The message exceeded the maximum retry age of {Options.MaxOutboxRetryAge}.", TimeSpan.Zero, true);
+            return new(entry, message, null, $"The message exceeded the maximum retry age of {Options.MaxOutboxRetryAge}.", TimeSpan.Zero, true);
         }
         var start = Stopwatch.GetTimestamp();
-        var message = entry.Message;
         try
         {
             var target = Shared.GrainFactory.GetGrain<IInboxExtension>(message.ReceiverId);
             var result = await target.DeliverAsync(message.ToInboxMessage(), cancellationToken).ConfigureAwait(true);
-            return new(entry, result, null, Stopwatch.GetElapsedTime(start), false);
+            return new(entry, message, result, null, Stopwatch.GetElapsedTime(start), false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new(entry, null, "Delivery was canceled.", Stopwatch.GetElapsedTime(start), false);
+            return new(entry, message, null, "Delivery was canceled.", Stopwatch.GetElapsedTime(start), false);
         }
         catch (Exception exception)
         {
@@ -184,7 +308,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             {
                 LogDeliveryError(Logger, exception, message.Envelope.MessageId, message.ReceiverId);
             }
-            return new(entry, null, exception.ToString(), Stopwatch.GetElapsedTime(start), false);
+            return new(entry, message, null, exception.ToString(), Stopwatch.GetElapsedTime(start), false);
         }
     }
 
@@ -200,12 +324,15 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             return true;
         }
 
-        var candidates = SelectMessages();
-        if (candidates is null) return false;
+        List<OutboxEntry>? withdrawn = null;
+        var candidates = SelectMessages(ref withdrawn);
+        if (withdrawn is not null) await RemoveWithdrawnAsync(withdrawn).ConfigureAwait(true);
+        if (candidates is null) return withdrawn is not null;
         var attempts = new Task<DeliveryOutcome>[candidates.Count];
         for (var index = 0; index < attempts.Length; index++)
         {
-            attempts[index] = DeliverAsync(candidates[index], _pump.ShutdownToken);
+            var (entry, message) = candidates[index];
+            attempts[index] = DeliverAsync(entry, message, _pump.ShutdownToken);
         }
 
         var deliveries = Task.WhenAll(attempts);
@@ -236,13 +363,14 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             foreach (var outcome in outcomes)
             {
                 // Outcomes for entries which were replaced or removed since the attempt started are stale.
-                var id = outcome.Entry.Message.Envelope.MessageId;
+                var id = outcome.Entry.MessageId;
                 if (!_messages.TryGetValue(id, out var current) || !ReferenceEquals(current, outcome.Entry)) continue;
 
                 var status = outcome.Result?.Status;
                 if (status is DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.DeadLettered)
                 {
                     Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id });
+                    Retire(current, status == DeliveryStatus.DeadLettered ? OutboxMessageRetirement.DeadLettered : OutboxMessageRetirement.Delivered);
                     delivered++;
                 }
                 else
@@ -250,6 +378,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                     if (status == DeliveryStatus.Backpressured) backpressured++;
                     var (retry, deadLetter) = PrepareRetry(outcome, ref deadLetters);
                     Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id, State = retry, DeadLetter = deadLetter });
+                    if (deadLetter is not null) Retire(current, OutboxMessageRetirement.DeadLettered);
                 }
                 RecordDeliveryMetrics(outcome);
                 applied++;
@@ -263,6 +392,33 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         if (applied == 0) return;
         await PersistAsync().ConfigureAwait(true);
         LogDeliveryComplete(Logger, delivered, backpressured, applied - delivered - backpressured, Count);
+    }
+
+    /// <summary>Removes reference entries whose sources withdrew their messages, without delivering or retiring them.</summary>
+    private async ValueTask RemoveWithdrawnAsync(List<OutboxEntry> withdrawn)
+    {
+        try
+        {
+            foreach (var entry in withdrawn)
+            {
+                Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = entry.MessageId });
+                Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "withdrawn");
+                if (entry.Source is null)
+                {
+                    LogMessageUnprovided(Logger, entry.MessageId);
+                }
+                else
+                {
+                    LogMessageWithdrawn(Logger, entry.MessageId);
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            FailStaging(exception);
+        }
+
+        await PersistAsync().ConfigureAwait(true);
     }
 
     private void ApplyDeadLetters(Dictionary<HierarchicalKey, OutboxDeadLetter> entries)
@@ -299,7 +455,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         {
             var letter = new OutboxDeadLetter
             {
-                Message = outcome.Entry.Message,
+                Message = outcome.Message,
                 DeadLetteredAt = now,
                 Reason = error,
                 AttemptCount = attemptCount
@@ -323,7 +479,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     private void RecordDeliveryMetrics(DeliveryOutcome outcome)
     {
-        var message = outcome.Entry.Message;
+        var message = outcome.Message;
         var status = outcome.Result?.Status;
         var metricStatus = status switch
         {
@@ -444,8 +600,14 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     [LoggerMessage(Level = LogLevel.Error, Message = "Error delivering message {MessageId} to {ReceiverId}")]
     private static partial void LogDeliveryError(ILogger logger, Exception exception, HierarchicalKey messageId, GrainId receiverId);
 
+    [LoggerMessage(Level = LogLevel.Information, Message = "Removed outbox message {MessageId}, which its source withdrew")]
+    private static partial void LogMessageWithdrawn(ILogger logger, HierarchicalKey messageId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Removed outbox message {MessageId}, which no registered outbox message source provides")]
+    private static partial void LogMessageUnprovided(ILogger logger, HierarchicalKey messageId);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining")]
     private static partial void LogDeliveryComplete(ILogger logger, int deliveredCount, int backpressuredCount, int failedCount, int remainingCount);
 
-    private readonly record struct DeliveryOutcome(OutboxEntry Entry, DeliveryResult? Result, string? Error, TimeSpan Duration, bool Expired);
+    private readonly record struct DeliveryOutcome(OutboxEntry Entry, OutboxMessage Message, DeliveryResult? Result, string? Error, TimeSpan Duration, bool Expired);
 }

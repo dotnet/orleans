@@ -77,9 +77,30 @@ public sealed class MessagingCommandSerializationTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ReferenceEnqueue_CarriesNoMessageInJsonAndOrleansSerialization()
+    {
+        var command = new OutboxCommand { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() { EnqueuedAt = Now } };
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer<OutboxCommand>>();
+
+        var json = JsonSerializer.Serialize(command, OutboxJsonContext.Default.OutboxCommand);
+        var fromJson = JsonSerializer.Deserialize(json, OutboxJsonContext.Default.OutboxCommand)!;
+        var fromBinary = serializer.Deserialize(serializer.SerializeToArray(command))!;
+
+        Assert.DoesNotContain("Payload", json, StringComparison.Ordinal);
+        foreach (var recovered in new[] { fromJson, fromBinary })
+        {
+            Assert.Null(recovered.Message);
+            Assert.Equal(HierarchicalKey.Create("orders", "reference"), recovered.Reference!.Value.MessageId);
+        }
+    }
+
     private static InboxMessage InboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt) };
 
     private static OutboxMessage OutboxMessage(string id, DateTimeOffset? deliverAt = null) => new() { Envelope = Envelope(id, deliverAt), ReceiverId = Receiver };
+
+    private static OutboxMessageReference Reference(string id) => new() { MessageId = HierarchicalKey.Create("orders", id) };
 
     private static Envelope Envelope(string id, DateTimeOffset? deliverAt = null) => new()
     {
@@ -126,6 +147,7 @@ public sealed class MessagingCommandSerializationTests
         [
             new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("enqueue"), State = new() { EnqueuedAt = Now } },
             new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("scheduled", Now), State = new() { EnqueuedAt = Now } },
+            new() { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() { EnqueuedAt = Now } },
             new() { Kind = OutboxCommandKind.Delivery, MessageId = HierarchicalKey.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", EnqueuedAt = Now } },
             new() { Kind = OutboxCommandKind.Delivery, MessageId = HierarchicalKey.Create("orders", "dead"), DeadLetter = deadLetter },
             new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [HierarchicalKey.Create("orders", "dead")] },
@@ -134,7 +156,11 @@ public sealed class MessagingCommandSerializationTests
                 Kind = OutboxCommandKind.Snapshot,
                 Snapshot = new()
                 {
-                    Messages = [new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, EnqueuedAt = Now } }],
+                    Messages =
+                    [
+                        new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, EnqueuedAt = Now } },
+                        new() { Reference = Reference("pending-reference"), State = new() { AttemptCount = 2, EnqueuedAt = Now } }
+                    ],
                     DeadLetters = [deadLetter]
                 }
             }

@@ -27,7 +27,222 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     private SourceSinkProbe Probe => fixture.Probe;
 
     [Fact]
-    public async Task SinkAcceptance_DeduplicatesWithinTheWindowAndTheSinkReportsLaterDuplicates()
+    public async Task SourceMessage_JournalsEachPayloadOnceAndRetiresInTheRemovalWrite()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var messageId = NewMessageId("delivered");
+        var payload = NewPayload();
+
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, payload, write: true);
+
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Writes(sender).Length == 2);
+        var senderState = await OnGrainAsync(sender, context => Grain(context).GetState());
+        Assert.Empty(senderState.Outgoing);
+        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), Assert.Single(senderState.Retired).Value);
+        // The outbox materializes the message once to validate the send and once for the delivery attempt.
+        Assert.Equal(2, Probe.For(sender).Materializations);
+
+        // The payload is journaled once by each grain: in the sender's source state and in the receiver's sink state.
+        Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(sender), payload));
+        Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(receiver), payload));
+
+        // The retirement commits in the write which removes the outbox entry.
+        var writes = Writes(sender);
+        var retirement = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirement.Delivered));
+        Assert.True(writes[0].AsSpan().IndexOf(retirement) < 0);
+        Assert.True(writes[1].AsSpan().IndexOf(retirement) >= 0);
+
+        // The sink accepted the message without an inbox entry; the inbox journals only its processed record.
+        var receiverState = await OnGrainAsync(receiver, context => (
+            Grain(context).GetState(),
+            Inbox(context).Count,
+            InboxTestAccess.GetProcessedKeys(Inbox(context)).Contains(messageId)));
+        Assert.Equal(payload, receiverState.Item1.Received[messageId.ToString()]);
+        Assert.Equal(0, receiverState.Count);
+        Assert.True(receiverState.Item3);
+        Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
+        Assert.Equal(0, Probe.For(receiver).Handled);
+        Assert.Single(Writes(receiver));
+
+        // A recovered sender agrees: the entry is removed and its retirement is recorded.
+        Assert.True(Cluster.TryGetGrainContext(sender.GetGrainId(), out var senderContext));
+        await sender.DeactivateAsync();
+        await senderContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+        var recovered = await OnGrainAsync(sender, context => Grain(context).GetState());
+        Assert.Empty(recovered.Outgoing);
+        Assert.Single(recovered.Retired);
+        Assert.Equal(2, Writes(sender).Length);
+    }
+
+    [Fact]
+    public async Task SourceMessage_RecoveredFromTheJournal_IsDeliveredFromItsSource()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var messageId = NewMessageId("recovered");
+        var payload = NewPayload();
+
+        await sender.StageFromSourceAndDeactivateAsync(receiver.GetGrainId(), messageId, payload);
+
+        await WaitUntilAsync(receiver, context => Grain(context).GetState().Received.ContainsKey(messageId.ToString()));
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 1);
+        Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
+        Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(sender), payload));
+        Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(receiver), payload));
+    }
+
+    [Fact]
+    public async Task SourceMessage_DeadLetteredByTheOutbox_MaterializesItsMessageBeforeRetiring()
+    {
+        var sender = NewGrain();
+        var receiver = Cluster.Client.GetGrain<INoHandlerGrain>(Guid.NewGuid());
+        await receiver.PingAsync();
+        var messageId = NewMessageId("outbox-dead-letter");
+        var payload = NewPayload();
+
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, payload, write: true);
+
+        // The receiver has no handler, so both permitted delivery attempts fail.
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 1);
+        var (state, deadLetters) = await OnGrainAsync(sender, context => (
+            Grain(context).GetState(),
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
+        Assert.Empty(state.Outgoing);
+        Assert.Equal(nameof(OutboxMessageRetirement.DeadLettered), state.Retired[messageId.ToString()]);
+        var letter = Assert.Single(deadLetters);
+        Assert.Equal(messageId, letter.Message.Envelope.MessageId);
+        Assert.Equal(receiver.GetGrainId(), letter.Message.ReceiverId);
+        Assert.Equal(payload, letter.Message.Envelope.Payload);
+        Assert.Equal(SourceSinkGrain.Subject, letter.Message.Envelope.Subject);
+        Assert.Equal(2, letter.AttemptCount);
+        Assert.Equal(3, Probe.For(sender).Materializations);
+
+        // The dead letter keeps its own copy for diagnosis.
+        await WaitUntilAsync(sender, _ => Storage.CountPayloadOccurrences(Journal(sender), payload) == 2);
+    }
+
+    [Fact]
+    public async Task SourceMessage_DeadLetteredByTheReceiver_RetiresAsDeadLettered()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        Probe.For(receiver).Mode = SinkMode.Throw;
+        var messageId = NewMessageId("receiver-dead-letter");
+        var payload = NewPayload();
+
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, payload, write: true);
+
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 1);
+        var (state, outboxDeadLetters) = await OnGrainAsync(sender, context => (
+            Grain(context).GetState(),
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
+        Assert.Equal(nameof(OutboxMessageRetirement.DeadLettered), state.Retired[messageId.ToString()]);
+        Assert.Empty(state.Outgoing);
+        Assert.Empty(outboxDeadLetters);
+        var inboxLetter = Assert.Single(await OnGrainAsync(receiver, context =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().InboxDeadLetters));
+        Assert.Equal(payload, inboxLetter.Message.Envelope.Payload);
+        Assert.Equal(SourceSinkGrain.Rejection, inboxLetter.Reason);
+    }
+
+    [Fact]
+    public async Task SourceMessage_CoalescesWithItsPendingReferenceAndRejectsConflicts()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain().GetGrainId();
+        var messageId = NewMessageId("coalesced");
+        var sentId = NewMessageId("sent");
+
+        await sender.StageFromSourceAsync(receiver, messageId, NewPayload(), write: false);
+        await sender.SendFromSourceAsync(messageId);
+        Assert.Equal(1, await sender.GetOutboxCountAsync());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sender.SendAsync(receiver, messageId, NewPayload(), write: false));
+        await sender.SendAsync(receiver, sentId, NewPayload(), write: false);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sender.SendFromSourceAsync(sentId));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => sender.SendFromSourceAsync(NewMessageId("unprovided")));
+        await Assert.ThrowsAsync<ArgumentException>(() => sender.StageFromSourceAsync(sender.GetGrainId(), NewMessageId("self"), NewPayload(), write: false));
+        Assert.Equal(2, await sender.GetOutboxCountAsync());
+
+        await sender.WriteAsync();
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0);
+
+        // Materialized to validate the first send, to reject the self-addressed send, and for delivery; an unprovided
+        // message is never materialized.
+        Assert.Equal(3, Probe.For(sender).Materializations);
+    }
+
+    [Fact]
+    public async Task SourceMessage_WithdrawnBySource_IsRemovedWithoutDeliveryOrRetirement()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var messageId = NewMessageId("withdrawn");
+
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, NewPayload(), write: false);
+        await sender.WithdrawAsync(messageId);
+        Assert.Equal(1, await sender.GetOutboxCountAsync());
+        await sender.WriteAsync();
+
+        // The removal commits in its own write, after the write which staged the entry.
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Writes(sender).Length == 2);
+        var state = await OnGrainAsync(sender, context => Grain(context).GetState());
+        Assert.Empty(state.Outgoing);
+        Assert.Empty(state.Retired);
+        Assert.Equal(1, Probe.For(sender).Materializations);
+        Assert.Equal(0, Probe.For(receiver).SinkOffers);
+
+        Assert.True(Cluster.TryGetGrainContext(sender.GetGrainId(), out var senderContext));
+        await sender.DeactivateAsync();
+        await senderContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+    }
+
+    [Fact]
+    public async Task RecoveredReferenceEntry_IsWithdrawnWhenNoSourceProvidesItAndFailsWithoutSources()
+    {
+        var grain = NewGrain();
+        var withoutSources = Cluster.Client.GetGrain<INoHandlerGrain>(Guid.NewGuid());
+        _ = await grain.GetOutboxCountAsync();
+        await withoutSources.PingAsync();
+        var unprovided = NewMessageId("unprovided");
+
+        // Replays a reference entry, validates the recovered state as recovery does, then runs a delivery pass.
+        await OnGrainAsync(grain, context =>
+        {
+            var outbox = Outbox(context);
+            ApplyReference(outbox, unprovided);
+            ((IStateMachine)outbox).OnRecoveryCompleted();
+            var pump = context.ActivationServices.GetRequiredService<MessagingPump>();
+            pump.EnsureStarted();
+            pump.Signal();
+            return true;
+        });
+        await WaitUntilAsync(grain, context => Outbox(context).Count == 0);
+        Assert.Empty((await OnGrainAsync(grain, context => Grain(context).GetState())).Retired);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => OnGrainAsync(withoutSources, context =>
+        {
+            var outbox = Outbox(context);
+            ApplyReference(outbox, unprovided);
+            ((IStateMachine)outbox).OnRecoveryCompleted();
+            return true;
+        }));
+        Assert.Contains("no outbox message source is registered", error.Message, StringComparison.Ordinal);
+
+        void ApplyReference(Outbox outbox, HierarchicalKey messageId) =>
+            ((IDurableValueCommandHandler<OutboxCommand>)outbox).ApplySet(new OutboxCommand
+            {
+                Kind = OutboxCommandKind.Enqueue,
+                Reference = new() { MessageId = messageId },
+                State = new() { EnqueuedAt = DateTimeOffset.UtcNow }
+            });
+    }
+
+    [Fact]
+    public async Task SinkAcceptance_DeduplicatesWithinTheWindowAndIsOfferedAgainAfterItExpires()
     {
         var receiver = NewGrain();
         var message = NewInboxMessage("deduplicated", NewPayload());
@@ -166,6 +381,26 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(receiver), declinedPayload));
     }
 
+    [Fact]
+    public async Task SelfSentMessage_IsAcceptedByTheSinkInTheSendingWrite()
+    {
+        var grain = NewGrain();
+        _ = await grain.GetOutboxCountAsync();
+        var writes = Writes(grain).Length;
+        var messageId = NewMessageId("self");
+        var payload = NewPayload();
+
+        await grain.SendAsync(grain.GetGrainId(), messageId, payload, write: true);
+
+        var (state, inboxCount, outboxCount) = await OnGrainAsync(grain, context => (Grain(context).GetState(), Inbox(context).Count, Outbox(context).Count));
+        Assert.Equal(payload, state.Received[messageId.ToString()]);
+        Assert.Equal(0, inboxCount);
+        Assert.Equal(0, outboxCount);
+        Assert.Equal(1, Probe.For(grain).SinkAcceptances);
+        Assert.Equal(writes + 1, Writes(grain).Length);
+        Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(grain), payload));
+    }
+
     private ISourceSinkGrain NewGrain() => Cluster.Client.GetGrain<ISourceSinkGrain>(Guid.NewGuid());
 
     private static MessageId NewMessageId(string name) => MessageId.Create("source-sink", name, Guid.NewGuid().ToString("N"));
@@ -184,6 +419,8 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     private static SourceSinkGrain Grain(IGrainContext context) => Assert.IsType<SourceSinkGrain>(context.GrainInstance);
 
     private static Inbox Inbox(IGrainContext context) => context.ActivationServices.GetRequiredService<Inbox>();
+
+    private static Outbox Outbox(IGrainContext context) => context.ActivationServices.GetRequiredService<Outbox>();
 
     private Task<T> OnGrainAsync<T>(IAddressable grain, Func<IGrainContext, T> func)
     {
@@ -340,17 +577,25 @@ public sealed class SourceSinkProbe
 
 public interface ISourceSinkGrain : IGrainWithGuidKey
 {
+    Task StageFromSourceAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload, bool write);
+    Task StageFromSourceAndDeactivateAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload);
+    Task SendFromSourceAsync(HierarchicalKey messageId);
+    Task WithdrawAsync(HierarchicalKey messageId);
+    Task SendAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload, bool write);
     Task WriteAsync();
+    Task<int> GetOutboxCountAsync();
     Task DeactivateAsync();
 }
 
-/// <summary>Stores received payloads as an inbox sink.</summary>
-public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, IInboxMessageSink
+/// <summary>Stores outgoing messages as an outbox source and received payloads as an inbox sink.</summary>
+public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, IOutboxMessageSource, IInboxMessageSink
 {
     internal const string Subject = "source-sink/payload";
     internal const string Rejection = "The sink rejected the message.";
     private readonly IJournaledStateManager _manager;
+    private readonly IOutbox _outbox;
     private readonly IDurableDictionary<string, byte[]> _outgoing;
+    private readonly IDurableDictionary<string, string> _receivers;
     private readonly IDurableDictionary<string, byte[]> _received;
     private readonly IDurableDictionary<string, string> _retired;
     private readonly SourceSinkProbe.Counters _probe;
@@ -359,24 +604,67 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         IGrainContext context,
         IJournaledStateManager manager,
         IInbox inbox,
+        IOutbox outbox,
         [FromKeyedServices("outgoing")] IDurableDictionary<string, byte[]> outgoing,
+        [FromKeyedServices("receivers")] IDurableDictionary<string, string> receivers,
         [FromKeyedServices("received")] IDurableDictionary<string, byte[]> received,
         [FromKeyedServices("retired")] IDurableDictionary<string, string> retired,
         SourceSinkProbe probe)
     {
         _manager = manager;
+        _outbox = outbox;
         _outgoing = outgoing;
+        _receivers = receivers;
         _received = received;
         _retired = retired;
         _probe = probe.For(context.GrainId);
-        _probe.OnActivated();
+        outbox.Register(this);
         inbox.Register(this).Register(new Handler(_probe));
     }
 
     internal (Dictionary<string, byte[]> Outgoing, Dictionary<string, byte[]> Received, Dictionary<string, string> Retired) GetState() =>
         (new(_outgoing), new(_received), new(_retired));
 
+    public async Task StageFromSourceAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload, bool write)
+    {
+        _outgoing[messageId.ToString()] = payload;
+        _receivers[messageId.ToString()] = receiver.ToString();
+        _outbox.Send(messageId);
+        if (write) await _manager.WriteStateAsync(CancellationToken.None);
+    }
+
+    public async Task StageFromSourceAndDeactivateAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload)
+    {
+        await StageFromSourceAsync(receiver, messageId, payload, write: true);
+        DeactivateOnIdle();
+    }
+
+    public Task SendFromSourceAsync(HierarchicalKey messageId)
+    {
+        _outbox.Send(messageId);
+        return Task.CompletedTask;
+    }
+
+    public Task WithdrawAsync(HierarchicalKey messageId)
+    {
+        Assert.True(_outgoing.Remove(messageId.ToString()));
+        Assert.True(_receivers.Remove(messageId.ToString()));
+        return Task.CompletedTask;
+    }
+
+    public async Task SendAsync(GrainId receiver, HierarchicalKey messageId, byte[] payload, bool write)
+    {
+        _outbox.Send(new OutboxMessage
+        {
+            Envelope = new Envelope { MessageId = messageId, Payload = payload, Subject = Subject },
+            ReceiverId = receiver
+        });
+        if (write) await _manager.WriteStateAsync(CancellationToken.None);
+    }
+
     public async Task WriteAsync() => await _manager.WriteStateAsync(CancellationToken.None);
+
+    public Task<int> GetOutboxCountAsync() => Task.FromResult(_outbox.Count());
 
     public Task DeactivateAsync()
     {
@@ -384,7 +672,33 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         return Task.CompletedTask;
     }
 
-    bool IInboxMessageSink.TryAccept(InboxMessage message, out DeliveryResult result)
+    bool IOutboxMessageSource.TryGetMessage(HierarchicalKey messageId, out OutboxMessage message)
+    {
+        var key = messageId.ToString();
+        if (!_outgoing.TryGetValue(key, out var payload))
+        {
+            message = default;
+            return false;
+        }
+
+        _probe.OnMaterialized();
+        message = new()
+        {
+            Envelope = new() { MessageId = messageId, Payload = payload, Subject = Subject },
+            ReceiverId = GrainId.Parse(_receivers[key])
+        };
+        return true;
+    }
+
+    void IOutboxMessageSource.OnRetired(HierarchicalKey messageId, OutboxMessageRetirement retirement)
+    {
+        var key = messageId.ToString();
+        Assert.True(_outgoing.Remove(key));
+        Assert.True(_receivers.Remove(key));
+        _retired[key] = retirement.ToString();
+    }
+
+    bool IInboxMessageSink.TryAccept(InboxMessage message)
     {
         result = default;
         if (message.Envelope.Subject != Subject) return false;

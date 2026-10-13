@@ -160,6 +160,11 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             return;
         }
 
+        if (message.Envelope.DeliverAt is null && StageSinkAcceptance(message) is not null)
+        {
+            return;
+        }
+
         try
         {
             Emit(new() { Kind = InboxCommandKind.Accept, Message = message });

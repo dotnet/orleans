@@ -110,13 +110,21 @@ construction or activation setup, before journal recovery.
 
 - `IOutbox.Register(IOutboxMessageSource)` adds a source, and
   `IOutbox.Send(messageId)` stages a reference entry with the message ID and delivery
-  state. The first source whose `TryGetMessage` returns the message owns it, and
-  returns the same `OutboxMessage` while it provides the message. A source withdraws
-  a pending message by returning `false`. When the message retires, `OnRetired`
-  reports `OutboxMessageRetirement.Delivered` or `DeadLettered`. After the send, a
-  source that throws or returns an invalid message dead-letters that entry alone,
-  with `OnRetired(DeadLettered)` in the same journal write; an exception during
-  `Send` propagates without staging anything.
+  state. The first source whose `TryGetMessage` returns the message owns it; the
+  outbox calls `TryGetMessage` to validate the send and before each delivery attempt,
+  and the source returns the same `OutboxMessage` while it provides the message. Every
+  delivery rule above applies. A source withdraws a pending message by returning
+  `false`: the outbox removes the entry before its next attempt, without delivery or
+  `OnRetired`, and an attempt already in flight still completes. When the message
+  retires, the outbox calls `OnRetired` with
+  `OutboxMessageRetirement.Delivered` (`Accepted` or `Duplicate`) or `DeadLettered`
+  (receiver-reported or outbox dead-lettering) while it stages the removal, so the
+  source's changes commit in the same journal write. An outbox dead letter stores the
+  materialized message. Sending a pending reference again coalesces; an ID pending as
+  an ordinary message, or one which no source provides, throws
+  `InvalidOperationException`. A source message addressed to the sending grain throws
+  `ArgumentException`. A recovered reference fails the activation when no source is
+  registered.
 - `IInbox.Register(IInboxMessageSink)` adds a sink. After validation and
   deduplication, the inbox offers each message, including self-sent and scheduled
   messages, to the sinks in order. The first sink whose `TryAccept` returns `true`
@@ -193,6 +201,6 @@ delivered messages tagged by grain type and status; histograms for processing an
 delivery duration; and `orleans-messaging-inbox-depth` and
 `orleans-messaging-outbox-depth` up-down counters for pending work. A message a grain
 sends to itself counts as sent and as received by its inbox, and never contributes
-to outbox delivery or depth. A message an inbox sink accepts counts as received
-`accepted` and processed `success`; one which the sink dead-letters counts as received
-and processed `dead_lettered`.
+to outbox delivery or depth. Reference sends count as sent. A message an inbox sink
+accepts counts as received `accepted` and processed `success`; one which the sink
+dead-letters counts as received and processed `dead_lettered`.
