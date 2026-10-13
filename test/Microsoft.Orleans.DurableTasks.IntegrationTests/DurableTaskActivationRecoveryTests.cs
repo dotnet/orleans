@@ -18,13 +18,23 @@ public sealed class DurableTaskRecoveryCollection
     public const string Name = "Durable task activation recovery";
 }
 
+/// <summary>Runs activation recovery coverage with task state stored in the default JSON journal format.</summary>
 [Collection(DurableTaskRecoveryCollection.Name)]
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableTasks")]
-public sealed class DurableTaskActivationRecoveryTests : IAsyncLifetime
+public sealed class JsonDurableTaskActivationRecoveryTests() : DurableTaskActivationRecoveryTests(DurableTaskRecoveryFixture.Json);
+
+/// <summary>Runs activation recovery coverage with task state stored in the Orleans binary journal format.</summary>
+[Collection(DurableTaskRecoveryCollection.Name)]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
+public sealed class OrleansBinaryDurableTaskActivationRecoveryTests() : DurableTaskActivationRecoveryTests(DurableTaskRecoveryFixture.OrleansBinary);
+
+public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey) : IAsyncLifetime
 {
-    private readonly DurableTaskRecoveryFixture _fixture = new();
+    private readonly DurableTaskRecoveryFixture _fixture = new(journalFormatKey);
 
     public ValueTask InitializeAsync() => _fixture.InitializeAsync();
     public ValueTask DisposeAsync() => _fixture.DisposeAsync();
@@ -86,12 +96,31 @@ public sealed class DurableTaskActivationRecoveryTests : IAsyncLifetime
             cancellationToken));
         await attached.CancelAsync(cancellationToken);
     }
+
+    [Fact]
+    public async Task DelayedTaskResumesWhenDue()
+    {
+        const string rootId = "delay-resume";
+        const int argument = 5;
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+
+        var scheduled = await grain.DelayThenComputeAsync(argument).ScheduleAsync(rootId, cancellationToken);
+        var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal((argument * 3) + 7, response.GetResult<int>());
+        Assert.Single(_fixture.Probe.GetLogicalTimes(grainId));
+        Assert.Equal((argument * 3) + 7, await grain.GetDurableTask<int>(rootId).WaitAsync(cancellationToken));
+    }
 }
 
 public interface IDurableTaskRecoveryTestGrain : IGrainWithGuidKey
 {
     DurableTask<int> ComputeAsync(int value);
     DurableTask<DateTimeOffset> ObserveLogicalTimeAsync();
+    DurableTask<int> DelayThenComputeAsync(int value);
     Task<Guid> GetActivationIdAsync();
     Task RequestDeactivationAsync();
 }
@@ -231,6 +260,13 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
         return value;
     }
 
+    public async DurableTask<int> DelayThenComputeAsync(int value)
+    {
+        probe.RecordLogicalTime(this.GetGrainId(), DurableExecutionContext.Current!.UtcNow);
+        await DurableTask.Delay(TimeSpan.FromSeconds(1)).WithId("pause");
+        return checked((value * 3) + 7);
+    }
+
     public Task<Guid> GetActivationIdAsync() => Task.FromResult(_activationId);
 
     public Task RequestDeactivationAsync()
@@ -240,14 +276,20 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
     }
 }
 
+/// <summary>
+/// Hosts an in-process cluster whose grains journal task state, messaging, and durable jobs in one journal format.
+/// </summary>
 internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
 {
-    public DurableTaskRecoveryFixture()
+    public const string Json = "json";
+    public const string OrleansBinary = "orleans-binary";
+
+    public DurableTaskRecoveryFixture(string journalFormatKey)
     {
         Probe = new();
         MessagingProbe = new();
         Storage = new VolatileJournalStorageProvider(
-            Options.Create(new JournaledStateManagerOptions { JournalFormatKey = "orleans-binary" }));
+            Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }));
         var clusterId = $"durable-task-recovery-{Guid.NewGuid():N}";
         var serviceId = $"durable-task-recovery-service-{Guid.NewGuid():N}";
         var builder = new InProcessTestClusterBuilder();
@@ -268,7 +310,7 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
                 options.ServiceId = serviceId;
             });
             siloBuilder.AddJournaling();
-            siloBuilder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = "orleans-binary");
+            siloBuilder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
             siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.AddDurableTasks();
             siloBuilder.Services.AddSingleton(Probe);
