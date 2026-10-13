@@ -9,18 +9,18 @@ using Orleans.Serialization.Session;
 namespace Orleans.Messaging.Tests.Support;
 
 // Captures opaque handler output in the same journal as inbox effects. Dispatch belongs to the outbox layer.
-internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, OutboxMessage> messages)
-    : IOutbox, ILifecycleObserver, IEnumerable<KeyValuePair<HierarchicalKey, OutboxMessage>>
+internal sealed class JournaledTestOutbox(IDurableDictionary<MessageId, OutboxMessage> messages)
+    : IOutbox, ILifecycleObserver, IEnumerable<KeyValuePair<MessageId, OutboxMessage>>
 {
     private bool _stopped;
     private readonly TaskCompletionSource _stopping = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Task Stopping => _stopping.Task;
     public int SendCalls { get; private set; }
     public Exception? NextSendFailure { get; set; }
-    public IDurableDictionary<HierarchicalKey, OutboxMessage> StoredMessages { get; } = messages;
+    public IDurableDictionary<MessageId, OutboxMessage> StoredMessages { get; } = messages;
     public int Count => StoredMessages.Count;
     public IEnumerable<OutboxMessage> Messages => StoredMessages.Values;
-    public IEnumerator<KeyValuePair<HierarchicalKey, OutboxMessage>> GetEnumerator() => StoredMessages.GetEnumerator();
+    public IEnumerator<KeyValuePair<MessageId, OutboxMessage>> GetEnumerator() => StoredMessages.GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     public void Send(OutboxMessage envelope)
@@ -48,13 +48,13 @@ internal sealed class JournaledTestOutbox(IDurableDictionary<HierarchicalKey, Ou
         StoredMessages.Add(envelope.Envelope.MessageId, envelope);
     }
 
-    public void Send(HierarchicalKey messageId) =>
+    public void Send(MessageId messageId) =>
         throw new NotSupportedException("The test outbox stores complete envelopes only.");
 
     public IOutbox Register(IOutboxMessageSource source) =>
         throw new NotSupportedException("The test outbox stores complete envelopes only.");
 
-    public bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out OutboxMessage envelope) =>
+    public bool TryGetMessage(MessageId messageId, [MaybeNullWhen(false)] out OutboxMessage envelope) =>
         StoredMessages.TryGetValue(messageId, out envelope);
     public Task OnStart(CancellationToken cancellationToken) => Task.CompletedTask;
     public Task OnStop(CancellationToken cancellationToken)

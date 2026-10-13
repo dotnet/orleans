@@ -98,7 +98,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
     private ISourceSinkGrain NewGrain() => Cluster.Client.GetGrain<ISourceSinkGrain>(Guid.NewGuid());
 
-    private static HierarchicalKey NewMessageId(string name) => HierarchicalKey.Create("source-sink", name, Guid.NewGuid().ToString("N"));
+    private static MessageId NewMessageId(string name) => MessageId.Create("source-sink", name, Guid.NewGuid().ToString("N"));
 
     private static byte[] NewPayload() => RandomNumberGenerator.GetBytes(48);
 
