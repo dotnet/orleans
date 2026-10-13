@@ -14,8 +14,12 @@ using Orleans.Serialization;
 namespace Microsoft.Orleans.DurableTasks.Tests;
 
 /// <summary>
-/// Records staged messages in send order, coalescing equivalent sends of a pending identity like the messaging outbox.
+/// Records staged messages in send order, including repeated sends of a pending identity.
 /// </summary>
+/// <remarks>
+/// The messaging outbox stages a message addressed to the sending grain, such as a delay resume, directly in that grain's
+/// own inbox; this fake records every send the adapter makes through <see cref="IOutbox"/>, whatever its receiver.
+/// </remarks>
 internal sealed class RecordingOutbox : IOutbox
 {
     private readonly List<OutboxMessage> _sends = [];
