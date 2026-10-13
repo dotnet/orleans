@@ -6,6 +6,7 @@ using Orleans.DurableTasks.Protocol;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Runtime;
 
@@ -77,12 +78,15 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
 
     private void ObserveCompletion(TaskId childId)
     {
-        if (_runtime.GetCompletedAt(childId) is not { } completedAt)
+        if (_runtime.GetCompletedAt(childId) is { } completedAt)
         {
-            return;
+            ObserveTime(completedAt);
         }
+    }
 
-        var ticks = completedAt.UtcTicks;
+    private void ObserveTime(DateTimeOffset time)
+    {
+        var ticks = time.UtcTicks;
         for (var current = Volatile.Read(ref _utcNowTicks); ticks > current;)
         {
             var observed = Interlocked.CompareExchange(ref _utcNowTicks, ticks, current);
@@ -214,6 +218,58 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     {
         ThrowIfNotChildTaskId(taskId);
         return new ExecutionTaskHandle(_runtime.GetScheduledTaskHandle(taskId), this);
+    }
+
+    /// <remarks>
+    /// The wait observes the signals of the invoked task whose execution tree contains this execution, and advances this
+    /// execution's logical time to when the signal was recorded.
+    /// </remarks>
+    protected override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken) =>
+        RunOnScheduler(
+            _scheduler,
+            () => WaitForSignalCoreAsync(name, cancellationToken));
+
+    private async ValueTask<DurableTaskResponse> WaitForSignalCoreAsync(string name, CancellationToken cancellationToken)
+    {
+        ThrowIfDeleted();
+        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
+        var (value, recordedAt) = await _runtime.WaitForSignalAsync(TaskId, name, executionCts.Token);
+        ObserveTime(recordedAt);
+        return value;
+    }
+
+    /// <summary>
+    /// Sends a signal to the invoked task <paramref name="taskId"/> on <paramref name="target"/>, recording the send under a
+    /// generated child identifier of this execution, so a replay doesn't send it again.
+    /// </summary>
+    /// <remarks>
+    /// The identifier is generated when the send begins, so sends begin in deterministic order, like unnamed children.
+    /// Durable cancellation of this execution doesn't abandon the send; host abort does.
+    /// </remarks>
+    internal ValueTask SendSignalAsync(
+        GrainId target,
+        TaskId taskId,
+        string name,
+        DurableTaskResponse value,
+        CancellationToken cancellationToken)
+    {
+        var markerId = CreateChildTaskId(name: null);
+        return RunOnScheduler(
+            _scheduler,
+            () => SendSignalCoreAsync(markerId, target, taskId, name, value, cancellationToken));
+    }
+
+    private async ValueTask SendSignalCoreAsync(
+        TaskId markerId,
+        GrainId target,
+        TaskId taskId,
+        string name,
+        DurableTaskResponse value,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDeleted();
+        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
+        await _runtime.SendSignalAsync(markerId, target, taskId, name, value, executionCts.Token);
     }
 
     protected override ValueTask<TaskId> SelectCompletionAsync(

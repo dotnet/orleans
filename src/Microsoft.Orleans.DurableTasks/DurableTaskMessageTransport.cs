@@ -19,8 +19,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// the message from the task's stored result as an <see cref="IOutboxMessageSource"/>, so the result is journaled once.
 /// A delay resume is a message the grain sends to itself
 /// with <see cref="Envelope.DeliverAt"/> set to the delay's due time, which the grain's own inbox accepts in the delay's
-/// journal write; its identity also covers the delay generation and due time. The runtime derives readiness from
-/// journaled state, so duplicate and stale resumes are harmless.
+/// journal write; its identity also covers the delay generation and due time. A signal's identity also covers its name
+/// and value. The runtime derives readiness from journaled state, so duplicate and stale resumes are harmless.
 /// </remarks>
 internal sealed class DurableTaskMessageTransport(
     Lazy<IOutbox> outbox,
@@ -111,6 +111,36 @@ internal sealed class DurableTaskMessageTransport(
                 DurableTaskMessageTypes.ResumeSubject,
                 dueTime.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture))
             .Key.CreateChildKey(generation.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+
+    public void SendSignal(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        string name,
+        DurableTaskResponse value,
+        string payloadFingerprint) =>
+        Send(
+            messageTypes.Signal,
+            sender,
+            target,
+            taskId,
+            new DurableTaskSignalMessage { TaskId = taskId, Name = name, Value = value, Sender = sender },
+            CreateSignalMessageId(sender, target, taskId, name, payloadFingerprint),
+            deliverAt: null);
+
+    /// <summary>Creates the identity of one signal value.</summary>
+    /// <remarks>
+    /// A replayed send of the same value coalesces, and the receiver deduplicates its redelivery. Covering the value
+    /// gives a conflicting value its own message, which the receiver rejects. The fingerprint has a fixed length, so it
+    /// precedes the name unambiguously.
+    /// </remarks>
+    internal static MessageId CreateSignalMessageId(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        string name,
+        string payloadFingerprint) =>
+        CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.SignalSubject, $"{payloadFingerprint}:{name}");
 
     private void Send<T>(MessageType<T> messageType, GrainId sender, GrainId target, TaskId taskId, T body) =>
         Send(messageType, sender, target, taskId, body, messageId: default, deliverAt: null);
