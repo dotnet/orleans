@@ -23,11 +23,19 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 internal sealed class RecordingOutbox : IOutbox
 {
     private readonly List<OutboxMessage> _sends = [];
+    private readonly List<HierarchicalKey> _sourceSends = [];
 
     /// <summary>Gets every staged send, including sends which coalesce with a pending identity.</summary>
     public IReadOnlyList<OutboxMessage> Messages => _sends;
 
+    /// <summary>Gets every staged reference send, whose message a registered source provides.</summary>
+    public IReadOnlyList<HierarchicalKey> SourceMessages => _sourceSends;
+
     public void Send(OutboxMessage message) => _sends.Add(message);
+
+    public void Send(HierarchicalKey messageId) => _sourceSends.Add(messageId);
+
+    public IOutbox Register(IOutboxMessageSource source) => throw new NotSupportedException();
 }
 
 internal static class MessagingTestHelpers

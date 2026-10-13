@@ -136,19 +136,19 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task InvocationWithoutRequestContextFailsBeforeChangingDurableState()
+    public void InvocationWithoutRequestContextFailsBeforeChangingDurableState()
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var sender = GrainId.Create("caller", "one");
         var receiver = GrainId.Create("test", "one");
-        var context = InvocationContext(sender, receiver, TaskId.Parse("legacy"), new TestDurableTaskRequest());
+        var message = InvocationMessage(sender, receiver, TaskId.Parse("legacy"), new TestDurableTaskRequest());
         var handler = CreateHandler(runtime);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(context, CancellationToken.None));
+        // The inbox dead-letters a message which its sink rejects; the sink stages nothing first.
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => handler.TryAccept(message));
 
         Assert.Equal("The durable task invocation request has no context.", exception.Message);
-        context.DidNotReceive().Complete();
         Assert.Empty(storage.Tasks);
         Assert.Equal(0, manager.WriteCount);
         Assert.Empty(transport.Invocations);
@@ -158,7 +158,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task InboxInvocationRequiresMatchingTargetAndSender()
+    public void InboxInvocationRequiresMatchingTargetAndSender()
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var sender = GrainId.Create("caller", "one");
@@ -166,30 +166,33 @@ public sealed class DurableTaskRuntimeInvariantTests
         var request = CreateSerializableRequest(GrainId.Create("target", "other"));
         var handler = CreateHandler(runtime);
 
-        var wrongTarget = InvocationContext(sender, receiver, TaskId.Parse("wrong-target"), request);
-        var targetException = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(wrongTarget, TestContext.Current.CancellationToken));
+        var wrongTarget = InvocationMessage(sender, receiver, TaskId.Parse("wrong-target"), request);
+        var targetException = Assert.Throws<InvalidOperationException>(
+            () => handler.TryAccept(wrongTarget));
         Assert.Contains("not receiver", targetException.Message, StringComparison.Ordinal);
-        wrongTarget.DidNotReceive().Complete();
 
         request.Context!.TargetId = receiver;
-        var missingSender = InvocationContext(default, receiver, TaskId.Parse("missing-sender"), request, messageIdSender: sender);
-        var senderException = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(missingSender, TestContext.Current.CancellationToken));
+        var missingSender = InvocationMessage(default, receiver, TaskId.Parse("missing-sender"), request, messageIdSender: sender);
+        var senderException = Assert.Throws<InvalidOperationException>(
+            () => handler.TryAccept(missingSender));
         Assert.Contains("no sender", senderException.Message, StringComparison.Ordinal);
-        missingSender.DidNotReceive().Complete();
+
+        var selfInvocation = InvocationMessage(receiver, receiver, TaskId.Parse("self"), request);
+        var selfException = Assert.Throws<InvalidOperationException>(() => handler.TryAccept(selfInvocation));
+        Assert.Contains("owning grain", selfException.Message, StringComparison.Ordinal);
 
         Assert.Empty(storage.Tasks);
         Assert.Empty(transport.Completions);
     }
 
     [Fact]
-    public void InboxHandlerAcceptsOnlyDurableRpcSubjects()
+    public void InboxSinkAcceptsDurableRpcCallsAndHandlerHandlesOnlyResumes()
     {
-        var (runtime, _, _, _) = CreateRuntime();
+        var (runtime, storage, _, _) = CreateRuntime();
         var handler = CreateHandler(runtime);
-        var durableRpc = CancellationContext(GrainId.Create("caller", "one"), GrainId.Create("test", "one"), TaskId.Parse("root"));
-        var other = MessagingTestHelpers.CreateHandlerContext(new InboxMessage
+        var cancellation = CancellationMessage(GrainId.Create("caller", "one"), GrainId.Create("test", "one"), TaskId.Parse("root"));
+        var resume = MessagingTestHelpers.CreateResumeMessage(runtime.GrainId, TaskId.Parse("delay"), 1, DateTimeOffset.UtcNow);
+        var other = new InboxMessage
         {
             Envelope = new Envelope
             {
@@ -197,19 +200,25 @@ public sealed class DurableTaskRuntimeInvariantTests
                 Payload = [],
                 Subject = "orders/reserve",
             },
-        });
-        var raw = MessagingTestHelpers.CreateHandlerContext(new InboxMessage
+        };
+        var raw = new InboxMessage
         {
             Envelope = new Envelope
             {
                 MessageId = HierarchicalKey.Create("raw", "one"),
                 Payload = [],
             },
-        });
+        };
 
-        Assert.True(handler.CanHandle(durableRpc));
-        Assert.False(handler.CanHandle(other));
-        Assert.False(handler.CanHandle(raw));
+        Assert.False(handler.TryAccept(resume));
+        Assert.False(handler.TryAccept(other));
+        Assert.False(handler.TryAccept(raw));
+        Assert.Empty(storage.Tasks);
+        Assert.True(handler.TryAccept(cancellation));
+        Assert.True(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(resume)));
+        Assert.False(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(cancellation)));
+        Assert.False(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(other)));
+        Assert.False(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(raw)));
     }
 
     [Fact]
@@ -222,22 +231,20 @@ public sealed class DurableTaskRuntimeInvariantTests
         var taskId = TaskId.Parse("bound-cancellation");
         var handler = CreateHandler(runtime);
 
-        await HandleAsync(handler, CancellationContext(caller, receiver, taskId));
+        Accept(handler, CancellationMessage(caller, receiver, taskId));
 
         Assert.Equal(caller, storage.Get(taskId).CallerId);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        var otherCancellation = CancellationContext(otherCaller, receiver, taskId);
-        var cancellationException = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(otherCancellation, TestContext.Current.CancellationToken));
+        var otherCancellation = CancellationMessage(otherCaller, receiver, taskId);
+        var cancellationException = Assert.Throws<InvalidOperationException>(
+            () => handler.TryAccept(otherCancellation));
         Assert.Contains("already associated with caller", cancellationException.Message, StringComparison.Ordinal);
-        otherCancellation.DidNotReceive().Complete();
 
         var request = CreateSerializableRequest(receiver);
-        var otherInvocation = InvocationContext(otherCaller, receiver, taskId, request);
-        var invocationException = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(otherInvocation, TestContext.Current.CancellationToken));
+        var otherInvocation = InvocationMessage(otherCaller, receiver, taskId, request);
+        var invocationException = Assert.Throws<InvalidOperationException>(
+            () => handler.TryAccept(otherInvocation));
         Assert.Contains("already associated with caller", invocationException.Message, StringComparison.Ordinal);
-        otherInvocation.DidNotReceive().Complete();
     }
 
     [Fact]
@@ -254,7 +261,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         storage.SetRemoteRequest(childId, child, target, "fingerprint");
         var handler = CreateHandler(runtime);
 
-        await HandleAsync(handler, CancellationContext(caller, receiver, rootId));
+        Accept(handler, CancellationMessage(caller, receiver, rootId));
 
         Assert.Equal(0, manager.WriteCount);
         Assert.NotNull(storage.Get(rootId).CancellationRequestedAt);
@@ -285,7 +292,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         var writesBeforeCancellation = manager.WriteCount;
         var handler = CreateHandler(runtime);
 
-        await HandleAsync(handler, CancellationContext(caller, receiver, taskId));
+        Accept(handler, CancellationMessage(caller, receiver, taskId));
 
         Assert.Equal(writesBeforeCancellation, manager.WriteCount);
         Assert.Null(storage.Get(taskId).Result);
@@ -324,7 +331,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var handler = CreateHandler(runtime);
 
-        await HandleAsync(handler, CancellationContext(caller, receiver, rootId));
+        Accept(handler, CancellationMessage(caller, receiver, rootId));
         Assert.False((await childHandle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
 
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -373,21 +380,19 @@ public sealed class DurableTaskRuntimeInvariantTests
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var writesBeforeBatch = manager.WriteCount;
 
-        // The inbox handles every message of a batch before its single batch write, so no handler may wait for it.
-        IInboxHandlerContext[] batch =
+        // The inbox accepts every message before the write which commits them, so no message may wait for it.
+        InboxMessage[] batch =
         [
-            CancellationContext(caller, receiver, rootIds[0]),
-            CompletionContext(target, receiver, remoteIds[0], DurableTaskResponse.FromResult(10)),
-            CancellationContext(caller, receiver, rootIds[1]),
-            CompletionContext(target, receiver, remoteIds[1], DurableTaskResponse.FromResult(20)),
-            CancellationContext(caller, receiver, rootIds[2]),
-            CancellationContext(caller, receiver, rootIds[0]),
+            CancellationMessage(caller, receiver, rootIds[0]),
+            CompletionMessage(target, receiver, remoteIds[0], DurableTaskResponse.FromResult(10)),
+            CancellationMessage(caller, receiver, rootIds[1]),
+            CompletionMessage(target, receiver, remoteIds[1], DurableTaskResponse.FromResult(20)),
+            CancellationMessage(caller, receiver, rootIds[2]),
+            CancellationMessage(caller, receiver, rootIds[0]),
         ];
-        foreach (var context in batch)
+        foreach (var message in batch)
         {
-            var handling = handler.HandleAsync(context, TestContext.Current.CancellationToken);
-            Assert.True(handling.IsCompletedSuccessfully);
-            context.Received(1).Complete();
+            Accept(handler, message);
         }
 
         Assert.Equal(writesBeforeBatch, manager.WriteCount);
@@ -403,9 +408,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(20, (await remoteHandles[1].WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
         await WaitUntilAsync(() => rootIds.All(rootId => storage.Get(rootId).Result is { IsCompleted: true }));
         Assert.All(rootIds, rootId => Assert.Equal(DurableTaskStatus.Canceled, storage.Get(rootId).Result!.Status));
-        Assert.Equal(
-            remoteIds.Select(static id => (id, GrainId.Create("target", "one"))).ToHashSet(),
-            transport.CompletionAcknowledgements.Select(static ack => (ack.TaskId, ack.Target)).ToHashSet());
     }
 
     [Fact]
@@ -420,22 +422,42 @@ public sealed class DurableTaskRuntimeInvariantTests
         var handler = CreateHandler(runtime);
         var response = DurableTaskResponse.FromResult(42);
 
-        var wrongSender = CompletionContext(GrainId.Create("target", "other"), receiver, taskId, response);
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await handler.HandleAsync(wrongSender, TestContext.Current.CancellationToken));
+        var wrongSender = CompletionMessage(GrainId.Create("target", "other"), receiver, taskId, response);
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => handler.TryAccept(wrongSender));
         Assert.Contains("does not accept completions", exception.Message, StringComparison.Ordinal);
-        wrongSender.DidNotReceive().Complete();
         Assert.Null(storage.Get(taskId).Result);
-        Assert.Empty(transport.CompletionAcknowledgements);
 
-        await HandleAsync(handler, CompletionContext(expectedTarget, receiver, taskId, response));
+        Accept(handler, CompletionMessage(expectedTarget, receiver, taskId, response));
 
+        // The accepted completion is staged once, in task state, and nothing is sent back to the child.
         Assert.Equal(42, storage.Get(taskId).Result!.GetResult<int>());
-        Assert.Equal(expectedTarget, Assert.Single(transport.CompletionAcknowledgements).Target);
+        Assert.Empty(transport.Completions);
+        Assert.Empty(transport.Cancellations);
+        Assert.Single(transport.Invocations);
     }
 
     [Fact]
-    public async Task CompletedRequestReplayRequeuesPersistedUnacknowledgedCompletion()
+    public void CompletedRequestReplayDoesNotResendPendingCompletion()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root");
+        var request = CreateRequest(1);
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRequest(taskId, state, request);
+        storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+        storage.AddCompletionDestination(taskId, state, request.Context!.CallerId);
+        storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
+
+        // A listed destination has a completion pending in the outbox, which retires it.
+        var response = runtime.ScheduleFromInbox(taskId, request);
+
+        Assert.Equal(42, response.GetResult<int>());
+        Assert.Empty(transport.Completions);
+    }
+
+    [Fact]
+    public void CompletedRequestReplayResendsCompletionAfterItWasDeadLettered()
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root");
@@ -444,7 +466,6 @@ public sealed class DurableTaskRuntimeInvariantTests
         var state = storage.GetOrCreate(taskId);
         storage.SetRequest(taskId, state, request);
         storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
-        storage.AddCompletionDestination(taskId, state, caller);
         storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
 
         var response = runtime.ScheduleFromInbox(taskId, request);
@@ -453,6 +474,8 @@ public sealed class DurableTaskRuntimeInvariantTests
         var completion = Assert.Single(transport.Completions);
         Assert.Equal(caller, completion.Target);
         Assert.Equal(taskId, completion.TaskId);
+        Assert.Contains(caller, storage.Get(taskId).CompletionDestinations);
+        Assert.Equal(42, completion.Materialize(runtime).Response.GetResult<int>());
     }
 
     [Fact]
@@ -723,14 +746,14 @@ public sealed class DurableTaskRuntimeInvariantTests
         var taskId = TaskId.Parse("pre-canceled");
         var handler = CreateHandler(runtime);
 
-        await HandleAsync(handler, CancellationContext(caller, receiver, taskId));
+        Accept(handler, CancellationMessage(caller, receiver, taskId));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         var request = CreateSerializableRequest(receiver);
-        await HandleAsync(handler, InvocationContext(caller, receiver, taskId, request));
+        Accept(handler, InvocationMessage(caller, receiver, taskId, request));
 
         var completion = Assert.Single(transport.Completions);
         Assert.Equal(caller, completion.Target);
-        Assert.Equal(DurableTaskStatus.Canceled, completion.Response.Status);
+        Assert.Equal(DurableTaskStatus.Canceled, completion.Materialize(runtime).Response.Status);
     }
 
     [Fact]
@@ -1339,7 +1362,7 @@ public sealed class DurableTaskRuntimeInvariantTests
         Assert.Equal(7, storage.Get(taskId).Result!.GetResult<int>());
         var completion = Assert.Single(replacementTransport.Completions);
         Assert.Equal(caller, completion.Target);
-        Assert.Equal(7, completion.Response.GetResult<int>());
+        Assert.Equal(7, completion.Materialize(replacement).Response.GetResult<int>());
         Assert.Empty(transport.Completions);
     }
 
@@ -1802,7 +1825,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task FirstTerminalResponseWinsAndAcknowledgementRemovesOnlyItsWaiter()
+    public async Task FirstTerminalResponseWinsAndRetirementRemovesOnlyItsDestination()
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root/child");
@@ -1817,15 +1840,18 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(7), target);
         runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(8), target);
-        runtime.AcknowledgeCompletionFromInbox(taskId, waiter);
+        var waiterCompletion = DurableTaskMessageTransport.CreateMessageId(runtime.GrainId, waiter, taskId, DurableTaskMessageTypes.CompletionSubject);
+        Assert.True(((IOutboxMessageSource)runtime).TryGetMessage(waiterCompletion, out _));
+        ((IOutboxMessageSource)runtime).OnRetired(waiterCompletion, OutboxMessageRetirement.Delivered);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(7, storage.Get(taskId).Result!.GetResult<int>());
         Assert.Equal(7, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
         Assert.DoesNotContain(waiter, storage.Get(taskId).CompletionDestinations);
         Assert.Contains(other, storage.Get(taskId).CompletionDestinations);
+        Assert.Null(storage.Get(taskId).TombstonedAt);
+        Assert.False(((IOutboxMessageSource)runtime).TryGetMessage(waiterCompletion, out _));
         Assert.Empty(transport.Completions);
-        Assert.Equal(2, transport.CompletionAcknowledgements.Count);
     }
 
     [Fact]
@@ -1960,14 +1986,13 @@ public sealed class DurableTaskRuntimeInvariantTests
         var rootId = TaskId.Parse("root");
         var childId = TaskId.Parse("root/child");
         var grandchildId = TaskId.Parse("root/child/grandchild");
-        var waiter = GrainId.Create("caller", "one");
+        var triggerId = TaskId.Parse("trigger");
         var completedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
 
         var root = storage.GetOrCreate(rootId);
         root.Result = DurableTaskResponse.Completed;
         root.CompletedAt = completedAt;
         root.RequestFingerprint = "root";
-        root.CompletionDestinations.Add(waiter);
         var child = storage.GetOrCreate(childId);
         child.Result = DurableTaskResponse.Completed;
         child.CompletedAt = completedAt;
@@ -1975,19 +2000,108 @@ public sealed class DurableTaskRuntimeInvariantTests
         var grandchild = storage.GetOrCreate(grandchildId);
         grandchild.Result = DurableTaskResponse.Completed;
         grandchild.CompletedAt = completedAt;
+        var observedPrunedWrite = false;
         manager.BeforeWrite = () =>
         {
-            Assert.NotNull(storage.Get(rootId).TombstonedAt);
-            Assert.NotNull(storage.Get(childId).TombstonedAt);
-            Assert.False(storage.Contains(grandchildId));
+            // The third write persists the cleanup which follows the trigger task's completion.
+            if (manager.WriteCount == 2)
+            {
+                observedPrunedWrite = storage.Get(rootId).TombstonedAt is not null
+                    && storage.Get(childId).TombstonedAt is not null
+                    && !storage.Contains(grandchildId);
+            }
         };
 
-        runtime.AcknowledgeCompletionFromInbox(rootId, waiter);
-        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var handle = await runtime.ScheduleChildAsync(triggerId, DurableTask.Run(_ => { }), TestContext.Current.CancellationToken);
+        await handle.WaitAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => manager.WriteCount >= 3);
 
+        Assert.True(observedPrunedWrite);
         Assert.NotNull(storage.Get(rootId).TombstonedAt);
         Assert.NotNull(storage.Get(childId).TombstonedAt);
         Assert.False(storage.Contains(grandchildId));
+    }
+
+    [Fact]
+    public async Task DeliveredCompletionPrunesItsTaskWithoutRetention()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.FromDays(1));
+        var taskId = TaskId.Parse("root");
+        var childId = TaskId.Parse("root/child");
+        var request = CreateRequest(1);
+        var caller = request.Context!.CallerId;
+        runtime.ScheduleFromInbox(taskId, request);
+        var child = storage.GetOrCreate(childId);
+        child.Result = DurableTaskResponse.Completed;
+        child.CompletedAt = DateTimeOffset.UtcNow;
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => transport.Completions.Count == 1 && manager.WriteCount >= 2);
+        var completion = Assert.Single(transport.Completions);
+        Assert.Equal(caller, completion.Target);
+        Assert.Equal(0, completion.Materialize(runtime).Response.GetResult<int>());
+        var writes = manager.WriteCount;
+
+        // The outbox stages the completion's removal and calls the source in the same synchronous block.
+        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.Delivered);
+
+        var pruned = storage.Get(taskId);
+        Assert.NotNull(pruned.TombstonedAt);
+        Assert.Null(pruned.Result);
+        Assert.Null(pruned.Request);
+        Assert.Empty(pruned.CompletionDestinations);
+        Assert.False(storage.LogicalTimes.ContainsKey(taskId));
+        Assert.False(((IOutboxMessageSource)runtime).TryGetMessage(completion.MessageId, out _));
+
+        // Local descendants follow the retention policy.
+        Assert.Null(storage.Get(childId).TombstonedAt);
+        Assert.Equal(writes, manager.WriteCount);
+
+        // The tombstone rejects a conflicting reuse of the identity.
+        Assert.Throws<InvalidOperationException>(() => runtime.ScheduleFromInbox(taskId, CreateRequest(2)));
+    }
+
+    [Fact]
+    public async Task DeadLetteredCompletionRetainsResultForRetentionPolicy()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.FromDays(1));
+        var taskId = TaskId.Parse("root");
+        var request = CreateRequest(1);
+        runtime.ScheduleFromInbox(taskId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => transport.Completions.Count == 1 && manager.WriteCount >= 2);
+        var completion = Assert.Single(transport.Completions);
+
+        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.DeadLettered);
+
+        var retained = storage.Get(taskId);
+        Assert.Null(retained.TombstonedAt);
+        Assert.Equal(0, retained.Result!.GetResult<int>());
+        Assert.Empty(retained.CompletionDestinations);
+        Assert.Equal(0, (await runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken)).GetResult<int>());
+
+        // A re-invocation after the completion was dead-lettered sends the retained result again.
+        Assert.Equal(0, runtime.ScheduleFromInbox(taskId, request).GetResult<int>());
+        Assert.Equal(2, transport.Completions.Count);
+        Assert.Equal(completion.MessageId, transport.Completions[1].MessageId);
+        Assert.True(((IOutboxMessageSource)runtime).TryGetMessage(completion.MessageId, out _));
+    }
+
+    [Fact]
+    public async Task DeliveredCompletionOfTaskAwaitedByLocalParentIsPrunedWithParent()
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime(TimeSpan.FromDays(1));
+        var parentId = TaskId.Parse("root");
+        var taskId = TaskId.Parse("root/remote-call");
+        storage.GetOrCreate(parentId);
+        runtime.ScheduleFromInbox(taskId, CreateRequest(1));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => transport.Completions.Count == 1 && manager.WriteCount >= 2);
+
+        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+
+        Assert.Null(storage.Get(taskId).TombstonedAt);
+        Assert.Equal(0, storage.Get(taskId).Result!.GetResult<int>());
+        Assert.Empty(storage.Get(taskId).CompletionDestinations);
     }
 
     [Fact]
@@ -2032,7 +2146,7 @@ public sealed class DurableTaskRuntimeInvariantTests
             await releaseCancellationWrite.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         };
 
-        await HandleAsync(handler, CancellationContext(caller, receiver, rootId));
+        Accept(handler, CancellationMessage(caller, receiver, rootId));
         var cancellationWrite = manager.WriteStateAsync(TestContext.Current.CancellationToken).AsTask();
         await cancellationWriteEntered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var remoteRequest = CreateRemoteRequest(17);
@@ -2587,6 +2701,8 @@ public sealed class DurableTaskRuntimeInvariantTests
     private static DurableTaskMessageHandler CreateHandler(DurableTaskGrainRuntime runtime) =>
         new(runtime, MessagingTestHelpers.MessageTypes);
 
+    private static void Accept(IInboxMessageSink sink, InboxMessage message) => Assert.True(sink.TryAccept(message));
+
     private static async Task HandleAsync(IInboxHandler handler, IInboxHandlerContext context)
     {
         Assert.True(handler.CanHandle(context));
@@ -2599,38 +2715,38 @@ public sealed class DurableTaskRuntimeInvariantTests
         context.DidNotReceive().Fail(Arg.Any<string>());
     }
 
-    private static IInboxHandlerContext InvocationContext(
+    private static InboxMessage InvocationMessage(
         GrainId sender,
         GrainId receiver,
         TaskId taskId,
         IDurableTaskRequest request,
         GrainId? messageIdSender = null) =>
-        MessagingTestHelpers.CreateHandlerContext(MessagingTestHelpers.CreateMessage(
+        MessagingTestHelpers.CreateMessage(
             MessagingTestHelpers.MessageTypes.Invocation,
             messageIdSender ?? sender,
             receiver,
             taskId,
-            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender }));
+            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender });
 
-    private static IInboxHandlerContext CompletionContext(
+    private static InboxMessage CompletionMessage(
         GrainId sender,
         GrainId receiver,
         TaskId taskId,
         DurableTaskResponse response) =>
-        MessagingTestHelpers.CreateHandlerContext(MessagingTestHelpers.CreateMessage(
+        MessagingTestHelpers.CreateMessage(
             MessagingTestHelpers.MessageTypes.Completion,
             sender,
             receiver,
             taskId,
-            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender }));
+            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
 
-    private static IInboxHandlerContext CancellationContext(GrainId sender, GrainId receiver, TaskId taskId) =>
-        MessagingTestHelpers.CreateHandlerContext(MessagingTestHelpers.CreateMessage(
+    private static InboxMessage CancellationMessage(GrainId sender, GrainId receiver, TaskId taskId) =>
+        MessagingTestHelpers.CreateMessage(
             MessagingTestHelpers.MessageTypes.Cancellation,
             sender,
             receiver,
             taskId,
-            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender }));
+            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender });
     private static ValueTask<TaskId> InvokeSelectCompletionCoreAsync(
         GrainDurableExecutionContext context,
         TaskId decisionId,

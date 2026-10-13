@@ -181,17 +181,22 @@ public class VolatileDurableTaskGrainStorage(
         return result;
     }
 
-    private DurableTaskState CopyState(DurableTaskState state) =>
-        (_stateCopier.Copy(state)
-        ?? throw new InvalidOperationException("The durable task state copier returned null.")).Bind(_serializer);
+    // The copier copies the persisted members; the payloads, which journaled storage persists separately, are shared.
+    private DurableTaskState CopyState(DurableTaskState state)
+    {
+        var copy = (_stateCopier.Copy(state)
+            ?? throw new InvalidOperationException("The durable task state copier returned null.")).Bind(_serializer);
+        copy.CopyPayloadsFrom(state);
+        return copy;
+    }
 
     private Dictionary<TaskId, DurableTaskState> CopyStorage(Dictionary<TaskId, DurableTaskState> storage)
     {
         var result = _storageCopier.Copy(storage)
             ?? throw new InvalidOperationException("The durable task storage copier returned null.");
-        foreach (var state in result.Values)
+        foreach (var (taskId, state) in result)
         {
-            state.Bind(_serializer);
+            state.Bind(_serializer).CopyPayloadsFrom(storage[taskId]);
         }
 
         return result;

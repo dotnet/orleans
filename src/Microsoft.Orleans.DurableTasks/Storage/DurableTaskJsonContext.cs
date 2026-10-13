@@ -10,6 +10,7 @@ namespace Orleans.DurableTasks.Storage;
 /// </summary>
 [JsonSerializable(typeof(DurableTaskState))]
 [JsonSerializable(typeof(DateTimeOffset))]
+[JsonSerializable(typeof(byte[]))]
 internal sealed partial class DurableTaskJsonContext : JsonSerializerContext;
 
 /// <summary>
