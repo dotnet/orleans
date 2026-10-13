@@ -1,12 +1,8 @@
 #nullable enable
 using System;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-using NSubstitute;
 using Orleans.DurableTasks;
-using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Xunit;
 
@@ -23,96 +19,68 @@ public class DurableTaskStateTests
         var state = new DurableTaskState();
 
         Assert.Empty(state.CompletionDestinations);
-        Assert.Empty(state.LegacyObservers);
         Assert.Null(state.Result);
         Assert.Null(state.Request);
+        Assert.Null(state.RequestPayload);
+        Assert.Null(state.ResultPayload);
         Assert.Null(state.CompletedAt);
         Assert.Null(state.CancellationRequestedAt);
         Assert.Equal(default, state.CreatedAt);
     }
 
     [Fact]
-    public void MigrateLegacyObservers_EmptyLegacyObservers_ReturnsFalseAndLeavesCompletionDestinationsUnchanged()
+    public void SetResult_StoresOrleansPayloadAndCachesValue()
     {
-        var existingDestination = GrainId.Create("grain-type", "existing");
-        var state = new DurableTaskState();
-        state.CompletionDestinations.Add(existingDestination);
+        var serializer = CreateSerializer();
+        var state = new DurableTaskState().Bind(serializer);
+        var response = DurableTaskResponse.FromResult("value");
 
-        var changed = state.MigrateLegacyObservers();
+        state.SetResult(response);
 
-        Assert.False(changed);
-        Assert.Equal(new[] { existingDestination }, state.CompletionDestinations.ToArray());
+        Assert.Same(response, state.Result);
+        var decoded = Assert.IsType<DurableTaskResponse<string>>(
+            serializer.Deserialize<DurableTaskResponse>(state.ResultPayload!));
+        Assert.Equal("value", decoded.GetResult<string>());
+
+        state.SetResult(null);
+
+        Assert.Null(state.Result);
+        Assert.Null(state.ResultPayload);
     }
 
     [Fact]
-    public void MigrateLegacyObservers_OnlyNonGrainReferenceObservers_ClearsLegacyObserversAndReturnsTrue()
+    public void PayloadDecodesOnFirstAccessAndCachesDecodedValue()
     {
-        var state = new DurableTaskState();
-        var nonGrainObserver = Substitute.For<IDurableTaskObserver>();
-        state.LegacyObservers.Add(nonGrainObserver);
+        var serializer = CreateSerializer();
+        var state = new DurableTaskState
+        {
+            ResultPayload = serializer.SerializeToArray<DurableTaskResponse>(DurableTaskResponse.FromResult(7)),
+        }.Bind(serializer);
 
-        var changed = state.MigrateLegacyObservers();
+        var first = state.Result;
 
-        Assert.True(changed);
-        Assert.Empty(state.LegacyObservers);
-        Assert.Empty(state.CompletionDestinations);
+        Assert.Equal(7, Assert.IsType<DurableTaskResponse<int>>(first).GetResult<int>());
+        Assert.Same(first, state.Result);
     }
 
     [Fact]
-    public void MigrateLegacyObservers_GrainReferenceAlreadyInCompletionDestinations_StillReturnsTrueBecauseListIsCleared()
+    public void UnboundStateRejectsPayloadAccess()
     {
-        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        var observer = FakeGrainReferenceObserver.Create(services, "observer-grain-type", "observer-key");
+        var serializer = CreateSerializer();
+        var state = new DurableTaskState
+        {
+            ResultPayload = serializer.SerializeToArray<DurableTaskResponse>(DurableTaskResponse.Completed),
+        };
 
-        var state = new DurableTaskState();
-        state.CompletionDestinations.Add(observer.GrainId);
-        state.LegacyObservers.Add(observer);
+        var exception = Assert.Throws<InvalidOperationException>(() => state.Result);
 
-        var changed = state.MigrateLegacyObservers();
-
-        // The GrainId was already present, so HashSet.Add returns false internally, but the method still
-        // reports a change because LegacyObservers itself was non-empty and got cleared.
-        Assert.True(changed);
-        Assert.Empty(state.LegacyObservers);
-        Assert.Single(state.CompletionDestinations);
-        Assert.Contains(observer.GrainId, state.CompletionDestinations);
+        Assert.Equal("The durable task state is not bound to a durable task storage.", exception.Message);
+        Assert.Throws<InvalidOperationException>(() => state.SetResult(DurableTaskResponse.Completed));
     }
 
-    [Fact]
-    public void MigrateLegacyObservers_NewGrainReference_AddsGrainIdToCompletionDestinationsAndReturnsTrue()
-    {
-        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        var observer = FakeGrainReferenceObserver.Create(services, "observer-grain-type", "new-observer-key");
-
-        var state = new DurableTaskState();
-        state.LegacyObservers.Add(observer);
-
-        Assert.DoesNotContain(observer.GrainId, state.CompletionDestinations);
-
-        var changed = state.MigrateLegacyObservers();
-
-        Assert.True(changed);
-        Assert.Empty(state.LegacyObservers);
-        Assert.Single(state.CompletionDestinations);
-        Assert.Contains(observer.GrainId, state.CompletionDestinations);
-    }
-
-    [Fact]
-    public void MigrateLegacyObservers_MixOfGrainReferenceAndNonGrainReference_OnlyGrainReferenceIsMigrated()
-    {
-        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
-        var grainObserver = FakeGrainReferenceObserver.Create(services, "observer-grain-type", "mixed-key");
-        var nonGrainObserver = Substitute.For<IDurableTaskObserver>();
-
-        var state = new DurableTaskState();
-        state.LegacyObservers.Add(grainObserver);
-        state.LegacyObservers.Add(nonGrainObserver);
-
-        var changed = state.MigrateLegacyObservers();
-
-        Assert.True(changed);
-        Assert.Empty(state.LegacyObservers);
-        Assert.Single(state.CompletionDestinations);
-        Assert.Contains(grainObserver.GrainId, state.CompletionDestinations);
-    }
+    private static Serializer CreateSerializer() =>
+        new ServiceCollection()
+            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskState).Assembly))
+            .BuildServiceProvider()
+            .GetRequiredService<Serializer>();
 }
