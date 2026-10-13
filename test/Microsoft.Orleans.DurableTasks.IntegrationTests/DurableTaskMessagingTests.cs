@@ -56,13 +56,28 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey).AsReference<IDurableTaskGrainExtension>();
         for (var index = 0; index < FanOut; index++)
         {
-            // The worker keeps each canceled child's terminal state under the caller's child identity.
+            // The worker retains each canceled child's terminal state under the caller's child identity until the
+            // caller's inbox accepts its completion, then prunes it to a tombstone.
             var childId = TaskId.CreateRoot("fan-out").Child($"wait-{index}");
-            var childResponse = await worker.SubscribeOrPollAsync(
-                childId,
-                new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(30) },
-                cancellationToken);
-            Assert.Equal(DurableTaskStatus.Canceled, childResponse.Status);
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+            while (true)
+            {
+                try
+                {
+                    var childResponse = await worker.SubscribeOrPollAsync(
+                        childId,
+                        new SubscribeOrPollOptions { PollTimeout = TimeSpan.Zero },
+                        cancellationToken);
+                    Assert.Equal(DurableTaskStatus.Canceled, childResponse.Status);
+                }
+                catch (DurableTaskNotFoundException)
+                {
+                    break;
+                }
+
+                Assert.True(DateTime.UtcNow < deadline, $"Durable task '{childId}' was not pruned after its completion was delivered.");
+                await Task.Delay(10, cancellationToken);
+            }
         }
     }
 }
