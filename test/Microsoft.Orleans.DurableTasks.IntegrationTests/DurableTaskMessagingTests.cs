@@ -13,14 +13,10 @@ namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 /// A coordinator fans out several durable calls to one worker, so the worker's inbox and the coordinator's inbox
 /// each receive several durable RPC messages which can be processed in one inbox batch with a single batch write.
 /// </remarks>
-[Collection(DurableTaskRecoveryCollection.Name)]
-[TestSuite("BVT")]
-[TestProvider("None")]
-[TestArea("DurableTasks")]
-public sealed class DurableTaskMessagingTests : IAsyncLifetime
+public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyncLifetime
 {
     private const int FanOut = 8;
-    private readonly DurableTaskRecoveryFixture _fixture = new();
+    private readonly DurableTaskRecoveryFixture _fixture = new(journalFormatKey);
 
     public ValueTask InitializeAsync() => _fixture.InitializeAsync();
     public ValueTask DisposeAsync() => _fixture.DisposeAsync();
@@ -70,6 +66,20 @@ public sealed class DurableTaskMessagingTests : IAsyncLifetime
         }
     }
 }
+
+/// <summary>Runs cross-grain messaging coverage with task state stored in the default JSON journal format.</summary>
+[Collection(DurableTaskRecoveryCollection.Name)]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
+public sealed class JsonDurableTaskMessagingTests() : DurableTaskMessagingTests(DurableTaskRecoveryFixture.Json);
+
+/// <summary>Runs cross-grain messaging coverage with task state stored in the Orleans binary journal format.</summary>
+[Collection(DurableTaskRecoveryCollection.Name)]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
+public sealed class OrleansBinaryDurableTaskMessagingTests() : DurableTaskMessagingTests(DurableTaskRecoveryFixture.OrleansBinary);
 
 public interface IDurableTaskCoordinatorGrain : IGrainWithGuidKey
 {
