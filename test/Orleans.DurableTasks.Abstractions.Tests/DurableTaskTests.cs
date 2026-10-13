@@ -78,6 +78,20 @@ public class DurableTaskTests
     }
 
     [Fact]
+    public async Task DelayUntilSchedulesTheAbsoluteDueTime()
+    {
+        var now = new DateTimeOffset(2040, 5, 6, 7, 8, 9, TimeSpan.Zero);
+        var host = new TestHost(now);
+        var context = host.CreateContext(TaskId.CreateRoot("delay-until"));
+        var dueTime = now.AddDays(-1);
+
+        var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.DelayUntil(dueTime), context);
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal(dueTime, host.LastDelayDueTime);
+    }
+
+    [Fact]
     public async Task DelayReceivesDurableCancellationToken()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);

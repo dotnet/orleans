@@ -17,6 +17,10 @@ public abstract class DurableTask
         return new DelayDurableTask(duration);
     }
 
+    /// <summary>Creates a durable delay which completes at <paramref name="dueTime"/>, measured using host logical time.</summary>
+    /// <remarks>A due time at or before the current logical time completes the delay promptly.</remarks>
+    public static DurableTask DelayUntil(DateTimeOffset dueTime) => new DelayUntilDurableTask(dueTime);
+
     /// <summary>Creates a durable task which invokes <paramref name="action"/>.</summary>
     public static DurableTask Run(Action<CancellationToken> action)
     {
@@ -216,6 +220,12 @@ internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
         => context.ScheduleDelayAsync(context.TaskId, context.UtcNow + duration, context.ExecutionCancellationToken);
+}
+
+internal sealed class DelayUntilDurableTask(DateTimeOffset dueTime) : DurableTask
+{
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        => context.ScheduleDelayAsync(context.TaskId, dueTime, context.ExecutionCancellationToken);
 }
 
 internal abstract class DelegateDurableTaskBase : DurableTask
