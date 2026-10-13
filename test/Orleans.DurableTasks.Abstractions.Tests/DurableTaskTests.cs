@@ -146,7 +146,7 @@ public class DurableTaskTests
         {
             var executionToken = await started.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
             Assert.False(executionToken.IsCancellationRequested);
-            Assert.NotEqual(context.CancellationToken, executionToken);
+            Assert.Equal(context.CancellationToken, executionToken);
             if (durableCancellation)
             {
                 await DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
@@ -161,8 +161,8 @@ public class DurableTaskTests
             Assert.Equal(DurableTaskStatus.Canceled, response.Status);
             Assert.Equal(executionToken, Assert.IsAssignableFrom<OperationCanceledException>(response.Exception).CancellationToken);
             Assert.Equal(durableCancellation, context.IsCancellationRequested);
-            Assert.Equal(durableCancellation, context.CancellationToken.IsCancellationRequested);
-            Assert.Equal(durableCancellation ? 1 : 0, tokenObservers);
+            Assert.True(context.CancellationToken.IsCancellationRequested);
+            Assert.Equal(1, tokenObservers);
             Assert.Equal(durableCancellation ? 1 : 0, durableCallbacks);
             Assert.Equal(!durableCancellation, executionAbort.IsCancellationRequested);
         }
@@ -214,7 +214,7 @@ public class DurableTaskTests
         Assert.Equal(4, observedTokens.Count);
         Assert.All(observedTokens, token => Assert.True(token.IsCancellationRequested));
         Assert.Equal(durableCancellation, context.IsCancellationRequested);
-        Assert.Equal(durableCancellation, context.CancellationToken.IsCancellationRequested);
+        Assert.True(context.CancellationToken.IsCancellationRequested);
 
         void Observe(CancellationToken token)
         {
@@ -260,7 +260,7 @@ public class DurableTaskTests
             Assert.Equal(executionToken, Assert.IsAssignableFrom<OperationCanceledException>(response.Exception).CancellationToken);
             Assert.Equal(now.AddMinutes(3), host.LastDelayDueTime);
             Assert.Equal(durableCancellation, context.IsCancellationRequested);
-            Assert.Equal(durableCancellation, context.CancellationToken.IsCancellationRequested);
+            Assert.True(context.CancellationToken.IsCancellationRequested);
         }
         finally
         {
