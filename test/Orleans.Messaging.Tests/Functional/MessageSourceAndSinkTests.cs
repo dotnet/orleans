@@ -291,8 +291,6 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
     internal (Dictionary<string, byte[]> Outgoing, Dictionary<string, byte[]> Received, Dictionary<string, string> Retired) GetState() =>
         (new(_outgoing), new(_received), new(_retired));
 
-    internal void StagePayload(HierarchicalKey messageId, byte[] payload) => _outgoing[messageId.ToString()] = payload;
-
     public async Task WriteAsync() => await _manager.WriteStateAsync(CancellationToken.None);
 
     public Task DeactivateAsync()
