@@ -9,7 +9,7 @@ namespace Orleans.Messaging;
 /// <para>
 /// A handler decodes the body, performs asynchronous I/O, validates local results, and checks cancellation before
 /// the first shared business or journaled mutation. From that mutation until it returns, it executes synchronously:
-/// it applies safe-to-commit business changes, stages outgoing messages through <see cref="IOutbox.Send"/>, and calls
+/// it applies safe-to-commit business changes, stages outgoing messages through <see cref="IOutbox.Send(OutboxMessage)"/>, and calls
 /// <see cref="IInboxHandlerContext.Complete"/> or <see cref="IInboxHandlerContext.Fail"/>. The runtime persists the
 /// outcome with those changes. Failures before a terminal operation follow the inbox retry and dead-letter policy.
 /// </para>
