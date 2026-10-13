@@ -17,7 +17,7 @@ public sealed class InboxLifecycleBehaviorTests : MessagingBehaviorTestBase
         var before = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var shutdown = Fixture.GetPump(receiver).ShutdownToken;
-        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/teardown-active");
+        using var handler = Fixture.HandlerProbe.Arm(receiver.GetGrainId(), "messages/teardown-active", observeCancellation: false);
         var envelope = CreateEnvelope(receiver, NewMessage(95, "active-handler"), "messages/teardown-active");
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await handler.WaitUntilEnteredAsync();
