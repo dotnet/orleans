@@ -11,7 +11,7 @@ namespace Orleans.Messaging;
 /// <see cref="DeliveryStatus.Accepted"/> has synchronously staged the message's effects in its own journaled state. The
 /// inbox then journals only the message's processed record, without its payload, in the same journal write, and reports
 /// the result once that write is durable. Run effects which depend on the write, such as starting work, from
-/// <c>Orleans.Journaling.IStateMachine.OnWriteCompleted</c>.
+/// <see cref="Orleans.Journaling.IStateMachine.OnWriteCompleted"/>.
 /// </para>
 /// <para>
 /// A sink-owned message never occupies inbox capacity and has no inbox retry lifecycle: the sink owns its processing,
