@@ -41,11 +41,11 @@ namespace Orleans.Messaging
 
     public enum DeliveryStatus
     {
-        Accepted = 0,
-        Duplicate = 1,
-        Backpressured = 2,
-        HandlerNotFound = 3,
-        DeadLettered = 4
+        Accepted = 1,
+        Duplicate = 2,
+        Backpressured = 3,
+        HandlerNotFound = 4,
+        DeadLettered = 5
     }
 
     [GenerateSerializer]
