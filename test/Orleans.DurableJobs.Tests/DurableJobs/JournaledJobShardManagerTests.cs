@@ -483,6 +483,36 @@ public partial class JournaledJobShardManagerTests
     }
 
     [Fact]
+    public async Task ShardCreatedFromCallerScheduler_PersistsOnThreadPool()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var appendSchedulers = new ConcurrentQueue<TaskScheduler>();
+        var storageProvider = new CountingJournalStorageProvider(delayAppends: false, _ =>
+        {
+            appendSchedulers.Enqueue(TaskScheduler.Current);
+            return ValueTask.CompletedTask;
+        });
+        using var services = CreateServices(storageProvider);
+        var membership = new TestClusterMembershipService();
+        var silo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5045), 0);
+        membership.SetSiloStatus(silo, SiloStatus.Active);
+        var manager = CreateManager(services, membership, silo);
+        var callerScheduler = new ConcurrentExclusiveSchedulerPair().ExclusiveScheduler;
+        var start = DateTimeOffset.UtcNow.AddSeconds(-5);
+
+        var shard = await Task.Factory.StartNew(
+            () => manager.CreateShardAsync(start, start.AddHours(1), new Dictionary<string, string>(), cancellationToken),
+            cancellationToken,
+            TaskCreationOptions.None,
+            callerScheduler).Unwrap();
+        await ScheduleJobAsync(shard, "caller-scheduler-job", cancellationToken);
+
+        Assert.NotEmpty(appendSchedulers);
+        Assert.All(appendSchedulers, scheduler => Assert.Same(TaskScheduler.Default, scheduler));
+        await DrainAndUnregisterAsync(manager, shard, cancellationToken, expectedJobs: 1);
+    }
+
+    [Fact]
     public async Task ActiveRemoteOwnerShard_IsNotClaimedUntilOwnerDies()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

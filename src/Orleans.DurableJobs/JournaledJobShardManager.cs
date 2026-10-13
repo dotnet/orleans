@@ -589,7 +589,10 @@ internal sealed partial class JournaledJobShardManager : JobShardManager
         {
             manager.RegisterStateMachine(JournaledJobShardState.StateName, state);
             manager.RegisterStateMachine(JournaledJobShardOwnershipFence.StateName, fence);
-            await manager.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+            // The manager processes its journal on the initializing scheduler. Initialize from the thread pool so
+            // the shard runs independently of its caller, which may be a grain activation scheduling a job.
+            await Task.Run(() => manager.InitializeAsync(cancellationToken).AsTask(), CancellationToken.None).ConfigureAwait(false);
 
             if (!isNew)
             {
