@@ -126,15 +126,22 @@ construction or activation setup, before journal recovery.
   message addressed to the sending grain throws `ArgumentException`. A recovered
   reference fails the activation when no source is registered.
 - `IInbox.Register(IInboxMessageSink)` adds a sink. After validation and
-  deduplication, the inbox offers each message without `DeliverAt`, including
-  self-sent messages, to the sinks in order. A sink returning `true` has staged the
-  message in its own state; the inbox journals only the processed record in the same
-  write and returns `Accepted` once it is durable. Sink-accepted messages never
-  occupy capacity and have no inbox retry or dead-letter lifecycle. A sink that
-  throws stages nothing: the inbox dead-letters the message and returns
-  `DeadLettered`. Declined and scheduled messages follow the handler path. A message
-  is offered again after its processed record leaves `DeduplicationWindow`, so sinks
-  must be idempotent.
+  deduplication, the inbox offers each message, including self-sent and scheduled
+  messages, to the sinks in order. The first sink whose `TryAccept` returns `true`
+  reports the `DeliveryResult`:
+  - `Accepted`: the sink staged the message in its own state. The inbox journals
+    only the processed record in the same write and returns `Accepted` once it is
+    durable.
+  - `Duplicate`: the sink already holds the message.
+  - `Backpressured`: the sink is at capacity, so the sender retries. A self-sent
+    message fails its `Send` instead.
+  - `DeadLettered`: the inbox dead-letters the message with the sink's reason. A
+    sink that throws or reports another status is treated the same way.
+
+  Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
+  sink honors their `DeliverAt`. Declined messages follow the handler path once
+  `DeliverAt` passes. A message is offered again after its processed record leaves
+  `DeduplicationWindow`, so sinks must be idempotent.
 
 ## Delivery and processing
 
