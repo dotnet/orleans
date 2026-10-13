@@ -27,7 +27,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
         byte[] payload = empty ? [] : [0, 255, 128, 42];
-        var message = Raw(HierarchicalKey.Create("raw", Guid.NewGuid().ToString("N")), payload);
+        var message = Raw(MessageId.Create("raw", Guid.NewGuid().ToString("N")), payload);
         Assert.Null(message.Envelope.Subject);
         Assert.Null(message.Envelope.Headers);
         using var handler = new RawHandler(context);
@@ -61,7 +61,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
         var grain = Assert.IsType<MessagingTestGrain>(context.GrainInstance);
-        var key = HierarchicalKey.Create("custom", Guid.NewGuid().ToString("N"));
+        var key = MessageId.Create("custom", Guid.NewGuid().ToString("N"));
         var original = Raw(key, [1, 2, 3], "original");
         var changed = Raw(key, [1, 2, 3], "changed");
         using var handler = new RawHandler(context);
@@ -95,7 +95,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
     public async Task UnknownHeaders_RecoverAndRemainAvailableAfterRetryAndDeadLetter()
     {
         var receiver = NewGrain();
-        var key = HierarchicalKey.Create("headers", Guid.NewGuid().ToString("N"));
+        var key = MessageId.Create("headers", Guid.NewGuid().ToString("N"));
         var body = NewMessage(810, "poison") with { LogicalId = key, ThrowDuringPreparation = true };
         var application = CreateEnvelope(receiver, body);
         byte[] opaque = [0xff, 0, 0x80, 0x7f];
@@ -172,7 +172,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
         var context = Fixture.GetGrainContext(receiver);
-        var key = HierarchicalKey.Create("malformed", Guid.NewGuid().ToString("N"));
+        var key = MessageId.Create("malformed", Guid.NewGuid().ToString("N"));
         var message = Raw(key, [1, 2]);
         if (completed)
         {
@@ -200,7 +200,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         Assert.Empty(snapshot.Effects);
     }
 
-    private static InboxMessage Raw(HierarchicalKey key, byte[] payload, string? trace = null)
+    private static InboxMessage Raw(MessageId key, byte[] payload, string? trace = null)
     {
         Dictionary<string, byte[]>? headers = null;
         if (trace is not null) (headers ??= new(StringComparer.Ordinal))["custom.trace"] = Encoding.UTF8.GetBytes(trace);
@@ -240,7 +240,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
             Entered.TrySetResult();
             await Release.Task.WaitAsync(cancellationToken);
             var key = handler.Message.Envelope.MessageId;
-            var effects = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<HierarchicalKey, MessageEffect>>("test-effects");
+            var effects = context.ActivationServices.GetRequiredKeyedService<IDurableDictionary<MessageId, MessageEffect>>("test-effects");
             effects[key] = new(key, 1, 800, "raw");
             handler.Complete();
         }
