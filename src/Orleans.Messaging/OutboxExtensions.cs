@@ -14,6 +14,10 @@ public static class OutboxExtensions
     /// <param name="messageId">The stable application command identity.</param>
     /// <param name="destination">The destination inbox.</param>
     /// <param name="body">The body to encode.</param>
+    /// <param name="deliverAt">
+    /// The optional earliest time, on the Durable Jobs clock, at which the receiving inbox processes the message.
+    /// The outbox still delivers the message immediately. See <see cref="Envelope.DeliverAt"/>.
+    /// </param>
     /// <remarks>
     /// Serialization finishes before staging begins. Compute fallible business results first,
     /// then send, apply the business state, and complete in one synchronous final block.
@@ -21,11 +25,11 @@ public static class OutboxExtensions
     /// </remarks>
     public static void Send<T>(
         this IOutbox outbox, MessageType<T> messageType,
-        HierarchicalKey messageId, GrainId destination, T body)
+        HierarchicalKey messageId, GrainId destination, T body, DateTimeOffset? deliverAt = null)
     {
         ArgumentNullException.ThrowIfNull(outbox);
         ArgumentNullException.ThrowIfNull(messageType);
-        var message = messageType.Create(messageId, destination, body);
+        var message = messageType.Create(messageId, destination, body, deliverAt);
         outbox.Send(message);
     }
 
@@ -36,12 +40,16 @@ public static class OutboxExtensions
     /// <param name="messageId">The stable application command identity.</param>
     /// <param name="destination">The destination grain.</param>
     /// <param name="body">The body to encode.</param>
+    /// <param name="deliverAt">
+    /// The optional earliest time, on the Durable Jobs clock, at which the receiving inbox processes the message.
+    /// The outbox still delivers the message immediately. See <see cref="Envelope.DeliverAt"/>.
+    /// </param>
     public static void Send<T>(
         this IOutbox outbox, MessageType<T> messageType,
-        HierarchicalKey messageId, IAddressable destination, T body)
+        HierarchicalKey messageId, IAddressable destination, T body, DateTimeOffset? deliverAt = null)
     {
         ArgumentNullException.ThrowIfNull(destination);
-        outbox.Send(messageType, messageId, destination.GetGrainId(), body);
+        outbox.Send(messageType, messageId, destination.GetGrainId(), body, deliverAt);
     }
 
     /// <summary>Encodes and synchronously stages typed commands in enumeration order.</summary>
