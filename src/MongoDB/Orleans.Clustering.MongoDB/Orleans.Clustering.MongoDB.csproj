@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Clustering.MongoDB</PackageId>
+    <Title>Microsoft Orleans Clustering MongoDB Provider</Title>
+    <Description>MongoDB cluster membership and gateway discovery for Microsoft Orleans.</Description>
+    <PackageTags>$(PackageTags) MongoDB Clustering</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.MongoDB\Orleans.MongoDB.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.MongoDB.Tests" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

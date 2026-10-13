@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.MongoDB\Orleans.MongoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.Clustering.MongoDB\Orleans.Clustering.MongoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.Persistence.MongoDB\Orleans.Persistence.MongoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\MongoDB\Orleans.Reminders.MongoDB\Orleans.Reminders.MongoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Clustering.TestKit\Orleans.Clustering.TestKit.csproj" PrivateAssets="all" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Persistence.TestKit\Orleans.Persistence.TestKit.csproj" PrivateAssets="all" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders.TestKit\Orleans.Reminders.TestKit.csproj" PrivateAssets="all" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Persistence.MongoDB</PackageId>
+    <Title>Microsoft Orleans Persistence MongoDB Provider</Title>
+    <Description>MongoDB grain state persistence for Microsoft Orleans, with JSON, BSON document, and binary serialization.</Description>
+    <PackageTags>$(PackageTags) MongoDB Persistence</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+    <ProjectReference Include="..\Orleans.MongoDB\Orleans.MongoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.MongoDB.Tests" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

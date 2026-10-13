@@ -1,0 +1,163 @@
+---
+title: MongoDB providers
+description: Configure MongoDB for Orleans clustering, document-based grain persistence, and durable reminders.
+ms.date: 10/13/2026
+ms.topic: how-to
+---
+
+# MongoDB providers
+
+Orleans provides MongoDB integrations for these capabilities:
+
+| Capability | Package |
+|---|---|
+| Cluster membership and external-client gateway discovery | `Microsoft.Orleans.Clustering.MongoDB` |
+| Grain state persistence | `Microsoft.Orleans.Persistence.MongoDB` |
+| Durable reminders | `Microsoft.Orleans.Reminders.MongoDB` |
+| Shared client configuration, included by each provider | `Microsoft.Orleans.MongoDB` |
+
+Install the capability packages used by the application. Configure a reusable
+MongoDB client with a connection string supplied through application configuration
+or a secret store. The settings-factory overload of
+<xref:Orleans.Hosting.MongoDBSiloBuilderExtensions.UseMongoDBClient*> supports
+MongoDB credentials, TLS, connection pools, and timeouts. Applications can also
+register an <xref:Orleans.Providers.MongoDB.Utils.IMongoClientFactory> and select
+clients using each provider's `ClientName` option.
+
+## Configure a silo
+
+The following source-based example configures clustering, BSON document
+persistence, and reminders:
+
+:::code language="csharp" source="../snippets/mongodb/MongoDBConfiguration.cs" id="mongodb_silo":::
+
+Membership is partitioned by Orleans `ClusterId`. Reminders are partitioned by
+`ServiceId`. Persistence is isolated by database, collection prefix, state name,
+and grain key. Use a separate database or collection prefix for applications that
+must have independent grain state. Keep identifiers and prefixes stable when
+accessing an existing deployment.
+
+## Configure providers from application configuration
+
+The packages register `MongoDB` as the `ProviderType` for silo/client clustering,
+grain storage, and reminders. Register a shared MongoDB client with
+`AddMongoDBClient` or through the host's Aspire MongoDB integration, then supply
+the provider options under the corresponding Orleans configuration sections:
+
+:::code language="csharp" source="../snippets/mongodb/MongoDBConfiguration.cs" id="mongodb_configuration":::
+
+Named grain-storage sections select storage provider names; use `Default` for
+default grain storage. Configuration binding supports database names, collection
+prefixes, client names, membership strategies, and reminder index management.
+
+## Configure an external client
+
+External clients discover active gateways using the clustering package:
+
+:::code language="csharp" source="../snippets/mongodb/MongoDBConfiguration.cs" id="mongodb_client":::
+
+Configure the client and silos with matching `ClusterId`, database, collection
+prefix, and membership strategy.
+
+## Choose a membership strategy
+
+<xref:Orleans.Providers.MongoDB.Configuration.MongoDBMembershipStrategy> controls
+the membership collection format:
+
+| Strategy | Runtime behavior | Deployment requirement |
+|---|---|---|
+| `SingleDocument` (default) | Stores the membership rows and table version for one cluster in a single atomically updated document. | Capacity for the cluster membership document within MongoDB's document-size limit. |
+| `Multiple` | Stores one document per silo and atomically updates the silo row and table version in a transaction. | A replica set or transaction-capable sharded cluster. |
+| `MultipleDeprecated` | Reads and writes the contributed provider's legacy per-silo collection format. | Retained for existing deployments using that format. |
+
+Use `SingleDocument` for small clusters or `Multiple` for transactional,
+per-silo membership storage. Provision a replica set for local tests that exercise
+`Multiple`; a single-node replica set supports MongoDB transactions.
+
+`Multiple` reads the membership rows and table version in one snapshot
+transaction with a fresh session for each operation. Membership async methods
+propagate cancellation to MongoDB commands, cursor reads, and transactions.
+
+## Select a persistence format
+
+<xref:Orleans.Providers.MongoDB.Configuration.MongoDBGrainStorageOptions.GrainStateSerializer>
+selects the MongoDB state serializer:
+
+| Serializer | Stored state |
+|---|---|
+| <xref:Orleans.Providers.MongoDB.StorageProviders.Serializers.JsonGrainStateSerializer> (default) | A BSON document produced using Newtonsoft.Json and the configured Orleans JSON settings. |
+| <xref:Orleans.Providers.MongoDB.StorageProviders.Serializers.BsonGrainStateSerializer> | A native, queryable BSON document using MongoDB serializers, attributes, and class maps. |
+| <xref:Orleans.Providers.MongoDB.StorageProviders.Serializers.BinaryGrainStateSerializer> | Orleans-serialized bytes stored in BSON. |
+
+An explicitly configured serializer takes precedence over a keyed
+<xref:Orleans.Providers.MongoDB.StorageProviders.Serializers.IGrainStateSerializer>
+registered for the storage provider's name, followed by the globally registered
+serializer. For example, configure binary serialization for stream pub-sub state:
+
+:::code language="csharp" source="../snippets/mongodb/MongoDBConfiguration.cs" id="mongodb_serializers":::
+
+BSON document serialization supports application-owned MongoDB class maps.
+Orleans stream pub-sub state uses the JSON or binary serializer.
+
+Persistence documents contain `_id` (grain key), `_etag` (optimistic-concurrency
+token), and `_doc` (serialized state). The default collection prefix is `Grains`;
+the collection suffix is the state name, or the state type name when the state
+name is `state`. Keep the serializer, prefix, and key generator stable across
+rolling upgrades.
+
+Successful writes advance the ETag. Clears remove the document, recreate the state
+using the registered Orleans activator, and reset its ETag and existence metadata. Writes and
+clears reject stale ETags with <xref:Orleans.Storage.InconsistentStateException>,
+preserving the caller's metadata on failure. A `*` ETag requests an unconditional
+write or clear. Configure acknowledged MongoDB writes so the provider can observe
+these outcomes.
+
+## Migrate the contributed package
+
+Replace the `Orleans.Providers.MongoDB` package reference with the capability
+packages listed above. The provider retains the `Orleans.Providers.MongoDB.*`
+namespaces, builder method names, collection names, and stored document formats.
+Keep database names, collection prefixes, membership strategies, serializers,
+and key generators unchanged to access existing data.
+
+Persistence writes and clears enforce the supplied ETag. Applications should
+retain the ETag returned by the most recent read or write when clearing state.
+
+The MongoDB driver dependency is updated with the migration. Review custom BSON
+serialization mappings and verify a backup-and-restore rehearsal with
+representative existing documents before deployment.
+
+Reminders use the `<CollectionPrefix>OrleansReminderV2` collection. The provider
+creates a service-ID/grain-hash index and removes obsolete hash indexes.
+<xref:Orleans.Providers.MongoDB.Configuration.MongoDBRemindersOptions.CreateIndexes>
+defaults to `true`. Set it to `false` when administrators manage indexes or the
+application identity has data-only permissions. Administrators should provision
+the compound index `{ ServiceId: 1, GrainHash: 1 }` for reminder range queries;
+the provider then performs data operations while administrators own index creation
+and legacy-index cleanup.
+Existing deployments can use `PurgeLegacyIndexes` after all silos using older
+reminder query shapes have been upgraded, allowing the remaining legacy indexes
+to be reclaimed safely.
+
+The reminder provider validates grain IDs and nonempty reminder names before
+writing. A stored document missing required identity fields produces a visible
+read error. If such an error occurs, inspect and repair the affected document,
+and review application BSON conventions and MongoDB command interceptors to
+identify the writer responsible for the corruption.
+
+## Operational guidance
+
+- Grant the application identity permissions for provider-owned collections,
+  their indexes, and transactions. Use TLS and MongoDB authentication for
+  production connections.
+- Keep membership and reminders near the silo deployment to bound database
+  latency on liveness and reminder operations. Monitor MongoDB request failures,
+  transaction aborts, connection-pool saturation, and query latency.
+- Back up grain state and reminders according to the application's recovery
+  requirements. Restrict direct writes to provider documents to preserve
+  membership, reminder, and ETag invariants.
+- `CreateShardKeyForCosmos` issues a hashed `_id` sharding command for deployments
+  using the compatible Cosmos DB for MongoDB API. Enable it for databases whose
+  sharding configuration requires that command and grants permission to execute it.
+- Exercise silo loss, database failover, credential rotation, stale ETags, and
+  rolling upgrades against the deployment's MongoDB topology.
