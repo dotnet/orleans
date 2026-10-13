@@ -1,10 +1,8 @@
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using Orleans.DurableTasks.Protocol;
-using Orleans.DurableJobs;
 using Orleans.DurableTasks;
 using Orleans.Messaging;
 using Orleans.Runtime;
@@ -12,23 +10,20 @@ using Orleans.Runtime;
 namespace Orleans.DurableTasks.Runtime;
 
 /// <summary>
-/// Stages durable grain RPC messages in the grain's outbox and schedules delay resumes on Durable Jobs.
+/// Stages durable grain RPC messages, including delay resumes, in the grain's outbox.
 /// </summary>
 /// <remarks>
 /// The outbox is resolved on first use so that activations which never send messages do not require messaging state.
 /// Each message identity is derived from its sender, receiver, task, and subject, so replaying a send coalesces with the
-/// pending message and the receiver deduplicates a redelivery. Resume jobs carry the task and delay generation;
-/// the runtime derives readiness from journaled state, so duplicate and stale resumes are harmless.
+/// pending message and the receiver deduplicates a redelivery. A delay resume is a message the grain sends to itself
+/// with <see cref="Envelope.DeliverAt"/> set to the delay's due time; its identity also covers the delay generation
+/// and due time. The runtime derives readiness from journaled state, so duplicate and stale resumes are harmless.
 /// </remarks>
 internal sealed class DurableTaskMessageTransport(
     Lazy<IOutbox> outbox,
-    ILocalDurableJobManager jobManager,
     DurableTaskMessageTypes messageTypes) : IDurableTaskMessageTransport
 {
     internal const string MessageIdRoot = "durable-rpc";
-    internal const string ResumeJobName = "orleans.durable-rpc.resume";
-    internal const string ResumeTaskIdMetadata = "orleans.durable-rpc.task-id";
-    internal const string ResumeGenerationMetadata = "orleans.durable-rpc.generation";
 
     public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
         Send(
@@ -62,29 +57,45 @@ internal sealed class DurableTaskMessageTransport(
             taskId,
             new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender });
 
-    public async ValueTask ScheduleResumeAsync(
-        GrainId target,
-        TaskId taskId,
-        long generation,
-        DateTimeOffset dueTime,
-        CancellationToken cancellationToken)
+    public void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime)
     {
-        await jobManager.ScheduleJobAsync(
-            new ScheduleJobRequest
-            {
-                Target = target,
-                JobName = ResumeJobName,
-                DueTime = dueTime,
-                Metadata = new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    [ResumeTaskIdMetadata] = taskId.ToString(),
-                    [ResumeGenerationMetadata] = generation.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                },
-            },
-            cancellationToken);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(generation);
+        Send(
+            messageTypes.Resume,
+            grainId,
+            grainId,
+            taskId,
+            new DurableTaskResumeMessage { TaskId = taskId, Generation = generation, Sender = grainId },
+            CreateResumeMessageId(grainId, taskId, generation, dueTime),
+            dueTime);
     }
 
-    private void Send<T>(MessageType<T> messageType, GrainId sender, GrainId target, TaskId taskId, T body)
+    /// <summary>Creates the identity of one delay resume.</summary>
+    /// <remarks>
+    /// A delay's generation and due time are stable across replays, so a replayed resume coalesces. Covering the due
+    /// time keeps the identity distinct if a removed delay's task ID is reused while its earlier resume is still
+    /// recorded as processed.
+    /// </remarks>
+    internal static HierarchicalKey CreateResumeMessageId(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime) =>
+        CreateMessageId(
+            grainId,
+            grainId,
+            taskId,
+            DurableTaskMessageTypes.ResumeSubject,
+            dueTime.UtcTicks.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        .CreateChildKey(generation.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    private void Send<T>(MessageType<T> messageType, GrainId sender, GrainId target, TaskId taskId, T body) =>
+        Send(messageType, sender, target, taskId, body, messageId: default, deliverAt: null);
+
+    private void Send<T>(
+        MessageType<T> messageType,
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        T body,
+        HierarchicalKey messageId,
+        DateTimeOffset? deliverAt)
     {
         // Validate the task id before serializing the body: the TaskId surrogate converter rejects a default TaskId
         // with a less specific exception.
@@ -93,11 +104,20 @@ internal sealed class DurableTaskMessageTransport(
             throw new ArgumentException("The task id must not be empty.", nameof(taskId));
         }
 
-        var message = messageType.Create(CreateMessageId(sender, target, taskId, messageType.Subject), target, body);
-        outbox.Value.Send(message);
+        if (messageId.IsDefault)
+        {
+            messageId = CreateMessageId(sender, target, taskId, messageType.Subject);
+        }
+
+        outbox.Value.Send(messageType.Create(messageId, target, body, deliverAt));
     }
 
-    internal static HierarchicalKey CreateMessageId(GrainId sender, GrainId target, TaskId taskId, string subject)
+    internal static HierarchicalKey CreateMessageId(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        string subject,
+        string? discriminator = null)
     {
         if (!subject.StartsWith(DurableTaskMessageTypes.SubjectPrefix, StringComparison.Ordinal))
         {
@@ -109,6 +129,11 @@ internal sealed class DurableTaskMessageTransport(
         Append(hash, target.ToString());
         Append(hash, taskId.ToString());
         Append(hash, subject);
+        if (discriminator is not null)
+        {
+            Append(hash, discriminator);
+        }
+
         return HierarchicalKey.Create(
             MessageIdRoot,
             subject[DurableTaskMessageTypes.SubjectPrefix.Length..],

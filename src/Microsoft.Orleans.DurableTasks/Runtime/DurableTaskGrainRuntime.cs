@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.DurableJobs;
 using Orleans.Journaling;
 
 namespace Orleans.DurableTasks.Runtime;
@@ -32,8 +31,12 @@ namespace Orleans.DurableTasks.Runtime;
 /// <para>
 /// The runtime is also a journal state machine which writes no entries. Capture marks the effects which depend on
 /// the captured changes, and write completion runs them: starting committed requests, completing handles with
-/// committed responses, and propagating committed cancellation. Write preparation schedules the resume jobs of staged
-/// delays before they become durable.
+/// committed responses, and propagating committed cancellation.
+/// </para>
+/// <para>
+/// A delay stages a resume message to its own grain together with its delay state, scheduled with
+/// <see cref="Orleans.Messaging.Envelope.DeliverAt"/> for the delay's due time. The message is durable whenever the
+/// delay is, and the inbox processes it once it is due, so the adapter schedules no Durable Jobs of its own.
 /// </para>
 /// </remarks>
 internal sealed partial class DurableTaskGrainRuntime(
@@ -43,7 +46,6 @@ internal sealed partial class DurableTaskGrainRuntime(
     IEnumerable<IDurableTaskMessageTransport> messageTransports) :
     IDurableTaskGrainRuntime,
     IDurableTaskGrainExtension,
-    IDurableJobFeatureHandler,
     IStateMachine
 {
     /// <summary>The journal state machine name of the runtime's commit hook.</summary>
@@ -55,7 +57,6 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly ConcurrentDictionary<TaskId, byte> _pendingStarts = [];
     private readonly ConcurrentDictionary<TaskId, DurableTaskResponse> _pendingHandleResponses = [];
     private readonly ConcurrentDictionary<long, CancellationPropagation> _pendingCancellationPropagations = [];
-    private readonly ConcurrentDictionary<(TaskId TaskId, long Generation), DateTimeOffset> _pendingResumes = [];
     private readonly ConcurrentDictionary<(TaskId TaskId, GrainId Target), byte> _preStagedCancellations = [];
     private readonly ConcurrentDictionary<long, Task> _backgroundTasks = [];
     private readonly SemaphoreSlim _resumePendingGate = new(1, 1);
@@ -374,7 +375,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
-        _ = MessageTransport;
+        var transport = MessageTransport;
         var logicalUtcNow = GetOrCreateLogicalTime(taskId);
         var duration = dueTime - logicalUtcNow;
         if (_storage.TryGetTask(taskId, out var state))
@@ -417,7 +418,9 @@ internal sealed partial class DurableTaskGrainRuntime(
         state ??= _storage.GetOrCreateTask(taskId, request: null);
         var generation = checked(state.ResumeGeneration + 1);
         _storage.SetDelay(taskId, state, dueTime, duration, generation);
-        _pendingResumes[(taskId, generation)] = dueTime;
+
+        // The resume commits in the same journal write as the delay, so every durable delay has a durable resume.
+        transport.SendResume(GrainId, taskId, generation, dueTime);
         await WriteStateAsync(cancellationToken);
         return DurableTaskResponse.Pending;
     }
@@ -431,53 +434,40 @@ internal sealed partial class DurableTaskGrainRuntime(
             GetOrCreateLogicalTime(taskId) + duration,
             cancellationToken);
 
-    public bool CanHandle(string jobName) =>
-        string.Equals(jobName, DurableTaskMessageTransport.ResumeJobName, StringComparison.Ordinal);
-
-    public async ValueTask<DurableJobRunResult> ExecuteJobAsync(
-        IJobRunContext context,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Stages the outcome of a delay whose scheduled resume message became due, completing its handle after commit.
+    /// </summary>
+    /// <remarks>
+    /// A delay whose cancellation was requested terminalizes as canceled. A pending delay of the same generation
+    /// completes. Resumes for an earlier generation, a terminal delay, or a missing task change nothing.
+    /// </remarks>
+    internal void ResumeDelayFromInbox(TaskId taskId, long generation, GrainId sender)
     {
         ThrowIfStopping();
-        if (context.Job.Metadata is not { } metadata
-            || !metadata.TryGetValue(DurableTaskMessageTransport.ResumeTaskIdMetadata, out var taskIdText)
-            || !TaskId.TryParse(taskIdText, out var taskId)
-            || !metadata.TryGetValue(DurableTaskMessageTransport.ResumeGenerationMetadata, out var generationText)
-            || !long.TryParse(
-                generationText,
-                System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var generation))
+        if (sender != GrainId)
         {
-            return DurableJobRunResult.Completed;
+            throw new InvalidOperationException(
+                $"Durable delay '{taskId}' does not accept resumes from grain '{sender}'.");
         }
 
-        // Resume jobs are scheduled while preparing the write which stages their delay, so a missing task belongs
-        // to a delay which never became durable.
         if (!_storage.TryGetTask(taskId, out var state)
             || state.Result is { IsCompleted: true })
         {
-            return DurableJobRunResult.Completed;
+            return;
         }
 
         if (state.CancellationRequestedAt.HasValue)
         {
-            await SetResponseAsync(taskId, DurableTaskResponse.Canceled, cancellationToken);
-            return DurableJobRunResult.Completed;
+            _pendingHandleResponses[taskId] = StageResponse(taskId, DurableTaskResponse.Canceled);
+            return;
         }
 
-        if (state.ResumeGeneration != generation)
+        if (state.DueTime is null || state.ResumeGeneration != generation)
         {
-            return DurableJobRunResult.Completed;
+            return;
         }
 
-        if (state.DueTime is { } dueTime && dueTime > UtcNow)
-        {
-            return DurableJobRunResult.RescheduleAt(dueTime);
-        }
-
-        await SetResponseAsync(taskId, DurableTaskResponse.Completed, cancellationToken);
-        return DurableJobRunResult.Completed;
+        _pendingHandleResponses[taskId] = StageResponse(taskId, DurableTaskResponse.Completed);
     }
 
     private DurableTaskResponse StageAcceptedResponse(TaskId taskId, DurableTaskResponse response)
@@ -519,6 +509,11 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         var transport = MessageTransport;
         var winningResponse = StageAcceptedResponse(taskId, response);
+
+        // The child retains its result until this acknowledgement arrives, and the acknowledgement commits with the
+        // accepted response. Retention does not depend on outbox dead-lettering or the inbox deduplication window: a
+        // caller which replays after its completion message was dead-lettered can invoke the child again and receive
+        // the result.
         transport.SendCompletionAck(GrainId, sender, taskId);
         _pendingHandleResponses[taskId] = winningResponse;
     }
@@ -585,14 +580,9 @@ internal sealed partial class DurableTaskGrainRuntime(
                 continue;
             }
 
-            if (state.DueTime is { } dueTime && state.ResumeGeneration > 0)
+            // A pending delay's resume message is durable with the delay, and the inbox processes it when due.
+            if (state.DueTime is not null)
             {
-                await MessageTransport.ScheduleResumeAsync(
-                    GrainId,
-                    taskId,
-                    state.ResumeGeneration,
-                    dueTime,
-                    cancellationToken);
                 continue;
             }
 
@@ -829,32 +819,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         _pendingStarts.Clear();
         _pendingHandleResponses.Clear();
         _pendingCancellationPropagations.Clear();
-        _pendingResumes.Clear();
         _preStagedCancellations.Clear();
         _committingStarts = [];
         _committingHandleResponses = [];
         _committingCancellationPropagations = [];
     }
 
-    ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken) =>
-        _pendingResumes.IsEmpty ? default : ScheduleStagedResumesAsync(cancellationToken);
-
-    /// <summary>
-    /// Schedules the resume jobs of staged delays before the write which makes those delays durable.
-    /// </summary>
-    /// <remarks>
-    /// Job identities are stable for a task and generation, so scheduling is idempotent. A failure leaves the
-    /// remaining resumes pending for the next write, and the delays' readiness remains derived from journaled state.
-    /// </remarks>
-    private async ValueTask ScheduleStagedResumesAsync(CancellationToken cancellationToken)
-    {
-        var transport = MessageTransport;
-        foreach (var resume in _pendingResumes.ToArray())
-        {
-            await transport.ScheduleResumeAsync(GrainId, resume.Key.TaskId, resume.Key.Generation, resume.Value, cancellationToken);
-            _pendingResumes.TryRemove(resume);
-        }
-    }
+    ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken) => default;
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer) => CaptureCommitEffects();
 
