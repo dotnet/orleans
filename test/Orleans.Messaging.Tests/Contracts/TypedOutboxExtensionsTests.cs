@@ -22,7 +22,7 @@ public sealed class TypedOutboxExtensionsTests
     private static GrainId Owner => GrainId.Create("warehouse", "reply-owner");
     private static GrainId ReceivedSender => GrainId.Create("customer", "original-command-sender");
     private static GrainId Destination => GrainId.Create("audit", "explicit-destination");
-    private static HierarchicalKey CommandId => HierarchicalKey.Create("orders", "42", "reserve");
+    private static MessageId CommandId => MessageId.Create("orders", "42", "reserve");
 
     [Fact]
     public void SendBatch_EnumeratesOnceAndStagesEachMessageBeforeAdvancing()
@@ -31,20 +31,20 @@ public sealed class TypedOutboxExtensionsTests
         var type = new MessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
         var outbox = new StoringOutbox();
         var enumerations = 0;
-        IEnumerable<(HierarchicalKey, GrainId, string)> Messages()
+        IEnumerable<(MessageId, GrainId, string)> Messages()
         {
             Assert.Equal(1, ++enumerations);
             yield return (CommandId, Destination, "first");
             Assert.Equal(1, outbox.RawSendCalls);
             Assert.Equal("first", type.Decode(Assert.Single(outbox.Messages)));
-            yield return (CommandId.CreateChildKey("second"), ReceivedSender, "second");
+            yield return (new MessageId(CommandId.Key.CreateChildKey("second")), ReceivedSender, "second");
         }
 
         outbox.Send(type, Messages());
 
         Assert.Equal(1, enumerations);
         Assert.Equal(2, outbox.RawSendCalls);
-        Assert.Equal(new[] { CommandId, CommandId.CreateChildKey("second") }, outbox.Messages.Select(value => value.Envelope.MessageId));
+        Assert.Equal(new[] { CommandId, new MessageId(CommandId.Key.CreateChildKey("second")) }, outbox.Messages.Select(value => value.Envelope.MessageId));
         Assert.Equal(new[] { Destination, ReceivedSender }, outbox.Messages.Select(value => value.ReceiverId));
         Assert.All(outbox.Messages, value => Assert.Equal(Subject, GetSubject(value.Envelope)));
         Assert.Equal(new[] { "first", "second" }, outbox.Messages.Select(type.Decode));
@@ -61,12 +61,12 @@ public sealed class TypedOutboxExtensionsTests
         var type = new MessageType<string>(Subject, new Serializer<string>(codec, sessions));
         var outbox = new StoringOutbox();
         var sentinel = new InvalidDataException("later preparation failed");
-        IEnumerable<(HierarchicalKey, GrainId, string)> Messages()
+        IEnumerable<(MessageId, GrainId, string)> Messages()
         {
             yield return (CommandId, Destination, "first");
             if (!encodingFailure) throw sentinel;
             codec.NextFailure = sentinel;
-            yield return (CommandId.CreateChildKey("second"), Destination, "second");
+            yield return (new MessageId(CommandId.Key.CreateChildKey("second")), Destination, "second");
         }
 
         Assert.Same(sentinel, Assert.Throws<InvalidDataException>(() => outbox.Send(type, Messages())));
@@ -78,12 +78,12 @@ public sealed class TypedOutboxExtensionsTests
         var earlierPayload = earlier.Envelope.Payload.ToArray();
         Assert.Equal("first", type.Decode(earlier));
         Assert.Equal(encodingFailure ? 2 : 1, codec.Writes);
-        outbox.Send(type, CommandId.CreateChildKey("second"), Destination, "recovered");
+        outbox.Send(type, new MessageId(CommandId.Key.CreateChildKey("second")), Destination, "recovered");
         Assert.Equal(new[] { "first", "recovered" }, outbox.Messages.Select(type.Decode));
         Assert.Equal(2, outbox.RawSendCalls);
         var retained = outbox.Messages.First();
         Assert.Equal(earlierPayload, retained.Envelope.Payload);
-        Assert.Equal(new[] { CommandId, CommandId.CreateChildKey("second") },
+        Assert.Equal(new[] { CommandId, new MessageId(CommandId.Key.CreateChildKey("second")) },
             outbox.Messages.Select(message => message.Envelope.MessageId));
         Assert.All(outbox.Messages, message => Assert.Equal(Destination, message.ReceiverId));
     }
@@ -98,7 +98,7 @@ public sealed class TypedOutboxExtensionsTests
         var actual = new StoringOutbox();
         var type = new MessageType<string>(Subject, services.GetRequiredService<Serializer<string>>());
         IOutbox outbox = actual;
-        IEnumerable<(HierarchicalKey, GrainId, string)> messages = [(CommandId, Destination, "body")];
+        IEnumerable<(MessageId, GrainId, string)> messages = [(CommandId, Destination, "body")];
         switch (variation)
         {
             case "outbox": outbox = null!; break;
@@ -136,10 +136,10 @@ public sealed class TypedOutboxExtensionsTests
         body[body.Length / 2] = 17;
         var sentinel = new IOException("raw staging failed");
         var outbox = new StoringOutbox() { Failure = sentinel, StoreBeforeFailure = storeBeforeFailure };
-        (HierarchicalKey, GrainId, byte[])[] messages =
+        (MessageId, GrainId, byte[])[] messages =
         [
             (CommandId, Destination, body),
-            (CommandId.CreateChildKey("second"), Destination, body)
+            (new MessageId(CommandId.Key.CreateChildKey("second")), Destination, body)
         ];
 
         Assert.Same(sentinel, Assert.Throws<IOException>(() => outbox.Send(type, messages)));
@@ -226,9 +226,9 @@ public sealed class TypedOutboxExtensionsTests
         else outbox.SendReply(type, context, Destination, "approved €42");
 
         var staged = Assert.Single(outbox.Messages);
-        Assert.Equal(CommandId.CreateChildKey("result"), staged.Envelope.MessageId);
+        Assert.Equal(new MessageId(CommandId.Key.CreateChildKey("result")), staged.Envelope.MessageId);
         Assert.Equal("orders/42/reserve/result", staged.Envelope.MessageId.ToString());
-        Assert.Equal(4, staged.Envelope.MessageId.CountSegments());
+        Assert.Equal(4, staged.Envelope.MessageId.Key.CountSegments());
         Assert.Equal(Destination, staged.ReceiverId);
         Assert.NotEqual(ReceivedSender, staged.ReceiverId);
         Assert.Equal(Subject, GetSubject(staged.Envelope));
@@ -255,9 +255,9 @@ public sealed class TypedOutboxExtensionsTests
         var type = new MessageType<string>(Subject, serializer);
         var key = variation switch
         {
-            "segments" => HierarchicalKey.Create(Enumerable.Repeat("s", 31).ToArray()),
-            "ascii-bytes" => HierarchicalKey.Create(new string('k', 1017)),
-            "multibyte-bytes" => HierarchicalKey.Create(new string('\u20ac', 339)),
+            "segments" => MessageId.Create(Enumerable.Repeat("s", 31).ToArray()),
+            "ascii-bytes" => MessageId.Create(new string('k', 1017)),
+            "multibyte-bytes" => MessageId.Create(new string('\u20ac', 339)),
             _ => throw new ArgumentOutOfRangeException(nameof(variation))
         };
         var context = Context(key);
@@ -266,8 +266,8 @@ public sealed class TypedOutboxExtensionsTests
         Invoke(outbox, type, context, key, Destination, "boundary result", reply: true, addressable: addressable);
 
         var staged = Assert.Single(outbox.Messages);
-        Assert.Equal(key.CreateChildKey("result"), staged.Envelope.MessageId);
-        if (variation == "segments") Assert.Equal(32, staged.Envelope.MessageId.CountSegments());
+        Assert.Equal(new MessageId(key.Key.CreateChildKey("result")), staged.Envelope.MessageId);
+        if (variation == "segments") Assert.Equal(32, staged.Envelope.MessageId.Key.CountSegments());
         else Assert.Equal(1024, System.Text.Encoding.UTF8.GetByteCount(staged.Envelope.MessageId.ToString()));
         Assert.Equal(Destination, staged.ReceiverId);
         Assert.Equal(serializer.SerializeToArray("boundary result"), staged.Envelope.Payload.ToArray());
@@ -301,7 +301,7 @@ public sealed class TypedOutboxExtensionsTests
         Assert.Same(published.Envelope.Payload, outbox.WireSeen);
         Assert.NotSame(body, published.Envelope.Payload);
         Assert.Equal(body, serializer.Deserialize(published.Envelope.Payload));
-        Assert.Equal(reply ? CommandId.CreateChildKey("result") : CommandId, staged.Envelope.MessageId);
+        Assert.Equal(reply ? new MessageId(CommandId.Key.CreateChildKey("result")) : CommandId, staged.Envelope.MessageId);
         Assert.Equal(Destination, staged.ReceiverId);
         Assert.Equal(0, context.CompletionCount);
         outbox.ClearMessages();
@@ -348,7 +348,7 @@ public sealed class TypedOutboxExtensionsTests
         Assert.Equal(serializer.SerializeToArray(body), outbox.WireSeen.ToArray());
         var published = outbox.LastPublished!.Value;
         Assert.Equal(Destination, published.ReceiverId);
-        Assert.Equal(reply ? CommandId.CreateChildKey("result") : CommandId, published.Envelope.MessageId);
+        Assert.Equal(reply ? new MessageId(CommandId.Key.CreateChildKey("result")) : CommandId, published.Envelope.MessageId);
         Assert.Equal(Subject, GetSubject(published.Envelope));
         Assert.Same(outbox.WireSeen, published.Envelope.Payload);
         if (storeBeforeFailure)
@@ -396,7 +396,7 @@ public sealed class TypedOutboxExtensionsTests
         var staged = Assert.Single(outbox.Messages);
         Assert.Equal(direct.SerializeToArray("recovered €42"), staged.Envelope.Payload.ToArray());
         Assert.Equal("recovered €42", direct.Deserialize(staged.Envelope.Payload));
-        Assert.Equal(reply ? CommandId.CreateChildKey("result") : CommandId, staged.Envelope.MessageId);
+        Assert.Equal(reply ? new MessageId(CommandId.Key.CreateChildKey("result")) : CommandId, staged.Envelope.MessageId);
         Assert.Equal(2, codec.Writes);
         Assert.Equal(1, outbox.RawSendCalls);
         Assert.Equal(0, context.CompletionCount);
@@ -434,8 +434,8 @@ public sealed class TypedOutboxExtensionsTests
         {
             "messageId" or "unset-parent" => default,
             // Reply adds seven UTF8 bytes ("/result").
-            "bytes" => HierarchicalKey.Create(new string('k', reply ? 1018 : 1025)),
-            "multibyte-bytes" => HierarchicalKey.Create(new string('\u20ac', reply ? 339 : 341) + (reply ? "a" : "ab")),
+            "bytes" => MessageId.Create(new string('k', reply ? 1018 : 1025)),
+            "multibyte-bytes" => MessageId.Create(new string('\u20ac', reply ? 339 : 341) + (reply ? "a" : "ab")),
             _ => CommandId
         };
         var context = Context(reply ? key : null);
@@ -494,7 +494,7 @@ public sealed class TypedOutboxExtensionsTests
     private static ServiceProvider CreateServices() =>
         new ServiceCollection().AddSerializer().BuildServiceProvider();
 
-    private static CountingContext Context(HierarchicalKey? key = null)
+    private static CountingContext Context(MessageId? key = null)
     {
         var messageId = key ?? CommandId;
         if (messageId == default) return new(new InboxMessage { Envelope = default });
@@ -515,7 +515,7 @@ public sealed class TypedOutboxExtensionsTests
     }
 
     private static void Invoke<T>(IOutbox outbox, MessageType<T> type, CountingContext context,
-        HierarchicalKey key, GrainId destination, T body, bool reply, bool addressable)
+        MessageId key, GrainId destination, T body, bool reply, bool addressable)
     {
         if (addressable)
         {
@@ -569,11 +569,11 @@ public sealed class TypedOutboxExtensionsTests
             _messages.Add(message);
         }
 
-        public void Send(HierarchicalKey messageId) => throw new NotSupportedException();
+        public void Send(MessageId messageId) => throw new NotSupportedException();
 
         public IOutbox Register(IOutboxMessageSource source) => throw new NotSupportedException();
 
-        public bool TryGetMessage(HierarchicalKey messageId, [MaybeNullWhen(false)] out OutboxMessage envelope)
+        public bool TryGetMessage(MessageId messageId, [MaybeNullWhen(false)] out OutboxMessage envelope)
         {
             foreach (var message in _messages)
                 if (message.Envelope.MessageId == messageId)
