@@ -332,7 +332,7 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
     public const string Json = "json";
     public const string OrleansBinary = "orleans-binary";
 
-    public DurableTaskRecoveryFixture(string journalFormatKey)
+    public DurableTaskRecoveryFixture(string journalFormatKey, Action<ISiloBuilder>? configureSilo = null)
     {
         Probe = new();
         MessagingProbe = new();
@@ -372,6 +372,7 @@ internal sealed class DurableTaskRecoveryFixture : IAsyncLifetime
                 services => services.GetRequiredService<VolatileJournalStorageProvider>());
             siloBuilder.Services.AddSingleton<IJournalStorageCatalog>(
                 services => services.GetRequiredService<VolatileJournalStorageProvider>());
+            configureSilo?.Invoke(siloBuilder);
         });
         Cluster = builder.Build();
     }
