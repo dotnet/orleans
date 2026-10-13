@@ -30,7 +30,8 @@ public interface IOutbox
     /// </remarks>
     /// <exception cref="ArgumentException">The envelope has an unset identity, invalid subject or destination, or exceeds identity/subject limits.</exception>
     /// <exception cref="InvalidOperationException">
-    /// The identity conflicts, or the outbox is unavailable.
+    /// The identity conflicts, an inbox sink backpressured a message addressed to the sending grain, or the outbox is
+    /// unavailable.
     /// </exception>
     void Send(OutboxMessage message);
 
