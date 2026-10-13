@@ -72,8 +72,9 @@ validation disabled until its first published version establishes a baseline.
 - Each request and result payload is journaled once per grain. The callee's inbox
   accepts invocations, and the caller's inbox accepts completions, directly into
   task state, journaling only the message's processed record alongside it. The
-  callee's outbox journals a reference to each completion and materializes its
-  envelope from the stored result for every delivery attempt. Task state persists
+  callee's outbox journals only the ID and delivery state of each completion, and
+  the runtime materializes the message from the stored result for every delivery
+  attempt. Task state persists
   request and result payloads separately from the task's metadata, so updates to
   the metadata do not rewrite them.
 - Terminal responses and completion notifications commit together. The callee
