@@ -81,8 +81,9 @@ public static class InboxExtensions
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
-            var body = messageType.Decode(context.Message);
             cancellationToken.ThrowIfCancellationRequested();
+            // The delegate owns the decoded body, including when cancellation arrives during decoding.
+            var body = messageType.Decode(context.Message);
             return Invoke(body, context, cancellationToken);
         }
 
