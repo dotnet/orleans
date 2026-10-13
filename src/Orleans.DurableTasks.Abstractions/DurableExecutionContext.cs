@@ -128,6 +128,21 @@ public abstract class DurableExecutionContext
         => throw new NotSupportedException("The durable execution host does not support detached tasks.");
 
     /// <summary>
+    /// Waits for the signal named <paramref name="name"/> of the invoked task whose execution contains this execution,
+    /// and returns a successful response holding the signal's recorded value.
+    /// </summary>
+    /// <remarks>
+    /// The host records the first value it receives for each name of an invoked task, together with that task's state,
+    /// and returns it to every wait for that name, including waits during replay. A signal which arrived before the wait
+    /// completes it immediately. Canceling <paramref name="cancellationToken"/> abandons the wait. Hosts which don't
+    /// support signals keep this default implementation, which throws <see cref="NotSupportedException"/>.
+    /// </remarks>
+    protected internal virtual ValueTask<DurableTaskResponse> WaitForSignalAsync(
+        string name,
+        CancellationToken cancellationToken)
+        => throw new NotSupportedException("The durable execution host does not support signals.");
+
+    /// <summary>
     /// Returns the first completed candidate and persists that selection under <paramref name="decisionId"/>.
     /// Repeated calls with the same decision identifier return the recorded winner.
     /// </summary>
