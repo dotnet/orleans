@@ -90,6 +90,8 @@ namespace Orleans.DurableTasks
     {
         public static DurableTask Delay(System.TimeSpan duration) { throw null; }
 
+        public static DurableTask DelayUntil(System.DateTimeOffset dueTime) { throw null; }
+
         public static DurableTask<TResult> FromResult<TResult>(TResult value) { throw null; }
 
         public static DurableTask Run(System.Action<System.Threading.CancellationToken> action) { throw null; }
