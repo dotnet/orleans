@@ -34,7 +34,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private MessagingShared Shared => _pump.Shared;
     private DurableMessagingOptions Options => _pump.Shared.Options;
     private ILogger Logger => _pump.Shared.OutboxLogger;
-    private TimeProvider TimeProvider => _pump.Shared.TimeProvider;
+    // Delivery retries, expiry, and retention follow the durable jobs clock which schedules outbox wake-ups.
+    private TimeProvider TimeProvider => _pump.Shared.JobTimeProvider;
     private GrainId GrainId => _pump.GrainContext.GrainId;
 
     internal IReadOnlyDictionary<HierarchicalKey, OutboxEntry> MessageState => _messages;
