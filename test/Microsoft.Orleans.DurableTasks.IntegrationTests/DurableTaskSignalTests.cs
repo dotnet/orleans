@@ -59,7 +59,7 @@ public abstract class DurableTaskSignalTests(string journalFormatKey) : IAsyncLi
         // The sender records the send in its workflow's tree, so a replay doesn't send it again.
         var senderTasks = await GetTasksAsync(sender, cancellationToken);
         Assert.Equal(
-            [TaskId.CreateRoot("send"), TaskId.CreateRoot("send").Child("$child-1")],
+            [TaskId.CreateRoot("send"), TaskId.CreateRoot("send").Child($"$send:{waiter.GetGrainId()}:approval:approved")],
             senderTasks.Keys.OrderBy(static id => id.ToString(), StringComparer.Ordinal));
     }
 

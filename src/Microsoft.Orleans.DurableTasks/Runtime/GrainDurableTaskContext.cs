@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
@@ -34,6 +35,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private readonly CancellationTokenRegistration _shutdownRegistration;
     private bool _deleted;
     private bool _aborted;
+
+    // The number of sends of each signal which this attempt has begun, by marker segment. Guarded by _lock.
+    private Dictionary<string, int>? _signalSends;
+#if NET9_0_OR_GREATER
+    private readonly Lock _lock = new();
+#else
+    private readonly object _lock = new();
+#endif
 
     public GrainDurableTaskContext(
         TaskId taskId,
@@ -297,17 +306,17 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             throw new NotSupportedException("Only durable grain calls can be detached.");
         }
 
-        var markerId = CreateMarkerId("detach", [requestContext.TargetId.ToString(), rootId.ToString()]);
+        var markerId = Id.Child(CreateMarkerSegment("detach", [requestContext.TargetId.ToString(), rootId.ToString()]));
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         await _runtime.DetachAsync(rootId, request, markerId, executionCts.Token);
     }
 
     /// <summary>
-    /// Creates the identifier of a marker which records an operation of this execution, from the operation's identity:
+    /// Creates the segment of a marker which records an operation of this execution, from the operation's identity:
     /// <c>${kind}:{part}:{part}...</c>, with <c>\</c>, <c>:</c>, and <c>$</c> escaped in each part, so distinct
-    /// identities create distinct identifiers.
+    /// identities create distinct segments, and a <c>$</c> suffix can number repeated occurrences.
     /// </summary>
-    private TaskId CreateMarkerId(string kind, ReadOnlySpan<string> parts)
+    private static string CreateMarkerSegment(string kind, ReadOnlySpan<string> parts)
     {
         var segment = new StringBuilder("$").Append(kind);
         foreach (var part in parts)
@@ -324,7 +333,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             }
         }
 
-        return Id.Child(segment.ToString());
+        return segment.ToString();
     }
 
     private IScheduledTaskHandle GetChildTaskHandleCore(TaskId taskId)
@@ -352,11 +361,15 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     /// <summary>
-    /// Sends a signal to the invoked task <paramref name="taskId"/> on <paramref name="target"/>, recording the send under a
-    /// generated child identifier of this execution, so a replay doesn't send it again.
+    /// Sends a signal to the invoked task <paramref name="taskId"/> on <paramref name="target"/>, recording the send under
+    /// <c>$send:{target}:{taskId}:{name}</c> in this execution, so a replay doesn't send it again.
     /// </summary>
     /// <remarks>
-    /// The identifier is generated when the send begins, so sends begin in deterministic order, like unnamed children.
+    /// The signal's identity names the record, so adding or removing other operations doesn't change the record which a
+    /// send reaches. Repeated sends of one signal in an execution, such as a retry after
+    /// <see cref="DurableSignalResult.TaskNotFound"/>, are numbered by occurrence, <c>$send:{target}:{taskId}:{name}$2</c>
+    /// and so on, so each reaches its own record; the target reports an equal value as
+    /// <see cref="DurableSignalResult.Duplicate"/> and a different one as <see cref="DurableSignalResult.Conflict"/>.
     /// Durable cancellation of this execution doesn't abandon the send; host abort does.
     /// </remarks>
     /// <param name="throwOnRejection">Whether a rejection by a task of this grain throws rather than being recorded and returned.</param>
@@ -368,7 +381,16 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         bool throwOnRejection,
         CancellationToken cancellationToken)
     {
-        var markerId = CreateChildTaskId(name: null);
+        var signal = CreateMarkerSegment("send", [target.ToString(), taskId.ToString(), name]);
+        int occurrence;
+        lock (_lock)
+        {
+            _signalSends ??= [];
+            _signalSends.TryGetValue(signal, out occurrence);
+            _signalSends[signal] = ++occurrence;
+        }
+
+        var markerId = Id.Child(occurrence == 1 ? signal : $"{signal}${occurrence.ToString(CultureInfo.InvariantCulture)}");
         return RunOnScheduler(
             _scheduler,
             () => SendSignalCoreAsync(markerId, target, taskId, name, value, throwOnRejection, cancellationToken));

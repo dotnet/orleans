@@ -29,7 +29,8 @@ public static class DurableTaskGrainExtensions
     /// </para>
     /// <para>
     /// Within a durable execution, the send and a record of it in the execution's tree commit in one journal write of
-    /// the sending grain, so a replay doesn't send it again; sends begin in deterministic order, like unnamed children.
+    /// the sending grain, so a replay doesn't send it again. The record's identifier derives from the target, the task, and
+    /// the signal name, and repeated sends of one signal in an execution are numbered by occurrence.
     /// A send to another grain is staged in the outbox, and the target's inbox records the value in task state or
     /// dead-letters a rejected signal. Elsewhere, such as from a client or an ordinary grain method, the send is a call
     /// to <paramref name="target"/> which completes once the task durably holds the value and throws when the task
