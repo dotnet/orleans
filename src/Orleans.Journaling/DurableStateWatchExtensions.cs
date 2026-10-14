@@ -7,8 +7,8 @@ namespace Orleans.Journaling;
 /// <para>
 /// A watch stream begins with the current contents and then delivers each change in the order it was made.
 /// In <see cref="DurableWatchMode.Committed"/> mode, the stream delivers a change after the journal write which
-/// contains it is acknowledged, so readers observe only durable state. In <see cref="DurableWatchMode.Speculative"/>
-/// mode, the stream delivers staged changes immediately and reports their durability with watermarks.
+/// contains it is acknowledged, so readers observe only durable state. With <see cref="DurableWatchMode.Staged"/>,
+/// the stream delivers staged changes immediately and reports their durability with watermarks.
 /// </para>
 /// <para>
 /// Collection streams retain a bounded number of undelivered changes for each reader. A reader which falls behind

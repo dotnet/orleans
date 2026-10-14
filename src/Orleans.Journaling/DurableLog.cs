@@ -77,7 +77,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         var sequence = NextSequence;
         _codec.WriteAppend(item, GetWriter());
         _items.Add(item);
-        SignalReaders(speculativeOnly: true);
+        SignalReaders(DurableWatchMode.Staged);
         return sequence;
     }
 
@@ -92,7 +92,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
         _codec.WriteTrimBefore(sequence, GetWriter());
         ApplyTrimBefore(sequence);
-        SignalReaders(speculativeOnly: false);
+        SignalReaders(DurableWatchMode.Committed);
     }
 
     public IDurableLogDraft<T> BeginDraft()
@@ -136,14 +136,14 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             }
         }
 
-        SignalReaders(speculativeOnly: false);
+        SignalReaders(DurableWatchMode.Committed);
     }
 
     void IStateMachine.OnRecoveryCompleted()
     {
         _capturedSequence = NextSequence;
         _committedSequence = NextSequence;
-        SignalReaders(speculativeOnly: false);
+        SignalReaders(DurableWatchMode.Committed);
     }
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
@@ -218,11 +218,11 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     private DurableChangeStatus GetEntryStatus(long sequence) =>
         sequence < _committedSequence ? DurableChangeStatus.Committed : DurableChangeStatus.Staged;
 
-    private void SignalReaders(bool speculativeOnly)
+    private void SignalReaders(DurableWatchMode visibility)
     {
         if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
         {
-            topic.Signal(speculativeOnly);
+            topic.Signal(visibility);
         }
     }
 
@@ -232,7 +232,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         var removed = _drafts!.Open.Remove(draft);
         Debug.Assert(removed);
         draft.Close(abandonReason);
-        SignalReaders(speculativeOnly: true);
+        SignalReaders(DurableWatchMode.Drafts);
     }
 
     private Draft? FindOpenDraft(LogDraftId id)
@@ -265,7 +265,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         using var registration = DurableStateObservation.RegisterCancellation(reader.Watcher, cancellationToken);
         try
         {
-            if (reader.IsSpeculative && resumeDraftId is { } draftId)
+            if (reader.IncludesDrafts && resumeDraftId is { } draftId)
             {
                 if (FindOpenDraft(draftId) is { } draft)
                 {
@@ -314,8 +314,10 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             for (var i = 0; i < followed.Count; i++)
             {
                 var draft = followed[i].Draft;
-                if (draft.IsOpen)
+                if (draft.IsOpen
+                    || (draft.CommittedSequence >= _committedSequence && !reader.Watcher.IncludesStaged))
                 {
+                    // Readers without staged entries learn of a commit once its entry is durable.
                     continue;
                 }
 
@@ -347,7 +349,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             return true;
         }
 
-        var limit = reader.IsSpeculative ? NextSequence : _committedSequence;
+        var limit = reader.Watcher.IncludesStaged ? NextSequence : _committedSequence;
         if (reader.Cursor < limit)
         {
             var sequence = reader.Cursor++;
@@ -369,7 +371,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             return true;
         }
 
-        if (reader.IsSpeculative && _drafts is { Open.Count: > 0 } drafts)
+        if (reader.IncludesDrafts && _drafts is { Open.Count: > 0 } drafts)
         {
             var followedDrafts = reader.FollowedDrafts ??= [];
             foreach (var draft in drafts.Open)
@@ -445,7 +447,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         {
             ThrowIfClosed();
             _items!.Add(item);
-            log.SignalReaders(speculativeOnly: true);
+            log.SignalReaders(DurableWatchMode.Drafts);
         }
 
         public long Commit(T entry)
@@ -486,7 +488,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         public SignalWatcher Watcher { get; } = watcher;
 
-        public bool IsSpeculative => Watcher.Mode is DurableWatchMode.Speculative;
+        public bool IncludesDrafts => (Watcher.Mode & DurableWatchMode.Drafts) != 0;
 
         public long Cursor { get; set; } = cursor;
 

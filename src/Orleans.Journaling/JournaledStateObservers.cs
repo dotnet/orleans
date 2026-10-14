@@ -172,14 +172,16 @@ internal sealed class StateTopic(JournaledStateObservers hub)
     /// <summary>
     /// Wakes watchers which read the state directly.
     /// </summary>
-    /// <param name="speculativeOnly">Whether only speculative watchers can observe the change.</param>
-    public void Signal(bool speculativeOnly)
+    /// <param name="visibility">
+    /// The mode flags which make the change observable, or <see cref="DurableWatchMode.Committed"/> to wake every watcher.
+    /// </param>
+    public void Signal(DurableWatchMode visibility)
     {
         lock (hub.SyncRoot)
         {
             foreach (var watcher in _watchers)
             {
-                if (!speculativeOnly || watcher.Mode is DurableWatchMode.Speculative)
+                if (visibility is DurableWatchMode.Committed || (watcher.Mode & visibility) != 0)
                 {
                     watcher.Signal();
                 }
@@ -244,6 +246,11 @@ internal abstract class StateWatcher(JournaledStateObservers hub, IStateMachine 
     public IStateMachine State { get; } = state;
 
     public DurableWatchMode Mode { get; } = mode;
+
+    /// <summary>
+    /// Gets a value indicating whether the watcher delivers staged changes and watermarks.
+    /// </summary>
+    public bool IncludesStaged => (Mode & DurableWatchMode.Staged) != 0;
 
     protected long CommittedVersion { get; private set; }
 
@@ -357,7 +364,7 @@ internal sealed class ChangeWatcher<TChange> : StateWatcher, IChangeSink<TChange
         }
 
         _buffer.Enqueue((change, version));
-        if (Mode is DurableWatchMode.Speculative || version <= CommittedVersion)
+        if (IncludesStaged || version <= CommittedVersion)
         {
             Signal();
         }
@@ -376,7 +383,7 @@ internal sealed class ChangeWatcher<TChange> : StateWatcher, IChangeSink<TChange
                     return true;
                 }
 
-                if (Mode is DurableWatchMode.Speculative)
+                if (IncludesStaged)
                 {
                     _buffer.Dequeue();
                     if (_unconfirmedVersion == 0)
@@ -440,7 +447,7 @@ internal sealed class ValueWatcher<T> : StateWatcher, IChangeSink<T>
 
     public void OnChange(T value, long version)
     {
-        if (Mode is DurableWatchMode.Speculative || version <= CommittedVersion)
+        if (IncludesStaged || version <= CommittedVersion)
         {
             // Durable values supersede values which await acknowledgement.
             _pendingCount = 0;
@@ -479,7 +486,7 @@ internal sealed class ValueWatcher<T> : StateWatcher, IChangeSink<T>
     internal override void OnWatermark(long version)
     {
         base.OnWatermark(version);
-        if (Mode is DurableWatchMode.Committed)
+        if (!IncludesStaged)
         {
             while (_pendingCount > 0 && _pendingVersion0 <= version)
             {
@@ -509,7 +516,7 @@ internal sealed class ValueWatcher<T> : StateWatcher, IChangeSink<T>
 
             _hasUnreadValue = false;
             var status = _version <= CommittedVersion ? DurableChangeStatus.Committed : DurableChangeStatus.Staged;
-            if (Mode is DurableWatchMode.Speculative)
+            if (IncludesStaged)
             {
                 _awaitingConfirmation = status is DurableChangeStatus.Staged ? _version : 0;
             }
@@ -559,7 +566,7 @@ internal static class DurableStateObservation
 
     public static void ValidateWatch(DurableWatchMode mode, int capacity)
     {
-        if (mode is not (DurableWatchMode.Committed or DurableWatchMode.Speculative))
+        if ((mode & ~DurableWatchMode.Speculative) != 0)
         {
             throw new ArgumentOutOfRangeException(nameof(mode), mode, "The watch mode is not supported.");
         }
