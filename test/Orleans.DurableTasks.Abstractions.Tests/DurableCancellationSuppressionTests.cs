@@ -19,13 +19,13 @@ public class DurableCancellationSuppressionTests
         var response = await RunAsync(log, async () =>
         {
             await Step("before");
-            using (DurableExecutionContext.SuppressCancellation())
+            using (DurableTask.Current.SuppressCancellation())
             {
                 await Step("inside");
                 await Task.Yield();
                 await Step("after-yield");
                 await DurableTask.Delay(TimeSpan.Zero).WithId("delay");
-                using (DurableExecutionContext.SuppressCancellation())
+                using (DurableTask.Current.SuppressCancellation())
                 {
                     await Step("nested");
                 }
@@ -67,7 +67,7 @@ public class DurableCancellationSuppressionTests
 
         static async Task CompensateAsync()
         {
-            using (DurableExecutionContext.SuppressCancellation())
+            using (DurableTask.Current.SuppressCancellation())
             {
                 await Step("compensation");
             }
@@ -80,7 +80,7 @@ public class DurableCancellationSuppressionTests
         var log = new ConcurrentDictionary<string, bool>();
         var response = await RunAsync(log, async () =>
         {
-            using (DurableExecutionContext.SuppressCancellation())
+            using (DurableTask.Current.SuppressCancellation())
             {
                 await DurableTask.Run(async _ => await Step("grandchild")).WithId("child");
             }
@@ -101,10 +101,10 @@ public class DurableCancellationSuppressionTests
         var response = await DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(async cancellationToken =>
             {
-                using (DurableExecutionContext.SuppressCancellation())
+                using (DurableTask.Current.SuppressCancellation())
                 {
                     await Step("release");
-                    var current = DurableExecutionContext.Current!;
+                    var current = DurableTask.Current;
                     return (cancellationToken.IsCancellationRequested, current.IsCancellationRequested, current.CancellationReason);
                 }
             }),
@@ -117,7 +117,7 @@ public class DurableCancellationSuppressionTests
     [Fact]
     public void ScopeRequiresADurableExecution()
     {
-        Assert.Throws<InvalidOperationException>(() => DurableExecutionContext.SuppressCancellation());
+        Assert.Throws<InvalidOperationException>(() => DurableTask.Current.SuppressCancellation());
     }
 
     private static ConfiguredDurableTask Step(string name) => DurableTask.Run(static _ => { }).WithId(name);
@@ -128,7 +128,7 @@ public class DurableCancellationSuppressionTests
             new RecordingContext(TaskId.CreateRoot("root"), log));
 
     /// <summary>Records, for each child it schedules, whether the scheduling code suppressed cancellation.</summary>
-    private sealed class RecordingContext(TaskId id, ConcurrentDictionary<string, bool> log) : DurableExecutionContext(id)
+    private sealed class RecordingContext(TaskId id, ConcurrentDictionary<string, bool> log) : DurableTaskContext(id)
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 

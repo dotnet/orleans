@@ -24,19 +24,44 @@ public class DurableTaskTests
 
         Assert.Equal(42, response.GetResult<int>());
         Assert.Equal(3, moveNextCount);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
 
         async DurableTask<int> Definition()
         {
             moveNextCount++;
-            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.Same(context, DurableTask.Current);
             await Task.Yield();
             moveNextCount++;
-            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.Same(context, DurableTask.Current);
             await Task.Delay(1).ConfigureAwait(false);
             moveNextCount++;
-            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.Same(context, DurableTask.Current);
             return 42;
+        }
+    }
+
+    [Fact]
+    public async Task CurrentDescribesTheRunningTaskAndThrowsOutsideOne()
+    {
+        var host = new TestHost(new DateTimeOffset(2030, 1, 2, 3, 4, 5, TimeSpan.Zero));
+        var context = host.CreateContext(TaskId.CreateRoot("root"));
+
+        Assert.Throws<InvalidOperationException>(() => DurableTask.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out var none));
+        Assert.Null(none);
+
+        var response = await DurableTaskRuntimeHelper.RunAsync(
+            DurableTask.Run(_ => DurableTaskContext.TryGetCurrent(out var current) ? current.Id : default),
+            context);
+
+        Assert.Equal(TaskId.CreateRoot("root"), response.GetResult<TaskId>());
+        Assert.Same(context, await RunAndCaptureAsync());
+
+        async Task<DurableTaskContext> RunAndCaptureAsync()
+        {
+            DurableTaskContext? observed = null;
+            await DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => observed = DurableTask.Current), context);
+            return observed!;
         }
     }
 
@@ -277,9 +302,9 @@ public class DurableTaskTests
         var inner = host.CreateContext(TaskId.CreateRoot("inner"));
         var task = DurableTask.Run(async cancellationToken =>
         {
-            Assert.Same(inner, DurableExecutionContext.Current);
+            Assert.Same(inner, DurableTask.Current);
             await Task.Delay(1, cancellationToken).ConfigureAwait(false);
-            Assert.Same(inner, DurableExecutionContext.Current);
+            Assert.Same(inner, DurableTask.Current);
         });
 
         await host.RunWithAmbientAsync(outer, async () =>
@@ -291,7 +316,7 @@ public class DurableTaskTests
             }
         });
 
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Fact]
@@ -302,7 +327,7 @@ public class DurableTaskTests
         var inner = host.CreateContext(TaskId.CreateRoot("inner"));
         var task = DurableTask.Run(_ =>
         {
-            Assert.Same(inner, DurableExecutionContext.Current);
+            Assert.Same(inner, DurableTask.Current);
             return 17;
         });
 
@@ -310,10 +335,10 @@ public class DurableTaskTests
         {
             var response = await DurableTaskRuntimeHelper.RunAsync(task, inner);
             Assert.Equal(17, response.GetResult<int>());
-            Assert.Same(outer, DurableExecutionContext.Current);
+            Assert.Same(outer, DurableTask.Current);
         });
 
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Fact]
@@ -498,14 +523,14 @@ public class DurableTaskTests
         async DurableTask ObserveNonGenericAsync()
         {
             await NonCriticalYieldAwaitable.Instance;
-            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.Same(context, DurableTask.Current);
             nonGenericObserved = ambient.Value;
         }
 
         async DurableTask<string?> ObserveGenericAsync()
         {
             await NonCriticalYieldAwaitable.Instance;
-            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.Same(context, DurableTask.Current);
             return ambient.Value;
         }
     }
@@ -538,7 +563,7 @@ public class DurableTaskTests
         {
             observedBeforeAwait = ambient.Value;
             await Task.Yield();
-            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.Same(context, DurableTask.Current);
             observedAfterAwait = ambient.Value;
         }
     }
@@ -553,7 +578,7 @@ public class DurableTaskTests
         Task<DurableTaskResponse>? innerExecution = null;
         var outerTask = DurableTask.Run(_ =>
         {
-            Assert.Same(outer, DurableExecutionContext.Current);
+            Assert.Same(outer, DurableTask.Current);
             using (ExecutionContext.SuppressFlow())
             {
                 innerExecution = DurableTaskRuntimeHelper.RunAsync(InnerAsync(), inner).AsTask();
@@ -562,7 +587,7 @@ public class DurableTaskTests
             Assert.NotNull(innerExecution);
             Assert.False(innerExecution.IsCompleted);
             awaitable.Complete();
-            Assert.Same(outer, DurableExecutionContext.Current);
+            Assert.Same(outer, DurableTask.Current);
         });
 
         var outerResponse = await DurableTaskRuntimeHelper.RunAsync(outerTask, outer);
@@ -570,13 +595,13 @@ public class DurableTaskTests
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, outerResponse.Status);
         Assert.Equal(42, innerResponse.GetResult<int>());
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
 
         async DurableTask<int> InnerAsync()
         {
-            Assert.Same(inner, DurableExecutionContext.Current);
+            Assert.Same(inner, DurableTask.Current);
             var result = await awaitable;
-            Assert.Same(inner, DurableExecutionContext.Current);
+            Assert.Same(inner, DurableTask.Current);
             return result;
         }
     }
@@ -647,7 +672,7 @@ public class DurableTaskTests
                 await CriticalYieldAwaitable.Instance;
             }
 
-            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.Same(context, DurableTask.Current);
             return ambient.Value;
         }
     }
@@ -919,12 +944,12 @@ public class DurableTaskTests
         ambient.Value = "registration";
         using var safeRegistration = context.CancellationToken.Register(() =>
         {
-            Assert.Null(DurableExecutionContext.Current);
+            Assert.False(DurableTaskContext.TryGetCurrent(out _));
             safeObserved = ambient.Value;
         });
         using var unsafeRegistration = context.CancellationToken.UnsafeRegister(_ =>
         {
-            Assert.Null(DurableExecutionContext.Current);
+            Assert.False(DurableTaskContext.TryGetCurrent(out DurableTaskContext? _));
             unsafeObserved = ambient.Value;
         }, null);
         ambient.Value = "request";
@@ -934,7 +959,7 @@ public class DurableTaskTests
         ambient.Value = "immediate-registration";
         using var immediateRegistration = alreadyCanceled.CancellationToken.Register(() =>
         {
-            Assert.Null(DurableExecutionContext.Current);
+            Assert.False(DurableTaskContext.TryGetCurrent(out _));
             immediateObserved = ambient.Value;
         });
 
@@ -958,7 +983,7 @@ public class DurableTaskTests
             registration = context.CancellationToken.Register(
                 () =>
                 {
-                    Assert.Null(DurableExecutionContext.Current);
+                    Assert.False(DurableTaskContext.TryGetCurrent(out _));
                     observed = SynchronizationContext.Current;
                 },
                 useSynchronizationContext: true);
@@ -1056,7 +1081,7 @@ public class DurableTaskTests
         var first = DurableTaskRuntimeHelper.RequestCancellationAsync(context, uncancelableToken);
         await callbackStarted.Task;
         Assert.True(tokenCallbackInvoked);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
 
         var second = DurableTaskRuntimeHelper.RequestCancellationAsync(context, uncancelableToken);
         Assert.Same(first, second);
@@ -1480,12 +1505,12 @@ public class DurableTaskTests
 
         await context.RegisterCancellationCallbackAsync(token =>
         {
-            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.Same(context, DurableTask.Current);
             Assert.True(token.IsCancellationRequested);
             return ValueTask.CompletedTask;
         }, Xunit.TestContext.Current.CancellationToken);
 
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Fact]
@@ -1502,7 +1527,7 @@ public class DurableTaskTests
 
         var registration = await context.RegisterCancellationCallbackAsync(async token =>
         {
-            Assert.Same(context, DurableExecutionContext.Current);
+            Assert.Same(context, DurableTask.Current);
             Assert.True(token.IsCancellationRequested);
             Interlocked.Increment(ref calls);
             callbackStarted.SetResult();
@@ -1527,7 +1552,7 @@ public class DurableTaskTests
                 async () => await registration.DisposeAsync()));
         Assert.Equal(1, calls);
         Assert.True(cancellation.IsCompletedSuccessfully);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Theory]
@@ -1546,7 +1571,7 @@ public class DurableTaskTests
         {
             await using var registration = await completed.RegisterCancellationCallbackAsync(async token =>
             {
-                Assert.Same(completed, DurableExecutionContext.Current);
+                Assert.Same(completed, DurableTask.Current);
                 Assert.True(token.IsCancellationRequested);
                 nestedCalls++;
                 var cycleClosingRequest = DurableTaskRuntimeHelper.RequestCancellationAsync(active, CancellationToken.None);
@@ -1577,7 +1602,7 @@ public class DurableTaskTests
         Assert.Same(
             completedCancellation,
             DurableTaskRuntimeHelper.RequestCancellationAsync(completed, CancellationToken.None));
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Fact]
@@ -1957,7 +1982,7 @@ public class DurableTaskTests
     }
 
     [Fact]
-    public void DurableExecutionContextRejectsNoneTaskId()
+    public void DurableTaskContextRejectsNoneTaskId()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
 
@@ -2547,7 +2572,7 @@ public class DurableTaskTests
         AssertDurableFailureResponse(functionResponse, failure);
         Assert.Equal(1, actionCalls);
         Assert.Equal(1, functionCalls);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Fact]
@@ -2577,7 +2602,7 @@ public class DurableTaskTests
         AssertDurableFailureResponse(functionResponse, failure);
         Assert.Equal(1, actionCalls);
         Assert.Equal(1, functionCalls);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Fact]
@@ -2676,12 +2701,12 @@ public class DurableTaskTests
             }
         });
 
-        var childId = context.TaskId.Child("$child-1");
+        var childId = context.Id.Child("$child-1");
         var response = await host.GetEntry(childId).WaitAsync(default);
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
         Assert.Equal([childId], host.EntryIds);
         Assert.Equal(1, host.ExecutionCount);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     private static async Task AssertGenericDurableTaskAwaiterForwardsContinuation(
@@ -2734,13 +2759,13 @@ public class DurableTaskTests
             }
         });
 
-        var childId = context.TaskId.Child("$child-1");
+        var childId = context.Id.Child("$child-1");
         var response = await host.GetEntry(childId).WaitAsync(default);
         Assert.Equal(expectedResult, response.GetResult<int>());
         Assert.Equal(typeof(int), response.ResultType);
         Assert.Equal([childId], host.EntryIds);
         Assert.Equal(1, host.ExecutionCount);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     private static void AssertDurableFailureResponse(
@@ -2829,7 +2854,7 @@ public class DurableTaskTests
         Assert.Equal(typeof(int), unsafeResult.ResultType);
         Assert.Equal(1, unsafeResultFirst.GetResultCount);
         Assert.Equal(1, unsafeResultSecond.GetResultCount);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
 
         async DurableTask AwaitSafeVoidAsync()
         {
@@ -2894,7 +2919,7 @@ public class DurableTaskTests
         Assert.Equal(54, unsafeResult.GetResult<int>());
         Assert.Equal(typeof(int), unsafeResult.ResultType);
         Assert.Equal(1, unsafeResultAwaitable.GetResultCount);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
 
         async DurableTask AwaitSafeVoidAsync() => _ = await safeVoidAwaitable;
         async DurableTask AwaitUnsafeVoidAsync() => _ = await unsafeVoidAwaitable;
@@ -2916,7 +2941,7 @@ public class SchedulingTests
         var definition = host.CreateRootDefinition<string>(async context =>
         {
             await Task.Yield();
-            return DurableTaskResponse.FromResult(context.TaskId.ToString());
+            return DurableTaskResponse.FromResult(context.Id.ToString());
         });
 
         var first = await definition.ScheduleAsync("stable-root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
@@ -3007,7 +3032,7 @@ public class SchedulingTests
         var ambient = host.CreateContext(TaskId.CreateRoot("ambient"));
         var definition = host.CreateRootDefinition<string>(
             context => ValueTask.FromResult<DurableTaskResponse>(
-                DurableTaskResponse.FromResult(context.TaskId.ToString())));
+                DurableTaskResponse.FromResult(context.Id.ToString())));
         ScheduledTask<string>? scheduled = null;
 
         await host.RunWithAmbientAsync(
@@ -3682,7 +3707,7 @@ public class SchedulingTests
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var definition = host.CreateRootDefinition<string>(
             context => ValueTask.FromResult<DurableTaskResponse>(
-                DurableTaskResponse.FromResult(context.TaskId.ToString())));
+                DurableTaskResponse.FromResult(context.Id.ToString())));
 
         var scheduled = await definition.ScheduleAsync("tenant/workflow", cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
@@ -3918,13 +3943,13 @@ public class SchedulingTests
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var definition = host.CreateRootDefinition<int>(async context =>
         {
-            Assert.Equal(TaskId.CreateRoot("selected-root"), context.TaskId);
+            Assert.Equal(TaskId.CreateRoot("selected-root"), context.Id);
             started.TrySetResult();
             await release.Task;
             return DurableTaskResponse.FromResult(89);
         });
 
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
         var scheduled = await definition.WithId("selected-root").ScheduleAsync(Xunit.TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
 
@@ -3966,7 +3991,7 @@ public class SchedulingTests
         Assert.Equal(expectedId, scheduled.Id);
         Assert.Equal(@"phase2\/root", scheduled.Id.ToString());
         Assert.Equal([expectedId], host.EntryIds);
-        Assert.Equal(expectedId, observedContext!.TaskId);
+        Assert.Equal(expectedId, observedContext!.Id);
         Assert.False(await scheduled.IsCompletedAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken));
         Assert.Same(DurableTaskResponse.Pending, await expectedEntry.PollAsync(default, Xunit.TestContext.Current.CancellationToken));
 
@@ -3975,7 +4000,7 @@ public class SchedulingTests
         Assert.Same(DurableTaskResponse.Completed, await expectedEntry.WaitAsync(Xunit.TestContext.Current.CancellationToken));
         Assert.Equal(1, invocationCount);
         Assert.Equal(1, host.ExecutionCount);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Fact]
@@ -4754,7 +4779,7 @@ public class SchedulingTests
         Assert.Equal(1, awaitable.OnCompletedCount);
         Assert.Equal(1, awaitable.GetResultCount);
         Assert.Equal(1, afterAwaitCount);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
 
         async DurableTask<int> ExecuteAsync()
         {
@@ -4795,7 +4820,7 @@ public class SchedulingTests
         Assert.Equal(1, awaitable.UnsafeOnCompletedCount);
         Assert.Equal(1, awaitable.GetResultCount);
         Assert.Equal(1, afterAwaitCount);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
 
         async DurableTask<string> ExecuteAsync()
         {
@@ -4827,7 +4852,7 @@ public class SchedulingTests
         Assert.Equal(0, awaitable.GetResultCount);
         var thrown = Assert.Throws<InvalidOperationException>(() => response.GetResult<object?>());
         Assert.Same(expected, thrown);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
 
         async DurableTask ExecuteAsync()
         {
@@ -4873,7 +4898,7 @@ public class SchedulingTests
         Assert.Equal(1, awaitable.GetResultCount);
         var thrown = Assert.Throws<ApplicationException>(() => response.GetResult<int>());
         Assert.Same(expected, thrown);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
 
         async DurableTask<int> ExecuteAsync()
         {
@@ -4938,7 +4963,7 @@ public class SchedulingTests
         Assert.Equal([childId, rootId], host.EntryIds);
         Assert.True(host.IsCancellationRequested(rootId));
         Assert.Equal(0, host.ExecutionCount);
-        Assert.Null(DurableExecutionContext.Current);
+        Assert.False(DurableTaskContext.TryGetCurrent(out _));
     }
 
     [Fact]
@@ -5233,7 +5258,7 @@ internal sealed class TestHost(DateTimeOffset utcNow)
     public int ActiveWaitCount => Volatile.Read(ref _activeWaitCount);
 
     public async Task RunWithAmbientAsync(
-        DurableExecutionContext ambient,
+        DurableTaskContext ambient,
         Func<Task> callback)
     {
         var wrapper = DurableTask.Run(async _ => await callback());
@@ -5409,7 +5434,7 @@ internal sealed class TestContext(
     TestHost host,
     TaskId id,
     DateTimeOffset utcNow,
-    CancellationToken executionAbortToken = default) : DurableExecutionContext(id, executionAbortToken)
+    CancellationToken executionAbortToken = default) : DurableTaskContext(id, executionAbortToken)
 {
     public override DateTimeOffset UtcNow => utcNow;
 
@@ -5450,13 +5475,13 @@ internal sealed class RootDefinition<TResult>(
 
     public IScheduledTaskHandle GetHandle(TaskId taskId) => host.GetEntry(taskId);
 
-    protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => throw new InvalidOperationException("Root definitions are scheduled by their host.");
 }
 
 internal sealed class CallbackDurableTask(Func<TestContext, ValueTask<DurableTaskResponse>> callback) : DurableTask
 {
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         try
         {
@@ -5605,7 +5630,7 @@ internal sealed class ControlledRootDefinition<TResult>(ControlledScheduledWaitS
         return new ControlledScheduledTaskHandle(taskId, state);
     }
 
-    protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => throw new InvalidOperationException("The controlled root definition is scheduled by its host.");
 }
 
@@ -5644,7 +5669,7 @@ internal sealed class RecordingRootDefinition<TResult>(RecordingScheduledTaskHan
         return handle;
     }
 
-    protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => throw new InvalidOperationException("The recording root definition is scheduled by its host.");
 }
 
@@ -5846,7 +5871,7 @@ internal sealed class NonGenericRootDefinition(
         return handle;
     }
 
-    protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => throw new InvalidOperationException("The non-generic root definition is scheduled by its host.");
 }
 
@@ -5888,7 +5913,7 @@ internal sealed class DirectRootDefinition(DirectScheduledTaskState state) : Dur
 
     public IScheduledTaskHandle GetHandle(TaskId taskId) => new DirectScheduledTaskHandle(taskId, state);
 
-    protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => throw new InvalidOperationException("The direct root definition is scheduled by its host.");
 }
 
