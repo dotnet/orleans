@@ -104,7 +104,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
         await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, payload, write: true);
 
-        // The receiver has no handler, so both permitted delivery attempts fail.
+        // The receiver has no handler, so delivery attempts fail until MaxHandlerNotFoundRetryAge elapses.
         await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 1);
         var (state, deadLetters) = await OnGrainAsync(sender, context => (
             Grain(context).GetState(),
@@ -116,8 +116,8 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(receiver.GetGrainId(), letter.Message.ReceiverId);
         Assert.Equal(payload, letter.Message.Envelope.Payload);
         Assert.Equal(SourceSinkGrain.Subject, letter.Message.Envelope.Subject);
-        Assert.Equal(2, letter.AttemptCount);
-        Assert.Equal(3, Probe.For(sender).Materializations);
+        Assert.True(letter.AttemptCount > 1);
+        Assert.Equal(letter.AttemptCount + 1, Probe.For(sender).Materializations);
 
         // The dead letter keeps its own copy for diagnosis.
         await WaitUntilAsync(sender, _ => Storage.CountPayloadOccurrences(Journal(sender), payload) == 2);
@@ -412,7 +412,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         {
             Kind = OutboxCommandKind.Enqueue,
             Reference = new() { MessageId = messageId },
-            State = new() { EnqueuedAt = DateTimeOffset.UtcNow }
+            State = new()
         });
 
     private static void AssertSourceFailureDeadLetter(DeadLetter<OutboxMessage> letter, MessageId messageId, SourceFault fault)

@@ -75,7 +75,6 @@ public static class MessagingExtensions
 
         services.ConfigureNamedOptionForLogging<DurableMessagingOptions>(Options.DefaultName);
         services.TryAddSingleton<MessagingInstruments>();
-        services.TryAddSingleton<DefaultDeliveryResiliencePipeline>();
         services.TryAddScoped<MessagingPump>();
         services.TryAddScoped<Inbox>();
         services.Replace(ServiceDescriptor.Scoped<IInbox>(static sp => sp.GetRequiredService<Inbox>()));
