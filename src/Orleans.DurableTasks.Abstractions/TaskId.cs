@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.DurableTasks;
@@ -263,7 +264,27 @@ internal sealed class HierarchicalKey : IEquatable<HierarchicalKey>
         return true;
     }
 
-    public override string ToString() => string.Join(Separator, _segments.Select(EscapeSegment));
+    public override string ToString()
+    {
+        var length = _segments.Length - 1;
+        foreach (var segment in _segments)
+        {
+            length += segment.Length;
+            foreach (var character in segment)
+            {
+                if (character is Separator or Escape)
+                {
+                    length++;
+                }
+            }
+        }
+
+        return string.Create(length, this, static (destination, key) =>
+        {
+            var formatted = key.TryFormat(destination, out var charsWritten);
+            Debug.Assert(formatted && charsWritten == destination.Length, "The escaped length matches the formatted path.");
+        });
+    }
 
     public bool TryFormat(Span<char> destination, out int charsWritten)
     {
@@ -306,9 +327,6 @@ internal sealed class HierarchicalKey : IEquatable<HierarchicalKey>
 
         return true;
     }
-
-    private static string EscapeSegment(string segment)
-        => segment.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("/", "\\/", StringComparison.Ordinal);
 
     public bool Equals(HierarchicalKey? other)
         => other is not null && _segments.AsSpan().SequenceEqual(other._segments);
