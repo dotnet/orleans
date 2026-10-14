@@ -16,13 +16,17 @@ public interface IBasketGrain : IGrainWithStringKey
 // a durable grain stages the invocation in its outbox, which replaces eShop's integration event log.
 public sealed class BasketGrain : DurableGrain, IBasketGrain
 {
-    private readonly IDurableDictionary<int, BasketItem> _items;
-    private readonly IDurableValue<Guid> _lastCheckout;
+    private static readonly TimeSpan CheckoutRetention = TimeSpan.FromDays(7);
 
-    public BasketGrain()
+    private readonly TimeProvider _timeProvider;
+    private readonly IDurableDictionary<int, BasketItem> _items;
+    private readonly IDurableDictionary<Guid, DateTimeOffset> _checkouts;
+
+    public BasketGrain(TimeProvider timeProvider)
     {
+        _timeProvider = timeProvider;
         _items = StateManager.GetOrAddDictionary<int, BasketItem>("items");
-        _lastCheckout = StateManager.GetOrAddValue<Guid>("last-checkout");
+        _checkouts = StateManager.GetOrAddDictionary<Guid, DateTimeOffset>("checkouts");
     }
 
     public Task<BasketItem[]> GetAsync() => Task.FromResult(_items.Values.ToArray());
@@ -44,11 +48,14 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
         return _items.Values.ToArray();
     }
 
-    // The request ID becomes the order ID, so a retried checkout returns the same order.
+    // The request ID becomes the order ID. The basket remembers its checkouts for CheckoutRetention, so a retried
+    // checkout within that period returns the same order, even after later checkouts.
     public async Task<Guid?> CheckoutAsync(CheckoutRequest request)
     {
-        if (_lastCheckout.Value == request.RequestId)
+        if (_checkouts.ContainsKey(request.RequestId))
         {
+            // A checkout whose write failed before committing keeps its changes staged, so the retry writes them.
+            await WriteStateAsync();
             return request.RequestId;
         }
 
@@ -62,7 +69,13 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
             .Select(item => new OrderLine(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity))
             .ToArray();
         _items.Clear();
-        _lastCheckout.Value = orderId;
+        var now = _timeProvider.GetUtcNow();
+        foreach (var id in _checkouts.Where(pair => now - pair.Value >= CheckoutRetention).Select(pair => pair.Key).ToArray())
+        {
+            _checkouts.Remove(id);
+        }
+
+        _checkouts[orderId] = now;
 
         // The detached workflow is staged in the outbox with the cleared basket, and both commit in one journal write.
         // The order ID derives the workflow's root task ID, so the order runs one workflow, which it retains with its
