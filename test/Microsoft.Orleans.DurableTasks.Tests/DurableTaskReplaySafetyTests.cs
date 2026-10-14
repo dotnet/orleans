@@ -352,6 +352,72 @@ public sealed class DurableTaskReplaySafetyTests
         }
     });
 
+    [Fact]
+    public Task ReplayReportsIsReplayingUntilItReachesEveryRecordedOperation() => ActivationScheduler.RunAsync(async () =>
+    {
+        var observed = new List<string>();
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, observed, insertOperation: false));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+        }
+
+        Assert.Equal(["start:False", "a:False", "b:False"], observed);
+        observed.Clear();
+
+        // The replay reaches the effect and the step which the first attempt recorded, in that order.
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+        replay.Grain.OpenGate();
+        Assert.Equal(3, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
+
+        Assert.Equal(["start:True", "a:True", "b:False", "gate:False"], observed);
+    });
+
+    [Fact]
+    public Task ReplayWhichStartsANewOperationStopsReplaying() => ActivationScheduler.RunAsync(async () =>
+    {
+        var observed = new List<string>();
+        var insertOperation = false;
+        await using var harness = new DurableTaskReplayHarness(grain => Workflow(grain, observed, insertOperation));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+        }
+
+        // A later version adds an effect between the recorded ones, so its replay runs new work before reaching "b".
+        observed.Clear();
+        insertOperation = true;
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+        replay.Grain.OpenGate();
+        Assert.Equal(3, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
+
+        Assert.Equal(["start:True", "a:True", "inserted:False", "b:False", "gate:False"], observed);
+    });
+
+    private static async DurableTask<int> Workflow(ReplayGrain grain, List<string> observed, bool insertOperation)
+    {
+        Observe("start");
+        var a = DurableTask.Once("a", static () => 1);
+        Observe("a");
+        if (insertOperation)
+        {
+            DurableTask.Once("inserted", static () => 0);
+            Observe("inserted");
+        }
+
+        var b = await DurableTask.Run(static _ => 2).WithId("b");
+        Observe("b");
+        await grain.WaitAtGateAsync();
+        Observe("gate");
+        return a + b;
+
+        void Observe(string point) => observed.Add($"{point}:{DurableTask.Current.IsReplaying}");
+    }
+
     /// <summary>Increments the grain's counter in an effect, then waits at the grain's gate.</summary>
     private static DurableTask IncrementOnce(ReplayGrain grain) => IncrementOnceAsync(grain);
 

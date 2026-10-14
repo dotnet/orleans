@@ -2168,6 +2168,129 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task ReplayReportsReplayingUntilItReachesEveryRecordedOperation() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var observations = new ConcurrentQueue<(int Run, string Point, bool Replaying)>();
+        TaskCompletionSource<DurableTaskContext>[] waiting = [new(TaskCreationOptions.RunContinuationsAsynchronously), new(TaskCreationOptions.RunContinuationsAsynchronously)];
+        var runs = 0;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async _ =>
+            {
+                var run = Interlocked.Increment(ref runs);
+                var context = DurableTask.Current;
+                observations.Enqueue((run, "start", context.IsReplaying));
+                DurableTask.Once("effect", () => 1);
+                observations.Enqueue((run, "effect", context.IsReplaying));
+                await DurableTask.Run(static _ => 2).WithId("step");
+                observations.Enqueue((run, "step", context.IsReplaying));
+                waiting[run - 1].TrySetResult(context);
+                await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("delay");
+            }));
+
+        runtime.ScheduleFromInbox(TaskId.Parse("root"), request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        var first = await waiting[0].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => storage.Contains(TaskId.Parse("root/delay")));
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        var (replacement, _, _, _) = CreateRuntime(storage, manager);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
+        var replay = await waiting[1].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // The replay reaches the delay, the last operation which the first run recorded, and then runs live.
+        await WaitUntilAsync(() => !replay.IsReplaying);
+        Assert.False(first.IsReplaying);
+        Assert.Equal(
+            [
+                (1, "start", false), (1, "effect", false), (1, "step", false),
+                (2, "start", true), (2, "effect", true), (2, "step", true),
+            ],
+            observations);
+        await replacement.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    });
+
+    [Fact]
+    public Task ReplayWhichStartsAnUnrecordedOperationStopsReplaying() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var observations = new ConcurrentQueue<(int Run, string Point, bool Replaying)>();
+        TaskCompletionSource[] waiting = [new(TaskCreationOptions.RunContinuationsAsynchronously), new(TaskCreationOptions.RunContinuationsAsynchronously)];
+        var runs = 0;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async _ =>
+            {
+                var run = Interlocked.Increment(ref runs);
+                var context = DurableTask.Current;
+                if (run > 1)
+                {
+                    // A deployment added an effect before the recorded ones.
+                    observations.Enqueue((run, "start", context.IsReplaying));
+                    DurableTask.Once("added", () => 0);
+                }
+
+                DurableTask.Once("effect", () => 1);
+                observations.Enqueue((run, "effect", context.IsReplaying));
+                waiting[run - 1].TrySetResult();
+                await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("delay");
+            }));
+
+        runtime.ScheduleFromInbox(TaskId.Parse("root"), request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await waiting[0].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => storage.Contains(TaskId.Parse("root/delay")));
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        var (replacement, _, _, _) = CreateRuntime(storage, manager);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
+        await waiting[1].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal([(1, "effect", false), (2, "start", true), (2, "effect", false)], observations);
+        await replacement.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    });
+
+    [Fact]
+    public Task ReplayWhichReachesARecordedOperationAgainKeepsReplaying() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var detachedRequest = CreateRemoteRequest(1);
+        var observations = new ConcurrentQueue<(int Run, string Point, bool Replaying)>();
+        TaskCompletionSource[] waiting = [new(TaskCreationOptions.RunContinuationsAsynchronously), new(TaskCreationOptions.RunContinuationsAsynchronously)];
+        var runs = 0;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async _ =>
+            {
+                var run = Interlocked.Increment(ref runs);
+                var context = DurableTask.Current;
+
+                // The second detach of the same task reaches the marker which the first one reached.
+                await new TestStateManager.TestRemoteDurableTask(detachedRequest).DetachAsync("detached", CancellationToken.None);
+                await new TestStateManager.TestRemoteDurableTask(detachedRequest).DetachAsync("detached", CancellationToken.None);
+                observations.Enqueue((run, "detached", context.IsReplaying));
+                DurableTask.Once("effect", () => 1);
+                observations.Enqueue((run, "effect", context.IsReplaying));
+                waiting[run - 1].TrySetResult();
+                await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("delay");
+            }));
+
+        runtime.ScheduleFromInbox(TaskId.Parse("root"), request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await waiting[0].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => storage.Contains(TaskId.Parse("root/delay")));
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        var (replacement, _, _, _) = CreateRuntime(storage, manager);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
+        await waiting[1].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal([(1, "detached", false), (1, "effect", false), (2, "detached", true), (2, "effect", true)], observations);
+        await replacement.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    });
+
+    [Fact]
     public Task OnceOffTheActivationSchedulerFails() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
