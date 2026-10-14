@@ -42,8 +42,10 @@ namespace Orleans.DurableTasks.Runtime;
 /// <para>
 /// The runtime is the <see cref="IOutboxMessageSource"/> of its completion messages: the outbox journals a reference to
 /// each completion, and the runtime materializes the message from the task's stored result, so the result is journaled
-/// once. A stored result which no longer decodes fails only the operations which read it: the outbox dead-letters its
-/// completion, whose retirement doesn't decode the result, and activation never decodes stored results.
+/// once while the completion is pending. A dead-lettered completion's dead letter holds a copy of the result, and the
+/// task keeps its own for the retention period, so polls and re-invocations still observe it. A stored result which no
+/// longer decodes fails only the operations which read it: the outbox dead-letters its completion, whose retirement
+/// doesn't decode the result, and activation never decodes stored results.
 /// </para>
 /// <para>
 /// An invoked task, which was scheduled as a request, owns an execution tree: the task and its descendants which are not
