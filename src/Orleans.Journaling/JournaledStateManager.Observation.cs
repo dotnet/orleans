@@ -67,6 +67,26 @@ internal partial class JournaledStateManager
         }
     }
 
+    /// <inheritdoc/>
+    public IReadOnlyList<string> GetRetiredStateNames()
+    {
+        lock (_lock)
+        {
+            ThrowIfFenced();
+            ObjectDisposedException.ThrowIf(_disposed != 0, this);
+            List<string>? result = null;
+            foreach (var (name, state) in _states)
+            {
+                if (state is RetiredStateMachine)
+                {
+                    (result ??= []).Add(name);
+                }
+            }
+
+            return result ?? [];
+        }
+    }
+
     // Called under the manager lock after capturing a write's journal entries.
     // Returns the write's version, or zero when the capture omitted state-owned pending entries.
     private long OnWriteCaptured(bool capturedAllStates)
