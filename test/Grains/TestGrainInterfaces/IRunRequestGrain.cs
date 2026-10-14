@@ -15,6 +15,8 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task StartValueRequest(int value);
 
+    Task SetRequestFilterMode(RequestFilterMode mode);
+
     Task StartRequestContextRequest(string value);
 
     Task StartFaultingRequest();
@@ -41,4 +43,15 @@ public interface INonReentrantRunRequestGrain : IRunRequestGrain
 
 public interface IReentrantRunRequestGrain : IRunRequestGrain
 {
+}
+
+/// <summary>
+/// How the grain's call filter handles requests queued by <c>RunRequestAsync</c>.
+/// </summary>
+[GenerateSerializer]
+public enum RequestFilterMode
+{
+    Invoke,
+    Throw,
+    ShortCircuit,
 }

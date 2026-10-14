@@ -128,6 +128,7 @@ namespace Orleans
         /// on a non-reentrant grain, the callback runs exclusively, the same as a grain method call.
         /// The request passes through grain call filters as <c>IGrainRequestInvoker.RunRequestAsync</c>,
         /// starts a new call chain, and keeps the activation alive.
+        /// A call filter which fails or sets the result without invoking the request completes the returned task with that outcome.
         /// </para>
         /// <para>
         /// Use this method to run code from a background task, such as a stream or messaging handler, as a grain request.

@@ -130,6 +130,29 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
     }
 
     [Fact]
+    public async Task RunRequest_FilterThrows_FaultsRequest()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+        await grain.SetRequestFilterMode(RequestFilterMode.Throw);
+
+        await grain.StartValueRequest(1);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+        Assert.Equal("Filter failed.", exception.Message);
+    }
+
+    [Fact]
+    public async Task RunRequest_FilterShortCircuits_CompletesWithFilterResult()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+        await grain.SetRequestFilterMode(RequestFilterMode.ShortCircuit);
+
+        await grain.StartValueRequest(1);
+
+        Assert.Equal("filtered", await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task RunRequest_FromOutsideActivation_RunsOnActivation()
     {
         var key = Guid.NewGuid();

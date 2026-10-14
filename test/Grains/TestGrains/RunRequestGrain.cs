@@ -11,11 +11,30 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
     private readonly List<string> _filteredCalls = [];
     private TaskCompletionSource? _gate;
     private Task _pending = Task.CompletedTask;
+    private RequestFilterMode _requestFilterMode;
 
     public async Task Invoke(IIncomingGrainCallContext context)
     {
         _filteredCalls.Add($"{context.InterfaceName}.{context.MethodName}");
+        if (context.InterfaceName == "IGrainRequestInvoker")
+        {
+            switch (_requestFilterMode)
+            {
+                case RequestFilterMode.Throw:
+                    throw new InvalidOperationException("Filter failed.");
+                case RequestFilterMode.ShortCircuit:
+                    context.Result = "filtered";
+                    return;
+            }
+        }
+
         await context.Invoke();
+    }
+
+    public Task SetRequestFilterMode(RequestFilterMode mode)
+    {
+        _requestFilterMode = mode;
+        return Task.CompletedTask;
     }
 
     public async Task StartRequestDuringCall()

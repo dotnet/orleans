@@ -338,10 +338,13 @@ namespace Orleans.Runtime
                     response = Response.FromException(exc1);
                 }
 
+                var localRequest = message.IsLocalOnly ? message.BodyObject as ILocalRequest : null;
+                localRequest?.OnInvoked(response);
+
                 if (response.Exception is { } invocationException)
                 {
-                    // Callers observe two-way failures, and local-only request owners report their own failures.
-                    var logLevel = message.Direction != Message.Directions.OneWay || message.IsLocalOnly ? LogLevel.Debug : LogLevel.Warning;
+                    // Callers observe two-way failures, and local requests report failures through their tasks.
+                    var logLevel = message.Direction != Message.Directions.OneWay || localRequest is not null ? LogLevel.Debug : LogLevel.Warning;
                     LogGrainInvokeException(this.invokeExceptionLogger, logLevel, invocationException, message);
 
                     // If a grain allowed an inconsistent state exception to escape and the exception originated from
@@ -374,6 +377,7 @@ namespace Orleans.Runtime
             catch (Exception exc2)
             {
                 LogWarningInvokeException(this.logger, exc2, message);
+                (message.BodyObject as ILocalRequest)?.Reject(exc2);
 
                 if (message.Direction != Message.Directions.OneWay)
                 {

@@ -9,6 +9,7 @@ namespace Orleans.Runtime;
 /// <remarks>
 /// The request is its own completion source, so queuing a request allocates only this object and its message.
 /// Cancellation applies while the request is queued. Once the callback starts, the task reflects the callback's outcome.
+/// When a call filter completes the invocation without running the callback, the task reflects the filter's outcome.
 /// </remarks>
 internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResult>, IInvokable, IGrainRequestInvoker, ILocalRequest
 {
@@ -83,6 +84,25 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
         TrySetException(exception);
     }
 
+    void ILocalRequest.OnInvoked(Response response)
+    {
+        if (Task.IsCompleted)
+        {
+            return;
+        }
+
+        // A call filter completed the invocation without running the callback.
+        _registration.Dispose();
+        if (response.Exception is { } exception)
+        {
+            TrySetException(exception);
+        }
+        else
+        {
+            TrySetResult(response.Result is TResult result ? result : default!);
+        }
+    }
+
     public object? GetTarget() => this;
 
     public void SetTarget(ITargetHolder holder)
@@ -133,7 +153,7 @@ internal interface IGrainRequestInvoker : IAddressable
 }
 
 /// <summary>
-/// A local-only request which must be notified when its activation drops it without running it.
+/// A local-only request whose task reports its outcome to the code which queued it.
 /// </summary>
 internal interface ILocalRequest
 {
@@ -141,4 +161,9 @@ internal interface ILocalRequest
     /// Completes the request with <paramref name="exception"/>.
     /// </summary>
     void Reject(Exception exception);
+
+    /// <summary>
+    /// Completes the request with the invocation's <paramref name="response"/> if the invocation did not run the request.
+    /// </summary>
+    void OnInvoked(Response response);
 }
