@@ -278,14 +278,16 @@ internal sealed class CassandraJournalStorage : IJournalStorage
         var stagedBatch = CreateReplaceBatch();
         var stagedCount = 0;
         var publicationStarted = false;
+        var remaining = value;
 
         try
         {
-            for (long offset = 0; offset < value.Length; offset += _options.RowSizeBytes)
+            while (!remaining.IsEmpty)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var length = (int)Math.Min(_options.RowSizeBytes, value.Length - offset);
-                var payload = value.Slice(offset, length).ToArray();
+                var length = (int)Math.Min(_options.RowSizeBytes, remaining.Length);
+                var payload = remaining.Slice(0, length).ToArray();
+                remaining = remaining.Slice(length);
                 stagedBatch.Add(_queries.ReplaceEntry(_journalId.Value, generation, sequence, Guid.NewGuid(), payload));
                 stagedCount++;
                 sequence++;

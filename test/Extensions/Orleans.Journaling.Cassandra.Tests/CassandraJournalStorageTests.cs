@@ -193,6 +193,23 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
+    public async Task ReplaceAsync_PreservesSegmentedInputAcrossRowBoundaries()
+    {
+        await using var harness = await CreateHarnessAsync(rowSizeBytes: 6);
+        var id = NewJournalId();
+        var expected = Enumerable.Range(1, 37).Select(value => (byte)value).ToArray();
+        var value = CreateSegmentedSequence(expected, [1, 3, 2, 7, 1, 5, 4, 9, 5]);
+
+        await harness.Provider.CreateStorage(id).ReplaceAsync(value, TestContext.Current.CancellationToken);
+
+        var generation = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        Assert.Equal(7, (await GetSequencesAsync(harness.Session, harness.Options.TableName, id, generation)).Length);
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal(expected, consumer.Bytes.ToArray());
+    }
+
+    [Fact]
     public async Task ReplaceAsync_EmptySnapshotPublishesEmptyGenerationAndRemainsAppendable()
     {
         await using var harness = await CreateHarnessAsync();
@@ -822,6 +839,21 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
 
     private static JournalId NewJournalId() => new($"test/{Guid.NewGuid():N}");
 
+    private static ReadOnlySequence<byte> CreateSegmentedSequence(byte[] value, int[] segmentLengths)
+    {
+        var first = new TestSequenceSegment(value.AsMemory(0, segmentLengths[0]));
+        var last = first;
+        var offset = segmentLengths[0];
+        foreach (var segmentLength in segmentLengths.Skip(1))
+        {
+            last = last.Append(value.AsMemory(offset, segmentLength));
+            offset += segmentLength;
+        }
+
+        Assert.Equal(value.Length, offset);
+        return new ReadOnlySequence<byte>(first, 0, last, last.Memory.Length);
+    }
+
     private static async Task<Guid> GetActiveGenerationAsync(ISession session, string table, JournalId id)
     {
         var row = (await session.ExecuteAsync(new SimpleStatement(
@@ -848,6 +880,21 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
             $"SELECT generation FROM {table} WHERE journal_id = ?",
             id.Value));
         return result.Select(row => row.GetValue<Guid>("generation")).Distinct().ToArray();
+    }
+
+    private sealed class TestSequenceSegment : ReadOnlySequenceSegment<byte>
+    {
+        public TestSequenceSegment Append(ReadOnlyMemory<byte> nextMemory)
+        {
+            var next = new TestSequenceSegment(nextMemory)
+            {
+                RunningIndex = RunningIndex + Memory.Length,
+            };
+            Next = next;
+            return next;
+        }
+
+        public TestSequenceSegment(ReadOnlyMemory<byte> memory) => Memory = memory;
     }
 
     private sealed class ProviderHarness(
