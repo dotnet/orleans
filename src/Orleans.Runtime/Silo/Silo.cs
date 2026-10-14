@@ -69,8 +69,6 @@ namespace Orleans.Runtime
         {
             SystemStatus = SystemStatus.Creating;
             Services = services;
-            // Capture connection and message measurements from the beginning of the silo's lifetime.
-            SiloRuntimeMetricsListener.Start();
             RingProvider = services.GetRequiredService<IConsistentRingProvider>();
             platformWatchdog = services.GetRequiredService<Watchdog>();
             this.siloDetails = siloDetails;

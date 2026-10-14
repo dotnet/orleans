@@ -46,7 +46,7 @@ import Overview from './overview/overview';
 import SiloState from './silos/silo-state-label';
 import Alert from './components/alert';
 import LogStream from './logstream/log-stream';
-import SiloCounters from './silos/silo-counters';
+import SiloCounters, { type Counter } from './silos/silo-counters';
 import Reminders from './reminders/reminders';
 import Preferences from './components/preferences';
 import storage from './lib/storage';
@@ -277,6 +277,7 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   let siloData: any[] = [];
   let siloStats: any[] = [];
+  let siloCounters: Counter[] = [];
   const loadData = function () {
     http.get(`HistoricalStats/${host}`, (err, data) => {
       siloData = data;
@@ -284,6 +285,10 @@ function renderPage(jsx: JSX.Element, path: string) {
     });
     http.get(`SiloStats/${host}`, (err, data) => {
       siloStats = data;
+      render();
+    });
+    http.get(`SiloCounters/${host}`, (_err, data) => {
+      siloCounters = data;
       render();
     });
   };
@@ -319,6 +324,7 @@ function renderPage(jsx: JSX.Element, path: string) {
           siloMetadata={siloMetadata}
           dashboardCounters={dashboardCounters}
           siloStats={siloStats}
+          counters={siloCounters}
         />
       </Page>,
       '#/silos'
