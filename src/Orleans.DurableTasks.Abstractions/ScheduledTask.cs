@@ -473,7 +473,7 @@ public abstract class ScheduledTask
     /// Links the caller's wait cancellation with the execution's abort token, or returns <see langword="null"/> when the
     /// caller's token can't be canceled, so the abort token alone applies.
     /// </summary>
-    private static CancellationTokenSource? CreateLinkedWaitCancellation(DurableExecutionContext context, CancellationToken cancellationToken) =>
+    internal static CancellationTokenSource? CreateLinkedWaitCancellation(DurableExecutionContext context, CancellationToken cancellationToken) =>
         cancellationToken.CanBeCanceled
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.ExecutionAbortToken)
             : null;
