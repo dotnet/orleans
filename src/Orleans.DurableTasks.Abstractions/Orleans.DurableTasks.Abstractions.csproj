@@ -23,6 +23,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <ProjectReference Include="..\Orleans.DurableTasks.Analyzers\Orleans.DurableTasks.Analyzers.csproj"
+                      ReferenceOutputAssembly="false"
+                      PrivateAssets="all" />
+    <None Include="..\Orleans.DurableTasks.Analyzers\bin\$(Configuration)\netstandard2.0\Orleans.DurableTasks.Analyzers.dll"
+          Pack="true"
+          PackagePath="analyzers/dotnet/cs"
+          Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
