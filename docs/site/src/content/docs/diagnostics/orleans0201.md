@@ -29,7 +29,7 @@ A replay runs the body from the start, so it produces another value:
 - **Another key.** A replay which reaches the `charge` step before it recorded a result runs the step with a new key, so the payment provider can't recognize the retry and charges again.
 - **Divergence.** A value which reaches a durable call's arguments, a `WithId` name, or a branch makes the replay schedule a different operation than the one which the first run recorded, and the operation fails with a divergence error.
 
-For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
+For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
 
 ## How to fix violations
 
