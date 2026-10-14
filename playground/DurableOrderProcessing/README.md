@@ -44,13 +44,17 @@ sequenceDiagram
 `OrderGrain.PlaceOrderAsync` reads top to bottom as the flow above. Every arrow is a durable call: a grain method which
 returns `DurableTask` or `DurableTask<T>`. The workflow awaits each call under a stable child ID from `WithId`, and a
 named `DurableTask.WhenAll` gives its inputs IDs beneath its own, such as `reserve/0` and `reserve/1`. Each state
-transition is also a durable task method, such as `await MarkPaid().WithId("pay")`, so its journaled state change
-commits with its recorded result. A paid order waits for its `Shipped` signal, then records the `Shipped` transition and
-completes.
+transition is a recorded effect, such as `DurableTask.Once("pay", MarkPaid)`: its journaled state change commits with
+its recorded result in the workflow's next journal write, without a write of its own, and a replay returns the result
+without running the transition again. The code between them reads only the request and recorded results, so each
+projection update addresses `request.BuyerId`. A paid order waits for its `Shipped` signal, then records the `Shipped`
+transition and completes.
 
-When the buyer cancels, the workflow catches `OperationCanceledException`, then runs its compensation inline in a
-`DurableTask.Current.SuppressCancellation()` scope: it releases each line concurrently and records the cancellation
-with `DurableTask.Current.CancellationReason`. Rejected stock and declined payments run the same compensation.
+When the buyer cancels, the next durable operation before payment authorization throws `OperationCanceledException`, so
+a cancellation which arrives as validation completes is observed too. The workflow catches it, then runs its
+compensation inline in a `DurableTask.Current.SuppressCancellation()` scope: it releases each line concurrently and
+records the cancellation with `DurableTask.Current.CancellationReason`. Rejected stock and declined payments run the same
+compensation.
 
 ## Endpoints
 
@@ -78,9 +82,9 @@ expose the durable task runtime:
 | Compensation | The transition which cancels the order stages `ReleaseStock` for each confirmed line. | Inline, in a `SuppressCancellation()` scope, so the cancellation which ended the workflow doesn't cancel its compensation: `WhenAll(...ReleaseAsync...).WithId("release")` releases the lines concurrently, then the `cancel` transition marks each line which held a reservation as released. `ReleaseAsync` returns whether it released stock, so releasing a line whose reservation never ran is a no-op. |
 | Projection | `StatusChanged` messages carry a version; the buyer keeps the highest. | The workflow detaches one `RecordOrderAsync` call per version under `DetachedTaskId.For($"buyer-v{version}")`, such as `place-order-{orderId}:buyer-v2`, so it doesn't wait for the buyer and cancellation doesn't reach the update. The buyer keeps the highest version and retains the detached task. |
 | Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | Task IDs derived from the order ID, such as `place-order-{orderId}/reserve/0` and `place-order-{orderId}/authorize-payment`; `(grain, task ID)` identifies one execution, and a reused ID with different arguments fails while the task exists. |
-| Recovery | The inbox and outbox resume pending messages; each handler runs from the state it finds. | The next activation replays pending tasks from the start; completed children return their recorded results, so the workflow resumes where it stopped. Durable Jobs wakes the order when the delay is due or a completion arrives. |
+| Recovery | The inbox and outbox resume pending messages; each handler runs from the state it finds. | The next activation replays pending tasks from the start; completed children and transitions return their recorded results, so the workflow resumes where it stopped. Durable Jobs wakes the order when the delay is due or a completion arrives. |
 | Observability | Order state and the dashboard. | Order state, the dashboard, and per-grain task lists with each task's status, timestamps, due time, remote target, and result. |
-| Non-blank lines of code | Grains 403, contracts 112, host 49. | Grains 386, contracts 89, host 90, including the diagnostics endpoints. |
+| Non-blank lines of code | Grains 414, contracts 112, host 49. | Grains 390, contracts 89, host 90, including the diagnostics endpoints. |
 
 Both samples produce the same outcomes for a successful order, a cancellation during the grace period, a rejected line,
 and a declined card, including statuses, versions, descriptions, and stock levels.
