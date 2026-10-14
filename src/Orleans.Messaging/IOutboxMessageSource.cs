@@ -8,7 +8,7 @@ namespace Orleans.Messaging;
 /// <see cref="IOutbox.Send(MessageId)"/> stages a reference entry which carries the message ID and delivery
 /// state, but no payload or receiver, so the payload is journaled once, in the application's state. The outbox keeps
 /// every delivery semantic of an ordinary message: delivery after the sending write is durable, retries with backoff,
-/// dead-lettering after <c>MaxHandlerNotFoundRetryAge</c> or <c>MaxOutboxRetryAge</c>, wake-ups, and metrics.
+/// dead-lettering after <c>MaxOutboxRetryAge</c>, wake-ups, and metrics.
 /// </para>
 /// <para>
 /// The outbox calls <see cref="TryGetMessage"/> when the message is sent and before every delivery attempt. The first

@@ -49,10 +49,9 @@ public sealed class DeliveryAndOptionsContractTests
 
         Assert.Equal(1000, options.MaxCapacity);
         Assert.Equal(TimeSpan.FromDays(7), options.DeduplicationWindow);
-        Assert.Equal(TimeSpan.FromDays(1), options.MaxOutboxRetryAge);
+        Assert.Equal(TimeSpan.FromHours(6), options.MaxOutboxRetryAge);
         Assert.Equal(TimeSpan.FromDays(30), options.DeadLetterRetentionPeriod);
         Assert.Equal(5, options.MaxProcessingAttempts);
-        Assert.Equal(TimeSpan.FromHours(6), options.MaxHandlerNotFoundRetryAge);
         Assert.Same(ResiliencePipeline.Empty, options.DeliveryResiliencePipeline);
         Assert.Equal(1000, options.MaxRetainedDeadLetters);
         Assert.Equal(32, options.InboxBatchSize);
@@ -69,7 +68,6 @@ public sealed class DeliveryAndOptionsContractTests
             (nameof(DurableMessagingOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.MaxValue),
             (nameof(DurableMessagingOptions.MaxProcessingAttempts), options => options.MaxProcessingAttempts = 0),
-            (nameof(DurableMessagingOptions.MaxHandlerNotFoundRetryAge), options => options.MaxHandlerNotFoundRetryAge = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.MaxOutboxRetryAge), options => options.MaxOutboxRetryAge = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.DeadLetterRetentionPeriod), options => options.DeadLetterRetentionPeriod = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.MaxRetainedDeadLetters), options => options.MaxRetainedDeadLetters = 0),
