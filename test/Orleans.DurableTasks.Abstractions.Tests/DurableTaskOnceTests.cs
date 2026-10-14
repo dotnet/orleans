@@ -199,6 +199,31 @@ public class DurableTaskOnceTests
     }
 
     [Fact]
+    public async Task NamedChildrenCombinatorsAndEffectsShareOneCountPerName()
+    {
+        var host = new TestHost(Now);
+
+        var response = await DurableTaskRuntimeHelper.RunAsync(Body(), host.CreateContext(TaskId.CreateRoot("root")));
+
+        // The same occurrence of a name has the same ordinal whichever kind of operation uses it, so a host can detect a
+        // deployment which changes the kind of an occurrence.
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal(
+            ["root/$once:step", "root/$once:step$4"],
+            host.Effects.Keys.Select(id => id.ToString()).Order(StringComparer.Ordinal));
+        Assert.Contains(TaskId.Parse("root/step$2"), host.EntryIds);
+        Assert.Contains(TaskId.Parse("root/step$3/0"), host.EntryIds);
+
+        static async DurableTask Body()
+        {
+            DurableTask.Once("step", () => 1);
+            await DurableTask.Run(static _ => { }).WithId("step");
+            await DurableTask.WhenAll([DurableTask.Run(static _ => { })]).WithId("step");
+            DurableTask.Once("step", () => 2);
+        }
+    }
+
+    [Fact]
     public async Task HostWithoutRecordedEffectsRejectsOnce()
     {
         var context = new EffectContext(TaskId.CreateRoot("root"), log: null);

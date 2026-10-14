@@ -10,14 +10,14 @@ public static class DurableTaskExtensions
     public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).GetAwaiter();
 
     /// <summary>
-    /// Assigns one stable logical identifier segment. Within a durable execution, segments beginning
-    /// with <c>$</c> are reserved for generated identifiers.
+    /// Assigns one stable logical identifier segment. Within a durable execution, a segment repeated in one run
+    /// identifies its later occurrences by their order, such as <c>reserve$2</c>, and segments don't contain <c>$</c>.
     /// </summary>
     public static ConfiguredDurableTask WithId(this DurableTask task, string segment) => new ConfiguredDurableTask(task).WithId(segment);
 
     /// <summary>
-    /// Assigns one stable logical identifier segment. Within a durable execution, segments beginning
-    /// with <c>$</c> are reserved for generated identifiers.
+    /// Assigns one stable logical identifier segment. Within a durable execution, a segment repeated in one run
+    /// identifies its later occurrences by their order, such as <c>reserve$2</c>, and segments don't contain <c>$</c>.
     /// </summary>
     public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string segment) => new ConfiguredDurableTask<TResult>(task).WithId(segment);
 
@@ -45,9 +45,10 @@ public static class DurableTaskExtensions
     /// unchanged; another definition under that identifier fails like other identifier reuse.
     /// </para>
     /// <para>
-    /// Within a durable execution, the host records the start in the execution with a generated child identifier and
-    /// commits both together, so a replay doesn't start the task again. Detach calls in one execution, like unnamed
-    /// children, begin in deterministic order. Outside a durable execution, the definition must support root scheduling.
+    /// Within a durable execution, the host records the start in the execution under an identifier which it derives from
+    /// the detached task's identity and commits both together, so a replay doesn't start the task again. Adding or
+    /// removing other operations doesn't change the record which a detach reaches. Outside a durable execution, the
+    /// definition must support root scheduling.
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="task"/> or <paramref name="rootId"/> is <see langword="null"/>.</exception>
@@ -61,7 +62,7 @@ public static class DurableTaskExtensions
         var taskId = TaskId.CreateRoot(rootId);
         if (DurableTaskContext.Ambient is { } context)
         {
-            return context.DetachTaskAsync(context.CreateOperationId("detach"), taskId, task, cancellationToken);
+            return context.DetachTaskAsync(taskId, task, cancellationToken);
         }
 
         return task is ISchedulableTask schedulable

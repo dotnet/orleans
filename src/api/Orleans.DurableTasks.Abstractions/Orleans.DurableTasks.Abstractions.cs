@@ -232,7 +232,7 @@ namespace Orleans.DurableTasks
 
         protected internal virtual TaskId CreateChildTaskId(string? name) { throw null; }
 
-        protected internal virtual System.Threading.Tasks.ValueTask DetachTaskAsync(TaskId markerId, TaskId rootId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken) { throw null; }
+        protected internal virtual System.Threading.Tasks.ValueTask DetachTaskAsync(TaskId rootId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
         protected internal virtual void OnBodyCompleted(DurableTaskResponse response) { }
