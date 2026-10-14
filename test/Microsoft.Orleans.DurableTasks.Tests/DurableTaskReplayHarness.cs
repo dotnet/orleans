@@ -105,6 +105,15 @@ internal sealed class ReplayActivation(
     /// <summary>Gets the grain's counter, its log's entry count, and the completed tasks which each journal write gathered.</summary>
     public IReadOnlyCollection<(int Counter, int Entries, TaskId[] Completed)> Writes => probe.Writes;
 
+    /// <summary>Completes once a write fails after <see cref="FailWrites"/>.</summary>
+    public Task FailedWrite => probe.FailedWrite;
+
+    /// <summary>
+    /// Fails every later journal write before it reaches storage, so the changes which the activation stages from now on
+    /// are lost when it ends, as they are when the silo crashes before their write.
+    /// </summary>
+    public void FailWrites() => probe.FailWrites();
+
     /// <summary>Schedules the harness's workflow as a client does.</summary>
     public async Task ScheduleAsync(TaskId taskId, CancellationToken cancellationToken) =>
         await ((IDurableTaskServer)Runtime).ScheduleAsync(
@@ -143,7 +152,7 @@ internal sealed class ReplayGrain(
     /// <summary>Gets the grain's journaled state.</summary>
     public IDurableValue<int> Counter { get; } = counter;
 
-    /// <summary>Gets the grain's journaled log, to which workflows report their progress.</summary>
+    /// <summary>Gets the grain's journaled log, to which workflows publish their progress.</summary>
     public IDurableLog<int> Log { get; } = log;
 
     /// <summary>Completes once the workflow waits at the gate.</summary>
@@ -167,12 +176,31 @@ internal sealed class ReplayGrain(
     public DurableTask CreateWorkflow() => Harness.Workflow(this);
 }
 
-/// <summary>A journal state machine which writes nothing and records what each write gathers.</summary>
+/// <summary>A journal state machine which writes nothing, records what each write gathers, and can fail writes.</summary>
 internal sealed class WriteProbe(Func<(int Counter, int Entries, TaskId[] Completed)> snapshot) : IStateMachine
 {
     private readonly ConcurrentQueue<(int Counter, int Entries, TaskId[] Completed)> _writes = new();
+    private readonly TaskCompletionSource _failedWrite = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private volatile bool _failsWrites;
 
     public IReadOnlyCollection<(int Counter, int Entries, TaskId[] Completed)> Writes => _writes;
+
+    /// <summary>Completes once the probe fails a write.</summary>
+    public Task FailedWrite => _failedWrite.Task;
+
+    /// <summary>Fails the preparation of every later write, so no later write reaches storage.</summary>
+    public void FailWrites() => _failsWrites = true;
+
+    ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken)
+    {
+        if (!_failsWrites)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        _failedWrite.TrySetResult();
+        return ValueTask.FromException(new InvalidOperationException("The write probe failed the write before it reached storage."));
+    }
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         throw new InvalidOperationException("The write probe writes no entries.");
