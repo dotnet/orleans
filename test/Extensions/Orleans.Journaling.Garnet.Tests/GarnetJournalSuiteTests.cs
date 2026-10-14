@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
+using Orleans.Journaling.Ranges;
 using Orleans.Journaling.Tests;
 
 namespace Orleans.Journaling.Garnet.Tests;
@@ -19,6 +20,8 @@ public sealed class GarnetJournalBatchTests : JournalBatchTests
         services.Configure<GarnetJournalStorageOptions>(options =>
         {
             options.DataDirectory = _directory;
+            options.MetaStore = new InMemoryRangeMetaStore();
+            options.HostId = GarnetPartitionFixture.HostId;
             options.LogMemorySize = "64m";
             options.IndexMemorySize = "1m";
         });
@@ -81,7 +84,7 @@ internal static class GarnetSuiteStorage
 {
     public static IJournalStorage Create(GarnetPartitionFixture fixture, JournaledStateManagerOptions options)
         => new GarnetJournalStorage(
-            fixture.Provider.Client,
+            fixture.Provider.Router,
             JournalId.Create("suite", Guid.NewGuid().ToString("N")),
             options.JournalFormatKey!,
             GarnetJournalStorageOptions.DEFAULT_COMPACTION_THRESHOLD_BYTES);

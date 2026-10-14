@@ -11,16 +11,31 @@ internal sealed class GarnetJournalStorageOptionsValidator(
     {
         ArgumentNullException.ThrowIfNull(options);
         var prefix = $"Invalid configuration for {nameof(GarnetJournalStorageProvider)} '{name}'. {nameof(GarnetJournalStorageOptions)}";
-        var hasDirectory = !string.IsNullOrWhiteSpace(options.DataDirectory);
-        if (hasDirectory == (options.ConfigurationOptions is not null))
+        if (options.MetaStore is null)
         {
-            throw new OrleansConfigurationException(
-                $"{prefix}: set exactly one of {nameof(options.DataDirectory)} and {nameof(options.ConfigurationOptions)}.");
+            throw new OrleansConfigurationException($"{prefix}.{nameof(options.MetaStore)} is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(options.HostId))
+        {
+            throw new OrleansConfigurationException($"{prefix}.{nameof(options.HostId)} is required.");
         }
 
         if (options.BucketCount <= 0 || !BitOperations.IsPow2(options.BucketCount))
         {
             throw new OrleansConfigurationException($"{prefix}.{nameof(options.BucketCount)} must be a positive power of two.");
+        }
+
+        if (options.InitialRangeMap is { } map)
+        {
+            try
+            {
+                map.Validate();
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new OrleansConfigurationException($"{prefix}.{nameof(options.InitialRangeMap)} is invalid: {exception.Message}", exception);
+            }
         }
 
         if (options.CompactionThresholdBytes < 0)
@@ -33,10 +48,10 @@ internal sealed class GarnetJournalStorageOptionsValidator(
             throw new OrleansConfigurationException($"{prefix}.{nameof(options.OperationTimeout)} must be positive.");
         }
 
-        if (hasDirectory && (string.IsNullOrWhiteSpace(options.LogMemorySize) || string.IsNullOrWhiteSpace(options.IndexMemorySize) || string.IsNullOrWhiteSpace(options.CheckpointAofSize)))
+        if (string.IsNullOrWhiteSpace(options.LogMemorySize) || string.IsNullOrWhiteSpace(options.IndexMemorySize) || string.IsNullOrWhiteSpace(options.CheckpointAofSize))
         {
             throw new OrleansConfigurationException(
-                $"{prefix}.{nameof(options.LogMemorySize)}, {nameof(options.IndexMemorySize)}, and {nameof(options.CheckpointAofSize)} are required for an embedded partition.");
+                $"{prefix}.{nameof(options.LogMemorySize)}, {nameof(options.IndexMemorySize)}, and {nameof(options.CheckpointAofSize)} are required.");
         }
     }
 }
