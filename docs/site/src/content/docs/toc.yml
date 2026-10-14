@@ -126,6 +126,14 @@ items:
             href: grains/messaging-recipes.md
           - name: Operations and throughput
             href: grains/messaging-operations.md
+      - name: Durable tasks
+        items:
+          - name: Programming model and guarantees
+            href: grains/durable-tasks.md
+          - name: Practical recipes
+            href: grains/durable-tasks-recipes.md
+          - name: Operations and troubleshooting
+            href: grains/durable-tasks-operations.md
       - name: Transactions
         href: grains/transactions.md
   - name: Serialization and code generation
