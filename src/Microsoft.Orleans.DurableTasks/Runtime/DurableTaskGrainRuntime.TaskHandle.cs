@@ -31,16 +31,18 @@ internal sealed partial class DurableTaskGrainRuntime
             set => Volatile.Write(ref _isRunning, value ? 1 : 0);
         }
 
-        public async ValueTask CancelAsync(CancellationToken cancellationToken)
+        public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
+
+        public async ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
         {
             ValueTask cancellation;
             if (RemoteTarget.IsDefault)
             {
-                cancellation = runtime.CancelScheduledTaskAsync(TaskId, CancellationToken.None);
+                cancellation = runtime.CancelScheduledTaskAsync(TaskId, reason, CancellationToken.None);
             }
             else
             {
-                cancellation = runtime.CancelRemoteAsync(TaskId, RemoteTarget, CancellationToken.None);
+                cancellation = runtime.CancelRemoteAsync(TaskId, RemoteTarget, reason, CancellationToken.None);
             }
 
             await cancellation.AsTask().WaitAsync(cancellationToken);

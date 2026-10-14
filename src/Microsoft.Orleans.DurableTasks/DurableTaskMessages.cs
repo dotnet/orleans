@@ -54,6 +54,12 @@ internal sealed class DurableTaskCancellationMessage
     /// </summary>
     [Id(2)]
     public string? AbortReason { get; init; }
+
+    /// <summary>
+    /// Gets the reason which a cooperative cancellation request carries, or <see langword="null"/> when it carries none.
+    /// </summary>
+    [Id(3)]
+    public string? CancellationReason { get; init; }
 }
 
 /// <summary>

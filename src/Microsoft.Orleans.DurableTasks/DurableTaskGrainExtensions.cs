@@ -59,8 +59,66 @@ public static class DurableTaskGrainExtensions
 
         var response = DurableTaskResponse.FromResult(value);
         return DurableExecutionContext.Current is GrainDurableExecutionContext context
-            ? context.SendSignalAsync(target.GetGrainId(), taskId, signal.Name, response, cancellationToken)
+            ? SendFromExecutionAsync(context, target.GetGrainId(), taskId, signal.Name, response, cancellationToken)
             : target.AsReference<IDurableTaskGrainExtension>().SignalAsync(taskId, signal.Name, response, cancellationToken);
+
+        static async ValueTask SendFromExecutionAsync(
+            GrainDurableExecutionContext context,
+            GrainId target,
+            TaskId taskId,
+            string name,
+            DurableTaskResponse response,
+            CancellationToken cancellationToken) =>
+            await context.SendSignalAsync(target, taskId, name, response, throwOnRejection: true, cancellationToken);
+    }
+
+    /// <summary>
+    /// Delivers <paramref name="signal"/> with <paramref name="value"/> to the invoked task <paramref name="taskId"/> on
+    /// <paramref name="target"/>, and returns how the task handled it.
+    /// </summary>
+    /// <typeparam name="T">The signal's value type.</typeparam>
+    /// <param name="target">The grain which owns the task.</param>
+    /// <param name="taskId">The identifier of a task which a client or another grain invoked on <paramref name="target"/>.</param>
+    /// <param name="signal">The signal descriptor which the task's waits share.</param>
+    /// <param name="value">The signal's value.</param>
+    /// <param name="cancellationToken">A token which abandons the send.</param>
+    /// <returns>
+    /// <see cref="DurableSignalResult.Accepted"/> or <see cref="DurableSignalResult.Duplicate"/> once the task durably
+    /// holds the value, or the reason the task rejected it, which changes nothing.
+    /// </returns>
+    /// <remarks>
+    /// The send is a call to <paramref name="target"/>, for clients and ordinary grain methods; it behaves as
+    /// <see cref="SignalDurableTaskAsync{T}(IAddressable, TaskId, DurableSignal{T}, T, CancellationToken)"/>, which throws
+    /// for the rejections this method returns. A durable execution sends signals to other grains with
+    /// <see cref="SignalDurableTaskAsync{T}(IAddressable, TaskId, DurableSignal{T}, T, CancellationToken)"/>, which
+    /// records the send for replay, and signals its own grain's tasks with
+    /// <see cref="IDurableTaskManager.TrySignalAsync{T}(TaskId, DurableSignal{T}, T, CancellationToken)"/>.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/> or <paramref name="signal"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="taskId"/> is empty.</exception>
+    /// <exception cref="InvalidOperationException">The caller is a durable execution.</exception>
+    public static ValueTask<DurableSignalResult> TrySignalDurableTaskAsync<T>(
+        this IAddressable target,
+        TaskId taskId,
+        DurableSignal<T> signal,
+        T value,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(signal);
+        if (taskId.IsDefault)
+        {
+            throw new ArgumentException("A signal requires a task identifier.", nameof(taskId));
+        }
+
+        if (DurableExecutionContext.Current is not null)
+        {
+            throw new InvalidOperationException(
+                "A durable execution sends signals to other grains with SignalDurableTaskAsync, which records the send for replay.");
+        }
+
+        return target.AsReference<IDurableTaskGrainExtension>()
+            .TrySignalAsync(taskId, signal.Name, DurableTaskResponse.FromResult(value), cancellationToken);
     }
 
     /// <summary>
@@ -93,6 +151,9 @@ internal sealed class AttachedScheduledTask<TResult>(
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) =>
         _handle.CancelAsync(cancellationToken);
+
+    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) =>
+        _handle.CancelAsync(reason, cancellationToken);
 
     protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) =>
         _handle.AbortAsync(reason, cancellationToken);

@@ -22,7 +22,8 @@ internal interface IDurableTaskMessageTransport
     /// <summary>Encodes a completion message addressed to <paramref name="target"/>.</summary>
     OutboxMessage CreateCompletionMessage(MessageId messageId, GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response);
 
-    void SendCancellation(GrainId sender, GrainId target, TaskId taskId);
+    /// <summary>Stages a cooperative cancellation, carrying its <paramref name="reason"/>, of a task which <paramref name="target"/> executes.</summary>
+    void SendCancellation(GrainId sender, GrainId target, TaskId taskId, string? reason = null);
 
     /// <summary>Stages an administrative abort of a task which <paramref name="target"/> executes for <paramref name="sender"/>.</summary>
     void SendAbort(GrainId sender, GrainId target, TaskId taskId, string reason);

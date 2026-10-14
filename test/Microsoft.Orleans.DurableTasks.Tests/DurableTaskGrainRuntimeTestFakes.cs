@@ -34,6 +34,7 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<RecordedCompletion> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
+    public List<string?> CancellationReasons { get; } = [];
     public List<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime)> Resumes { get; } = [];
     public Task ResumeSent => _resumeSent.Task;
     public Action<GrainId, GrainId, TaskId, IDurableTaskRequest>? BeforeSendInvocation { get; set; }
@@ -69,10 +70,11 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
             target,
             new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
 
-    public void SendCancellation(GrainId sender, GrainId target, TaskId taskId)
+    public void SendCancellation(GrainId sender, GrainId target, TaskId taskId, string? reason = null)
     {
         BeforeSendCancellation?.Invoke(sender, target, taskId);
         Cancellations.Add((sender, target, taskId));
+        CancellationReasons.Add(reason);
     }
 
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, string Reason)> Aborts { get; } = [];

@@ -32,6 +32,17 @@ public interface IDurableTaskServer : IGrainExtension
     [Alias("CancelAsync")]
     ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default);
 
+    /// <summary>Durably requests cancellation of a task of this grain, carrying <paramref name="reason"/>.</summary>
+    /// <param name="taskId">The task identifier.</param>
+    /// <param name="reason">
+    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// <see langword="null"/> for none.
+    /// </param>
+    /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
+    /// <remarks>The first cancellation request determines the reason.</remarks>
+    [Alias("CancelWithReasonAsync")]
+    ValueTask CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Administratively aborts a task of this grain: commits the task and its execution tree as failed with
     /// <see cref="DurableTaskAbortedException"/> in one write, and stops their running attempts without running further
@@ -74,6 +85,18 @@ public interface IDurableTaskGrainExtension : IGrainExtension, IDurableTaskServe
     /// </exception>
     [Alias("SignalAsync")]
     ValueTask SignalAsync(TaskId taskId, string name, DurableTaskResponse value, CancellationToken cancellationToken = default);
+
+    /// <summary>Delivers a signal to the invoked task <paramref name="taskId"/> of this grain, and returns how the task handled it.</summary>
+    /// <param name="taskId">The invoked task's identifier.</param>
+    /// <param name="name">The signal name.</param>
+    /// <param name="value">A successful response which holds the signal's value.</param>
+    /// <param name="cancellationToken">A token which abandons waiting for the signal to commit.</param>
+    /// <returns>
+    /// <see cref="DurableSignalResult.Accepted"/> or <see cref="DurableSignalResult.Duplicate"/> once the task durably
+    /// holds the value, or the reason the task rejected it, which changes nothing.
+    /// </returns>
+    [Alias("TrySignalAsync")]
+    ValueTask<DurableSignalResult> TrySignalAsync(TaskId taskId, string name, DurableTaskResponse value, CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer]
@@ -101,7 +124,10 @@ public struct DurableTaskDiagnosticState
     [Id(3)]
     public string? Request { get; set; }
 
-    /// <summary>Gets or sets a summary of the stored result: its value, its exception, or its decoding failure.</summary>
+    /// <summary>
+    /// Gets or sets a summary of the stored result: its value, its exception, or its decoding failure. A
+    /// <c>Canceling</c> or <c>Canceled</c> task reports its cancellation reason, if any.
+    /// </summary>
     [Id(4)]
     public string? Response { get; set; }
 
@@ -141,7 +167,7 @@ internal interface IDurableTaskGrainRuntime
     /// </summary>
     ValueTask DetachAsync(TaskId rootId, IDurableTaskRequest request, TaskId markerId, CancellationToken cancellationToken);
     ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
-    ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, CancellationToken cancellationToken);
+    ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, string? reason, CancellationToken cancellationToken);
     ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);
 
@@ -162,12 +188,14 @@ internal interface IDurableTaskGrainRuntime
     /// Sends a signal to the invoked task <paramref name="taskId"/> on <paramref name="target"/>, recording the send under
     /// <paramref name="markerId"/>, and waits for the journal write which commits both.
     /// </summary>
-    ValueTask SendSignalAsync(
+    /// <param name="throwOnRejection">Whether a rejection by a task of this grain throws rather than being recorded and returned.</param>
+    ValueTask<DurableSignalResult> SendSignalAsync(
         TaskId markerId,
         GrainId target,
         TaskId taskId,
         string name,
         DurableTaskResponse value,
+        bool throwOnRejection,
         CancellationToken cancellationToken) =>
         throw new NotSupportedException("The durable task runtime does not support signals.");
     //IScheduledTaskHandle OnCreateScheduledTaskHandle(IScheduledTaskHandle handle);
