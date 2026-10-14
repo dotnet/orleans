@@ -92,16 +92,4 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// </remarks>
     /// <returns>A snapshot of the registered state machines in no particular order.</returns>
     IReadOnlyList<KeyValuePair<string, IStateMachine>> GetStateMachines() => [];
-
-    /// <summary>
-    /// Gets the names of retired state: state which the journal contains but which no state machine is registered for.
-    /// </summary>
-    /// <remarks>
-    /// The manager preserves retired state, and registering a state with the same name in a later activation restores it.
-    /// Once <see cref="JournaledStateManagerOptions.RetirementGracePeriod"/> elapses, a later snapshot removes the state and its data.
-    /// Use this snapshot after recovery to detect legacy state which requires migration.
-    /// Implementations which do not track retirement return an empty collection.
-    /// </remarks>
-    /// <returns>A snapshot of the retired state names in no particular order.</returns>
-    IReadOnlyList<string> GetRetiredStateNames() => [];
 }
