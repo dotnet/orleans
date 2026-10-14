@@ -30,34 +30,34 @@ namespace Orleans.DurableTasks
         public readonly void Dispose() { }
     }
 
-    public partial struct ConfiguredDurableTask
+    public readonly partial struct ConfiguredDurableTask
     {
-        public System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public DurableTaskAwaiter GetAwaiter() { throw null; }
+        public readonly DurableTaskAwaiter GetAwaiter() { throw null; }
 
-        public System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.Threading.Tasks.Task<ScheduledTask> ScheduleAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly System.Threading.Tasks.Task<ScheduledTask> ScheduleAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public ConfiguredDurableTask WithId(string segment) { throw null; }
+        public readonly ConfiguredDurableTask WithId(string segment) { throw null; }
     }
 
-    public partial struct ConfiguredDurableTask<TResult>
+    public readonly partial struct ConfiguredDurableTask<TResult>
     {
-        public System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public DurableTaskAwaiter<TResult> GetAwaiter() { throw null; }
+        public readonly DurableTaskAwaiter<TResult> GetAwaiter() { throw null; }
 
-        public System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly System.Threading.Tasks.Task<DurableTaskStatus> PollAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public System.Threading.Tasks.Task<ScheduledTask<TResult>> ScheduleAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public readonly System.Threading.Tasks.Task<ScheduledTask<TResult>> ScheduleAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public ConfiguredDurableTask<TResult> WithId(string segment) { throw null; }
+        public readonly ConfiguredDurableTask<TResult> WithId(string segment) { throw null; }
     }
 
     public readonly partial struct ConfiguredScheduledTaskAwaitable<TResult>
