@@ -170,6 +170,15 @@ framework assets; its first published version establishes the compatibility base
   are accepted when they are delivered; scheduled delay resumes are processed when
   due. Execution starts, local completions, and cancellation propagation follow
   the commit.
+- An activation recovers task state after its journal, inbox, and outbox have
+  recovered, and starts the recovered executions once the grain's
+  `OnActivateAsync` has completed.
+- Activation shutdown begins when deactivation starts, before the grain's
+  `OnDeactivateAsync` runs. It stops new execution and signals the attempt-scoped
+  execution-abort token observed by delegate and delay operations and
+  adapter-controlled waits. The runtime then drains active execution, before
+  messaging and the journal stop, discards its results, and leaves committed
+  work available for replay in the next activation.
 - Each request and result payload is journaled once per grain. The callee's inbox
   accepts invocations, and the caller's inbox accepts completions, directly into
   task state, journaling only the message's processed record alongside it. The
@@ -284,10 +293,6 @@ framework assets; its first published version establishes the compatibility base
   one write. A candidate which completes without a sequence, such as a child run by a
   custom scheduler or a result stored before sequences were stamped, is selected by a
   decision recorded in the execution's tree, and a recorded decision keeps its winner.
-- Activation shutdown stops new execution, signals the attempt-scoped execution-abort
-  token observed by delegate and delay operations and adapter-controlled waits,
-  drains active execution, discards its results, and leaves committed work
-  available for replay in the next activation.
 
 Durability covers state and messages participating in Orleans Journaling and
 Messaging commits. Direct external side effects require their own idempotency
