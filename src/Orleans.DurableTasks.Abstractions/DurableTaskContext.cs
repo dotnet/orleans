@@ -23,7 +23,7 @@ public abstract class DurableTaskContext
     private string? _cancellationReason;
     private long _nextChildId;
     private long _nextOperationId;
-    private Dictionary<string, int>? _segmentOccurrences;
+    private Dictionary<string, int>? _nameOccurrences;
 
     /// <summary>Initializes an execution with durable cancellation.</summary>
     protected DurableTaskContext(TaskId taskId) : this(taskId, CancellationToken.None)
@@ -216,17 +216,18 @@ public abstract class DurableTaskContext
 
     /// <summary>
     /// Starts <paramref name="taskDefinition"/> as a detached root task under <paramref name="rootId"/> and records the
-    /// start under <paramref name="markerId"/>, a descendant of this execution.
+    /// start in this execution.
     /// </summary>
     /// <remarks>
     /// The detached task isn't part of this execution: durable cancellation of this execution doesn't cancel it, and this
-    /// execution doesn't observe its result. The host commits the start together with its record, so a replay which
-    /// reaches the same marker leaves the detached task unchanged. A marker reused for another detached start fails.
-    /// The returned operation completes once the start is durable. Hosts which don't support detached tasks keep this
-    /// default implementation, which throws <see cref="NotSupportedException"/>.
+    /// execution doesn't observe its result. The host records the start under an identifier which it derives from the
+    /// detached task's identity, such as its target and <paramref name="rootId"/>, and commits the start together with
+    /// its record. Detaching the same task again, including during a replay, therefore reaches the same record and
+    /// leaves the detached task unchanged, independently of other operations which a deployment adds or removes; another
+    /// definition under the same identity fails. The returned operation completes once the start is durable. Hosts which
+    /// don't support detached tasks keep this default implementation, which throws <see cref="NotSupportedException"/>.
     /// </remarks>
     protected internal virtual ValueTask DetachTaskAsync(
-        TaskId markerId,
         TaskId rootId,
         DurableTask taskDefinition,
         CancellationToken cancellationToken)
@@ -272,28 +273,26 @@ public abstract class DurableTaskContext
 
     /// <summary>
     /// Creates a child identifier, using <paramref name="name"/> when supplied.
-    /// Explicit names beginning with <c>$</c> are reserved for generated identifiers.
     /// </summary>
     /// <remarks>
-    /// Generated identifiers are replay-stable when unnamed children are created in the same
-    /// deterministic order. A concurrent batch can use
+    /// A name repeated in one run identifies its later occurrences by their order: the first is <paramref name="name"/>,
+    /// and later ones append their ordinal, such as <c>reserve$2</c>, so children named in a loop keep their identifiers
+    /// on replay. Named children, named combinators, and <see cref="DurableTask.Once{TResult}(string, Func{TResult})"/>
+    /// effects share one count per name. Names don't contain <c>$</c>, which generated identifiers use. Generated
+    /// identifiers are replay-stable when unnamed children are created in the same deterministic order. A concurrent
+    /// batch can use
     /// <see cref="DurableTask.WhenAll(IReadOnlyList{DurableTask})"/> and
     /// <see cref="DurableTask.WhenAny(IReadOnlyList{DurableTask})"/>, whose input indexes provide
     /// stable logical slots. Concurrent independent scheduling operations, including concurrent
     /// combinator invocations, must use explicit names or otherwise begin in deterministic order.
     /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is empty or contains <c>$</c>.</exception>
     protected internal virtual TaskId CreateChildTaskId(string? name)
     {
         if (name is not null)
         {
-            if (name.StartsWith(GeneratedSegmentPrefix))
-            {
-                throw new ArgumentException(
-                    $"Explicit child names beginning with '{GeneratedSegmentPrefix}' are reserved for generated identifiers.",
-                    nameof(name));
-            }
-
-            return Id.Child(name);
+            ValidateName(name, nameof(name));
+            return CreateNamedChildId(name);
         }
 
         return Id.Child(
@@ -316,28 +315,35 @@ public abstract class DurableTaskContext
     }
 
     /// <summary>
-    /// Creates the identifier of a named operation of this execution: the first occurrence of
-    /// <paramref name="segment"/> in this attempt is the segment itself, and each later occurrence appends its ordinal,
-    /// such as <c>reserve$2</c>.
+    /// Creates the identifier of a named operation of this execution: the first occurrence of <paramref name="name"/> in
+    /// this attempt is <c>{prefix}{name}</c>, and each later occurrence appends its ordinal, such as <c>reserve$2</c>.
     /// </summary>
+    /// <param name="name">The caller-supplied name.</param>
+    /// <param name="kindPrefix">
+    /// The prefix which distinguishes the kind of operation, such as <c>$once:</c> for a recorded effect, or empty for a
+    /// child or a combinator.
+    /// </param>
     /// <remarks>
     /// Occurrences are numbered in the order in which the attempt creates them, so a replay which creates the same named
     /// operations in the same order assigns the same identifiers, and adding a later occurrence doesn't rename earlier
-    /// ones.
+    /// ones. Every kind of named operation shares one count per name, so the same occurrence of a name has the same
+    /// ordinal whichever kind of operation uses it: <c>x$2</c> and <c>$once:x$2</c> identify the same occurrence. A host
+    /// which finds the other kind recorded for an occurrence reports the replay's divergence rather than running the
+    /// operation again.
     /// </remarks>
-    internal TaskId CreateNamedChildId(string segment)
+    internal TaskId CreateNamedChildId(string name, string kindPrefix = "")
     {
         int occurrence;
         lock (_lock)
         {
-            _segmentOccurrences ??= new(StringComparer.Ordinal);
-            _segmentOccurrences.TryGetValue(segment, out occurrence);
-            _segmentOccurrences[segment] = ++occurrence;
+            _nameOccurrences ??= new(StringComparer.Ordinal);
+            _nameOccurrences.TryGetValue(name, out occurrence);
+            _nameOccurrences[name] = ++occurrence;
         }
 
         return Id.Child(occurrence == 1
-            ? segment
-            : $"{segment}{GeneratedSegmentPrefix}{occurrence.ToString(CultureInfo.InvariantCulture)}");
+            ? kindPrefix + name
+            : $"{kindPrefix}{name}{GeneratedSegmentPrefix}{occurrence.ToString(CultureInfo.InvariantCulture)}");
     }
 
     /// <summary>

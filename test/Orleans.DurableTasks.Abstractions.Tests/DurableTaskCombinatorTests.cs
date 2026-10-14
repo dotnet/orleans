@@ -226,7 +226,7 @@ public class DurableTaskCombinatorTests
             DurableTask.Run(async _ => await DurableTask.WhenAll([DurableTask.Run(static _ => { })]).WithId("$when-all-1")),
             host.CreateContext(RootId));
 
-        Assert.StartsWith("Explicit child names", Assert.IsType<ArgumentException>(response.Exception).Message, StringComparison.Ordinal);
+        Assert.StartsWith("Names can't contain '$'", Assert.IsType<ArgumentException>(response.Exception).Message, StringComparison.Ordinal);
         Assert.Empty(host.EntryIds);
     }
 
