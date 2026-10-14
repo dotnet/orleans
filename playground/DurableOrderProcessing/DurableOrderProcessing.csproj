@@ -6,8 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <!-- Durable task methods are deferred definitions, so their bodies are often synchronous (CS1998). -->
-    <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005;CS1998</NoWarn>
+    <NoWarn>$(NoWarn);ORLEANSEXP003;ORLEANSEXP005</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
