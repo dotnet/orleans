@@ -189,7 +189,8 @@ if (reserved.Count < lines.Count)
 `ScheduledTask.WhenEach(tasks)` yields each task once, in completion order, as an `IAsyncEnumerable`, and
 `DurableTask.WhenEach(inputs)` schedules its inputs under a generated `$when-each-N` operation identifier when the
 enumeration begins, then yields them the same way. A yielded handle has observed its terminal response, and a failure or
-a cancellation doesn't fail the enumeration. Inputs which the enumeration doesn't reach keep running.
+a cancellation doesn't fail the enumeration. Inputs which the enumeration doesn't reach keep running. The enumeration's
+cancellation token abandons scheduling the inputs and waiting for them, without canceling them.
 
 Within a durable execution, the host selects each next task: the remaining task which completed first in its durable
 completion order. Every replay yields the same order, including a replay in which more tasks have already completed, so
