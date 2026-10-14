@@ -86,13 +86,13 @@ public class DurableStateObservationTests : JournalingTestBase
     });
 
     [Fact]
-    public Task ValueWatch_SpeculativeMode_DeliversStagedValueThenItsCommit() => RunOnActivationSchedulerAsync(async () =>
+    public Task ValueWatch_StagedMode_DeliversStagedValueThenItsCommit() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
         var value = CreateValue(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
 
-        await using var watch = value.WatchAsync(DurableWatchMode.Speculative, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var watch = value.WatchAsync(DurableWatchMode.Staged, CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Committed(null, version: 0), await watch.NextAsync());
 
         value.Value = "staged";
@@ -132,7 +132,7 @@ public class DurableStateObservationTests : JournalingTestBase
         await sut.Lifecycle.OnStart(CancellationToken);
 
         await using var committed = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
-        await using var speculative = value.WatchAsync(DurableWatchMode.Speculative, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var speculative = value.WatchAsync(DurableWatchMode.Staged, CancellationToken).GetAsyncEnumerator(CancellationToken);
         await committed.NextAsync();
         await speculative.NextAsync();
 
@@ -215,13 +215,13 @@ public class DurableStateObservationTests : JournalingTestBase
     });
 
     [Fact]
-    public Task DictionaryWatch_SpeculativeMode_DeliversWatermarkAfterWrite() => RunOnActivationSchedulerAsync(async () =>
+    public Task DictionaryWatch_StagedMode_DeliversWatermarkAfterWrite() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
         var dictionary = CreateDictionary(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
 
-        await using var watch = dictionary.WatchAsync(DurableWatchMode.Speculative, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var watch = dictionary.WatchAsync(DurableWatchMode.Staged, CancellationToken).GetAsyncEnumerator(CancellationToken);
         var resync = await watch.NextAsync();
         Assert.Equal(DictionaryChangeKind.Resync, resync.Kind);
         Assert.Equal(DurableChangeStatus.Committed, resync.Status);
@@ -281,9 +281,9 @@ public class DurableStateObservationTests : JournalingTestBase
         queue.Enqueue(1);
         await sut.Manager.WriteStateAsync(CancellationToken);
 
-        await using var listWatch = list.WatchAsync(DurableWatchMode.Speculative, CancellationToken).GetAsyncEnumerator(CancellationToken);
-        await using var setWatch = set.WatchAsync(DurableWatchMode.Speculative, CancellationToken).GetAsyncEnumerator(CancellationToken);
-        await using var queueWatch = queue.WatchAsync(DurableWatchMode.Speculative, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var listWatch = list.WatchAsync(DurableWatchMode.Staged, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var setWatch = set.WatchAsync(DurableWatchMode.Staged, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var queueWatch = queue.WatchAsync(DurableWatchMode.Staged, CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal([1], (await listWatch.NextAsync()).Snapshot!);
         Assert.Equal([1], (await setWatch.NextAsync()).Snapshot!);
         Assert.Equal([1], (await queueWatch.NextAsync()).Snapshot!);
@@ -548,7 +548,7 @@ public class DurableStateObservationTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken);
 
         await using var committed = dictionary.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
-        await using var speculative = dictionary.WatchAsync(DurableWatchMode.Speculative, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var speculative = dictionary.WatchAsync(DurableWatchMode.Staged, CancellationToken).GetAsyncEnumerator(CancellationToken);
         var committedView = new Dictionary<string, int>();
         var speculativeView = new Dictionary<string, int>();
         Apply(committedView, await committed.NextAsync());
