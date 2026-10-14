@@ -246,30 +246,33 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     /// The identifier is generated when the send begins, so sends begin in deterministic order, like unnamed children.
     /// Durable cancellation of this execution doesn't abandon the send; host abort does.
     /// </remarks>
-    internal ValueTask SendSignalAsync(
+    /// <param name="throwOnRejection">Whether a rejection by a task of this grain throws rather than being recorded and returned.</param>
+    internal ValueTask<DurableSignalResult> SendSignalAsync(
         GrainId target,
         TaskId taskId,
         string name,
         DurableTaskResponse value,
+        bool throwOnRejection,
         CancellationToken cancellationToken)
     {
         var markerId = CreateChildTaskId(name: null);
         return RunOnScheduler(
             _scheduler,
-            () => SendSignalCoreAsync(markerId, target, taskId, name, value, cancellationToken));
+            () => SendSignalCoreAsync(markerId, target, taskId, name, value, throwOnRejection, cancellationToken));
     }
 
-    private async ValueTask SendSignalCoreAsync(
+    private async ValueTask<DurableSignalResult> SendSignalCoreAsync(
         TaskId markerId,
         GrainId target,
         TaskId taskId,
         string name,
         DurableTaskResponse value,
+        bool throwOnRejection,
         CancellationToken cancellationToken)
     {
         ThrowIfDeleted();
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        await _runtime.SendSignalAsync(markerId, target, taskId, name, value, executionCts.Token);
+        return await _runtime.SendSignalAsync(markerId, target, taskId, name, value, throwOnRejection, executionCts.Token);
     }
 
     protected override ValueTask<TaskId> SelectCompletionAsync(
@@ -390,17 +393,19 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     {
         public TaskId TaskId => inner.TaskId;
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken) =>
+        public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
+
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) =>
             RunOnScheduler(
                 owner._scheduler,
-                () => CancelCoreAsync(cancellationToken));
+                () => CancelCoreAsync(reason, cancellationToken));
 
-        private async ValueTask CancelCoreAsync(CancellationToken cancellationToken)
+        private async ValueTask CancelCoreAsync(string? reason, CancellationToken cancellationToken)
         {
             using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
                 owner._abortSource.Token);
-            await inner.CancelAsync(executionCts.Token);
+            await inner.CancelAsync(reason, executionCts.Token);
         }
 
         public ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>

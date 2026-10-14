@@ -213,7 +213,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
                 async _ =>
                 {
                     await durableCts.CancelAsync();
-                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, CancellationToken.None);
+                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, executionContext.CancellationReason, CancellationToken.None);
                 });
             var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.TaskId, this, durableCts.Token);
             return durableResponse.IsCompleted
@@ -229,7 +229,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
             async _ =>
             {
                 await cts.CancelAsync();
-                await remote.CancelAsync(executionContext.TaskId, CancellationToken.None);
+                await GrainScheduledTaskHandle.RequestCancellationAsync(remote, executionContext.TaskId, executionContext.CancellationReason);
             });
         var response = await remote.ScheduleAsync(executionContext.TaskId, this, cts.Token);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
@@ -404,7 +404,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
                 async _ =>
                 {
                     await durableCts.CancelAsync();
-                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, CancellationToken.None);
+                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, executionContext.CancellationReason, CancellationToken.None);
                 });
             var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.TaskId, this, durableCts.Token);
             return durableResponse.IsCompleted
@@ -420,7 +420,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
             async _ =>
             {
                 await cts.CancelAsync();
-                await remote.CancelAsync(executionContext.TaskId, CancellationToken.None);
+                await GrainScheduledTaskHandle.RequestCancellationAsync(remote, executionContext.TaskId, executionContext.CancellationReason);
             });
         var response = await remote.ScheduleAsync(executionContext.TaskId, this, cts.Token);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
@@ -457,11 +457,20 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
     public TaskId TaskId { get; } = taskId;
     public DurableTaskResponse? LastResponse { get; private set; } = lastResponse;
 
-    public async ValueTask CancelAsync(CancellationToken cancellationToken)
+    public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
+
+    public async ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
     {
         // TODO: Add resilience via Polly
-        await grain.CancelAsync(TaskId, CancellationToken.None).AsTask().WaitAsync(cancellationToken);
+        await RequestCancellationAsync(grain, TaskId, reason).AsTask().WaitAsync(cancellationToken);
     }
+
+    /// <summary>Requests cancellation of <paramref name="taskId"/> on <paramref name="grain"/>, carrying <paramref name="reason"/>.</summary>
+    /// <remarks>A request without a reason uses the original operation, which every version of the grain serves.</remarks>
+    internal static ValueTask RequestCancellationAsync(IDurableTaskServer grain, TaskId taskId, string? reason) =>
+        reason is null
+            ? grain.CancelAsync(taskId, CancellationToken.None)
+            : grain.CancelAsync(taskId, reason, CancellationToken.None);
 
     public async ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
         await grain.AbortAsync(TaskId, reason, CancellationToken.None).AsTask().WaitAsync(cancellationToken);

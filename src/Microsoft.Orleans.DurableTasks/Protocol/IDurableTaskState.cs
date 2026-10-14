@@ -38,6 +38,13 @@ public interface IDurableTaskState
     public DateTimeOffset? CancellationRequestedAt { get; }
 
     /// <summary>
+    /// The reason which the task's cancellation request carries, or <see langword="null"/> when cancellation hasn't been
+    /// requested or its request carries no reason.
+    /// </summary>
+    /// <remarks>The first cancellation request determines the reason.</remarks>
+    public string? CancellationReason { get; }
+
+    /// <summary>
     /// The time at which the task was created.
     /// </summary>
     public DateTimeOffset CreatedAt { get; }

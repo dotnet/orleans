@@ -243,7 +243,7 @@ public class VolatileDurableTaskGrainStorage(
         _hierarchy.Clear();
     }
 
-    public void RequestCancellation(TaskId taskId, IDurableTaskState state)
+    public void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null)
     {
         _ = GetState(taskId, state);
         if (!_workingCopy.TryGetValue(taskId, out var current)
@@ -255,6 +255,7 @@ public class VolatileDurableTaskGrainStorage(
 
         var updated = CopyState(current);
         updated.CancellationRequestedAt = _timeProvider.GetUtcNow();
+        updated.CancellationReason = reason;
         _workingCopy[taskId] = TrackState(taskId, updated);
     }
 
