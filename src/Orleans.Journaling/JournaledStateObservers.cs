@@ -169,6 +169,24 @@ internal sealed class StateTopic(JournaledStateObservers hub)
         }
     }
 
+    /// <summary>
+    /// Wakes watchers which read the state directly.
+    /// </summary>
+    /// <param name="speculativeOnly">Whether only speculative watchers can observe the change.</param>
+    public void Signal(bool speculativeOnly)
+    {
+        lock (hub.SyncRoot)
+        {
+            foreach (var watcher in _watchers)
+            {
+                if (!speculativeOnly || watcher.Mode is DurableWatchMode.Speculative)
+                {
+                    watcher.Signal();
+                }
+            }
+        }
+    }
+
     internal void Add(StateWatcher watcher) => _watchers.Add(watcher);
 
     internal bool Remove(StateWatcher watcher) => _watchers.Remove(watcher);
@@ -279,6 +297,12 @@ internal abstract class StateWatcher(JournaledStateObservers hub, IStateMachine 
     {
     }
 }
+
+/// <summary>
+/// Watches a state machine which readers query directly when signaled.
+/// </summary>
+internal sealed class SignalWatcher(JournaledStateObservers hub, IStateMachine state, DurableWatchMode mode)
+    : StateWatcher(hub, state, mode);
 
 /// <summary>
 /// Buffers a bounded number of collection changes and resynchronizes the reader after an overflow.
