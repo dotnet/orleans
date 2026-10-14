@@ -16,7 +16,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     private static readonly TimeSpan CancellationTestTimeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public async Task CanceledBodyWhichCatchesTheCancellationCompletesWithItsOwnResult()
+    public Task CanceledBodyWhichCatchesTheCancellationCompletesWithItsOwnResult() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -41,10 +41,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal("compensated", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
         Assert.NotNull(storage.Get(rootId).CancellationRequestedAt);
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(TaskId.Parse("root/work")).Result!.Status);
-    }
+    });
 
     [Fact]
-    public async Task CancellationWhichEscapesTheBodyCancelsTheTask()
+    public Task CancellationWhichEscapesTheBodyCancelsTheTask() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -61,10 +61,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(DurableTaskStatus.Canceled, (await WaitForResponseAsync(runtime, rootId)).Status);
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(rootId).Result!.Status);
-    }
+    });
 
     [Fact]
-    public async Task AttachedChildScheduledAfterCancellationIsCanceledWithoutRunning()
+    public Task AttachedChildScheduledAfterCancellationIsCanceledWithoutRunning() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -98,10 +98,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal("after-canceled", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
         Assert.Equal(0, Volatile.Read(ref afterRuns));
         Assert.False(storage.Contains(TaskId.Parse("root/after")));
-    }
+    });
 
     [Fact]
-    public async Task DelayOfCanceledBodyTerminalizesPromptly()
+    public Task DelayOfCanceledBodyTerminalizesPromptly() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, transport) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -126,10 +126,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal("stopped-waiting", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(delayId).Result!.Status);
         Assert.Null(storage.Get(delayId).DueTime);
-    }
+    });
 
     [Fact]
-    public async Task RecoveryReplaysCanceledBodyWithItsCancellationRequested()
+    public Task RecoveryReplaysCanceledBodyWithItsCancellationRequested() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -179,10 +179,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal(1, Volatile.Read(ref stepRuns));
         Assert.Equal(0, Volatile.Read(ref afterRuns));
         Assert.Equal([true], observedCancellation);
-    }
+    });
 
     [Fact]
-    public async Task RecoveryTerminalizesCanceledRequestWhoseBodyNeverStarted()
+    public Task RecoveryTerminalizesCanceledRequestWhoseBodyNeverStarted() => ActivationScheduler.RunAsync(async () =>
     {
         var (_, storage, manager, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -195,10 +195,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(rootId).Result!.Status);
         Assert.Equal(0, request.CreateTaskCallCount);
-    }
+    });
 
     [Fact]
-    public async Task InvokedTaskCanceledThroughInboxSendsItsBodysOutcomeToTheCaller()
+    public Task InvokedTaskCanceledThroughInboxSendsItsBodysOutcomeToTheCaller() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var caller = GrainId.Create("caller", "one");
@@ -229,10 +229,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var completion = Assert.Single(transport.Completions);
         Assert.Equal(caller, completion.Target);
         Assert.Equal(3, completion.Materialize(runtime).Response.GetResult<int>());
-    }
+    });
 
     [Fact]
-    public async Task CanceledParentsRemoteChildAwaitsItsCalleeOutcome()
+    public Task CanceledParentsRemoteChildAwaitsItsCalleeOutcome() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -249,10 +249,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         runtime.AcceptResponseFromInbox(childId, DurableTaskResponse.FromResult(4), request.Context!.TargetId);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(4, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
-    }
+    });
 
     [Fact]
-    public async Task AbortTerminalizesTreeInOneWriteAndStopsRunningAttempts()
+    public Task AbortTerminalizesTreeInOneWriteAndStopsRunningAttempts() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -313,10 +313,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.All(treeIds, id => AssertAborted(storage.Get(id).Result, "operator"));
         Assert.All(treeIds, id => Assert.Null(storage.Get(id).CancellationRequestedAt));
         Assert.Empty(transport.Cancellations);
-    }
+    });
 
     [Fact]
-    public async Task AbortOfCancelingTaskWhichIgnoresCancellationFaultsItAndDiscardsItsResult()
+    public Task AbortOfCancelingTaskWhichIgnoresCancellationFaultsItAndDiscardsItsResult() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -342,10 +342,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         release.SetResult();
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
         AssertAborted(storage.Get(rootId).Result, "stuck cleanup");
-    }
+    });
 
     [Fact]
-    public async Task AbortLeavesTerminalAndUnknownTasksUnchanged()
+    public Task AbortLeavesTerminalAndUnknownTasksUnchanged() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -363,10 +363,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Empty(transport.Aborts);
         await Assert.ThrowsAsync<ArgumentException>(
             () => runtime.AbortTaskAsync(rootId, " ", TestContext.Current.CancellationToken).AsTask());
-    }
+    });
 
     [Fact]
-    public async Task InboxAbortFaultsRunningInvokedTaskAndCompletesItsCaller()
+    public Task InboxAbortFaultsRunningInvokedTaskAndCompletesItsCaller() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var caller = GrainId.Create("caller", "one");
@@ -392,10 +392,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         AssertAborted(completion.Materialize(runtime).Response, "caller aborted");
         AssertAborted(storage.Get(taskId).Result, "caller aborted");
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
-    }
+    });
 
     [Fact]
-    public async Task InboxAbortWhichPrecedesItsInvocationCancelsTheInvocation()
+    public Task InboxAbortWhichPrecedesItsInvocationCancelsTheInvocation() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var caller = GrainId.Create("caller", "one");
@@ -409,7 +409,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
         Assert.Equal(0, request.CreateTaskCallCount);
-    }
+    });
 
     [Fact]
     public void AbortMessageCarriesReasonUnderItsOwnIdentity()
@@ -451,7 +451,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task AbortReachesSchedulerOwnedChildrenThroughTheirHandles()
+    public Task AbortReachesSchedulerOwnedChildrenThroughTheirHandles() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -473,7 +473,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.False(abortable.Canceled.IsCompleted);
         AssertAborted(storage.Get(abortable.TaskId).Result, "operator");
         AssertAborted(storage.Get(cancelOnly.TaskId).Result, "operator");
-    }
+    });
 
     private sealed class RecordingSchedulerHandle(TaskId taskId, bool supportsAbort) : IScheduledTaskHandle
     {
