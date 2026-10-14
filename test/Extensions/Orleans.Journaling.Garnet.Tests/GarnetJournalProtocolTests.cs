@@ -1,5 +1,5 @@
 using System.Buffers;
-using NSubstitute;
+using Orleans.Journaling.Ranges;
 using Orleans.Storage;
 using StackExchange.Redis;
 
@@ -26,7 +26,7 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
     private static JournalId NewId(string name) => JournalId.Create("protocol", Guid.NewGuid().ToString("N"), name);
 
     [Fact]
-    public async Task Initialization_OpensEveryBucketAndRecordsBucketCount()
+    public async Task Initialization_OpensEveryBucketAndRecordsPartitionDescriptor()
     {
         var count = 0;
         for (var bucket = 0; bucket < GarnetJournalStorageOptions.DEFAULT_BUCKET_COUNT; bucket++)
@@ -36,16 +36,15 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         }
 
         Assert.Equal(GarnetJournalStorageOptions.DEFAULT_BUCKET_COUNT, count);
-        Assert.Equal(GarnetJournalStorageOptions.DEFAULT_BUCKET_COUNT.ToString(), (string?)await _fixture.Database.HashGetAsync(GarnetJournalKeys.PartitionKey, "bucket-count"));
+        Assert.Equal(GarnetJournalStorageOptions.DEFAULT_BUCKET_COUNT.ToString(), (string?)await _fixture.Database.HashGetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.BucketCountField));
+        Assert.Equal("p0", (string?)await _fixture.Database.HashGetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.PartitionIdField));
 
-        var mismatched = GarnetPartitionFixture.CreateProvider(_fixture.DataDirectory, options =>
-        {
-            options.DataDirectory = null;
-            options.ConfigurationOptions = new ConfigurationOptions { EndPoints = { Provider.EmbeddedEndPoint! } };
-            options.BucketCount = 16;
-        });
+        // The partition's storage holds 4096 buckets, so a map with another bucket count cannot use it.
+        await _fixture.StopAsync();
+        var mismatched = GarnetPartitionFixture.CreateProvider(_fixture.DataDirectory, new InMemoryRangeMetaStore(), options => options.BucketCount = 16);
         await Assert.ThrowsAsync<InvalidOperationException>(() => mismatched.StartAsync(CancellationToken));
         await mismatched.StopAsync(CancellationToken);
+        await _fixture.InitializeAsync();
     }
 
     [Fact]
@@ -221,64 +220,6 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ConcurrentInitialization_WithConflictingBucketCounts_StartsOnlyOneCount()
-    {
-        var directory = GarnetPartitionFixture.CreateTemporaryDirectory();
-        try
-        {
-            using var host = GarnetJournalPartitionHost.Start(
-                new GarnetJournalPartitionSettings { DataDirectory = directory, LogMemorySize = "64m", IndexMemorySize = "1m" },
-                loggerFactory: null);
-            await using var connection = await ConnectionMultiplexer.ConnectAsync(new ConfigurationOptions
-            {
-                EndPoints = { host.EndPoint },
-                Protocol = RedisProtocol.Resp2,
-            });
-
-            var database = connection.GetDatabase();
-            var clients = new[] { 16, 32 }.Select(count => new GarnetJournalPartitionClient(database, count, TimeSpan.FromSeconds(10))).ToArray();
-            var failures = await Task.WhenAll(clients.Select(client => Capture(client.EnsureSinglePartitionInitializedAsync(CancellationToken))));
-
-            Assert.Single(failures, failure => failure is null);
-            Assert.All(failures.Where(failure => failure is not null), failure => Assert.IsType<InvalidOperationException>(failure));
-            var winner = clients[Array.IndexOf(failures, null)].BucketCount;
-            Assert.Equal(winner.ToString(), (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, "bucket-count"));
-            Assert.Equal("1", (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, "initialized"));
-        }
-        finally
-        {
-            GarnetPartitionFixture.TryDeleteDirectory(directory);
-        }
-
-        static async Task<Exception?> Capture(Task task)
-        {
-            try
-            {
-                await task;
-                return null;
-            }
-            catch (Exception exception)
-            {
-                return exception;
-            }
-        }
-    }
-
-    [Fact]
-    public async Task OperationTimeout_BoundsEachAttempt()
-    {
-        var database = Substitute.For<IDatabase>();
-        database.ExecuteAsync(Arg.Any<string>(), Arg.Any<object[]>()).Returns(new TaskCompletionSource<RedisResult>().Task);
-        var client = new GarnetJournalPartitionClient(database, GarnetJournalStorageOptions.DEFAULT_BUCKET_COUNT, TimeSpan.FromMilliseconds(200));
-        var ambiguous = new System.Runtime.CompilerServices.StrongBox<bool>();
-
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        await Assert.ThrowsAsync<TimeoutException>(() => client.ExecuteAsync(GarnetJournalProtocol.Read, [], CancellationToken, ambiguous).AsTask());
-        Assert.InRange(stopwatch.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(5));
-        Assert.True(ambiguous.Value);
-    }
-
-    [Fact]
     public async Task WritersWhichObservedMissingJournal_CreateItOnce()
     {
         var id = NewId("duplicate-activation");
@@ -341,27 +282,32 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
     [Fact]
     public async Task SealedBucket_RejectsEveryOperation()
     {
+        await using var fixture = new GarnetPartitionFixture { Configure = options => options.OperationTimeout = TimeSpan.FromMilliseconds(200) };
+        await fixture.InitializeAsync();
         var id = NewId("sealed");
-        var storage = (GarnetJournalStorage)Provider.CreateStorage(id);
+        var storage = (GarnetJournalStorage)fixture.Provider.CreateStorage(id);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken);
         var bucketKey = GarnetJournalKeys.GetBucketKey(storage.Bucket);
 
-        Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "seal", "5", "-", "1"]));
-        Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "seal", "5", "-", "1"]));
-        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "seal", "6", "-", "1"]));
-        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "open", "6", "-", "1"]));
+        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "seal", "5", "-", "1"]));
+        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "seal", "5", "-", "1"]));
+        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "seal", "6", "-", "1"]));
+        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "open", "6", "-", "1"]));
 
-        Assert.Equal(["-10", "sealed", "5"], await ExecuteAsync(GarnetJournalProtocol.Read, [.. Keys(storage)]));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken).AsTask());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken).AsTask());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.ReadAsync(new CapturingConsumer(), CancellationToken).AsTask());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.GetMetadataAsync(CancellationToken).AsTask());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.UpdateMetadataAsync(cancellationToken: CancellationToken).AsTask());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken).AsTask());
-        await Assert.ThrowsAsync<InvalidOperationException>(() => storage.DeleteAsync(CancellationToken).AsTask());
+        Assert.Equal(["-10", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Read, [.. Keys(storage)]));
+        Assert.Equal(["-10", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Index, [(RedisKey)bucketKey, (RedisKey)GarnetJournalKeys.GetIndexKey(storage.Bucket)]));
+
+        // No view assigns the bucket elsewhere, so every operation retries until it times out.
+        await Assert.ThrowsAsync<TimeoutException>(() => storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken).AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken).AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => storage.ReadAsync(new CapturingConsumer(), CancellationToken).AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => storage.GetMetadataAsync(CancellationToken).AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => storage.UpdateMetadataAsync(cancellationToken: CancellationToken).AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken).AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => storage.DeleteAsync(CancellationToken).AsTask());
 
         // The sealed bucket's data is intact.
-        Assert.Equal(1, await _fixture.Database.ListLengthAsync(storage.DataKey));
+        Assert.Equal(1, await fixture.Database.ListLengthAsync(storage.DataKey));
     }
 
     [Fact]
@@ -441,9 +387,11 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
 
     private static object[] Keys(GarnetJournalStorage storage) => storage.GetProcedureKeys();
 
-    private async Task<string?[]> ExecuteAsync(string procedure, object[] args)
+    private Task<string?[]> ExecuteAsync(string procedure, object[] args) => ExecuteAsync(_fixture.Database, procedure, args);
+
+    private static async Task<string?[]> ExecuteAsync(IDatabase database, string procedure, object[] args)
     {
-        var result = await Provider.Client.ExecuteAsync(procedure, args, CancellationToken);
+        var result = (RedisResult[])(await database.ExecuteAsync(procedure, args))!;
         return result.Select(value => (string?)value).ToArray();
     }
 }

@@ -1,6 +1,6 @@
 # Range-partitioned journal storage on embedded Garnet
 
-Status: phases 0 and 1 implemented; phases 2–5 designed. This document records the design, its decisions (marked **Decided** or **Undecided**), and the evidence behind them.
+Status: phases 0, 1, and 2 implemented; phases 3–5 designed. This document records the design, its decisions (marked **Decided** or **Undecided**), and the evidence behind them.
 
 The system stores `Orleans.Journaling` journals in embedded [Garnet](https://github.com/microsoft/garnet) instances, one per *partition*, and moves ownership of key ranges between partitions online using the range migration scheme designed for Roux (`roux/docs/design/range-migration.md` and `roux/specs/range-migration`). Each journal is linearizable, and every write is durable before it is acknowledged.
 
@@ -10,7 +10,7 @@ The system stores `Orleans.Journaling` journals in embedded [Garnet](https://git
 | --- | --- | --- |
 | 0 | Embedded Garnet, transaction procedures, AOF commit-wait, crash recovery, fencing question | Done: [durability](#durability), [fencing](#fencing) |
 | 1 | `Orleans.Journaling.Garnet` with one partition per cluster | Done: provider suites pass; [measurements](#measurements) |
-| 2 | Many partitions, buckets, MetaStore, routing with view versions; static range map | Designed |
+| 2 | Many partitions, buckets, MetaStore, routing with view versions; static range map | Done: [MetaStore](#metastore), [routing](#routing), [hosting](#partition-hosting-phase-2); routing, MetaStore CAS, and three-silo, four-partition cluster tests |
 | 3 | Handover, lazy migration, consolidation, tombstones, GC; specification first | Designed; [bucket checks](#journal-procedures) and tombstones implemented |
 | 4 | Partition hosting and failover on shared durable storage, with fencing | Designed |
 | 5 | Balancer, splits and merges, locality placement, key filters, benchmarks | Designed |
@@ -38,7 +38,7 @@ flowchart TB
 | Partition | One Garnet instance with its own AOF and checkpoints, identified by a `PartitionId` that is never reused. |
 | Range map, view `V` | The versioned mapping from ranges to partitions, with in-progress migrations and hosting assignments, at version `V`. Stored in the MetaStore. |
 
-Phase 1 runs one partition which owns every bucket. A silo hosts it in process (`DataDirectory`); other silos connect to it (`ConfigurationOptions`).
+A silo hosts the partitions the range map assigns to it, each an embedded Garnet server with its own data directory and endpoint, and routes every journal operation to the partition which owns the journal's bucket. The range map is static in phase 2: ranges move between partitions from phase 3.
 
 ## Partition data layout
 
@@ -48,7 +48,7 @@ Phase 1 runs one partition which owns every bucket. A silo hosts it in process (
 | `oj:m:{b}:{id}` | hash | `$etag`, `$content-etag`, `$append-length`, `$format`, `$schema-version`, `$recent-etags`, and caller properties; or a tombstone: `$deleted`, `$etag`, and `$recent-etags`. |
 | `oj:i:{b}` | set | Encoded ids of the bucket's live journals, updated in the same transaction as every create and delete. |
 | `oj:b:{b}` | hash | Bucket state: `state` (`open` or `sealed`; absent key means absent), `version`, `source`, `done`. |
-| `oj:partition` | hash | `bucket-count` and `schema-version`, written once every bucket of a new partition is open. |
+| `oj:partition` | hash | `partition-id`, `bucket-count`, and `schema-version`, written once the partition has opened its initial buckets. |
 
 `{b}` is the bucket in decimal; `{id}` is the journal id encoded as generalized UTF-8 (WTF-8), which is injective over .NET strings including unpaired surrogates, so the catalog decodes ids from the index without metadata reads.
 
@@ -60,6 +60,8 @@ Each journal operation is one Garnet `CustomTransactionProcedure`, registered be
 2. Returns `WrongPartition(state, version)` unless the bucket is `open`. This is Roux's in-band seal: an operation and a seal of its bucket are serialized by the bucket lock, so an operation either commits before the seal, and is part of the sealed state, or observes the seal and fails. No write is acknowledged after the seal (the Delos erratum ordering).
 3. Returns `NeedPull(source)` if the bucket's migration is not `done` and the partition holds neither the journal nor its tombstone.
 4. Applies the conditional operation with the same semantics as the Redis provider: content-ETag checks for data writes, metadata-ETag checks for metadata updates.
+
+The catalog's `OJINDEX` procedure takes shared locks on the bucket and its index, applies the same bucket checks (returning `NeedPull` for any bucket whose migration is not `done`), and returns the index as one snapshot.
 
 Garnet logs a procedure invocation to the AOF as its input, after `Main` returns, and replays it by running the procedure again. Three rules follow, each enforced in `GarnetJournalProcedures.cs`:
 
@@ -112,8 +114,8 @@ With Tsavorite's default Windows device (unbuffered, without write-through), one
 | D3 | Clients generate ETags and retry ambiguous outcomes with identical arguments; journals retain their last eight mutation ETags. | Decided | Required for deterministic replay (D2) and for applying each mutation at most once across lost replies, including retries at another partition after a migration. Keeping several ETags, rather than only the current one, recognizes a retry after later mutations, including a deletion. |
 | D4 | Delete writes a tombstone carrying the deletion's recent ETags. | Decided | Makes retries around deletes idempotent, and is required during migration so that a later read does not fall back to the source and resurrect the journal. |
 | D5 | Tombstone reclamation. | Undecided | During migration, tombstones may be dropped once their bucket is `done`. Outside migration they serve only retry idempotency; reclaim them after a retention bound longer than `OperationTimeout`, measured in bucket transitions rather than clocks. |
-| D6 | Operations require only `state == open`; the bucket's `version` is returned with `WrongPartition` so the client refreshes its view. | Decided | Refines the brief's `version == expectedVersion`. At most one partition holds a bucket open (Roux's `singleOpen`), so an open bucket is the unique acceptor regardless of the client's view; the view version is a staleness hint, not a safety condition. |
-| D7 | A new single partition claims its bucket count in `oj:partition` (set only if absent), opens every bucket at version 0 with `done = 1`, then marks itself initialized. | Decided | Concurrent initializations with different bucket counts cannot both succeed. Opening is idempotent, so a crash during initialization is repaired by the next start. |
+| D6 | Operations require only `state == open`; the bucket's `version` is returned with `WrongPartition` so the client refreshes its view. | Decided | Refines the brief's `version == expectedVersion`. At most one partition holds a bucket open (Roux's `singleOpen`), so an open bucket is the unique acceptor regardless of the client's view; the view version is a staleness hint, not a safety condition. See D17. |
+| D7 | A new partition opens the buckets the map assigns to it, outside any migration, at their assignment version with `done = 1`, then writes `oj:partition` with its id and the bucket count. | Decided | Opening is idempotent, so a crash during initialization is repaired by the next start; the descriptor pins the partition id and bucket count, so a data directory cannot be reused for another partition or map. |
 | D8 | Lock the bucket key shared and the bucket index exclusively for operations that may create or delete. | Decided | The shared bucket lock implements the in-band seal; the index lock serializes creates and deletes per bucket for microseconds, while locks are held only in memory (AOF waits happen after release). |
 | D9 | Reach partitions over RESP (StackExchange.Redis), including the in-process partition over loopback. | Decided for phases 1–2 | Garnet's in-process sessions (`EmbeddedRespServer`) are internal to its benchmarks. Productizing them is a Garnet change, worth doing in phase 5 for locality placement. |
 | D10 | Depend on `Microsoft.Garnet` 2.2.0 and target net10.0 only. | Decided | Garnet requires Microsoft.Extensions 10.x, which the repository uses on net10.0. |
@@ -121,35 +123,74 @@ With Tsavorite's default Windows device (unbuffered, without write-through), one
 | D12 | Zombie-host fencing mechanism. | Undecided | See [Fencing](#fencing). |
 | D13 | Garnet replication is not used. | Decided | It is asynchronous and cannot satisfy synchronous durability. Availability comes from failover onto shared durable storage (phase 4). |
 | D14 | Local partitions use the `RandomAccess` device (write-through, unbuffered). | Decided | Tsavorite's default devices are unbuffered but not write-through (Windows) or depend on the native backend (Linux), which survives process loss but not necessarily power loss. Write-through makes an acknowledged write durable on the device on every platform. |
-| D15 | The catalog reads each bucket index with `SMEMBERS`. | Decided | Garnet's `SSCAN` cursor is a position in the set's enumeration, so a delete between pages skips members. One snapshot per bucket includes every journal that exists for the whole listing. |
+| D15 | The catalog reads each bucket index whole (`SMEMBERS`, in the `OJINDEX` procedure at the bucket's owner). | Decided | Garnet's `SSCAN` cursor is a position in the set's enumeration, so a delete between pages skips members. One snapshot per bucket includes every journal that exists for the whole listing. |
 | D16 | Every mutation is conditional on a state identity that never recurs: a content ETag, a metadata ETag, or an absence named by its tombstone's ETag. | Decided | Duplicate activations which both observe a missing journal cannot both create it, and a retry whose ETag has left the history cannot apply again: a creation cannot resurrect a deleted journal, and an unconditional metadata update cannot overwrite a later one. |
+| D17 | Requests do not carry the client's view version. A `WrongPartition` reply carries the version of the bucket's last transition; the client refreshes its view when that version is newer than its own and retries at once, and otherwise backs off and retries. | Decided | Refines the brief, which sends the client's version with each request. By D6 the partition's decision does not depend on the client's view, so the client's version would be unused; the reported version tells the client which view to wait for. A reported version no newer than the client's view means the owner has not opened the bucket yet (or the endpoint now belongs to another partition), which is transient. |
+| D18 | Hosts publish each partition's endpoint in the range map (`PartitionHosting.Endpoint`), by CAS, after the partition has opened its buckets. | Decided | Endpoints change when a host restarts with a free port or a partition fails over, and the MetaStore is already the authority for hosting. Clients route to a partition only once it serves its buckets. A stale endpoint is safe: whatever listens there rejects buckets it does not hold open. |
+| D19 | `PartitionId` is a string of 1–64 characters from `[A-Za-z0-9._-]`, starting with a letter or digit. `StorageLocation` is a path relative to the host's data directory. | Decided | Ids name files, keys, and the bucket `source` field (where `-` means none); relative locations keep the map independent of host file systems. Phase 4 interprets `StorageLocation` for shared storage. |
+| D20 | The Azure Blob MetaStore lives in the provider package. | Decided | `Microsoft.Garnet` already depends on `Azure.Storage.Blobs`, so a separate package would add no isolation. |
+| D21 | A Garnet MetaStore in a dedicated instance with commit-wait. | Undecided | Optional in the brief; the in-memory and Azure Blob stores cover phase 2. Worth adding if a deployment needs a MetaStore without Azure. |
+| D22 | `HostId` defaults to the silo name, and must be stable across restarts while hosting is static. | Decided for phase 2 | The static map assigns partitions to hosts by name. Phase 4 assigns hosts through the coordinator, keyed by live silos. |
 
 ## Range layer (phases 2–3)
 
 ### MetaStore
 
-The MetaStore is pluggable and holds the range map. Every change, including migration phase and hosting changes, is a compare-and-swap from `V` to `V + 1`, so a crashed or duplicated coordinator is safe.
+The MetaStore is pluggable and holds the range map. Every change, including migration phase and hosting changes, is a compare-and-swap from `V` to `V + 1`, so a crashed or duplicated coordinator is safe. The types live in `Orleans.Journaling.Ranges` and reference neither Garnet nor Orleans.
 
 ```csharp
 public interface IRangeMetaStore
 {
-    ValueTask<RangeMapSnapshot> ReadAsync(CancellationToken cancellationToken);
-    ValueTask<(bool Written, RangeMapSnapshot Current)> TryWriteAsync(RangeMap next, long expectedVersion, CancellationToken cancellationToken);
+    ValueTask<RangeMapSnapshot?> ReadAsync(CancellationToken cancellationToken);
+    ValueTask<RangeMapWriteResult> TryWriteAsync(RangeMap next, long expectedVersion, CancellationToken cancellationToken);
 }
 
 public sealed record RangeMapSnapshot(long Version, RangeMap Map);
+public readonly record struct RangeMapWriteResult(bool Written, RangeMapSnapshot? Current);
 public sealed record RangeMap(
     int BucketCount,
     ImmutableArray<RangeAssignment> Ranges,
     ImmutableArray<Migration> Migrations,
-    ImmutableDictionary<PartitionId, PartitionHosting> Partitions);
-public sealed record RangeAssignment(int FirstBucket, int LastBucket, PartitionId Owner, long AssignedAtVersion);
+    ImmutableSortedDictionary<PartitionId, PartitionHosting> Partitions);
+public sealed record RangeAssignment(int FirstBucket, int LastBucket, PartitionId Owner, long AssignedAtVersion = 0);
 public sealed record Migration(int FirstBucket, int LastBucket, PartitionId Source, PartitionId Destination, long StartedAtVersion, MigrationPhase Phase);
-public sealed record PartitionHosting(string Host, long Epoch, string StorageLocation);
+public enum MigrationPhase { Committed, Sealed, Opened, Done, Complete }
+public sealed record PartitionHosting(string Host, long Epoch, string StorageLocation, string? Endpoint = null);
+public readonly record struct PartitionId(string Value);
 ```
 
-`RangeAssignment.AssignedAtVersion` is added to the brief's sketch so a client can compare its assignment with the version a partition reports. `PartitionHosting.Host` is a string so the interface carries no Orleans types. Implementations: in-memory (tests), Azure Blob (one document, ETag CAS), and a dedicated Garnet instance with commit-wait.
+Refinements of the brief's sketch, and why:
 
+- **No map is version 0.** `ReadAsync` returns `null` for an empty store, and the first map is written with `expectedVersion = 0` as version 1, so every silo can race to write the initial map and exactly one succeeds.
+- **`RangeMapWriteResult`** names the CAS outcome. `Current` is the written map on success and the map that prevented the write on failure, so a writer retries from it without another read.
+- **`RangeAssignment.AssignedAtVersion`** is the version at which the owner opens the range's buckets: 0 for ranges assigned when the map was created, otherwise the version which committed the migration into the owner. A partition reports it in `WrongPartition`, which lets clients decide between refreshing and backing off (D17).
+- **`PartitionHosting.Host` is a string** (`HostId`, the silo name by default; D22), and **`Endpoint`** is the `host:port` the hosting silo publishes once the partition serves (D18).
+- **`ImmutableSortedDictionary`** gives the map a deterministic order, so equal maps serialize to equal documents. `RangeMap` compares its collections by value.
+- **`RangeMap.Validate`** checks the structural invariants: a power-of-two bucket count; ordered, contiguous ranges covering every bucket and owned by known partitions; disjoint migrations between distinct known partitions whose buckets the map already assigns to the destination (the commit step of the handover); and complete hosting records. Stores validate every write, and routers validate every view they read. Invariants across versions, such as the fixed bucket count, are enforced by the router, which rejects a view that changes them.
+
+Implementations:
+
+- `InMemoryRangeMetaStore`, for tests and single-process development.
+- `AzureBlobRangeMetaStore`: one JSON document (format version, map version, map) in a blob. A write reads the document, compares versions, and uploads conditionally on the ETag it read (`If-None-Match: *` for the first map). If the upload fails its condition, the store reads the blob again and reports success only if it holds exactly the bytes this write uploaded, which covers an SDK retry of an upload whose first attempt succeeded.
+- A dedicated Garnet MetaStore is optional (D21).
+
+### Routing
+
+`GarnetJournalRouter` holds the cached view and a connection per published endpoint. An operation computes its journal's bucket, finds the owner in the view, and runs its procedure there:
+
+- **`WrongPartition(state, version)`**: if `version` is newer than the view, the router refreshes from the MetaStore and retries at once; otherwise the owner has not yet opened the bucket, and the router backs off and retries (D17).
+- **Unavailability** (no published endpoint, connection failures, timeouts, transactions that did not run): back off from 10 ms to 1 s, refresh the view in case the endpoint changed, and retry.
+- Every retry reuses the operation's arguments, so idempotent retries (D3) make a retry at another partition safe. After `OperationTimeout`, the operation fails with `TimeoutException`. Grains see `InconsistentStateException` only for genuine conflicts.
+
+Views are applied in version order: a refresh that returns an older or equal version is ignored. Concurrent refreshes share one MetaStore read. When a view changes an endpoint, the router stops using the old connection at once and closes it after `OperationTimeout`, once operations in flight on it have finished. Safety does not depend on the view: only a partition that holds a bucket open accepts operations on it, and at most one partition does.
+
+The catalog reads every bucket's index at its owner with `OJINDEX`, 32 buckets at a time. While a bucket's migration is not `done` its source may hold more journals, so `OJINDEX` returns `NeedPull` and the catalog fails rather than return a partial listing; phase 3 lists the union.
+
+### Partition hosting (phase 2)
+
+On start, each silo reads the range map, writing `InitialRangeMap` (or a one-partition map hosted by itself, if it has a `DataDirectory`) if the store is empty, and waits if neither applies. It then starts an embedded Garnet server for each partition the map assigns to its `HostId`, in `DataDirectory/StorageLocation`, on consecutive ports from `ListenEndPoint` (free ports by default). Each new partition opens its initial buckets (D7) and records its descriptor; a restarted partition checks its descriptor against the map. Once its partitions serve, the silo publishes their endpoints by CAS (D18). Silos with no partitions route only.
+
+In phase 2 the map's ranges and hosting assignments never change; only endpoints do. Phase 3 opens and seals buckets through migrations, and phase 4 moves partitions between hosts with a new epoch.
 ### Handover and migration
 
 Moving buckets `[f, l]` from partition A to B at view `V`: commit `V` (assign to B, add `Migration(..., Committed)`); A seals each bucket (`OJBUCKET seal V`); B opens each bucket (`open V source=A done=0`) only after A's seal is recorded. B returns `NeedPull` for a journal it does not hold; the client reads the journal from A (stable, since A's bucket is sealed), installs it in B with a conditional install (only if B holds neither the journal nor its tombstone), and retries. A consolidator scans A's `oj:i:{b}` and installs each journal; when every journal is present in B, B sets `done` in a transaction that rechecks the condition. After `Done`, the coordinator records `Complete`, and A deletes the bucket's journals and index but keeps `oj:b:{b}` sealed, so later reads in A return `WrongPartition`: reclaimed data reads as an error, never as absent.

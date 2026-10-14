@@ -24,9 +24,10 @@ internal static class GarnetJournalProtocol
     public const string Delete = "OJDELETE";
     public const string UpdateMetadata = "OJSETMETA";
     public const string Bucket = "OJBUCKET";
+    public const string Index = "OJINDEX";
 
     /// <summary>Procedure names in registration order.</summary>
-    public static readonly string[] Names = [Read, GetMetadata, Create, Append, Replace, Delete, UpdateMetadata, Bucket];
+    public static readonly string[] Names = [Read, GetMetadata, Create, Append, Replace, Delete, UpdateMetadata, Bucket, Index];
 
     public const int MissingStatus = 0;
     public const int SuccessStatus = 1;

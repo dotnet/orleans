@@ -28,11 +28,13 @@ namespace Orleans.Journaling
 
         public long CompactionThresholdBytes { get { throw null; } set { } }
 
-        public StackExchange.Redis.ConfigurationOptions? ConfigurationOptions { get { throw null; } set { } }
-
         public string? DataDirectory { get { throw null; } set { } }
 
+        public string? HostId { get { throw null; } set { } }
+
         public string IndexMemorySize { get { throw null; } set { } }
+
+        public Ranges.RangeMap? InitialRangeMap { get { throw null; } set { } }
 
         public int InitStage { get { throw null; } set { } }
 
@@ -40,6 +42,136 @@ namespace Orleans.Journaling
 
         public string LogMemorySize { get { throw null; } set { } }
 
+        public Ranges.IRangeMetaStore? MetaStore { get { throw null; } set { } }
+
         public System.TimeSpan OperationTimeout { get { throw null; } set { } }
+    }
+}
+
+namespace Orleans.Journaling.Ranges
+{
+    public sealed partial class AzureBlobRangeMetaStore : IRangeMetaStore
+    {
+        public AzureBlobRangeMetaStore(Azure.Storage.Blobs.BlobClient blob) { }
+
+        public System.Threading.Tasks.ValueTask<RangeMapSnapshot?> ReadAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<RangeMapWriteResult> TryWriteAsync(RangeMap next, long expectedVersion, System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    public sealed partial class InMemoryRangeMetaStore : IRangeMetaStore
+    {
+        public System.Threading.Tasks.ValueTask<RangeMapSnapshot?> ReadAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<RangeMapWriteResult> TryWriteAsync(RangeMap next, long expectedVersion, System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    public partial interface IRangeMetaStore
+    {
+        System.Threading.Tasks.ValueTask<RangeMapSnapshot?> ReadAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<RangeMapWriteResult> TryWriteAsync(RangeMap next, long expectedVersion, System.Threading.CancellationToken cancellationToken);
+    }
+
+    public sealed partial record Migration(int FirstBucket, int LastBucket, PartitionId Source, PartitionId Destination, long StartedAtVersion, MigrationPhase Phase)
+    {
+    }
+
+    public enum MigrationPhase
+    {
+        Committed = 0,
+        Sealed = 1,
+        Opened = 2,
+        Done = 3,
+        Complete = 4
+    }
+
+    public sealed partial record PartitionHosting(string Host, long Epoch, string StorageLocation, string? Endpoint = null)
+    {
+    }
+
+    public readonly partial struct PartitionId : System.IComparable<PartitionId>, System.IEquatable<PartitionId>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public const int MaxLength = 64;
+        public PartitionId(string value) { }
+
+        public bool IsDefault { get { throw null; } }
+
+        public string Value { get { throw null; } }
+
+        public readonly int CompareTo(PartitionId other) { throw null; }
+
+        public readonly bool Equals(PartitionId other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        public override readonly int GetHashCode() { throw null; }
+
+        public static bool IsValid(string? value) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(PartitionId left, PartitionId right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(PartitionId left, PartitionId right) { throw null; }
+
+        public override readonly string ToString() { throw null; }
+    }
+
+    public sealed partial record RangeAssignment(int FirstBucket, int LastBucket, PartitionId Owner, long AssignedAtVersion = 0)
+    {
+    }
+
+    public sealed partial record RangeMap(int BucketCount, System.Collections.Immutable.ImmutableArray<RangeAssignment> Ranges, System.Collections.Immutable.ImmutableArray<Migration> Migrations, System.Collections.Immutable.ImmutableSortedDictionary<PartitionId, PartitionHosting> Partitions)
+    {
+        public static RangeMap CreateUniform(int bucketCount, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<PartitionId, PartitionHosting>> partitions) { throw null; }
+
+        public bool Equals(RangeMap? other) { throw null; }
+
+        public int FindRange(int bucket) { throw null; }
+
+        public override int GetHashCode() { throw null; }
+
+        public PartitionId GetOwner(int bucket) { throw null; }
+
+        public void Validate() { }
+    }
+
+    public sealed partial record RangeMapSnapshot(long Version, RangeMap Map)
+    {
+    }
+
+    public readonly partial struct RangeMapWriteResult : System.IEquatable<RangeMapWriteResult>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public RangeMapWriteResult(bool Written, RangeMapSnapshot? Current) { }
+
+        public RangeMapSnapshot? Current { get { throw null; } init { } }
+
+        public bool Written { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out bool Written, out RangeMapSnapshot? Current) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(RangeMapWriteResult other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(RangeMapWriteResult left, RangeMapWriteResult right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(RangeMapWriteResult left, RangeMapWriteResult right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
     }
 }
