@@ -1,16 +1,20 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenTelemetry.Metrics;
 using Orleans;
 using Orleans.Dashboard;
 using Orleans.Dashboard.Core;
 using Orleans.Dashboard.Implementation;
+using Orleans.Dashboard.Model;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 using Xunit;
 
@@ -32,9 +36,31 @@ public class DashboardHostTests
         .Single(field => field.FieldType == typeof(MeterProvider));
 
     [Fact]
+    public async Task Metrics_ExportOnlyTheLocalSiloMeter()
+    {
+        using var fixture = new HostFixture();
+        using var otherServices = new ServiceCollection().AddMetrics().AddSingleton<OrleansInstruments>().BuildServiceProvider();
+        await using var host = fixture.CreateHost();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        var meter = fixture.Instruments.Meter;
+        var otherMeter = otherServices.GetRequiredService<OrleansInstruments>().Meter;
+        const string counterName = "dashboard-host-test-counter";
+        meter.CreateCounter<int>(counterName).Add(7);
+        otherMeter.CreateCounter<int>(counterName).Add(100);
+        otherMeter.CreateCounter<int>("other-silo-only").Add(1);
+
+        Assert.True(GetMeterProvider(host).ForceFlush());
+
+        var counters = fixture.CounterReports.Last();
+        var counter = Assert.Single(counters);
+        Assert.Equal(counterName, counter.Name);
+        Assert.Equal("7", counter.Value);
+    }
+
+    [Fact]
     public async Task StartAsync_ValidDependencies_ActivatesDashboardGrainAndSiloGrainServiceOnce()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
 
         try
@@ -56,7 +82,7 @@ public class DashboardHostTests
     public async Task StartAsync_DashboardGrainActivationThrows_LogsWarningAndContinues()
     {
         var expectedException = new InvalidOperationException("dashboard initialization failed");
-        var fixture = new HostFixture { DashboardInitializeException = expectedException };
+        using var fixture = new HostFixture { DashboardInitializeException = expectedException };
         var host = fixture.CreateHost();
 
         try
@@ -80,7 +106,7 @@ public class DashboardHostTests
     public async Task StartAsync_SiloGrainServiceActivationThrows_LogsWarningAndContinues()
     {
         var expectedException = new InvalidOperationException("version update failed");
-        var fixture = new HostFixture { SiloSetVersionException = expectedException };
+        using var fixture = new HostFixture { SiloSetVersionException = expectedException };
         var host = fixture.CreateHost();
 
         try
@@ -105,7 +131,7 @@ public class DashboardHostTests
     {
         var dashboardException = new InvalidOperationException("dashboard initialization failed");
         var siloException = new InvalidOperationException("version update failed");
-        var fixture = new HostFixture
+        using var fixture = new HostFixture
         {
             DashboardInitializeException = dashboardException,
             SiloSetVersionException = siloException,
@@ -137,7 +163,7 @@ public class DashboardHostTests
     [Fact]
     public async Task StopAsync_AfterStart_CompletesAndDoesNotReactivateServices()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
         await host.StartAsync(TestContext.Current.CancellationToken);
         var originalProvider = GetMeterProvider(host);
@@ -164,7 +190,7 @@ public class DashboardHostTests
     [Fact]
     public async Task StopAsync_CalledTwice_RemainsSafe()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
         var trackingProvider = new TrackingMeterProvider();
         SetMeterProvider(host, trackingProvider);
@@ -187,7 +213,7 @@ public class DashboardHostTests
     [Fact]
     public void Dispose_TelemetryDisposalThrows_DoesNotThrow()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
         var expectedException = new InvalidOperationException("synchronous telemetry disposal failed");
         var throwingProvider = new ThrowingMeterProvider(expectedException);
@@ -203,7 +229,7 @@ public class DashboardHostTests
     [Fact]
     public async Task DisposeAsync_TelemetryDisposalThrows_DoesNotThrowOrSynchronouslyDispose()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
         var expectedException = new InvalidOperationException("asynchronous telemetry disposal failed");
         var throwingProvider = new ThrowingAsyncMeterProvider(expectedException);
@@ -220,7 +246,7 @@ public class DashboardHostTests
     [Fact]
     public async Task DisposeAsync_SynchronousTelemetryProvider_DisposesExactlyOnce()
     {
-        var fixture = new HostFixture();
+        using var fixture = new HostFixture();
         var host = fixture.CreateHost();
         var trackingProvider = new TrackingMeterProvider();
         SetMeterProvider(host, trackingProvider);
@@ -294,8 +320,10 @@ public class DashboardHostTests
         return result;
     }
 
-    private sealed class HostFixture
+    private sealed class HostFixture : IDisposable
     {
+        private readonly ServiceProvider _services = new ServiceCollection().AddMetrics()
+            .AddSingleton<OrleansInstruments>().BuildServiceProvider();
         private readonly IDashboardGrain _dashboardGrain;
         private readonly IGrainFactory _grainFactory;
         private readonly ISiloGrainService _siloGrainService;
@@ -343,10 +371,12 @@ public class DashboardHostTests
                 _siloGrainService,
                 destination => SiloGrainDestinations.Add(destination));
 
-            var telemetryService = CreateProxy<ISiloGrainService>((method, _) =>
-                method.Name == nameof(ISiloGrainService.ReportCounters)
-                    ? Task.CompletedTask
-                    : throw new NotSupportedException(method.Name));
+            var telemetryService = CreateProxy<ISiloGrainService>((method, arguments) =>
+            {
+                if (method.Name != nameof(ISiloGrainService.ReportCounters)) throw new NotSupportedException(method.Name);
+                CounterReports.Enqueue(((Immutable<StatCounter[]>)arguments![0]!).Value);
+                return Task.CompletedTask;
+            });
             var telemetryClient = new RecordingSiloGrainClient(telemetryService);
             _telemetryExporter = new DashboardTelemetryExporter(
                 LocalSiloDetails,
@@ -355,6 +385,8 @@ public class DashboardHostTests
         }
 
         public CapturingLogger<DashboardHost> Logger { get; } = new();
+        public OrleansInstruments Instruments => _services.GetRequiredService<OrleansInstruments>();
+        public ConcurrentQueue<StatCounter[]> CounterReports { get; } = new();
 
         public TestLocalSiloDetails LocalSiloDetails { get; }
 
@@ -379,7 +411,9 @@ public class DashboardHostTests
         public List<(string OrleansVersion, string HostVersion)> SetVersionCalls { get; } = [];
 
         public DashboardHost CreateHost() =>
-            new(Logger, LocalSiloDetails, _grainFactory, _telemetryExporter, _siloGrainClient);
+            new(Logger, LocalSiloDetails, Instruments, _grainFactory, _telemetryExporter, _siloGrainClient);
+
+        public void Dispose() => _services.Dispose();
     }
 
     private sealed class TestLocalSiloDetails : ILocalSiloDetails

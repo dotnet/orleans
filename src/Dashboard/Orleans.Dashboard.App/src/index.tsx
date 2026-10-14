@@ -45,10 +45,11 @@ import Overview from './overview/overview';
 import SiloState from './silos/silo-state-label';
 import Alert from './components/alert';
 import LogStream from './logstream/log-stream';
-import SiloCounters from './silos/silo-counters';
+import SiloCounters, { type Counter } from './silos/silo-counters';
 import Reminders from './reminders/reminders';
 import Preferences from './components/preferences';
 import storage from './lib/storage';
+import initializeSidebar from './lib/sidebar';
 import Lifecycle, { LifecycleStageInfo } from './lifecycle/lifecycle';
 
 interface Settings {
@@ -65,6 +66,7 @@ interface MenuItem {
 }
 
 const target = document.getElementById('content');
+initializeSidebar();
 
 // Restore theme preference.
 let defaultTheme = storage.get('theme') || 'dark';
@@ -344,20 +346,27 @@ function renderPage(jsx: JSX.Element, path: string) {
   scroll();
   renderLoading();
 
-  http.get(`SiloCounters/${host}`, (err, data) => {
+  let counters: Counter[] = [];
+  const loadData = function () {
+    http.get(`SiloCounters/${host}`, (err, data) => {
+      counters = data;
+      render();
+    });
+  };
+
+  render = function () {
     if (routeIndex != thisRouteIndex) return;
     const subTitle = <a href={`#/host/${host}`}>Silo Details</a>;
     renderPage(
       <Page title={`Silo ${host}`} subTitle={subTitle}>
-        <SiloCounters
-          silo={host}
-          dashboardCounters={dashboardCounters}
-          counters={data}
-        />
+        <SiloCounters counters={counters} />
       </Page>,
       '#/silos'
     );
-  });
+  };
+
+  events.on('refresh', loadData);
+  loadData();
 });
 
 (routie as any)('/grain/:grainType', function (grainType: string) {
