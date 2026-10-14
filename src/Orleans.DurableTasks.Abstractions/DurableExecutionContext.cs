@@ -214,9 +214,23 @@ public abstract class DurableExecutionContext
         => throw new NotSupportedException("The durable execution host does not support signals.");
 
     /// <summary>
-    /// Returns the first completed candidate and persists that selection under <paramref name="decisionId"/>.
-    /// Repeated calls with the same decision identifier return the recorded winner.
+    /// Returns a completed candidate, and returns the same candidate for every call with the same
+    /// <paramref name="decisionId"/>, including calls during replay.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The candidate is the one which completed first: a host persists the selection under <paramref name="decisionId"/>,
+    /// or derives it from a durable completion order, such as a sequence which stamps each terminal result when the host
+    /// stages it. A durable order needs no record: the completed candidate with the lowest sequence is the same in every
+    /// replay, because candidates which complete later receive higher sequences.
+    /// </para>
+    /// <para>
+    /// <see cref="DurableTask.WhenAny(IReadOnlyList{DurableTask})"/> selects its winner with one call, and
+    /// <see cref="ScheduledTask.WhenEach(IReadOnlyList{ScheduledTask})"/> selects each next task with one call over the
+    /// remaining candidates, under a distinct decision identifier. The host reads <paramref name="candidates"/> only during
+    /// the call.
+    /// </para>
+    /// </remarks>
     protected internal abstract ValueTask<TaskId> SelectCompletionAsync(
         TaskId decisionId,
         IReadOnlyList<TaskId> candidates,
