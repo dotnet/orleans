@@ -84,6 +84,8 @@ namespace Orleans.Journaling
 
         public static IDurableList<T> GetOrAddList<T>(this IDurableStateManager manager, string name) { throw null; }
 
+        public static IDurableLog<T> GetOrAddLog<T>(this IDurableStateManager manager, string name) { throw null; }
+
         public static Runtime.IPersistentState<T> GetOrAddPersistentState<T>(this IDurableStateManager manager, string name) { throw null; }
 
         public static IDurableQueue<T> GetOrAddQueue<T>(this IDurableStateManager manager, string name) { throw null; }
@@ -187,6 +189,51 @@ namespace Orleans.Journaling
     {
         void AddRange(System.Collections.Generic.IEnumerable<T> collection);
         System.Collections.ObjectModel.ReadOnlyCollection<T> AsReadOnly();
+    }
+
+    public partial interface IDurableLogCommandCodec<T>
+    {
+        void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer);
+        void WriteAppend(T item, JournalStreamWriter writer);
+        void WriteSnapshot(long firstSequence, System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
+        void WriteTrimBefore(long sequence, JournalStreamWriter writer);
+    }
+
+    public partial interface IDurableLogCommandHandler<T>
+    {
+        void ApplyAppend(T item);
+        void ApplyTrimBefore(long sequence);
+        void Reset(long firstSequence, int capacityHint);
+    }
+
+    public partial interface IDurableLogDraft<T> : System.IDisposable
+    {
+        int Count { get; }
+
+        LogDraftId Id { get; }
+
+        bool IsOpen { get; }
+
+        void Abandon(string? reason = null);
+        long Commit(T entry);
+        void Write(T item);
+    }
+
+    public partial interface IDurableLog<T> : System.Collections.Generic.IReadOnlyCollection<T>, System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable
+    {
+        long CommittedSequence { get; }
+
+        long FirstSequence { get; }
+
+        T this[long sequence] { get; }
+
+        long NextSequence { get; }
+
+        long Append(T item);
+        IDurableLogDraft<T> BeginDraft();
+        System.Collections.Generic.IAsyncEnumerable<LogEvent<T>> ReadAsync(long fromSequence = 0, DurableWatchMode mode = DurableWatchMode.Committed, LogDraftId? resumeDraftId = null, System.Threading.CancellationToken cancellationToken = default);
+        void TrimBefore(long sequence);
+        bool TryGet(long sequence, out T item);
     }
 
     public partial interface IDurableQueueCommandCodec<T>
@@ -734,6 +781,93 @@ namespace Orleans.Journaling
     }
 
     [GenerateSerializer]
+    [Immutable]
+    public readonly partial struct LogDraftId : System.IEquatable<LogDraftId>
+    {
+        private readonly int _dummyPrimitive;
+        public LogDraftId(System.Guid activationId, long number) { }
+
+        [Id(0)]
+        public System.Guid ActivationId { get { throw null; } }
+
+        [Id(1)]
+        public long Number { get { throw null; } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(LogDraftId other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(LogDraftId left, LogDraftId right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(LogDraftId left, LogDraftId right) { throw null; }
+
+        public override readonly string ToString() { throw null; }
+
+        public static bool TryParse(System.ReadOnlySpan<char> value, out LogDraftId result) { throw null; }
+    }
+
+    [GenerateSerializer]
+    public enum LogEventKind : byte
+    {
+        Entry = 0,
+        Reset = 1,
+        Watermark = 2,
+        DraftItem = 3,
+        DraftCommitted = 4,
+        DraftAbandoned = 5
+    }
+
+    [GenerateSerializer]
+    public readonly partial struct LogEvent<T> : System.IEquatable<LogEvent<T>>
+    {
+        private readonly T? _Item_k__BackingField;
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        [Id(3)]
+        public LogDraftId? DraftId { get { throw null; } init { } }
+
+        [Id(2)]
+        public T? Item { get { throw null; } init { } }
+
+        [Id(0)]
+        public LogEventKind Kind { get { throw null; } init { } }
+
+        [Id(4)]
+        public string? Reason { get { throw null; } init { } }
+
+        [Id(1)]
+        public long Sequence { get { throw null; } init { } }
+
+        [Id(5)]
+        public DurableChangeStatus Status { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(LogEvent<T> other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(LogEvent<T> left, LogEvent<T> right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(LogEvent<T> left, LogEvent<T> right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
+    }
+
+    [GenerateSerializer]
     public enum QueueChangeKind : byte
     {
         Resync = 0,
@@ -952,6 +1086,19 @@ namespace Orleans.Journaling.Json
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer) { }
     }
 
+    public sealed partial class JsonDurableLogCommandCodec<T> : IDurableLogCommandCodec<T>
+    {
+        public JsonDurableLogCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+
+        public void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer) { }
+
+        public void WriteAppend(T item, JournalStreamWriter writer) { }
+
+        public void WriteSnapshot(long firstSequence, System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer) { }
+
+        public void WriteTrimBefore(long sequence, JournalStreamWriter writer) { }
+    }
+
     public sealed partial class JsonDurableQueueCommandCodec<T> : IDurableQueueCommandCodec<T>
     {
         public JsonDurableQueueCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
@@ -1158,6 +1305,51 @@ namespace OrleansCodeGen.Orleans.Journaling
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_LogDraftId : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.LogDraftId>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Journaling.LogDraftId>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Journaling.LogDraftId instance) { }
+
+        public global::Orleans.Journaling.LogDraftId ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Journaling.LogDraftId instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.LogDraftId value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_LogEventKind : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.LogEventKind>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public global::Orleans.Journaling.LogEventKind ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.LogEventKind value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_LogEvent<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.LogEvent<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Journaling.LogEvent<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public Codec_LogEvent(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.Journaling.LogEvent<T> instance) { }
+
+        public global::Orleans.Journaling.LogEvent<T> ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.Journaling.LogEvent<T> instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.LogEvent<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_QueueChangeKind : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.QueueChangeKind>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public global::Orleans.Journaling.QueueChangeKind ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
@@ -1256,6 +1448,16 @@ namespace OrleansCodeGen.Orleans.Journaling
         public Copier_ListChange(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
 
         public global::Orleans.Journaling.ListChange<T> DeepCopy(global::Orleans.Journaling.ListChange<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_LogEvent<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Journaling.LogEvent<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_LogEvent(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public global::Orleans.Journaling.LogEvent<T> DeepCopy(global::Orleans.Journaling.LogEvent<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
