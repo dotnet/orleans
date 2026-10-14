@@ -135,7 +135,7 @@ public sealed class DurableTaskCompensatingWorkflowGrain : DurableGrain, IDurabl
             await inventory.HoldAsync().WithId("hold");
             return "completed";
         }
-        catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
         {
             await inventory.ReleaseAsync(reserved).DetachAsync(GetCompensationRootId(this.GetPrimaryKey()));
             return "compensated";

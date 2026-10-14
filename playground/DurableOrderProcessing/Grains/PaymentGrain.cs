@@ -16,7 +16,7 @@ public sealed class PaymentGrain : DurableGrain, IPaymentGrain
     {
         // A real gateway call goes here. The task runs until its result commits, at least once, so pass the task ID to
         // the gateway as its idempotency key.
-        var context = DurableExecutionContext.Current!;
+        var context = DurableTask.Current;
         await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(200, 800)), context.CancellationToken);
         return cardLast4 == "0002"
             ? new PaymentResult(false, "The card was declined.")

@@ -65,7 +65,7 @@ public sealed class OrderGrain(IDurableTaskManager tasks) : DurableGrain, IOrder
 ```
 
 A cancellation request can carry a reason, which the canceled workflow reads from
-`DurableExecutionContext.CancellationReason`, for example to record why it stopped. The first
+`DurableTask.Current.CancellationReason`, for example to record why it stopped. The first
 request determines the reason; `ScheduledTask.CancelAsync(reason)` and
 `IDurableTaskGrainExtension.CancelAsync(taskId, reason)` carry one from clients and tooling.
 
@@ -234,7 +234,7 @@ framework assets; its first published version establishes the compatibility base
   request outside a cancellation suppression scope are canceled without running. Recovery replays a canceled body with its cancellation
   requested, so completed children return their recorded results. The first durable terminal result
   wins a race.
-- A body runs compensation inline in a `DurableExecutionContext.SuppressCancellation()` scope. Each
+- A body runs compensation inline in a `DurableTask.Current.SuppressCancellation()` scope. Each
   child which it schedules in the scope, such as a local step, a delay, or a call to another grain,
   records that its ancestors' cancellation doesn't reach it: it is created and runs when its parent's
   cancellation was already requested, a later request skips it and its descendants, and recovery
@@ -242,7 +242,7 @@ framework assets; its first published version establishes the compatibility base
   of its tree still reach it. A body detaches work which must outlive the task itself.
 - A cancellation request's reason commits with the request on each task it reaches, travels with the
   cancellation to each pending call to another grain, and is what a replay of a canceled body reads
-  from `DurableExecutionContext.CancellationReason`. Diagnostics report it as the `Response` of a
+  from `DurableTask.Current.CancellationReason`. Diagnostics report it as the `Response` of a
   `Canceling` or `Canceled` task.
 - An administrative abort, through `IDurableTaskManager.AbortAsync`, `IDurableTaskGrainExtension.AbortAsync`,
   or `ScheduledTask.AbortAsync`, commits the task and its execution tree as failed with

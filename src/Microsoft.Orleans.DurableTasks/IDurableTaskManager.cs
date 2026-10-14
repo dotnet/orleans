@@ -53,7 +53,7 @@ public interface IDurableTaskManager
     /// <summary>Durably requests cancellation of a task of this grain and its execution tree, carrying <paramref name="reason"/>.</summary>
     /// <param name="taskId">The task identifier.</param>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
     /// <see langword="null"/> for none.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
@@ -81,7 +81,7 @@ public interface IDurableTaskManager
     /// </summary>
     /// <param name="rootId">The root task's identifier, as passed to <see cref="TaskId.CreateRoot(string)"/>.</param>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
     /// <see langword="null"/> for none.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>

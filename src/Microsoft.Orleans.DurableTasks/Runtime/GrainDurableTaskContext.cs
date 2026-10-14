@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using System.Threading;
@@ -15,11 +16,11 @@ namespace Orleans.DurableTasks.Runtime;
 /// </summary>
 /// <remarks>
 /// The attempt's host execution-abort token is canceled when the activation shuts down or when the task is aborted:
-/// <see cref="DurableExecutionContext.CancellationToken"/> observes it, while
-/// <see cref="DurableExecutionContext.IsCancellationRequested"/> reports durable cancellation only. The runtime drains the
+/// <see cref="DurableTaskContext.CancellationToken"/> observes it, while
+/// <see cref="DurableTaskContext.IsCancellationRequested"/> reports durable cancellation only. The runtime drains the
 /// aborted attempt and discards its response; after shutdown, the next activation replays the task in a new context.
 /// </remarks>
-internal sealed class GrainDurableExecutionContext : DurableExecutionContext
+internal sealed class GrainDurableTaskContext : DurableTaskContext
 {
     private readonly IDurableTaskGrainRuntime _runtime;
     private readonly TaskScheduler _scheduler;
@@ -29,16 +30,10 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     // when it ends, so a completed attempt retains nothing on the shutdown token.
     private readonly CancellationTokenSource _abortSource;
     private readonly CancellationTokenRegistration _shutdownRegistration;
-    private HashSet<string>? _childNames;
     private bool _deleted;
     private bool _aborted;
-#if NET9_0_OR_GREATER
-    private readonly Lock _idLock = new();
-#else
-    private readonly object _idLock = new();
-#endif
 
-    public GrainDurableExecutionContext(
+    public GrainDurableTaskContext(
         TaskId taskId,
         IDurableTaskGrainRuntime runtime,
         TaskScheduler scheduler,
@@ -48,7 +43,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     {
     }
 
-    private GrainDurableExecutionContext(
+    private GrainDurableTaskContext(
         TaskId taskId,
         IDurableTaskGrainRuntime runtime,
         TaskScheduler scheduler,
@@ -125,12 +120,12 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     {
         if (_aborted)
         {
-            throw new OperationCanceledException($"Durable task '{TaskId}' was aborted.", _abortSource.Token);
+            throw new OperationCanceledException($"Durable task '{Id}' was aborted.", _abortSource.Token);
         }
 
         if (_deleted)
         {
-            throw new OperationCanceledException($"Durable task '{TaskId}' was deleted with its execution tree.");
+            throw new OperationCanceledException($"Durable task '{Id}' was deleted with its execution tree.");
         }
     }
 
@@ -173,7 +168,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         DateTimeOffset dueTime,
         CancellationToken cancellationToken)
     {
-        if (taskId != TaskId)
+        if (taskId != Id)
         {
             ThrowIfNotChildTaskId(taskId);
         }
@@ -190,33 +185,58 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
             () => GetChildTaskHandleCore(taskId));
 
     /// <remarks>
-    /// Only durable grain calls can be detached: the target recovers a root task from its serialized request. Durable
-    /// cancellation of this execution doesn't abandon the start; host abort does.
+    /// Only durable grain calls can be detached: the target recovers a root task from its serialized request. The start
+    /// is recorded under <c>$detach:{target}:{rootId}</c>, so each detached task which this execution starts has one
+    /// record, independently of other operations which a deployment adds or removes. Durable cancellation of this
+    /// execution doesn't abandon the start; host abort does.
     /// </remarks>
     protected override ValueTask DetachTaskAsync(
-        TaskId markerId,
         TaskId rootId,
         DurableTask taskDefinition,
         CancellationToken cancellationToken) =>
         RunOnScheduler(
             _scheduler,
-            () => DetachTaskCoreAsync(markerId, rootId, taskDefinition, cancellationToken));
+            () => DetachTaskCoreAsync(rootId, taskDefinition, cancellationToken));
 
     private async ValueTask DetachTaskCoreAsync(
-        TaskId markerId,
         TaskId rootId,
         DurableTask taskDefinition,
         CancellationToken cancellationToken)
     {
-        ThrowIfNotChildTaskId(markerId);
         ThrowIfDeleted();
-        if (taskDefinition is not IDurableTaskRequest request)
+        if (taskDefinition is not IDurableTaskRequest { Context: { } requestContext } request)
         {
             throw new NotSupportedException("Only durable grain calls can be detached.");
         }
 
+        var markerId = CreateMarkerId("detach", [requestContext.TargetId.ToString(), rootId.ToString()]);
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         await _runtime.DetachAsync(rootId, request, markerId, executionCts.Token);
+    }
+
+    /// <summary>
+    /// Creates the identifier of a marker which records an operation of this execution, from the operation's identity:
+    /// <c>${kind}:{part}:{part}...</c>, with <c>\</c>, <c>:</c>, and <c>$</c> escaped in each part, so distinct
+    /// identities create distinct identifiers.
+    /// </summary>
+    private TaskId CreateMarkerId(string kind, ReadOnlySpan<string> parts)
+    {
+        var segment = new StringBuilder("$").Append(kind);
+        foreach (var part in parts)
+        {
+            segment.Append(':');
+            foreach (var character in part)
+            {
+                if (character is ':' or '\\' or '$')
+                {
+                    segment.Append('\\');
+                }
+
+                segment.Append(character);
+            }
+        }
+
+        return Id.Child(segment.ToString());
     }
 
     private IScheduledTaskHandle GetChildTaskHandleCore(TaskId taskId)
@@ -238,7 +258,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     {
         ThrowIfDeleted();
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        var (value, recordedAt) = await _runtime.WaitForSignalAsync(TaskId, name, executionCts.Token);
+        var (value, recordedAt) = await _runtime.WaitForSignalAsync(Id, name, executionCts.Token);
         ObserveTime(recordedAt);
         return value;
     }
@@ -305,34 +325,11 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
         return await _runtime.SelectCompletionAsync(decisionId, candidates, executionCts.Token);
     }
 
-    protected override TaskId CreateChildTaskId(string? name)
-    {
-        lock (_idLock)
-        {
-            var baseId = base.CreateChildTaskId(name);
-            if (name is null)
-            {
-                return baseId;
-            }
-
-            if (_childNames is null)
-            {
-                _childNames = new([name], StringComparer.Ordinal);
-            }
-            else if (!_childNames.Add(name))
-            {
-                return base.CreateChildTaskId(null);
-            }
-
-            return baseId;
-        }
-    }
-
     private void ThrowIfNotChildTaskId(TaskId taskId)
     {
-        if (taskId == TaskId || !TaskId.IsAncestorOf(taskId))
+        if (taskId == Id || !Id.IsAncestorOf(taskId))
         {
-            throw new InvalidOperationException($"The provided task ID '{taskId}' is not a descendant of this task '{TaskId}'.");
+            throw new InvalidOperationException($"The provided task ID '{taskId}' is not a descendant of this task '{Id}'.");
         }
     }
 
@@ -394,7 +391,7 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
 
     private sealed class ExecutionTaskHandle(
         IScheduledTaskHandle inner,
-        GrainDurableExecutionContext owner) : IScheduledTaskHandle
+        GrainDurableTaskContext owner) : IScheduledTaskHandle
     {
         public TaskId TaskId => inner.TaskId;
 

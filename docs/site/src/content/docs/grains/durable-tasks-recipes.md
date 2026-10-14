@@ -64,7 +64,7 @@ Pitfalls:
 - A winner which failed or was canceled fails `WhenAny`. Return a value, such as `null`,
   from inputs whose failure is an expected outcome.
 - Measure deadlines with durable delays or
-  <xref:Orleans.DurableTasks.DurableExecutionContext.UtcNow?displayProperty=nameWithType>.
+  <xref:Orleans.DurableTasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>.
 
 **Verify:** the shipping grain lists `first-quote/0`, `first-quote/1`, and
 `first-quote/2`, and `first-quote/2/$child-1`, the deadline's delay, as `Delayed` until its due
@@ -78,14 +78,14 @@ and record why the order was canceled.
 The `catch` block in [the fan-out recipe](#fan-out-to-every-line-with-a-named-whenall)
 filters on `IsCancellationRequested`, so it handles the workflow's own durable
 cancellation, and passes
-<xref:Orleans.DurableTasks.DurableExecutionContext.CancellationReason?displayProperty=nameWithType>
+<xref:Orleans.DurableTasks.DurableTaskContext.CancellationReason?displayProperty=nameWithType>
 to the compensation:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_compensation" language="csharp":::
 
 Children which a canceled task schedules terminate as canceled without running, except
 inside a
-<xref:Orleans.DurableTasks.DurableExecutionContext.SuppressCancellation*?displayProperty=nameWithType>
+<xref:Orleans.DurableTasks.DurableTaskContext.SuppressCancellation*?displayProperty=nameWithType>
 scope. The `release` inputs and the `cancel` step therefore run to completion, and the
 workflow returns an `OrderResult` which records the reason. A reservation which never
 ran leaves nothing to release, so `ReleaseAsync` returns whether the order held a
@@ -215,7 +215,7 @@ the same signal through the grain reference:
 Pitfalls:
 
 - Compute the deadline from
-  <xref:Orleans.DurableTasks.DurableExecutionContext.UtcNow?displayProperty=nameWithType>,
+  <xref:Orleans.DurableTasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>,
   so a replay computes the same deadline.
 - Address the invoked task, here the root task which the client scheduled. A local
   child's ID isn't an invoked task, so a signal to it returns `TaskNotFound`.
@@ -257,8 +257,8 @@ Pitfalls:
   derives the ID from a running durable task.
 
 **Verify:** the notification grain lists `issue-{invoiceId}:receipt`, and the invoice
-grain lists a completed `issue-{invoiceId}/$detach-1` marker until the invoice's tree
-is deleted.
+grain lists a completed `issue-{invoiceId}/$detach:{notification}:issue-{invoiceId}\:receipt`
+marker, named by the detached task's target and root ID, until the invoice's tree is deleted.
 
 ## Cancel and abort from ordinary grain methods
 
