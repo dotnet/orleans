@@ -30,7 +30,6 @@ Orleans enumerates a grain's `IAsyncEnumerable<T>` result through interleaving c
 | <xref:Orleans.Journaling.DurableWatchMode.Committed> | Each change after the storage provider acknowledges the journal write which contains it. This mode is the default. |
 | <xref:Orleans.Journaling.DurableWatchMode.Staged> | Staged changes as soon as they are made, followed by watermarks which report their durability. |
 | <xref:Orleans.Journaling.DurableWatchMode.Drafts> | Volatile draft content as it is written. State without drafts ignores this flag. |
-| <xref:Orleans.Journaling.DurableWatchMode.Speculative> | `Staged` and `Drafts` together. |
 
 `DurableWatchMode.Committed | DurableWatchMode.Drafts` streams live drafts alongside only durable entries, so every entry a reader receives is a valid resume point. A stream without `Staged` never delivers a change before it is durable.
 
