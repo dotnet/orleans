@@ -32,6 +32,8 @@ namespace Orleans.DurableTasks
 
     public partial struct ConfiguredDurableTask
     {
+        public System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public DurableTaskAwaiter GetAwaiter() { throw null; }
@@ -45,6 +47,8 @@ namespace Orleans.DurableTasks
 
     public partial struct ConfiguredDurableTask<TResult>
     {
+        public System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public DurableTaskAwaiter<TResult> GetAwaiter() { throw null; }
