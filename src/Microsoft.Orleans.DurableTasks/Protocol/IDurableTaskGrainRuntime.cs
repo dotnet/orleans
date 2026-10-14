@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.DurableTasks;
+using Orleans.DurableTasks.Runtime;
 using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Protocol;
@@ -173,6 +174,19 @@ internal interface IDurableTaskGrainRuntime
 
     /// <summary>Returns when a task's terminal result was recorded, or <see langword="null"/> when it has none.</summary>
     DateTimeOffset? GetCompletedAt(TaskId taskId);
+
+    /// <summary>
+    /// Stages the terminal response of the body which <paramref name="context"/> runs, from the work item which ran the
+    /// body's final code on the activation, without writing.
+    /// </summary>
+    /// <remarks>
+    /// The response then commits with the journaled state which the body's final code changed. The attempt still commits
+    /// the response once the body's run returns it, which leaves an already staged response unchanged. A runtime which
+    /// doesn't stage responses early keeps this default implementation, which does nothing.
+    /// </remarks>
+    void StageBodyResponse(GrainDurableTaskContext context, DurableTaskResponse response)
+    {
+    }
 
     /// <summary>
     /// Waits for the signal <paramref name="name"/> of the invoked task whose execution tree contains

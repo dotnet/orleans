@@ -76,6 +76,9 @@ internal sealed class DurableTaskJournalHarness : IAsyncDisposable
         }
     }
 
+    /// <summary>Creates an activation scope without recovering its state, so callers can register state first.</summary>
+    public AsyncServiceScope CreateScope() => _services.CreateAsyncScope();
+
     /// <summary>Returns the journal format key stamped on the stored journal.</summary>
     public async Task<string?> GetStoredJournalFormatKeyAsync(CancellationToken cancellationToken)
     {
