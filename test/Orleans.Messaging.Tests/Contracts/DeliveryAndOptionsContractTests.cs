@@ -1,4 +1,5 @@
 using Orleans.Messaging.Configuration;
+using Polly;
 using Xunit;
 
 namespace Orleans.Messaging.Tests.Contracts;
@@ -51,7 +52,8 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal(TimeSpan.FromDays(1), options.MaxOutboxRetryAge);
         Assert.Equal(TimeSpan.FromDays(30), options.DeadLetterRetentionPeriod);
         Assert.Equal(5, options.MaxProcessingAttempts);
-        Assert.Equal(100, options.MaxDeliveryAttempts);
+        Assert.Equal(TimeSpan.FromHours(6), options.MaxHandlerNotFoundRetryAge);
+        Assert.Same(ResiliencePipeline.Empty, options.DeliveryResiliencePipeline);
         Assert.Equal(1000, options.MaxRetainedDeadLetters);
         Assert.Equal(32, options.InboxBatchSize);
         Assert.Equal(32, options.OutboxBatchSize);
@@ -67,7 +69,7 @@ public sealed class DeliveryAndOptionsContractTests
             (nameof(DurableMessagingOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.BackpressureRetryDelay), options => options.BackpressureRetryDelay = TimeSpan.MaxValue),
             (nameof(DurableMessagingOptions.MaxProcessingAttempts), options => options.MaxProcessingAttempts = 0),
-            (nameof(DurableMessagingOptions.MaxDeliveryAttempts), options => options.MaxDeliveryAttempts = 0),
+            (nameof(DurableMessagingOptions.MaxHandlerNotFoundRetryAge), options => options.MaxHandlerNotFoundRetryAge = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.MaxOutboxRetryAge), options => options.MaxOutboxRetryAge = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.DeadLetterRetentionPeriod), options => options.DeadLetterRetentionPeriod = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.MaxRetainedDeadLetters), options => options.MaxRetainedDeadLetters = 0),
@@ -84,6 +86,15 @@ public sealed class DeliveryAndOptionsContractTests
         }
     }
 
+
+    [Fact]
+    public void Validate_NullDeliveryResiliencePipeline_Fails()
+    {
+        var options = new DurableMessagingOptions { DeliveryResiliencePipeline = null! };
+
+        var exception = Assert.Throws<ArgumentNullException>(options.Validate);
+        Assert.Equal(nameof(DurableMessagingOptions.DeliveryResiliencePipeline), exception.ParamName);
+    }
 
     [Fact]
     public void Validate_MaxOutboxRetryAgeNotLessThanDeduplicationWindow_FailsAtBoundaryAndAbove()
