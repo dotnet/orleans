@@ -106,6 +106,25 @@ public class DurableStateObservationTests : JournalingTestBase
     });
 
     [Fact]
+    public Task ValueWatch_DraftsWithoutStaged_DeliversOnlyCommittedValues() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var value = CreateValue(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+
+        // Values have no drafts, so the flag selects committed values only.
+        await using var watch = value.WatchAsync(DurableWatchMode.Drafts, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Committed(null, version: 0), await watch.NextAsync());
+
+        value.Value = "staged";
+        var next = watch.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Committed("staged", version: 1), watch.Current);
+    });
+
+    [Fact]
     public Task ValueWatch_CollapsesToLatestValue() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
