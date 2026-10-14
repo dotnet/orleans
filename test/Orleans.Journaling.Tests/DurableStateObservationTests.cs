@@ -383,34 +383,31 @@ public class DurableStateObservationTests : JournalingTestBase
         Assert.Equal(["history", "status"], stateMachines.Select(static pair => pair.Key));
         Assert.Same(dictionary, stateMachines[0].Value);
         Assert.Same(value, stateMachines[1].Value);
-        Assert.Empty(sut.Manager.GetRetiredStateNames());
     });
 
     [Fact]
-    public Task GetRetiredStateNames_ListsJournaledStateWhichIsNotRegistered() => RunOnActivationSchedulerAsync(async () =>
+    public Task GetStateMachines_ExcludesRetiredState() => RunOnActivationSchedulerAsync(async () =>
     {
         var storage = new GatedJournalStorage();
         var first = CreateSystem(storage);
-        var legacy = CreateValue(first.Manager, "legacy");
+        var retired = CreateValue(first.Manager, "retired");
         var firstStatus = CreateValue(first.Manager, "status");
         await first.Lifecycle.OnStart(CancellationToken);
-        legacy.Value = "old";
+        retired.Value = "old";
         firstStatus.Value = "current";
         await first.Manager.WriteStateAsync(CancellationToken);
 
         var second = CreateSystem(storage);
-        var status = CreateValue(second.Manager, "status");
+        CreateValue(second.Manager, "status");
         await second.Lifecycle.OnStart(CancellationToken);
-
-        Assert.Equal(["legacy"], second.Manager.GetRetiredStateNames());
         Assert.Equal(["status"], second.Manager.GetStateMachines().Select(static pair => pair.Key));
 
         // Registering the state again restores it.
         var third = CreateSystem(storage);
-        var restored = CreateValue(third.Manager, "legacy");
+        var restored = CreateValue(third.Manager, "retired");
         CreateValue(third.Manager, "status");
         await third.Lifecycle.OnStart(CancellationToken);
-        Assert.Empty(third.Manager.GetRetiredStateNames());
+        Assert.Equal(["retired", "status"], third.Manager.GetStateMachines().Select(static pair => pair.Key).Order(StringComparer.Ordinal));
         Assert.Equal("old", restored.Value);
     });
 
