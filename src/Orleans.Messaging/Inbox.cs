@@ -321,7 +321,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                         AttemptCount = attempts,
                         LastError = error.ToString(),
                         NextAttemptAt = MessagingTime.AddClamped(TimeProvider.GetUtcNow(),
-                            TimeSpan.FromTicks(Options.BackpressureRetryDelay.Ticks * (1L << Math.Min(attempts - 1, DurableMessagingOptions.MaximumBackoffExponent))))
+                            TimeSpan.FromTicks(Options.RetryInitialInterval.Ticks * (1L << Math.Min(attempts - 1, DurableMessagingOptions.MaximumBackoffExponent))))
                     }
                 });
                 status = "retry";
