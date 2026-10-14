@@ -26,6 +26,9 @@ sequenceDiagram
     par each line
         Order->>Catalog: ReserveAsync
     end
+    opt buyer cancels during validation
+        Order-)Order: ReleaseReservationsAsync, detached root place-order-{orderId}-compensate
+    end
     alt all lines reserved
         Order->>Payment: AuthorizeAsync
         alt payment succeeded
@@ -60,15 +63,15 @@ commits. Diagnostics endpoints expose the durable task runtime:
 | --- | --- | --- |
 | Checkout | The basket stages `SubmitOrder` in its outbox and clears itself in one journal write. | The basket clears itself and schedules `PlaceOrderAsync` under root ID `place-order-{orderId}`. A durable grain stages the invocation in its outbox, so both commit in one journal write. |
 | Grace period | The order sends itself `GracePeriodElapsed` with `Envelope.DeliverAt`; the handler ignores it unless the order is still `Submitted`. | `await DurableTask.Delay(gracePeriod).WithId("grace-period")`. The runtime sends the same kind of scheduled self-message. |
-| Cancellation | `CancelAsync` cancels a `Submitted` or `AwaitingValidation` order; late stock confirmations release their reservations. | `CancelAsync` is an ordinary grain method. It records the decision in the order's state, then cancels the PlaceOrder task through the grain's `IDurableTaskManager`, which ends the grace period delay. Buyers cancel during the grace period. |
-| Reservation fan-out | One `ReserveStock` message per line; `StockResult` replies arrive in any order and the handler tracks each line. | `DurableTask.WhenAll` over one reservation call per line, which returns the results in line order. |
+| Cancellation | `CancelAsync` cancels a `Submitted` or `AwaitingValidation` order; late stock confirmations release their reservations. | `CancelAsync` is an ordinary grain method which cancels a `Submitted` or `AwaitingValidation` order. It records the decision in the order's state, then cancels the PlaceOrder task through the grain's `IDurableTaskManager`. The workflow observes the cancellation: during the grace period it cancels the delay, which ends the workflow; during validation the workflow awaits every reservation's outcome, then compensates. |
+| Reservation fan-out | One `ReserveStock` message per line; `StockResult` replies arrive in any order and the handler tracks each line. | One reservation call per line, scheduled concurrently with `WithId($"reserve-{productId}")`; the workflow awaits every outcome in line order. |
 | Payment | `AuthorizePayment` and a `PaymentResult` reply, correlated by message ID. | `await payment.AuthorizeAsync(total, card).WithId("authorize-payment")`. |
-| Compensation | The transition which cancels the order stages `ReleaseStock` for each confirmed line. | `ReleaseAsync` for each reserved line in reverse order, then the `cancel` transition. |
+| Compensation | The transition which cancels the order stages `ReleaseStock` for each confirmed line. | `ReleaseAsync` for each reserved line in reverse order, then the `cancel` transition. When the buyer cancels during validation, the workflow's further steps are canceled, so it detaches `ReleaseReservationsAsync` on its own order under root ID `place-order-{orderId}-compensate`; cancellation doesn't reach the detached task, which releases the reserved lines in reverse order and marks them released. |
 | Projection | `StatusChanged` messages carry a version; the buyer keeps the highest. | `RecordOrderAsync` durable calls, one per version; the buyer keeps the highest because the workflow and the cancel and ship methods record independently. Cancel and ship detach their call with `DetachAsync($"order-{orderId:N}-v{version}")`, which commits with the decision in one journal write; the buyer retains the detached task, so the order retains no task for either command. |
-| Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | Task IDs derived from the order ID, such as `place-order-{orderId}/authorize-payment`, or indexed slots under a `WhenAll` for fan-out; `(grain, task ID)` identifies one execution, and a reused ID with different arguments fails while the task exists. |
+| Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | Task IDs derived from the order ID, such as `place-order-{orderId}/reserve-{productId}` and `place-order-{orderId}/authorize-payment`; `(grain, task ID)` identifies one execution, and a reused ID with different arguments fails while the task exists. |
 | Recovery | The inbox and outbox resume pending messages; each handler runs from the state it finds. | The next activation replays pending tasks from the start; completed children return their recorded results, so the workflow resumes where it stopped. Durable Jobs wakes the order when the delay is due or a completion arrives. |
 | Observability | Order state and the dashboard. | Order state, the dashboard, and per-grain task lists with each task's status, timestamps, due time, remote target, and result. |
-| Non-blank lines of code | Grains 403, contracts 112, host 49. | Grains 359, contracts 86, host 90, including the diagnostics endpoints. |
+| Non-blank lines of code | Grains 403, contracts 112, host 49. | Grains 405, contracts 86, host 90, including the diagnostics endpoints. |
 
 Both samples produce the same outcomes for a successful order, a cancellation during the grace period, a rejected line,
 and a declined card, including statuses, versions, descriptions, and stock levels.
