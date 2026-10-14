@@ -551,6 +551,8 @@ public sealed partial class DurableTaskSignalTests
             }
         }
 
+        public void SuppressCancellation(TaskId taskId, IDurableTaskState state) => ((State)state).CancellationSuppressed = true;
+
         public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation) =>
             (((State)state).DueTime, ((State)state).ResumeGeneration) = (dueTime, generation);
 
@@ -599,6 +601,7 @@ public sealed partial class DurableTaskSignalTests
         public DateTimeOffset? CompletedAt { get; set; }
         public DateTimeOffset? CancellationRequestedAt { get; set; }
         public string? CancellationReason { get; set; }
+        public bool CancellationSuppressed { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? DueTime { get; set; }
         public long ResumeGeneration { get; set; }

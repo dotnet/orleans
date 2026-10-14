@@ -472,9 +472,16 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private ValueTask WriteStateAsync(CancellationToken cancellationToken) => _storage.WriteAsync(cancellationToken);
 
-    public async ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
+    public ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
         TaskId taskId,
         IDurableTaskRequest request,
+        CancellationToken cancellationToken) =>
+        ScheduleRemoteAsync(taskId, request, suppressCancellation: false, cancellationToken);
+
+    private async ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
+        TaskId taskId,
+        IDurableTaskRequest request,
+        bool suppressCancellation,
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
@@ -511,6 +518,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         state ??= _storage.GetOrCreateTask(taskId, request: null);
+        MarkCancellationSuppressed(taskId, state, suppressCancellation);
         if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
         {
             _storage.SetRemoteRequest(taskId, state, context.TargetId, fingerprint);
@@ -1183,9 +1191,22 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
+    /// <summary>Schedules a child which its ancestors' durable cancellation reaches.</summary>
+    public ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
+        TaskId taskId,
+        DurableTask durableTask,
+        CancellationToken cancellationToken) =>
+        ScheduleChildAsync(taskId, durableTask, suppressCancellation: false, cancellationToken);
+
+    /// <summary>Schedules or reattaches to a child.</summary>
+    /// <param name="suppressCancellation">
+    /// Whether the parent scheduled the child in a cancellation suppression scope. Such a child is created and runs even
+    /// when an ancestor's cancellation was requested, and records that its ancestors' cancellation doesn't reach it.
+    /// </param>
     public async ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
         TaskId taskId,
         DurableTask durableTask,
+        bool suppressCancellation,
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
@@ -1194,6 +1215,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return await ScheduleCustomChildAsync(
                 taskId,
                 schedulableTask,
+                suppressCancellation,
                 cancellationToken);
         }
 
@@ -1281,9 +1303,9 @@ internal sealed partial class DurableTaskGrainRuntime(
             return handle;
         }
 
-        // A child of a canceled ancestor is not created. A child which existed when the cancellation was requested
-        // records the request itself.
-        if (state is not { CancellationRequestedAt: not null } && IsAncestorCancellationRequested(taskId))
+        // A child of a canceled ancestor is not created, unless the parent scheduled it in a cancellation suppression
+        // scope. A child which existed when the cancellation was requested records the request itself.
+        if (state is not { CancellationRequestedAt: not null } && IsAncestorCancellationRequested(taskId, state, suppressCancellation))
         {
             return new CompletedTaskHandle(taskId, DurableTaskResponse.Canceled);
         }
@@ -1295,17 +1317,15 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (remoteRequest is not null)
         {
-            return await ScheduleRemoteChildAsync(taskId, remoteRequest, cancellationToken);
+            return await ScheduleRemoteChildAsync(taskId, remoteRequest, suppressCancellation, cancellationToken);
         }
 
         // Otherwise, the task must be a local method invocation. Its state is staged and commits with the next write,
         // such as the first durable operation of its body or its result, so a synchronous step costs one write. A step's
         // identity and inputs follow from its parent's inputs and earlier results, so a replay which finds no record
         // runs the step again.
-        if (state is null)
-        {
-            _ = _storage.GetOrCreateTask(taskId, null);
-        }
+        state ??= _storage.GetOrCreateTask(taskId, null);
+        MarkCancellationSuppressed(taskId, state, suppressCancellation);
 
         var executionContext = CreateExecutionContext(taskId);
         handle = GetOrCreateRunningTaskHandle(taskId);
@@ -1316,6 +1336,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private async ValueTask<IScheduledTaskHandle> ScheduleRemoteChildAsync(
         TaskId taskId,
         IDurableTaskRequest request,
+        bool suppressCancellation,
         CancellationToken cancellationToken)
     {
         _ = MessageTransport;
@@ -1328,7 +1349,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         try
         {
-            var response = await ScheduleRemoteAsync(taskId, request, cancellationToken);
+            var response = await ScheduleRemoteAsync(taskId, request, suppressCancellation, cancellationToken);
             if (response.IsCompleted)
             {
                 return new CompletedTaskHandle(taskId, response);
@@ -1344,23 +1365,53 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
-    private bool IsAncestorCancellationRequested(TaskId taskId)
+    /// <summary>Returns whether the durable cancellation of one of a task's ancestors reaches the task.</summary>
+    /// <param name="taskId">The task.</param>
+    /// <param name="state">The task's state, if it exists.</param>
+    /// <param name="suppressCancellation">Whether the task's parent schedules it in a cancellation suppression scope.</param>
+    /// <remarks>
+    /// Cancellation reaches a task through its ancestors up to the nearest one which is suppressed: the cancellation of
+    /// that task's own ancestors doesn't reach it, so it doesn't reach its descendants either.
+    /// </remarks>
+    private bool IsAncestorCancellationRequested(TaskId taskId, IDurableTaskState? state, bool suppressCancellation)
     {
+        if (suppressCancellation || state is { CancellationSuppressed: true })
+        {
+            return false;
+        }
+
         for (var ancestorId = taskId.Parent(); !ancestorId.IsDefault; ancestorId = ancestorId.Parent())
         {
-            if (_storage.TryGetTask(ancestorId, out var ancestorState)
-                && ancestorState.CancellationRequestedAt.HasValue)
+            if (_storage.TryGetTask(ancestorId, out var ancestorState))
             {
-                return true;
+                if (ancestorState.CancellationRequestedAt.HasValue)
+                {
+                    return true;
+                }
+
+                if (ancestorState.CancellationSuppressed)
+                {
+                    return false;
+                }
             }
         }
 
         return false;
     }
 
+    /// <summary>Records that a child which its parent scheduled in a cancellation suppression scope is unreachable by its ancestors' cancellation.</summary>
+    private void MarkCancellationSuppressed(TaskId taskId, IDurableTaskState state, bool suppressCancellation)
+    {
+        if (suppressCancellation && !state.CancellationSuppressed)
+        {
+            _storage.SuppressCancellation(taskId, state);
+        }
+    }
+
     private async ValueTask<IScheduledTaskHandle> ScheduleCustomChildAsync(
         TaskId taskId,
         ISchedulableTask schedulableTask,
+        bool suppressCancellation,
         CancellationToken cancellationToken)
     {
         var stateExisted = _storage.TryGetTask(taskId, out var state);
@@ -1395,7 +1446,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, CancellationToken.None));
         }
 
-        if (IsAncestorCancellationRequested(taskId))
+        if (IsAncestorCancellationRequested(taskId, state, suppressCancellation))
         {
             if (state is null)
             {
@@ -1429,6 +1480,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         // The child state lets cancellation of the child or its ancestors reach the deferred handle.
         state ??= _storage.GetOrCreateTask(taskId, null);
+        MarkCancellationSuppressed(taskId, state, suppressCancellation);
 
         DurableTaskResponse schedulingResponse;
         IScheduledTaskHandle? scheduledHandle = null;
@@ -2217,7 +2269,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             foreach (var (childTaskId, childTaskState) in _storage.GetChildren(currentTaskId).ToList())
             {
                 Debug.Assert(currentTaskId.IsParentOf(childTaskId));
-                _ = RequestCancellationCore(childTaskId, childTaskState, contexts, handles);
+
+                // A child scheduled in a cancellation suppression scope isn't reached by its ancestors' cancellation;
+                // its own cancellation, an abort of the tree, and deletion of the tree still reach it.
+                if (!childTaskState.CancellationSuppressed)
+                {
+                    _ = RequestCancellationCore(childTaskId, childTaskState, contexts, handles);
+                }
             }
 
             _storage.RequestCancellation(currentTaskId, currentTaskState, reason);

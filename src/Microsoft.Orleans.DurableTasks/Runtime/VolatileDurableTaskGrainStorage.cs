@@ -259,6 +259,13 @@ public class VolatileDurableTaskGrainStorage(
         _workingCopy[taskId] = TrackState(taskId, updated);
     }
 
+    public void SuppressCancellation(TaskId taskId, IDurableTaskState state)
+    {
+        var typedState = GetState(taskId, state);
+        typedState.CancellationSuppressed = true;
+        AddOrUpdateTask(taskId, typedState);
+    }
+
     public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation)
     {
         var typedState = GetState(taskId, state);
