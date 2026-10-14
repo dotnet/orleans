@@ -176,6 +176,13 @@ internal interface IDurableTaskGrainRuntime
     DateTimeOffset? GetCompletedAt(TaskId taskId);
 
     /// <summary>
+    /// Returns the operations which earlier attempts of <paramref name="executionId"/> recorded and which a replay
+    /// reaches, such as its children, markers, and recorded effects, or <see langword="null"/> when there are none.
+    /// </summary>
+    /// <remarks>The caller owns the returned set.</remarks>
+    HashSet<TaskId>? GetRecordedOperations(TaskId executionId) => null;
+
+    /// <summary>
     /// Stages the terminal response of the body which <paramref name="context"/> runs, from the work item which ran the
     /// body's final code on the activation, without writing.
     /// </summary>

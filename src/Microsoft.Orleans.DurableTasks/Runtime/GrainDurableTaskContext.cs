@@ -38,6 +38,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     // The number of sends of each signal which this attempt has begun, by marker segment. Guarded by _lock.
     private Dictionary<string, int>? _signalSends;
+
+    // While the attempt replays: the operations which earlier attempts recorded and this attempt hasn't reached yet, and
+    // those which it has reached. Both are released when the replay ends. Guarded by _lock; _unreached is read without it
+    // to report IsReplaying.
+    private HashSet<TaskId>? _unreached;
+    private HashSet<TaskId>? _reached;
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -70,6 +76,55 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _shutdownRegistration = shutdownToken.UnsafeRegister(
             static state => ((CancellationTokenSource)state!).Cancel(),
             abortSource);
+        _unreached = runtime.GetRecordedOperations(taskId);
+    }
+
+    /// <remarks>
+    /// The runtime supplies the operations which earlier attempts recorded in this execution's tree when the attempt
+    /// starts: its children, detach and signal-send markers, and effect records, but not signal values, which senders
+    /// record, invoked descendants, or cancellations which arrived before their requests. The attempt reaches an
+    /// operation when it schedules it, looks up its handle, detaches or signals under its marker, selects a completion
+    /// under its decision, or runs an effect under its name. Scheduling an operation which no earlier attempt recorded
+    /// ends the replay; reaching an operation again doesn't.
+    /// </remarks>
+    public override bool IsReplaying => Volatile.Read(ref _unreached) is not null;
+
+    /// <summary>Notes that this attempt reached <paramref name="operationId"/>, which can end its replay.</summary>
+    /// <param name="operationId">The operation's identifier.</param>
+    /// <param name="recordsOperation">
+    /// Whether the operation records itself under a new identifier, as scheduling does, rather than only looking up an
+    /// existing one, as a handle lookup or a completion selection which the host derives from a durable order does.
+    /// </param>
+    private void ObserveOperation(TaskId operationId, bool recordsOperation)
+    {
+        if (Volatile.Read(ref _unreached) is null)
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            if (_unreached is not { } unreached)
+            {
+                return;
+            }
+
+            if (unreached.Remove(operationId))
+            {
+                if (unreached.Count > 0)
+                {
+                    (_reached ??= []).Add(operationId);
+                    return;
+                }
+            }
+            else if (!recordsOperation || _reached?.Contains(operationId) is true)
+            {
+                return;
+            }
+
+            Volatile.Write(ref _unreached, null);
+            _reached = null;
+        }
     }
 
     /// <summary>
@@ -147,6 +202,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         // The suppression scope flows with the scheduling code, so it is read before switching schedulers.
         var suppressCancellation = IsCancellationSuppressed;
+        ObserveOperation(taskId, recordsOperation: true);
         return RunOnScheduler(
             _scheduler,
             () => ScheduleChildTaskCoreAsync(taskId, task, suppressCancellation, cancellationToken));
@@ -177,10 +233,17 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
         TaskId taskId,
         DateTimeOffset dueTime,
-        CancellationToken cancellationToken) =>
-        RunOnScheduler(
+        CancellationToken cancellationToken)
+    {
+        if (taskId != Id)
+        {
+            ObserveOperation(taskId, recordsOperation: true);
+        }
+
+        return RunOnScheduler(
             _scheduler,
             () => ScheduleDelayCoreAsync(taskId, dueTime, cancellationToken));
+    }
 
     private async ValueTask<DurableTaskResponse> ScheduleDelayCoreAsync(
         TaskId taskId,
@@ -199,9 +262,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
-        => RunOnScheduler(
+    {
+        ObserveOperation(taskId, recordsOperation: false);
+        return RunOnScheduler(
             _scheduler,
             () => GetChildTaskHandleCore(taskId));
+    }
 
     /// <remarks>
     /// The body's final code runs in the work item which calls this, so staging the response here commits it in the same
@@ -241,6 +307,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         ThrowIfNotChildTaskId(effectId);
         ThrowIfDeleted();
+        ObserveOperation(effectId, recordsOperation: true);
         if (TryGetOtherKindId(effectId, out var stepId))
         {
             _runtime.ThrowIfRecordedAsOtherKind(effectId, stepId, "a DurableTask.Once effect");
@@ -307,6 +374,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         var markerId = Id.Child(CreateMarkerSegment("detach", [requestContext.TargetId.ToString(), rootId.ToString()]));
+        ObserveOperation(markerId, recordsOperation: true);
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         await _runtime.DetachAsync(rootId, request, markerId, executionCts.Token);
     }
@@ -391,6 +459,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         var markerId = Id.Child(occurrence == 1 ? signal : $"{signal}${occurrence.ToString(CultureInfo.InvariantCulture)}");
+        ObserveOperation(markerId, recordsOperation: true);
         return RunOnScheduler(
             _scheduler,
             () => SendSignalCoreAsync(markerId, target, taskId, name, value, throwOnRejection, cancellationToken));
@@ -413,10 +482,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     protected override ValueTask<TaskId> SelectCompletionAsync(
         TaskId decisionId,
         IReadOnlyList<TaskId> candidates,
-        CancellationToken cancellationToken) =>
-        RunOnScheduler(
+        CancellationToken cancellationToken)
+    {
+        ObserveOperation(decisionId, recordsOperation: false);
+        return RunOnScheduler(
             _scheduler,
             () => SelectCompletionCoreAsync(decisionId, candidates, cancellationToken));
+    }
 
     private async ValueTask<TaskId> SelectCompletionCoreAsync(
         TaskId decisionId,
