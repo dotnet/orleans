@@ -20,6 +20,8 @@ This page describes the message, commit, and execution model. Continue with:
   payment-provider reconciliation, out-of-order projections, and notification fan-out.
 - [Operations and throughput](messaging-operations.md) for configuration,
   diagnostics, dead-letter replay, upgrades, and sequential messaging benchmarks.
+- [Durable tasks](durable-tasks.md) for multi-step workflows written as sequential
+  code, which run over the same inbox and outbox.
 
 ## Message and routing model
 
