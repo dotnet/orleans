@@ -107,7 +107,9 @@ It cannot reverse or withdraw the durable request.
 `DurableTaskResponse` has pending, subscribed, succeeded, canceled, and failed states.
 Pending and subscribed responses are incomplete. Succeeded, canceled, and failed responses
 are terminal, and awaiting a terminal response returns its value or throws its recorded
-cancellation or failure.
+cancellation or failure. A host's wait returns a terminal response; `ScheduledTask.WaitAsync` and the combinators
+which return or yield observed handles, such as `ScheduledTask.WhenAny`, `ScheduledTask.WhenEach`, and
+`WhenAllCompleted`, throw `InvalidOperationException` when a wait returns an incomplete response.
 
 ## Combinators
 

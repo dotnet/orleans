@@ -90,6 +90,45 @@ public class ScheduledTaskWhenAnyTests
     }
 
     [Fact]
+    public async Task OutsideAnExecutionAnIncompleteWaitResponseFailsTheSelection()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var incomplete = await host.CreateRootDefinition<int>(static _ => ValueTask.FromResult(DurableTaskResponse.Pending))
+            .ScheduleAsync("incomplete", TestCancellation);
+
+        var whenAny = await Assert.ThrowsAsync<InvalidOperationException>(() => ScheduledTask.WhenAny([incomplete], TestCancellation));
+        var whenEach = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await foreach (var _ in ScheduledTask.WhenEach([incomplete]).WithCancellation(TestCancellation))
+            {
+            }
+        });
+
+        Assert.Equal("The durable task has not completed.", whenAny.Message);
+        Assert.Equal(whenAny.Message, whenEach.Message);
+        Assert.False(incomplete.IsCompleted);
+        Assert.Equal(0, host.ActiveWaitCount);
+    }
+
+    [Fact]
+    public async Task WithinAnExecutionAnIncompleteWaitResponseFailsTheSelection()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var root = host.CreateRootDefinition<int>(async _ =>
+        {
+            var handles = await DurableTask.ScheduleAll([new CallbackDurableTask(static _ => ValueTask.FromResult(DurableTaskResponse.Pending))]);
+            await ScheduledTask.WhenAny(handles, TestCancellation);
+            return DurableTaskResponse.FromResult(0);
+        });
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await await root.ScheduleAsync("root", TestCancellation));
+
+        Assert.Equal("The durable task has not completed.", exception.Message);
+        Assert.Equal([TaskId.Parse("root/$when-any-2/$winner")], host.DecisionIds);
+    }
+
+    [Fact]
     public async Task EmptyCandidatesAreRejected()
     {
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => ScheduledTask.WhenAny(Array.Empty<ScheduledTask>(), TestCancellation));
