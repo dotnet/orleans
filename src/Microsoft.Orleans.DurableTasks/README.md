@@ -152,8 +152,9 @@ if (result is DurableSignalResult.Conflict or DurableSignalResult.TaskCompleted)
 }
 ```
 - A wait advances its execution's logical time to when the signal was recorded. A deadline is
-  `TryWaitAsync(deadline)`, a `WhenAny` race between the wait and `DurableTask.DelayUntil`, whose
-  indexed slots belong to the waiting execution's tree.
+  `TryWaitAsync(deadline)`, a `Race` between the wait and `DurableTask.DelayUntil`, whose
+  indexed slots belong to the waiting execution's tree. The race cancels the input which
+  loses and completes once both are terminal.
 
 Repository consumers which need a preview package can opt this project into
 packing with `-p:PackDurableTaskAdapter=true`. Packing validates the package's
