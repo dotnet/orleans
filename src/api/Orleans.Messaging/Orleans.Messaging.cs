@@ -324,8 +324,6 @@ namespace Orleans.Messaging.Configuration
 
         public int MaxCapacity { get { throw null; } set { } }
 
-        public System.TimeSpan MaxHandlerNotFoundRetryAge { get { throw null; } set { } }
-
         public System.TimeSpan MaxOutboxRetryAge { get { throw null; } set { } }
 
         public int MaxProcessingAttempts { get { throw null; } set { } }
