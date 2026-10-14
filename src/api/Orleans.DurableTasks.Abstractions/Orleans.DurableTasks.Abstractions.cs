@@ -72,6 +72,8 @@ namespace Orleans.DurableTasks
 
         protected DurableExecutionContext(TaskId taskId) { }
 
+        public string? CancellationReason { get { throw null; } }
+
         public System.Threading.CancellationToken CancellationToken { get { throw null; } }
 
         public static DurableExecutionContext? Current { get { throw null; } }
@@ -311,6 +313,8 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskRuntimeHelper
     {
+        public static System.Threading.Tasks.Task RequestCancellationAsync(DurableExecutionContext context, string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public static System.Threading.Tasks.Task RequestCancellationAsync(DurableExecutionContext context, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public static System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context) { throw null; }
@@ -355,6 +359,7 @@ namespace Orleans.DurableTasks
         TaskId TaskId { get; }
 
         System.Threading.Tasks.ValueTask AbortAsync(string reason, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsync(System.Threading.CancellationToken cancellationToken);
@@ -403,7 +408,11 @@ namespace Orleans.DurableTasks
 
         protected virtual System.Threading.Tasks.ValueTask AbortAsyncCore(string reason, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        public System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public abstract System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default);
+        protected virtual System.Threading.Tasks.ValueTask CancelAsyncCore(string? reason, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public ScheduledTaskAwaiter GetAwaiter() { throw null; }
 
         public System.Threading.Tasks.Task<DurableTaskResponse> GetResponseAsync(PollingOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
