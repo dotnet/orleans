@@ -235,6 +235,141 @@ public class DurableTaskOnceTests
         Assert.Equal(0, runs);
     }
 
+    [Fact]
+    public async Task UnnamedOnceRunsItsEffectOnceUnderAGeneratedIdentifier()
+    {
+        var host = new TestHost(Now);
+        var taskId = TaskId.CreateRoot("root");
+        var runs = 0;
+
+        Guid Body() => DurableTask.Once(() =>
+        {
+            runs++;
+            return Guid.NewGuid();
+        });
+
+        var first = await RunAsync(host, taskId, Body);
+        var replayed = await RunAsync(host, taskId, Body);
+
+        Assert.Equal(1, runs);
+        Assert.Equal(first, replayed);
+        Assert.Equal([TaskId.Parse("root/$child-1")], host.Effects.Keys);
+    }
+
+    [Fact]
+    public async Task UnnamedEffectsAndUnnamedChildrenShareGeneratedIdentifiersInOrder()
+    {
+        var host = new TestHost(Now);
+        var effectRuns = 0;
+        var childRuns = 0;
+
+        var first = await DurableTaskRuntimeHelper.RunAsync(Body(), host.CreateContext(TaskId.CreateRoot("root")));
+        var replayed = await DurableTaskRuntimeHelper.RunAsync(Body(), host.CreateContext(TaskId.CreateRoot("root")));
+
+        // Named operations don't advance the generated count, so the unnamed operations are $child-1, $child-2, and
+        // $child-3 in the order in which the body creates them, and each replay finds the same records.
+        Assert.Equal([1, 2, 3], first.GetResult<int[]>());
+        Assert.Equal([1, 2, 3], replayed.GetResult<int[]>());
+        Assert.Equal(2, effectRuns);
+        Assert.Equal(1, childRuns);
+        Assert.Equal(
+            ["root/$child-1", "root/$child-3", "root/$once:named"],
+            host.Effects.Keys.Select(id => id.ToString()).Order(StringComparer.Ordinal));
+        Assert.Contains(TaskId.Parse("root/$child-2"), host.EntryIds);
+
+        async DurableTask<int[]> Body()
+        {
+            var a = DurableTask.Once(() => ++effectRuns);
+            DurableTask.Once("named", () => 0);
+            var b = await DurableTask.Run(_ => 1 + ++childRuns);
+            var c = DurableTask.Once(() => 1 + ++effectRuns);
+            return [a, b, c];
+        }
+    }
+
+    [Fact]
+    public async Task UnnamedActionEffectRunsOnceAndRecordsItsFailure()
+    {
+        var host = new TestHost(Now);
+        var taskId = TaskId.CreateRoot("root");
+        var runs = 0;
+
+        string Body()
+        {
+            DurableTask.Once(() => { runs++; });
+            try
+            {
+                DurableTask.Once(Fail);
+                return "completed";
+            }
+            catch (InvalidOperationException exception)
+            {
+                return exception.Message;
+            }
+        }
+
+        void Fail()
+        {
+            runs++;
+            throw new InvalidOperationException("Recorded failure.");
+        }
+
+        Assert.Equal("Recorded failure.", await RunAsync(host, taskId, Body));
+        Assert.Equal("Recorded failure.", await RunAsync(host, taskId, Body));
+        Assert.Equal(2, runs);
+        Assert.Equal(
+            ["root/$child-1", "root/$child-2"],
+            host.Effects.Keys.Select(id => id.ToString()).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void OutsideADurableTaskAnUnnamedEffectRunsEveryTime()
+    {
+        var runs = 0;
+
+        Assert.Equal(1, DurableTask.Once(() => ++runs));
+        Assert.Equal(2, DurableTask.Once(() => ++runs));
+        DurableTask.Once(() => { runs++; });
+        Assert.Equal(3, runs);
+        Assert.Throws<InvalidOperationException>(() => DurableTask.Once(Fail));
+
+        static int Fail() => throw new InvalidOperationException();
+    }
+
+    [Fact]
+    public async Task UnnamedEffectsAreValidatedBeforeTheyRun()
+    {
+        var host = new TestHost(Now);
+        var runs = 0;
+
+        var response = await DurableTaskRuntimeHelper.RunAsync(
+            DurableTask.Run(_ => DurableTask.Once(() => ValueTask.FromResult(++runs))),
+            host.CreateContext(TaskId.CreateRoot("root")));
+
+        Assert.IsType<NotSupportedException>(response.Exception);
+        Assert.Throws<ArgumentNullException>(() => DurableTask.Once((Func<int>)null!));
+        Assert.Throws<ArgumentNullException>(() => DurableTask.Once((Action)null!));
+        Assert.Throws<NotSupportedException>(() => DurableTask.Once(() => new ValueTask(Task.FromResult(++runs))));
+        Assert.Throws<NotSupportedException>(() => { _ = Once<Task<int>>(() => Task.FromResult(++runs)); });
+        Assert.Throws<NotSupportedException>(() => Once<DurableTask<int>>(() => DurableTask.FromResult(++runs)));
+        Assert.Equal(0, runs);
+        Assert.Empty(host.Effects);
+
+        static T Once<T>(Func<T> effect) => DurableTask.Once(effect);
+    }
+
+    [Fact]
+    public async Task HostWithoutRecordedEffectsRejectsUnnamedOnce()
+    {
+        var context = new EffectContext(TaskId.CreateRoot("root"), log: null);
+        var runs = 0;
+
+        var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => DurableTask.Once(() => ++runs)), context);
+
+        Assert.IsType<NotSupportedException>(response.Exception);
+        Assert.Equal(0, runs);
+    }
+
     private static async Task<T> RunAsync<T>(TestHost host, TaskId taskId, Func<T> body)
     {
         var response = await DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => body()), host.CreateContext(taskId));

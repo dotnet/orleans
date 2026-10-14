@@ -152,7 +152,7 @@ internal sealed class DurableTaskSymbols
         return awaited is IInvocationOperation invocation && IsDurableTasksType(invocation.TargetMethod.ContainingType);
     }
 
-    /// <summary>Returns whether an invocation records an effect: <c>DurableTask.Once</c>.</summary>
+    /// <summary>Returns whether an invocation records an effect: <c>DurableTask.Once</c>, named or unnamed.</summary>
     public bool IsOnce(IInvocationOperation invocation) =>
         invocation.TargetMethod.Name == "Once"
         && SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType, DurableTask);

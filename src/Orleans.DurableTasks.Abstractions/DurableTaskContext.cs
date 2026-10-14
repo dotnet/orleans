@@ -303,8 +303,10 @@ public abstract class DurableTaskContext
     /// A name repeated in one run identifies its later occurrences by their order: the first is <paramref name="name"/>,
     /// and later ones append their ordinal, such as <c>reserve$2</c>, so children named in a loop keep their identifiers
     /// on replay. Named children, named combinators, and <see cref="DurableTask.Once{TResult}(string, Func{TResult})"/>
-    /// effects share one count per name. Names don't contain <c>$</c>, which generated identifiers use. Generated
-    /// identifiers are replay-stable when unnamed children are created in the same deterministic order. A concurrent
+    /// effects share one count per name. Names don't contain <c>$</c>, which generated identifiers use. Unnamed children
+    /// and unnamed <see cref="DurableTask.Once{TResult}(Func{TResult})"/> effects share one count of generated
+    /// identifiers, <c>$child-1</c>, <c>$child-2</c>, and so on. Generated identifiers are replay-stable when unnamed
+    /// operations are created in the same deterministic order. A concurrent
     /// batch can use
     /// <see cref="DurableTask.WhenAll(IReadOnlyList{DurableTask})"/> and
     /// <see cref="DurableTask.WhenAny(IReadOnlyList{DurableTask})"/>, whose input indexes provide
