@@ -8,14 +8,16 @@ namespace Orleans.Journaling.Ranges;
 /// Serializes range map snapshots as JSON documents.
 /// </summary>
 /// <remarks>
-/// The document records its format version, the map version, and the map. Partitions are written in id order, so
+/// The document records its format version, the map version, optionally the identifier of the write which stored it, and the map. Partitions are written in id order, so
 /// equal snapshots serialize to equal bytes.
 /// </remarks>
 internal static class RangeMapJsonSerializer
 {
     private const int FormatVersion = 1;
 
-    public static byte[] Serialize(RangeMapSnapshot snapshot)
+    /// <param name="snapshot">The snapshot.</param>
+    /// <param name="writeId">An identifier of the write which stores the document, which makes the document unique to that write.</param>
+    public static byte[] Serialize(RangeMapSnapshot snapshot, string? writeId = null)
     {
         var buffer = new ArrayBufferWriter<byte>(1024);
         using (var writer = new Utf8JsonWriter(buffer))
@@ -24,6 +26,12 @@ internal static class RangeMapJsonSerializer
             writer.WriteStartObject();
             writer.WriteNumber("format", FormatVersion);
             writer.WriteNumber("version", snapshot.Version);
+            if (writeId is not null)
+            {
+                writer.WriteString("writeId", writeId);
+            }
+
+            writer.WriteString("id", map.Id);
             writer.WriteNumber("bucketCount", map.BucketCount);
             writer.WriteStartArray("ranges");
             foreach (var range in map.Ranges)
@@ -132,7 +140,7 @@ internal static class RangeMapJsonSerializer
                 }
             }
 
-            var map = new RangeMap(root.GetProperty("bucketCount").GetInt32(), ranges.ToImmutable(), migrations.ToImmutable(), partitions.ToImmutable());
+            var map = new RangeMap(root.GetProperty("id").GetString()!, root.GetProperty("bucketCount").GetInt32(), ranges.ToImmutable(), migrations.ToImmutable(), partitions.ToImmutable());
             map.Validate();
             return new RangeMapSnapshot(version, map);
         }

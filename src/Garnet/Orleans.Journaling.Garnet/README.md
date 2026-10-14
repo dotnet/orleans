@@ -35,7 +35,7 @@ builder.UseOrleans(silo =>
 
 ## Example: several partitions across silos
 
-Every silo shares one MetaStore and configures the same initial map. The first silo to start writes it; each silo hosts the partitions assigned to its `HostId`, which defaults to the silo name, and routes operations on other buckets to the silos hosting them.
+Every silo shares one MetaStore and configures the same initial map. The first silo to start writes it; each silo hosts the partitions assigned to its `HostId` and routes operations on other buckets to the silos hosting them.
 
 ```csharp
 using System.Net;
@@ -75,7 +75,7 @@ Partition endpoints have no authentication, so expose them only on a trusted net
 | Option | Default | Description |
 | --- | --- | --- |
 | `MetaStore` | none (required) | Store holding the range map, shared by every silo: `AzureBlobRangeMetaStore`, or one `InMemoryRangeMetaStore` instance for tests. |
-| `HostId` | silo name | This silo's identifier in the map's hosting assignments. Must be stable across restarts. |
+| `HostId` | generated and stored in `DataDirectory` | This silo's identifier in the map's hosting assignments. Must be stable across restarts; set it to name hosts in `InitialRangeMap`. |
 | `InitialRangeMap` | one partition, `p0`, hosted by the first silo with a `DataDirectory` | Map written to an empty MetaStore. Ignored once the MetaStore holds a map. |
 | `DataDirectory` | none | Directory holding the partitions this silo hosts, each in the subdirectory named by its storage location. Required on silos which host partitions. |
 | `ListenEndPoint` | free loopback ports | Endpoint on which hosted partitions listen; with a non-zero port, partitions use consecutive ports from it. A wildcard address is published as the machine's host name. |

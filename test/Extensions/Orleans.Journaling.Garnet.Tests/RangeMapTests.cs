@@ -11,6 +11,7 @@ namespace Orleans.Journaling.Garnet.Tests;
 [TestCategory("BVT")]
 public sealed class RangeMapTests
 {
+    private const string MapId = "map";
     private static readonly PartitionId A = new("a");
     private static readonly PartitionId B = new("b");
     private static readonly PartitionId C = new("c");
@@ -40,6 +41,7 @@ public sealed class RangeMapTests
     public void GetOwner_MatchesTheRangeContainingEachBucket()
     {
         var map = new RangeMap(
+            MapId,
             32,
             [new(0, 0, A), new(1, 9, B, 3), new(10, 10, A, 4), new(11, 30, C), new(31, 31, B, 7)],
             [],
@@ -59,20 +61,21 @@ public sealed class RangeMapTests
 
     private static readonly Dictionary<string, RangeMap> InvalidMapsByReason = new()
     {
-        ["bucket count"] = new RangeMap(12, [new(0, 11, A)], [], Partitions(A)),
-        ["no partitions"] = new RangeMap(4, [new(0, 3, A)], [], ImmutableSortedDictionary<PartitionId, PartitionHosting>.Empty),
-        ["gap"] = new RangeMap(4, [new(0, 1, A), new(3, 3, A)], [], Partitions(A)),
-        ["overlap"] = new RangeMap(4, [new(0, 2, A), new(2, 3, A)], [], Partitions(A)),
-        ["short"] = new RangeMap(4, [new(0, 2, A)], [], Partitions(A)),
-        ["unknown owner"] = new RangeMap(4, [new(0, 3, B)], [], Partitions(A)),
-        ["negative version"] = new RangeMap(4, [new(0, 3, A, -1)], [], Partitions(A)),
-        ["default migrations"] = new RangeMap(4, [new(0, 3, A)], default, Partitions(A)),
-        ["missing host"] = new RangeMap(4, [new(0, 3, A)], [], ImmutableSortedDictionary<PartitionId, PartitionHosting>.Empty.Add(A, new PartitionHosting("", 0, "a"))),
-        ["empty endpoint"] = new RangeMap(4, [new(0, 3, A)], [], ImmutableSortedDictionary<PartitionId, PartitionHosting>.Empty.Add(A, new PartitionHosting("h", 0, "a", " "))),
-        ["migration to non-owner"] = new RangeMap(4, [new(0, 1, A), new(2, 3, B, 2)], [new(1, 2, A, B, 2, MigrationPhase.Committed)], Partitions(A, B)),
-        ["migration to self"] = new RangeMap(4, [new(0, 3, A)], [new(1, 2, A, A, 2, MigrationPhase.Committed)], Partitions(A)),
-        ["overlapping migrations"] = new RangeMap(4, [new(0, 3, B, 2)], [new(0, 1, A, B, 2, MigrationPhase.Sealed), new(1, 2, C, B, 2, MigrationPhase.Committed)], Partitions(A, B, C)),
-        ["undefined phase"] = new RangeMap(4, [new(0, 3, B, 2)], [new(0, 1, A, B, 2, (MigrationPhase)17)], Partitions(A, B)),
+        ["map id"] = new RangeMap("-", 4, [new(0, 3, A)], [], Partitions(A)),
+        ["bucket count"] = new RangeMap(MapId, 12, [new(0, 11, A)], [], Partitions(A)),
+        ["no partitions"] = new RangeMap(MapId, 4, [new(0, 3, A)], [], ImmutableSortedDictionary<PartitionId, PartitionHosting>.Empty),
+        ["gap"] = new RangeMap(MapId, 4, [new(0, 1, A), new(3, 3, A)], [], Partitions(A)),
+        ["overlap"] = new RangeMap(MapId, 4, [new(0, 2, A), new(2, 3, A)], [], Partitions(A)),
+        ["short"] = new RangeMap(MapId, 4, [new(0, 2, A)], [], Partitions(A)),
+        ["unknown owner"] = new RangeMap(MapId, 4, [new(0, 3, B)], [], Partitions(A)),
+        ["negative version"] = new RangeMap(MapId, 4, [new(0, 3, A, -1)], [], Partitions(A)),
+        ["default migrations"] = new RangeMap(MapId, 4, [new(0, 3, A)], default, Partitions(A)),
+        ["missing host"] = new RangeMap(MapId, 4, [new(0, 3, A)], [], ImmutableSortedDictionary<PartitionId, PartitionHosting>.Empty.Add(A, new PartitionHosting("", 0, "a"))),
+        ["empty endpoint"] = new RangeMap(MapId, 4, [new(0, 3, A)], [], ImmutableSortedDictionary<PartitionId, PartitionHosting>.Empty.Add(A, new PartitionHosting("h", 0, "a", " "))),
+        ["migration to non-owner"] = new RangeMap(MapId, 4, [new(0, 1, A), new(2, 3, B, 2)], [new(1, 2, A, B, 2, MigrationPhase.Committed)], Partitions(A, B)),
+        ["migration to self"] = new RangeMap(MapId, 4, [new(0, 3, A)], [new(1, 2, A, A, 2, MigrationPhase.Committed)], Partitions(A)),
+        ["overlapping migrations"] = new RangeMap(MapId, 4, [new(0, 3, B, 2)], [new(0, 1, A, B, 2, MigrationPhase.Sealed), new(1, 2, C, B, 2, MigrationPhase.Committed)], Partitions(A, B, C)),
+        ["undefined phase"] = new RangeMap(MapId, 4, [new(0, 3, B, 2)], [new(0, 1, A, B, 2, (MigrationPhase)17)], Partitions(A, B)),
     };
 
     public static TheoryData<string> InvalidMaps => [.. InvalidMapsByReason.Keys];
@@ -88,6 +91,7 @@ public sealed class RangeMapTests
     public void Validate_AcceptsMigrationsIntoTheirDestinations()
     {
         var map = new RangeMap(
+            MapId,
             8,
             [new(0, 3, A), new(4, 5, B, 2), new(6, 7, C, 3)],
             [new(4, 5, A, B, 2, MigrationPhase.Opened), new(6, 7, B, C, 3, MigrationPhase.Committed)],
@@ -113,6 +117,7 @@ public sealed class RangeMapTests
     public void Json_RoundTripsSnapshots()
     {
         var map = new RangeMap(
+            MapId,
             8,
             [new(0, 3, A), new(4, 5, B, 2), new(6, 7, C, 3)],
             [new(4, 5, A, B, 2, MigrationPhase.Done), new(6, 7, B, C, 3, MigrationPhase.Committed)],
@@ -125,15 +130,18 @@ public sealed class RangeMapTests
         Assert.Equal(snapshot, copy);
         Assert.Equal(bytes, RangeMapJsonSerializer.Serialize(copy));
         Assert.NotEqual(snapshot, copy with { Map = copy.Map with { Migrations = [] } });
+        Assert.NotEqual(snapshot, copy with { Map = copy.Map with { Id = "other" } });
+        Assert.Equal(snapshot, RangeMapJsonSerializer.Deserialize(RangeMapJsonSerializer.Serialize(snapshot, writeId: "w")));
     }
 
     [Theory]
     [InlineData("{}")]
-    [InlineData("""{"format":2,"version":1,"bucketCount":1,"ranges":[],"migrations":[],"partitions":[]}""")]
-    [InlineData("""{"format":1,"version":0,"bucketCount":1,"ranges":[{"first":0,"last":0,"owner":"a","assignedAt":0}],"migrations":[],"partitions":[{"id":"a","host":"h","epoch":0,"storage":"a"}]}""")]
-    [InlineData("""{"format":1,"version":1,"bucketCount":2,"ranges":[{"first":0,"last":0,"owner":"a","assignedAt":0}],"migrations":[],"partitions":[{"id":"a","host":"h","epoch":0,"storage":"a"}]}""")]
-    [InlineData("""{"format":1,"version":1,"bucketCount":1,"ranges":[{"first":0,"last":0,"owner":"a","assignedAt":0}],"migrations":[],"partitions":[{"id":"a","host":"h","epoch":0,"storage":"a"},{"id":"a","host":"h","epoch":0,"storage":"a"}]}""")]
-    [InlineData("""{"format":1,"version":1,"bucketCount":1,"ranges":[{"first":0,"last":0,"owner":"-","assignedAt":0}],"migrations":[],"partitions":[{"id":"a","host":"h","epoch":0,"storage":"a"}]}""")]
+    [InlineData("""{"format":1,"version":1,"bucketCount":1,"ranges":[{"first":0,"last":0,"owner":"a","assignedAt":0}],"migrations":[],"partitions":[{"id":"a","host":"h","epoch":0,"storage":"a"}]}""")]
+    [InlineData("""{"format":2,"version":1,"id":"m","bucketCount":1,"ranges":[],"migrations":[],"partitions":[]}""")]
+    [InlineData("""{"format":1,"version":0,"id":"m","bucketCount":1,"ranges":[{"first":0,"last":0,"owner":"a","assignedAt":0}],"migrations":[],"partitions":[{"id":"a","host":"h","epoch":0,"storage":"a"}]}""")]
+    [InlineData("""{"format":1,"version":1,"id":"m","bucketCount":2,"ranges":[{"first":0,"last":0,"owner":"a","assignedAt":0}],"migrations":[],"partitions":[{"id":"a","host":"h","epoch":0,"storage":"a"}]}""")]
+    [InlineData("""{"format":1,"version":1,"id":"m","bucketCount":1,"ranges":[{"first":0,"last":0,"owner":"a","assignedAt":0}],"migrations":[],"partitions":[{"id":"a","host":"h","epoch":0,"storage":"a"},{"id":"a","host":"h","epoch":0,"storage":"a"}]}""")]
+    [InlineData("""{"format":1,"version":1,"id":"m","bucketCount":1,"ranges":[{"first":0,"last":0,"owner":"-","assignedAt":0}],"migrations":[],"partitions":[{"id":"a","host":"h","epoch":0,"storage":"a"}]}""")]
     public void Json_RejectsInvalidDocuments(string json)
     {
         Assert.Throws<InvalidDataException>(() => RangeMapJsonSerializer.Deserialize(System.Text.Encoding.UTF8.GetBytes(json)));
