@@ -7,6 +7,7 @@ internal static class JsonJournalEntryFields
     public const string Items = "items";
     public const string Key = "key";
     public const string Message = "message";
+    public const string Sequence = "sequence";
     public const string State = "state";
     public const string Value = "value";
     public const string Version = "version";
@@ -15,6 +16,7 @@ internal static class JsonJournalEntryFields
 internal static class JsonJournalEntryCommands
 {
     public const string Add = "add";
+    public const string Append = "append";
     public const string Canceled = "canceled";
     public const string Clear = "clear";
     public const string Completed = "completed";
@@ -27,4 +29,5 @@ internal static class JsonJournalEntryCommands
     public const string RemoveAt = "removeAt";
     public const string Set = "set";
     public const string Snapshot = "snapshot";
+    public const string TrimBefore = "trimBefore";
 }
