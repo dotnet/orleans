@@ -206,7 +206,7 @@ public sealed class ConversationGrain(IDurableStateManager stateManager) : Grain
 `DurableStateWatchExtensions.WatchAsync` watches values, dictionaries, lists, sets, and queues. Each
 event carries a `DurableChangeStatus` of `Draft`, `Staged`, or `Committed`. The default
 `DurableWatchMode.Committed` mode delivers a change after the journal write which contains it is
-acknowledged, so readers observe only durable state. `DurableWatchMode.Speculative` delivers staged
+acknowledged, so readers observe only durable state. `DurableWatchMode.Staged` delivers staged
 changes immediately and reports their durability with watermarks. Each acknowledged write publishes one
 watermark shared by every watcher of the manager.
 
