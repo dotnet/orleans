@@ -1,7 +1,7 @@
 ---
 title: Durable task recipes
-description: Fan out, race, compensate, settle every input, process completions in order, wait for signals, detach work, cancel, abort, and schedule durable tasks.
-ms.date: 10/13/2026
+description: Fan out, race, time out, compensate, settle every input, process completions in order, wait for signals, detach work, cancel, abort, and schedule durable tasks.
+ms.date: 10/14/2026
 ms.topic: how-to
 ---
 
@@ -43,32 +43,73 @@ Pitfalls:
 `reserve/{n-1}`, each `Completed` with its `True` or `False` result, and each catalog
 grain lists a task with the same ID.
 
-## Race inputs against a deadline with WhenAny
+## Take the first result and cancel the rest with Race
 
-**Task:** take the first shipping quote from two carriers, or give up after two minutes.
+**Task:** take the first shipping quote from two carriers, and cancel the other
+carrier's request.
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_race" language="csharp":::
 
-The deadline is a local step which awaits a durable delay and returns `null`, so it has
-the same result type as the carrier calls. `WhenAny<TResult>` returns the index and
-result of the input which completed first. The grain stamps each input's result with a
-durable completion sequence, so a replay returns the same winner even when the other
-inputs have completed since.
+<xref:Orleans.DurableTasks.DurableTask.Race*?displayProperty=nameWithType> schedules the
+requests as `first-quote/0` and `first-quote/1` and selects the one which completed
+first. The grain stamps each input's result with a durable completion sequence, so a
+replay selects the same winner even when the other request has completed since. `Race`
+then requests cancellation of the other request with the reason
+`Another task won the race.` and waits until that request is terminal, so the workflow
+continues only after both carrier calls have settled. `Race<TResult>` returns the
+winner's index and result.
 
 Pitfalls:
 
-- The other inputs keep running after the race. Their results are recorded and unused,
-  and the runtime cancels any which are still pending when it deletes the task's
-  execution tree. Use [`WhenEach`](#process-results-as-they-arrive-with-wheneach) to
-  cancel the remaining inputs explicitly.
-- A winner which failed or was canceled fails `WhenAny`. Return a value, such as `null`,
+- A winner which failed or was canceled fails `Race`. Return a value, such as `null`,
   from inputs whose failure is an expected outcome.
-- Measure deadlines with durable delays or
-  <xref:Orleans.DurableTasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>.
+- Cancellation is cooperative. A carrier which ignores the request keeps the race
+  waiting until its call completes, and the race discards that call's result.
+- To leave the other inputs running, use
+  <xref:Orleans.DurableTasks.DurableTask.WhenAny*?displayProperty=nameWithType>, whose
+  other inputs run until they complete or the runtime deletes the task's execution tree.
 
-**Verify:** the shipping grain lists `first-quote/0`, `first-quote/1`, and
-`first-quote/2`, and `first-quote/2/$child-1`, the deadline's delay, as `Delayed` until its due
-time.
+**Verify:** while the slower request settles, the shipping grain lists it as
+`Canceling` with the reason `Another task won the race.`; once `QuoteFirstAsync`
+returns, `first-quote/0` and `first-quote/1` are both terminal.
+
+## Time out a call with WaitAsync
+
+**Task:** request a quote from the ground carrier, and give up after two minutes.
+
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_timeout" language="csharp":::
+
+<xref:Orleans.DurableTasks.DurableTaskExtensions.WaitAsync*?displayProperty=nameWithType>
+races the call, `ground-quote/0`, with a durable delay, `ground-quote/1`. The runtime
+records the delay's due time, so a replay after a deactivation keeps the original
+deadline: the timeout counts from the first run. When the delay elapses first, the call
+receives a cancellation request with the reason
+`The operation timed out after 00:02:00.`, and `WaitAsync` waits for the carrier's
+outcome. A call which ends canceled throws <xref:System.TimeoutException>, whose inner
+exception is the call's `OperationCanceledException`; a quote which the carrier returns
+anyway is the result. When the call completes first, `WaitAsync` cancels the delay and
+returns the call's result or throws its failure.
+<xref:Orleans.DurableTasks.DurableTaskExtensions.WaitUntilAsync*> takes an absolute
+deadline instead.
+
+Pitfalls:
+
+- Compute absolute deadlines from
+  <xref:Orleans.DurableTasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>, so
+  a replay computes the same deadline.
+- Catch `TimeoutException` to handle the timeout. An `OperationCanceledException`
+  reports another cancellation, such as the workflow's own.
+- `Race(...).WaitAsync(timeout).WithId(name)` bounds a whole race, which then runs as the
+  child `{name}/0` with its inputs beneath it.
+- For a task which is already scheduled,
+  <xref:Orleans.DurableTasks.ScheduledTask.WaitAsync*?displayProperty=nameWithType> with a
+  timeout applies the same rules. Outside a durable task, such as in a client, it
+  measures the timeout on the system clock.
+
+**Verify:** the shipping grain lists `ground-quote/1` as `Delayed` until its due time.
+After a timeout, `ground-quote/0` reports the reason
+`The operation timed out after 00:02:00.`, and the workflow returns `null` once the
+carrier's request ends canceled.
 
 ## Compensate inline when the workflow is canceled
 

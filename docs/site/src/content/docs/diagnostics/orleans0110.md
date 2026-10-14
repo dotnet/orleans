@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0110: Run concurrent durable work through durable combinators"
 description: Understand ORLEANS0110, which reports durable task code which combines durable work with a Task combinator.
-ms.date: 10/13/2026
+ms.date: 10/14/2026
 ms.topic: reference
 ---
 
@@ -25,7 +25,7 @@ For the replay model, see [Replay and determinism](../grains/durable-tasks.md#re
 
 ## How to fix violations
 
-Use `DurableTask.WhenAll`, `DurableTask.WhenAny`, `DurableTask.ScheduleAll`, or `DurableTask.WhenEach`. For examples, see [Durable task recipes](../grains/durable-tasks-recipes.md).
+Use `DurableTask.WhenAll`, `DurableTask.WhenAny`, `DurableTask.Race`, `DurableTask.ScheduleAll`, or `DurableTask.WhenEach`. To bound durable work with a timeout instead of racing it with `Task.Delay`, use its `WaitAsync` or `WaitUntilAsync`. For examples, see [Durable task recipes](../grains/durable-tasks-recipes.md).
 
 ## When to suppress
 
