@@ -2269,7 +2269,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             foreach (var (childTaskId, childTaskState) in _storage.GetChildren(currentTaskId).ToList())
             {
-                Debug.Assert(currentTaskId.IsParentOf(childTaskId));
+                // A named combinator's inputs are this task's nearest stored descendants beneath the combinator's ID.
+                Debug.Assert(currentTaskId.IsAncestorOf(childTaskId));
 
                 // A child scheduled in a cancellation suppression scope isn't reached by its ancestors' cancellation;
                 // its own cancellation, an abort of the tree, and deletion of the tree still reach it.
