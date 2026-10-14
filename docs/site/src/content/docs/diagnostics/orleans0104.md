@@ -21,7 +21,7 @@ A delegate passed to `DurableTask.Once` assigns a local variable, parameter, or 
 
 A replay returns an effect's recorded result without running the effect. The assignment therefore happens only in the run which runs the effect, and the replayed body observes the variable's previous value.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

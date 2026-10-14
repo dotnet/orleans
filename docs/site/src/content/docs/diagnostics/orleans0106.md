@@ -21,7 +21,7 @@ A local variable holds the definition which an `async DurableTask` method return
 
 An `async DurableTask` method returns a single-use definition. Calling the method again creates a definition for another run.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

@@ -23,7 +23,7 @@ Grain state always holds the latest committed changes. When a body replays from 
 
 Three places access state once. A `DurableTask.Once` effect runs once and records its result. A local step, an `async DurableTask` method on the same grain, commits its state changes with its recorded result. The code after the body's last durable operation commits with the body's result.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
