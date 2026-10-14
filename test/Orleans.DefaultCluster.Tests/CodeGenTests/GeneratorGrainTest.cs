@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -204,15 +205,25 @@ namespace Tester.CodeGenTests
             var localObject = new ObserverWithGenericMethods();
 
             var grain = this.GrainFactory.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
-            var observer = this.GrainFactory.CreateObjectReference<IGrainObserverWithGenericMethods>(localObject);
-            await grain.SetValueOnObserver(observer, "ToastedEnchiladas");
-            Assert.Equal("ToastedEnchiladas", await localObject.ValueTask);
-
-            // Keep the observer strongly reachable until its callback completes. CreateObjectReference holds
-            // only a weak reference to the target, so a garbage collection that runs after the ValueTask getter
-            // above is read (and before SetValue is invoked) could otherwise collect localObject prematurely,
-            // leaving valueCompletion uncompleted and this test hanging indefinitely (see dotnet/orleans#11427).
-            GC.KeepAlive(localObject);
+            // Root the observer and its suspended callback continuation independently of the test runner.
+            var observerRoot = GCHandle.Alloc(localObject);
+            try
+            {
+                var observer = this.GrainFactory.CreateObjectReference<IGrainObserverWithGenericMethods>(localObject);
+                try
+                {
+                    await grain.SetValueOnObserver(observer, "ToastedEnchiladas");
+                    Assert.Equal("ToastedEnchiladas", await localObject.ValueTask);
+                }
+                finally
+                {
+                    this.GrainFactory.DeleteObjectReference(observer);
+                }
+            }
+            finally
+            {
+                observerRoot.Free();
+            }
         }
 
         [Fact]
