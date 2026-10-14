@@ -79,9 +79,9 @@ public abstract partial class DurableTask
     /// <remarks>
     /// The winner is the input which completed first, and the host selects the same winner on replay, from its durable
     /// completion order or from a record of the selection. A winner which failed or was canceled fails the combined task.
-    /// The other inputs keep running. Each input runs as a child identified by its input index under the combinator's
-    /// operation identifier, which also identifies a recorded selection: the segment assigned with <c>WithId</c>, or a
-    /// segment generated in execution order.
+    /// The other inputs keep running; <see cref="Race(IReadOnlyList{DurableTask})"/> also cancels them. Each input runs
+    /// as a child identified by its input index under the combinator's operation identifier, which also identifies a
+    /// recorded selection: the segment assigned with <c>WithId</c>, or a segment generated in execution order.
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="tasks"/> is empty.</exception>
     public static DurableTask<int> WhenAny(IReadOnlyList<DurableTask> tasks)
@@ -97,9 +97,9 @@ public abstract partial class DurableTask
     /// <remarks>
     /// The winner is the input which completed first, and the host selects the same winner on replay, from its durable
     /// completion order or from a record of the selection. A winner which failed or was canceled fails the combined task.
-    /// The other inputs keep running. Each input runs as a child identified by its input index under the combinator's
-    /// operation identifier, which also identifies a recorded selection: the segment assigned with <c>WithId</c>, or a
-    /// segment generated in execution order.
+    /// The other inputs keep running; <see cref="Race{TResult}(IReadOnlyList{DurableTask{TResult}})"/> also cancels them.
+    /// Each input runs as a child identified by its input index under the combinator's operation identifier, which also
+    /// identifies a recorded selection: the segment assigned with <c>WithId</c>, or a segment generated in execution order.
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="tasks"/> is empty.</exception>
     public static DurableTask<(int Index, TResult Result)> WhenAny<TResult>(IReadOnlyList<DurableTask<TResult>> tasks)
@@ -413,20 +413,7 @@ public abstract partial class DurableTask
     {
         var tasks = await ScheduleInputsAsync(inputs, context, operationId, static handle => new ScheduledTaskHandle(handle), cancellationToken)
             .ConfigureAwait(false);
-        var candidates = new TaskId[tasks.Length];
-        for (var index = 0; index < candidates.Length; index++)
-        {
-            candidates[index] = tasks[index].Id;
-        }
-
-        var winner = await context.SelectCompletionAsync(operationId.Child("$winner"), candidates, cancellationToken).ConfigureAwait(false);
-        var winnerIndex = Array.IndexOf(candidates, winner);
-        if (winnerIndex < 0)
-        {
-            throw new InvalidOperationException($"The host selected '{winner}', which is not a candidate of '{operationId}'.");
-        }
-
-        return (tasks, winnerIndex);
+        return (tasks, await ScheduledTask.SelectIndexAsync(context, operationId, tasks, cancellationToken).ConfigureAwait(false));
     }
 
     private static async Task<TTask[]> ScheduleInputsAsync<TTask>(
@@ -442,9 +429,7 @@ public abstract partial class DurableTask
         var scheduling = new Task<IScheduledTaskHandle>[inputs.Length];
         for (var index = 0; index < inputs.Length; index++)
         {
-            var input = new ConfiguredDurableTaskCore<DurableTask>(inputs[index], context)
-                .WithId(operationId.Child(index.ToString(CultureInfo.InvariantCulture)));
-            scheduling[index] = ScheduleInputAsync(input, cancellationToken);
+            scheduling[index] = ScheduleChildAsync(inputs[index], context, operationId.Child(index.ToString(CultureInfo.InvariantCulture)), cancellationToken);
         }
 
         var handles = await Task.WhenAll(scheduling).ConfigureAwait(false);
@@ -455,12 +440,22 @@ public abstract partial class DurableTask
         }
 
         return tasks;
+    }
 
-        static async Task<IScheduledTaskHandle> ScheduleInputAsync(
-            ConfiguredDurableTaskCore<DurableTask> input,
+    /// <summary>Schedules <paramref name="task"/> as the child <paramref name="taskId"/> of <paramref name="context"/>.</summary>
+    internal static Task<IScheduledTaskHandle> ScheduleChildAsync(
+        DurableTask task,
+        DurableTaskContext context,
+        TaskId taskId,
+        CancellationToken cancellationToken)
+    {
+        return ScheduleAsync(new ConfiguredDurableTaskCore<DurableTask>(task, context).WithId(taskId), cancellationToken);
+
+        static async Task<IScheduledTaskHandle> ScheduleAsync(
+            ConfiguredDurableTaskCore<DurableTask> child,
             CancellationToken cancellationToken)
         {
-            var (response, handle) = await input.ScheduleCoreAsync(cancellationToken).ConfigureAwait(false);
+            var (response, handle) = await child.ScheduleCoreAsync(cancellationToken).ConfigureAwait(false);
             Debug.Assert(response is null && handle is not null, "A child of an execution is scheduled through a handle.");
             return handle;
         }
