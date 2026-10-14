@@ -9,7 +9,7 @@ public interface IOrderGrain : IGrainWithGuidKey
 {
     Task<OrderDetails?> GetAsync();
 
-    // The order workflow, which basket checkout schedules under PlaceOrderTaskId(orderId).
+    // The order workflow, which basket checkout detaches under PlaceOrderTaskId(orderId).
     DurableTask<OrderResult> PlaceOrderAsync(SubmitOrder request);
 
     Task<bool> CancelAsync();
