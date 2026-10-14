@@ -26,8 +26,9 @@ public interface IOrderGrain : IGrainWithGuidKey
 // PlaceOrder is one durable task. After a deactivation, the runtime replays it from the start: completed child tasks
 // return their recorded results, so the workflow resumes where it stopped. The order's state is its history: the
 // workflow keeps the current snapshot in a local variable, computes each transition from the request, recorded results,
-// and logical time, and reports the new snapshot to the history log. A report appends once per position, so a replay
-// returns the recorded entry's sequence without appending it again. Cancel and ship are ordinary methods which read the
+// and logical time, and appends the new snapshot to the history log in a recorded effect, DurableTask.Once. The effect
+// appends once per position in the workflow, so a replay returns the recorded entry's sequence without appending it
+// again. Cancel and ship are ordinary methods which read the
 // latest snapshot: cancel requests durable cancellation of the workflow with the buyer's reason, and ship sends the
 // workflow its Shipped signal.
 public sealed class OrderGrain : DurableGrain, IOrderGrain
@@ -82,7 +83,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     {
         var lines = request.Lines;
         var order = OrderDetails.Submit(OrderId, request, DurableTask.Current.UtcNow);
-        _history.Report(order);
+        DurableTask.Once(() => _history.Append(order));
         await RecordAsync(order.Order);
 
         // While the order awaits validation, CancelAsync can cancel this task. The next durable operation, up to the
@@ -95,7 +96,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             await DurableTask.Delay(_options.GracePeriod).WithId("grace-period");
             order = order.BeginValidation();
             reservable = lines;
-            _history.Report(order);
+            DurableTask.Once(() => _history.Append(order));
             await RecordAsync(order.Order);
 
             // Reserves every line concurrently, as the children reserve/0, reserve/1, and so on. WhenAll waits for every
@@ -108,7 +109,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
                 return await CancelOrderAsync(order, lines, $"'{lines[rejected].ProductName}' is out of stock.");
             }
 
-            _history.Report(order);
+            DurableTask.Once(() => _history.Append(order));
             await RecordAsync(order.Order);
 
             // The authorization runs as authorize-payment/0 and its timeout as authorize-payment/1. When the timeout
@@ -134,20 +135,20 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         }
 
         order = order.MarkPaid();
-        _history.Report(order);
+        DurableTask.Once(() => _history.Append(order));
         await RecordAsync(order.Order);
         await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).CommitAsync(OrderId))).WithId("commit");
 
         // The order ships when ShipAsync signals it; the wait returns at once for a shipment which arrived earlier.
         await Shipped.WaitAsync();
         order = order.MarkShipped();
-        _history.Report(order);
+        DurableTask.Once(() => _history.Append(order));
         await RecordAsync(order.Order);
         return Result(order);
     }
 
     // The workflow observes the cancellation during its grace period or stock validation, releases the stock it
-    // reserved, and reports the cancellation with this reason.
+    // reserved, and records the cancellation with this reason.
     public async Task<bool> CancelAsync()
     {
         if (Latest?.Order.Status is not (OrderStatus.Submitted or OrderStatus.AwaitingValidation))
@@ -160,7 +161,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     }
 
     // The workflow records the first shipment, so shipping again conflicts with it, including before the workflow has
-    // reported the Shipped status.
+    // appended the Shipped snapshot.
     public async Task<bool> ShipAsync()
     {
         if (Latest?.Order.Status is not OrderStatus.Paid)
@@ -172,7 +173,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         return result is DurableSignalResult.Accepted;
     }
 
-    // Releases the lines' reservations concurrently, then reports the cancellation. Releasing is idempotent and returns
+    // Releases the lines' reservations concurrently, then records the cancellation. Releasing is idempotent and returns
     // whether the line held a reservation, so the workflow releases each line without tracking which reservations ran.
     // The suppression scope keeps the workflow's cancellation from reaching this compensation, so it runs to completion.
     private async Task<OrderResult> CancelOrderAsync(OrderDetails order, OrderLine[] lines, string? reason)
@@ -182,7 +183,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             var released = await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
                 .WithId("release");
             order = order.Cancel([.. lines.Where((_, i) => released[i]).Select(line => line.ProductId)], reason);
-            _history.Report(order);
+            DurableTask.Once(() => _history.Append(order));
             await RecordAsync(order.Order);
             return Result(order);
         }
