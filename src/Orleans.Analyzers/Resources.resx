@@ -328,7 +328,4 @@
   <data name="GrainClassDuplicateDeclarationDescription" xml:space="preserve">
     <value>Each grain class should only be declared once in OrleansContracts.txt.</value>
   </data>
-  <data name="DurableTaskAsyncMethodLacksAwaitSuppressionJustification" xml:space="preserve">
-    <value>An async DurableTask method defines a deferred durable step which the host runs under replay control, so a body which completes without awaiting is a normal step.</value>
-  </data>
 </root>

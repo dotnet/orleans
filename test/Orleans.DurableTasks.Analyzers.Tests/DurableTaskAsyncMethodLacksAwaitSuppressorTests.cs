@@ -1,14 +1,11 @@
 using System.Collections.Immutable;
-using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using Orleans.Analyzers;
-using Orleans.DurableTasks;
 using Xunit;
 
-namespace Analyzers.Tests;
+namespace Orleans.DurableTasks.Analyzers.Tests;
 
 /// <summary>
 /// Tests for the suppressor which suppresses CS1998 for async functions returning Orleans durable tasks.
@@ -23,7 +20,7 @@ namespace Analyzers.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("Analyzer")]
-public class DurableTaskAsyncMethodLacksAwaitSuppressorTest
+public class DurableTaskAsyncMethodLacksAwaitSuppressorTests
 {
     private const string Usings = """
         using System;
@@ -32,12 +29,10 @@ public class DurableTaskAsyncMethodLacksAwaitSuppressorTest
 
         """;
 
-    private static readonly ImmutableArray<MetadataReference> CoreReferences = CreateReferences(typeof(object).Assembly, typeof(Task).Assembly);
-    private static readonly ImmutableArray<MetadataReference> DurableTaskReferences = CreateReferences(typeof(object).Assembly, typeof(Task).Assembly, typeof(DurableTask).Assembly);
     private static readonly bool CompilerReportsCS1998 = CSharpCompilation.Create(
             "Probe",
             [CSharpSyntaxTree.ParseText("class C { async System.Threading.Tasks.Task M() { } }")],
-            CoreReferences,
+            AnalyzerVerifier.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
         .GetDiagnostics()
         .Any(d => d.Id == DurableTaskAsyncMethodLacksAwaitSuppressor.SuppressedDiagnosticId);
@@ -70,7 +65,7 @@ public class DurableTaskAsyncMethodLacksAwaitSuppressorTest
     [MemberData(nameof(DurableTaskFunctions))]
     public async Task SuppressesCS1998ForDurableTaskFunctions(string member)
     {
-        var diagnostics = await GetCS1998DiagnosticsAsync(Usings + $"public class C {{ {member} }}", DurableTaskReferences);
+        var diagnostics = await GetCS1998DiagnosticsAsync(Usings + $"public class C {{ {member} }}");
 
         var diagnostic = Assert.Single(diagnostics);
         Assert.True(diagnostic.IsSuppressed);
@@ -80,7 +75,7 @@ public class DurableTaskAsyncMethodLacksAwaitSuppressorTest
     [MemberData(nameof(OtherAsyncFunctions))]
     public async Task DoesNotSuppressCS1998ForOtherTaskTypes(string member)
     {
-        var diagnostics = await GetCS1998DiagnosticsAsync(Usings + $"public class C {{ {member} }}", DurableTaskReferences);
+        var diagnostics = await GetCS1998DiagnosticsAsync(Usings + $"public class C {{ {member} }}");
 
         var diagnostic = Assert.Single(diagnostics);
         Assert.False(diagnostic.IsSuppressed);
@@ -98,27 +93,10 @@ public class DurableTaskAsyncMethodLacksAwaitSuppressorTest
             }
             """;
 
-        var diagnostics = await GetCS1998DiagnosticsAsync(source, DurableTaskReferences);
+        var diagnostics = await GetCS1998DiagnosticsAsync(source);
 
         Assert.Equal(3, diagnostics.Length);
         Assert.All(diagnostics, diagnostic => Assert.False(diagnostic.IsSuppressed));
-    }
-
-    [Fact]
-    public async Task SuppressesCS1998ByMetadataNameWithoutAbstractionsReference()
-    {
-        var source = CreateTaskLikeTypesSource("Orleans.DurableTasks") + """
-            public class C
-            {
-                public async Orleans.DurableTasks.DurableTask Run() { }
-                public async Orleans.DurableTasks.DurableTask<int> Get() => 1;
-            }
-            """;
-
-        var diagnostics = await GetCS1998DiagnosticsAsync(source, CoreReferences);
-
-        Assert.Equal(2, diagnostics.Length);
-        Assert.All(diagnostics, diagnostic => Assert.True(diagnostic.IsSuppressed));
     }
 
     [Fact]
@@ -143,7 +121,7 @@ public class DurableTaskAsyncMethodLacksAwaitSuppressorTest
             }
             """;
 
-        var diagnostics = await GetCS1998DiagnosticsAsync(source, DurableTaskReferences);
+        var diagnostics = await GetCS1998DiagnosticsAsync(source);
 
         Assert.Equal(4, diagnostics.Length);
         Assert.True(diagnostics[0].IsSuppressed);
@@ -158,21 +136,19 @@ public class DurableTaskAsyncMethodLacksAwaitSuppressorTest
         var options = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
             .WithSpecificDiagnosticOptions([new(DurableTaskAsyncMethodLacksAwaitSuppressor.SuppressionId, ReportDiagnostic.Suppress)]);
 
-        var diagnostics = await GetCS1998DiagnosticsAsync(Usings + "public class C { public async DurableTask<int> Get() => 1; }", DurableTaskReferences, options);
+        var diagnostics = await GetCS1998DiagnosticsAsync(Usings + "public class C { public async DurableTask<int> Get() => 1; }", options);
 
         var diagnostic = Assert.Single(diagnostics);
         Assert.False(diagnostic.IsSuppressed);
     }
 
-    private static async Task<Diagnostic[]> GetCS1998DiagnosticsAsync(
-        string source,
-        ImmutableArray<MetadataReference> references,
-        CSharpCompilationOptions? options = null)
+    /// <summary>Compiles <paramref name="source"/> with the durable task stubs and returns its CS1998 diagnostics.</summary>
+    private static async Task<Diagnostic[]> GetCS1998DiagnosticsAsync(string source, CSharpCompilationOptions? options = null)
     {
         var compilation = CSharpCompilation.Create(
             "TestAssembly",
-            [CSharpSyntaxTree.ParseText(source, path: "Test.cs")],
-            references,
+            [CSharpSyntaxTree.ParseText(source, path: "Test.cs"), CSharpSyntaxTree.ParseText(DurableTaskStubs.Source, path: "Stubs.cs")],
+            AnalyzerVerifier.References,
             options ?? new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
 
@@ -187,21 +163,14 @@ public class DurableTaskAsyncMethodLacksAwaitSuppressorTest
             : [new LegacyAsyncLacksAwaitAnalyzer(), new DurableTaskAsyncMethodLacksAwaitSuppressor()];
         var diagnostics = await compilation
             .WithAnalyzers(analyzers, analyzerOptions)
-            .GetAllDiagnosticsAsync();
+            .GetAllDiagnosticsAsync(TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain(diagnostics, d => d.Id == "AD0001");
         return diagnostics
-            .Where(d => d.Id == DurableTaskAsyncMethodLacksAwaitSuppressor.SuppressedDiagnosticId)
+            .Where(d => d.Id == DurableTaskAsyncMethodLacksAwaitSuppressor.SuppressedDiagnosticId && d.Location.SourceTree?.FilePath == "Test.cs")
             .OrderBy(d => d.Location.SourceSpan.Start)
             .ToArray();
     }
-
-    private static ImmutableArray<MetadataReference> CreateReferences(params Assembly[] assemblies)
-        => [.. assemblies
-            .SelectMany(assembly => assembly.GetReferencedAssemblies().Select(Assembly.Load))
-            .Concat(assemblies)
-            .Distinct()
-            .Select(assembly => MetadataReference.CreateFromFile(assembly.Location))];
 
     private static string CreateTaskLikeTypesSource(string @namespace) => $$"""
         namespace {{@namespace}}

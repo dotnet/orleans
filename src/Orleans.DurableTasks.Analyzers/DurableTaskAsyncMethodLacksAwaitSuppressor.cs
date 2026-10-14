@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace Orleans.Analyzers;
+namespace Orleans.DurableTasks.Analyzers;
 
 /// <summary>
 /// Suppresses CS1998 for async methods, local functions, and anonymous functions which return
@@ -23,17 +23,14 @@ public sealed class DurableTaskAsyncMethodLacksAwaitSuppressor : DiagnosticSuppr
     private static readonly SuppressionDescriptor Rule = new(
         id: SuppressionId,
         suppressedDiagnosticId: SuppressedDiagnosticId,
-        justification: new LocalizableResourceString(
-            nameof(Resources.DurableTaskAsyncMethodLacksAwaitSuppressionJustification),
-            Resources.ResourceManager,
-            typeof(Resources)));
+        justification: "An async DurableTask method defines a deferred durable step which the host runs under replay control, so a body which completes without awaiting is a normal step.");
 
     public override ImmutableArray<SuppressionDescriptor> SupportedSuppressions { get; } = ImmutableArray.Create(Rule);
 
     public override void ReportSuppressions(SuppressionAnalysisContext context)
     {
-        var durableTask = context.Compilation.GetTypeByMetadataName(Constants.DurableTaskFullyQualifiedName);
-        var genericDurableTask = context.Compilation.GetTypeByMetadataName(Constants.GenericDurableTaskFullyQualifiedName);
+        var durableTask = context.Compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableTask");
+        var genericDurableTask = context.Compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableTask`1");
         if (durableTask is null && genericDurableTask is null)
         {
             return;
