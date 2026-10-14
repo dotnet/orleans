@@ -31,6 +31,8 @@ internal static class DurableTaskStubs
                 public static DurableTask<T> Run<T>(Func<CancellationToken, Task<T>> function) => null!;
                 public static T Once<T>(string name, Func<T> effect) => effect();
                 public static void Once(string name, Action effect) => effect();
+                public static T Once<T>(Func<T> effect) => effect();
+                public static void Once(Action effect) => effect();
                 public static DurableTask<T[]> WhenAll<T>(IEnumerable<DurableTask<T>> inputs) => null!;
                 public static DurableTask WhenAll(IEnumerable<DurableTask> inputs) => null!;
                 public static DurableTask<int> WhenAny(IEnumerable<DurableTask> inputs) => null!;

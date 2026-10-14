@@ -103,6 +103,16 @@ namespace Orleans.DurableTasks
 
         public static DurableTask<TResult> FromResult<TResult>(TResult value) { throw null; }
 
+        public static void Once(System.Action effect) { }
+
+        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void Once(System.Func<DurableTask> effect) { }
+
+        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void Once(System.Func<System.Threading.Tasks.Task> effect) { }
+
         public static void Once(string name, System.Action effect) { }
 
         [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
@@ -112,6 +122,16 @@ namespace Orleans.DurableTasks
         [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static void Once(string name, System.Func<System.Threading.Tasks.Task> effect) { }
+
+        public static TResult Once<TResult>(System.Func<TResult> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult Once<TResult>(System.Func<DurableTask<TResult>> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult Once<TResult>(System.Func<System.Threading.Tasks.Task<TResult>> effect) { throw null; }
 
         public static TResult Once<TResult>(string name, System.Func<TResult> effect) { throw null; }
 

@@ -71,7 +71,7 @@ public abstract partial class DurableTask
         }
 
         return GetEffectContext(name) is { } context
-            ? RunEffect(context, name, effect, static effect => DurableTaskResponse.FromResult(effect())).GetResult<TResult>()
+            ? RunEffect(context, context.CreateNamedChildId(name, OnceSegmentPrefix), effect, static effect => DurableTaskResponse.FromResult(effect())).GetResult<TResult>()
             : effect();
     }
 
@@ -106,7 +106,7 @@ public abstract partial class DurableTask
 
         RunEffect(
             context,
-            name,
+            context.CreateNamedChildId(name, OnceSegmentPrefix),
             effect,
             static effect =>
             {
@@ -139,6 +139,112 @@ public abstract partial class DurableTask
     [EditorBrowsable(EditorBrowsableState.Never)]
     public static TResult Once<TResult>(string name, Func<DurableTask<TResult>> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
 
+    /// <summary>
+    /// Runs <paramref name="effect"/> once for the running durable task and returns its result, which every later run of
+    /// the task's body returns without running <paramref name="effect"/> again.
+    /// </summary>
+    /// <typeparam name="TResult">The type of the effect's result, which the host stores with the task.</typeparam>
+    /// <param name="effect">The synchronous effect, which returns every value the body uses.</param>
+    /// <returns>The result which the effect returned when it ran.</returns>
+    /// <remarks>
+    /// <para>
+    /// The effect runs and records its outcome as <see cref="Once{TResult}(string, Func{TResult})"/> describes, under the
+    /// execution's next generated child identifier, such as <c>$child-3</c>, instead of a name.
+    /// </para>
+    /// <para>
+    /// Unnamed effects and unnamed children share one count of generated identifiers, in the order in which a run of the
+    /// body creates them, as <see cref="DurableTaskContext.CreateChildTaskId(string)"/> describes. A replay therefore
+    /// finds each recorded outcome when the body creates its unnamed operations in the same order. Name an effect when
+    /// the body's unnamed operations can change order or number between runs, for example across deployments.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var paymentId = DurableTask.Once(Guid.NewGuid);
+    /// </code>
+    /// </example>
+    /// <exception cref="ArgumentNullException"><paramref name="effect"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>, or an
+    /// earlier run recorded another kind of operation under the effect's generated identifier.
+    /// </exception>
+    /// <exception cref="NotSupportedException">
+    /// <typeparamref name="TResult"/> is an asynchronous operation, such as a <see cref="Task"/>, a
+    /// <see cref="ValueTask"/>, or a <see cref="DurableTask"/>, or the host doesn't support recorded effects.
+    /// </exception>
+    public static TResult Once<TResult>(Func<TResult> effect)
+    {
+        ArgumentNullException.ThrowIfNull(effect);
+        if (AsynchronousResult<TResult>.Value)
+        {
+            throw new NotSupportedException(OnceMustBeSynchronous);
+        }
+
+        return DurableTaskContext.Ambient is { } context
+            ? RunEffect(context, context.CreateChildTaskId(null), effect, static effect => DurableTaskResponse.FromResult(effect())).GetResult<TResult>()
+            : effect();
+    }
+
+    /// <summary>
+    /// Runs <paramref name="effect"/> once for the running durable task; later runs of the task's body don't run it again.
+    /// </summary>
+    /// <param name="effect">The synchronous effect.</param>
+    /// <remarks>
+    /// The effect runs and records its outcome as <see cref="Once{TResult}(string, Func{TResult})"/> describes, under the
+    /// execution's next generated child identifier, which <see cref="Once{TResult}(Func{TResult})"/> describes. A replay
+    /// returns, or throws the exception which the effect threw, without running it. Outside a durable task, the effect
+    /// runs every time.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="effect"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>, or an
+    /// earlier run recorded another kind of operation under the effect's generated identifier.
+    /// </exception>
+    /// <exception cref="NotSupportedException">The host doesn't support recorded effects.</exception>
+    public static void Once(Action effect)
+    {
+        ArgumentNullException.ThrowIfNull(effect);
+        if (DurableTaskContext.Ambient is not { } context)
+        {
+            effect();
+            return;
+        }
+
+        RunEffect(
+            context,
+            context.CreateChildTaskId(null),
+            effect,
+            static effect =>
+            {
+                effect();
+                return DurableTaskResponse.Completed;
+            }).EnsureSuccessfulCompletion();
+    }
+
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
+    /// <remarks>An asynchronous lambda also converts to a durable task, and this overload takes precedence.</remarks>
+    [Obsolete(OnceMustBeSynchronous, error: true)]
+    [OverloadResolutionPriority(1)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static void Once(Func<Task> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+
+    /// <summary>Rejects an asynchronous effect, which <c>DurableTask.Once</c> can't record.</summary>
+    /// <remarks>An asynchronous lambda also converts to a durable task, and this overload takes precedence.</remarks>
+    [Obsolete(OnceMustBeSynchronous, error: true)]
+    [OverloadResolutionPriority(1)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static TResult Once<TResult>(Func<Task<TResult>> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+
+    /// <summary>Rejects a durable task effect, which runs as a durable child when it is awaited.</summary>
+    [Obsolete(OnceMustBeSynchronous, error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static void Once(Func<DurableTask> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+
+    /// <summary>Rejects a durable task effect, which runs as a durable child when it is awaited.</summary>
+    [Obsolete(OnceMustBeSynchronous, error: true)]
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public static TResult Once<TResult>(Func<DurableTask<TResult>> effect) => throw new NotSupportedException(OnceMustBeSynchronous);
+
     /// <summary>Validates <paramref name="name"/> and returns the running task's context, or <see langword="null"/>.</summary>
     private static DurableTaskContext? GetEffectContext(string name)
     {
@@ -148,10 +254,10 @@ public abstract partial class DurableTask
 
     private static DurableTaskResponse RunEffect<TEffect>(
         DurableTaskContext context,
-        string name,
+        TaskId effectId,
         TEffect effect,
         Func<TEffect, DurableTaskResponse> run)
-        => context.RunEffect(context.CreateNamedChildId(name, OnceSegmentPrefix), (effect, run), static state => Invoke(state));
+        => context.RunEffect(effectId, (effect, run), static state => Invoke(state));
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The effect's failure is recorded as its outcome.")]
     private static DurableTaskResponse Invoke<TEffect>((TEffect Effect, Func<TEffect, DurableTaskResponse> Run) state)

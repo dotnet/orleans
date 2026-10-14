@@ -359,7 +359,7 @@ Follow these rules in re-executed code:
   children, whose external effects need their own idempotency.
 - Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
   or concurrently outside a combinator, and to combinators. Generated identifiers are stable only when unnamed
-  children and combinators are created in the same order. Hosts name detach records by the
+  children, unnamed `DurableTask.Once` effects, and combinators are created in the same order. Hosts name detach records by the
   detached task's identity, so they're stable without names.
 - Scheduling an existing identifier with different arguments fails, so a replay which diverges
   from the recorded execution surfaces as an error.
@@ -398,6 +398,11 @@ var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
   don't contain `$`. Effects share the count with names which `WithId` assigns, so a replay which
   finds a step where a deployment now runs an effect, or the reverse, fails with a divergence error
   instead of running the work again.
+- `DurableTask.Once(effect)` omits the name for terseness, such as
+  `var paymentId = DurableTask.Once(Guid.NewGuid);`. The effect takes the execution's next generated
+  identifier, `$child-1`, `$child-2`, and so on, which unnamed effects share with unnamed children,
+  so it's replay-stable when the body creates its unnamed operations in the same order. Name effects
+  whose position can change between runs or deployments.
 - The effect is synchronous. Asynchronous and durable effects don't compile, and a result type which
   is asynchronous through generic code, such as `ValueTask<T>`, throws `NotSupportedException`
   before the effect runs. Asynchronous work runs as an awaited child, such as an `async DurableTask`
