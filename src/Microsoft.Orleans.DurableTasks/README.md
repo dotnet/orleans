@@ -225,7 +225,9 @@ validation disabled until its first published version establishes a baseline.
 - Messages use stable identities derived from the sender, receiver, task, and
   subject, so replayed sends coalesce and redeliveries are deduplicated.
 - Recovery precedes new execution. Child identifiers, selection decisions, and
-  outbound durable messages remain replay-stable. Each execution's logical UTC
+  outbound durable messages remain replay-stable. A replay which schedules another
+  operation under a recorded identifier fails with an error which names the
+  recorded and the requested operations. Each execution's logical UTC
   time is persisted before its effects commit and reused during replay; it
   advances to the recorded completion time of each child result the execution
   observes, so a delay starts when the work before it completed.

@@ -2548,8 +2548,31 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(18)),
                 TestContext.Current.CancellationToken).AsTask());
 
+        // The error names the recorded and the requested operations, so a diverging replay is diagnosable.
+        Assert.StartsWith(
+            $"Durable child task '{childId}' is already associated with a different request. It records a call to grain '{originalRequest.Context!.TargetId}' (fingerprint ",
+            exception.Message);
+        Assert.Contains("and this attempt requested a call to grain", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(transport.Invocations);
+    }
+
+    [Fact]
+    public async Task ScheduleChildAsync_DivergingReplayNamesRecordedAndRequestedOperations()
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var childId = TaskId.Parse("root/step");
+        var target = GrainId.Create("target", "one");
+        storage.SetRemoteRequest(childId, storage.GetOrCreate(childId), target, "0123456789ABCDEF0123");
+
+        // The workflow changed: a replay schedules a local step where the first execution recorded a grain call.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleChildAsync(
+                childId,
+                DurableTask.FromResult(1),
+                TestContext.Current.CancellationToken).AsTask());
+
         Assert.Equal(
-            $"Durable child task '{childId}' is already associated with a different request.",
+            $"Durable child task '{childId}' is already associated with a different request. It records a call to grain '{target}' (fingerprint 0123456789AB), and this attempt requested a local child task. A replay schedules the same operation, with the same arguments, under each identifier; new workflow steps use new identifiers.",
             exception.Message);
         Assert.Empty(transport.Invocations);
     }
