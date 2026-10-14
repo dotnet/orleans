@@ -3088,6 +3088,7 @@ public class SchedulingTests
     [Theory]
     [InlineData("$child-1")]
     [InlineData("$when-all-1")]
+    [InlineData("reserve$2")]
     public async Task ExplicitChildNamesRejectGeneratedNamespace(string name)
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
@@ -3096,10 +3097,38 @@ public class SchedulingTests
         var response = await DurableTaskRuntimeHelper.RunAsync(Definition(), context);
 
         var exception = Assert.IsType<ArgumentException>(response.Exception);
-        Assert.StartsWith("Explicit child names", exception.Message);
+        Assert.StartsWith("Names can't contain '$'", exception.Message);
 
         async DurableTask Definition()
             => await DurableTask.Run(static _ => { }).WithId(name);
+    }
+
+    [Fact]
+    public async Task RepeatedChildNamesIdentifyLaterOccurrencesByOrder()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+
+        var first = await ExecuteAsync(host);
+        var replay = await ExecuteAsync(host);
+
+        Assert.Equal(["root/line", "root/line$2", "root/line$3"], first.Select(id => id.ToString()));
+        Assert.Equal(first, replay);
+        Assert.Equal(3, host.ExecutionCount);
+
+        static async Task<IReadOnlyList<TaskId>> ExecuteAsync(TestHost host)
+        {
+            var response = await DurableTaskRuntimeHelper.RunAsync(Definition(), host.CreateContext(TaskId.CreateRoot("root")));
+            Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+            return host.EntryIds;
+        }
+
+        static async DurableTask Definition()
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                await DurableTask.Run(static _ => { }).WithId("line");
+            }
+        }
     }
 
     [Fact]

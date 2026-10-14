@@ -57,7 +57,7 @@ public partial class DurableTaskDetachTests
     }
 
     [Fact]
-    public async Task DetachInExecutionRecordsEachStartUnderReplayStableGeneratedMarker()
+    public async Task DetachInExecutionPassesEachStartToTheHostInOrderOnEveryReplay()
     {
         var detached = new DetachableRootDefinition();
         var other = new DetachableRootDefinition();
@@ -74,15 +74,15 @@ public partial class DurableTaskDetachTests
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Response.Status);
         Assert.Equal(
-            new (TaskId, TaskId, DurableTask)[]
+            new (TaskId, DurableTask)[]
             {
-                (TaskId.Parse("starter/$detach-1"), TaskId.CreateRoot("first"), detached),
-                (TaskId.Parse("starter/$detach-2"), TaskId.CreateRoot("second"), other),
+                (TaskId.CreateRoot("first"), detached),
+                (TaskId.CreateRoot("second"), other),
             },
-            response.Context.Detached.Select(static entry => (entry.MarkerId, entry.RootId, entry.Definition)));
+            response.Context.Detached.Select(static entry => (entry.RootId, entry.Definition)));
         Assert.Equal(
-            response.Context.Detached.Select(static entry => (entry.MarkerId, entry.RootId)),
-            replayed.Context.Detached.Select(static entry => (entry.MarkerId, entry.RootId)));
+            response.Context.Detached.Select(static entry => entry.RootId),
+            replayed.Context.Detached.Select(static entry => entry.RootId));
 
         // The host starts the task; the definition is neither scheduled as a child nor through root scheduling.
         Assert.Empty(detached.Detached);
@@ -129,22 +129,21 @@ public partial class DurableTaskDetachTests
 
     private sealed class DetachRecordingContext(TaskId taskId, bool supportsDetach = true) : DurableTaskContext(taskId)
     {
-        public List<(TaskId MarkerId, TaskId RootId, DurableTask Definition, CancellationToken CancellationToken)> Detached { get; } = [];
+        public List<(TaskId RootId, DurableTask Definition, CancellationToken CancellationToken)> Detached { get; } = [];
 
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
         protected override ValueTask DetachTaskAsync(
-            TaskId markerId,
             TaskId rootId,
             DurableTask taskDefinition,
             CancellationToken cancellationToken)
         {
             if (!supportsDetach)
             {
-                return base.DetachTaskAsync(markerId, rootId, taskDefinition, cancellationToken);
+                return base.DetachTaskAsync(rootId, taskDefinition, cancellationToken);
             }
 
-            Detached.Add((markerId, rootId, taskDefinition, cancellationToken));
+            Detached.Add((rootId, taskDefinition, cancellationToken));
             return ValueTask.CompletedTask;
         }
 
