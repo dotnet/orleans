@@ -241,7 +241,7 @@ public abstract class MessageSourceAndSinkFixture(string journalFormatKey) : IAs
             {
                 options.DeduplicationWindow = DeduplicationWindow;
                 options.MaxOutboxRetryAge = TimeSpan.FromMinutes(5);
-                options.MaxDeliveryAttempts = 2;
+                options.MaxHandlerNotFoundRetryAge = TimeSpan.FromMilliseconds(100);
                 options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(10);
             });
             silo.Services.AddSingleton(Probe);
