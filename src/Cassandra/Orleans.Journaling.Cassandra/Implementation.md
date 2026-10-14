@@ -93,8 +93,13 @@ the header in one **logged, same-partition conditional batch**. The LWT is on
 the header update; the entry insert and header update commit together. This
 prevents publishing a sequence/count/length that does not match the inserted
 entry and prevents two writers from successfully claiming the same sequence.
-Empty appends do not write a row. `MaxAppendBytes` bounds one append payload,
-not the lifetime journal size.
+When appending the first entry to an empty journal, the same LWT updates the
+header's format key to the configured write format. This handles an empty
+journal created under a different format, where recovery has no bytes from
+which to request a migration snapshot. Non-empty journals retain their format
+until replacement publishes a snapshot in the configured format. Empty appends
+do not write a row. `MaxAppendBytes` bounds one append payload, not the
+lifetime journal size.
 
 ## Replacement protocol
 
@@ -230,6 +235,8 @@ coverage includes:
 - round-trip recovery and Cassandra paging;
 - absent-journal reads, create-if-absent metadata, and empty
   append/replacement behavior;
+- first append updates the format key for an empty journal after a format
+  change;
 - append and replacement rejection after another handle creates a journal
   which this handle observed as absent, plus cold-handle adoption of an
   existing journal;
@@ -238,6 +245,7 @@ coverage includes:
   deletion;
 - range cleanup of an old UUIDv7 generation while retaining a recent one;
 - successful replacement when a post-publication delete fails;
+- replacement whose publication commits but whose client response is lost;
 - delete LWT conflict when a concurrent append wins after the delete header read;
 - a surfaced active-generation cleanup failure after the delete LWT, with the
   journal remaining absent and leftover rows unreachable;

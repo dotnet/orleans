@@ -221,6 +221,7 @@ internal sealed class CassandraJournalStorage : IJournalStorage
         for (var attempt = 0; attempt < 5; attempt++)
         {
             var sequence = state.NextSequence;
+            var format = sequence == 0 ? _journalFormatKey : state.Format;
             var revision = Guid.NewGuid();
             var contentRevision = Guid.NewGuid();
             var result = await _queries.Session.ExecuteAsync(
@@ -234,6 +235,7 @@ internal sealed class CassandraJournalStorage : IJournalStorage
                     checked(state.TotalLength + payload.Length),
                     checked(state.AppendCount + 1),
                     checked(state.AppendLength + payload.Length),
+                    format,
                     revision,
                     contentRevision,
                     state.Revision,
@@ -249,6 +251,7 @@ internal sealed class CassandraJournalStorage : IJournalStorage
                     TotalLength = checked(state.TotalLength + payload.Length),
                     AppendCount = checked(state.AppendCount + 1),
                     AppendLength = checked(state.AppendLength + payload.Length),
+                    Format = format,
                     Revision = revision,
                     ContentRevision = contentRevision,
                 });

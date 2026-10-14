@@ -169,6 +169,30 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
+    public async Task AppendAsync_UpdatesFormatWhenAppendingToAnEmptyJournalAfterFormatChange()
+    {
+        await using var oldFormatHarness = await CreateHarnessAsync(journalFormatKey: "old-format");
+        await using var newFormatHarness = await CreateHarnessAsync(
+            journalFormatKey: "new-format",
+            tableName: oldFormatHarness.Options.TableName);
+        var id = NewJournalId();
+        Assert.True(await oldFormatHarness.Provider.CreateStorage(id).CreateIfNotExistsAsync(
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        await newFormatHarness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([1, 2]),
+            TestContext.Current.CancellationToken);
+
+        var metadata = Assert.IsAssignableFrom<IJournalMetadata>(
+            await newFormatHarness.Provider.CreateStorage(id).GetMetadataAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("new-format", metadata.FormatKey);
+        var consumer = new CapturingConsumer();
+        await newFormatHarness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal("new-format", consumer.FormatKey);
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
     public async Task ReplaceAsync_PublishesFreshGenerationWithRestartedSequenceAndRemovesOldRows()
     {
         await using var harness = await CreateHarnessAsync(rowSizeBytes: 4, readPageSize: 2);
@@ -383,6 +407,35 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         var consumer = new CapturingConsumer();
         await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
         Assert.Equal([2], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_PreservesPublishedGenerationWhenResponseIsLost()
+    {
+        await using var harness = await CreateHarnessAsync(
+            sessionDecorator: static session => PublicationResponseLossSessionProxy.Create(session));
+        var id = NewJournalId();
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([1]),
+            TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => harness.Provider.CreateStorage(id).ReplaceAsync(
+                new ReadOnlySequence<byte>([2, 3]),
+                TestContext.Current.CancellationToken).AsTask());
+        Assert.Equal("Injected lost response after replacement publication.", exception.Message);
+
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([2, 3], consumer.Bytes.ToArray());
+        Assert.True(consumer.IsCompleted);
+
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([4]),
+            TestContext.Current.CancellationToken);
+        consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([2, 3, 4], consumer.Bytes.ToArray());
     }
 
     [Fact]
@@ -637,12 +690,14 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         int rowSizeBytes = 64 * 1024,
         int compactionAppendCount = 100,
         int readPageSize = 128,
-        Func<ISession, ISession>? sessionDecorator = null)
+        Func<ISession, ISession>? sessionDecorator = null,
+        string journalFormatKey = "json",
+        string? tableName = null)
     {
         var session = await _container.GetSessionAsync(TestContext.Current.CancellationToken);
         var options = new CassandraJournalStorageOptions
         {
-            TableName = $"journal_test_{Guid.NewGuid():N}",
+            TableName = tableName ?? $"journal_test_{Guid.NewGuid():N}",
             MaxAppendBytes = maxAppendBytes,
             RowSizeBytes = rowSizeBytes,
             CompactionAppendCount = compactionAppendCount,
@@ -651,7 +706,7 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         options.ConfigureClient(_ => Task.FromResult(sessionDecorator?.Invoke(session) ?? session));
         var provider = new CassandraJournalStorageProvider(
             Options.Create(options),
-            Options.Create(new JournaledStateManagerOptions()),
+            Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }),
             new ServiceCollection().BuildServiceProvider(),
             NullLogger<CassandraJournalStorage>.Instance);
         await provider.InitializeAsync(TestContext.Current.CancellationToken);
@@ -752,6 +807,39 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
                 ?? throw new InvalidOperationException("A delete race callback was not configured.");
             await beforeDelete().ConfigureAwait(false);
             return await _inner!.ExecuteAsync(statement).ConfigureAwait(false);
+        }
+    }
+
+    private class PublicationResponseLossSessionProxy : DispatchProxy
+    {
+        private ISession? _inner;
+        private int _loseNextPublicationResponse = 1;
+
+        public static ISession Create(ISession inner)
+        {
+            var session = DispatchProxy.Create<ISession, PublicationResponseLossSessionProxy>();
+            ((PublicationResponseLossSessionProxy)(object)session)._inner = inner;
+            return session;
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(ISession.ExecuteAsync)
+                && args is { Length: > 0 }
+                && args[0] is BoundStatement statement
+                && statement.PreparedStatement.QueryString.Contains("SET active_generation", StringComparison.Ordinal)
+                && Interlocked.Exchange(ref _loseNextPublicationResponse, 0) == 1)
+            {
+                return ExecuteAndLoseResponseAsync(statement);
+            }
+
+            return targetMethod!.Invoke(_inner, args);
+        }
+
+        private async Task<RowSet> ExecuteAndLoseResponseAsync(BoundStatement statement)
+        {
+            await _inner!.ExecuteAsync(statement).ConfigureAwait(false);
+            throw new InvalidOperationException("Injected lost response after replacement publication.");
         }
     }
 
