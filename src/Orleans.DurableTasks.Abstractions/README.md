@@ -109,7 +109,9 @@ replay when the input order is stable. They schedule their inputs concurrently, 
 commit the batch together. `WhenAll<T>` returns the inputs' results in input order.
 `WhenAny` returns the winner's input index, and `WhenAny<T>` also returns its result; a winner
 which failed or was canceled fails the combinator. `WhenAny` asks the host to persist its
-selected winner under a deterministic decision ID, then leaves all other scheduled tasks running.
+selected winner under a deterministic decision ID, then leaves all other scheduled tasks running. Durable
+cancellation reaches the inputs, which are attached children, and the combinators wait for their
+outcomes.
 
 `ScheduledTask.WhenAny` returns the first task whose durable response arrives, including a
 failed or canceled response. It captures its candidates when called, preserving the selected
