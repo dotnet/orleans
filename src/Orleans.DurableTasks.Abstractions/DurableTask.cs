@@ -402,8 +402,9 @@ public readonly struct ConfiguredDurableTask
     public DurableTaskAwaiter GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
 
     /// <summary>
-    /// Returns a configuration which assigns a stable logical identifier segment. Within a durable execution, segments
-    /// beginning with <c>$</c> are reserved for generated identifiers.
+    /// Returns a configuration which assigns a stable logical identifier segment. Within a durable execution, a segment
+    /// repeated in one run identifies its later occurrences by their order, such as <c>reserve$2</c>, and segments don't
+    /// contain <c>$</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">This configuration already has an identifier.</exception>
     public ConfiguredDurableTask WithId(string segment) => new(_core.WithId(segment));
@@ -458,8 +459,9 @@ public readonly struct ConfiguredDurableTask<TResult>
     public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
 
     /// <summary>
-    /// Returns a configuration which assigns a stable logical identifier segment. Within a durable execution, segments
-    /// beginning with <c>$</c> are reserved for generated identifiers.
+    /// Returns a configuration which assigns a stable logical identifier segment. Within a durable execution, a segment
+    /// repeated in one run identifies its later occurrences by their order, such as <c>reserve$2</c>, and segments don't
+    /// contain <c>$</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">This configuration already has an identifier.</exception>
     public ConfiguredDurableTask<TResult> WithId(string segment) => new(_core.WithId(segment));

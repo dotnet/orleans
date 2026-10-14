@@ -18,7 +18,8 @@ public abstract partial class DurableTask
     /// <typeparam name="TResult">The type of the effect's result, which the host stores with the task.</typeparam>
     /// <param name="name">
     /// The effect's name within the running task. A name repeated in one run identifies the effect's later occurrences by
-    /// their order, so an effect in a loop keeps one name. Names don't contain <c>$</c>.
+    /// their order, so an effect in a loop keeps one name; names which <c>WithId</c> assigns share the same count. Names
+    /// don't contain <c>$</c>.
     /// </param>
     /// <param name="effect">The synchronous effect, which returns every value the body uses.</param>
     /// <returns>The result which the effect returned when it ran.</returns>
@@ -150,7 +151,7 @@ public abstract partial class DurableTask
         string name,
         TEffect effect,
         Func<TEffect, DurableTaskResponse> run)
-        => context.RunEffect(context.CreateNamedChildId(OnceSegmentPrefix + name), (effect, run), static state => Invoke(state));
+        => context.RunEffect(context.CreateNamedChildId(name, OnceSegmentPrefix), (effect, run), static state => Invoke(state));
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The effect's failure is recorded as its outcome.")]
     private static DurableTaskResponse Invoke<TEffect>((TEffect Effect, Func<TEffect, DurableTaskResponse> Run) state)

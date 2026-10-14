@@ -22,8 +22,9 @@ on this abstractions assembly.
   invocation assigns stable indexed slots to its concurrent batch, beneath an operation ID which
   `WithId` names. Independent concurrent
   scheduling operations, including concurrent combinator invocations, use explicit `WithId`
-  segments or otherwise begin in deterministic order. Generated segments begin with `$`; that
-  prefix is reserved and rejected for explicit child names.
+  segments or otherwise begin in deterministic order. A segment which `WithId` repeats in one run
+  identifies its later occurrences by their order, `line`, `line$2`, and so on, so children named in
+  a loop keep their IDs on replay. Generated segments contain `$`, which explicit names don't.
 - Scheduling the same definition under an existing ID reattaches to the response recorded
   for that ID. Hosts preserve the first definition associated with an ID.
 - A host can supply an execution-abort token when constructing `DurableTaskContext`.
@@ -227,10 +228,10 @@ await buyer.RecordOrderAsync(summary).DetachAsync($"order-{orderId:N}-v{summary.
   caller observes.
 - Detaching the same definition under the same root ID again leaves the task unchanged. Another
   definition under that ID fails like other ID reuse.
-- Within a durable execution, the host records each detach under a generated child ID of the
-  execution and commits the record with the start, so a replay doesn't start the task again.
-  Detach calls begin in deterministic order, like unnamed children. Outside a durable execution,
-  the definition starts through `ISchedulableTask.DetachAsync`.
+- Within a durable execution, the host records each detach in the execution under an ID which it
+  derives from the detached task's identity, and commits the record with the start, so a replay
+  doesn't start the task again, including after a deployment adds or removes other operations.
+  Outside a durable execution, the definition starts through `ISchedulableTask.DetachAsync`.
 - Within a durable execution, `DetachedTaskId.For(segment)` derives a root ID from the execution's
   task ID, `{taskId}:{segment}`, which is unique to that execution and segment and the same on every
   replay. Segments contain no `:`. Observers derive the same ID with
@@ -376,7 +377,9 @@ var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
   commit with the recorded exception. A result which the host can't store, for example because it
   doesn't serialize, is recorded as that failure.
 - A name repeated in one run identifies later occurrences by their order: `pay`, then `pay$2`. Names
-  don't contain `$`.
+  don't contain `$`. Effects share the count with names which `WithId` assigns, so a replay which
+  finds a step where a deployment now runs an effect, or the reverse, fails with a divergence error
+  instead of running the work again.
 - The effect is synchronous. Asynchronous and durable effects don't compile, and a result type which
   is asynchronous through generic code, such as `ValueTask<T>`, throws `NotSupportedException`
   before the effect runs. Asynchronous work runs as an awaited child, such as an `async DurableTask`
