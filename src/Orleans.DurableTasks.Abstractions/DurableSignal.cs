@@ -65,11 +65,13 @@ public sealed class DurableSignal<T>
     /// </returns>
     /// <remarks>
     /// <para>
-    /// The definition is a <see cref="DurableTask.WhenAny(IReadOnlyList{DurableTask})"/> race between
-    /// <see cref="WaitAsync"/> and <see cref="DurableTask.DelayUntil(DateTimeOffset)"/>, whose inputs are identified under
-    /// its operation identifier: the segment assigned with <c>WithId</c>, or a segment generated in execution order. The
-    /// winner is the input which completed first, and the host selects the same winner on replay, so replay returns the same
-    /// outcome.
+    /// The definition is a <see cref="DurableTask.Race(IReadOnlyList{DurableTask})"/> between <see cref="WaitAsync"/>, the
+    /// input <c>0</c>, and <see cref="DurableTask.DelayUntil(DateTimeOffset)"/>, the input <c>1</c>, which are identified
+    /// under its operation identifier: the segment assigned with <c>WithId</c>, or a segment generated in execution order.
+    /// The winner is the input which completed first, and the host selects the same winner on replay, so replay returns the
+    /// same outcome. The other input then receives a durable cancellation request carrying the reason
+    /// <c>Another task won the race.</c>, and the definition completes once both inputs are terminal, so neither the wait nor
+    /// the deadline's delay outlives it.
     /// </para>
     /// <para>
     /// After the deadline wins, the signal keeps its latch: a later <see cref="WaitAsync"/> returns a value which arrives
@@ -78,13 +80,11 @@ public sealed class DurableSignal<T>
     /// </remarks>
     public DurableTask<(bool Received, T Value)> TryWaitAsync(DateTimeOffset deadline)
         => new CombinatorDurableTask<(bool Received, T Value)>(
-            DurableTask.WhenAnyOperation,
+            ScheduledTask.RaceOperation,
             [WaitAsync(), DurableTask.DelayUntil(deadline)],
             static async (inputs, context, operationId) =>
             {
-                var cancellationToken = context.ExecutionAbortToken;
-                var (tasks, index) = await DurableTask.SelectAsync(inputs, context, operationId, cancellationToken).ConfigureAwait(false);
-                var response = await tasks[index].WaitAsyncCore(cancellationToken).ConfigureAwait(false);
+                var (index, response) = await DurableTask.RaceAsync(inputs, context, operationId).ConfigureAwait(false);
                 if (index == 0)
                 {
                     return (true, response.GetResult<T>());
