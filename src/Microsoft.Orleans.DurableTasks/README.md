@@ -103,10 +103,10 @@ static readonly DurableSignal<Shipment> Shipped = new("shipped");
 var shipment = await Shipped.WaitAsync();
 
 // From a client, or from a durable task on another grain.
-await order.SignalDurableTaskAsync(TaskId.CreateRoot(workflowId), Shipped, shipment);
+await order.SignalDurableTaskAsync(workflowId, Shipped, shipment);
 
 // From the grain's own methods.
-await tasks.SignalAsync(TaskId.CreateRoot(workflowId), Shipped, shipment);
+await tasks.SignalAsync(workflowId, Shipped, shipment);
 ```
 
 - The invoked task records the first value for each name as a terminal record in its

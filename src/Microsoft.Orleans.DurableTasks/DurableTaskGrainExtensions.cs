@@ -73,6 +73,26 @@ public static class DurableTaskGrainExtensions
     }
 
     /// <summary>
+    /// Delivers <paramref name="signal"/> with <paramref name="value"/> to the root task <paramref name="rootId"/> on
+    /// <paramref name="target"/>.
+    /// </summary>
+    /// <typeparam name="T">The signal's value type.</typeparam>
+    /// <param name="target">The grain which owns the task.</param>
+    /// <param name="rootId">The root ID under which a client or another grain invoked or detached the task.</param>
+    /// <param name="signal">The signal descriptor which the task's waits share.</param>
+    /// <param name="value">The signal's value.</param>
+    /// <param name="cancellationToken">A token which abandons the send.</param>
+    /// <returns>A task which completes as <see cref="SignalDurableTaskAsync{T}(IAddressable, TaskId, DurableSignal{T}, T, CancellationToken)"/> describes.</returns>
+    /// <remarks>The send behaves as <see cref="SignalDurableTaskAsync{T}(IAddressable, TaskId, DurableSignal{T}, T, CancellationToken)"/> for <c>TaskId.CreateRoot(rootId)</c>.</remarks>
+    public static ValueTask SignalDurableTaskAsync<T>(
+        this IAddressable target,
+        string rootId,
+        DurableSignal<T> signal,
+        T value,
+        CancellationToken cancellationToken = default)
+        => target.SignalDurableTaskAsync(TaskId.CreateRoot(rootId), signal, value, cancellationToken);
+
+    /// <summary>
     /// Delivers <paramref name="signal"/> with <paramref name="value"/> to the invoked task <paramref name="taskId"/> on
     /// <paramref name="target"/>, and returns how the task handled it.
     /// </summary>
@@ -120,6 +140,26 @@ public static class DurableTaskGrainExtensions
         return target.AsReference<IDurableTaskGrainExtension>()
             .TrySignalAsync(taskId, signal.Name, DurableTaskResponse.FromResult(value), cancellationToken);
     }
+
+    /// <summary>
+    /// Delivers <paramref name="signal"/> with <paramref name="value"/> to the root task <paramref name="rootId"/> on
+    /// <paramref name="target"/>, and returns how the task handled it.
+    /// </summary>
+    /// <typeparam name="T">The signal's value type.</typeparam>
+    /// <param name="target">The grain which owns the task.</param>
+    /// <param name="rootId">The root ID under which a client or another grain invoked or detached the task.</param>
+    /// <param name="signal">The signal descriptor which the task's waits share.</param>
+    /// <param name="value">The signal's value.</param>
+    /// <param name="cancellationToken">A token which abandons the send.</param>
+    /// <returns>The task's handling of the signal, as <see cref="TrySignalDurableTaskAsync{T}(IAddressable, TaskId, DurableSignal{T}, T, CancellationToken)"/> returns.</returns>
+    /// <remarks>The send behaves as <see cref="TrySignalDurableTaskAsync{T}(IAddressable, TaskId, DurableSignal{T}, T, CancellationToken)"/> for <c>TaskId.CreateRoot(rootId)</c>.</remarks>
+    public static ValueTask<DurableSignalResult> TrySignalDurableTaskAsync<T>(
+        this IAddressable target,
+        string rootId,
+        DurableSignal<T> signal,
+        T value,
+        CancellationToken cancellationToken = default)
+        => target.TrySignalDurableTaskAsync(TaskId.CreateRoot(rootId), signal, value, cancellationToken);
 
     /// <summary>
     /// Gets a typed handle which observes an existing root durable task without scheduling it.
