@@ -286,8 +286,8 @@ schedules the same children, with the same identifiers and arguments, in the sam
   When a deployment changes a workflow while executions are pending, keep the existing steps
   and identifiers, and give new steps new identifiers.
 - An `async DurableTask` method which completes without awaiting is a normal step, for example
-  a state transition whose result the parent records. Compilers which report CS1998 for such
-  methods can suppress it.
+  a state transition whose result the parent records. The Orleans analyzers suppress CS1998 for
+  such methods ([ORLEANS0028](https://aka.ms/orleans/diagnostics#orleans0028)).
 
 ## Host responsibilities
 
