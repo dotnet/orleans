@@ -54,7 +54,7 @@ public sealed partial class DurableTaskSignalTests
             if (observed.Count == 1)
             {
                 firstAttemptObserved.TrySetResult();
-                await Task.Delay(Timeout.InfiniteTimeSpan, DurableExecutionContext.Current!.CancellationToken);
+                await Task.Delay(Timeout.InfiniteTimeSpan, DurableTask.Current.CancellationToken);
             }
 
             return outcome.Value;

@@ -165,10 +165,10 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
                     order.Lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units)))
                 .WithId("reserve");
         }
-        catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
         {
             // WhenAll has waited for every reservation, so none is still running.
-            return await CancelOrderAsync(order.Lines, DurableExecutionContext.Current.CancellationReason);
+            return await CancelOrderAsync(order.Lines, DurableTask.Current.CancellationReason);
         }
 
         if (Array.IndexOf(reserved, false) >= 0)
@@ -223,7 +223,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     private async Task<OrderResult> CancelOrderAsync(OrderLine[] lines, string? reason)
     {
         // The workflow's cancellation doesn't reach children scheduled in this scope.
-        using (DurableExecutionContext.SuppressCancellation())
+        using (DurableTask.Current.SuppressCancellation())
         {
             await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
                 .WithId("release");
@@ -441,13 +441,13 @@ public sealed class AllocationGrain : DurableGrain, IAllocationGrain
 
         // Releases exactly the lines whose reservation succeeded, including after a cancellation request.
         var held = lines.Where((_, i) => reservations[i].TryGetResult(out var reserved) && reserved);
-        using (DurableExecutionContext.SuppressCancellation())
+        using (DurableTask.Current.SuppressCancellation())
         {
             await DurableTask.WhenAll(held.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
                 .WithId("release");
         }
 
-        DurableExecutionContext.Current!.CancellationToken.ThrowIfCancellationRequested();
+        DurableTask.Current.CancellationToken.ThrowIfCancellationRequested();
         return false;
     }
 
@@ -523,7 +523,7 @@ public sealed class ExpenseGrain(IDurableTaskManager tasks) : DurableGrain, IExp
     public async DurableTask<ExpenseOutcome> SubmitAsync(ExpenseClaim claim)
     {
         // Logical time, which a replay observes unchanged.
-        var deadline = DurableExecutionContext.Current!.UtcNow.AddDays(3);
+        var deadline = DurableTask.Current.UtcNow.AddDays(3);
         var (received, decision) = await Decided.TryWaitAsync(deadline).WithId("decision");
         if (!received)
         {

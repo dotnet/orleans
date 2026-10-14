@@ -81,9 +81,9 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
                 .WithId("reserve");
             summary = await RecordStock(lines, confirmed).WithId("record-stock");
         }
-        catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
         {
-            return await CancelOrderAsync(reservable, DurableExecutionContext.Current.CancellationReason);
+            return await CancelOrderAsync(reservable, DurableTask.Current.CancellationReason);
         }
 
         if (Array.IndexOf(confirmed, false) is var rejected and >= 0)
@@ -143,7 +143,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     // The suppression scope keeps the workflow's cancellation from reaching this compensation, so it runs to completion.
     private async Task<OrderResult> CancelOrderAsync(OrderLine[] lines, string? reason)
     {
-        using (DurableExecutionContext.SuppressCancellation())
+        using (DurableTask.Current.SuppressCancellation())
         {
             var released = await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
                 .WithId("release");

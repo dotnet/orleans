@@ -442,7 +442,7 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
 
     public async DurableTask<bool> ObserveDeactivationAsync()
     {
-        _executionToken = DurableExecutionContext.Current!.CancellationToken;
+        _executionToken = DurableTask.Current.CancellationToken;
         probe.RecordActivationObservation(this.GetGrainId(), _activated);
         await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("wait");
         return _activated;
@@ -463,7 +463,7 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
 
     public async DurableTask<int> DelayThenComputeAsync(int value)
     {
-        probe.RecordLogicalTime(this.GetGrainId(), DurableExecutionContext.Current!.UtcNow);
+        probe.RecordLogicalTime(this.GetGrainId(), DurableTask.Current.UtcNow);
         await DurableTask.Delay(TimeSpan.FromSeconds(1)).WithId("pause");
         return checked((value * 3) + 7);
     }
@@ -479,7 +479,7 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
     // probe observes only a time which a replay reads back.
     private async Task<DateTimeOffset> ObserveCommittedLogicalTimeAsync()
     {
-        var value = DurableExecutionContext.Current!.UtcNow;
+        var value = DurableTask.Current.UtcNow;
         await DurableTask.Run(static _ => { }).WithId("commit");
         probe.RecordLogicalTime(this.GetGrainId(), value);
         return value;

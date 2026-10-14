@@ -96,7 +96,7 @@ public sealed class DurableTaskReasonWorkflowGrain : DurableGrain, IDurableTaskR
     public async DurableTask<string> RunAsync(Guid holderKey)
     {
         var holder = await GrainFactory.GetGrain<IDurableTaskReasonHolderGrain>(holderKey).HoldAsync().WithId("hold");
-        return $"workflow: {DurableExecutionContext.Current!.CancellationReason}; holder: {holder}";
+        return $"workflow: {DurableTask.Current.CancellationReason}; holder: {holder}";
     }
 
     public async DurableTask<string> CompensateInlineAsync(Guid holderKey)
@@ -107,12 +107,12 @@ public sealed class DurableTaskReasonWorkflowGrain : DurableGrain, IDurableTaskR
             await holder.BlockAsync().WithId("block");
             return "completed";
         }
-        catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
         {
-            using (DurableExecutionContext.SuppressCancellation())
+            using (DurableTask.Current.SuppressCancellation())
             {
                 var released = await holder.ReleaseAsync(2).WithId("release");
-                return $"released {released} after {DurableExecutionContext.Current.CancellationReason}";
+                return $"released {released} after {DurableTask.Current.CancellationReason}";
             }
         }
     }
@@ -130,9 +130,9 @@ public sealed class DurableTaskReasonHolderGrain(DurableTaskMessagingProbe probe
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                 return "completed";
             }
-            catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+            catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
             {
-                return DurableExecutionContext.Current.CancellationReason!;
+                return DurableTask.Current.CancellationReason!;
             }
         });
 

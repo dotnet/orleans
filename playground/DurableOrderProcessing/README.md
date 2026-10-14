@@ -49,8 +49,8 @@ commits with its recorded result. A paid order waits for its `Shipped` signal, t
 completes.
 
 When the buyer cancels, the workflow catches `OperationCanceledException`, then runs its compensation inline in a
-`DurableExecutionContext.SuppressCancellation()` scope: it releases each line concurrently and records the cancellation
-with `DurableExecutionContext.CancellationReason`. Rejected stock and declined payments run the same compensation.
+`DurableTask.Current.SuppressCancellation()` scope: it releases each line concurrently and records the cancellation
+with `DurableTask.Current.CancellationReason`. Rejected stock and declined payments run the same compensation.
 
 ## Endpoints
 

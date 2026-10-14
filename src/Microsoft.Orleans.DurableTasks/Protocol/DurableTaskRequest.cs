@@ -32,7 +32,7 @@ public interface IDurableTaskRequest : IRequest
     /// Invoke the method on the target.
     /// </summary>
     /// <returns>The result of invocation.</returns>
-    //ValueTask<DurableTaskResponse> InvokeImplementation(DurableExecutionContext executionContext);
+    //ValueTask<DurableTaskResponse> InvokeImplementation(DurableTaskContext executionContext);
     DurableTask CreateTask();
 
     /// <summary>
@@ -195,7 +195,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     }
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -213,12 +213,12 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
                 async _ =>
                 {
                     await durableCts.CancelAsync();
-                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, executionContext.CancellationReason, CancellationToken.None);
+                    await runtime.CancelRemoteAsync(executionContext.Id, Context.TargetId, executionContext.CancellationReason, CancellationToken.None);
                 });
-            var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.TaskId, this, durableCts.Token);
+            var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.Id, this, durableCts.Token);
             return durableResponse.IsCompleted
                 ? durableResponse
-                : await runtime.GetScheduledTaskHandle(executionContext.TaskId).WaitAsync(durableCts.Token);
+                : await runtime.GetScheduledTaskHandle(executionContext.Id).WaitAsync(durableCts.Token);
         }
 
         PrepareClientContext(Context);
@@ -229,13 +229,13 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
             async _ =>
             {
                 await cts.CancelAsync();
-                await GrainScheduledTaskHandle.RequestCancellationAsync(remote, executionContext.TaskId, executionContext.CancellationReason);
+                await GrainScheduledTaskHandle.RequestCancellationAsync(remote, executionContext.Id, executionContext.CancellationReason);
             });
-        var response = await remote.ScheduleAsync(executionContext.TaskId, this, cts.Token);
+        var response = await remote.ScheduleAsync(executionContext.Id, this, cts.Token);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
         while (!response.IsCompleted && !cts.IsCancellationRequested)
         {
-            response = await remote.SubscribeOrPollAsync(executionContext.TaskId, options, cts.Token);
+            response = await remote.SubscribeOrPollAsync(executionContext.Id, options, cts.Token);
         }
 
         return response;
@@ -247,7 +247,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    //ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableExecutionContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
+    //ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
     DurableTask IDurableTaskRequest.CreateTask() => InvokeInner();
 
     // Generated. This invokes the target method directly.
@@ -386,7 +386,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         DurableTaskRequest.DetachCoreAsync(_shared, this, taskId, cancellationToken);
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext executionContext)
+    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
     {
         // Schedule this request with the remote service.
         // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
@@ -404,12 +404,12 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
                 async _ =>
                 {
                     await durableCts.CancelAsync();
-                    await runtime.CancelRemoteAsync(executionContext.TaskId, Context.TargetId, executionContext.CancellationReason, CancellationToken.None);
+                    await runtime.CancelRemoteAsync(executionContext.Id, Context.TargetId, executionContext.CancellationReason, CancellationToken.None);
                 });
-            var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.TaskId, this, durableCts.Token);
+            var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.Id, this, durableCts.Token);
             return durableResponse.IsCompleted
                 ? durableResponse
-                : await runtime.GetScheduledTaskHandle(executionContext.TaskId).WaitAsync(durableCts.Token);
+                : await runtime.GetScheduledTaskHandle(executionContext.Id).WaitAsync(durableCts.Token);
         }
 
         DurableTaskRequest.PrepareClientContext(Context);
@@ -420,13 +420,13 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
             async _ =>
             {
                 await cts.CancelAsync();
-                await GrainScheduledTaskHandle.RequestCancellationAsync(remote, executionContext.TaskId, executionContext.CancellationReason);
+                await GrainScheduledTaskHandle.RequestCancellationAsync(remote, executionContext.Id, executionContext.CancellationReason);
             });
-        var response = await remote.ScheduleAsync(executionContext.TaskId, this, cts.Token);
+        var response = await remote.ScheduleAsync(executionContext.Id, this, cts.Token);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
         while (!response.IsCompleted && !cts.IsCancellationRequested)
         {
-            response = await remote.SubscribeOrPollAsync(executionContext.TaskId, options, cts.Token);
+            response = await remote.SubscribeOrPollAsync(executionContext.Id, options, cts.Token);
         }
 
         return response;
@@ -436,7 +436,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 
     /// <inheritdoc/>
-    //ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableExecutionContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
+    //ValueTask<DurableTaskResponse> IDurableTaskRequest.InvokeImplementation(DurableTaskContext executionContext) => DurableTaskRuntimeHelper.RunAsync(InvokeInner(), executionContext);
     DurableTask IDurableTaskRequest.CreateTask() => InvokeInner();
 
     // Generated. This invokes the target method directly.

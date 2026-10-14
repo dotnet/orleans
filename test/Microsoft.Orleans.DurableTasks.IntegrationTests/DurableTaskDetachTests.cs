@@ -54,7 +54,8 @@ public abstract class DurableTaskDetachTests(string journalFormatKey) : IAsyncLi
         var starterTasks = await GetTaskIdsAsync(starter, cancellationToken);
         Assert.Equal(2, starterTasks.Count);
         Assert.Contains(TaskId.CreateRoot("workflow"), starterTasks);
-        Assert.Contains(TaskId.CreateRoot("workflow").Child("$detach-1"), starterTasks);
+        var workerId = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey).GetGrainId();
+        Assert.Contains(TaskId.CreateRoot("workflow").Child($"$detach:{workerId}:workflow-echo"), starterTasks);
     }
 
     [Fact]

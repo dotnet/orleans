@@ -141,7 +141,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var (runtime, storage, manager, transport) = CreateRuntime();
         var sender = GrainId.Create("caller", "one");
         var receiver = GrainId.Create("test", "one");
-        var message = InvocationMessage(sender, receiver, TaskId.Parse("legacy"), new TestDurableTaskRequest());
+        var message = InvocationMessage(sender, receiver, TaskId.Parse("no-context"), new TestDurableTaskRequest());
         var handler = CreateHandler(runtime);
 
         // The inbox dead-letters a message which its sink rejects; the sink stages nothing first.
@@ -1387,7 +1387,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 catch (OperationCanceledException) when (executionToken.IsCancellationRequested)
                 {
                     // Host abort reaches the delegate token, but it is not durable cancellation.
-                    var context = DurableExecutionContext.Current!;
+                    var context = DurableTask.Current;
                     aborted.TrySetResult((executionToken.IsCancellationRequested, context.IsCancellationRequested));
                 }
 
@@ -1590,7 +1590,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var observations = new ConcurrentQueue<DateTimeOffset>();
         var request = CreateRequest(
             1,
-            () => DurableTask.Run(_ => observations.Enqueue(DurableExecutionContext.Current!.UtcNow)));
+            () => DurableTask.Run(_ => observations.Enqueue(DurableTask.Current.UtcNow)));
         var state = storage.GetOrCreate(taskId);
         storage.SetRequest(taskId, state, request);
         storage.SetRequestFingerprint(
@@ -1740,7 +1740,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var firstAttemptObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
         {
-            var context = DurableExecutionContext.Current!;
+            var context = DurableTask.Current;
             var before = context.UtcNow;
             await DurableTask.Run(_ => time.Advance(TimeSpan.FromHours(1))).WithId("step");
             observations.Enqueue((before, context.UtcNow));
@@ -1777,7 +1777,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var runtime = new SchedulerProbeRuntime(scheduler);
         using var shutdown = new CancellationTokenSource();
         var context = await Task.Factory.StartNew(
-            () => new GrainDurableExecutionContext(
+            () => new GrainDurableTaskContext(
                 TaskId.Parse("root"),
                 runtime,
                 scheduler,
@@ -1800,7 +1800,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     public Task ExecutionContextRejectsUnrelatedCompletionSelectionIds() => ActivationScheduler.RunAsync(async () =>
     {
         var runtime = new SchedulerProbeRuntime(TaskScheduler.Current);
-        var context = new GrainDurableExecutionContext(
+        var context = new GrainDurableTaskContext(
             TaskId.Parse("root"),
             runtime,
             TaskScheduler.Current,
@@ -1815,7 +1815,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     [Fact]
     public void ExecutionContextChildIdsSeparateGeneratedAndExplicitNamespaces()
     {
-        var context = new GrainDurableExecutionContext(
+        var context = new GrainDurableTaskContext(
             TaskId.Parse("root"),
             new SchedulerProbeRuntime(TaskScheduler.Current),
             TaskScheduler.Current,
@@ -1830,7 +1830,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.NotEqual(generated, explicitNumeric);
         Assert.NotEqual(explicitSuffix, repeatedName);
         Assert.StartsWith("root/$child-", generated.ToString(), StringComparison.Ordinal);
-        Assert.StartsWith("root/$child-", repeatedName.ToString(), StringComparison.Ordinal);
+        Assert.Equal(TaskId.Parse("root/job$2"), repeatedName);
         Assert.Equal(TaskId.Parse("root/0"), explicitNumeric);
         var exception = Assert.Throws<TargetInvocationException>(
             () => InvokeCreateChildTaskId(context, "$reserved"));
@@ -1872,7 +1872,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         var runtime = new ShutdownProbeRuntime();
         using var shutdown = new CancellationTokenSource();
-        var context = new GrainDurableExecutionContext(
+        var context = new GrainDurableTaskContext(
             TaskId.Parse("root"),
             runtime,
             TaskScheduler.Current,
@@ -3049,9 +3049,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var starterId = TaskId.Parse("starter");
-        var markerId = starterId.Child("$detach-1");
         var rootId = TaskId.CreateRoot("detached");
         var detachedRequest = CreateRemoteRequest(1);
+        var markerId = starterId.Child($"$detach:{detachedRequest.Context!.TargetId}:detached");
         var writes = new ConcurrentQueue<(bool Marker, int Invocations)>();
         manager.AfterWriteCompleted = _ => writes.Enqueue((storage.Contains(markerId), transport.DetachedInvocations.Count));
         TaskCompletionSource[] detached = [new(TaskCreationOptions.RunContinuationsAsynchronously), new(TaskCreationOptions.RunContinuationsAsynchronously)];
@@ -3097,12 +3097,42 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task DetachRecordsOneMarkerPerDetachedTask() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var starterId = TaskId.Parse("starter");
+        var detachedRequest = CreateRemoteRequest(1);
+        var target = detachedRequest.Context!.TargetId;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async _ =>
+            {
+                // An unnamed child before the detach doesn't change the marker which the detach reaches.
+                await DurableTask.Run(static _ => { });
+                await new TestStateManager.TestRemoteDurableTask(detachedRequest).DetachAsync("detached", CancellationToken.None);
+                await new TestStateManager.TestRemoteDurableTask(detachedRequest).DetachAsync("detached", CancellationToken.None);
+                await new TestStateManager.TestRemoteDurableTask(detachedRequest).DetachAsync("other:root", CancellationToken.None);
+            }));
+
+        runtime.ScheduleFromInbox(starterId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => storage.Get(starterId).Result is { IsCompleted: true });
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(starterId).Result!.Status);
+        Assert.Equal(
+            [TaskId.CreateRoot("detached"), TaskId.CreateRoot("other:root")],
+            transport.DetachedInvocations.Select(static invocation => invocation.TaskId));
+        Assert.True(storage.Contains(starterId.Child($"$detach:{target}:detached")));
+        Assert.True(storage.Contains(starterId.Child($"$detach:{target}:other\\:root")));
+    });
+
+    [Fact]
     public Task DetachIgnoresTheStartersDurableCancellation() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var starterId = TaskId.Parse("starter");
-        var markerId = starterId.Child("$detach-1");
         var detachedRequest = CreateRemoteRequest(1);
+        var markerId = starterId.Child($"$detach:{detachedRequest.Context!.TargetId}:cleanup");
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(
             1,
@@ -3113,7 +3143,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 {
                     await Task.Delay(Timeout.InfiniteTimeSpan, executionToken);
                 }
-                catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+                catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
                 {
                     // Cleanup outlives the canceled starter.
                     await new TestStateManager.TestRemoteDurableTask(detachedRequest).DetachAsync("cleanup", CancellationToken.None);
@@ -3148,9 +3178,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var retention = TimeSpan.FromHours(1);
         var (runtime, storage, manager, transport) = CreateRuntime(retention, timeProvider: clock);
         var starterId = TaskId.Parse("starter");
-        var markerId = starterId.Child("$detach-1");
         var rootId = TaskId.CreateRoot("detached");
         var detachedRequest = CreateRequest(2, () => DurableTask.FromResult(5));
+        var markerId = starterId.Child($"$detach:{detachedRequest.Context!.TargetId}:detached");
         var writes = new ConcurrentQueue<(bool Marker, bool Root)>();
         manager.AfterWriteCompleted = _ => writes.Enqueue((storage.Contains(markerId), storage.Contains(rootId)));
         var request = CreateRequest(
@@ -3238,7 +3268,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     public Task DetachMarkerReusedForAnotherStartFailsBeforeStaging() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
-        var markerId = TaskId.Parse("starter/$detach-1");
+        var markerId = TaskId.Parse("starter/$detach:target:first");
         await runtime.DetachAsync(TaskId.CreateRoot("first"), CreateRemoteRequest(1), markerId, TestContext.Current.CancellationToken);
         var writes = manager.WriteCount;
 
@@ -3413,16 +3443,16 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             taskId,
             new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender });
     private static ValueTask<TaskId> InvokeSelectCompletionCoreAsync(
-        GrainDurableExecutionContext context,
+        GrainDurableTaskContext context,
         TaskId decisionId,
         IReadOnlyList<TaskId> candidates,
         CancellationToken cancellationToken) =>
-        (ValueTask<TaskId>)typeof(GrainDurableExecutionContext)
+        (ValueTask<TaskId>)typeof(GrainDurableTaskContext)
             .GetMethod("SelectCompletionCoreAsync", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(context, [decisionId, candidates, cancellationToken])!;
 
-    private static TaskId InvokeCreateChildTaskId(GrainDurableExecutionContext context, string? name) =>
-        (TaskId)typeof(GrainDurableExecutionContext)
+    private static TaskId InvokeCreateChildTaskId(GrainDurableTaskContext context, string? name) =>
+        (TaskId)typeof(GrainDurableTaskContext)
             .GetMethod("CreateChildTaskId", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(context, [name])!;
 
@@ -3660,9 +3690,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         TaskId childId,
         Action<IScheduledTaskHandle>? handleCaptured = null) : DurableTask
     {
-        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         {
-            var handle = (IScheduledTaskHandle)typeof(DurableExecutionContext)
+            var handle = (IScheduledTaskHandle)typeof(DurableTaskContext)
                 .GetMethod("GetChildTaskHandle", BindingFlags.Instance | BindingFlags.NonPublic)!
                 .Invoke(context, [childId])!;
             handleCaptured?.Invoke(handle);
@@ -3943,7 +3973,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         }
         internal sealed class PendingDurableTask : DurableTask
         {
-            protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) =>
+            protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) =>
                 new(DurableTaskResponse.Pending);
         }
 
@@ -3974,7 +4004,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 return new(DurableTaskResponse.Pending);
             }
             public IScheduledTaskHandle GetHandle(TaskId taskId) => throw new NotSupportedException();
-            protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) =>
+            protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) =>
                 throw new NotSupportedException();
         }
 
