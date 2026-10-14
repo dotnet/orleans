@@ -311,6 +311,8 @@ namespace Orleans.Journaling
     {
         TState GetOrAddState<TState>(string name)
             where TState : class;
+        System.Collections.Generic.IReadOnlyList<string> GetRetiredStateNames();
+        System.Collections.Generic.IReadOnlyList<System.Collections.Generic.KeyValuePair<string, IStateMachine>> GetStateMachines();
         bool TryGetState<TState>(string name, out TState? state)
             where TState : class;
         System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken = default);

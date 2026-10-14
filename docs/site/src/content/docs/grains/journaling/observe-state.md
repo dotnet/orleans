@@ -133,7 +133,7 @@ Host code which takes an `IDurableLog<T>` in a test grain to test it the same wa
 
 ## Discover registered state
 
-Diagnostic tools enumerate a manager's registered state with <xref:Orleans.Journaling.IJournaledStateManager.GetStateMachines*>, which returns each name and instance. <xref:Orleans.Journaling.IJournaledStateManager.GetRetiredStateNames*> returns the names of retired state, which the journal contains but no state machine is registered for:
+A grain's `StateManager`, and diagnostic tools, enumerate registered state with <xref:Orleans.Journaling.IDurableStateManager.GetStateMachines*>, which returns each name and instance. <xref:Orleans.Journaling.IDurableStateManager.GetRetiredStateNames*> returns the names of retired state, which the journal contains but no state machine is registered for:
 
 :::code language="csharp" source="../../snippets/compiled/Grains/JournalingObservationSnippets.cs" id="state_discovery":::
 
