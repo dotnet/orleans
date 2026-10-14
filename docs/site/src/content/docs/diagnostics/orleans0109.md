@@ -21,7 +21,7 @@ A durable task body calls `ConfigureAwait(false)`, `Task.Run`, `Task.Factory.Sta
 
 A durable task body runs on its grain activation's scheduler, which orders its durable operations and its grain-state changes. Work which runs elsewhere schedules durable operations in an order which differs between runs, and changes grain state concurrently with the activation.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

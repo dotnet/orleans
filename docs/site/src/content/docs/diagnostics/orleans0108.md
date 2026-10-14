@@ -23,7 +23,7 @@ A name which one run repeats identifies its later occurrences by their order, as
 
 A call site in a loop repeats its name in each iteration, which identifies iterations by their order.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

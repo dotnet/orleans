@@ -21,7 +21,7 @@ A durable task body declares or passes an `async void` method, local function, o
 
 A durable task body observes the operations it awaits. Asynchronous void code continues after the body has moved on, so its durable operations run outside the body's order, and its failures escape the body.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

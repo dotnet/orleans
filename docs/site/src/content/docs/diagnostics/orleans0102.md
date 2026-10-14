@@ -21,7 +21,7 @@ A durable task body awaits an operation other than a durable operation, such as 
 
 A replay re-runs each await between durable operations. It repeats the operation's external effects, it can observe another result, and it can fail where the first run succeeded. A step records its result, so a replay of its parent returns that result without running the step again.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

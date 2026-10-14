@@ -21,11 +21,11 @@ A durable task body passes durable operations to `Task.WhenAll`, `Task.WhenAny`,
 
 Concurrent durable operations which a Task combinator starts receive generated identifiers in the order in which they begin, which can differ on replay. Durable combinators identify each input by its index, and choose the first completion by the grain's recorded completion order.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
-Use `DurableTask.WhenAll`, `DurableTask.WhenAny`, `DurableTask.ScheduleAll`, or `DurableTask.WhenEach`. For examples, see [Durable task recipes](../grains/durable-tasks-recipes.md).
+Use `DurableTask.WhenAll`, `DurableTask.WhenAny`, `DurableTask.ScheduleAll`, or `DurableTask.WhenEach`. For examples, see [Combinators](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#combinators).
 
 ## When to suppress
 

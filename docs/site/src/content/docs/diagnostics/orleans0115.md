@@ -21,7 +21,7 @@ A durable task body logs, at a point from which it can still reach a durable ope
 
 A replay re-runs this code and logs the event again. A logger which `ReplaySafe()` returns skips events while the task replays operations which it has already recorded, so each event is logged once.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
