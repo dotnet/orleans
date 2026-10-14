@@ -217,6 +217,58 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
+    public async Task ReplaceAsync_StagesMultipleBatchesAndRecoversAllRows()
+    {
+        await using var harness = await CreateHarnessAsync(rowSizeBytes: 1);
+        var id = NewJournalId();
+        var expected = Enumerable.Range(0, 65).Select(static value => (byte)value).ToArray();
+
+        await harness.Provider.CreateStorage(id).ReplaceAsync(
+            new ReadOnlySequence<byte>(expected),
+            TestContext.Current.CancellationToken);
+
+        var generation = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        var sequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, generation);
+        Assert.True(Enumerable.Range(0, 65).Select(static value => (long)value).SequenceEqual(sequences));
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal(expected, consumer.Bytes.ToArray());
+        Assert.True(consumer.IsCompleted);
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_WhenSecondStagingBatchFails_KeepsOldGenerationAndDeletesStagedRows()
+    {
+        FailSecondStagingBatchSessionProxy? stagingProxy = null;
+        await using var harness = await CreateHarnessAsync(
+            rowSizeBytes: 1,
+            sessionDecorator: session => FailSecondStagingBatchSessionProxy.Create(session, out stagingProxy));
+        var id = NewJournalId();
+        var storage = harness.Provider.CreateStorage(id);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([99]), TestContext.Current.CancellationToken);
+        var oldGeneration = await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id);
+        stagingProxy!.Arm();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.ReplaceAsync(
+                new ReadOnlySequence<byte>(Enumerable.Range(0, 65).Select(static value => (byte)value).ToArray()),
+                TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal("Injected failure on the second replacement staging batch.", exception.Message);
+        Assert.Equal(2, stagingProxy.AttemptedStagingBatches);
+        Assert.Equal(1, stagingProxy.SucceededStagingBatches);
+        Assert.Equal(oldGeneration, await GetActiveGenerationAsync(harness.Session, harness.Options.TableName, id));
+        var oldGenerationSequences = await GetSequencesAsync(harness.Session, harness.Options.TableName, id, oldGeneration);
+        Assert.Equal([0L], oldGenerationSequences);
+        var generations = await GetGenerationsAsync(harness.Session, harness.Options.TableName, id);
+        Assert.True(new HashSet<Guid> { Guid.Empty, oldGeneration }.SetEquals(generations));
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([99], consumer.Bytes.ToArray());
+        Assert.True(consumer.IsCompleted);
+    }
+
+    [Fact]
     public async Task ReplaceAsync_PreservesSegmentedInputAcrossRowBoundaries()
     {
         await using var harness = await CreateHarnessAsync(rowSizeBytes: 6);
@@ -840,6 +892,54 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
         {
             await _inner!.ExecuteAsync(statement).ConfigureAwait(false);
             throw new InvalidOperationException("Injected lost response after replacement publication.");
+        }
+    }
+
+    private class FailSecondStagingBatchSessionProxy : DispatchProxy
+    {
+        private ISession? _inner;
+        private int _armed;
+        private int _attemptedStagingBatches;
+        private int _succeededStagingBatches;
+
+        public int AttemptedStagingBatches => Volatile.Read(ref _attemptedStagingBatches);
+        public int SucceededStagingBatches => Volatile.Read(ref _succeededStagingBatches);
+
+        public static ISession Create(ISession inner, out FailSecondStagingBatchSessionProxy proxy)
+        {
+            var session = DispatchProxy.Create<ISession, FailSecondStagingBatchSessionProxy>();
+            proxy = (FailSecondStagingBatchSessionProxy)(object)session;
+            proxy._inner = inner;
+            return session;
+        }
+
+        public void Arm() => Volatile.Write(ref _armed, 1);
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (Volatile.Read(ref _armed) == 1
+                && targetMethod?.Name == nameof(ISession.ExecuteAsync)
+                && args is { Length: > 0 }
+                && args[0] is BatchStatement)
+            {
+                var attempt = Interlocked.Increment(ref _attemptedStagingBatches);
+                if (attempt == 2)
+                {
+                    return Task.FromException<RowSet>(
+                        new InvalidOperationException("Injected failure on the second replacement staging batch."));
+                }
+
+                return ExecuteStagingBatchAsync(targetMethod, args);
+            }
+
+            return targetMethod!.Invoke(_inner, args);
+        }
+
+        private async Task<RowSet> ExecuteStagingBatchAsync(MethodInfo targetMethod, object?[] args)
+        {
+            var result = await ((Task<RowSet>)targetMethod.Invoke(_inner, args)!).ConfigureAwait(false);
+            Interlocked.Increment(ref _succeededStagingBatches);
+            return result;
         }
     }
 

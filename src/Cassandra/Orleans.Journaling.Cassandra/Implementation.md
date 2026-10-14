@@ -243,6 +243,8 @@ coverage includes:
 - detection of missing active-generation rows before reporting a complete read;
 - generation replacement, restarted sequence numbers, and exact old-generation
   deletion;
+- replacement spanning multiple full staging batches plus a partial final
+  batch, and failure in the second batch with old-generation recovery intact;
 - range cleanup of an old UUIDv7 generation while retaining a recent one;
 - successful replacement when a post-publication delete fails;
 - replacement whose publication commits but whose client response is lost;
