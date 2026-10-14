@@ -20,7 +20,35 @@ internal interface IDurableTaskMessageTransport
     MessageId GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId);
 
     /// <summary>Encodes a completion message addressed to <paramref name="target"/>.</summary>
-    OutboxMessage CreateCompletionMessage(MessageId messageId, GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response);
+    /// <param name="observerId">
+    /// The observation in <paramref name="target"/>'s execution tree which the completion completes, or
+    /// <see langword="default"/> for a completion addressed to the task's caller.
+    /// </param>
+    OutboxMessage CreateCompletionMessage(
+        MessageId messageId,
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        DurableTaskResponse response,
+        TaskId observerId = default);
+
+    /// <summary>
+    /// Gets the stable ID of the completion of <paramref name="taskId"/> which <paramref name="sender"/> sends to the
+    /// observation <paramref name="observerId"/> of <paramref name="target"/>.
+    /// </summary>
+    MessageId GetObservationCompletionMessageId(GrainId sender, GrainId target, TaskId taskId, TaskId observerId);
+
+    /// <summary>
+    /// Stages a completion which reports to the observation <paramref name="observerId"/> of <paramref name="target"/> that
+    /// <paramref name="sender"/> retains no invoked task <paramref name="taskId"/>.
+    /// </summary>
+    void SendObservationNotFound(GrainId sender, GrainId target, TaskId taskId, TaskId observerId);
+
+    /// <summary>
+    /// Stages a subscription of the observation <paramref name="observerId"/> of <paramref name="sender"/> to the terminal
+    /// result of the invoked task <paramref name="taskId"/> of <paramref name="target"/>, or the end of that subscription.
+    /// </summary>
+    void SendObservation(GrainId sender, GrainId target, TaskId taskId, TaskId observerId, bool unsubscribe);
 
     /// <summary>Stages a cooperative cancellation, carrying its <paramref name="reason"/>, of a task which <paramref name="target"/> executes.</summary>
     void SendCancellation(GrainId sender, GrainId target, TaskId taskId, string? reason = null);

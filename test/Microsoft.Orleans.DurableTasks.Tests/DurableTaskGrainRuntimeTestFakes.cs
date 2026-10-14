@@ -64,11 +64,23 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
         Completions.Add(new(sender, target, taskId, messageId));
     }
 
-    public OutboxMessage CreateCompletionMessage(MessageId messageId, GrainId sender, GrainId target, TaskId taskId, DurableTaskResponse response) =>
+    public OutboxMessage CreateCompletionMessage(
+        MessageId messageId,
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        DurableTaskResponse response,
+        TaskId observerId = default) =>
         MessagingTestHelpers.MessageTypes.Completion.Create(
             messageId,
             target,
-            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
+            new DurableTaskCompletionMessage
+            {
+                TaskId = taskId,
+                Response = response,
+                Sender = sender,
+                ObserverId = observerId.IsDefault ? null : observerId,
+            });
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId, string? reason = null)
     {

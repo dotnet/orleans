@@ -81,8 +81,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <remarks>
     /// The runtime supplies the operations which earlier attempts recorded in this execution's tree when the attempt
-    /// starts: its children, detach and signal-send markers, and effect records, but not signal values, which senders
-    /// record, invoked descendants, or cancellations which arrived before their requests. The attempt reaches an
+    /// starts: its children, including observations, detach and signal-send markers, and effect records, but not signal
+    /// values or observation subscriptions, which other operations record, invoked descendants, or cancellations which
+    /// arrived before their requests. The attempt reaches an
     /// operation when it schedules it, looks up its handle, detaches or signals under its marker, selects a completion
     /// under its decision, or runs an effect under its name. Scheduling an operation which no earlier attempt recorded
     /// ends the replay; reaching an operation again doesn't.
@@ -222,7 +223,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             _runtime.ThrowIfRecordedAsOtherKind(
                 taskId,
                 effectId,
-                task is IDurableTaskRequest { Context.TargetId: var target } ? $"a call to grain '{target}'" : "a local child task");
+                task switch
+                {
+                    IDurableTaskRequest { Context.TargetId: var target } => $"a call to grain '{target}'",
+                    IDurableTaskObservation observation => $"an observation of task '{observation.TaskId}' on grain '{observation.Target}'",
+                    _ => "a local child task",
+                });
         }
 
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
