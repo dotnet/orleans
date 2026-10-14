@@ -23,7 +23,7 @@ A replay runs this code again, and it observes another value. When the value rea
 
 `DurableTask.Current.UtcNow` is the execution's logical time, which advances to each observed child's recorded completion time, so a replay observes the same times. `DurableTask.Once` records any other value, so a replay returns the recorded value.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
