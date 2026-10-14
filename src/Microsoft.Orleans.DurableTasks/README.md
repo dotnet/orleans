@@ -48,7 +48,7 @@ An absent root or a root whose result retention has expired throws
 `DurableTaskNotFoundException`. A returned failed response remains an execution
 failure, including when the stored user exception has that same type.
 
-A durable grain observes and cancels its own tasks through `IDurableTaskManager`, which
+A durable grain observes, cancels, and aborts its own tasks through `IDurableTaskManager`, which
 it injects from its activation services. The manager runs against the activation's
 runtime, without a grain call to the grain itself:
 
@@ -147,8 +147,26 @@ validation disabled until its first published version establishes a baseline.
   Activation doesn't decode stored results, so the grain keeps processing other
   work; operations which read that result, such as polling it, surface the decoding
   error to their caller.
-- Cancellation is monotonic, duplicates are idempotent, and the first durable
-  terminal result wins a race.
+- Cancellation is cooperative, monotonic, and idempotent. A cancellation request commits before it
+  propagates: it cancels the durable token of each running execution in the task's tree, stages a
+  cancellation to each pending call to another grain, whose callee applies the same rules to its own
+  task, and terminalizes delays and tasks whose bodies haven't started as canceled. A started body
+  decides its task's outcome: the task is canceled when the cancellation escapes it, and otherwise
+  completes with the body's result or failure. Attached children which the body schedules after the
+  request are canceled without running, and a body detaches work which must outlive the cancellation,
+  such as compensation. Recovery replays a canceled body with its cancellation requested, so completed
+  children return their recorded results. The first durable terminal result wins a race.
+- An administrative abort, through `IDurableTaskManager.AbortAsync`, `IDurableTaskGrainExtension.AbortAsync`,
+  or `ScheduledTask.AbortAsync`, commits the task and its execution tree as failed with
+  `DurableTaskAbortedException` in one journal write, which also stages an abort to each pending call to
+  another grain; that callee aborts its task's tree in turn. The write's completion signals each running
+  attempt in the tree through its execution-abort token and discards its result. Abort runs no task code,
+  including cancellation callbacks and compensation, and the tree's delays terminalize with it, so their
+  resumes are stale. The stored exception's message is the abort reason, and the task's completion time
+  records when it was aborted; diagnostics report the task as `Faulted` with
+  `DurableTaskAbortedException: <reason>`. A child which a custom scheduler runs receives the abort through its
+  handle, or a cancellation request when its scheduler doesn't support abort. Aborting a terminal task changes
+  nothing, and an abort which arrives before its invocation is recorded as a cancellation.
 - A detached task is a root on its target with no caller. Durable cancellation of its
   starter doesn't reach it, and deleting the starter's execution tree deletes only the
   marker which recorded the start. Detaching the same request under the same root ID
