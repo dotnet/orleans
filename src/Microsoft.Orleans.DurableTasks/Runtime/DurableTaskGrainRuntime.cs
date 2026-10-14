@@ -628,10 +628,11 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         // The cancellation and its message commit together; the outbox delivers the message only after that commit. The
         // message carries the recorded reason, which the first request determines.
+        var recordedReason = state.CancellationRequestedAt.HasValue ? state.CancellationReason : reason;
         _storage.RequestCancellation(taskId, state, reason);
         if (!_preStagedCancellations.TryRemove((taskId, target), out _))
         {
-            StageCancellation(taskId, target, state.CancellationReason);
+            StageCancellation(taskId, target, recordedReason);
         }
 
         await WriteStateAsync(cancellationToken);

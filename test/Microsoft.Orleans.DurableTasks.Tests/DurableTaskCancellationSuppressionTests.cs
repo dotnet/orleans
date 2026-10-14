@@ -1,9 +1,12 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Orleans.DurableTasks.Storage;
 using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
@@ -225,6 +228,33 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal("no longer needed", storage.Get(childId).CancellationReason);
         Assert.True(storage.Get(childId).CancellationSuppressed);
     });
+
+    [Fact]
+    public async Task VolatileStorageRecoversTheFirstCancellationReasonAndTheSuppression()
+    {
+        using var services = new ServiceCollection()
+            .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
+            .BuildServiceProvider();
+        var storage = new VolatileDurableTaskGrainStorage(
+            services.GetRequiredService<DeepCopier<Dictionary<TaskId, DurableTaskState>>>(),
+            services.GetRequiredService<DeepCopier<DurableTaskState>>(),
+            TimeProvider.System,
+            services.GetRequiredService<Serializer>());
+        var taskId = TaskId.Parse("root/cleanup");
+        var state = storage.GetOrCreateTask(taskId, request: null);
+
+        storage.SuppressCancellation(taskId, state);
+        storage.RequestCancellation(taskId, state, "buyer");
+        Assert.True(storage.TryGetTask(taskId, out var canceled));
+        storage.RequestCancellation(taskId, canceled, "later");
+        await storage.WriteAsync(TestContext.Current.CancellationToken);
+        storage.Clear();
+        await storage.ReadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(storage.TryGetTask(taskId, out var recovered));
+        Assert.Equal(("buyer", true), (recovered.CancellationReason, recovered.CancellationSuppressed));
+        Assert.NotNull(recovered.CancellationRequestedAt);
+    }
 
     [Fact]
     public void JsonTaskStateStoresCancellationSuppressionOnlyWhenSet()
