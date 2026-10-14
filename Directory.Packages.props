@@ -36,7 +36,7 @@
     <PackageVersion Include="Google.Protobuf" Version="3.33.5" />
     <PackageVersion Include="Grpc.Tools" Version="2.78.0" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
-    <PackageVersion Include="KubernetesClient" Version="18.0.13" />
+    <PackageVersion Include="KubernetesClient" Version="21.0.8" />
     <PackageVersion Include="MessagePack" Version="3.1.11" />
     <PackageVersion Include="Microsoft.NET.StringTools" Version="17.11.4" />
     <PackageVersion Include="Microsoft.Accordant" Version="0.1.6" />
