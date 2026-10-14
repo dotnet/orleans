@@ -181,6 +181,28 @@ public abstract class DurableExecutionContext
     protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
 
     /// <summary>
+    /// Receives this execution's terminal response when its body completes, synchronously with the body's final code.
+    /// </summary>
+    /// <param name="response">The body's terminal response.</param>
+    /// <remarks>
+    /// <para>
+    /// The definitions which run bodies call this before any continuation of the body runs: an <see langword="async"/>
+    /// durable task method calls it from the step which completes its state machine, and a delegate definition calls it
+    /// from the work which completes its delegate, or from a continuation which runs synchronously with that work.
+    /// </para>
+    /// <para>
+    /// A host which commits the state changes a body makes together with the body's result, such as journaled grain
+    /// state, stages the result here. Work which runs after the body's final code, such as a commit which another
+    /// operation requests, then commits the result together with the changes that code made. The host still receives the
+    /// response from <see cref="DurableTask.RunAsync(DurableExecutionContext)"/>. Implementations return without
+    /// throwing. The default implementation does nothing.
+    /// </para>
+    /// </remarks>
+    protected internal virtual void OnBodyCompleted(DurableTaskResponse response)
+    {
+    }
+
+    /// <summary>
     /// Starts <paramref name="taskDefinition"/> as a detached root task under <paramref name="rootId"/> and records the
     /// start under <paramref name="markerId"/>, a descendant of this execution.
     /// </summary>

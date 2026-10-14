@@ -105,80 +105,140 @@ internal sealed class DelayUntilDurableTask(DateTimeOffset dueTime) : DurableTas
         => context.ScheduleDelayAsync(context.TaskId, dueTime, context.CancellationToken);
 }
 
-internal abstract class DelegateDurableTaskBase : DurableTask
+/// <summary>Runs delegate bodies and reports their completion to the execution context.</summary>
+internal static class DelegateBody
 {
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
-    protected async ValueTask<DurableTaskResponse> InvokeAsync(
+    public static ValueTask<DurableTaskResponse> Run<TState>(
         DurableExecutionContext context,
-        Func<CancellationToken, ValueTask<DurableTaskResponse>> callback)
+        Func<TState, CancellationToken, DurableTaskResponse> body,
+        TState state)
     {
-        using var scope = DurableExecutionContext.Enter(context);
+        DurableTaskResponse response;
+        using (DurableExecutionContext.Enter(context))
+        {
+            try
+            {
+                response = body(state, context.CancellationToken);
+            }
+            catch (Exception exception)
+            {
+                response = DurableTaskResponse.FromException(exception);
+            }
 
+            context.OnBodyCompleted(response);
+        }
+
+        return new(response);
+    }
+
+    /// <summary>Runs an asynchronous delegate and creates its response from its completed task.</summary>
+    /// <remarks>
+    /// The completion is reported from a continuation which runs synchronously with the delegate's final code, on the
+    /// scheduler which started the delegate, so a host which runs the delegate's code on that scheduler stages the
+    /// response in the same work item as the code's state changes.
+    /// </remarks>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
+    public static ValueTask<DurableTaskResponse> RunAsync<TTask>(
+        DurableExecutionContext context,
+        Func<CancellationToken, TTask> function,
+        Func<TTask, DurableTaskResponse> getResponse)
+        where TTask : Task
+    {
+        TTask task;
+        using (DurableExecutionContext.Enter(context))
+        {
+            try
+            {
+                task = function(context.CancellationToken)
+                    ?? throw new InvalidOperationException("The durable task delegate returned a null task.");
+            }
+            catch (Exception exception)
+            {
+                var failure = DurableTaskResponse.FromException(exception);
+                context.OnBodyCompleted(failure);
+                return new(failure);
+            }
+
+            if (task.IsCompleted)
+            {
+                return new(Complete(context, task, getResponse));
+            }
+        }
+
+        return new(task.ContinueWith(
+            static (completed, state) =>
+            {
+                var (context, getResponse) = ((DurableExecutionContext, Func<TTask, DurableTaskResponse>))state!;
+                using (DurableExecutionContext.Enter(context))
+                {
+                    return Complete(context, (TTask)completed, getResponse);
+                }
+            },
+            (context, getResponse),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Current));
+    }
+
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
+    private static DurableTaskResponse Complete<TTask>(
+        DurableExecutionContext context,
+        TTask task,
+        Func<TTask, DurableTaskResponse> getResponse)
+        where TTask : Task
+    {
+        DurableTaskResponse response;
         try
         {
-            return await callback(context.CancellationToken).ConfigureAwait(false);
+            response = getResponse(task);
         }
         catch (Exception exception)
         {
-            return DurableTaskResponse.FromException(exception);
+            response = DurableTaskResponse.FromException(exception);
         }
+
+        context.OnBodyCompleted(response);
+        return response;
     }
 }
 
-internal sealed class DelegateDurableTask(Action<CancellationToken> action) : DelegateDurableTaskBase
+internal sealed class DelegateDurableTask(Action<CancellationToken> action) : DurableTask
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-        => InvokeAsync(context, token =>
-        {
-            action(token);
-            return new(DurableTaskResponse.Completed);
-        });
+        => DelegateBody.Run(
+            context,
+            static (action, token) =>
+            {
+                action(token);
+                return DurableTaskResponse.Completed;
+            },
+            action);
 }
 
 internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResult> function) : DurableTask<TResult>
 {
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-    {
-        using var scope = DurableExecutionContext.Enter(context);
-
-        try
-        {
-            return new(DurableTaskResponse.FromResult(function(context.CancellationToken)));
-        }
-        catch (Exception exception)
-        {
-            return new(DurableTaskResponse.FromException(exception));
-        }
-    }
+        => DelegateBody.Run(context, static (function, token) => DurableTaskResponse.FromResult(function(token)), function);
 }
 
-internal class AsyncDelegateDurableTask(Func<CancellationToken, Task> function) : DelegateDurableTaskBase
+internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, Task> function) : DurableTask
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-        => InvokeAsync(context, async token =>
-        {
-            await function(token).ConfigureAwait(false);
-            return DurableTaskResponse.Completed;
-        });
+        => DelegateBody.RunAsync(
+            context,
+            function,
+            static task =>
+            {
+                task.GetAwaiter().GetResult();
+                return DurableTaskResponse.Completed;
+            });
 }
 
-internal class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, Task<TResult>> function) : DurableTask<TResult>
+internal sealed class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, Task<TResult>> function) : DurableTask<TResult>
 {
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
-    protected internal override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-    {
-        using var scope = DurableExecutionContext.Enter(context);
-
-        try
-        {
-            return DurableTaskResponse.FromResult(await function(context.CancellationToken).ConfigureAwait(false));
-        }
-        catch (Exception exception)
-        {
-            return DurableTaskResponse.FromException(exception);
-        }
-    }
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        => DelegateBody.RunAsync(context, function, static task => DurableTaskResponse.FromResult(task.GetAwaiter().GetResult()));
 }
 
 /// <summary>
