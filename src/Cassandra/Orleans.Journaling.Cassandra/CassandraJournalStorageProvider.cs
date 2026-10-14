@@ -83,7 +83,6 @@ internal sealed class CassandraJournalStorageProvider : IJournalStorageProvider,
 
     internal Task CloseAsync(CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
         var session = _session;
         _session = null;
         _queries = null;
