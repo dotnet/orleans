@@ -46,16 +46,28 @@
         <button id="checkout">Checkout</button> <span id="checkout-result" class="muted"></span>
       </section>
     </div>
-    <section>
-      <h2>Orders</h2>
-      <table>
-        <thead><tr><th>Order</th><th>Date</th><th class="num">Total</th><th>Status</th><th></th></tr></thead>
-        <tbody id="orders"></tbody>
-      </table>
-    </section>
+    <div>
+      <section>
+        <h2>Orders</h2>
+        <table>
+          <thead><tr><th>Order</th><th>Date</th><th class="num">Total</th><th>Status</th><th></th></tr></thead>
+          <tbody id="orders"></tbody>
+        </table>
+      </section>
+      <section>
+        <h2>Order history</h2>
+        <p id="detail-title" class="muted">Select an order to watch its history.</p>
+        <table>
+          <thead><tr><th class="num">Version</th><th>Status</th><th>Stock</th></tr></thead>
+          <tbody id="history"></tbody>
+        </table>
+      </section>
+    </div>
   </main>
   <script>
     const statuses = ["Submitted", "AwaitingValidation", "StockConfirmed", "Paid", "Shipped", "Cancelled"];
+    const stockStatuses = ["Pending", "Confirmed", "Rejected", "Released", "Committed"];
+    const named = (names, value) => typeof value === "number" ? names[value] : value;
     const buyer = () => encodeURIComponent(document.getElementById("buyer").value.trim() || "alice");
     const money = value => value.toFixed(2);
     const escape = text => String(text ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -96,6 +108,7 @@
           address: { street: "15703 NE 61st Ct", city: "Redmond", state: "WA", country: "U.S.", zipCode: "98052" },
         }) ?? {};
         result.textContent = orderId ? `Submitted order ${orderId.slice(0, 8)}.` : "";
+        if (orderId) watchOrder(orderId);
       } catch (error) {
         result.textContent = error.message;
       }
@@ -125,14 +138,36 @@
       document.getElementById("orders").innerHTML = orders.length === 0
         ? `<tr><td colspan="5" class="muted">No orders yet.</td></tr>`
         : orders.map(order => {
-          const status = typeof order.status === "number" ? statuses[order.status] : order.status;
+          const status = named(statuses, order.status);
           return `
-          <tr><td><a href="/api/orders/${order.orderId}/tasks"><code>${order.orderId.slice(0, 8)}</code></a></td>
+          <tr><td><a href="#" onclick="watchOrder('${order.orderId}'); return false;"><code>${order.orderId.slice(0, 8)}</code></a></td>
           <td>${new Date(order.orderDate).toLocaleTimeString()}</td><td class="num">${money(order.total)}</td>
           <td><span class="status ${status}">${status}</span><br><span class="muted">${escape(order.description)}</span></td>
           <td><button onclick="orderAction('${order.orderId}', 'cancel')">Cancel</button>
           <button onclick="orderAction('${order.orderId}', 'ship')">Ship</button></td></tr>`;
         }).join("");
+    }
+
+    // The selected order's history arrives as server-sent events: each committed snapshot once, in order. A reconnected
+    // stream replays the history from the start, so the view starts over when the stream opens.
+    let watched;
+    function watchOrder(orderId) {
+      watched?.close();
+      const history = document.getElementById("history");
+      document.getElementById("detail-title").innerHTML =
+        `Order <code>${orderId.slice(0, 8)}</code> <a href="/api/orders/${orderId}/tasks">tasks</a>`;
+      history.innerHTML = "";
+      watched = new EventSource(`/api/orders/${orderId}/events`);
+      watched.onopen = () => { history.innerHTML = ""; };
+      watched.onmessage = event => {
+        const { order, stock } = JSON.parse(event.data);
+        const status = named(statuses, order.status);
+        history.insertAdjacentHTML("beforeend", `
+          <tr><td class="num">${order.version}</td>
+          <td><span class="status ${status}">${status}</span><br><span class="muted">${escape(order.description)}</span></td>
+          <td>${stock.map(line => `${line.productId}: ${named(stockStatuses, line.status)}`).join("<br>")}</td></tr>`);
+        if (status === "Shipped" || status === "Cancelled") watched.close();
+      };
     }
 
     refresh();

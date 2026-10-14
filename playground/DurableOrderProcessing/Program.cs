@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Orleans.Core.Internal;
 using Orleans.Dashboard;
 using Orleans.DurableTasks;
@@ -56,6 +57,11 @@ api.MapGet("/buyers/{buyerId}/orders", (string buyerId, IGrainFactory grains) =>
 api.MapGet("/orders/{orderId:guid}", async (Guid orderId, IGrainFactory grains) =>
     await grains.GetGrain<IOrderGrain>(orderId).GetAsync() is { } order ? Results.Ok(order) : Results.NotFound());
 
+// Streams the order's history as server-sent events: each committed snapshot, from submission until the order ships or
+// is cancelled. The stream waits for the first snapshot, so a client can watch an order as soon as checkout returns.
+api.MapGet("/orders/{orderId:guid}/events", (Guid orderId, IGrainFactory grains, CancellationToken cancellationToken) =>
+    TypedResults.ServerSentEvents(WatchOrderAsync(grains.GetGrain<IOrderGrain>(orderId), cancellationToken)));
+
 // Polls the order's PlaceOrder workflow without waiting.
 api.MapGet("/orders/{orderId:guid}/workflow", async (Guid orderId, IGrainFactory grains) =>
 {
@@ -109,6 +115,38 @@ static async Task<object[]> ListTasksAsync(IAddressable grain)
     }
 
     return [.. tasks];
+}
+
+// Watches an order across its activations. A deactivation aborts the order's enumeration; the next activation streams
+// the history from the start again, so the watch skips the snapshots which it has already delivered.
+static async IAsyncEnumerable<OrderDetails> WatchOrderAsync(IOrderGrain order, [EnumeratorCancellation] CancellationToken cancellationToken)
+{
+    var delivered = 0;
+    while (true)
+    {
+        var position = 0;
+        await using var snapshots = order.WatchAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+        while (true)
+        {
+            try
+            {
+                if (!await snapshots.MoveNextAsync())
+                {
+                    yield break;
+                }
+            }
+            catch (EnumerationAbortedException)
+            {
+                break;
+            }
+
+            if (position++ == delivered)
+            {
+                delivered++;
+                yield return snapshots.Current;
+            }
+        }
+    }
 }
 
 internal sealed record BasketQuantity(int Quantity);
