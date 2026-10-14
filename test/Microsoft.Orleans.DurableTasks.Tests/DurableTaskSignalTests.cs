@@ -23,7 +23,7 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableTasks")]
-public sealed class DurableTaskSignalTests
+public sealed partial class DurableTaskSignalTests
 {
     private static readonly DurableSignal<string> Approved = new("approved");
     private static readonly TaskId WorkflowId = TaskId.CreateRoot("workflow");
