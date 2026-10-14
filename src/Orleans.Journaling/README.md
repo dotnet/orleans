@@ -216,17 +216,36 @@ new `Resync` snapshot. A manager creates its observer state when the first watch
 state publishes nothing.
 
 `IDurableLog<T>` is an append-only log with durable, monotonically increasing `long` sequence numbers.
-`Append` returns an entry's sequence, `TrimBefore` bounds retention without reusing sequence numbers,
-and `CommittedSequence` marks the end of the durable entries. `ReadAsync(fromSequence, mode, resumeDraftId)`
-re-reads retained entries from a position, delivers `Reset` when the position was trimmed, and waits for new
-entries. `BeginDraft` opens a draft whose `Write` items reach speculative readers immediately; `Commit`
-appends its durable entry and `Abandon` or disposal discards it. Draft identifiers include the activation
-which opened them, so a reader reconnecting to a new activation receives `DraftAbandoned` for a lost draft
-and resumes from its committed sequence.
+`Append` returns an entry's sequence and `CommittedSequence` marks the end of the durable entries.
+`TrimBefore` bounds retention, `Clear` replaces the history and consumes one sequence number, so sequence
+numbers are never reused, and `Seal` durably ends the log. `ReadAsync(fromSequence, mode, resumeDraftId)`
+re-reads retained entries from a position and waits for new entries. Every active reader receives `Trimmed`
+when entries are trimmed and `Reset` when the history is replaced, including a reader which resumes at or
+before a cleared sequence number. The stream delivers `CaughtUp` once after the entries which were committed
+when the read began, and ends with `Sealed` once a seal is durable.
 
-A failed journal write faults watch streams; a stopped manager completes them.
+`DurableWatchMode` is a set of flags: `Staged` adds staged changes and watermarks, and `Drafts` adds draft
+content. `Committed | Drafts` streams live drafts with only durable entries, so every entry is a valid resume
+point.
+
+`BeginDraft` opens a draft whose `Write` items reach readers with `Drafts` immediately. `Commit` appends zero
+or more entries as one journal entry and reports `DraftCommitted` with the committed range; `Commit()` with no
+entries closes the draft cleanly. `Abandon` or disposal reports `DraftAbandoned` with a
+`LogDraftAbandonReason`. A closed draft releases its items, so a reader which has not read every item
+receives the outcome next and never receives the rest; the committed entries carry the final content. The
+log closes open drafts when its journal is deleted or it is sealed, so check `IsOpen` before committing a
+draft which the log can close. A reader which resumes a draft that closed in the current activation receives
+its outcome; the log records the outcomes of its 16 most recently closed drafts. Draft identifiers include
+the activation which opened them, so a reader reconnecting to a new activation receives `DraftAbandoned` with
+`PreviousActivation` and resumes from its position.
+
+A failed journal write faults watch streams; a stopped manager completes them without `Sealed`.
 `IJournaledStateManager.GetStateMachines()` enumerates registered state names and instances for
-diagnostic tools.
+diagnostic tools, and `GetRetiredStateNames()` lists retired state which may require migration.
+
+To test code which uses durable state, host it in a grain on an `InProcessTestCluster` whose silos call `AddJournaling()`,
+apply the application's journal format configuration, and call `AddVolatileJournalStorage()`. The silos run
+real journaled state managers over in-memory journals.
 
 ## Custom state and standalone ownership
 
