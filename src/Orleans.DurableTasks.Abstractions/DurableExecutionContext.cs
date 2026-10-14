@@ -8,6 +8,7 @@ public abstract class DurableExecutionContext
 {
     private const char GeneratedSegmentPrefix = '$';
     private static readonly AsyncLocal<DurableExecutionContext?> AmbientContext = new();
+    private static readonly AsyncLocal<DurableExecutionContext?> CancellationSuppressedContext = new();
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cancellationSource = new();
     private readonly CancellationTokenSource? _executionCancellationSource;
@@ -90,6 +91,50 @@ public abstract class DurableExecutionContext
             }
         }
     }
+
+    /// <summary>
+    /// Starts a scope in which the current durable execution schedules children which its durable cancellation doesn't
+    /// reach, such as compensation which a canceled workflow runs inline.
+    /// </summary>
+    /// <returns>The scope, which ends when it is disposed.</returns>
+    /// <remarks>
+    /// <para>
+    /// Children scheduled in the scope, including local steps, delays, calls to other grains, and combinator inputs, run
+    /// to completion: a cancellation which the execution observed before scheduling them doesn't cancel them, and a later
+    /// one doesn't reach them. The host records this with each child, so it holds across replay. The execution's own
+    /// <see cref="CancellationToken"/>, <see cref="IsCancellationRequested"/>, and <see cref="CancellationReason"/>
+    /// still report its cancellation, and operations which run as part of the execution itself, such as a signal wait,
+    /// still observe it. An administrative abort still reaches the children, and so does deleting the execution's tree.
+    /// </para>
+    /// <para>
+    /// The scope follows the asynchronous flow which entered it, across awaits, and applies only to the execution which
+    /// entered it: a child's own children are reached by the child's cancellation as usual. Scopes nest, and disposing a
+    /// scope restores the state which preceded it. Work which must outlive the execution itself runs as a detached task.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The caller isn't running in a durable execution.</exception>
+    public static CancellationSuppressionScope SuppressCancellation()
+    {
+        var context = Current
+            ?? throw new InvalidOperationException("Durable cancellation can be suppressed only within a durable execution.");
+        var previous = CancellationSuppressedContext.Value;
+        CancellationSuppressedContext.Value = context;
+        return new(previous);
+    }
+
+    /// <summary>
+    /// Gets whether the calling code runs in a <see cref="SuppressCancellation"/> scope of this execution, so that a child
+    /// which it schedules isn't reached by this execution's durable cancellation.
+    /// </summary>
+    /// <remarks>
+    /// Hosts read this when they schedule a child, before any asynchronous work, and record it with the child: a host
+    /// creates and runs such a child even after this execution's cancellation was requested, and doesn't propagate this
+    /// execution's cancellation to it.
+    /// </remarks>
+    protected internal bool IsCancellationSuppressed => ReferenceEquals(CancellationSuppressedContext.Value, this);
+
+    internal static void RestoreCancellationSuppression(DurableExecutionContext? previous) =>
+        CancellationSuppressedContext.Value = previous;
 
     /// <summary>
     /// Gets the token which is canceled when durable cancellation is requested or the host aborts this execution attempt.
