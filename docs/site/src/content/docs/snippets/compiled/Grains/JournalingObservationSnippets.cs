@@ -161,11 +161,6 @@ public static class StateDiagnostics
         {
             yield return $"{name}: {stateMachine.GetType().Name}";
         }
-
-        foreach (var name in manager.GetRetiredStateNames())
-        {
-            yield return $"{name}: retired";
-        }
     }
     // </state_discovery>
 }

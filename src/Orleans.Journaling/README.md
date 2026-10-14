@@ -241,7 +241,7 @@ the activation which opened them, so a reader reconnecting to a new activation r
 
 A failed journal write faults watch streams; a stopped manager completes them without `Sealed`.
 `GetStateMachines()` on a grain's `StateManager` enumerates registered state names and instances for
-diagnostic tools, and `GetRetiredStateNames()` lists retired state which may require migration.
+diagnostic tools.
 
 To test code which uses durable state, host it in a grain on an `InProcessTestCluster` whose silos call `AddJournaling()`,
 apply the application's journal format configuration, and call `AddVolatileJournalStorage()`. The silos run

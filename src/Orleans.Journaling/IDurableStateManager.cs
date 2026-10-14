@@ -49,7 +49,4 @@ public interface IDurableStateManager
 
     /// <inheritdoc cref="IJournaledStateManager.GetStateMachines"/>
     IReadOnlyList<KeyValuePair<string, IStateMachine>> GetStateMachines() => [];
-
-    /// <inheritdoc cref="IJournaledStateManager.GetRetiredStateNames"/>
-    IReadOnlyList<string> GetRetiredStateNames() => [];
 }
