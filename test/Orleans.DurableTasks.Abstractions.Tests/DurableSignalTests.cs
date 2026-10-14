@@ -157,7 +157,7 @@ public partial class DurableSignalTests
     {
         private readonly ConcurrentDictionary<string, TaskCompletionSource<DurableTaskResponse>> _signals = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, TaskCompletionSource> _waitStarted = new(StringComparer.Ordinal);
-        private readonly ConcurrentDictionary<TaskId, Handle> _children = new();
+        private readonly ConcurrentDictionary<TaskId, Child> _children = new();
 
         public ConcurrentQueue<(TaskId ExecutionId, string Name, CancellationToken CancellationToken)> Waits { get; } = new();
 
@@ -192,24 +192,43 @@ public partial class DurableSignalTests
         }
 
         public IScheduledTaskHandle Schedule(TaskId taskId, DurableTask definition) =>
-            _children.GetOrAdd(taskId, id => new(id, DurableTaskRuntimeHelper.RunAsync(definition, new SignalContext(this, id)).AsTask()));
+            _children.GetOrAdd(taskId, id => new(id, definition, new SignalContext(this, id)));
 
         public IScheduledTaskHandle GetHandle(TaskId taskId) => _children[taskId];
+
+        /// <summary>Gets the child which the host scheduled under <paramref name="taskId"/>.</summary>
+        public Child GetChild(TaskId taskId) => _children[taskId];
 
         private TaskCompletionSource<DurableTaskResponse> GetSignal(string name) =>
             _signals.GetOrAdd(name, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
 
-        private sealed class Handle(TaskId taskId, Task<DurableTaskResponse> response) : IScheduledTaskHandle
+        /// <summary>A child execution, whose cancellation requests reach its context as a host's do.</summary>
+        public sealed class Child(TaskId taskId, DurableTask definition, SignalContext context) : IScheduledTaskHandle
         {
             public TaskId TaskId => taskId;
 
+            /// <summary>Gets the child's terminal response, once it ends.</summary>
+            private Task<DurableTaskResponse> Response { get; } = DurableTaskRuntimeHelper.RunAsync(definition, context).AsTask();
+
+            /// <summary>Gets the child's terminal status, or <see langword="null"/> while it runs.</summary>
+            public DurableTaskStatus? Status => Response.IsCompletedSuccessfully ? Response.Result.Status : null;
+
+            /// <summary>Gets the reason of the first cancellation request.</summary>
+            public string? CancellationReason { get; private set; }
+
             public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) =>
-                new(response.WaitAsync(cancellationToken));
+                new(Response.WaitAsync(cancellationToken));
 
             public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) =>
-                new(response.IsCompletedSuccessfully ? response.Result : DurableTaskResponse.Pending);
+                new(Response.IsCompletedSuccessfully ? Response.Result : DurableTaskResponse.Pending);
 
-            public ValueTask CancelAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+            public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
+
+            public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
+            {
+                CancellationReason ??= reason;
+                return new(DurableTaskRuntimeHelper.RequestCancellationAsync(context, reason, cancellationToken));
+            }
         }
     }
 

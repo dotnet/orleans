@@ -83,7 +83,7 @@ public abstract partial class DurableTask
 
     // Cancellation reaches the inputs, which are attached children, so the race waits for their outcomes and stops waiting
     // only when the host aborts the attempt.
-    private static async Task<(int Index, DurableTaskResponse Response)> RaceAsync(
+    internal static async Task<(int Index, DurableTaskResponse Response)> RaceAsync(
         DurableTask[] inputs,
         DurableTaskContext context,
         TaskId operationId)
