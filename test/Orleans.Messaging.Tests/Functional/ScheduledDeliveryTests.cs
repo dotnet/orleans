@@ -168,6 +168,28 @@ public sealed class ScheduledDeliveryTests() : MessagingBehaviorTestBase(new Sch
         Assert.Equal(1, Assert.Single((await receiver.GetSnapshotAsync()).Effects).Count);
     }
 
+    [Fact]
+    public async Task ScheduledMessage_LeavesActivationCollectableUntilDue()
+    {
+        var receiver = NewGrain();
+        var before = await receiver.GetSnapshotAsync();
+        var deliverAt = JobClock.GetUtcNow() + Delay;
+        var envelope = Schedule(CreateEnvelope(receiver, NewMessage(50, "collected")), deliverAt);
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        await AssertWakeupAtAsync(receiver, deliverAt);
+
+        // Work which is due later does not keep the activation alive; the durable wake-up reactivates it.
+        var context = Fixture.GetGrainContext(receiver);
+        await Fixture.CollectAsync(context);
+
+        var reactivated = await receiver.GetSnapshotAsync();
+        Assert.NotEqual(before.ActivationId, reactivated.ActivationId);
+        Assert.Equal(1, reactivated.InboxCount);
+        JobClock.Advance(Delay);
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
+        Assert.Equal("collected", Assert.Single((await Fixture.WaitForEffectCountAsync(receiver, 1)).Effects).Value);
+    }
+
     private async Task AssertWakeupAtAsync(IMessagingTestGrain grain, DateTimeOffset deliverAt)
     {
         var result = await Fixture.RunPumpAsync(grain);
