@@ -75,12 +75,12 @@ public class DurableMessagingOptions
     public TimeSpan DeduplicationWindow { get; set; } = TimeSpan.FromDays(7);
 
     /// <summary>
-    /// Gets or sets the base delay between retry attempts for outbox delivery and inbox processing.
+    /// Gets or sets the delay before the first retry of a failed outbox delivery or inbox processing attempt.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The outbox applies exponential backoff from this duration after each failed delivery attempt, including when
-    /// the target inbox returns <c>DeliveryResult.Backpressured()</c>. The inbox applies the same backoff after a
+    /// The outbox doubles this interval after each failed delivery attempt, including when the target inbox returns
+    /// <c>DeliveryResult.Backpressured()</c>, up to 64 times this interval. The inbox applies the same backoff after a
     /// handler fails.
     /// </para>
     /// <para>
@@ -94,9 +94,9 @@ public class DurableMessagingOptions
     /// </para>
     /// </remarks>
     /// <value>
-    /// The base backpressure retry delay. Must be greater than zero. Defaults to 1 second.
+    /// The initial retry interval. Must be greater than zero. Defaults to 1 second.
     /// </value>
-    public TimeSpan BackpressureRetryDelay { get; set; } = TimeSpan.FromSeconds(1);
+    public TimeSpan RetryInitialInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     /// <summary>
     /// Gets or sets the maximum number of attempts before an inbox message is dead-lettered.
@@ -109,17 +109,17 @@ public class DurableMessagingOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The period starts with the first failed attempt and restarts whenever the receiver answers with
+    /// The timeout starts with the first failed attempt and restarts whenever the receiver answers with
     /// <c>DeliveryResult.Backpressured()</c>, so the outbox retries a backpressured message until the receiver takes it.
-    /// A receiver checks its deduplication records before answering, so only attempts since the period started can have
-    /// been accepted, and the period stays within <see cref="DeduplicationWindow"/> to keep their retries deduplicated.
+    /// A receiver checks its deduplication records before answering, so only attempts since the timeout started can have
+    /// been accepted, and the timeout stays within <see cref="DeduplicationWindow"/> to keep their retries deduplicated.
     /// </para>
     /// <para>
     /// The outbox logs each <c>DeliveryResult.HandlerNotFound()</c> answer as an error.
     /// </para>
     /// </remarks>
     /// <value>Must be greater than zero and less than <see cref="DeduplicationWindow"/>. Defaults to 6 hours.</value>
-    public TimeSpan MaxOutboxRetryAge { get; set; } = TimeSpan.FromHours(6);
+    public TimeSpan OutboxRetryTimeout { get; set; } = TimeSpan.FromHours(6);
 
     /// <summary>
     /// Gets or sets how long inbox and outbox dead letters are retained.
@@ -148,7 +148,7 @@ public class DurableMessagingOptions
     /// <para>
     /// The outbox calls each receiver through this pipeline, so its strategies, such as timeouts, retries, and circuit
     /// breakers, act within one delivery attempt. When an attempt fails, the outbox schedules the next attempt with
-    /// <see cref="BackpressureRetryDelay"/> backoff and continues delivering other messages. Receiving inboxes
+    /// <see cref="RetryInitialInterval"/> backoff and continues delivering other messages. Receiving inboxes
     /// deduplicate by message ID, so retrying a delivery whose outcome is unknown is safe.
     /// </para>
     /// <para>
@@ -185,16 +185,16 @@ public class DurableMessagingOptions
             throw new ArgumentOutOfRangeException(nameof(DeduplicationWindow), DeduplicationWindow, "DeduplicationWindow must be greater than TimeSpan.Zero.");
         }
 
-        if (BackpressureRetryDelay <= TimeSpan.Zero)
+        if (RetryInitialInterval <= TimeSpan.Zero)
         {
-            throw new ArgumentOutOfRangeException(nameof(BackpressureRetryDelay), BackpressureRetryDelay, "BackpressureRetryDelay must be greater than TimeSpan.Zero.");
+            throw new ArgumentOutOfRangeException(nameof(RetryInitialInterval), RetryInitialInterval, "RetryInitialInterval must be greater than TimeSpan.Zero.");
         }
-        if (BackpressureRetryDelay > MaxSupportedRetryDelay)
+        if (RetryInitialInterval > MaxSupportedRetryDelay)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(BackpressureRetryDelay),
-                BackpressureRetryDelay,
-                $"BackpressureRetryDelay must be less than or equal to {MaxSupportedRetryDelay}.");
+                nameof(RetryInitialInterval),
+                RetryInitialInterval,
+                $"RetryInitialInterval must be less than or equal to {MaxSupportedRetryDelay}.");
         }
 
         if (MaxProcessingAttempts <= 0)
@@ -202,17 +202,17 @@ public class DurableMessagingOptions
             throw new ArgumentOutOfRangeException(nameof(MaxProcessingAttempts), MaxProcessingAttempts, "MaxProcessingAttempts must be greater than zero.");
         }
 
-        if (MaxOutboxRetryAge <= TimeSpan.Zero)
+        if (OutboxRetryTimeout <= TimeSpan.Zero)
         {
-            throw new ArgumentOutOfRangeException(nameof(MaxOutboxRetryAge), MaxOutboxRetryAge, "MaxOutboxRetryAge must be greater than TimeSpan.Zero.");
+            throw new ArgumentOutOfRangeException(nameof(OutboxRetryTimeout), OutboxRetryTimeout, "OutboxRetryTimeout must be greater than TimeSpan.Zero.");
         }
 
-        if (MaxOutboxRetryAge >= DeduplicationWindow)
+        if (OutboxRetryTimeout >= DeduplicationWindow)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(MaxOutboxRetryAge),
-                MaxOutboxRetryAge,
-                "MaxOutboxRetryAge must be less than DeduplicationWindow.");
+                nameof(OutboxRetryTimeout),
+                OutboxRetryTimeout,
+                "OutboxRetryTimeout must be less than DeduplicationWindow.");
         }
 
         if (DeliveryResiliencePipeline is null)
