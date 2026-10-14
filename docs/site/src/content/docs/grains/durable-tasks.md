@@ -321,6 +321,9 @@ descriptor, which names the signal:
   grains use `SignalDurableTaskAsync`, which records the send for replay. The `Try`
   forms return a `DurableSignalResult`: `Accepted`, `Duplicate`, `Conflict`,
   `TaskNotFound`, or `TaskCompleted`.
+- A grain can commit an invocation on another grain and a signal for it in one journal
+  write. The signal message can then arrive first; the receiving grain records its value,
+  and the invocation observes it when it arrives.
 
 ## Commit model and guarantees
 

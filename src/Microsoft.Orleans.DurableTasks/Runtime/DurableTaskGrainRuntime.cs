@@ -57,7 +57,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// cancellation to each pending remote child and signals each running execution, whose result is then discarded.
 /// Completions and resumes which arrive for a deleted task are ignored. A cancellation which arrives before its
 /// invocation is recorded until <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.MaxOutboxRetryAge"/>
-/// has elapsed, after which the invocation can no longer arrive.
+/// has elapsed, after which the invocation can no longer arrive, and so is a signal which arrives before its invocation.
 /// </para>
 /// <para>
 /// Cancellation is cooperative: a request is recorded in task state, cancels the durable token of running attempts,
@@ -2002,9 +2002,23 @@ internal sealed partial class DurableTaskGrainRuntime(
                 var recordExpiry = AddSaturating(state.CreatedAt, _shared.MaxOutboxRetryAge);
                 expiry = recordExpiry > expiry ? recordExpiry : expiry;
             }
+            else if (IsSignalRecord(state))
+            {
+                // A signal record without its task preceded the invocation, which arrives within the sender's retry age,
+                // or never.
+                expiry = GetEarlySignalExpiry(state);
+            }
 
             if (expiry <= now)
             {
+                if (IsSignalRecord(state))
+                {
+                    _shared.Logger.LogWarning(
+                        "{Id} discarding a signal for durable task '{TaskId}', whose invocation didn't arrive within the sender's retry age.",
+                        GrainId,
+                        taskId.Parent());
+                }
+
                 (expired ??= []).Add((taskId, state));
             }
             else if (expiry < nextExpiry)

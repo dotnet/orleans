@@ -33,9 +33,10 @@ Messaging settings in `DurableMessagingOptions` govern the transport; see
 [Capacity, retries, and retention](messaging-operations.md#capacity-retries-and-retention).
 
 - `MaxOutboxRetryAge` bounds how long the outbox retries an invocation, completion,
-  cancellation, or signal before dead-lettering it. A cancellation which arrives before
-  its invocation is retained for this period, so the invocation terminates as canceled
-  when it arrives.
+  cancellation, or signal before dead-lettering it. A cancellation or signal which arrives
+  before its invocation is retained for this period, so the invocation terminates as
+  canceled, or observes the signal, when it arrives. A signal whose invocation doesn't
+  arrive in this period is deleted, and the grain logs a warning.
 - `DeduplicationWindow` deduplicates redelivered durable task messages, like other
   messages.
 - Invocations, completions, cancellations, and signals are accepted directly into task
@@ -169,7 +170,8 @@ described in [Inspect and replay dead letters](messaging-operations.md#inspect-a
 
 - The receiving inbox dead-letters a message which fails validation, such as an
   invocation which reuses a task ID with a different request, and a rejected signal,
-  with the rejection as its reason.
+  such as one with a conflicting value or for a completed task, with the rejection as
+  its reason.
 - The outbox dead-letters a message whose delivery fails for `MaxOutboxRetryAge`.
 - The outbox dead-letters a completion whose stored result no longer decodes, for
   example after a deployment removed the result type, with the decoding error as its
