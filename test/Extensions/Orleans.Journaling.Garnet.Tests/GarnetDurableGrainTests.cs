@@ -41,6 +41,7 @@ public sealed class GarnetIntegrationTestFixture : IntegrationTestFixture
             {
                 storage.MetaStore = metaStore;
                 storage.InitialRangeMap = InitialRangeMap;
+                storage.HostId = options.SiloName;
                 storage.DataDirectory = options.SiloName is "Silo_2" ? null : Path.Combine(directory, options.SiloName);
                 storage.LogMemorySize = "64m";
                 storage.IndexMemorySize = "1m";

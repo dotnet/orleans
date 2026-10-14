@@ -23,6 +23,9 @@ internal static class GarnetJournalKeys
     /// <summary>The key of the partition descriptor hash.</summary>
     public static readonly byte[] PartitionKey = "oj:partition"u8.ToArray();
 
+    /// <summary>The partition descriptor field holding the identity of the range map the partition belongs to.</summary>
+    public const string MapIdField = "map-id";
+
     /// <summary>The partition descriptor field holding the partition's id.</summary>
     public const string PartitionIdField = "partition-id";
 
@@ -38,7 +41,21 @@ internal static class GarnetJournalKeys
         return (int)(XxHash64.HashToUInt64(encodedJournalId) & (ulong)(bucketCount - 1));
     }
 
-    public static byte[] GetBucketKey(int bucket) => Concat(BucketPrefix, bucket, separator: false, []);
+    /// <summary>
+    /// Gets the key of a bucket's state in a partition of the map <paramref name="mapId"/>.
+    /// </summary>
+    /// <remarks>
+    /// The key carries the map's identity, so a partition of another map, reached through a stale endpoint, holds no
+    /// such bucket and rejects the operation.
+    /// </remarks>
+    public static byte[] GetBucketKey(string mapId, int bucket)
+    {
+        var prefix = new byte[BucketPrefix.Length + Encoding.ASCII.GetByteCount(mapId) + 1];
+        BucketPrefix.CopyTo(prefix);
+        Encoding.ASCII.GetBytes(mapId, prefix.AsSpan(BucketPrefix.Length));
+        prefix[^1] = (byte)':';
+        return Concat(prefix, bucket, separator: false, []);
+    }
 
     public static byte[] GetIndexKey(int bucket) => Concat(IndexPrefix, bucket, separator: false, []);
 

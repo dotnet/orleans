@@ -25,6 +25,7 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
     private readonly Dictionary<PartitionId, ConnectionMultiplexer> _admin = [];
     private readonly List<GarnetJournalRouter> _routers = [];
     private InMemoryRangeMetaStore _store = null!;
+    private string _mapId = null!;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -42,6 +43,7 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
         // p0 and p1 split the buckets; p2 owns none yet.
         var map = RangeMap.CreateUniform(BucketCount, [Hosting(P0), Hosting(P1)]);
         map = map with { Partitions = map.Partitions.Add(P2, Hosting(P2).Value) };
+        _mapId = map.Id;
         _store = new InMemoryRangeMetaStore();
         await _store.TryWriteAsync(map, 0, CancellationToken);
         await GarnetJournalPartitionManager.InitializeAsync(_hosts[P0].EndPoint, P0, map, CancellationToken);
@@ -200,6 +202,24 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
         await Assert.ThrowsAsync<TimeoutException>(() => storage.AppendAsync(new ReadOnlySequence<byte>([5]), CancellationToken).AsTask());
     }
 
+    [Fact]
+    public async Task PartitionOfAnotherMap_RejectsOperations()
+    {
+        // A router of another map whose endpoints, for example stale ones, reach this map's partitions.
+        var own = (await CreateRouterAsync()).View;
+        var foreignStore = new InMemoryRangeMetaStore();
+        var foreign = (await foreignStore.TryWriteAsync(own.Map with { Id = RangeMap.CreateId() }, 0, CancellationToken)).Current!;
+        var router = new GarnetJournalRouter(foreignStore, foreign, TimeSpan.FromMilliseconds(500));
+        _routers.Add(router);
+        var storage = CreateStorage(router, "foreign");
+
+        await Assert.ThrowsAsync<TimeoutException>(() => storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken).AsTask());
+        foreach (var connection in _admin.Values)
+        {
+            Assert.False(await connection.GetDatabase().KeyExistsAsync(storage.DataKey));
+        }
+    }
+
     private static KeyValuePair<PartitionId, PartitionHosting> Hosting(PartitionId id) => new(id, new PartitionHosting("test", 0, id.Value));
 
     private async Task<GarnetJournalRouter> CreateRouterAsync()
@@ -229,7 +249,7 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
     {
         var result = (RedisResult[])(await _admin[partition].GetDatabase().ExecuteAsync(
             GarnetJournalProtocol.Bucket,
-            [(RedisKey)GarnetJournalKeys.GetBucketKey(bucket), operation, version.ToString(), GarnetJournalProtocol.NoSource, "1"]))!;
+            [(RedisKey)GarnetJournalKeys.GetBucketKey(_mapId, bucket), operation, version.ToString(), GarnetJournalProtocol.NoSource, "1"]))!;
         return (string?)result[0];
     }
 
