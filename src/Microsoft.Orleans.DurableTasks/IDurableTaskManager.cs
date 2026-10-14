@@ -123,8 +123,9 @@ public interface IDurableTaskManager
     /// <returns>An operation which completes once the signal commits with this grain's pending state changes.</returns>
     /// <remarks>
     /// The task records the first value for each signal name. A signal with an equal value leaves the task unchanged.
-    /// Within a durable execution, the send is recorded in the execution's tree, so a replay leaves the task unchanged;
-    /// sends begin in deterministic order, like unnamed children. <see cref="TrySignalAsync{T}(TaskId, DurableSignal{T}, T, CancellationToken)"/>
+    /// Within a durable execution, the send is recorded in the execution's tree under an identifier derived from the task
+    /// and the signal name, so a replay leaves the task unchanged; repeated sends of one signal in an execution are
+    /// numbered by occurrence. <see cref="TrySignalAsync{T}(TaskId, DurableSignal{T}, T, CancellationToken)"/>
     /// reports a rejection as its result instead of throwing.
     /// </remarks>
     /// <exception cref="DurableTaskNotFoundException">This grain retains no invoked task <paramref name="taskId"/>.</exception>
