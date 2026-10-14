@@ -189,6 +189,25 @@ internal interface IDurableTaskGrainRuntime
     }
 
     /// <summary>
+    /// Returns the outcome which <paramref name="effectId"/> records, or runs <paramref name="effect"/> and stages a record
+    /// of its outcome, without writing.
+    /// </summary>
+    DurableTaskResponse RunEffect<TState>(TaskId effectId, TState state, Func<TState, DurableTaskResponse> effect) =>
+        throw new NotSupportedException("The durable task runtime does not support recorded effects.");
+
+    /// <summary>
+    /// Throws when <paramref name="operationId"/> isn't recorded and an earlier run recorded <paramref name="otherKindId"/>,
+    /// the identifier which the other kind of named operation receives for the same occurrence of the same name.
+    /// </summary>
+    /// <param name="operationId">The operation which this run requests.</param>
+    /// <param name="otherKindId">The identifier of the other kind of operation for the same name and occurrence.</param>
+    /// <param name="requested">A description of the requested operation, for the error.</param>
+    /// <exception cref="InvalidOperationException">The earlier run recorded the other kind of operation.</exception>
+    void ThrowIfRecordedAsOtherKind(TaskId operationId, TaskId otherKindId, string requested)
+    {
+    }
+
+    /// <summary>
     /// Waits for the signal <paramref name="name"/> of the invoked task whose execution tree contains
     /// <paramref name="executionId"/>, and returns its committed value and the time it was recorded.
     /// </summary>

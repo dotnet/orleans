@@ -22,6 +22,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// </remarks>
 internal sealed class GrainDurableTaskContext : DurableTaskContext
 {
+    // The segment prefix of DurableTask.Once records, which share each occurrence of a name with children.
+    private const string EffectSegmentPrefix = "$once:";
     private readonly IDurableTaskGrainRuntime _runtime;
     private readonly TaskScheduler _scheduler;
     private long _utcNowTicks;
@@ -150,6 +152,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ThrowIfNotChildTaskId(taskId);
         ThrowIfDeleted();
+        if (TryGetOtherKindId(taskId, out var effectId))
+        {
+            _runtime.ThrowIfRecordedAsOtherKind(
+                taskId,
+                effectId,
+                task is IDurableTaskRequest { Context.TargetId: var target } ? $"a call to grain '{target}'" : "a local child task");
+        }
+
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         var handle = await _runtime.ScheduleChildAsync(taskId, task, suppressCancellation, executionCts.Token);
         return new ExecutionTaskHandle(handle, this);
@@ -197,6 +207,69 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         _runtime.StageBodyResponse(this, response);
+    }
+
+    /// <remarks>
+    /// The effect runs, and its record is staged, in the work item which calls this on the activation, so the record
+    /// commits in the same journal write as the journaled state which the effect changed. An effect which an earlier
+    /// run recorded as a child, or a child which an earlier run recorded as an effect, under the same name and
+    /// occurrence fails as a divergence instead of running again.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// The caller isn't running on the activation's scheduler, or an earlier run recorded another kind of operation under
+    /// the effect's name and occurrence.
+    /// </exception>
+    protected override DurableTaskResponse RunEffect<TState>(
+        TaskId effectId,
+        TState state,
+        Func<TState, DurableTaskResponse> effect)
+    {
+        if (TaskScheduler.Current != _scheduler)
+        {
+            throw new InvalidOperationException(
+                $"DurableTask.Once runs on the scheduler of the grain activation which runs durable task '{Id}', so its record commits with the state which it changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't record effects.");
+        }
+
+        ThrowIfNotChildTaskId(effectId);
+        ThrowIfDeleted();
+        if (TryGetOtherKindId(effectId, out var stepId))
+        {
+            _runtime.ThrowIfRecordedAsOtherKind(effectId, stepId, "a DurableTask.Once effect");
+        }
+
+        return _runtime.RunEffect(effectId, state, effect);
+    }
+
+    /// <summary>
+    /// Gets the identifier which the other kind of named operation receives for the occurrence of a name which
+    /// <paramref name="operationId"/> uses beneath this execution: a <c>DurableTask.Once</c> effect, <c>$once:x$2</c>,
+    /// and a child or combinator, <c>x$2</c>, share each occurrence of a name.
+    /// </summary>
+    /// <returns><see langword="false"/> when the operation's segment beneath this execution is generated.</returns>
+    private bool TryGetOtherKindId(TaskId operationId, out TaskId otherId)
+    {
+        var named = operationId;
+        for (var parent = named.Parent(); parent != Id; parent = parent.Parent())
+        {
+            named = parent;
+        }
+
+        var executionPath = Id.ToString();
+        var segment = named.ToString().AsSpan(executionPath.Length + 1);
+        if (segment.StartsWith(EffectSegmentPrefix, StringComparison.Ordinal))
+        {
+            otherId = TaskId.Parse($"{executionPath}/{segment[EffectSegmentPrefix.Length..]}");
+            return true;
+        }
+
+        if (segment[0] != '$')
+        {
+            otherId = TaskId.Parse($"{executionPath}/{EffectSegmentPrefix}{segment}");
+            return true;
+        }
+
+        otherId = default;
+        return false;
     }
 
     /// <remarks>
