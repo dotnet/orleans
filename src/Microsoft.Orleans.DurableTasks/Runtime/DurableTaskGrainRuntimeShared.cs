@@ -25,7 +25,7 @@ internal sealed class DurableTaskGrainRuntimeShared(
     /// Gets how long an outbox retries a message before dead-lettering it, which bounds how late an invocation can
     /// arrive after a cancellation for it.
     /// </summary>
-    public TimeSpan MaxOutboxRetryAge { get; } = messagingOptions.Value.MaxOutboxRetryAge;
+    public TimeSpan OutboxRetryTimeout { get; } = messagingOptions.Value.OutboxRetryTimeout;
 
     public Serializer Serializer { get; } = serializer;
 }
