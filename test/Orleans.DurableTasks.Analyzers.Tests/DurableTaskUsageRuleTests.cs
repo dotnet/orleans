@@ -41,6 +41,36 @@ public class DurableTaskUsageRuleTests
         """);
 
     [Fact]
+    public Task UnnamedOnceEffectsReturnTheirOutputsAndHaveNoNames() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            public async DurableTask<int> RunAsync()
+            {
+                var captured = 0;
+                DurableTask.Once(() => { {|ORLEANS0104:captured = 1|}; });
+                DurableTask.Once(() => { {|ORLEANS0104:captured++|}; });
+                var returned = DurableTask.Once(() =>
+                {
+                    var local = 2;
+                    local++;
+                    _status.Value = local;
+                    return local;
+                });
+                DurableTask.Once(() => {|ORLEANS0109:Task.Run(() => 1)|}.Result);
+
+                // Unnamed effects take generated identifiers, so neither a result which contains '$' nor a repeated call
+                // site is a name.
+                DurableTask.Once(() => "$value");
+                DurableTask.Once(() => 3);
+                DurableTask.Once(() => 3);
+                await Step(captured + returned).WithId("step");
+                return returned;
+            }
+        }
+        """);
+
+    [Fact]
     public Task DefinitionsAreAwaitedScheduledOrDetached() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {

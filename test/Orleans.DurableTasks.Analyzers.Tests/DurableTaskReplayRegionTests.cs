@@ -113,6 +113,25 @@ public class DurableTaskReplayRegionTests
         """);
 
     [Fact]
+    public Task UnnamedEffectsAreRecordedOperations() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            public async DurableTask<string> RunAsync()
+            {
+                var status = {|ORLEANS0100:_status|}.Value;
+                var id = DurableTask.Once(Guid.NewGuid);
+                var read = DurableTask.Once(() => _status.Value);
+                var now = DurableTask.Once(() => DateTime.UtcNow);
+                DurableTask.Once(() => SetStatus(status + read));
+
+                // The tail follows the last recorded effect.
+                return $"{id} {now} {_status.Value}";
+            }
+        }
+        """);
+
+    [Fact]
     public Task GrainStateInALoopWhichSchedulesDurableWorkIsReported() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
