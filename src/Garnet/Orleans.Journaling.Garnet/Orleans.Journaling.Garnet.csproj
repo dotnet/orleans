@@ -6,7 +6,7 @@
     <Description>Experimental Orleans.Journaling storage backed by embedded Garnet partitions with synchronous AOF durability.</Description>
     <PackageTags>$(PackageTags) Journaling Garnet</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
