@@ -760,6 +760,33 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, activationsNotCollected);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        public async Task ActivationCollectorShouldCollectAfterReleasingKeepAliveHolds()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            await Initialize(DEFAULT_IDLE_TIMEOUT, cancellationToken);
+
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(KeepAliveActivationGcTestGrain));
+            var grain = this.testCluster.GrainFactory!.GetGrain<IKeepAliveActivationGcTestGrain>(Guid.NewGuid());
+            await grain.AcquireKeepAliveHold();
+            await grain.AcquireKeepAliveHold();
+
+            // Holds are counted, so the activation stays alive until every hold is released.
+            var mgmtGrain = this.testCluster.GrainFactory!.GetGrain<IManagementGrain>(0);
+            await mgmtGrain.ForceActivationCollection(TimeSpan.Zero, cancellationToken);
+            Assert.Equal(1, await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName));
+
+            await grain.ReleaseKeepAliveHold();
+            await mgmtGrain.ForceActivationCollection(TimeSpan.Zero, cancellationToken);
+            Assert.Equal(1, await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName));
+
+            await grain.ReleaseKeepAliveHold();
+            await WaitForActivationCountToConverge(fullGrainTypeName, expectedCount: 0, cancellationToken);
+            Assert.Equal(0, await TestUtils.GetActivationCount(this.testCluster.GrainFactory!, fullGrainTypeName));
+        }
+
         [TestSuite("SlowBVT")]
         [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]

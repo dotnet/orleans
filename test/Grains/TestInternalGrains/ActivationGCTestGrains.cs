@@ -188,5 +188,17 @@ namespace UnitTests.Grains
             DelayDeactivation(TimeSpan.Zero);
             return Task.CompletedTask;
         }
+
+        public Task AcquireKeepAliveHold()
+        {
+            ((IActivationKeepAlive)GrainContext).AcquireKeepAlive();
+            return Task.CompletedTask;
+        }
+
+        public Task ReleaseKeepAliveHold()
+        {
+            ((IActivationKeepAlive)GrainContext).ReleaseKeepAlive();
+            return Task.CompletedTask;
+        }
     }
 }

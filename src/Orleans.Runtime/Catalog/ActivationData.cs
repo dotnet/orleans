@@ -29,6 +29,7 @@ namespace Orleans.Runtime;
 internal sealed partial class ActivationData :
     IGrainContext,
     ICollectibleGrainContext,
+    IActivationKeepAlive,
     IGrainExtensionBinder,
     IActivationWorkingSetMember,
     IGrainTimerRegistry,
@@ -584,6 +585,27 @@ internal sealed partial class ActivationData :
         }
     }
 
+    void IActivationKeepAlive.AcquireKeepAlive()
+    {
+        lock (_lock)
+        {
+            _extras ??= new();
+            ++_extras.KeepAliveHolds;
+        }
+    }
+
+    void IActivationKeepAlive.ReleaseKeepAlive()
+    {
+        lock (_lock)
+        {
+            Debug.Assert(_extras is { KeepAliveHolds: > 0 });
+            if (--_extras!.KeepAliveHolds == 0)
+            {
+                MarkActive();
+            }
+        }
+    }
+
     public void ResetKeepAliveRequest()
     {
         lock (_lock)
@@ -613,7 +635,10 @@ internal sealed partial class ActivationData :
                     TimeSpan.FromTicks(Math.Max(keepAliveDuration.Ticks, CollectionAgeLimit.Ticks)));
             }
 
-            if (_waitingRequests.Count > 0 || _runningRequests.Count > 0 || _idleDuration.Elapsed < ageLimit)
+            if (_waitingRequests.Count > 0
+                || _runningRequests.Count > 0
+                || _idleDuration.Elapsed < ageLimit
+                || respectKeepAlive && _extras is { KeepAliveHolds: > 0 })
             {
                 return ActivationCollectionResult.Reschedule(CollectionAgeLimit);
             }
@@ -1100,7 +1125,7 @@ internal sealed partial class ActivationData :
         const int IdlenessLowerBound = 10_000;
         lock (_lock)
         {
-            var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound;
+            var inactive = IsInactive && _idleDuration.ElapsedMilliseconds > IdlenessLowerBound && _extras is not { KeepAliveHolds: > 0 };
 
             // This instance will remain in the working set if it is either not pending removal or if it is currently active.
             _isInWorkingSet = !wouldRemove || !inactive;
@@ -1615,13 +1640,7 @@ internal sealed partial class ActivationData :
             // is in the activation working set.
             if (message.IsKeepAlive)
             {
-                _idleDuration = CoarseStopwatch.StartNew();
-
-                if (!_isInWorkingSet)
-                {
-                    _isInWorkingSet = true;
-                    _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
-                }
+                MarkActive();
             }
 
             // The below logic only works for non-reentrant activations
@@ -1634,6 +1653,20 @@ internal sealed partial class ActivationData :
 
         // Signal the message pump to see if there is another request which can be processed now that this one has completed
         _workSignal.Signal();
+    }
+
+    /// <summary>
+    /// Restarts the idle period and ensures the activation is in the working set. Must be called under <see cref="_lock"/>.
+    /// </summary>
+    private void MarkActive()
+    {
+        _idleDuration = CoarseStopwatch.StartNew();
+
+        if (!_isInWorkingSet)
+        {
+            _isInWorkingSet = true;
+            _shared.InternalRuntime.ActivationWorkingSet.OnActive(this);
+        }
     }
 
     public void ReceiveMessage(object message) => ReceiveMessage((Message)message);
@@ -2473,6 +2506,11 @@ internal sealed partial class ActivationData :
         private const int IsStuckDeactivatingFlag = 1 << 1;
         private const int IsDisposingFlag = 1 << 2;
         private byte _flags;
+
+        /// <summary>
+        /// The number of <see cref="IActivationKeepAlive"/> holds which prevent idle collection.
+        /// </summary>
+        public int KeepAliveHolds;
 
         public HashSet<IGrainTimer>? Timers { get => GetValueOrDefault<HashSet<IGrainTimer>>(nameof(Timers)); set => SetOrRemoveValue(nameof(Timers), value); }
 

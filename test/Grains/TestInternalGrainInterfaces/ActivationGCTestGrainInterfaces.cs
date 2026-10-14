@@ -44,5 +44,7 @@ namespace UnitTests.GrainInterfaces
     {
         Task SetKeepAlive(TimeSpan keepAlive);
         Task CancelKeepAlive();
+        Task AcquireKeepAliveHold();
+        Task ReleaseKeepAliveHold();
     }
 }
