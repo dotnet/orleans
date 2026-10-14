@@ -1317,7 +1317,7 @@ public class DurableTaskModelTests
             registration.CallbackObservedCanceledToken |= token.IsCancellationRequested;
             registration.CallbackObservedAmbientContext |= ReferenceEquals(
                 context,
-                DurableExecutionContext.Current);
+                DurableTask.Current);
             if (registration.Failure is { } failure)
             {
                 registration.Status = CancellationRegistrationStatus.Failed;

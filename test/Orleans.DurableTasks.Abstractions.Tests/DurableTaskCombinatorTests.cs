@@ -260,7 +260,7 @@ public class DurableTaskCombinatorTests
 
         public Task<DurableTaskResponse> Response => _response.Task;
 
-        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         {
             var response = await DurableTaskRuntimeHelper.RunAsync(inner, context);
             _response.SetResult(response);
