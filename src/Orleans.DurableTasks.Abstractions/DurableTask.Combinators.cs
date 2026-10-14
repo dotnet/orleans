@@ -273,14 +273,14 @@ public abstract partial class DurableTask
     private static IAsyncEnumerable<TTask> WhenEachCore<TTask>(DurableTask[] inputs, Func<IScheduledTaskHandle, TTask> createTask)
         where TTask : ScheduledTask
     {
-        var context = DurableExecutionContext.Current
+        var context = DurableTaskContext.Ambient
             ?? throw new InvalidOperationException("DurableTask.WhenEach schedules its inputs in a durable execution, so it is called within one.");
         return WhenEachAsync(inputs, context, context.CreateOperationId(ScheduledTask.WhenEachOperation), createTask, CancellationToken.None);
     }
 
     private static async IAsyncEnumerable<TTask> WhenEachAsync<TTask>(
         DurableTask[] inputs,
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId,
         Func<IScheduledTaskHandle, TTask> createTask,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -299,12 +299,12 @@ public abstract partial class DurableTask
         }
     }
 
-    private static Task<ScheduledTask[]> ScheduleAllCoreAsync(DurableTask[] inputs, DurableExecutionContext context, TaskId operationId)
+    private static Task<ScheduledTask[]> ScheduleAllCoreAsync(DurableTask[] inputs, DurableTaskContext context, TaskId operationId)
         => ScheduleInputsAsync(inputs, context, operationId, static handle => (ScheduledTask)new ScheduledTaskHandle(handle), context.ExecutionAbortToken);
 
     private static Task<ScheduledTask<TResult>[]> ScheduleAllCoreAsync<TResult>(
         DurableTask[] inputs,
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId)
         => ScheduleInputsAsync(
             inputs,
@@ -315,7 +315,7 @@ public abstract partial class DurableTask
 
     private static async Task<ScheduledTask[]> WhenAllCompletedCoreAsync(
         DurableTask[] inputs,
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId)
         => await WaitForEveryCompletionAsync(
             await ScheduleAllCoreAsync(inputs, context, operationId).ConfigureAwait(false),
@@ -323,7 +323,7 @@ public abstract partial class DurableTask
 
     private static async Task<ScheduledTask<TResult>[]> WhenAllCompletedCoreAsync<TResult>(
         DurableTask[] inputs,
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId)
         => await WaitForEveryCompletionAsync(
             await ScheduleAllCoreAsync<TResult>(inputs, context, operationId).ConfigureAwait(false),
@@ -342,12 +342,12 @@ public abstract partial class DurableTask
 
     // Cancellation reaches the inputs, which are attached children, so each combinator waits for their outcomes and stops
     // waiting only when the host aborts the attempt.
-    private static async Task WhenAllCoreAsync(DurableTask[] inputs, DurableExecutionContext context, TaskId operationId)
+    private static async Task WhenAllCoreAsync(DurableTask[] inputs, DurableTaskContext context, TaskId operationId)
         => await WaitForAllAsync(inputs, context, operationId).ConfigureAwait(false);
 
     private static async Task<TResult[]> WhenAllCoreAsync<TResult>(
         DurableTask[] inputs,
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId)
     {
         var responses = await WaitForAllAsync(inputs, context, operationId).ConfigureAwait(false);
@@ -367,7 +367,7 @@ public abstract partial class DurableTask
     /// <remarks>Input order selects the exception, so a replay observes the same one in any completion order.</remarks>
     private static async Task<DurableTaskResponse[]> WaitForAllAsync(
         DurableTask[] inputs,
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId)
     {
         var cancellationToken = context.ExecutionAbortToken;
@@ -383,7 +383,7 @@ public abstract partial class DurableTask
         return responses;
     }
 
-    private static async Task<int> WhenAnyCoreAsync(DurableTask[] inputs, DurableExecutionContext context, TaskId operationId)
+    private static async Task<int> WhenAnyCoreAsync(DurableTask[] inputs, DurableTaskContext context, TaskId operationId)
     {
         var cancellationToken = context.ExecutionAbortToken;
         var (tasks, index) = await SelectAsync(inputs, context, operationId, cancellationToken).ConfigureAwait(false);
@@ -393,7 +393,7 @@ public abstract partial class DurableTask
 
     private static async Task<(int Index, TResult Result)> WhenAnyCoreAsync<TResult>(
         DurableTask[] inputs,
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId)
     {
         var cancellationToken = context.ExecutionAbortToken;
@@ -407,7 +407,7 @@ public abstract partial class DurableTask
     /// </summary>
     internal static async Task<(ScheduledTask[] Tasks, int Index)> SelectAsync(
         DurableTask[] inputs,
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId,
         CancellationToken cancellationToken)
     {
@@ -431,7 +431,7 @@ public abstract partial class DurableTask
 
     private static async Task<TTask[]> ScheduleInputsAsync<TTask>(
         DurableTask[] inputs,
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId,
         Func<IScheduledTaskHandle, TTask> createTask,
         CancellationToken cancellationToken)
@@ -495,7 +495,7 @@ internal interface IInlineOperation
     /// Runs the operation in <paramref name="context"/> under <paramref name="operationId"/>, or under an identifier
     /// generated in <paramref name="context"/> when <paramref name="operationId"/> is <see cref="TaskId.None"/>.
     /// </summary>
-    ValueTask<DurableTaskResponse> RunInlineAsync(DurableExecutionContext context, TaskId operationId);
+    ValueTask<DurableTaskResponse> RunInlineAsync(DurableTaskContext context, TaskId operationId);
 
     /// <summary>Creates the error for scheduling an inline-only operation as a task of its own.</summary>
     static NotSupportedException CreateInlineOnlyException() =>
@@ -509,16 +509,16 @@ internal interface IInlineOperation
 internal sealed class CombinatorDurableTask(
     string operationKind,
     DurableTask[] inputs,
-    Func<DurableTask[], DurableExecutionContext, TaskId, Task> body) : DurableTask, IInlineOperation
+    Func<DurableTask[], DurableTaskContext, TaskId, Task> body) : DurableTask, IInlineOperation
 {
     public bool InlineOnly => false;
 
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) => RunInlineAsync(context, TaskId.None);
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) => RunInlineAsync(context, TaskId.None);
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
-    public async ValueTask<DurableTaskResponse> RunInlineAsync(DurableExecutionContext context, TaskId operationId)
+    public async ValueTask<DurableTaskResponse> RunInlineAsync(DurableTaskContext context, TaskId operationId)
     {
-        using var scope = DurableExecutionContext.Enter(context);
+        using var scope = DurableTaskContext.Enter(context);
         try
         {
             await body(inputs, context, CombinatorOperation.Resolve(context, operationKind, operationId)).ConfigureAwait(false);
@@ -539,20 +539,20 @@ internal sealed class CombinatorDurableTask(
 internal sealed class CombinatorDurableTask<TResult>(
     string operationKind,
     DurableTask[] inputs,
-    Func<DurableTask[], DurableExecutionContext, TaskId, Task<TResult>> body,
+    Func<DurableTask[], DurableTaskContext, TaskId, Task<TResult>> body,
     bool inlineOnly = false) : DurableTask<TResult>, IInlineOperation
 {
     public bool InlineOnly => inlineOnly;
 
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) =>
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) =>
         inlineOnly
             ? new(DurableTaskResponse.FromException(IInlineOperation.CreateInlineOnlyException()))
             : RunInlineAsync(context, TaskId.None);
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
-    public async ValueTask<DurableTaskResponse> RunInlineAsync(DurableExecutionContext context, TaskId operationId)
+    public async ValueTask<DurableTaskResponse> RunInlineAsync(DurableTaskContext context, TaskId operationId)
     {
-        using var scope = DurableExecutionContext.Enter(context);
+        using var scope = DurableTaskContext.Enter(context);
         try
         {
             return DurableTaskResponse.FromResult(
@@ -569,6 +569,6 @@ internal static class CombinatorOperation
 {
     // A generated identifier is allocated before the body's first await, so combinators which begin in deterministic
     // order receive the same identifiers on replay.
-    public static TaskId Resolve(DurableExecutionContext context, string operationKind, TaskId operationId)
+    public static TaskId Resolve(DurableTaskContext context, string operationKind, TaskId operationId)
         => operationId.IsDefault ? context.CreateOperationId(operationKind) : operationId;
 }

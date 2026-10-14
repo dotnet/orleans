@@ -22,10 +22,10 @@ public static class DetachedTaskId
     /// <exception cref="InvalidOperationException">No durable execution is current.</exception>
     public static string For(string segment)
     {
-        var context = DurableExecutionContext.Current
+        var context = DurableTaskContext.Ambient
             ?? throw new InvalidOperationException(
                 "DetachedTaskId.For(segment) requires a durable execution context. Outside an execution, choose an explicit root identifier.");
-        return For(context.TaskId, segment);
+        return For(context.Id, segment);
     }
 
     /// <summary>Derives a detached task's root identifier from its starter's identifier and <paramref name="segment"/>.</summary>

@@ -96,7 +96,7 @@ public partial class DurableTaskDetachTests
         using var waitCancellation = new CancellationTokenSource();
         var response = await RunAsync(context, async () =>
         {
-            await DurableTaskRuntimeHelper.RequestCancellationAsync(DurableExecutionContext.Current!);
+            await DurableTaskRuntimeHelper.RequestCancellationAsync(DurableTask.Current);
             await new DetachableRootDefinition().DetachAsync("cleanup", waitCancellation.Token);
         });
 
@@ -127,7 +127,7 @@ public partial class DurableTaskDetachTests
         return (response, context);
     }
 
-    private sealed class DetachRecordingContext(TaskId taskId, bool supportsDetach = true) : DurableExecutionContext(taskId)
+    private sealed class DetachRecordingContext(TaskId taskId, bool supportsDetach = true) : DurableTaskContext(taskId)
     {
         public List<(TaskId MarkerId, TaskId RootId, DurableTask Definition, CancellationToken CancellationToken)> Detached { get; } = [];
 
@@ -184,7 +184,7 @@ public partial class DurableTaskDetachTests
             throw new NotSupportedException();
         }
 
-        protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
             => throw new NotSupportedException();
     }
 

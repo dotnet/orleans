@@ -100,7 +100,7 @@ public sealed class DurableSignal<T>
 
 internal sealed class SignalWaitDurableTask<T>(string name) : DurableTask<T>
 {
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => context.WaitForSignalAsync(name, context.CancellationToken);
 
     internal override bool RunsInlineInParent => true;

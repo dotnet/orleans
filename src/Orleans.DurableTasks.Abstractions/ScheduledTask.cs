@@ -125,7 +125,7 @@ public abstract class ScheduledTask
 
     /// <summary>Durably requests cancellation carrying <paramref name="reason"/>.</summary>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
     /// <see langword="null"/> for none.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
@@ -248,17 +248,17 @@ public abstract class ScheduledTask
     public static IAsyncEnumerable<ScheduledTask> WhenEach(IReadOnlyList<ScheduledTask> tasks)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        return WhenEachCoreAsync(tasks.ToArray(), DurableExecutionContext.Current);
+        return WhenEachCoreAsync(tasks.ToArray(), DurableTaskContext.Ambient);
     }
 
     /// <inheritdoc cref="WhenEach(IReadOnlyList{ScheduledTask})"/>
     public static IAsyncEnumerable<ScheduledTask<TResult>> WhenEach<TResult>(IReadOnlyList<ScheduledTask<TResult>> tasks)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        return WhenEachCoreAsync(tasks.ToArray(), DurableExecutionContext.Current);
+        return WhenEachCoreAsync(tasks.ToArray(), DurableTaskContext.Ambient);
     }
 
-    private static IAsyncEnumerable<TTask> WhenEachCoreAsync<TTask>(TTask[] tasks, DurableExecutionContext? context)
+    private static IAsyncEnumerable<TTask> WhenEachCoreAsync<TTask>(TTask[] tasks, DurableTaskContext? context)
         where TTask : ScheduledTask
         => context is null
             ? WhenEachObservedAsync(tasks, CancellationToken.None)
@@ -271,7 +271,7 @@ public abstract class ScheduledTask
     /// completions, each under a decision identifier beneath <paramref name="operationId"/>.
     /// </summary>
     internal static async IAsyncEnumerable<TTask> WhenEachSelectedAsync<TTask>(
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId,
         TTask[] tasks,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -431,13 +431,13 @@ public abstract class ScheduledTask
         where TTask : ScheduledTask
     {
         ArgumentOutOfRangeException.ThrowIfZero(tasks.Length, nameof(tasks));
-        return DurableExecutionContext.Current is { } context
+        return DurableTaskContext.Ambient is { } context
             ? SelectAnyIndexAsync(context, context.CreateOperationId(DurableTask.WhenAnyOperation), tasks, cancellationToken)
             : WaitForAnyIndexAsync(tasks, cancellationToken);
     }
 
     private static async Task<int> SelectAnyIndexAsync<TTask>(
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TaskId operationId,
         TTask[] tasks,
         CancellationToken cancellationToken)
@@ -473,7 +473,7 @@ public abstract class ScheduledTask
     /// Links the caller's wait cancellation with the execution's abort token, or returns <see langword="null"/> when the
     /// caller's token can't be canceled, so the abort token alone applies.
     /// </summary>
-    internal static CancellationTokenSource? CreateLinkedWaitCancellation(DurableExecutionContext context, CancellationToken cancellationToken) =>
+    internal static CancellationTokenSource? CreateLinkedWaitCancellation(DurableTaskContext context, CancellationToken cancellationToken) =>
         cancellationToken.CanBeCanceled
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.ExecutionAbortToken)
             : null;
