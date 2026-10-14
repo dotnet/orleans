@@ -125,16 +125,22 @@ public abstract class DurableTask
 
     private static async Task WhenAllCore(
         IReadOnlyList<DurableTask> tasks,
-        CancellationToken cancellationToken)
+        CancellationToken _)
     {
+        // Cancellation reaches the inputs, which are attached children, so the combinator waits for their outcomes
+        // and stops waiting only when the host aborts the attempt.
+        var cancellationToken = GetCurrentContext(nameof(WhenAll)).ExecutionAbortToken;
         var scheduled = await ScheduleCombinatorInputsAsync(tasks, nameof(WhenAll), "when-all", cancellationToken).ConfigureAwait(false);
         await ScheduledTask.WhenAll(scheduled.Tasks, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<IReadOnlyList<TResult>> WhenAllCore<TResult>(
         IReadOnlyList<DurableTask<TResult>> tasks,
-        CancellationToken cancellationToken)
+        CancellationToken _)
     {
+        // Cancellation reaches the inputs, which are attached children, so the combinator waits for their outcomes
+        // and stops waiting only when the host aborts the attempt.
+        var cancellationToken = GetCurrentContext(nameof(WhenAll)).ExecutionAbortToken;
         var scheduled = await ScheduleCombinatorInputsAsync(tasks, nameof(WhenAll), "when-all", cancellationToken).ConfigureAwait(false);
         await ScheduledTask.WhenAll(scheduled.Tasks, cancellationToken).ConfigureAwait(false);
         var results = new TResult[scheduled.Tasks.Length];
@@ -148,8 +154,11 @@ public abstract class DurableTask
 
     private static async Task<int> WhenAnyCore(
         IReadOnlyList<DurableTask> tasks,
-        CancellationToken cancellationToken)
+        CancellationToken _)
     {
+        // Cancellation reaches the inputs, which are attached children, so the combinator waits for their outcomes
+        // and stops waiting only when the host aborts the attempt.
+        var cancellationToken = GetCurrentContext(nameof(WhenAny)).ExecutionAbortToken;
         var scheduled = await ScheduleCombinatorInputsAsync(tasks, nameof(WhenAny), "when-any", cancellationToken).ConfigureAwait(false);
         var index = await SelectWinnerAsync(scheduled.Context, scheduled.OperationId, scheduled.Tasks, cancellationToken).ConfigureAwait(false);
         await scheduled.Tasks[index].WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -158,8 +167,11 @@ public abstract class DurableTask
 
     private static async Task<(int Index, TResult Result)> WhenAnyCore<TResult>(
         IReadOnlyList<DurableTask<TResult>> tasks,
-        CancellationToken cancellationToken)
+        CancellationToken _)
     {
+        // Cancellation reaches the inputs, which are attached children, so the combinator waits for their outcomes
+        // and stops waiting only when the host aborts the attempt.
+        var cancellationToken = GetCurrentContext(nameof(WhenAny)).ExecutionAbortToken;
         var scheduled = await ScheduleCombinatorInputsAsync(tasks, nameof(WhenAny), "when-any", cancellationToken).ConfigureAwait(false);
         var index = await SelectWinnerAsync(scheduled.Context, scheduled.OperationId, scheduled.Tasks, cancellationToken).ConfigureAwait(false);
         return (index, (await scheduled.Tasks[index].GetResponseAsync(cancellationToken).ConfigureAwait(false)).GetResult<TResult>());
