@@ -610,6 +610,9 @@ public sealed partial class DurableTaskSignalTests
         public GrainId RemoteTarget { get; set; }
         public string? RemoteRequestFingerprint { get; set; }
         public GrainId CallerId { get; set; }
+
+        // This storage doesn't order completions, so the runtime records each completion decision.
+        public long CompletionSequence => 0;
         IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     }
 
