@@ -153,7 +153,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         {
             base.ConfigureOptions(options);
             options.MaxProcessingAttempts = 3;
-            options.BackpressureRetryDelay = RetryDelay;
+            options.RetryInitialInterval = RetryDelay;
         }
     }
 }
