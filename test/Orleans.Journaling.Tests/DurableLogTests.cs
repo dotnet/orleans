@@ -65,6 +65,7 @@ public class DurableLogTests : JournalingTestBase
         await sut.Lifecycle.OnStart(CancellationToken);
 
         await using var read = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
         log.Append("a");
         var next = read.MoveNextAsync();
         Assert.False(next.IsCompleted);
@@ -88,6 +89,7 @@ public class DurableLogTests : JournalingTestBase
         await sut.Lifecycle.OnStart(CancellationToken);
 
         await using var read = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
         log.Append("captured");
         sut.Storage.HoldNextWrite();
         var write = sut.Manager.WriteStateAsync(CancellationToken).AsTask();
@@ -120,6 +122,7 @@ public class DurableLogTests : JournalingTestBase
 
         await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Entry(0, "committed"), await read.NextAsync());
+        Assert.Equal(CaughtUp(1), await read.NextAsync());
 
         log.Append("a");
         log.Append("b");
@@ -134,7 +137,7 @@ public class DurableLogTests : JournalingTestBase
     });
 
     [Fact]
-    public Task Read_BeforeTrimPoint_Resets() => RunOnActivationSchedulerAsync(async () =>
+    public Task Read_BeforeTrimPoint_ReportsTrim() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
         var log = CreateLog(sut.Manager);
@@ -148,15 +151,221 @@ public class DurableLogTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken);
 
         await using var read = log.ReadAsync(1, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
-        Assert.Equal(Reset(3), await read.NextAsync());
+        Assert.Equal(Trimmed(3), await read.NextAsync());
         Assert.Equal(Entry(3, "e3"), await read.NextAsync());
+        Assert.Equal(Entry(4, "e4"), await read.NextAsync());
+        Assert.Equal(CaughtUp(5), await read.NextAsync());
 
-        // A trim which passes the reader's position resets it to the new first entry.
+        // A committed reader observes a trim once it is durable.
+        log.TrimBefore(4);
+        var next = read.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Trimmed(4), read.Current);
+
+        // A trim which reaches the reader's position is reported, so a caught-up reader observes every trim.
         log.TrimBefore(5);
-        Assert.Equal(Reset(5), await read.NextAsync());
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.Equal(Trimmed(5), await read.NextAsync());
         log.Append("e5");
         await sut.Manager.WriteStateAsync(CancellationToken);
         Assert.Equal(Entry(5, "e5"), await read.NextAsync());
+    });
+
+    [Fact]
+    public Task CommittedRead_PositionedInUncommittedTrim_AwaitsTheTrim() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("a");
+        log.Append("b");
+        log.Append("c");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+
+        await using var read = log.ReadAsync(0, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Entry(0, "a"), await read.NextAsync());
+
+        // The trimmed entries are durable, but the trim is not, so the reader reports neither until the trim's write.
+        log.TrimBefore(2);
+        var next = read.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Trimmed(2), read.Current);
+        Assert.Equal(Entry(2, "c"), await read.NextAsync());
+        Assert.Equal(CaughtUp(3), await read.NextAsync());
+    });
+
+    [Fact]
+    public Task SpeculativeRead_ReportsStagedTrim() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("a");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+
+        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Entry(0, "a"), await read.NextAsync());
+        Assert.Equal(CaughtUp(1), await read.NextAsync());
+
+        log.TrimBefore(1);
+        Assert.Equal(Trimmed(1, DurableChangeStatus.Staged), await read.NextAsync());
+    });
+
+    [Fact]
+    public Task Clear_ReplacesHistoryAndResetsReaders() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var storage = new GatedJournalStorage();
+        var sut = CreateSystem(storage);
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("a");
+        log.Append("b");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+
+        await using var committed = log.ReadAsync(0, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var speculative = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Entry(0, "a"), await committed.NextAsync());
+        Assert.Equal(Entry(1, "b"), await committed.NextAsync());
+        Assert.Equal(CaughtUp(2), await committed.NextAsync());
+        Assert.Equal(Entry(0, "a"), await speculative.NextAsync());
+        Assert.Equal(Entry(1, "b"), await speculative.NextAsync());
+        Assert.Equal(CaughtUp(2), await speculative.NextAsync());
+
+        // The clear consumes sequence 2. Compacted history follows it.
+        log.Clear();
+        Assert.Equal((3L, 3L, 0), (log.FirstSequence, log.NextSequence, log.Count));
+        Assert.Equal(3, log.Append("summary"));
+        Assert.Equal(Reset(3, DurableChangeStatus.Staged), await speculative.NextAsync());
+        Assert.Equal(Entry(3, "summary", DurableChangeStatus.Staged), await speculative.NextAsync());
+
+        // The committed reader observes the clear and its replacement once they are durable.
+        var next = committed.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Reset(3), committed.Current);
+        Assert.Equal(Entry(3, "summary"), await committed.NextAsync());
+        Assert.Equal(Watermark(4), await speculative.NextAsync());
+
+        // Positions at or before the clear observed replaced history, including in a later activation.
+        var recovered = CreateSystem(storage);
+        var recoveredLog = CreateLog(recovered.Manager);
+        await recovered.Lifecycle.OnStart(CancellationToken);
+        Assert.Equal((3L, 4L), (recoveredLog.FirstSequence, recoveredLog.NextSequence));
+        await using (var resumed = recoveredLog.ReadAsync(2, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken))
+        {
+            Assert.Equal(Reset(3), await resumed.NextAsync());
+            Assert.Equal(Entry(3, "summary"), await resumed.NextAsync());
+        }
+
+        await using (var resumed = recoveredLog.ReadAsync(3, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken))
+        {
+            Assert.Equal(Entry(3, "summary"), await resumed.NextAsync());
+        }
+
+        // Trimming after a clear is still reported as a clear to positions before it.
+        recoveredLog.Append("next");
+        recoveredLog.TrimBefore(4);
+        storage.IsCompactionRequested = true;
+        await recovered.Manager.WriteStateAsync(CancellationToken);
+        var snapshotted = CreateSystem(storage);
+        var snapshottedLog = CreateLog(snapshotted.Manager);
+        await snapshotted.Lifecycle.OnStart(CancellationToken);
+        await using (var resumed = snapshottedLog.ReadAsync(1, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken))
+        {
+            Assert.Equal(Reset(4), await resumed.NextAsync());
+        }
+
+        await using (var resumed = snapshottedLog.ReadAsync(3, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken))
+        {
+            Assert.Equal(Trimmed(4), await resumed.NextAsync());
+        }
+    });
+
+    [Fact]
+    public Task CaughtUp_FollowsEntriesCommittedWhenTheReadBegan() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("a");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        log.Append("staged");
+
+        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Entry(0, "a"), await read.NextAsync());
+        Assert.Equal(CaughtUp(1), await read.NextAsync());
+        Assert.Equal(Entry(1, "staged", DurableChangeStatus.Staged), await read.NextAsync());
+
+        // Entries appended later do not repeat the event.
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.Equal(Watermark(2), await read.NextAsync());
+        log.Append("later");
+        Assert.Equal(Entry(2, "later", DurableChangeStatus.Staged), await read.NextAsync());
+    });
+
+    [Fact]
+    public Task Seal_EndsReadersAfterTheFinalEntry() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var storage = new GatedJournalStorage();
+        var sut = CreateSystem(storage);
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+
+        await using var committed = log.ReadAsync(0, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var speculative = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await committed.NextAsync());
+        Assert.Equal(CaughtUp(0), await speculative.NextAsync());
+
+        var draft = log.BeginDraft();
+        draft.Write("partial");
+        Assert.Equal(DraftItem(draft.Id, 0, "partial"), await speculative.NextAsync());
+        log.Append("terminated");
+        log.Seal();
+        log.Seal();
+        Assert.True(log.IsSealed);
+        Assert.False(draft.IsOpen);
+        Assert.Contains("sealed", Assert.Throws<InvalidOperationException>(() => draft.Commit()).Message);
+        Assert.Throws<InvalidOperationException>(() => log.Append("late"));
+        Assert.Throws<InvalidOperationException>(() => log.Clear());
+        Assert.Throws<InvalidOperationException>(() => log.BeginDraft());
+
+        Assert.Equal(Abandoned(draft.Id, LogDraftAbandonReason.Sealed), await speculative.NextAsync());
+        Assert.Equal(Entry(0, "terminated", DurableChangeStatus.Staged), await speculative.NextAsync());
+
+        // Readers end once the seal is durable.
+        var next = committed.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Entry(0, "terminated"), committed.Current);
+        Assert.Equal(Sealed(1), await committed.NextAsync());
+        Assert.False(await committed.MoveNextAsync());
+        Assert.Equal(Watermark(1), await speculative.NextAsync());
+        Assert.Equal(Sealed(1), await speculative.NextAsync());
+        Assert.False(await speculative.MoveNextAsync());
+
+        // A sealed log can be trimmed, and its seal is durable.
+        log.TrimBefore(1);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        var recovered = CreateSystem(storage);
+        var recoveredLog = CreateLog(recovered.Manager);
+        await recovered.Lifecycle.OnStart(CancellationToken);
+        Assert.True(recoveredLog.IsSealed);
+        await using var late = recoveredLog.ReadAsync(0, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(Trimmed(1), await late.NextAsync());
+        Assert.Equal(CaughtUp(1), await late.NextAsync());
+        Assert.Equal(Sealed(1), await late.NextAsync());
+        Assert.False(await late.MoveNextAsync());
+
+        // Deleting the journal unseals the log.
+        await recovered.Manager.DeleteStateAsync(CancellationToken);
+        Assert.False(recoveredLog.IsSealed);
+        Assert.Equal(0, recoveredLog.Append("restarted"));
     });
 
     [Fact]
@@ -166,13 +375,21 @@ public class DurableLogTests : JournalingTestBase
         var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
         log.Append("a");
+        log.Append("b");
         await sut.Manager.WriteStateAsync(CancellationToken);
 
         await using var read = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Entry(0, "a"), await read.NextAsync());
         await sut.Manager.DeleteStateAsync(CancellationToken);
-        Assert.Equal(Reset(0), await read.NextAsync());
         Assert.Equal((0L, 0L), (log.NextSequence, log.CommittedSequence));
+
+        // New history which reaches the reader's position before it resumes is reported as a reset.
+        log.Append("x");
+        log.Append("y");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.Equal(Reset(0), await read.NextAsync());
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
+        Assert.Equal(Entry(0, "x"), await read.NextAsync());
     });
 
     [Fact]
@@ -218,6 +435,8 @@ public class DurableLogTests : JournalingTestBase
 
         await using var speculative = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await using var committed = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await speculative.NextAsync());
+        Assert.Equal(CaughtUp(0), await committed.NextAsync());
         var committedNext = committed.MoveNextAsync();
 
         using var draft = log.BeginDraft();
@@ -252,6 +471,7 @@ public class DurableLogTests : JournalingTestBase
         await sut.Lifecycle.OnStart(CancellationToken);
 
         await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
         var failed = log.BeginDraft();
         failed.Write("partial");
         Assert.Equal(DraftItem(failed.Id, 0, "partial"), await read.NextAsync());
@@ -281,6 +501,7 @@ public class DurableLogTests : JournalingTestBase
 
         await using var read = log.ReadAsync(0, DurableWatchMode.Committed | DurableWatchMode.Drafts, cancellationToken: CancellationToken)
             .GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
         log.Append("question");
         var draft = log.BeginDraft();
         draft.Write("Hel");
@@ -323,6 +544,7 @@ public class DurableLogTests : JournalingTestBase
 
         await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Entry(0, "history"), await read.NextAsync());
+        Assert.Equal(CaughtUp(1), await read.NextAsync());
         Assert.Equal(DraftItem(draft.Id, 0, "a"), await read.NextAsync());
         Assert.Equal(DraftItem(draft.Id, 1, "b"), await read.NextAsync());
         draft.Write("c");
@@ -331,6 +553,7 @@ public class DurableLogTests : JournalingTestBase
         // A committed reader does not observe drafts.
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         await using var committed = log.ReadAsync(1, cancellationToken: cancellation.Token).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(1), await committed.NextAsync());
         var committedNext = committed.MoveNextAsync();
         Assert.False(committedNext.IsCompleted);
         draft.Abandon();
@@ -351,12 +574,14 @@ public class DurableLogTests : JournalingTestBase
 
         await using (var first = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken))
         {
+            Assert.Equal(CaughtUp(0), await first.NextAsync());
             Assert.Equal(DraftItem(draft.Id, 0, "a"), await first.NextAsync());
         }
 
         draft.Write("b");
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         await using var reconnected = log.ReadAsync(0, DurableWatchMode.Speculative, draft.Id, cancellation.Token).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await reconnected.NextAsync());
         Assert.Equal(DraftItem(draft.Id, 0, "a"), await reconnected.NextAsync());
         Assert.Equal(DraftItem(draft.Id, 1, "b"), await reconnected.NextAsync());
         var next = reconnected.MoveNextAsync();
@@ -405,6 +630,7 @@ public class DurableLogTests : JournalingTestBase
         // A reader without staged entries learns of the commit once its entries are durable.
         await using (var read = log.ReadAsync(1, DurableWatchMode.Drafts, staged.Id, CancellationToken).GetAsyncEnumerator(CancellationToken))
         {
+            Assert.Equal(CaughtUp(1), await read.NextAsync());
             var next = read.MoveNextAsync();
             Assert.False(next.IsCompleted);
             await sut.Manager.WriteStateAsync(CancellationToken);
@@ -437,6 +663,7 @@ public class DurableLogTests : JournalingTestBase
         var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
         await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
 
         var draft = log.BeginDraft();
         draft.Write("partial");
@@ -466,6 +693,7 @@ public class DurableLogTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken);
         await using var read = log.ReadAsync(1, DurableWatchMode.Committed | DurableWatchMode.Drafts, cancellationToken: CancellationToken)
             .GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(1), await read.NextAsync());
 
         var draft = log.BeginDraft();
         draft.Write("Thinking");
@@ -544,6 +772,7 @@ public class DurableLogTests : JournalingTestBase
 
         await using var read = log.ReadAsync(committedCursor, DurableWatchMode.Speculative, draft.Id, CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Abandoned(draft.Id, LogDraftAbandonReason.PreviousActivation), await read.NextAsync());
+        Assert.Equal(CaughtUp(1), await read.NextAsync());
 
         // The recovered activation regenerates the response from the last stored entry.
         using var retry = log.BeginDraft();
@@ -562,6 +791,7 @@ public class DurableLogTests : JournalingTestBase
         var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
         await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(CaughtUp(0), await read.NextAsync());
         var draft = log.BeginDraft();
         draft.Write("a");
         Assert.Equal(DraftItem(draft.Id, 0, "a"), await read.NextAsync());
@@ -569,6 +799,7 @@ public class DurableLogTests : JournalingTestBase
         await sut.Manager.DeleteStateAsync(CancellationToken);
         Assert.False(draft.IsOpen);
         Assert.Equal(Abandoned(draft.Id, LogDraftAbandonReason.Reset), await read.NextAsync());
+        Assert.Equal(Reset(0), await read.NextAsync());
     });
 
     [Fact]
@@ -602,17 +833,33 @@ public class DurableLogTests : JournalingTestBase
         codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteAppend(["a"], writer))), handler);
         codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteAppend(["b", "c"], writer))), handler);
         codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteTrimBefore(long.MaxValue, writer))), handler);
-        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(7, ["d", "e"], writer))), handler);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteClear(writer))), handler);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteSeal(writer))), handler);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(7, 5, isSealed: true, ["d", "e"], writer))), handler);
 
-        Assert.Equal(["append a", "append b", "append c", $"trim {long.MaxValue}", "reset 7 2", "append d", "append e"], handler.Commands);
+        Assert.Equal(
+            ["append a", "append b", "append c", $"trim {long.MaxValue}", "clear", "seal", "reset 7 5 True 2", "append d", "append e"],
+            handler.Commands);
         Assert.Throws<ArgumentException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteAppend([], writer)));
     }
 
     private static LogEvent<string> Entry(long sequence, string item, DurableChangeStatus status = DurableChangeStatus.Committed) =>
         new() { Kind = LogEventKind.Entry, Sequence = sequence, Item = item, Status = status };
 
-    private static LogEvent<string> Reset(long sequence) =>
-        new() { Kind = LogEventKind.Reset, Sequence = sequence, Status = DurableChangeStatus.Committed };
+    private static LogEvent<string> Reset(long sequence, DurableChangeStatus status = DurableChangeStatus.Committed) =>
+        new() { Kind = LogEventKind.Reset, Sequence = sequence, Status = status };
+
+    private static LogEvent<string> Trimmed(long sequence, DurableChangeStatus status = DurableChangeStatus.Committed) =>
+        new() { Kind = LogEventKind.Trimmed, Sequence = sequence, Status = status };
+
+    private static LogEvent<string> Watermark(long sequence) =>
+        new() { Kind = LogEventKind.Watermark, Sequence = sequence, Status = DurableChangeStatus.Committed };
+
+    private static LogEvent<string> CaughtUp(long sequence) =>
+        new() { Kind = LogEventKind.CaughtUp, Sequence = sequence, Status = DurableChangeStatus.Committed };
+
+    private static LogEvent<string> Sealed(long sequence) =>
+        new() { Kind = LogEventKind.Sealed, Sequence = sequence, Status = DurableChangeStatus.Committed };
 
     private static LogEvent<string> DraftItem(LogDraftId id, long position, string item) =>
         new() { Kind = LogEventKind.DraftItem, Sequence = position, Item = item, DraftId = id, Status = DurableChangeStatus.Draft };
@@ -664,8 +911,12 @@ public class DurableLogTests : JournalingTestBase
 
         public void WriteTrimBefore(long sequence, JournalStreamWriter writer) => inner.WriteTrimBefore(sequence, writer);
 
-        public void WriteSnapshot(long firstSequence, IReadOnlyCollection<string> items, JournalStreamWriter writer) =>
-            inner.WriteSnapshot(firstSequence, items, writer);
+        public void WriteClear(JournalStreamWriter writer) => inner.WriteClear(writer);
+
+        public void WriteSeal(JournalStreamWriter writer) => inner.WriteSeal(writer);
+
+        public void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, IReadOnlyCollection<string> items, JournalStreamWriter writer) =>
+            inner.WriteSnapshot(firstSequence, resetSequence, isSealed, items, writer);
 
         public void Apply(JournalBufferReader input, IDurableLogCommandHandler<string> consumer) => inner.Apply(input, consumer);
     }
@@ -678,6 +929,11 @@ public class DurableLogTests : JournalingTestBase
 
         public void ApplyTrimBefore(long sequence) => Commands.Add($"trim {sequence}");
 
-        public void Reset(long firstSequence, int capacityHint) => Commands.Add($"reset {firstSequence} {capacityHint}");
+        public void ApplyClear() => Commands.Add("clear");
+
+        public void ApplySeal() => Commands.Add("seal");
+
+        public void Reset(long firstSequence, long resetSequence, bool isSealed, int capacityHint) =>
+            Commands.Add($"reset {firstSequence} {resetSequence} {isSealed} {capacityHint}");
     }
 }

@@ -14,6 +14,9 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
     private const uint AppendCommand = 0;
     private const uint TrimBeforeCommand = 1;
     private const uint SnapshotCommand = 2;
+    private const uint ClearCommand = 3;
+    private const uint SealCommand = 4;
+    private const uint SealedFlag = 1;
 
     /// <inheritdoc/>
     public void WriteAppend(ReadOnlySpan<T> items, JournalStreamWriter writer)
@@ -50,9 +53,16 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(long firstSequence, IReadOnlyCollection<T> items, JournalStreamWriter writer)
+    public void WriteClear(JournalStreamWriter writer) => WriteCommand(ClearCommand, writer);
+
+    /// <inheritdoc/>
+    public void WriteSeal(JournalStreamWriter writer) => WriteCommand(SealCommand, writer);
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(firstSequence);
+        ArgumentOutOfRangeException.ThrowIfNegative(resetSequence);
+        ArgumentOutOfRangeException.ThrowIfLessThan(firstSequence, resetSequence);
         ArgumentNullException.ThrowIfNull(items);
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
@@ -60,6 +70,8 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(SnapshotCommand);
         payloadWriter.WriteVarUInt64((ulong)firstSequence);
+        payloadWriter.WriteVarUInt64((ulong)resetSequence);
+        payloadWriter.WriteVarUInt32(isSealed ? SealedFlag : 0);
         payloadWriter.WriteVarUInt32((uint)count);
         payloadWriter.Commit();
         var written = 0;
@@ -109,6 +121,12 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
             case TrimBeforeCommand:
                 consumer.ApplyTrimBefore(ReadSequence(ref reader));
                 break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            case SealCommand:
+                consumer.ApplySeal();
+                break;
             case SnapshotCommand:
                 ApplySnapshot(ref reader, consumer);
                 break;
@@ -120,13 +138,28 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
     private void ApplySnapshot<TInput>(ref Reader<TInput> reader, IDurableLogCommandHandler<T> consumer)
     {
         var firstSequence = ReadSequence(ref reader);
-        var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
+        var resetSequence = ReadSequence(ref reader);
+        var flags = reader.ReadVarUInt32();
+        if ((flags & ~SealedFlag) != 0)
+        {
+            throw new InvalidOperationException($"Malformed binary journal entry: unsupported durable log snapshot flags {flags}.");
+        }
 
-        consumer.Reset(firstSequence, count);
+        var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
+        consumer.Reset(firstSequence, resetSequence, (flags & SealedFlag) != 0, count);
         for (var i = 0; i < count; i++)
         {
             consumer.ApplyAppend(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
         }
+    }
+
+    private static void WriteCommand(uint command, JournalStreamWriter writer)
+    {
+        using var entry = writer.BeginEntry();
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        payloadWriter.WriteVarUInt32(command);
+        payloadWriter.Commit();
+        entry.Commit();
     }
 
     private static long ReadSequence<TInput>(ref Reader<TInput> reader)

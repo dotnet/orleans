@@ -7,8 +7,8 @@ namespace Orleans.Journaling.Json;
 /// JSON codec for durable log journal entries.
 /// </summary>
 /// <remarks>
-/// Commands are encoded as <c>["append", item, ...]</c>, <c>["trimBefore", sequence]</c>, and
-/// <c>["snapshot", firstSequence, [items]]</c>.
+/// Commands are encoded as <c>["append", item, ...]</c>, <c>["trimBefore", sequence]</c>, <c>["clear"]</c>, <c>["seal"]</c>,
+/// and <c>["snapshot", firstSequence, resetSequence, sealed, [items]]</c>.
 /// </remarks>
 /// <typeparam name="T">The type of entries in the log.</typeparam>
 public sealed class JsonDurableLogCommandCodec<T>(JsonSerializerOptions? options = null)
@@ -56,19 +56,30 @@ public sealed class JsonDurableLogCommandCodec<T>(JsonSerializerOptions? options
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(long firstSequence, IReadOnlyCollection<T> items, JournalStreamWriter writer)
+    public void WriteClear(JournalStreamWriter writer) =>
+        JsonCommandWriter.Write(writer, 0, static (jsonWriter, _) => jsonWriter.WriteStringValue(JsonJournalEntryCommands.Clear));
+
+    /// <inheritdoc/>
+    public void WriteSeal(JournalStreamWriter writer) =>
+        JsonCommandWriter.Write(writer, 0, static (jsonWriter, _) => jsonWriter.WriteStringValue(JsonJournalEntryCommands.Seal));
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(firstSequence);
+        ArgumentOutOfRangeException.ThrowIfNegative(resetSequence);
+        ArgumentOutOfRangeException.ThrowIfLessThan(firstSequence, resetSequence);
         ArgumentNullException.ThrowIfNull(items);
         JsonCommandWriter.Write(
             writer,
-            (typeInfo: _itemTypeInfo, firstSequence, items),
+            (typeInfo: _itemTypeInfo, firstSequence, resetSequence, isSealed, items),
             static (jsonWriter, command) =>
             {
                 var count = CollectionCodecHelpers.GetSnapshotCount(command.items);
 
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Snapshot);
                 jsonWriter.WriteNumberValue(command.firstSequence);
+                jsonWriter.WriteNumberValue(command.resetSequence);
+                jsonWriter.WriteBooleanValue(command.isSealed);
                 jsonWriter.WriteStartArray();
                 var written = 0;
                 foreach (var item in command.items)
@@ -112,20 +123,30 @@ public sealed class JsonDurableLogCommandCodec<T>(JsonSerializerOptions? options
 
                 break;
             case JsonJournalEntryCommands.TrimBefore:
-                var sequence = ReadSequence(ref reader, 1);
+                var sequence = ReadSequence(ref reader, 1, JsonJournalEntryFields.Sequence);
                 reader.EnsureEnd(2);
                 consumer.ApplyTrimBefore(sequence);
                 break;
+            case JsonJournalEntryCommands.Clear:
+                reader.EnsureEnd(1);
+                consumer.ApplyClear();
+                break;
+            case JsonJournalEntryCommands.Seal:
+                reader.EnsureEnd(1);
+                consumer.ApplySeal();
+                break;
             case JsonJournalEntryCommands.Snapshot:
-                var firstSequence = ReadSequence(ref reader, 1);
-                var count = reader.StartArray(2, JsonJournalEntryFields.Items);
-                consumer.Reset(firstSequence, count);
+                var firstSequence = ReadSequence(ref reader, 1, JsonJournalEntryFields.Sequence);
+                var resetSequence = ReadSequence(ref reader, 2, JsonJournalEntryFields.ResetSequence);
+                var isSealed = reader.ReadBoolean(3, JsonJournalEntryFields.Sealed);
+                var count = reader.StartArray(4, JsonJournalEntryFields.Items);
+                consumer.Reset(firstSequence, resetSequence, isSealed, count);
                 while (reader.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
                     consumer.ApplyAppend(reader.DeserializeCurrentAllowNull(JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 }
 
-                reader.EnsureEnd(3);
+                reader.EnsureEnd(5);
                 break;
             default:
                 reader.EnsureEnd(1);
@@ -133,12 +154,12 @@ public sealed class JsonDurableLogCommandCodec<T>(JsonSerializerOptions? options
         }
     }
 
-    private static long ReadSequence(ref JsonCommandReader reader, int index)
+    private static long ReadSequence(ref JsonCommandReader reader, int index, string operandName)
     {
-        var value = reader.ReadUInt64(index, JsonJournalEntryFields.Sequence);
+        var value = reader.ReadUInt64(index, operandName);
         if (value > long.MaxValue)
         {
-            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Sequence}' exceeds the maximum supported value {long.MaxValue}.");
+            throw new JsonException($"JSON journal command operand '{operandName}' exceeds the maximum supported value {long.MaxValue}.");
         }
 
         return (long)value;
