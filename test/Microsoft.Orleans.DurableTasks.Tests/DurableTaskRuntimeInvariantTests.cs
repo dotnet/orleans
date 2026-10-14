@@ -147,7 +147,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         // The inbox dead-letters a message which its sink rejects; the sink stages nothing first.
         var exception = Assert.Throws<InvalidOperationException>(
-            () => handler.TryAccept(message));
+            () => handler.TryAccept(message, out _));
 
         Assert.Equal("The durable task invocation request has no context.", exception.Message);
         Assert.Empty(storage.Tasks);
@@ -169,17 +169,17 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         var wrongTarget = InvocationMessage(sender, receiver, TaskId.Parse("wrong-target"), request);
         var targetException = Assert.Throws<InvalidOperationException>(
-            () => handler.TryAccept(wrongTarget));
+            () => handler.TryAccept(wrongTarget, out _));
         Assert.Contains("not receiver", targetException.Message, StringComparison.Ordinal);
 
         request.Context!.TargetId = receiver;
         var missingSender = InvocationMessage(default, receiver, TaskId.Parse("missing-sender"), request, messageIdSender: sender);
         var senderException = Assert.Throws<InvalidOperationException>(
-            () => handler.TryAccept(missingSender));
+            () => handler.TryAccept(missingSender, out _));
         Assert.Contains("no sender", senderException.Message, StringComparison.Ordinal);
 
         var selfInvocation = InvocationMessage(receiver, receiver, TaskId.Parse("self"), request);
-        var selfException = Assert.Throws<InvalidOperationException>(() => handler.TryAccept(selfInvocation));
+        var selfException = Assert.Throws<InvalidOperationException>(() => handler.TryAccept(selfInvocation, out _));
         Assert.Contains("owning grain", selfException.Message, StringComparison.Ordinal);
 
         Assert.Empty(storage.Tasks);
@@ -211,11 +211,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             },
         };
 
-        Assert.False(handler.TryAccept(resume));
-        Assert.False(handler.TryAccept(other));
-        Assert.False(handler.TryAccept(raw));
+        Assert.False(handler.TryAccept(resume, out _));
+        Assert.False(handler.TryAccept(other, out _));
+        Assert.False(handler.TryAccept(raw, out _));
         Assert.Empty(storage.Tasks);
-        Assert.True(handler.TryAccept(cancellation));
+        Assert.True(handler.TryAccept(cancellation, out _));
         Assert.True(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(resume)));
         Assert.False(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(cancellation)));
         Assert.False(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(other)));
@@ -238,13 +238,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         var otherCancellation = CancellationMessage(otherCaller, receiver, taskId);
         var cancellationException = Assert.Throws<InvalidOperationException>(
-            () => handler.TryAccept(otherCancellation));
+            () => handler.TryAccept(otherCancellation, out _));
         Assert.Contains("already associated with caller", cancellationException.Message, StringComparison.Ordinal);
 
         var request = CreateSerializableRequest(receiver);
         var otherInvocation = InvocationMessage(otherCaller, receiver, taskId, request);
         var invocationException = Assert.Throws<InvalidOperationException>(
-            () => handler.TryAccept(otherInvocation));
+            () => handler.TryAccept(otherInvocation, out _));
         Assert.Contains("already associated with caller", invocationException.Message, StringComparison.Ordinal);
     });
 
@@ -425,7 +425,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         var wrongSender = CompletionMessage(GrainId.Create("target", "other"), receiver, taskId, response);
         var exception = Assert.Throws<InvalidOperationException>(
-            () => handler.TryAccept(wrongSender));
+            () => handler.TryAccept(wrongSender, out _));
         Assert.Contains("does not accept completions", exception.Message, StringComparison.Ordinal);
         Assert.Null(storage.Get(taskId).Result);
 
@@ -3264,7 +3264,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     private static DurableTaskMessageHandler CreateHandler(DurableTaskGrainRuntime runtime) =>
         new(runtime, MessagingTestHelpers.MessageTypes);
 
-    private static void Accept(IInboxMessageSink sink, InboxMessage message) => Assert.True(sink.TryAccept(message));
+    private static void Accept(IInboxMessageSink sink, InboxMessage message)
+    {
+        Assert.True(sink.TryAccept(message, out var result));
+        Assert.Equal(DeliveryStatus.Accepted, result.Status);
+    }
 
     private static async Task HandleAsync(IInboxHandler handler, IInboxHandlerContext context)
     {
