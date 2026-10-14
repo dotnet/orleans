@@ -2321,6 +2321,54 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task ScheduleOfAnIdleGrainObservesTheEndOfRetention() => ActivationScheduler.RunAsync(async () =>
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var retention = TimeSpan.FromHours(1);
+        var (runtime, storage, _, _) = CreateRuntime(retention, timeProvider: clock);
+        var polledId = TaskId.Parse("polled-root");
+        var scheduledId = TaskId.Parse("scheduled-root");
+        var polled = CreateRequest(1);
+        var scheduled = CreateRequest(2);
+        await ((IDurableTaskServer)runtime).ScheduleAsync(polledId, polled, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).ScheduleAsync(scheduledId, scheduled, TestContext.Current.CancellationToken);
+        Assert.Equal(0, (await runtime.GetScheduledTaskHandle(polledId).WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        Assert.Equal(0, (await runtime.GetScheduledTaskHandle(scheduledId).WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        await WaitUntilIdleAsync(runtime);
+
+        // No write or activation follows the end of retention, so the schedule applies it itself and runs the request
+        // again, and a later poll observes the deletion.
+        clock.Advance(retention);
+        var again = CreateRequest(2);
+        await ((IDurableTaskServer)runtime).ScheduleAsync(scheduledId, again, TestContext.Current.CancellationToken);
+        Assert.Equal(0, (await runtime.GetScheduledTaskHandle(scheduledId).WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        Assert.Equal((1, 1), (scheduled.CreateTaskCallCount, again.CreateTaskCallCount));
+        Assert.False(storage.Contains(polledId));
+
+        var failure = await Assert.ThrowsAsync<DurableTaskNotFoundException>(
+            async () => await runtime.SubscribeOrPollAsync(polledId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken));
+        Assert.Equal(polledId, failure.TaskId);
+    });
+
+    [Fact]
+    public Task PollOfAnIdleGrainObservesTheEndOfRetention() => ActivationScheduler.RunAsync(async () =>
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var retention = TimeSpan.FromHours(1);
+        var (runtime, storage, _, _) = CreateRuntime(retention, timeProvider: clock);
+        var taskId = TaskId.Parse("polled-root");
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, CreateRequest(1), TestContext.Current.CancellationToken);
+        Assert.Equal(0, (await runtime.GetScheduledTaskHandle(taskId).WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
+        await WaitUntilIdleAsync(runtime);
+
+        clock.Advance(retention);
+        var failure = await Assert.ThrowsAsync<DurableTaskNotFoundException>(
+            async () => await runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken));
+        Assert.Equal(taskId, failure.TaskId);
+        Assert.False(storage.Contains(taskId));
+    });
+
+    [Fact]
     public Task InvokedTaskNestedUnderAnotherTaskKeepsItsOwnLifecycle() => ActivationScheduler.RunAsync(async () =>
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
