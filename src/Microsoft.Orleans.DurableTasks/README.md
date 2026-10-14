@@ -50,18 +50,24 @@ failure, including when the stored user exception has that same type.
 
 A durable grain observes, cancels, and aborts its own tasks through `IDurableTaskManager`, which
 it injects from its activation services. The manager runs against the activation's
-runtime, without a grain call to the grain itself:
+runtime, without a grain call to the grain itself. Its overloads which take a root ID string
+address the root task `TaskId.CreateRoot(rootId)`:
 
 ```csharp
 public sealed class OrderGrain(IDurableTaskManager tasks) : DurableGrain, IOrderGrain
 {
     public async Task<bool> CancelAsync()
     {
-        await tasks.CancelAsync(TaskId.CreateRoot(PlaceOrderTaskId(this.GetPrimaryKey())));
+        await tasks.CancelAsync(PlaceOrderTaskId(this.GetPrimaryKey()), "Cancelled by the buyer");
         return true;
     }
 }
 ```
+
+A cancellation request can carry a reason, which the canceled workflow reads from
+`DurableExecutionContext.CancellationReason`, for example to record why it stopped. The first
+request determines the reason; `ScheduledTask.CancelAsync(reason)` and
+`IDurableTaskGrainExtension.CancelAsync(taskId, reason)` carry one from clients and tooling.
 
 `DetachAsync` starts a durable grain call as a detached root task on its target, for
 fire-and-forget work, cleanup which outlives a canceled workflow, and durable calls from
@@ -121,6 +127,19 @@ await tasks.SignalAsync(TaskId.CreateRoot(workflowId), Shipped, shipment);
 - From a client or an ordinary grain method, `SignalDurableTaskAsync` calls the target, which
   completes once the task durably holds the value. A grain signals its own tasks through
   `IDurableTaskManager.SignalAsync`, which commits with the grain's pending state changes.
+- `IDurableTaskManager.TrySignalAsync` and, for clients and ordinary grain methods,
+  `TrySignalDurableTaskAsync` return a `DurableSignalResult` instead of throwing: `Accepted` or
+  `Duplicate` once the task durably holds the value, or `Conflict`, `TaskNotFound`, or
+  `TaskCompleted` for a rejected signal, which changes nothing. In a durable task, the
+  manager records the result with the send, so a replay returns the same result:
+
+```csharp
+var result = await tasks.TrySignalAsync(PlaceOrderTaskId(orderId), Shipped, shipment);
+if (result is DurableSignalResult.Conflict or DurableSignalResult.TaskCompleted)
+{
+    return false; // Already shipped, or the order finished.
+}
+```
 - A wait advances its execution's logical time to when the signal was recorded. A deadline is
   `TryWaitAsync(deadline)`, a `WhenAny` race between the wait and `DurableTask.DelayUntil`, whose
   indexed slots and winner record belong to the waiting execution's tree.
@@ -196,6 +215,10 @@ validation disabled until its first published version establishes a baseline.
   request are canceled without running, and a body detaches work which must outlive the cancellation,
   such as compensation. Recovery replays a canceled body with its cancellation requested, so completed
   children return their recorded results. The first durable terminal result wins a race.
+- A cancellation request's reason commits with the request on each task it reaches, travels with the
+  cancellation to each pending call to another grain, and is what a replay of a canceled body reads
+  from `DurableExecutionContext.CancellationReason`. Diagnostics report it as the `Response` of a
+  `Canceling` or `Canceled` task.
 - An administrative abort, through `IDurableTaskManager.AbortAsync`, `IDurableTaskGrainExtension.AbortAsync`,
   or `ScheduledTask.AbortAsync`, commits the task and its execution tree as failed with
   `DurableTaskAbortedException` in one journal write, which also stages an abort to each pending call to

@@ -329,10 +329,10 @@ public sealed partial class DurableTaskSignalTests
         var markerId = WorkflowId.Child("$child-1");
         var value = DurableTaskResponse.FromResult("ada");
 
-        await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, TestCancellation);
-        await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, TestCancellation);
+        await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, throwOnRejection: true, TestCancellation);
+        await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, throwOnRejection: true, TestCancellation);
         var reuse = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, DurableTaskResponse.FromResult("grace"), TestCancellation).AsTask());
+            () => harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, DurableTaskResponse.FromResult("grace"), throwOnRejection: true, TestCancellation).AsTask());
 
         Assert.Contains("another operation", reuse.Message, StringComparison.Ordinal);
         var sent = Assert.Single(harness.Transport.Signals);
@@ -542,8 +542,14 @@ public sealed partial class DurableTaskSignalTests
             }
         }
 
-        public void RequestCancellation(TaskId taskId, IDurableTaskState state) =>
-            ((State)state).CancellationRequestedAt ??= timeProvider.GetUtcNow();
+        public void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null)
+        {
+            if (((State)state).CancellationRequestedAt is null)
+            {
+                ((State)state).CancellationRequestedAt = timeProvider.GetUtcNow();
+                ((State)state).CancellationReason = reason;
+            }
+        }
 
         public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation) =>
             (((State)state).DueTime, ((State)state).ResumeGeneration) = (dueTime, generation);
@@ -592,6 +598,7 @@ public sealed partial class DurableTaskSignalTests
         public IDurableTaskRequest? Request { get; set; }
         public DateTimeOffset? CompletedAt { get; set; }
         public DateTimeOffset? CancellationRequestedAt { get; set; }
+        public string? CancellationReason { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? DueTime { get; set; }
         public long ResumeGeneration { get; set; }

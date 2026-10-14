@@ -274,7 +274,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <returns>The new execution context.</returns>
     /// <remarks>
     /// A body which starts, or replays, after cancellation of its task was requested observes the request from the start:
-    /// its durable token is canceled and <see cref="DurableExecutionContext.IsCancellationRequested"/> is set.
+    /// its durable token is canceled, <see cref="DurableExecutionContext.IsCancellationRequested"/> is set, and
+    /// <see cref="DurableExecutionContext.CancellationReason"/> reports the recorded reason.
     /// </remarks>
     private GrainDurableExecutionContext CreateExecutionContext(TaskId taskId)
     {
@@ -289,7 +290,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (_storage.TryGetTask(taskId, out var taskState) && taskState.CancellationRequestedAt.HasValue)
         {
             // No callback is registered before the body starts, so the request completes synchronously.
-            _ = DurableTaskRuntimeHelper.RequestCancellationAsync(context);
+            _ = DurableTaskRuntimeHelper.RequestCancellationAsync(context, taskState.CancellationReason);
         }
 
         return context;
@@ -466,8 +467,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private readonly record struct PendingCompletion(TaskId TaskId, GrainId Destination);
 
-    private void StageCancellation(TaskId taskId, GrainId target) =>
-        MessageTransport.SendCancellation(GrainId, target, taskId);
+    private void StageCancellation(TaskId taskId, GrainId target, string? reason) =>
+        MessageTransport.SendCancellation(GrainId, target, taskId, reason);
 
     private ValueTask WriteStateAsync(CancellationToken cancellationToken) => _storage.WriteAsync(cancellationToken);
 
@@ -603,7 +604,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         return $"{DetachMarkerFingerprintPrefix}{Convert.ToHexString(hash.GetHashAndReset())}";
     }
 
-    public async ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, CancellationToken cancellationToken)
+    public async ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, string? reason, CancellationToken cancellationToken)
     {
         ThrowIfStopping();
         if (!_storage.TryGetTask(taskId, out var state) || state.Result is { IsCompleted: true })
@@ -617,11 +618,12 @@ internal sealed partial class DurableTaskGrainRuntime(
                 $"Durable task '{taskId}' is not associated with remote target '{target}'.");
         }
 
-        // The cancellation and its message commit together; the outbox delivers the message only after that commit.
-        _storage.RequestCancellation(taskId, state);
+        // The cancellation and its message commit together; the outbox delivers the message only after that commit. The
+        // message carries the recorded reason, which the first request determines.
+        _storage.RequestCancellation(taskId, state, reason);
         if (!_preStagedCancellations.TryRemove((taskId, target), out _))
         {
-            StageCancellation(taskId, target);
+            StageCancellation(taskId, target, state.CancellationReason);
         }
 
         await WriteStateAsync(cancellationToken);
@@ -632,7 +634,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// A cancellation leaf, such as a delay or a task whose body hasn't started, terminalizes as canceled in the write
     /// which records the request. A started body observes the request through its durable token and decides its outcome.
     /// </remarks>
-    internal async ValueTask CancelScheduledTaskAsync(TaskId taskId, CancellationToken cancellationToken)
+    internal async ValueTask CancelScheduledTaskAsync(TaskId taskId, string? reason, CancellationToken cancellationToken)
     {
         ThrowIfStopping();
         if (!_storage.TryGetTask(taskId, out var state) || state.Result is { IsCompleted: true })
@@ -642,13 +644,13 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (!IsCancellationLeaf(taskId, state))
         {
-            await SignalCancellationAsync(taskId, cancellationToken);
+            await SignalCancellationAsync(taskId, callerId: default, reason, cancellationToken);
             return;
         }
 
-        var propagation = StageCancellationTree(taskId, callerId: default);
+        var propagation = StageCancellationTree(taskId, callerId: default, reason);
         await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, cancellationToken);
-        await PropagateCancellationAsync(propagation.Contexts, propagation.Handles, cancellationToken);
+        await PropagateCancellationAsync(propagation.Contexts, propagation.Handles, reason, cancellationToken);
     }
 
     /// <summary>Returns whether a task's body has started, which records the execution's logical time.</summary>
@@ -1522,8 +1524,10 @@ internal sealed partial class DurableTaskGrainRuntime(
             CancellationToken cancellationToken) =>
             await (await _handle.Task.WaitAsync(cancellationToken)).PollAsync(options, cancellationToken);
 
-        public async ValueTask CancelAsync(CancellationToken cancellationToken) =>
-            await (await _schedulerHandle.Task.WaitAsync(cancellationToken)).CancelAsync(cancellationToken);
+        public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
+
+        public async ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) =>
+            await (await _schedulerHandle.Task.WaitAsync(cancellationToken)).CancelAsync(reason, cancellationToken);
 
         public async ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
             await (await _schedulerHandle.Task.WaitAsync(cancellationToken)).AbortAsync(reason, cancellationToken);
@@ -1638,14 +1642,15 @@ internal sealed partial class DurableTaskGrainRuntime(
         !_executionContexts.TryGetValue(context.TaskId, out var registered) || !ReferenceEquals(registered, context);
 
     /// <summary>
-    /// The cancellation which a committed write propagates: durable cancellation of running attempts and of
-    /// scheduler-owned children, or, for an abort with <see cref="AbortReason"/>, the attempts' host abort and the
-    /// children's abort.
+    /// The cancellation which a committed write propagates: durable cancellation, carrying
+    /// <see cref="CancellationReason"/>, of running attempts and of scheduler-owned children, or, for an abort with
+    /// <see cref="AbortReason"/>, the attempts' host abort and the children's abort.
     /// </summary>
     private sealed record CancellationPropagation(
         List<GrainDurableExecutionContext> Contexts,
         List<IScheduledTaskHandle> Handles,
-        string? AbortReason = null);
+        string? AbortReason = null,
+        string? CancellationReason = null);
 
     private async Task SetResponseAsync(
         TaskId taskId,
@@ -1793,7 +1798,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        await PropagateCancellationAsync(propagation.Contexts, propagation.Handles, CancellationToken.None);
+        await PropagateCancellationAsync(propagation.Contexts, propagation.Handles, propagation.CancellationReason, CancellationToken.None);
     }
 
     /// <summary>Aborts a child which a custom scheduler runs, or requests its cancellation when the scheduler can't abort.</summary>
@@ -1980,7 +1985,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var terminal = state.CompletedAt.HasValue;
         if (!terminal && !state.RemoteTarget.IsDefault)
         {
-            StageCancellation(taskId, state.RemoteTarget);
+            StageCancellation(taskId, state.RemoteTarget, state.CancellationReason);
             _preStagedCancellations.TryRemove((taskId, state.RemoteTarget), out _);
         }
 
@@ -2071,18 +2076,18 @@ internal sealed partial class DurableTaskGrainRuntime(
             };
         }
 
-        // Diagnostics decode stored payloads, so a payload which no longer decodes is reported instead of thrown.
+        // Diagnostics decode stored payloads, so a payload which no longer decodes is reported instead of thrown. A
+        // canceling or canceled task reports its cancellation reason.
         static (string Status, string? Response) DescribeResult(IDurableTaskState taskState)
         {
             if (!HasStoredResult(taskState))
             {
-                var status = taskState switch
+                return taskState switch
                 {
-                    { CancellationRequestedAt: not null } => "Canceling",
-                    { DueTime: not null } => "Delayed",
-                    _ => "Pending",
+                    { CancellationRequestedAt: not null } => ("Canceling", taskState.CancellationReason),
+                    { DueTime: not null } => ("Delayed", null),
+                    _ => ("Pending", null),
                 };
-                return (status, null);
             }
 
             try
@@ -2091,7 +2096,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 return result.Status switch
                 {
                     DurableTaskStatus.CompletedSuccessfully => ("Completed", result.Result?.ToString()),
-                    DurableTaskStatus.Canceled => ("Canceled", null),
+                    DurableTaskStatus.Canceled => ("Canceled", taskState.CancellationReason),
                     _ => ("Faulted", DescribeException(result.Exception)),
                 };
             }
@@ -2130,39 +2135,45 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     public ValueTask SignalCancellationAsync(TaskId taskId, CancellationToken cancellationToken) =>
-        SignalCancellationAsync(taskId, callerId: default, cancellationToken);
+        SignalCancellationAsync(taskId, callerId: default, reason: null, cancellationToken);
 
     /// <summary>
     /// Stages a cancellation received through the inbox, propagating it after the inbox batch commits.
     /// </summary>
-    internal void SignalCancellationFromInbox(TaskId taskId, GrainId callerId)
+    internal void SignalCancellationFromInbox(TaskId taskId, GrainId callerId, string? reason)
     {
-        var propagation = StageCancellationTree(taskId, callerId);
+        var propagation = StageCancellationTree(taskId, callerId, reason);
         if (propagation.Contexts.Count > 0 || propagation.Handles.Count > 0)
         {
             _pendingCancellationPropagations[Interlocked.Increment(ref _cancellationPropagationId)] =
-                new(propagation.Contexts, propagation.Handles);
+                new(propagation.Contexts, propagation.Handles, CancellationReason: reason);
         }
     }
 
     private async ValueTask SignalCancellationAsync(
         TaskId taskId,
         GrainId callerId,
+        string? reason,
         CancellationToken cancellationToken)
     {
         // Cancellation is persisted before it propagates.
-        var propagation = StageCancellationTree(taskId, callerId);
+        var propagation = StageCancellationTree(taskId, callerId, reason);
         if (propagation.Changed)
         {
             await WriteStateAsync(cancellationToken);
         }
 
-        await PropagateCancellationAsync(propagation.Contexts, propagation.Handles, cancellationToken);
+        await PropagateCancellationAsync(propagation.Contexts, propagation.Handles, reason, cancellationToken);
     }
 
+    /// <remarks>
+    /// Each task which the request newly reaches records <paramref name="reason"/>, so every execution and handle which
+    /// the request collects is canceled carrying that reason.
+    /// </remarks>
     private (bool Changed, List<GrainDurableExecutionContext> Contexts, List<IScheduledTaskHandle> Handles) StageCancellationTree(
         TaskId taskId,
-        GrainId callerId)
+        GrainId callerId,
+        string? reason)
     {
         ThrowIfStopping();
         if (taskId.IsDefault)
@@ -2175,7 +2186,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             // The cancellation can precede its invocation, which this record cancels on arrival.
             taskState = _storage.GetOrCreateTask(taskId, request: null);
             StageCaller(taskId, taskState, callerId);
-            _storage.RequestCancellation(taskId, taskState);
+            _storage.RequestCancellation(taskId, taskState, reason);
             TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.MaxOutboxRetryAge));
             return (true, [], []);
         }
@@ -2209,14 +2220,14 @@ internal sealed partial class DurableTaskGrainRuntime(
                 _ = RequestCancellationCore(childTaskId, childTaskState, contexts, handles);
             }
 
-            _storage.RequestCancellation(currentTaskId, currentTaskState);
+            _storage.RequestCancellation(currentTaskId, currentTaskState, reason);
             if (TryGetExecutionContext(currentTaskId, out var context))
             {
                 if (currentTaskState.Request is IDurableTaskRequest request
                     && request.Context is { } requestContext
                     && requestContext.TargetId != GrainId)
                 {
-                    StageCancellation(currentTaskId, requestContext.TargetId);
+                    StageCancellation(currentTaskId, requestContext.TargetId, reason);
                     _preStagedCancellations.TryAdd((currentTaskId, requestContext.TargetId), 0);
                 }
 
@@ -2224,7 +2235,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
             else if (!currentTaskState.RemoteTarget.IsDefault)
             {
-                StageCancellation(currentTaskId, currentTaskState.RemoteTarget);
+                StageCancellation(currentTaskId, currentTaskState.RemoteTarget, reason);
             }
             else if (TryGetScheduledTaskHandle(currentTaskId, out var handle))
             {
@@ -2238,26 +2249,28 @@ internal sealed partial class DurableTaskGrainRuntime(
     private static async Task PropagateCancellationAsync(
         List<GrainDurableExecutionContext> canceledContexts,
         List<IScheduledTaskHandle> canceledHandles,
+        string? reason,
         CancellationToken cancellationToken)
     {
         var tasks = new List<Task>(canceledContexts.Count);
         foreach (var context in canceledContexts)
         {
-            tasks.Add(DurableTaskRuntimeHelper.RequestCancellationAsync(context, CancellationToken.None));
+            tasks.Add(DurableTaskRuntimeHelper.RequestCancellationAsync(context, reason, CancellationToken.None));
         }
 
         foreach (var handle in canceledHandles)
         {
-            tasks.Add(handle.CancelAsync(CancellationToken.None).AsTask());
+            tasks.Add(handle.CancelAsync(reason, CancellationToken.None).AsTask());
         }
 
         await Task.WhenAll(tasks).WaitAsync(cancellationToken);
     }
 
-    async ValueTask IDurableTaskServer.CancelAsync(TaskId taskId, CancellationToken cancellationToken)
-    {
-        await SignalCancellationAsync(taskId, cancellationToken);
-    }
+    ValueTask IDurableTaskServer.CancelAsync(TaskId taskId, CancellationToken cancellationToken) =>
+        SignalCancellationAsync(taskId, callerId: default, reason: null, cancellationToken);
+
+    ValueTask IDurableTaskServer.CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken) =>
+        SignalCancellationAsync(taskId, callerId: default, reason, cancellationToken);
 
     ValueTask IDurableTaskServer.AbortAsync(TaskId taskId, string reason, CancellationToken cancellationToken) =>
         AbortTaskAsync(taskId, reason, cancellationToken);
@@ -2289,7 +2302,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         if (!_storage.TryGetTask(taskId, out _))
         {
-            SignalCancellationFromInbox(taskId, callerId);
+            SignalCancellationFromInbox(taskId, callerId, reason: null);
             return;
         }
 
@@ -2383,8 +2396,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         return new AttachedScheduledTask<TResult>(taskId, this);
     }
 
-    ValueTask IDurableTaskManager.CancelAsync(TaskId taskId, CancellationToken cancellationToken) =>
-        SignalCancellationAsync(taskId, cancellationToken);
+    ValueTask IDurableTaskManager.CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken) =>
+        SignalCancellationAsync(taskId, callerId: default, reason, cancellationToken);
 
     private bool TryGetScheduledTaskHandle(TaskId taskId, [NotNullWhen(true)] out IScheduledTaskHandle? handle)
     {

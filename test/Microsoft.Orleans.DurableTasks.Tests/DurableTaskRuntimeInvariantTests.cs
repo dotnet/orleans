@@ -1172,7 +1172,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             Assert.Equal(0, manager.WriteCount);
         };
 
-        await runtime.CancelRemoteAsync(taskId, target, TestContext.Current.CancellationToken);
+        await runtime.CancelRemoteAsync(taskId, target, reason: null, TestContext.Current.CancellationToken);
 
         // The cancellation and its message commit in one write; the outbox delivers only committed messages.
         Assert.Equal(1, manager.WriteCount);
@@ -2709,7 +2709,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var cancellationObserved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var schedulerHandle = Substitute.For<IScheduledTaskHandle>();
         schedulerHandle.TaskId.Returns(childId);
-        schedulerHandle.CancelAsync(Arg.Any<CancellationToken>())
+        schedulerHandle.CancelAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(_ =>
             {
                 cancellationObserved.TrySetResult();
@@ -2743,7 +2743,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Same(DurableTaskResponse.Canceled, response);
         Assert.NotNull(storage.Get(childId).CancellationRequestedAt);
-        await schedulerHandle.Received(1).CancelAsync(Arg.Any<CancellationToken>());
+        await schedulerHandle.Received(1).CancelAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>());
     });
 
     [Fact]
@@ -3450,6 +3450,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public ValueTask CancelRemoteAsync(
             TaskId taskId,
             GrainId target,
+            string? reason,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public ValueTask DetachAsync(
@@ -3520,6 +3521,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public ValueTask CancelRemoteAsync(
             TaskId taskId,
             GrainId target,
+            string? reason,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public ValueTask DetachAsync(
@@ -3661,8 +3663,14 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             }
         }
 
-        public void RequestCancellation(TaskId taskId, IDurableTaskState state) =>
-            ((TestTaskState)state).CancellationRequestedAt ??= _timeProvider.GetUtcNow();
+        public void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null)
+        {
+            if (((TestTaskState)state).CancellationRequestedAt is null)
+            {
+                ((TestTaskState)state).CancellationRequestedAt = _timeProvider.GetUtcNow();
+                ((TestTaskState)state).CancellationReason = reason;
+            }
+        }
 
         public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation)
         {
@@ -3717,6 +3725,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public IDurableTaskRequest? Request { get; set; }
         public DateTimeOffset? CompletedAt { get; set; }
         public DateTimeOffset? CancellationRequestedAt { get; set; }
+        public string? CancellationReason { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? DueTime { get; set; }
         public long ResumeGeneration { get; set; }
