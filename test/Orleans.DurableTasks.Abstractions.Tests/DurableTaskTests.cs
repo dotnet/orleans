@@ -3121,6 +3121,35 @@ public class SchedulingTests
         Assert.Equal([1, 2, 3], await scheduled);
     }
 
+    [Fact]
+    public async Task WhenAllWaitsForItsInputsWhenCancellationIsRequested()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var context = host.CreateContext(TaskId.CreateRoot("root"));
+        var second = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var execution = DurableTaskRuntimeHelper.RunAsync(
+            DurableTask.WhenAll(
+            [
+                DurableTask.Run(static _ => 1),
+                DurableTask.Run(async _ =>
+                {
+                    waiting.TrySetResult();
+                    return await second.Task;
+                }),
+            ]),
+            context).AsTask();
+
+        await waiting.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+
+        // The input which ignores cancellation still completes, and the combinator returns both results.
+        second.SetResult(2);
+        var response = await execution.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+        Assert.Equal([1, 2], response.GetResult<IReadOnlyList<int>>());
+    }
+
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
