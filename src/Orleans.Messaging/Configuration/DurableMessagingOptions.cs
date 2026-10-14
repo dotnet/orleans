@@ -104,34 +104,22 @@ public class DurableMessagingOptions
     public int MaxProcessingAttempts { get; set; } = 5;
 
     /// <summary>
-    /// Gets or sets how long the outbox retries a message whose delivery attempts end without an answer from the
-    /// receiver, such as during an infrastructure outage, before the message is dead-lettered.
+    /// Gets or sets how long the outbox retries a message whose delivery attempts fail, such as during an
+    /// infrastructure outage or while the receiver reports no inbox handler, before the message is dead-lettered.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The period starts with the first unanswered attempt and restarts whenever the receiver answers. A receiver
-    /// checks its deduplication records before answering, so only unanswered attempts can have been accepted, and this
-    /// period stays within <see cref="DeduplicationWindow"/> to keep their retries deduplicated.
+    /// The period starts with the first failed attempt and restarts whenever the receiver answers with
+    /// <c>DeliveryResult.Backpressured()</c>, so the outbox retries a backpressured message until the receiver takes it.
+    /// A receiver checks its deduplication records before answering, so only attempts since the period started can have
+    /// been accepted, and the period stays within <see cref="DeduplicationWindow"/> to keep their retries deduplicated.
     /// </para>
     /// <para>
-    /// The outbox retries a message which the receiver answers with <c>DeliveryResult.Backpressured()</c> until the
-    /// receiver takes it.
+    /// The outbox logs each <c>DeliveryResult.HandlerNotFound()</c> answer as an error.
     /// </para>
     /// </remarks>
-    /// <value>Must be greater than zero and less than <see cref="DeduplicationWindow"/>. Defaults to 1 day.</value>
-    public TimeSpan MaxOutboxRetryAge { get; set; } = TimeSpan.FromDays(1);
-
-    /// <summary>
-    /// Gets or sets how long the outbox retries a message whose receiver reports no inbox handler, before the message
-    /// is dead-lettered.
-    /// </summary>
-    /// <remarks>
-    /// The period starts when the receiver first answers with <c>DeliveryResult.HandlerNotFound()</c>, which gives a
-    /// deployment time to register the handler, and restarts whenever the receiver answers otherwise. The outbox logs
-    /// each such answer as an error.
-    /// </remarks>
-    /// <value>Must be greater than zero. Defaults to 6 hours.</value>
-    public TimeSpan MaxHandlerNotFoundRetryAge { get; set; } = TimeSpan.FromHours(6);
+    /// <value>Must be greater than zero and less than <see cref="DeduplicationWindow"/>. Defaults to 6 hours.</value>
+    public TimeSpan MaxOutboxRetryAge { get; set; } = TimeSpan.FromHours(6);
 
     /// <summary>
     /// Gets or sets how long inbox and outbox dead letters are retained.
@@ -225,14 +213,6 @@ public class DurableMessagingOptions
                 nameof(MaxOutboxRetryAge),
                 MaxOutboxRetryAge,
                 "MaxOutboxRetryAge must be less than DeduplicationWindow.");
-        }
-
-        if (MaxHandlerNotFoundRetryAge <= TimeSpan.Zero)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(MaxHandlerNotFoundRetryAge),
-                MaxHandlerNotFoundRetryAge,
-                "MaxHandlerNotFoundRetryAge must be greater than TimeSpan.Zero.");
         }
 
         if (DeliveryResiliencePipeline is null)
