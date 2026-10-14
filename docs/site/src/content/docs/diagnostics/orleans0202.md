@@ -29,7 +29,7 @@ A replay runs the code before the body's last durable operation again, including
 
 A step records its result, so a replay returns the result without awaiting the operation again.
 
-For the replay model, see [Writing replay-safe workflows](../grains/durable-tasks.md#writing-replay-safe-workflows).
+For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
 
 ## How to fix violations
 
