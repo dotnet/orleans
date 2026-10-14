@@ -27,13 +27,13 @@ sequenceDiagram
         Order->>Catalog: ReserveAsync
     end
     alt all lines reserved
-        Order->>Payment: AuthorizeAsync
+        Order->>Payment: AuthorizeAsync, WaitAsync(payment timeout)
         alt payment succeeded
             par each line, WhenAll(...).WithId("commit")
                 Order->>Catalog: CommitAsync (Paid)
             end
             Note over Order: Shipped.WaitAsync() until ShipAsync signals the order (Shipped)
-        else payment declined
+        else payment declined or timed out
             Order->>Catalog: ReleaseAsync (each line, concurrently, Cancelled)
         end
     else a line is rejected, or the buyer cancels during validation
@@ -56,8 +56,8 @@ completes. `GetAsync`, `CancelAsync`, and `ShipAsync` read the latest snapshot.
 When the buyer cancels, the next durable operation before payment authorization throws `OperationCanceledException`, so
 a cancellation which arrives as validation completes is observed too. The workflow catches it, then runs its
 compensation inline in a `DurableTask.Current.SuppressCancellation()` scope: it releases each line concurrently and
-reports the cancellation with `DurableTask.Current.CancellationReason`. Rejected stock and declined payments run the same
-compensation; a rejected line keeps its `Rejected` status in the cancelled snapshot.
+reports the cancellation with `DurableTask.Current.CancellationReason`. Rejected stock, declined payments, and payment
+timeouts run the same compensation; a rejected line keeps its `Rejected` status in the cancelled snapshot.
 
 ## Observe an order
 
@@ -98,21 +98,24 @@ observes it, compensates, and reports the `Cancelled` snapshot. Ship sends the t
 | Grace period | The order sends itself `GracePeriodElapsed` with `Envelope.DeliverAt`; the handler ignores it unless the order is still `Submitted`. | `await DurableTask.Delay(gracePeriod).WithId("grace-period")`. The runtime sends the same kind of scheduled self-message. |
 | Cancellation | `CancelAsync` cancels a `Submitted` or `AwaitingValidation` order; late stock confirmations release their reservations. | `CancelAsync` is an ordinary grain method which, for a `Submitted` or `AwaitingValidation` order, requests durable cancellation of the PlaceOrder task with the buyer's reason through the grain's `IDurableTaskManager`. During the grace period, the cancellation ends the delay at once. During validation, `WhenAll` waits for every reservation to settle, then throws `OperationCanceledException`, so the workflow compensates knowing that no reservation is still running. |
 | Reservation fan-out | One `ReserveStock` message per line; `StockResult` replies arrive in any order and the handler tracks each line. | `await DurableTask.WhenAll(lines.Select(...ReserveAsync...)).WithId("reserve")` schedules one call per line concurrently, as children `reserve/0`, `reserve/1`, and so on, and returns each line's result in line order. |
-| Payment | `AuthorizePayment` and a `PaymentResult` reply, correlated by message ID. | `await payment.AuthorizeAsync(total, card).WithId("authorize-payment")`. |
+| Payment | `AuthorizePayment` and a `PaymentResult` reply, correlated by message ID. | `await payment.AuthorizeAsync(total, card).WaitAsync(paymentTimeout).WithId("authorize-payment")` runs the call as `authorize-payment/0` and a durable delay as `authorize-payment/1`. When the delay elapses first, the payment grain observes a cancellation request, and an authorization which ends canceled throws `TimeoutException`, so the workflow cancels the order with the reason `Payment authorization timed out.` |
 | Shipment | `ShipAsync` moves a `Paid` order to `Shipped`. | `ShipAsync` sends the PlaceOrder task its `Shipped` signal with `TrySignalAsync`; the paid workflow awaits `Shipped.WaitAsync()` and reports the `Shipped` snapshot. The task records the first shipment, so a second one returns `Conflict`, which the endpoint reports as `409`. |
 | Compensation | The transition which cancels the order stages `ReleaseStock` for each confirmed line. | Inline, in a `SuppressCancellation()` scope, so the cancellation which ended the workflow doesn't cancel its compensation: `WhenAll(...ReleaseAsync...).WithId("release")` releases the lines concurrently, then the `Cancelled` snapshot marks each line which held a reservation as released. `ReleaseAsync` returns whether it released stock, so releasing a line whose reservation never ran is a no-op. |
 | Projection | `StatusChanged` messages carry a version; the buyer keeps the highest. | The workflow detaches one `RecordOrderAsync` call per version under `DetachedTaskId.For($"buyer-v{version}")`, such as `place-order-{orderId}:buyer-v2`, so it doesn't wait for the buyer and cancellation doesn't reach the update. The buyer keeps the highest version and retains the detached task. |
-| Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | Task IDs derived from the order ID, such as `place-order-{orderId}/reserve/0` and `place-order-{orderId}/authorize-payment`; `(grain, task ID)` identifies one execution, and a reused ID with different arguments fails while the task exists. |
+| Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | Task IDs derived from the order ID, such as `place-order-{orderId}/reserve/0` and `place-order-{orderId}/authorize-payment/0`; `(grain, task ID)` identifies one execution, and a reused ID with different arguments fails while the task exists. |
 | Recovery | The inbox and outbox resume pending messages; each handler runs from the state it finds. | The next activation replays pending tasks from the start; completed children and reports return their recorded results, so the workflow resumes where it stopped and the history holds each version once. Durable Jobs wakes the order when the delay is due or a completion arrives. |
 | Observability | Order state and the dashboard. | The order's history as a server-sent event stream, the dashboard, and per-grain task lists with each task's status, timestamps, due time, remote target, and result. |
-| Non-blank lines of code | Grains 414, contracts 112, host 49. | Grains 354, contracts 124, host 125, including the event stream and diagnostics endpoints. |
+| Non-blank lines of code | Grains 414, contracts 112, host 49. | Grains 364, contracts 126, host 125, including the event stream and diagnostics endpoints. |
 
 Both samples produce the same outcomes for a successful order, a cancellation during the grace period, a rejected line,
-and a declined card, including statuses, versions, descriptions, and stock levels.
+and a declined card, including statuses, versions, descriptions, and stock levels. DurableOrderProcessing also bounds
+payment authorization: for a card ending in `0003`, the simulated gateway doesn't respond, so the authorization times out
+after `Ordering:PaymentTimeout` and the order is cancelled with the reason `Payment authorization timed out.`
 
 ## Configuration
 
-`Ordering:GracePeriod` in `appsettings.json` sets the delay before stock validation. A changed setting applies to new
-orders; a replayed delay keeps the due time it recorded. Journals and Durable Jobs use volatile in-memory storage, and
-journaled state uses the JSON journal format with the source-generated `DurableOrderProcessingJsonContext`, which includes the history's `OrderDetails` snapshots; durable task
+`Ordering:GracePeriod` in `appsettings.json` sets the delay before stock validation, and `Ordering:PaymentTimeout` bounds
+payment authorization. A changed setting applies to new orders; a replayed delay keeps the due time it recorded.
+Journals and Durable Jobs use volatile in-memory storage, and journaled state uses the JSON journal format with the
+source-generated `DurableOrderProcessingJsonContext`, which includes the history's `OrderDetails` snapshots; durable task
 arguments and results use the Orleans serializer.
