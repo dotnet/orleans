@@ -10,7 +10,7 @@ namespace Orleans.DurableTasks;
 /// never changes, so <see cref="IsCompleted"/>, <see cref="Status"/>, and <see cref="Exception"/> then inspect the task
 /// synchronously, without contacting the host.
 /// </remarks>
-public abstract class ScheduledTask
+public abstract partial class ScheduledTask
 {
     private DurableTaskResponse? _response;
 
@@ -445,21 +445,9 @@ public abstract class ScheduledTask
     {
         using var linked = CreateLinkedWaitCancellation(context, cancellationToken);
         var waitToken = linked?.Token ?? context.ExecutionAbortToken;
-        var candidates = new TaskId[tasks.Length];
-        for (var index = 0; index < candidates.Length; index++)
-        {
-            candidates[index] = tasks[index].Id;
-        }
-
         try
         {
-            var selected = await context.SelectCompletionAsync(operationId.Child("$winner"), candidates, waitToken).ConfigureAwait(false);
-            var winnerIndex = Array.IndexOf(candidates, selected);
-            if (winnerIndex < 0)
-            {
-                throw new InvalidOperationException($"The host selected '{selected}', which is not a candidate of '{operationId}'.");
-            }
-
+            var winnerIndex = await SelectIndexAsync(context, operationId, tasks, waitToken).ConfigureAwait(false);
             _ = await tasks[winnerIndex].ObserveTerminalAsync(waitToken).ConfigureAwait(false);
             return winnerIndex;
         }
@@ -467,6 +455,32 @@ public abstract class ScheduledTask
         {
             throw new OperationCanceledException(cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Returns the index of the task among <paramref name="tasks"/> which the host of <paramref name="context"/> selects as
+    /// the first to complete, under the decision identifier <c>$winner</c> beneath <paramref name="operationId"/>.
+    /// </summary>
+    internal static async Task<int> SelectIndexAsync(
+        DurableTaskContext context,
+        TaskId operationId,
+        ScheduledTask[] tasks,
+        CancellationToken cancellationToken)
+    {
+        var candidates = new TaskId[tasks.Length];
+        for (var index = 0; index < candidates.Length; index++)
+        {
+            candidates[index] = tasks[index].Id;
+        }
+
+        var selected = await context.SelectCompletionAsync(operationId.Child("$winner"), candidates, cancellationToken).ConfigureAwait(false);
+        var winnerIndex = Array.IndexOf(candidates, selected);
+        if (winnerIndex < 0)
+        {
+            throw new InvalidOperationException($"The host selected '{selected}', which is not a candidate of '{operationId}'.");
+        }
+
+        return winnerIndex;
     }
 
     /// <summary>
@@ -583,7 +597,7 @@ public abstract class ScheduledTask
 }
 
 /// <summary>Represents a host-scheduled durable task with a result.</summary>
-public abstract class ScheduledTask<TResult> : ScheduledTask
+public abstract partial class ScheduledTask<TResult> : ScheduledTask
 {
     /// <summary>Gets an awaiter which returns the successful result.</summary>
     public new ScheduledTaskAwaiter<TResult> GetAwaiter() => new(this, CancellationToken.None);

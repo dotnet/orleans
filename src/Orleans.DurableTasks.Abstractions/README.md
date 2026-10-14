@@ -131,6 +131,21 @@ completion order, or persists its selection under a deterministic decision ID. `
 tasks running. Durable cancellation reaches the inputs, which are attached children, and the combinators wait for
 their outcomes.
 
+`Race` keeps structured concurrency: it schedules its inputs and selects the winner like `WhenAny`, then requests
+durable cancellation of every other input with the reason `Another task won the race.`, and completes once every input
+is terminal, so no input outlives it. It returns what `WhenAny` returns, a winner which failed or was canceled fails it,
+and the other inputs' outcomes don't affect it. `WaitAsync(timeout)` and `WaitUntilAsync(dueTime)` race a definition, as
+input `0`, with a durable `Delay` or `DelayUntil`, as input `1`. A replay keeps the delay's recorded due time, so a
+timeout counts from the first run. When the delay elapses first, the task receives a cancellation request with a reason
+such as `The operation timed out after 00:02:00.`, and the combinator waits for its outcome: a task which ends canceled
+fails it with a `TimeoutException` whose inner exception is the task's `OperationCanceledException`, and any other
+outcome, such as a result which the task returns after observing the request, is its outcome:
+
+```csharp
+// The authorization runs as authorize/0 and its timeout as authorize/1.
+var payment = await Payments.AuthorizeAsync(order.Total).WaitAsync(TimeSpan.FromMinutes(2)).WithId("authorize");
+```
+
 A combinator's generated operation identifier, such as `$when-all-2`, counts the combinators which ran before it in
 the execution. `WithId` names the operation, so its inputs keep their identifiers when a deployment adds or removes
 earlier combinators:
@@ -154,6 +169,14 @@ returns the first task whose durable response arrives. It captures its candidate
 task's identity when the caller subsequently reuses or changes the input collection, and the returned task has observed
 its terminal response. Caller cancellation and host wait failures are propagated. Outside a durable execution, after
 selection, it cancels and drains the losing wait operations without canceling the durable tasks.
+
+`ScheduledTask.Race` selects its winner like `ScheduledTask.WhenAny`, under a generated `$race-N` operation identifier
+within a durable execution, then requests durable cancellation of the other tasks and returns the winner once every task
+is terminal, so each handle's outcome is observable. A handle's `WaitAsync(timeout)` and `WaitUntilAsync(dueTime)`
+return `Task` and `Task<T>`, with the outcomes of the definition overloads. Within a durable execution, the timeout is a
+durable delay which the execution schedules as `1` beneath a generated `$timeout-N` operation identifier, and the host
+selects the winner; outside one, the timeout elapses on the system clock, and the handle receives the cancellation
+request when it does. Their cancellation tokens abandon the wait without canceling the task.
 
 ## Scheduled task handles
 
