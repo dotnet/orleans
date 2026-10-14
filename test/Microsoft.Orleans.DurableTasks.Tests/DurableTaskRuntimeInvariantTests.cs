@@ -1852,20 +1852,47 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => runtime.SelectCompletionAsync(decisionId, [TaskId.Parse("root/two")], TestContext.Current.CancellationToken).AsTask());
 
-        Assert.Contains("another operation", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(
+            $"Durable completion decision '{decisionId}' is already associated with another operation. It records a selection of the first task to complete, and this attempt requested a selection of the first task to complete among 1 candidate. A replay schedules the same operation, with the same arguments, under each identifier; new workflow steps use new identifiers.",
+            exception.Message);
     });
 
     [Fact]
     public Task CompletionDecisionRejectsExistingChildOperation() => ActivationScheduler.RunAsync(async () =>
     {
-        var (runtime, _, _, _) = CreateRuntime();
+        var (runtime, storage, _, _) = CreateRuntime();
         var decisionId = TaskId.Parse("root/decision");
         await runtime.ScheduleDelayAsync(decisionId, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
+        var dueTime = storage.Get(decisionId).DueTime!.Value;
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => runtime.SelectCompletionAsync(decisionId, [TaskId.Parse("root/candidate")], TestContext.Current.CancellationToken).AsTask());
+            () => runtime.SelectCompletionAsync(
+                decisionId,
+                [TaskId.Parse("root/candidate/0"), TaskId.Parse("root/candidate/1")],
+                TestContext.Current.CancellationToken).AsTask());
 
-        Assert.Contains("another operation", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(
+            $"Durable completion decision '{decisionId}' is already associated with another operation. It records a delay due at {dueTime:O}, and this attempt requested a selection of the first task to complete among 2 candidates. A replay schedules the same operation, with the same arguments, under each identifier; new workflow steps use new identifiers.",
+            exception.Message);
+    });
+
+    [Fact]
+    public Task ChildScheduledUnderARecordedSelectionNamesTheSelection() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var decisionId = TaskId.Parse("root/race/$winner");
+        var winner = TaskId.Parse("root/race/0");
+        storage.GetOrCreate(winner).Result = DurableTaskResponse.Completed;
+        await runtime.SelectCompletionAsync(decisionId, [winner], TestContext.Current.CancellationToken);
+
+        // The workflow changed: a replay schedules a local step where the first execution recorded a race's selection.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => runtime.ScheduleChildAsync(decisionId, DurableTask.FromResult(1), TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Contains(
+            "It records a selection of the first task to complete, and this attempt requested a local child task.",
+            exception.Message,
+            StringComparison.Ordinal);
     });
 
     [Fact]

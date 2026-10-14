@@ -274,7 +274,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 throw CreateDivergenceException(
                     $"Durable completion decision '{decisionId}' is already associated with another operation.",
                     decision,
-                    $"a WhenAny decision among {candidates.Count} candidates");
+                    DescribeSelection(candidates.Count));
             }
 
             if (decision.RequestFingerprint is null)
@@ -360,7 +360,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         { RemoteTarget.IsDefault: false } => $"a call to grain '{state.RemoteTarget}' ({AbbreviateFingerprint(state.RemoteRequestFingerprint)})",
         { DueTime: { } dueTime } => $"a delay due at {dueTime:O}",
-        { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(CompletionDecisionFingerprintPrefix, StringComparison.Ordinal) => "a WhenAny decision",
+        { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(CompletionDecisionFingerprintPrefix, StringComparison.Ordinal) => "a selection of the first task to complete",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(DetachMarkerFingerprintPrefix, StringComparison.Ordinal) => "a detached task's start",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalSendFingerprintPrefix, StringComparison.Ordinal) => "a signal's send",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal) => "a signal's value",
@@ -372,6 +372,10 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private static string DescribeRequest(IDurableTaskRequest request, string fingerprint) =>
         $"{request.GetInterfaceName()}.{request.GetMethodName()} ({AbbreviateFingerprint(fingerprint)})";
+
+    // WhenAny, Race, timeouts, and signal deadlines record their selections alike, so the description names none of them.
+    private static string DescribeSelection(int candidateCount) =>
+        $"a selection of the first task to complete among {candidateCount} {(candidateCount == 1 ? "candidate" : "candidates")}";
 
     private static string AbbreviateFingerprint(string? fingerprint) =>
         fingerprint is null ? "no fingerprint" : $"fingerprint {fingerprint[..Math.Min(12, fingerprint.Length)]}";
