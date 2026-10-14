@@ -136,6 +136,9 @@ public sealed class OrderingOptions
 {
     // eShop's GracePeriodManager waits one minute; a shorter default keeps the demo responsive.
     public TimeSpan GracePeriod { get; set; } = TimeSpan.FromSeconds(10);
+
+    // The order is cancelled when payment authorization doesn't complete within this time.
+    public TimeSpan PaymentTimeout { get; set; } = TimeSpan.FromSeconds(30);
 }
 
 // Journaled state is stored as JSON lines, so each persisted type needs source-generated metadata.
