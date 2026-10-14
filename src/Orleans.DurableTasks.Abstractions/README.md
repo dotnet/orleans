@@ -114,8 +114,8 @@ can commit the batch together.
 `WhenAll` follows `Task.WhenAll`: it completes only after every input is terminal, including inputs which
 durable cancellation reaches. Awaiting it then throws the first failure in input order when any input failed;
 otherwise it throws the first input's `OperationCanceledException` in input order when any input was canceled;
-otherwise `WhenAll<T>` returns an array of the results in input order. Input order, rather than completion order,
-selects the exception, so a replay observes the same one. `WhenAny` returns the winner's input index,
+otherwise `WhenAll<T>` returns an array of the results in input order. Input order selects the exception, so a
+replay observes the same one in any completion order. `WhenAny` returns the winner's input index,
 and `WhenAny<T>` also returns its result; a winner which failed or was canceled fails the combinator. `WhenAny`
 asks the host to persist its selected winner under a deterministic decision ID, then leaves all other scheduled
 tasks running. Durable cancellation reaches the inputs, which are attached children, and the combinators wait for
