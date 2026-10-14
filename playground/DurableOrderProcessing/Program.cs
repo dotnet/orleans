@@ -67,13 +67,13 @@ api.MapGet("/orders/{orderId:guid}/workflow", async (Guid orderId, IGrainFactory
         {
             taskId = workflow.Id.ToString(),
             status = response.Status.ToString(),
-            result = response.Status is DurableTaskStatus.CompletedSuccessfully ? response.GetResult<OrderResult>() : null,
+            result = workflow.TryGetResult(out var result) ? result : null,
             error = response.Exception?.Message,
         });
     }
     catch (DurableTaskNotFoundException)
     {
-        // The order deletes the workflow once the basket which scheduled it has accepted its result.
+        // The order retains the detached workflow's result for DurableTaskOptions.ResultRetentionPeriod.
         return Results.NotFound();
     }
 });
@@ -82,8 +82,8 @@ api.MapGet("/orders/{orderId:guid}/workflow", async (Guid orderId, IGrainFactory
 api.MapGet("/orders/{orderId:guid}/tasks", (Guid orderId, IGrainFactory grains) =>
     ListTasksAsync(grains.GetGrain<IOrderGrain>(orderId)));
 
-api.MapGet("/buyers/{buyerId}/basket/tasks", (string buyerId, IGrainFactory grains) =>
-    ListTasksAsync(grains.GetGrain<IBasketGrain>(buyerId)));
+api.MapGet("/buyers/{buyerId}/tasks", (string buyerId, IGrainFactory grains) =>
+    ListTasksAsync(grains.GetGrain<IBuyerGrain>(buyerId)));
 
 api.MapGet("/catalog/{productId:int}/tasks", (int productId, IGrainFactory grains) =>
     ListTasksAsync(grains.GetGrain<ICatalogItemGrain>(productId)));
