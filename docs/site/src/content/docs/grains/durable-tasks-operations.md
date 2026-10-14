@@ -51,15 +51,19 @@ multi-silo deployments; see [Journaling configuration](journaling/configuration.
 ## Retention and deletion
 
 Each invoked task owns an execution tree: the task, its local steps, delays,
-combinator records, `DurableTask.Once` records, signal records, detach and signal-send
-markers, and its records of calls to other grains. The grain deletes the tree in one
-journal write:
+combinator records, `DurableTask.Once` records, signal records, observation records,
+detach and signal-send markers, and its records of calls to other grains. The grain
+deletes the tree in one journal write:
 
 | Invoked by | Deleted |
 | --- | --- |
 | A durable task or an ordinary method of another durable grain | When the outbox retires the completion after the calling grain has durably accepted the result. |
 | A client, or `DetachAsync` | `ResultRetentionPeriod` after completion. |
 | Any caller, after its completion was dead-lettered | `ResultRetentionPeriod` after the dead letter. |
+
+A task which durable tasks observe through `ObserveDurableTask` is also retained until
+the outbox retires the completion to each observation. A dead-lettered observation
+completion restarts the retention period, like a caller's.
 
 A grain's record of a call which an ordinary method scheduled is a root of its own,
 retained for `ResultRetentionPeriod` after the result arrives.
@@ -104,8 +108,10 @@ stored payloads and report decoding failures instead of throwing.
 
 Grain references also expose task control: the `GetDurableTask<TResult>(rootId)`
 extension returns a handle which polls, waits for, cancels, or aborts an existing root
-task, and the `SignalDurableTaskAsync` and `TrySignalDurableTaskAsync` extensions deliver
-signals.
+task, the `ObserveDurableTask<TResult>(rootId)` extension lets a durable task await an
+existing task's result, and the `SignalDurableTaskAsync` and `TrySignalDurableTaskAsync`
+extensions deliver signals. Diagnostics describe an observation's `Request` as
+`an observation of task '{taskId}' on grain '{grain}'`.
 
 ## Diagnose replay divergence
 
