@@ -5249,6 +5249,9 @@ internal sealed class TestHost(DateTimeOffset utcNow)
 
     public bool Contains(TaskId id) => _entries.ContainsKey(id);
 
+    /// <summary>Gets the outcomes which <c>DurableTask.Once</c> recorded, by effect identifier.</summary>
+    public ConcurrentDictionary<TaskId, DurableTaskResponse> Effects { get; } = new();
+
     public bool IsCancellationRequested(TaskId id) => _entries.TryGetValue(id, out var entry) && entry.CancellationRequested;
 
     public IReadOnlyList<TaskId> EntryIds => _entries.Keys.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToArray();
@@ -5448,6 +5451,9 @@ internal sealed class TestContext(
 
     protected override ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken)
         => host.SelectCompletionAsync(decisionId, candidates, cancellationToken);
+
+    protected override DurableTaskResponse RunEffect<TState>(TaskId effectId, TState state, Func<TState, DurableTaskResponse> effect)
+        => host.Effects.GetOrAdd(effectId, _ => effect(state));
 
     public ValueTask<TaskId> SelectForTestAsync(
         TaskId decisionId,
