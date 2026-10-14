@@ -197,7 +197,7 @@ namespace Orleans.Journaling
     public partial interface IDurableLogCommandCodec<T>
     {
         void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer);
-        void WriteAppend(T item, JournalStreamWriter writer);
+        void WriteAppend(System.ReadOnlySpan<T> items, JournalStreamWriter writer);
         void WriteSnapshot(long firstSequence, System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
         void WriteTrimBefore(long sequence, JournalStreamWriter writer);
     }
@@ -217,8 +217,8 @@ namespace Orleans.Journaling
 
         bool IsOpen { get; }
 
-        void Abandon(string? reason = null);
-        long Commit(T entry);
+        void Abandon(string? message = null);
+        long Commit(scoped params System.ReadOnlySpan<T> entries);
         void Write(T item);
     }
 
@@ -784,6 +784,17 @@ namespace Orleans.Journaling
     }
 
     [GenerateSerializer]
+    public enum LogDraftAbandonReason : byte
+    {
+        None = 0,
+        Abandoned = 1,
+        Disposed = 2,
+        Reset = 3,
+        PreviousActivation = 4,
+        Unknown = 5
+    }
+
+    [GenerateSerializer]
     [Immutable]
     public readonly partial struct LogDraftId : System.IEquatable<LogDraftId>
     {
@@ -833,6 +844,12 @@ namespace Orleans.Journaling
         private readonly T? _Item_k__BackingField;
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
+        [Id(7)]
+        public LogDraftAbandonReason AbandonReason { get { throw null; } init { } }
+
+        [Id(6)]
+        public int Count { get { throw null; } init { } }
+
         [Id(3)]
         public LogDraftId? DraftId { get { throw null; } init { } }
 
@@ -843,7 +860,7 @@ namespace Orleans.Journaling
         public LogEventKind Kind { get { throw null; } init { } }
 
         [Id(4)]
-        public string? Reason { get { throw null; } init { } }
+        public string? Message { get { throw null; } init { } }
 
         [Id(1)]
         public long Sequence { get { throw null; } init { } }
@@ -1095,7 +1112,7 @@ namespace Orleans.Journaling.Json
 
         public void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer) { }
 
-        public void WriteAppend(T item, JournalStreamWriter writer) { }
+        public void WriteAppend(System.ReadOnlySpan<T> items, JournalStreamWriter writer) { }
 
         public void WriteSnapshot(long firstSequence, System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer) { }
 
@@ -1302,6 +1319,17 @@ namespace OrleansCodeGen.Orleans.Journaling
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.ListChange<T> value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_LogDraftAbandonReason : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.LogDraftAbandonReason>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public global::Orleans.Journaling.LogDraftAbandonReason ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.LogDraftAbandonReason value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
