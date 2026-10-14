@@ -95,6 +95,26 @@ public abstract class ScheduledTask
     private async ValueTask<DurableTaskResponse> ObserveAsync(ValueTask<DurableTaskResponse> response)
         => Observe(await response.ConfigureAwait(false));
 
+    /// <summary>
+    /// Waits for the terminal response and caches it, rejecting an incomplete response from the host with an
+    /// <see cref="InvalidOperationException"/>.
+    /// </summary>
+    /// <remarks>
+    /// Selection and aggregation helpers use this wait, since they return tasks which have observed their terminal
+    /// responses. A host failure which <see cref="WaitAsyncCore"/> throws synchronously propagates synchronously.
+    /// </remarks>
+    internal ValueTask<DurableTaskResponse> ObserveTerminalAsync(CancellationToken cancellationToken)
+    {
+        var wait = WaitAsyncCore(cancellationToken);
+        return wait.IsCompletedSuccessfully ? new(ObserveTerminal(wait.Result)) : ObserveTerminalAsync(wait);
+    }
+
+    private DurableTaskResponse ObserveTerminal(DurableTaskResponse response)
+        => response.IsCompleted ? Observe(response) : throw new InvalidOperationException("The durable task has not completed.");
+
+    private async ValueTask<DurableTaskResponse> ObserveTerminalAsync(ValueTask<DurableTaskResponse> response)
+        => ObserveTerminal(await response.ConfigureAwait(false));
+
     /// <summary>Durably requests cancellation.</summary>
     /// <remarks>
     /// The operation completes once the host has durably recorded the request, without waiting for the task to finish.
@@ -279,7 +299,7 @@ public abstract class ScheduledTask
             var next = remaining[index];
             remaining.RemoveAt(index);
             candidates.RemoveAt(index);
-            _ = await next.ObserveAsync(waitToken).ConfigureAwait(false);
+            _ = await next.ObserveTerminalAsync(waitToken).ConfigureAwait(false);
             yield return next;
         }
     }
@@ -297,7 +317,7 @@ public abstract class ScheduledTask
             foreach (var task in tasks)
             {
                 remaining.Add(task);
-                waits.Add(task.ObserveAsync(waitCancellation.Token).AsTask());
+                waits.Add(task.ObserveTerminalAsync(waitCancellation.Token).AsTask());
             }
 
             while (waits.Count > 0)
@@ -342,7 +362,7 @@ public abstract class ScheduledTask
 
         // A wait which fails synchronously fails only its own observation, so the other waits still start.
         static async Task<DurableTaskResponse> ObserveTaskAsync(ScheduledTask task, CancellationToken cancellationToken)
-            => await task.ObserveAsync(cancellationToken).ConfigureAwait(false);
+            => await task.ObserveTerminalAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -381,6 +401,7 @@ public abstract class ScheduledTask
     /// returned task has observed its terminal response.
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="tasks"/> is empty.</exception>
+    /// <exception cref="InvalidOperationException">The host's wait for the selected task returned an incomplete response.</exception>
     public static async Task<ScheduledTask> WhenAny(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
@@ -439,7 +460,7 @@ public abstract class ScheduledTask
                 throw new InvalidOperationException($"The host selected '{selected}', which is not a candidate of '{operationId}'.");
             }
 
-            _ = await tasks[winnerIndex].ObserveAsync(waitToken).ConfigureAwait(false);
+            _ = await tasks[winnerIndex].ObserveTerminalAsync(waitToken).ConfigureAwait(false);
             return winnerIndex;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -472,7 +493,7 @@ public abstract class ScheduledTask
         {
             foreach (var task in tasks)
             {
-                waits.Add(task.ObserveAsync(waitCancellation.Token).AsTask());
+                waits.Add(task.ObserveTerminalAsync(waitCancellation.Token).AsTask());
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

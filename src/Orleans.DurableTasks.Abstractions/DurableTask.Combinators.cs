@@ -327,7 +327,7 @@ public abstract partial class DurableTask
     {
         foreach (var task in tasks)
         {
-            _ = await task.ObserveAsync(cancellationToken).ConfigureAwait(false);
+            _ = await task.ObserveTerminalAsync(cancellationToken).ConfigureAwait(false);
         }
 
         return tasks;
@@ -369,7 +369,7 @@ public abstract partial class DurableTask
         var responses = new DurableTaskResponse[tasks.Length];
         for (var index = 0; index < responses.Length; index++)
         {
-            responses[index] = await tasks[index].WaitAsyncCore(cancellationToken).ConfigureAwait(false);
+            responses[index] = await tasks[index].ObserveTerminalAsync(cancellationToken).ConfigureAwait(false);
         }
 
         ScheduledTask.EnsureSuccessfulCompletion(responses);
