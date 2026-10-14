@@ -41,7 +41,9 @@ Messaging settings in `DurableMessagingOptions` govern the transport; see
   messages.
 - Invocations, completions, cancellations, and signals are accepted directly into task
   state, so they don't occupy inbox capacity. Delay resumes are scheduled messages which
-  the grain sends itself, so they're always admitted.
+  the grain sends itself, so they don't count toward `MaxCapacity`, like other scheduled
+  messages; the grain holds one resume for each delay it scheduled, until that delay's
+  due time.
 
 Configure shared, production-grade Journaling and Durable Jobs providers for
 multi-silo deployments; see [Journaling configuration](journaling/configuration.md).
@@ -195,7 +197,9 @@ cause.
 - Combinators and `ScheduleAll` schedule their inputs concurrently, and the runtime
   coalesces the invocations into one journal write.
 - Each request and result payload is journaled once per grain, and metadata updates
-  don't rewrite it. The completion sequence adds one integer to each task's state.
+  don't rewrite it. A dead-lettered completion's result is also held by its dead letter
+  while task state retains it for `ResultRetentionPeriod`. The completion sequence adds
+  one integer to each task's state.
 - Executions run on the activation's scheduler and interleave with the grain's methods
   at each `await`. A hot grain bounds the throughput of its workflows, so partition
   workflows by business owner, such as one grain per order.
