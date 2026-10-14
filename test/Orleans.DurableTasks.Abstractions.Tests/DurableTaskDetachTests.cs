@@ -7,7 +7,7 @@ namespace Orleans.DurableTasks.Abstractions.Tests;
 [TestProvider("None")]
 [TestArea("DurableTasks")]
 [TestCategory("BVT")]
-public class DurableTaskDetachTests
+public partial class DurableTaskDetachTests
 {
     private static CancellationToken TestCancellation => Xunit.TestContext.Current.CancellationToken;
 

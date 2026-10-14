@@ -5,7 +5,7 @@ namespace Orleans.DurableTasks;
 
 /// <summary>Defines a deferred, host-scheduled durable asynchronous operation.</summary>
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
-public abstract class DurableTask
+public abstract partial class DurableTask
 {
     /// <summary>Creates a successfully completed durable task.</summary>
     public static DurableTask<TResult> FromResult<TResult>(TResult value) => new CompletedDurableTask<TResult>(value);
@@ -75,180 +75,6 @@ public abstract class DurableTask
     {
         ArgumentNullException.ThrowIfNull(function);
         return Run(ct => function(state, ct));
-    }
-
-    /// <summary>Creates a durable task which completes after every input task completes successfully.</summary>
-    /// <remarks>A failed or canceled input fails the combined task.</remarks>
-    public static DurableTask WhenAll(IReadOnlyList<DurableTask> tasks)
-    {
-        ArgumentNullException.ThrowIfNull(tasks);
-        return new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask>>(
-            WhenAllCore,
-            tasks.ToArray());
-    }
-
-    /// <summary>Creates a durable task which returns the results of every input task, in input order.</summary>
-    /// <remarks>A failed or canceled input fails the combined task.</remarks>
-    public static DurableTask<IReadOnlyList<TResult>> WhenAll<TResult>(IReadOnlyList<DurableTask<TResult>> tasks)
-    {
-        ArgumentNullException.ThrowIfNull(tasks);
-        return new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask<TResult>>, IReadOnlyList<TResult>>(
-            WhenAllCore<TResult>,
-            tasks.ToArray());
-    }
-
-    /// <summary>Creates a durable task which returns the input index of the first input task to complete.</summary>
-    /// <remarks>
-    /// The host records the winner, so replay selects the same input. A winner which failed or was canceled fails the
-    /// combined task. The other inputs keep running.
-    /// </remarks>
-    public static DurableTask<int> WhenAny(IReadOnlyList<DurableTask> tasks)
-    {
-        ValidateWhenAnyTasks(tasks);
-        return new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask>, int>(
-            WhenAnyCore,
-            tasks.ToArray());
-    }
-
-    /// <summary>Creates a durable task which returns the input index and result of the first input task to complete.</summary>
-    /// <remarks>
-    /// The host records the winner, so replay selects the same input. A winner which failed or was canceled fails the
-    /// combined task. The other inputs keep running.
-    /// </remarks>
-    public static DurableTask<(int Index, TResult Result)> WhenAny<TResult>(IReadOnlyList<DurableTask<TResult>> tasks)
-    {
-        ValidateWhenAnyTasks(tasks);
-        return new InlineAsyncDelegateDurableTask<IReadOnlyList<DurableTask<TResult>>, (int Index, TResult Result)>(
-            WhenAnyCore<TResult>,
-            tasks.ToArray());
-    }
-
-    private static async Task WhenAllCore(
-        IReadOnlyList<DurableTask> tasks,
-        CancellationToken _)
-    {
-        // Cancellation reaches the inputs, which are attached children, so the combinator waits for their outcomes
-        // and stops waiting only when the host aborts the attempt.
-        var cancellationToken = GetCurrentContext(nameof(WhenAll)).ExecutionAbortToken;
-        var scheduled = await ScheduleCombinatorInputsAsync(tasks, nameof(WhenAll), "when-all", cancellationToken).ConfigureAwait(false);
-        await ScheduledTask.WhenAll(scheduled.Tasks, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static async Task<IReadOnlyList<TResult>> WhenAllCore<TResult>(
-        IReadOnlyList<DurableTask<TResult>> tasks,
-        CancellationToken _)
-    {
-        // Cancellation reaches the inputs, which are attached children, so the combinator waits for their outcomes
-        // and stops waiting only when the host aborts the attempt.
-        var cancellationToken = GetCurrentContext(nameof(WhenAll)).ExecutionAbortToken;
-        var scheduled = await ScheduleCombinatorInputsAsync(tasks, nameof(WhenAll), "when-all", cancellationToken).ConfigureAwait(false);
-        await ScheduledTask.WhenAll(scheduled.Tasks, cancellationToken).ConfigureAwait(false);
-        var results = new TResult[scheduled.Tasks.Length];
-        for (var index = 0; index < results.Length; index++)
-        {
-            results[index] = (await scheduled.Tasks[index].GetResponseAsync(cancellationToken).ConfigureAwait(false)).GetResult<TResult>();
-        }
-
-        return results;
-    }
-
-    private static async Task<int> WhenAnyCore(
-        IReadOnlyList<DurableTask> tasks,
-        CancellationToken _)
-    {
-        // Cancellation reaches the inputs, which are attached children, so the combinator waits for their outcomes
-        // and stops waiting only when the host aborts the attempt.
-        var cancellationToken = GetCurrentContext(nameof(WhenAny)).ExecutionAbortToken;
-        var scheduled = await ScheduleCombinatorInputsAsync(tasks, nameof(WhenAny), "when-any", cancellationToken).ConfigureAwait(false);
-        var index = await SelectWinnerAsync(scheduled.Context, scheduled.OperationId, scheduled.Tasks, cancellationToken).ConfigureAwait(false);
-        await scheduled.Tasks[index].WaitAsync(cancellationToken).ConfigureAwait(false);
-        return index;
-    }
-
-    private static async Task<(int Index, TResult Result)> WhenAnyCore<TResult>(
-        IReadOnlyList<DurableTask<TResult>> tasks,
-        CancellationToken _)
-    {
-        // Cancellation reaches the inputs, which are attached children, so the combinator waits for their outcomes
-        // and stops waiting only when the host aborts the attempt.
-        var cancellationToken = GetCurrentContext(nameof(WhenAny)).ExecutionAbortToken;
-        var scheduled = await ScheduleCombinatorInputsAsync(tasks, nameof(WhenAny), "when-any", cancellationToken).ConfigureAwait(false);
-        var index = await SelectWinnerAsync(scheduled.Context, scheduled.OperationId, scheduled.Tasks, cancellationToken).ConfigureAwait(false);
-        return (index, (await scheduled.Tasks[index].GetResponseAsync(cancellationToken).ConfigureAwait(false)).GetResult<TResult>());
-    }
-
-    private static async Task<(DurableExecutionContext Context, TaskId OperationId, ScheduledTask[] Tasks)> ScheduleCombinatorInputsAsync(
-        IReadOnlyList<DurableTask> tasks,
-        string operation,
-        string operationName,
-        CancellationToken cancellationToken)
-    {
-        var context = GetCurrentContext(operation);
-        var operationId = context.CreateOperationId(operationName);
-
-        // Inputs are scheduled concurrently, so a host can commit the whole batch together. Their indexed identifiers
-        // keep them replay-stable in any scheduling order.
-        var scheduling = new Task<ScheduledTask>[tasks.Count];
-        for (var index = 0; index < tasks.Count; index++)
-        {
-            scheduling[index] = new ConfiguredDurableTask(tasks[index], CreateCombinatorChildId(operationId, index))
-                .ScheduleAsync(cancellationToken);
-        }
-
-        return (context, operationId, await Task.WhenAll(scheduling).ConfigureAwait(false));
-    }
-
-    private static async Task<(DurableExecutionContext Context, TaskId OperationId, ScheduledTask<TResult>[] Tasks)> ScheduleCombinatorInputsAsync<TResult>(
-        IReadOnlyList<DurableTask<TResult>> tasks,
-        string operation,
-        string operationName,
-        CancellationToken cancellationToken)
-    {
-        var context = GetCurrentContext(operation);
-        var operationId = context.CreateOperationId(operationName);
-        var scheduling = new Task<ScheduledTask<TResult>>[tasks.Count];
-        for (var index = 0; index < tasks.Count; index++)
-        {
-            scheduling[index] = new ConfiguredDurableTask<TResult>(
-                tasks[index],
-                CreateCombinatorChildId(operationId, index)).ScheduleAsync(cancellationToken);
-        }
-
-        return (context, operationId, await Task.WhenAll(scheduling).ConfigureAwait(false));
-    }
-
-    private static async Task<int> SelectWinnerAsync(
-        DurableExecutionContext context,
-        TaskId operationId,
-        ScheduledTask[] scheduled,
-        CancellationToken cancellationToken)
-    {
-        var candidates = new TaskId[scheduled.Length];
-        for (var index = 0; index < candidates.Length; index++)
-        {
-            candidates[index] = scheduled[index].Id;
-        }
-
-        var winner = await context.SelectCompletionAsync(operationId.Child("$winner"), candidates, cancellationToken).ConfigureAwait(false);
-        var winnerIndex = Array.IndexOf(candidates, winner);
-        if (winnerIndex < 0)
-        {
-            throw new InvalidOperationException($"The host selected '{winner}', which is not a candidate of '{operationId}'.");
-        }
-
-        return winnerIndex;
-    }
-    private static DurableExecutionContext GetCurrentContext(string operation)
-        => DurableExecutionContext.Current
-            ?? throw new InvalidOperationException($"DurableTask.{operation} requires a durable execution context.");
-
-    private static TaskId CreateCombinatorChildId(TaskId operationId, int index)
-        => operationId.Child(index.ToString(System.Globalization.CultureInfo.InvariantCulture));
-
-    private static void ValidateWhenAnyTasks<TTask>(IReadOnlyList<TTask> tasks)
-    {
-        ArgumentNullException.ThrowIfNull(tasks);
-        ArgumentOutOfRangeException.ThrowIfZero(tasks.Count, nameof(tasks));
     }
 
     /// <summary>Runs the definition in the supplied execution context.</summary>
@@ -355,20 +181,6 @@ internal class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, Task<TR
     }
 }
 
-internal sealed class InlineAsyncDelegateDurableTask<TState>(
-    Func<TState, CancellationToken, Task> function,
-    TState state) : AsyncDelegateDurableTask(token => function(state, token))
-{
-    internal override bool RunsInlineInParent => true;
-}
-
-internal sealed class InlineAsyncDelegateDurableTask<TState, TResult>(
-    Func<TState, CancellationToken, Task<TResult>> function,
-    TState state) : AsyncDelegateDurableTask<TResult>(token => function(state, token))
-{
-    internal override bool RunsInlineInParent => true;
-}
-
 internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 {
     private TaskId _taskId;
@@ -428,9 +240,18 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 
     internal async Task<DurableTaskResponse> RunAsync(CancellationToken cancellationToken)
     {
-        if (_taskId.IsDefault && ParentContext is { } parent && Task.RunsInlineInParent)
+        if (ParentContext is { } parent)
         {
-            return await Task.RunAsync(parent).ConfigureAwait(false);
+            // An awaited combinator runs in the parent, and an identifier assigned with WithId names its operation.
+            if (Task is IInlineOperation operation)
+            {
+                return await operation.RunInlineAsync(parent, _taskId).ConfigureAwait(false);
+            }
+
+            if (_taskId.IsDefault && Task.RunsInlineInParent)
+            {
+                return await Task.RunAsync(parent).ConfigureAwait(false);
+            }
         }
 
         var scheduled = await ScheduleCoreAsync(cancellationToken).ConfigureAwait(false);
