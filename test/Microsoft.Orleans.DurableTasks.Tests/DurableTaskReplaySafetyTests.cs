@@ -1,4 +1,5 @@
 using Orleans.DurableTasks;
+using Orleans.DurableTasks.Protocol;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
@@ -330,6 +331,131 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
+    public Task UnnamedOnceCommitsItsRecordUnderAGeneratedIdentifierAndReplayReturnsTheRecordedValue() => ActivationScheduler.RunAsync(async () =>
+    {
+        var effectId = WorkflowId.Child("$child-2");
+        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
+
+            Assert.All(
+                activation.Writes.Where(static write => write.Counter == 2),
+                write => Assert.Contains(effectId, write.Completed));
+            Assert.Equal("$once", GetTask(activation, effectId).RequestFingerprint);
+        }
+
+        // The replay creates the unnamed child and the unnamed effect in the same order, so each finds its record.
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+        Assert.Equal(1, harness.EffectRuns);
+        Assert.Equal(2, replay.Grain.Counter.Value);
+        replay.Grain.OpenGate();
+
+        Assert.Equal(3, (await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>());
+        Assert.Equal(2, replay.Grain.Counter.Value);
+
+        static async DurableTask<int> Workflow(ReplayGrain grain)
+        {
+            var first = await DurableTask.Run(_ => ++grain.Counter.Value);
+            var second = DurableTask.Once(() =>
+            {
+                grain.Harness.CountEffectRun();
+                return ++grain.Counter.Value;
+            });
+            await grain.WaitAtGateAsync();
+            return first + second;
+        }
+    });
+
+    [Fact]
+    public Task ReplayWhichRunsAnUnnamedEffectWhereAnUnnamedChildWasRecordedFails() => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var harness = new DurableTaskReplayHarness(static grain => Original(grain));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+        }
+
+        // A later version replaces the unnamed step with an unnamed effect, which takes the step's generated identifier.
+        harness.Workflow = static grain => Changed(grain);
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+
+        var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
+        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
+        Assert.Contains("'workflow/$child-1'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a local child task, and this attempt requested a DurableTask.Once effect.", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, harness.EffectRuns);
+        Assert.Equal(1, replay.Grain.Counter.Value);
+
+        static async DurableTask<int> Original(ReplayGrain grain)
+        {
+            var value = await DurableTask.Run(_ => ++grain.Counter.Value);
+            await grain.WaitAtGateAsync();
+            return value;
+        }
+
+        static async DurableTask<int> Changed(ReplayGrain grain)
+        {
+            var value = DurableTask.Once(() =>
+            {
+                grain.Harness.CountEffectRun();
+                return ++grain.Counter.Value;
+            });
+            await grain.WaitAtGateAsync();
+            return value;
+        }
+    });
+
+    [Fact]
+    public Task ReplayWhichSchedulesAnUnnamedChildWhereAnUnnamedEffectWasRecordedFails() => ActivationScheduler.RunAsync(async () =>
+    {
+        var childRuns = 0;
+        await using var harness = new DurableTaskReplayHarness(static grain => Original(grain));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
+        }
+
+        // A later version replaces the unnamed effect with an unnamed step, which takes the effect's generated identifier.
+        harness.Workflow = grain => Changed(grain, () => childRuns++);
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+
+        var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
+        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
+        Assert.Contains("'workflow/$child-1'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.Once effect", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, childRuns);
+        Assert.Equal(1, harness.EffectRuns);
+        Assert.Equal(1, replay.Grain.Counter.Value);
+
+        static async DurableTask<int> Original(ReplayGrain grain)
+        {
+            var value = DurableTask.Once(() =>
+            {
+                grain.Harness.CountEffectRun();
+                return ++grain.Counter.Value;
+            });
+            await grain.WaitAtGateAsync();
+            return value;
+        }
+
+        static async DurableTask<int> Changed(ReplayGrain grain, Action run) =>
+            await DurableTask.Run(_ =>
+            {
+                run();
+                return ++grain.Counter.Value;
+            });
+    });
+
+    [Fact]
     public Task OnceAfterConfigureAwaitFalseFailsWithoutRunning() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
@@ -434,4 +560,10 @@ public sealed class DurableTaskReplaySafetyTests
 
     /// <summary>A result type which has no serializer.</summary>
     private sealed class UnserializableResult;
+
+    private static IDurableTaskState GetTask(ReplayActivation activation, TaskId taskId)
+    {
+        Assert.True(activation.Storage.TryGetTask(taskId, out var state));
+        return state;
+    }
 }
