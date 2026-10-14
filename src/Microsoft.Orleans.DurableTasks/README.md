@@ -145,8 +145,8 @@ if (result is DurableSignalResult.Conflict or DurableSignalResult.TaskCompleted)
   indexed slots belong to the waiting execution's tree.
 
 Repository consumers which need a preview package can opt this project into
-packing with `-p:PackDurableTaskAdapter=true`. The project keeps package
-validation disabled until its first published version establishes a baseline.
+packing with `-p:PackDurableTaskAdapter=true`. Packing validates the package's
+framework assets; its first published version establishes the compatibility baseline.
 
 ## Runtime guarantees
 
