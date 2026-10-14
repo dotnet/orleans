@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.DurableTasks;
@@ -633,6 +634,59 @@ public sealed class TicketGrain : DurableGrain, ITicketGrain
     }
 }
 // </durable_tasks_replay_regions>
+
+// <durable_tasks_progress>
+[GenerateSerializer, Immutable]
+public sealed record ExportProgress(int Completed, int Total);
+
+public interface IPartitionGrain : IGrainWithStringKey
+{
+    DurableTask ExportAsync();
+}
+
+public interface IExportGrain : IGrainWithStringKey
+{
+    DurableTask<int> ExportAsync(string[] partitions);
+
+    IAsyncEnumerable<ExportProgress> WatchAsync(CancellationToken cancellationToken);
+}
+
+public sealed class ExportGrain : DurableGrain, IExportGrain
+{
+    private readonly IDurableLog<ExportProgress> _progress;
+
+    public ExportGrain() => _progress = StateManager.GetOrAddLog<ExportProgress>("progress");
+
+    public async DurableTask<int> ExportAsync(string[] partitions)
+    {
+        // Each report appends once for its position in the task, so a replay doesn't publish older progress again.
+        _progress.Report(new ExportProgress(0, partitions.Length));
+        for (var i = 0; i < partitions.Length; i++)
+        {
+            await GrainFactory.GetGrain<IPartitionGrain>(partitions[i]).ExportAsync().WithId("partition");
+            _progress.Report(new ExportProgress(i + 1, partitions.Length));
+        }
+
+        return partitions.Length;
+    }
+
+    // Observers read committed reports in order, from the first.
+    public async IAsyncEnumerable<ExportProgress> WatchAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        await foreach (var change in _progress.ReadAsync(cancellationToken: cancellationToken))
+        {
+            if (change is { Kind: LogEventKind.Entry, Item: { } progress })
+            {
+                yield return progress;
+                if (progress.Completed == progress.Total)
+                {
+                    yield break;
+                }
+            }
+        }
+    }
+}
+// </durable_tasks_progress>
 
 internal static class InvoiceClient
 {

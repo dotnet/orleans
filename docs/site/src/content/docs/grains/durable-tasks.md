@@ -1,7 +1,7 @@
 ---
 title: Durable tasks
 description: Understand the durable task programming model, its replay and commit guarantees, cancellation, signals, and task lifecycle.
-ms.date: 10/13/2026
+ms.date: 10/14/2026
 ms.topic: conceptual
 ---
 
@@ -153,6 +153,13 @@ again. The order workflow changes its status this way:
   `pay$2`. Effects and children named with `WithId` share the count, so a deployment
   which turns a recorded step into an effect, or an effect into a step, fails with the
   divergence error instead of running the work again.
+- `DurableTask.Once(effect)` omits the name, such as
+  `var reference = DurableTask.Once(Guid.NewGuid);`. The effect takes the execution's
+  next generated child ID, such as `$child-3`, which unnamed effects share with unnamed
+  children, so it finds its record when every run creates its unnamed operations in the
+  same order. A replay which finds a child where an effect now runs, or the reverse,
+  fails with the divergence error. Name effects whose position can change between runs
+  or deployments.
 - Effects are synchronous: asynchronous and durable effects don't compile, and run as
   awaited children instead. An effect runs on the activation's scheduler, so `Once`
   after `ConfigureAwait(false)` throws `InvalidOperationException` without running it.
@@ -180,6 +187,33 @@ external service. A replay returns the delegate's recorded result, and runs a de
 whose result wasn't recorded again, so the delegate's external effect needs its own
 idempotency.
 
+## Progress reports
+
+A workflow publishes its progress to observers by reporting entries to a journaled
+<xref:Orleans.Journaling.IDurableLog`1> of its grain with
+<xref:Orleans.DurableTasks.DurableLogExtensions.Report*?displayProperty=nameWithType>.
+A report is an unnamed recorded effect which appends its entry: each report takes the
+next position within the task, and appends exactly once per position. The entry commits
+with the task's next durable write, and a replay returns the recorded sequence number
+without appending again. Observers of the log therefore see each report once, in the
+order in which the task made it, including after replays. Outside a durable task, a
+report appends directly.
+
+Use reports for progress which callers and user interfaces watch, such as each status
+of an order or each completed partition of an export. Compute each entry from the
+task's arguments, recorded results, and logical time, so each replay reports the same
+entries at the same positions. Observers read the log with
+<xref:Orleans.Journaling.IDurableLog`1.ReadAsync*>, typically through an
+`IAsyncEnumerable<T>` grain method; the committed mode delivers each report once it is
+durable. [Observe journaled state](journaling/observe-state.md) describes reading,
+resuming, and trimming logs.
+
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_progress" language="csharp":::
+
+The `playground/DurableOrderProcessing` project keeps each order's state as a log of
+snapshots which its workflow reports, and streams them to the browser as server-sent
+events.
+
 ## Replay and determinism
 
 After a deactivation or a failure, the next activation replays each pending task: the
@@ -195,7 +229,8 @@ three kinds of code:
 
 - **Recorded operations** run once per execution, and a replay returns their recorded
   outcomes: durable calls to other grains, local steps, `DurableTask.Run` delegates,
-  delays, signal waits and sends, detaches, and `DurableTask.Once` effects.
+  delays, signal waits and sends, detaches, `DurableTask.Once` effects, and progress
+  reports.
 - **Re-executed code** precedes the body's last recorded operation and runs again in
   every replay. It computes values from the method's arguments, recorded results, the
   execution's logical time and cancellation state, and configuration which stays the
