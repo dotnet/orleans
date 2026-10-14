@@ -25,7 +25,7 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 [TestSuite("BVT")]
 [TestProvider("None")]
 [TestArea("DurableTasks")]
-public sealed class DurableTaskRuntimeInvariantTests
+public sealed partial class DurableTaskRuntimeInvariantTests
 {
     [Fact]
     public void RuntimeJournalHookWritesNoEntries()
@@ -1207,7 +1207,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task RecoveryCommitsRemoteChildCancellationWithTerminalResponse()
+    public async Task RecoveryLeavesCanceledRemoteChildAwaitingItsCallee()
     {
         var (_, storage, manager, _) = CreateRuntime();
         var childId = TaskId.Parse("root/remote");
@@ -1216,18 +1216,16 @@ public sealed class DurableTaskRuntimeInvariantTests
         storage.SetRemoteRequest(childId, child, target, "fingerprint");
         storage.RequestCancellation(childId, child);
         var (recovered, _, _, transport) = CreateRuntime(storage, manager);
-        manager.BeforeWrite = () =>
-        {
-            Assert.Equal(DurableTaskStatus.Canceled, storage.Get(childId).Result!.Status);
-            var cancellation = Assert.Single(transport.Cancellations);
-            Assert.Equal(childId, cancellation.TaskId);
-            Assert.Equal(target, cancellation.Target);
-        };
 
         await recovered.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(1, manager.WriteCount);
-        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(childId).Result!.Status);
+        // The cancellation message committed with the request; the callee decides the child's outcome.
+        Assert.Equal(0, manager.WriteCount);
+        Assert.Null(storage.Get(childId).Result);
+        Assert.Empty(transport.Cancellations);
+        recovered.AcceptResponseFromInbox(childId, DurableTaskResponse.FromResult(5), target);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(5, storage.Get(childId).Result!.GetResult<int>());
     }
 
     [Fact]
@@ -1312,7 +1310,7 @@ public sealed class DurableTaskRuntimeInvariantTests
     }
 
     [Fact]
-    public async Task PersistedRemoteChildCancellationTerminalizesBeforeResend()
+    public async Task ReplayedCanceledRemoteChildAwaitsItsCalleeOutcome()
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/remote");
@@ -1325,11 +1323,12 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         var handle = await recovered.ScheduleChildAsync(taskId, retry, TestContext.Current.CancellationToken);
 
-        Assert.Equal(DurableTaskStatus.Canceled, (await handle.WaitAsync(TestContext.Current.CancellationToken)).Status);
+        Assert.False((await handle.PollAsync(new PollingOptions { PollTimeout = TimeSpan.Zero }, TestContext.Current.CancellationToken)).IsCompleted);
+        Assert.Empty(transport.Cancellations);
         Assert.Equal(0, retry.ScheduleAsyncCallCount);
-        var cancellation = Assert.Single(transport.Cancellations);
-        Assert.Equal(taskId, cancellation.TaskId);
-        Assert.Equal(request.Context!.TargetId, cancellation.Target);
+        recovered.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(9), request.Context!.TargetId);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(9, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
     }
 
     [Fact]
@@ -1360,6 +1359,7 @@ public sealed class DurableTaskRuntimeInvariantTests
 
         var observedWriteCount = await writeCountObservedDuringCancellation.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.True(observedWriteCount > writesBeforeCancellation);
+        Assert.Equal(DurableTaskStatus.Canceled, (await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)).Status);
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(taskId).Result!.Status);
     }
 

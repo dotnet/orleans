@@ -54,7 +54,15 @@ internal sealed class DurableTaskMessageHandler(
                 return true;
             case DurableTaskMessageTypes.CancellationSubject:
                 var cancellation = messageTypes.Cancellation.Decode(message);
-                runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender));
+                if (cancellation.AbortReason is { } abortReason)
+                {
+                    runtime.AbortFromInbox(cancellation.TaskId, abortReason, GetSender(cancellation.Sender));
+                }
+                else
+                {
+                    runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender));
+                }
+
                 return true;
             default:
                 return false;

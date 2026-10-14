@@ -463,6 +463,9 @@ internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskReques
         await grain.CancelAsync(TaskId, CancellationToken.None).AsTask().WaitAsync(cancellationToken);
     }
 
+    public async ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
+        await grain.AbortAsync(TaskId, reason, CancellationToken.None).AsTask().WaitAsync(cancellationToken);
+
     public async ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
     {
         if (LastResponse is { IsCompleted: true } response)

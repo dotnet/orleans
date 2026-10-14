@@ -47,6 +47,13 @@ internal sealed class DurableTaskCancellationMessage
 
     [Id(1)]
     public GrainId Sender { get; init; }
+
+    /// <summary>
+    /// Gets the reason for an administrative abort of the task, or <see langword="null"/> for a cooperative cancellation
+    /// request.
+    /// </summary>
+    [Id(2)]
+    public string? AbortReason { get; init; }
 }
 
 /// <summary>
