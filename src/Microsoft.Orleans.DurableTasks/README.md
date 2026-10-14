@@ -305,7 +305,15 @@ framework assets; its first published version establishes the compatibility base
   which doesn't serialize is recorded as that failure. Code which continues off the
   activation, for example after `ConfigureAwait(false)`, can't record effects. An
   effect and a child which use the same occurrence of a name, `$once:x$2` and
-  `x$2`, fail as a divergence in either direction.
+  `x$2`, fail as a divergence in either direction. An unnamed effect,
+  `DurableTask.Once(effect)`, takes the execution's next generated child
+  identifier, such as `$child-3`, so an effect and a child which a replay finds
+  under the same generated identifier fail as a divergence too.
+- `IDurableLog<T>.Report(item)` appends a progress report as an unnamed
+  `DurableTask.Once` effect: the entry and its record commit in the next journal
+  write, a replay returns the recorded sequence number without appending again,
+  and readers of the log observe each report once, in order. Outside a durable
+  task, it appends directly.
 - A run of a task's body reports `IsReplaying` from its start while earlier runs
   recorded operations in the task's tree: children, detach and signal-send
   markers, and recorded effects, but not signal values or invoked descendants.

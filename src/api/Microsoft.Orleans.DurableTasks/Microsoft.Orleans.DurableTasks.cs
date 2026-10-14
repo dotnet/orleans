@@ -26,6 +26,11 @@ namespace Orleans.Configuration
 
 namespace Orleans.DurableTasks
 {
+    public static partial class DurableLogExtensions
+    {
+        public static long Report<T>(this Journaling.IDurableLog<T> log, T item) { throw null; }
+    }
+
     [GenerateSerializer]
     [Alias("Orleans.DurableTasks.DurableSignalResult")]
     public enum DurableSignalResult

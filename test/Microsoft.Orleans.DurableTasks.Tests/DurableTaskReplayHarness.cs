@@ -52,8 +52,9 @@ internal sealed class DurableTaskReplayHarness(Func<ReplayGrain, DurableTask> wo
             var storage = services.GetRequiredService<DurableTaskGrainStorage>();
             var logicalTimes = services.GetRequiredKeyedService<IDurableDictionary<TaskId, DateTimeOffset>>("$task-logical-times");
             var counter = services.GetRequiredKeyedService<IDurableValue<int>>("counter");
+            var log = services.GetRequiredKeyedService<IDurableLog<int>>("log");
             var manager = services.GetRequiredService<IJournaledStateManager>();
-            var grain = new ReplayGrain(this, counter, manager);
+            var grain = new ReplayGrain(this, counter, log, manager);
             var grainContext = Substitute.For<IGrainContext>();
             grainContext.GrainId.Returns(GrainId);
             grainContext.GetTarget().Returns(grain);
@@ -65,7 +66,7 @@ internal sealed class DurableTaskReplayHarness(Func<ReplayGrain, DurableTask> wo
                 Options.Create(new DurableMessagingOptions()),
                 _journal.Serializer);
             var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, shared, [new RecordingDurableTaskMessageTransport()]);
-            var probe = new WriteProbe(() => (counter.Value, CompletedTasks(storage)));
+            var probe = new WriteProbe(() => (counter.Value, log.Count, CompletedTasks(storage)));
             manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
             manager.RegisterStateMachine("write-probe", probe);
             runtime.InitializeForActivation();
@@ -101,8 +102,8 @@ internal sealed class ReplayActivation(
 
     public ReplayGrain Grain { get; } = grain;
 
-    /// <summary>Gets the grain's counter and the completed tasks which each journal write gathered.</summary>
-    public IReadOnlyCollection<(int Counter, TaskId[] Completed)> Writes => probe.Writes;
+    /// <summary>Gets the grain's counter, its log's entry count, and the completed tasks which each journal write gathered.</summary>
+    public IReadOnlyCollection<(int Counter, int Entries, TaskId[] Completed)> Writes => probe.Writes;
 
     /// <summary>Schedules the harness's workflow as a client does.</summary>
     public async Task ScheduleAsync(TaskId taskId, CancellationToken cancellationToken) =>
@@ -126,8 +127,12 @@ internal sealed class ReplayActivation(
     }
 }
 
-/// <summary>The grain instance of one activation: its journaled counter and the workflow's controls.</summary>
-internal sealed class ReplayGrain(DurableTaskReplayHarness harness, IDurableValue<int> counter, IJournaledStateManager manager)
+/// <summary>The grain instance of one activation: its journaled counter and log, and the workflow's controls.</summary>
+internal sealed class ReplayGrain(
+    DurableTaskReplayHarness harness,
+    IDurableValue<int> counter,
+    IDurableLog<int> log,
+    IJournaledStateManager manager)
 {
     private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource _atGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -137,6 +142,9 @@ internal sealed class ReplayGrain(DurableTaskReplayHarness harness, IDurableValu
 
     /// <summary>Gets the grain's journaled state.</summary>
     public IDurableValue<int> Counter { get; } = counter;
+
+    /// <summary>Gets the grain's journaled log, to which workflows report their progress.</summary>
+    public IDurableLog<int> Log { get; } = log;
 
     /// <summary>Completes once the workflow waits at the gate.</summary>
     public Task AtGate => _atGate.Task;
@@ -160,11 +168,11 @@ internal sealed class ReplayGrain(DurableTaskReplayHarness harness, IDurableValu
 }
 
 /// <summary>A journal state machine which writes nothing and records what each write gathers.</summary>
-internal sealed class WriteProbe(Func<(int Counter, TaskId[] Completed)> snapshot) : IStateMachine
+internal sealed class WriteProbe(Func<(int Counter, int Entries, TaskId[] Completed)> snapshot) : IStateMachine
 {
-    private readonly ConcurrentQueue<(int Counter, TaskId[] Completed)> _writes = new();
+    private readonly ConcurrentQueue<(int Counter, int Entries, TaskId[] Completed)> _writes = new();
 
-    public IReadOnlyCollection<(int Counter, TaskId[] Completed)> Writes => _writes;
+    public IReadOnlyCollection<(int Counter, int Entries, TaskId[] Completed)> Writes => _writes;
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         throw new InvalidOperationException("The write probe writes no entries.");
