@@ -387,6 +387,37 @@ var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
 - The record applies only within a durable task. Outside one, the effect runs every time, so helpers
   which ordinary methods share with durable task bodies can call it.
 
+## Replay diagnostics and logging
+
+`DurableTask.Current.IsReplaying` reports whether a run of the body is re-running operations which an
+earlier run recorded. It is `true` from the start of a run which finds operations that earlier runs
+recorded in the task's tree, such as children, detach and signal-send markers, and `Once` records,
+until the run has reached each of them or starts an operation which no earlier run recorded. It then
+stays `false`. A first run reports `false` throughout. Signal values which callers sent to the task
+don't count as recorded operations.
+
+Use it for logging and diagnostics only. A run which ended before a journal write committed its work
+is replayed, so code which runs only while `IsReplaying` is `false` can run twice or never, and code
+which branches on it schedules different operations in different runs. Work which runs once belongs
+in `DurableTask.Once`, a step, or the body's synchronous tail.
+
+`logger.ReplaySafe()` returns a logger which skips events while the task replays, so each event is
+logged once:
+
+```csharp
+private readonly ILogger _log = logger.ReplaySafe();
+
+public async DurableTask<OrderResult> PlaceOrderAsync(SubmitOrder request)
+{
+    _log.LogInformation("Placing order {OrderId}", request.OrderId);
+    ...
+}
+```
+
+The logger reads the running task when it logs, so one instance serves durable task bodies and
+ordinary grain methods. Logs inside a `DurableTask.Once` effect, or inside a step which completed,
+don't repeat without it, because a replay returns their recorded results without running them.
+
 ## Host responsibilities
 
 A host derives from `DurableTaskContext`, implements `ISchedulableTask` definitions
@@ -407,4 +438,5 @@ implement `IScheduledTaskHandle.AbortAsync`. Hosts which support recorded effect
 `DurableTaskContext.RunEffect`: they return an effect's recorded outcome, or run the effect and stage its
 record in the same synchronous work, so the record commits with the state changes the effect made. Hosts
 which commit a body's state changes with its result stage the result in
-`DurableTaskContext.OnBodyCompleted`, which runs synchronously with the body's final code.
+`DurableTaskContext.OnBodyCompleted`, which runs synchronously with the body's final code. Hosts which
+track replay override `DurableTaskContext.IsReplaying`.
