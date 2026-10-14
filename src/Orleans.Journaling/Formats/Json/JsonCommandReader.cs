@@ -136,6 +136,17 @@ internal ref struct JsonCommandReader
         return value;
     }
 
+    public bool ReadBoolean(int index, string operandName)
+    {
+        ReadOperand(index, operandName);
+        return _reader.TokenType switch
+        {
+            JsonTokenType.True => true,
+            JsonTokenType.False => false,
+            _ => throw new JsonException($"JSON journal command operand '{operandName}' must be a Boolean."),
+        };
+    }
+
     public string? ReadString(int index, string operandName)
     {
         ReadOperand(index, operandName);

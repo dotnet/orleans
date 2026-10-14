@@ -29,9 +29,13 @@ public class JsonDurableLogTests
         Apply(codec, """["append","a"]""", writer => codec.WriteAppend(["a"], writer), handler);
         Apply(codec, """["append","b","c"]""", writer => codec.WriteAppend(["b", "c"], writer), handler);
         Apply(codec, """["trimBefore",3]""", writer => codec.WriteTrimBefore(3, writer), handler);
-        Apply(codec, """["snapshot",2,["d","e"]]""", writer => codec.WriteSnapshot(2, ["d", "e"], writer), handler);
+        Apply(codec, """["clear"]""", writer => codec.WriteClear(writer), handler);
+        Apply(codec, """["seal"]""", writer => codec.WriteSeal(writer), handler);
+        Apply(codec, """["snapshot",4,4,true,["d","e"]]""", writer => codec.WriteSnapshot(4, 4, isSealed: true, ["d", "e"], writer), handler);
 
-        Assert.Equal(["append a", "append b", "append c", "trim 3", "reset 2 2", "append d", "append e"], handler.Commands);
+        Assert.Equal(
+            ["append a", "append b", "append c", "trim 3", "clear", "seal", "reset 4 4 True 2", "append d", "append e"],
+            handler.Commands);
     }
 
     [Fact]
@@ -43,9 +47,12 @@ public class JsonDurableLogTests
         Assert.Throws<JsonException>(() => codec.Apply(Read("""["append"]"""), handler));
         Assert.ThrowsAny<JsonException>(() => codec.Apply(Read("""["append","a"] []"""), handler));
         Assert.Throws<JsonException>(() => codec.Apply(Read("""["trimBefore",-1]"""), handler));
-        Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",0,["a"],1]"""), handler));
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["clear",1]"""), handler));
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",0,0,1,[]]"""), handler));
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",0,0,false,["a"],1]"""), handler));
         Assert.Throws<NotSupportedException>(() => codec.Apply(Read("""["rewrite"]"""), handler));
         Assert.Throws<ArgumentOutOfRangeException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteTrimBefore(-1, writer)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(1, 2, isSealed: false, [], writer)));
     }
 
     [Fact]
@@ -61,6 +68,7 @@ public class JsonDurableLogTests
         await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await using var watch = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(DurableChangeStatus.Committed, (await watch.NextAsync()).Status);
+        Assert.Equal(LogEventKind.CaughtUp, (await read.NextAsync()).Kind);
 
         var draft = log.BeginDraft();
         draft.Write("Hel");
@@ -84,6 +92,23 @@ public class JsonDurableLogTests
         await recovered.InitializeAsync(CancellationToken);
         Assert.Equal((1L, 2L, 2L), (recoveredLog.FirstSequence, recoveredLog.NextSequence, recoveredLog.CommittedSequence));
         Assert.Equal(["World"], recoveredLog);
+
+        recoveredLog.Clear();
+        recoveredLog.Append("Summary");
+        recoveredLog.Seal();
+        await recovered.WriteStateAsync(CancellationToken);
+
+        var sealedManager = CreateManager(services, storage);
+        var sealedLog = CreateLog(services, sealedManager);
+        await sealedManager.InitializeAsync(CancellationToken);
+        Assert.Equal((3L, 4L, true), (sealedLog.FirstSequence, sealedLog.NextSequence, sealedLog.IsSealed));
+        Assert.Equal(["Summary"], sealedLog);
+        await using var sealedRead = sealedLog.ReadAsync(2, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        Assert.Equal(LogEventKind.Reset, (await sealedRead.NextAsync()).Kind);
+        Assert.Equal((LogEventKind.Entry, "Summary", DurableChangeStatus.Committed), ToTuple(await sealedRead.NextAsync()));
+        Assert.Equal(LogEventKind.CaughtUp, (await sealedRead.NextAsync()).Kind);
+        Assert.Equal(LogEventKind.Sealed, (await sealedRead.NextAsync()).Kind);
+        Assert.False(await sealedRead.MoveNextAsync());
 
         static (LogEventKind, string?, DurableChangeStatus) ToTuple(LogEvent<string> logEvent) => (logEvent.Kind, logEvent.Item, logEvent.Status);
     });
