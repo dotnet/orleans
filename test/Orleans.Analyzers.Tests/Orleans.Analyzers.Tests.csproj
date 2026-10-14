@@ -15,6 +15,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core\Orleans.Core.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Analyzers\Orleans.Analyzers.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Analyzers.Contracts\Orleans.Analyzers.Contracts.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableTasks.Abstractions\Orleans.DurableTasks.Abstractions.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
 </Project>

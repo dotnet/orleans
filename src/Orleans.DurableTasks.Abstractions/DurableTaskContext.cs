@@ -23,6 +23,7 @@ public abstract class DurableTaskContext
     private string? _cancellationReason;
     private long _nextChildId;
     private long _nextOperationId;
+    private Dictionary<string, int>? _segmentOccurrences;
 
     /// <summary>Initializes an execution with durable cancellation.</summary>
     protected DurableTaskContext(TaskId taskId) : this(taskId, CancellationToken.None)
@@ -301,6 +302,75 @@ public abstract class DurableTaskContext
 
     internal TaskId CreateOperationId(string kind)
         => Id.Child($"${kind}-{Interlocked.Increment(ref _nextOperationId).ToString(CultureInfo.InvariantCulture)}");
+
+    /// <summary>Validates a caller-supplied name, which can't contain the <c>$</c> which generated identifiers use.</summary>
+    internal static void ValidateName(string name, string paramName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name, paramName);
+        if (name.Contains(GeneratedSegmentPrefix, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"Names can't contain '{GeneratedSegmentPrefix}', which generated identifiers use.",
+                paramName);
+        }
+    }
+
+    /// <summary>
+    /// Creates the identifier of a named operation of this execution: the first occurrence of
+    /// <paramref name="segment"/> in this attempt is the segment itself, and each later occurrence appends its ordinal,
+    /// such as <c>reserve$2</c>.
+    /// </summary>
+    /// <remarks>
+    /// Occurrences are numbered in the order in which the attempt creates them, so a replay which creates the same named
+    /// operations in the same order assigns the same identifiers, and adding a later occurrence doesn't rename earlier
+    /// ones.
+    /// </remarks>
+    internal TaskId CreateNamedChildId(string segment)
+    {
+        int occurrence;
+        lock (_lock)
+        {
+            _segmentOccurrences ??= new(StringComparer.Ordinal);
+            _segmentOccurrences.TryGetValue(segment, out occurrence);
+            _segmentOccurrences[segment] = ++occurrence;
+        }
+
+        return Id.Child(occurrence == 1
+            ? segment
+            : $"{segment}{GeneratedSegmentPrefix}{occurrence.ToString(CultureInfo.InvariantCulture)}");
+    }
+
+    /// <summary>
+    /// Returns the outcome recorded for the effect <paramref name="effectId"/>, or runs the effect and records its outcome.
+    /// </summary>
+    /// <typeparam name="TState">The type of the state which <paramref name="effect"/> receives.</typeparam>
+    /// <param name="effectId">The effect's identifier, a child of this execution.</param>
+    /// <param name="state">The state which <paramref name="effect"/> receives.</param>
+    /// <param name="effect">
+    /// Runs the effect and returns its outcome: its result, or the exception which it threw. It doesn't throw.
+    /// </param>
+    /// <returns>The effect's outcome, which the host recorded.</returns>
+    /// <remarks>
+    /// <para>
+    /// <see cref="DurableTask.Once{TResult}(string, Func{TResult})"/> calls this synchronously from the task's body. A host
+    /// runs the effect and stages its record in the same synchronous work, so the record commits with the next durable
+    /// write together with the state changes which the effect made. Every later run of the body, including a replay,
+    /// receives the recorded outcome without running the effect.
+    /// </para>
+    /// <para>
+    /// A host which can't store the outcome, for example because its result doesn't serialize, records and returns that
+    /// failure instead, so every run observes the same failure. A host throws <see cref="InvalidOperationException"/>
+    /// without running the effect when it can't stage the record with the effect's state changes, for example when it is
+    /// called off the host's scheduler, or when an earlier run recorded another kind of operation under the effect's name
+    /// and occurrence, which is how a replay which diverges from its recorded execution surfaces. Hosts which don't
+    /// support recorded effects keep this default implementation, which throws <see cref="NotSupportedException"/>.
+    /// </para>
+    /// </remarks>
+    protected internal virtual DurableTaskResponse RunEffect<TState>(
+        TaskId effectId,
+        TState state,
+        Func<TState, DurableTaskResponse> effect)
+        => throw new NotSupportedException("The durable task host does not support DurableTask.Once.");
 
     /// <summary>
     /// Registers an asynchronous callback which observes the durable cancellation request.
