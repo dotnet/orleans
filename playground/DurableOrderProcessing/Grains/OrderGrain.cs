@@ -22,7 +22,7 @@ public interface IOrderGrain : IGrainWithGuidKey
 
 // The order process manager, following eShop's ordering flow:
 // Submitted -> (grace period) -> AwaitingValidation -> StockConfirmed -> Paid -> Shipped,
-// or Cancelled when stock is rejected, payment is declined, or the buyer cancels before stock is confirmed.
+// or Cancelled when stock is rejected, payment is declined or times out, or the buyer cancels before stock is confirmed.
 // PlaceOrder is one durable task. After a deactivation, the runtime replays it from the start: completed child tasks
 // return their recorded results, so the workflow resumes where it stopped. The order's state is its history: the
 // workflow keeps the current snapshot in a local variable, computes each transition from the request, recorded results,
@@ -110,13 +110,22 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
             _history.Report(order);
             await RecordAsync(order.Order);
+
+            // The authorization runs as authorize-payment/0 and its timeout as authorize-payment/1. When the timeout
+            // elapses first, the payment grain observes a cancellation request, and an authorization which then ends
+            // canceled throws TimeoutException.
             payment = await GrainFactory.GetGrain<IPaymentGrain>(OrderId)
                 .AuthorizeAsync(order.Order.Total, request.CardLast4)
+                .WaitAsync(_options.PaymentTimeout)
                 .WithId("authorize-payment");
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
         {
             return await CancelOrderAsync(order, reservable, DurableTask.Current.CancellationReason);
+        }
+        catch (TimeoutException)
+        {
+            return await CancelOrderAsync(order, lines, "Payment authorization timed out.");
         }
 
         if (!payment.Succeeded)
