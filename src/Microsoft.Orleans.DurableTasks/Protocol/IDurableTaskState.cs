@@ -45,6 +45,13 @@ public interface IDurableTaskState
     public string? CancellationReason { get; }
 
     /// <summary>
+    /// Gets whether the task's parent scheduled it in a cancellation suppression scope, so its ancestors' durable
+    /// cancellation doesn't reach it.
+    /// </summary>
+    /// <remarks>Its own cancellation, an abort of its tree, and deletion of its tree still reach it.</remarks>
+    public bool CancellationSuppressed { get; }
+
+    /// <summary>
     /// The time at which the task was created.
     /// </summary>
     public DateTimeOffset CreatedAt { get; }

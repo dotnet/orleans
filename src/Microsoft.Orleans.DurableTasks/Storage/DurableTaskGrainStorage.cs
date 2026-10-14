@@ -155,6 +155,13 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
+    public void SuppressCancellation(TaskId taskId, IDurableTaskState state)
+    {
+        var typedState = GetState(taskId, state);
+        typedState.CancellationSuppressed = true;
+        _items[taskId] = typedState;
+    }
+
     public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation)
     {
         var typedState = GetState(taskId, state);

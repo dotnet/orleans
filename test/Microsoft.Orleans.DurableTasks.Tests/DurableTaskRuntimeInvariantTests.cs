@@ -3439,6 +3439,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
             TaskId taskId,
             DurableTask taskDefinition,
+            bool suppressCancellation,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
@@ -3492,6 +3493,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
             TaskId taskId,
             DurableTask taskDefinition,
+            bool suppressCancellation,
             CancellationToken cancellationToken)
         {
             AssertScheduler();
@@ -3671,6 +3673,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             }
         }
 
+        public void SuppressCancellation(TaskId taskId, IDurableTaskState state) =>
+            ((TestTaskState)state).CancellationSuppressed = true;
+
         public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation)
         {
             ((TestTaskState)state).DueTime = dueTime;
@@ -3725,6 +3730,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public DateTimeOffset? CompletedAt { get; set; }
         public DateTimeOffset? CancellationRequestedAt { get; set; }
         public string? CancellationReason { get; set; }
+        public bool CancellationSuppressed { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? DueTime { get; set; }
         public long ResumeGeneration { get; set; }

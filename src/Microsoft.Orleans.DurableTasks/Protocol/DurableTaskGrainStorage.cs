@@ -29,6 +29,9 @@ public interface IDurableTaskGrainStorage
     /// <summary>Records that cancellation of a non-terminal task was requested, with the request's reason, if any.</summary>
     /// <remarks>The first request determines the reason: a task whose cancellation is recorded, or which is terminal, is unchanged.</remarks>
     void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null);
+
+    /// <summary>Records that the task's ancestors' durable cancellation doesn't reach it.</summary>
+    void SuppressCancellation(TaskId taskId, IDurableTaskState state);
     void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation);
 
     void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination);

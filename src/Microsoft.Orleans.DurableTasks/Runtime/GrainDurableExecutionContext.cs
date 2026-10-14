@@ -137,21 +137,26 @@ internal sealed class GrainDurableExecutionContext : DurableExecutionContext
     protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
         TaskId taskId,
         DurableTask task,
-        CancellationToken cancellationToken) =>
-        RunOnScheduler(
+        CancellationToken cancellationToken)
+    {
+        // The suppression scope flows with the scheduling code, so it is read before switching schedulers.
+        var suppressCancellation = IsCancellationSuppressed;
+        return RunOnScheduler(
             _scheduler,
-            () => ScheduleChildTaskCoreAsync(taskId, task, cancellationToken));
+            () => ScheduleChildTaskCoreAsync(taskId, task, suppressCancellation, cancellationToken));
+    }
 
     private async ValueTask<IScheduledTaskHandle> ScheduleChildTaskCoreAsync(
         TaskId taskId,
         DurableTask task,
+        bool suppressCancellation,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ThrowIfNotChildTaskId(taskId);
         ThrowIfDeleted();
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        var handle = await _runtime.ScheduleChildAsync(taskId, task, executionCts.Token);
+        var handle = await _runtime.ScheduleChildAsync(taskId, task, suppressCancellation, executionCts.Token);
         return new ExecutionTaskHandle(handle, this);
     }
 

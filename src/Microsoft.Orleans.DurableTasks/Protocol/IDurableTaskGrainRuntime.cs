@@ -158,7 +158,7 @@ public struct DurableTaskDiagnosticState
 internal interface IDurableTaskGrainRuntime
 {
     DateTimeOffset UtcNow { get; }
-    ValueTask<IScheduledTaskHandle> ScheduleChildAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken);
+    ValueTask<IScheduledTaskHandle> ScheduleChildAsync(TaskId taskId, DurableTask taskDefinition, bool suppressCancellation, CancellationToken cancellationToken);
     ValueTask<DurableTaskResponse> ScheduleRemoteAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken);
 
     /// <summary>
