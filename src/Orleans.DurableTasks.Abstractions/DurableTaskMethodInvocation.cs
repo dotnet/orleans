@@ -6,7 +6,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
 {
     private readonly TaskCompletionSource<DurableTaskResponse> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private DurableExecutionContext? _context;
+    private DurableTaskContext? _context;
     private ExecutionContext? _executionContext;
     private Action? _moveNextAction;
     private DurableTaskResponse? _terminalResponse;
@@ -37,7 +37,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
     {
         DurableTaskResponse? terminalResponse;
         var context = _context ?? throw new InvalidOperationException("The deferred durable task has not started.");
-        using (DurableExecutionContext.Enter(context))
+        using (DurableTaskContext.Enter(context))
         {
             MoveNextCore();
             terminalResponse = _terminalResponse;
@@ -68,7 +68,7 @@ internal abstract class DeferredMethodInvocation : DurableTask
         _terminalResponse = response;
     }
 
-    protected internal sealed override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected internal sealed override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (Interlocked.Exchange(ref _started, 1) != 0)
@@ -109,7 +109,7 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
 {
     private readonly TaskCompletionSource<DurableTaskResponse> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private DurableExecutionContext? _context;
+    private DurableTaskContext? _context;
     private ExecutionContext? _executionContext;
     private Action? _moveNextAction;
     private DurableTaskResponse? _terminalResponse;
@@ -140,7 +140,7 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
     {
         DurableTaskResponse? terminalResponse;
         var context = _context ?? throw new InvalidOperationException("The deferred durable task has not started.");
-        using (DurableExecutionContext.Enter(context))
+        using (DurableTaskContext.Enter(context))
         {
             MoveNextCore();
             terminalResponse = _terminalResponse;
@@ -175,7 +175,7 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
         _terminalResponse = response;
     }
 
-    protected internal sealed override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected internal sealed override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (Interlocked.Exchange(ref _started, 1) != 0)

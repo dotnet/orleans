@@ -77,43 +77,6 @@ namespace Orleans.DurableTasks
         public static string For(string segment) { throw null; }
     }
 
-    public abstract partial class DurableExecutionContext
-    {
-        protected DurableExecutionContext(TaskId taskId, System.Threading.CancellationToken executionAbortToken) { }
-
-        protected DurableExecutionContext(TaskId taskId) { }
-
-        public string? CancellationReason { get { throw null; } }
-
-        public System.Threading.CancellationToken CancellationToken { get { throw null; } }
-
-        public static DurableExecutionContext? Current { get { throw null; } }
-
-        public bool IsCancellationRequested { get { throw null; } }
-
-        protected internal bool IsCancellationSuppressed { get { throw null; } }
-
-        public TaskId TaskId { get { throw null; } }
-
-        public abstract System.DateTimeOffset UtcNow { get; }
-
-        protected internal virtual TaskId CreateChildTaskId(string? name) { throw null; }
-
-        protected internal virtual System.Threading.Tasks.ValueTask DetachTaskAsync(TaskId markerId, TaskId rootId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
-        protected internal virtual void OnBodyCompleted(DurableTaskResponse response) { }
-
-        public System.Threading.Tasks.ValueTask<System.IAsyncDisposable> RegisterCancellationCallbackAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        protected internal abstract System.Threading.Tasks.ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken);
-        protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken);
-        protected internal abstract System.Threading.Tasks.ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, System.Collections.Generic.IReadOnlyList<TaskId> candidates, System.Threading.CancellationToken cancellationToken);
-        public static CancellationSuppressionScope SuppressCancellation() { throw null; }
-
-        protected internal virtual System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, System.Threading.CancellationToken cancellationToken) { throw null; }
-    }
-
     public sealed partial class DurableSignal<T>
     {
         public DurableSignal(string name) { }
@@ -132,6 +95,8 @@ namespace Orleans.DurableTasks
     [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
     public abstract partial class DurableTask
     {
+        public static DurableTaskContext Current { get { throw null; } }
+
         public static DurableTask Delay(System.TimeSpan duration) { throw null; }
 
         public static DurableTask DelayUntil(System.DateTimeOffset dueTime) { throw null; }
@@ -154,7 +119,7 @@ namespace Orleans.DurableTasks
 
         public static DurableTask<TResult> Run<TState, TResult>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> function, TState state) { throw null; }
 
-        protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
+        protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context);
         public static DurableTask<ScheduledTask[]> ScheduleAll(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
 
         public static DurableTask<ScheduledTask[]> ScheduleAll(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
@@ -225,6 +190,43 @@ namespace Orleans.DurableTasks
         public readonly void OnCompleted(System.Action continuation) { }
 
         public readonly void UnsafeOnCompleted(System.Action continuation) { }
+    }
+
+    public abstract partial class DurableTaskContext
+    {
+        protected DurableTaskContext(TaskId taskId, System.Threading.CancellationToken executionAbortToken) { }
+
+        protected DurableTaskContext(TaskId taskId) { }
+
+        public string? CancellationReason { get { throw null; } }
+
+        public System.Threading.CancellationToken CancellationToken { get { throw null; } }
+
+        public TaskId Id { get { throw null; } }
+
+        public bool IsCancellationRequested { get { throw null; } }
+
+        protected internal bool IsCancellationSuppressed { get { throw null; } }
+
+        public abstract System.DateTimeOffset UtcNow { get; }
+
+        protected internal virtual TaskId CreateChildTaskId(string? name) { throw null; }
+
+        protected internal virtual System.Threading.Tasks.ValueTask DetachTaskAsync(TaskId markerId, TaskId rootId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
+        protected internal virtual void OnBodyCompleted(DurableTaskResponse response) { }
+
+        public System.Threading.Tasks.ValueTask<System.IAsyncDisposable> RegisterCancellationCallbackAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        protected internal abstract System.Threading.Tasks.ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken);
+        protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken);
+        protected internal abstract System.Threading.Tasks.ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, System.Collections.Generic.IReadOnlyList<TaskId> candidates, System.Threading.CancellationToken cancellationToken);
+        public CancellationSuppressionScope SuppressCancellation() { throw null; }
+
+        public static bool TryGetCurrent(out DurableTaskContext? context) { throw null; }
+
+        protected internal virtual System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public static partial class DurableTaskExtensions
@@ -354,11 +356,11 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskRuntimeHelper
     {
-        public static System.Threading.Tasks.Task RequestCancellationAsync(DurableExecutionContext context, string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task RequestCancellationAsync(DurableTaskContext context, string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task RequestCancellationAsync(DurableExecutionContext context, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task RequestCancellationAsync(DurableTaskContext context, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context) { throw null; }
+        public static System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableTaskContext context) { throw null; }
     }
 
     public enum DurableTaskStatus

@@ -213,13 +213,13 @@ public partial class DurableSignalTests
         }
     }
 
-    private sealed class SignalContext(SignalHost host, TaskId taskId, bool supportsSignals = true) : DurableExecutionContext(taskId)
+    private sealed class SignalContext(SignalHost host, TaskId taskId, bool supportsSignals = true) : DurableTaskContext(taskId)
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
         protected override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken) =>
             supportsSignals
-                ? host.WaitForSignalAsync(TaskId, name, cancellationToken)
+                ? host.WaitForSignalAsync(Id, name, cancellationToken)
                 : base.WaitForSignalAsync(name, cancellationToken);
 
         protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(

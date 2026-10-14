@@ -7,11 +7,11 @@ public static class DurableTaskRuntimeHelper
 {
     /// <summary>Runs <paramref name="task"/> in <paramref name="context"/> and converts terminal exceptions to responses.</summary>
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
-    public static async ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableExecutionContext context)
+    public static async ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableTaskContext context)
     {
         ArgumentNullException.ThrowIfNull(task);
         ArgumentNullException.ThrowIfNull(context);
-        using var scope = DurableExecutionContext.Enter(context);
+        using var scope = DurableTaskContext.Enter(context);
         try
         {
             return await task.RunAsync(context).ConfigureAwait(false);
@@ -26,7 +26,7 @@ public static class DurableTaskRuntimeHelper
     /// <remarks>
     /// Repeated requests share one completion. Ordinary token observers run synchronously according
     /// to <see cref="CancellationTokenSource"/> cancellation semantics. Durable callbacks registered
-    /// through <see cref="DurableExecutionContext.RegisterCancellationCallbackAsync"/> participate in
+    /// through <see cref="DurableTaskContext.RegisterCancellationCallbackAsync"/> participate in
     /// durable dependency and failure aggregation. External callers and acyclic durable callback
     /// dependencies wait for completion. If a call made from a durable callback, or asynchronous work
     /// carrying its normally flowed <see cref="ExecutionContext"/>, would close a dependency cycle,
@@ -39,16 +39,16 @@ public static class DurableTaskRuntimeHelper
     /// <para>
     /// The <paramref name="cancellationToken"/> only abandons this caller's wait; it does not undo the
     /// durable request. Callbacks registered directly on
-    /// <see cref="DurableExecutionContext.CancellationToken"/> are ordinary synchronous cleanup
+    /// <see cref="DurableTaskContext.CancellationToken"/> are ordinary synchronous cleanup
     /// observers. They must return promptly and must not call, block on, await, or otherwise
     /// orchestrate this method or durable cancellation of any context. Such use is outside the
-    /// contract. Use <see cref="DurableExecutionContext.RegisterCancellationCallbackAsync"/> for all
+    /// contract. Use <see cref="DurableTaskContext.RegisterCancellationCallbackAsync"/> for all
     /// cancellation work which requests another durable context, awaits asynchronous work, needs
     /// cycle handling, or participates in durable failure aggregation.
     /// </para>
     /// </remarks>
     public static Task RequestCancellationAsync(
-        DurableExecutionContext context,
+        DurableTaskContext context,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -60,17 +60,17 @@ public static class DurableTaskRuntimeHelper
     /// </summary>
     /// <param name="context">The execution whose cancellation is requested.</param>
     /// <param name="reason">
-    /// The reason which <see cref="DurableExecutionContext.CancellationReason"/> reports, or <see langword="null"/> for
+    /// The reason which <see cref="DurableTaskContext.CancellationReason"/> reports, or <see langword="null"/> for
     /// none. The first request determines the reason, so a host which replays a canceled execution passes the reason it
     /// recorded with the task's cancellation.
     /// </param>
     /// <param name="cancellationToken">A token which abandons this caller's wait.</param>
     /// <remarks>
     /// Apart from the reason, this request behaves as
-    /// <see cref="RequestCancellationAsync(DurableExecutionContext, CancellationToken)"/>.
+    /// <see cref="RequestCancellationAsync(DurableTaskContext, CancellationToken)"/>.
     /// </remarks>
     public static Task RequestCancellationAsync(
-        DurableExecutionContext context,
+        DurableTaskContext context,
         string? reason,
         CancellationToken cancellationToken = default)
     {

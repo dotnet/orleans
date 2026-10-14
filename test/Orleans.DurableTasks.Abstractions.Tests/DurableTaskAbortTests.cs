@@ -90,7 +90,7 @@ public class DurableTaskAbortTests
 
         public IScheduledTaskHandle GetHandle(TaskId taskId) => handle;
 
-        protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
             => throw new NotSupportedException();
     }
 
@@ -101,7 +101,7 @@ public class DurableTaskAbortTests
 
         public IScheduledTaskHandle GetHandle(TaskId taskId) => handle;
 
-        protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
             => throw new NotSupportedException();
     }
 
