@@ -56,6 +56,44 @@ public sealed class DurableSignal<T>
     /// </remarks>
     public DurableTask<T> WaitAsync() => new SignalWaitDurableTask<T>(Name);
 
+    /// <summary>Creates a definition which waits for this signal until <paramref name="deadline"/>.</summary>
+    /// <param name="deadline">The time, measured using host logical time, at which the wait stops.</param>
+    /// <returns>
+    /// A definition which, awaited within a durable execution, runs as part of that execution and completes with
+    /// <c>(true, value)</c> when the signal wins the race with <paramref name="deadline"/>, and with
+    /// <c>(false, default)</c> when the deadline wins.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// The definition is a <see cref="DurableTask.WhenAny(IReadOnlyList{DurableTask})"/> race between
+    /// <see cref="WaitAsync"/> and <see cref="DurableTask.DelayUntil(DateTimeOffset)"/>, whose inputs and recorded winner
+    /// are identified under its operation identifier: the segment assigned with <c>WithId</c>, or a segment generated in
+    /// execution order. The host records the winner, so replay returns the same outcome. When the signal and the deadline
+    /// have both completed, the host records whichever it observes first.
+    /// </para>
+    /// <para>
+    /// After the deadline wins, the signal keeps its latch: a later <see cref="WaitAsync"/> returns a value which arrives
+    /// after the deadline. Durable cancellation of the waiting execution cancels the race.
+    /// </para>
+    /// </remarks>
+    public DurableTask<(bool Received, T Value)> TryWaitAsync(DateTimeOffset deadline)
+        => new CombinatorDurableTask<(bool Received, T Value)>(
+            DurableTask.WhenAnyOperation,
+            [WaitAsync(), DurableTask.DelayUntil(deadline)],
+            static async (inputs, context, operationId) =>
+            {
+                var cancellationToken = context.ExecutionAbortToken;
+                var (tasks, index) = await DurableTask.SelectAsync(inputs, context, operationId, cancellationToken).ConfigureAwait(false);
+                var response = await tasks[index].WaitAsyncCore(cancellationToken).ConfigureAwait(false);
+                if (index == 0)
+                {
+                    return (true, response.GetResult<T>());
+                }
+
+                response.EnsureSuccessfulCompletion();
+                return (false, default!);
+            });
+
     /// <inheritdoc />
     public override string ToString() => Name;
 }

@@ -8,7 +8,7 @@ namespace Orleans.DurableTasks.Abstractions.Tests;
 [TestProvider("None")]
 [TestArea("DurableTasks")]
 [TestCategory("BVT")]
-public class DurableSignalTests
+public partial class DurableSignalTests
 {
     private static readonly DurableSignal<Approval> Approved = new("approved");
     private static readonly DateTimeOffset Deadline = DateTimeOffset.UnixEpoch.AddHours(1);
