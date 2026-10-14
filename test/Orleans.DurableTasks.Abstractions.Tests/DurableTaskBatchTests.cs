@@ -319,6 +319,30 @@ public class DurableTaskBatchTests
     }
 
     [Fact]
+    public async Task WhenEachEnumeratorCancellationAbandonsPendingScheduling()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var host = new TestHost(DateTimeOffset.UnixEpoch) { ScheduleGate = gate.Task };
+        using var cancellation = new CancellationTokenSource();
+        var root = host.CreateRootDefinition<bool>(async _ =>
+        {
+            var enumerator = DurableTask.WhenEach([DurableTask.Run(static _ => 1)]).GetAsyncEnumerator(cancellation.Token);
+            var moveNext = enumerator.MoveNextAsync().AsTask();
+            Assert.False(moveNext.IsCompleted);
+
+            await cancellation.CancelAsync();
+            var exception = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => moveNext.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation));
+            await enumerator.DisposeAsync();
+            gate.SetResult();
+            return DurableTaskResponse.FromResult(exception.CancellationToken.IsCancellationRequested);
+        });
+
+        Assert.True(await await root.ScheduleAsync("root", TestCancellation));
+        Assert.Equal(1, host.ScheduleRequestCount);
+    }
+
+    [Fact]
     public async Task ScheduledTaskWhenEachYieldsFailuresAndCancellationsWithoutThrowing()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);

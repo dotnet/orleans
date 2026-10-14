@@ -5253,15 +5253,19 @@ internal sealed class TestHost(DateTimeOffset utcNow)
         Interlocked.Increment(ref _scheduleRequestCount);
         if (ScheduleGate is { IsCompleted: false } gate)
         {
-            return ScheduleAfterGateAsync(gate, id, definition);
+            return ScheduleAfterGateAsync(gate, id, definition, cancellationToken);
         }
 
         return new(ScheduleChild(id, definition));
     }
 
-    private async ValueTask<IScheduledTaskHandle> ScheduleAfterGateAsync(Task gate, TaskId id, DurableTask definition)
+    private async ValueTask<IScheduledTaskHandle> ScheduleAfterGateAsync(
+        Task gate,
+        TaskId id,
+        DurableTask definition,
+        CancellationToken cancellationToken)
     {
-        await gate;
+        await gate.WaitAsync(cancellationToken);
         return ScheduleChild(id, definition);
     }
 
