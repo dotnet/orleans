@@ -64,8 +64,49 @@ public sealed record OrderState(
 [GenerateSerializer, Immutable]
 public sealed record StockLine(int ProductId, StockLineStatus Status);
 
+// A snapshot of an order: the entry which each step of the order's workflow reports to its history. Each transition
+// returns the next snapshot as a pure function of the current one and its inputs, and advances the order's version.
 [GenerateSerializer, Immutable]
-public sealed record OrderDetails(OrderState Order, StockLine[] Stock);
+public sealed record OrderDetails(OrderState Order, StockLine[] Stock)
+{
+    public static OrderDetails Submit(Guid orderId, SubmitOrder request, DateTimeOffset orderDate) => new(
+        new OrderState(
+            orderId,
+            request.BuyerId,
+            Version: 0,
+            OrderStatus.Submitted,
+            orderDate,
+            request.Lines,
+            request.Address,
+            request.CardLast4,
+            Description: null),
+        []);
+
+    public OrderDetails BeginValidation() =>
+        Next(OrderStatus.AwaitingValidation, [.. Order.Lines.Select(line => new StockLine(line.ProductId, StockLineStatus.Pending))]);
+
+    // Records each line's reservation. The order confirms its stock when every line was reserved; otherwise its status
+    // stays unchanged until the workflow cancels it.
+    public OrderDetails RecordStock(bool[] confirmed)
+    {
+        StockLine[] stock = [.. Order.Lines.Select((line, i) =>
+            new StockLine(line.ProductId, confirmed[i] ? StockLineStatus.Confirmed : StockLineStatus.Rejected))];
+        return Array.IndexOf(confirmed, false) < 0 ? Next(OrderStatus.StockConfirmed, stock) : this with { Stock = stock };
+    }
+
+    public OrderDetails MarkPaid() =>
+        Next(OrderStatus.Paid, [.. Stock.Select(line => line with { Status = StockLineStatus.Committed })]);
+
+    public OrderDetails MarkShipped() => Next(OrderStatus.Shipped, Stock);
+
+    public OrderDetails Cancel(int[] released, string? reason) => Next(
+        OrderStatus.Cancelled,
+        [.. Stock.Select(line => released.Contains(line.ProductId) ? line with { Status = StockLineStatus.Released } : line)],
+        reason);
+
+    private OrderDetails Next(OrderStatus status, StockLine[] stock, string? description = null) =>
+        new(Order with { Status = status, Version = Order.Version + 1, Description = description }, stock);
+}
 
 // Durable task arguments and results. The runtime stores them with the Orleans serializer.
 [GenerateSerializer, Immutable]
@@ -100,9 +141,9 @@ public sealed class OrderingOptions
 // Journaled state is stored as JSON lines, so each persisted type needs source-generated metadata.
 [JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(Guid))]
-[JsonSerializable(typeof(StockLineStatus))]
 [JsonSerializable(typeof(CatalogItem))]
 [JsonSerializable(typeof(BasketItem))]
-[JsonSerializable(typeof(OrderState))]
+[JsonSerializable(typeof(OrderDetails))]
+[JsonSerializable(typeof(StockLine))]
 [JsonSerializable(typeof(OrderSummary))]
 internal sealed partial class DurableOrderProcessingJsonContext : JsonSerializerContext;
