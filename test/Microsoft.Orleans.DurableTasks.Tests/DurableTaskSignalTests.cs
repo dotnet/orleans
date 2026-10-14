@@ -405,10 +405,82 @@ public sealed partial class DurableTaskSignalTests
 
         Assert.Equal("sent", await harness.GetResultAsync<string>(WorkflowId));
         Assert.Equal("ada", await harness.GetResultAsync<string>(orderId));
-        Assert.StartsWith("$signal-send:", harness.Storage.Get(WorkflowId.Child("$child-1")).RequestFingerprint, StringComparison.Ordinal);
+        Assert.StartsWith("$signal-send:", harness.Storage.Get(WorkflowId.Child($"$send:{harness.Runtime.GrainId}:order:approved")).RequestFingerprint, StringComparison.Ordinal);
         Assert.Equal("ada", harness.Storage.Get(orderId.Child("$signal:approved")).Result!.GetResult<string>());
         Assert.Empty(harness.Transport.Signals);
     });
+
+    [Fact]
+    public Task RepeatedSendsOfOneSignalAreNumberedByOccurrence() => ActivationScheduler.RunAsync(async () =>
+    {
+        var harness = new Harness();
+        var orderId = TaskId.CreateRoot("order");
+        var tasks = harness.Tasks;
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sends = 0;
+
+        // The first send finds no task and the retry is accepted; each send reaches its own record, so the retry isn't
+        // answered with the first send's recorded TaskNotFound.
+        await harness.ScheduleAsync(WorkflowId, async () =>
+        {
+            var first = await tasks.TrySignalAsync(orderId, Approved, "ada");
+            if (Interlocked.Increment(ref sends) == 1)
+            {
+                await release.Task;
+            }
+
+            var retry = await tasks.TrySignalAsync(orderId, Approved, "ada");
+            return $"{first},{retry}";
+        });
+        await WaitUntilAsync(() => Volatile.Read(ref sends) == 1);
+        await harness.ScheduleAsync(orderId, async () => await Approved.WaitAsync());
+        release.SetResult();
+
+        Assert.Equal("TaskNotFound,Accepted", await harness.GetResultAsync<string>(WorkflowId));
+        var signal = $"$send:{harness.Runtime.GrainId}:order:approved";
+        Assert.Equal(
+            DurableSignalResult.TaskNotFound,
+            harness.Storage.Get(WorkflowId.Child(signal)).Result!.GetResult<DurableSignalResult>());
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, harness.Storage.Get(WorkflowId.Child($"{signal}$2")).Result!.Status);
+        Assert.Equal("ada", await harness.GetResultAsync<string>(orderId));
+    });
+
+    [Fact]
+    public Task RepeatedSendReportsTheTargetsDuplicateOrConflict() => ActivationScheduler.RunAsync(async () =>
+    {
+        var harness = new Harness();
+        var orderId = TaskId.CreateRoot("order");
+        await harness.ScheduleAsync(orderId, async () => await Approved.WaitAsync());
+        var tasks = harness.Tasks;
+
+        await harness.ScheduleAsync(WorkflowId, async () =>
+        {
+            var first = await tasks.TrySignalAsync(orderId, Approved, "ada");
+            var same = await tasks.TrySignalAsync(orderId, Approved, "ada");
+            var other = await tasks.TrySignalAsync(orderId, Approved, "grace");
+            return $"{first},{same},{other}";
+        });
+
+        Assert.Equal("Accepted,Duplicate,Conflict", await harness.GetResultAsync<string>(WorkflowId));
+        Assert.Equal("ada", await harness.GetResultAsync<string>(orderId));
+        var signal = $"$send:{harness.Runtime.GrainId}:order:approved";
+        Assert.Equal(
+            DurableSignalResult.Duplicate,
+            harness.Storage.Get(WorkflowId.Child($"{signal}$2")).Result!.GetResult<DurableSignalResult>());
+        Assert.Equal(
+            DurableSignalResult.Conflict,
+            harness.Storage.Get(WorkflowId.Child($"{signal}$3")).Result!.GetResult<DurableSignalResult>());
+    });
+
+    private static async Task WaitUntilAsync(Func<bool> predicate)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestCancellation);
+        timeout.CancelAfter(TimeSpan.FromSeconds(10));
+        while (!predicate())
+        {
+            await Task.Delay(5, timeout.Token);
+        }
+    }
 
     [Fact]
     public void TransportStagesSignalsWithAValueScopedIdentity()
