@@ -168,7 +168,7 @@ through asynchronous grain and state-manager operations.
 `GetOrAddState<TState>(name)` takes an application contract, such as
 `IDurableDictionary<string, int>`, and uses a registered factory to construct its state-machine
 implementation. `DurableStateManagerExtensions` supplies `GetOrAddDictionary`, `GetOrAddList`,
-`GetOrAddQueue`, `GetOrAddSet`, `GetOrAddValue`, `GetOrAddTaskCompletionSource`, and
+`GetOrAddQueue`, `GetOrAddSet`, `GetOrAddLog`, `GetOrAddValue`, `GetOrAddTaskCompletionSource`, and
 `GetOrAddPersistentState` helpers.
 
 Declare new state components during construction or synchronous activation setup, before initialization. After initialization succeeds,
@@ -184,6 +184,49 @@ of `[FromKeyedServices("cart")] IDurableDictionary<string, int>` returns the sam
 Built-in durable state components use the configured JSON codec automatically. Configure `JsonJournalOptions` to control the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
 
 For trimming and Native AOT, use `Configure<JsonJournalOptions>(...)` to configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path when you also want to enable the JSON format explicitly. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
+
+## Observing state and streaming drafts
+
+Grains expose watch streams over their durable state as `IAsyncEnumerable<T>` methods:
+
+```csharp
+public sealed class ConversationGrain(IDurableStateManager stateManager) : Grain, IConversationGrain
+{
+    private readonly IDurableLog<string> _messages = stateManager.GetOrAddLog<string>("messages");
+    private readonly IDurableValue<string> _status = stateManager.GetOrAddValue<string>("status");
+
+    public IAsyncEnumerable<LogEvent<string>> WatchAsync(long after, CancellationToken cancellationToken = default) =>
+        _messages.ReadAsync(after + 1, cancellationToken: cancellationToken);
+
+    public IAsyncEnumerable<ValueChange<string>> WatchStatusAsync(CancellationToken cancellationToken = default) =>
+        _status.WatchAsync(cancellationToken: cancellationToken);
+}
+```
+
+`DurableStateWatchExtensions.WatchAsync` watches values, dictionaries, lists, sets, and queues. Each
+event carries a `DurableChangeStatus` of `Draft`, `Staged`, or `Committed`. The default
+`DurableWatchMode.Committed` mode delivers a change after the journal write which contains it is
+acknowledged, so readers observe only durable state. `DurableWatchMode.Speculative` delivers staged
+changes immediately and reports their durability with watermarks. Each acknowledged write publishes one
+watermark shared by every watcher of the manager.
+
+Value watches deliver the latest value and retain no backlog. Collection watches begin with a `Resync`
+snapshot and buffer a bounded number of changes for each reader; a reader which falls behind receives a
+new `Resync` snapshot. A manager creates its observer state when the first watch begins, and unwatched
+state publishes nothing.
+
+`IDurableLog<T>` is an append-only log with durable, monotonically increasing `long` sequence numbers.
+`Append` returns an entry's sequence, `TrimBefore` bounds retention without reusing sequence numbers,
+and `CommittedSequence` marks the end of the durable entries. `ReadAsync(fromSequence, mode, resumeDraftId)`
+re-reads retained entries from a position, delivers `Reset` when the position was trimmed, and waits for new
+entries. `BeginDraft` opens a draft whose `Write` items reach speculative readers immediately; `Commit`
+appends its durable entry and `Abandon` or disposal discards it. Draft identifiers include the activation
+which opened them, so a reader reconnecting to a new activation receives `DraftAbandoned` for a lost draft
+and resumes from its committed sequence.
+
+A failed journal write faults watch streams; a stopped manager completes them.
+`IJournaledStateManager.GetStateMachines()` enumerates registered state names and instances for
+diagnostic tools.
 
 ## Custom state and standalone ownership
 
