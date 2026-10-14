@@ -123,8 +123,10 @@ internal sealed partial class DurableTaskGrainRuntime
         {
             if (!string.Equals(recorded.RequestFingerprint, markerFingerprint, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException(
-                    $"Durable task '{markerId}' is already associated with another operation.");
+                throw CreateDivergenceException(
+                    $"Durable task '{markerId}' is already associated with another operation.",
+                    recorded,
+                    $"sending signal '{name}' to task '{taskId}' on grain '{target}'");
             }
 
             // The marker commits with the send, possibly in a write which an earlier attempt is still awaiting.
