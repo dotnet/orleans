@@ -75,6 +75,31 @@ public abstract class DurableTaskContext
     /// <summary>Gets the host-provided logical UTC time for this execution.</summary>
     public abstract DateTimeOffset UtcNow { get; }
 
+    /// <summary>
+    /// Gets a value indicating whether this run of the task's body is re-running operations which an earlier run
+    /// recorded. Use it for logging and diagnostics only.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A host replays a task which didn't finish, for example after its grain was deactivated, by running its body again
+    /// from the start. The value is <see langword="true"/> from the start of a run which finds operations that earlier
+    /// runs recorded for this task, such as children, markers, and recorded effects, until the run has reached each of
+    /// them or has started an operation which no earlier run recorded; it then stays <see langword="false"/>. Reaching
+    /// an operation again doesn't end the replay. A first run reports <see langword="false"/> throughout.
+    /// </para>
+    /// <para>
+    /// Code which reports events once, such as logging through
+    /// <see cref="DurableTaskLoggerExtensions.ReplaySafe(Microsoft.Extensions.Logging.ILogger)"/>, skips them while the
+    /// task replays. State changes and durable operations don't depend on the value: a run which ended before a durable
+    /// write committed its work is replayed, so code which runs only while the value is <see langword="false"/> can run
+    /// twice or never, and code which branches on it schedules different operations in different runs. A state change
+    /// which runs once belongs in <see cref="DurableTask.Once{TResult}(string, Func{TResult})"/>, in a step, or in the
+    /// body's synchronous tail.
+    /// </para>
+    /// <para>Hosts which don't track replay keep this default implementation, which returns <see langword="false"/>.</para>
+    /// </remarks>
+    public virtual bool IsReplaying => false;
+
     /// <summary>Gets a value indicating whether durable cancellation has been requested.</summary>
     public bool IsCancellationRequested
     {
