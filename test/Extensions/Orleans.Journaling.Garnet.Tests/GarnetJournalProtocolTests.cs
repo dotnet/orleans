@@ -31,7 +31,7 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         var count = 0;
         for (var bucket = 0; bucket < GarnetJournalStorageOptions.DEFAULT_BUCKET_COUNT; bucket++)
         {
-            var state = await _fixture.Database.HashGetAsync(GarnetJournalKeys.GetBucketKey(bucket), "state");
+            var state = await _fixture.Database.HashGetAsync(GarnetJournalKeys.GetBucketKey(Provider.Router.MapId, bucket), "state");
             count += state == "open" ? 1 : 0;
         }
 
@@ -287,15 +287,15 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         var id = NewId("sealed");
         var storage = (GarnetJournalStorage)fixture.Provider.CreateStorage(id);
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken);
-        var bucketKey = GarnetJournalKeys.GetBucketKey(storage.Bucket);
+        var bucketKey = storage.BucketKey;
 
-        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "seal", "5", "-", "1"]));
-        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "seal", "5", "-", "1"]));
-        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "seal", "6", "-", "1"]));
-        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [(RedisKey)bucketKey, "open", "6", "-", "1"]));
+        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [bucketKey, "seal", "5", "-", "1"]));
+        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [bucketKey, "seal", "5", "-", "1"]));
+        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [bucketKey, "seal", "6", "-", "1"]));
+        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [bucketKey, "open", "6", "-", "1"]));
 
         Assert.Equal(["-10", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Read, [.. Keys(storage)]));
-        Assert.Equal(["-10", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Index, [(RedisKey)bucketKey, (RedisKey)GarnetJournalKeys.GetIndexKey(storage.Bucket)]));
+        Assert.Equal(["-10", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Index, [bucketKey, (RedisKey)GarnetJournalKeys.GetIndexKey(storage.Bucket)]));
 
         // No view assigns the bucket elsewhere, so every operation retries until it times out.
         await Assert.ThrowsAsync<TimeoutException>(() => storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken).AsTask());
@@ -315,7 +315,7 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
     {
         var present = (GarnetJournalStorage)Provider.CreateStorage(NewId("present"));
         await present.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken);
-        var bucketKey = GarnetJournalKeys.GetBucketKey(present.Bucket);
+        var bucketKey = present.BucketKey;
         await _fixture.Database.HashSetAsync(bucketKey, [new("done", "0"), new("source", "7")]);
 
         // A journal in the same bucket that the partition does not hold may still be in the source.
@@ -383,6 +383,42 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         }
 
         Assert.True(ids.Where((_, index) => index is not 0 and not 2).ToHashSet().SetEquals(listed));
+    }
+
+    [Fact]
+    public async Task DefaultHostId_IsStoredInTheDataDirectoryAndSurvivesRestarts()
+    {
+        var directory = GarnetPartitionFixture.CreateTemporaryDirectory();
+        var store = new InMemoryRangeMetaStore();
+        var id = NewId("default-host");
+        try
+        {
+            var first = GarnetPartitionFixture.CreateProvider(directory, store, options => options.HostId = null);
+            await first.StartAsync(CancellationToken);
+            var hostId = (await store.ReadAsync(CancellationToken))!.Map.Partitions[new PartitionId("p0")].Host;
+            Assert.Equal(hostId, GarnetJournalStorageProvider.GetOrCreateHostId(directory));
+            await first.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken);
+            await first.StopAsync(CancellationToken);
+
+            // The restarted provider recognizes itself as the partition's host, serves it, and republishes its endpoint.
+            var second = GarnetPartitionFixture.CreateProvider(directory, store, options => options.HostId = null);
+            await second.StartAsync(CancellationToken);
+            try
+            {
+                Assert.Single(second.HostedPartitions);
+                var consumer = new CapturingConsumer();
+                await second.CreateStorage(id).ReadAsync(consumer, CancellationToken);
+                Assert.Equal([1], consumer.Bytes);
+            }
+            finally
+            {
+                await second.StopAsync(CancellationToken);
+            }
+        }
+        finally
+        {
+            GarnetPartitionFixture.TryDeleteDirectory(directory);
+        }
     }
 
     private static object[] Keys(GarnetJournalStorage storage) => storage.GetProcedureKeys();

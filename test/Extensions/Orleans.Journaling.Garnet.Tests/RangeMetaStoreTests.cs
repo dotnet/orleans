@@ -15,8 +15,11 @@ public abstract class RangeMetaStoreTests
 
     protected abstract IRangeMetaStore CreateStore();
 
+    /// <summary>Gets a value indicating whether the store determines the outcome of every write.</summary>
+    protected virtual bool DeterminesEveryOutcome => true;
+
     private static RangeMap CreateMap(long epoch = 0, string? endpoint = null)
-        => RangeMap.CreateUniform(16, [new(P0, new PartitionHosting("host", epoch, "p0", endpoint))]);
+        => RangeMap.CreateUniform(16, [new(P0, new PartitionHosting("host", epoch, "p0", endpoint))]) with { Id = "map" };
 
     [Fact]
     public async Task EmptyStore_ReadsNoMapAndAcceptsOnlyTheFirstVersion()
@@ -61,8 +64,9 @@ public abstract class RangeMetaStoreTests
     }
 
     /// <summary>
-    /// Concurrent writers each repeatedly read the map, increment its epoch, and write it back. Every successful write
-    /// applies exactly one increment, so the final epoch equals the number of successes and the final version.
+    /// Concurrent writers each repeatedly read the map, increment its epoch, and write it back. Every applied write
+    /// increments the epoch exactly once, so the final version is one more than the final epoch, and the epoch counts
+    /// every write reported as written plus at most every write whose outcome was unknown.
     /// </summary>
     [Fact]
     public async Task ConcurrentWriters_ApplyEachSuccessfulWriteExactlyOnce()
@@ -72,6 +76,7 @@ public abstract class RangeMetaStoreTests
         var store = CreateStore();
         await store.TryWriteAsync(CreateMap(), 0, CancellationToken);
         var conflicts = 0;
+        var unknown = 0;
 
         await Task.WhenAll(Enumerable.Range(0, Writers).Select(writer => Task.Run(async () =>
         {
@@ -80,10 +85,23 @@ public abstract class RangeMetaStoreTests
             {
                 var hosting = current.Map.Partitions[P0];
                 var next = current.Map with { Partitions = current.Map.Partitions.SetItem(P0, hosting with { Epoch = hosting.Epoch + 1, Endpoint = $"writer-{writer}:{i}" }) };
-                var result = await store.TryWriteAsync(next, current.Version, CancellationToken);
+                RangeMapWriteResult result;
+                try
+                {
+                    result = await store.TryWriteAsync(next, current.Version, CancellationToken);
+                }
+                catch (IOException)
+                {
+                    // The write may or may not have been applied.
+                    Interlocked.Increment(ref unknown);
+                    current = (await store.ReadAsync(CancellationToken))!;
+                    continue;
+                }
+
                 if (result.Written)
                 {
                     Assert.Equal(current.Version + 1, result.Current!.Version);
+                    Assert.Same(next, result.Current.Map);
                     i++;
                 }
                 else
@@ -97,9 +115,11 @@ public abstract class RangeMetaStoreTests
         }, CancellationToken)));
 
         var final = (await store.ReadAsync(CancellationToken))!;
-        Assert.Equal(1 + Writers * IncrementsPerWriter, final.Version);
-        Assert.Equal(Writers * IncrementsPerWriter, final.Map.Partitions[P0].Epoch);
-        TestContext.Current.TestOutputHelper?.WriteLine($"{conflicts} conflicting writes.");
+        var epoch = final.Map.Partitions[P0].Epoch;
+        Assert.Equal(1 + epoch, final.Version);
+        Assert.InRange(epoch, Writers * IncrementsPerWriter, Writers * IncrementsPerWriter + unknown);
+        Assert.True(unknown == 0 || !DeterminesEveryOutcome);
+        TestContext.Current.TestOutputHelper?.WriteLine($"{conflicts} conflicting writes, {unknown} writes with unknown outcomes.");
     }
 }
 
@@ -129,6 +149,9 @@ public sealed class AzureBlobRangeMetaStoreTests : RangeMetaStoreTests, IAsyncDi
             Assert.SkipWhen(string.IsNullOrEmpty(TestDefaultConfiguration.DataConnectionString), "DataConnectionString is not set. Skipping test.");
         }
     }
+
+    // A conditional upload which fails after a later write may itself have been applied and superseded.
+    protected override bool DeterminesEveryOutcome => false;
 
     // A new container per store exercises container creation on the first write.
     protected override IRangeMetaStore CreateStore() => new AzureBlobRangeMetaStore(CreateContainer().GetBlobClient("range-map.json"));

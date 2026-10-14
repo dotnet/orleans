@@ -57,7 +57,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         _compactionThresholdBytes = compactionThresholdBytes;
         var encoded = GarnetJournalKeys.EncodeJournalId(journalId.Value);
         Bucket = GarnetJournalKeys.GetBucket(encoded, router.BucketCount);
-        _bucketKey = GarnetJournalKeys.GetBucketKey(Bucket);
+        _bucketKey = GarnetJournalKeys.GetBucketKey(router.MapId, Bucket);
         _metadataKey = GarnetJournalKeys.GetMetadataKey(Bucket, encoded);
         _dataKey = GarnetJournalKeys.GetDataKey(Bucket, encoded);
         _indexKey = GarnetJournalKeys.GetIndexKey(Bucket);
@@ -67,6 +67,8 @@ internal sealed class GarnetJournalStorage : IJournalStorage
     internal int Bucket { get; }
 
     internal JournalId JournalId => _journalId;
+
+    internal RedisKey BucketKey => _bucketKey;
 
     internal RedisKey MetadataKey => _metadataKey;
 
