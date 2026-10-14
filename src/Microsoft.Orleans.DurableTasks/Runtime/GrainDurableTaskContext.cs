@@ -288,7 +288,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// The effect runs, and its record is staged, in the work item which calls this on the activation, so the record
     /// commits in the same journal write as the journaled state which the effect changed. An effect which an earlier
     /// run recorded as a child, or a child which an earlier run recorded as an effect, under the same name and
-    /// occurrence fails as a divergence instead of running again.
+    /// occurrence, or under the same generated identifier, fails as a divergence instead of running again.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// The caller isn't running on the activation's scheduler, or an earlier run recorded another kind of operation under
@@ -302,7 +302,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         if (TaskScheduler.Current != _scheduler)
         {
             throw new InvalidOperationException(
-                $"DurableTask.Once runs on the scheduler of the grain activation which runs durable task '{Id}', so its record commits with the state which it changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't record effects.");
+                $"A recorded effect, such as DurableTask.Once or IDurableLog<T>.Report, runs on the scheduler of the grain activation which runs durable task '{Id}', so its record commits with the state which it changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't record effects.");
         }
 
         ThrowIfNotChildTaskId(effectId);
