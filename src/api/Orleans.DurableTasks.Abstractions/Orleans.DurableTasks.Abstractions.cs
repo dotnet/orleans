@@ -102,6 +102,8 @@ namespace Orleans.DurableTasks
         protected internal virtual System.Threading.Tasks.ValueTask DetachTaskAsync(TaskId markerId, TaskId rootId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
+        protected internal virtual void OnBodyCompleted(DurableTaskResponse response) { }
+
         public System.Threading.Tasks.ValueTask<System.IAsyncDisposable> RegisterCancellationCallbackAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         protected internal abstract System.Threading.Tasks.ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken);

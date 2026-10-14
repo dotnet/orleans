@@ -36,8 +36,8 @@ internal abstract class DeferredMethodInvocation : DurableTask
     private void MoveNextInContext()
     {
         DurableTaskResponse? terminalResponse;
-        using (DurableExecutionContext.Enter(_context
-            ?? throw new InvalidOperationException("The deferred durable task has not started.")))
+        var context = _context ?? throw new InvalidOperationException("The deferred durable task has not started.");
+        using (DurableExecutionContext.Enter(context))
         {
             MoveNextCore();
             terminalResponse = _terminalResponse;
@@ -46,6 +46,9 @@ internal abstract class DeferredMethodInvocation : DurableTask
                 _context = null;
                 _executionContext = null;
                 ReleaseStateMachine();
+
+                // The step which completed the state machine ran the body's final code.
+                context.OnBodyCompleted(terminalResponse);
             }
         }
 
@@ -136,8 +139,8 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
     private void MoveNextInContext()
     {
         DurableTaskResponse? terminalResponse;
-        using (DurableExecutionContext.Enter(_context
-            ?? throw new InvalidOperationException("The deferred durable task has not started.")))
+        var context = _context ?? throw new InvalidOperationException("The deferred durable task has not started.");
+        using (DurableExecutionContext.Enter(context))
         {
             MoveNextCore();
             terminalResponse = _terminalResponse;
@@ -146,6 +149,9 @@ internal abstract class DurableTaskMethodInvocation<TResult> : DurableTask<TResu
                 _context = null;
                 _executionContext = null;
                 ReleaseStateMachine();
+
+                // The step which completed the state machine ran the body's final code.
+                context.OnBodyCompleted(terminalResponse);
             }
         }
 
