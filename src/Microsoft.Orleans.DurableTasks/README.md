@@ -309,11 +309,13 @@ framework assets; its first published version establishes the compatibility base
   `DurableTask.Once(effect)`, takes the execution's next generated child
   identifier, such as `$child-3`, so an effect and a child which a replay finds
   under the same generated identifier fail as a divergence too.
-- `IDurableLog<T>.Report(item)` appends a progress report as an unnamed
-  `DurableTask.Once` effect: the entry and its record commit in the next journal
-  write, a replay returns the recorded sequence number without appending again,
-  and readers of the log observe each report once, in order. Outside a durable
-  task, it appends directly.
+- A durable task publishes progress to an `IDurableLog<T>` of its grain. It
+  appends an entry with `DurableTask.Once(() => log.Append(item))`, whose entry
+  commits with the effect's record. A step which streams content writes it to a
+  draft from `BeginDraft()`, which readers with `DurableWatchMode.Drafts` receive
+  live, and commits the draft in its final synchronous code, so the entries commit
+  in the same journal write as the step's result. Either way, a replay returns the
+  recorded sequence number without appending or streaming again.
 - A run of a task's body reports `IsReplaying` from its start while earlier runs
   recorded operations in the task's tree: children, detach and signal-send
   markers, and recorded effects, but not signal values or invoked descendants.
