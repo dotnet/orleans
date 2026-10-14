@@ -224,6 +224,10 @@ validation disabled until its first published version establishes a baseline.
   canceled when that write completes.
 - Messages use stable identities derived from the sender, receiver, task, and
   subject, so replayed sends coalesce and redeliveries are deduplicated.
+- A local step's record commits with its first durable write: its result, or a
+  child, delay, or message it schedules. A synchronous step therefore costs one
+  journal write. A step's identity and inputs follow from its parent's inputs and
+  earlier results, so a replay which finds no record runs the step again.
 - Recovery precedes new execution. Child identifiers, selection decisions, and
   outbound durable messages remain replay-stable. A replay which schedules another
   operation under a recorded identifier fails with an error which names the
