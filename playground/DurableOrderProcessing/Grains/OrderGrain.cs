@@ -15,10 +15,6 @@ public interface IOrderGrain : IGrainWithGuidKey
     Task<bool> CancelAsync();
 
     Task<bool> ShipAsync();
-
-    // Releases the stock which an order cancelled during validation reserved. The workflow detaches it, under
-    // PlaceOrderTaskId(orderId) + "-compensate", so it runs to completion after the cancellation.
-    DurableTask ReleaseReservationsAsync(int[] productIds);
 }
 
 // The order process manager, following eShop's ordering flow:
@@ -27,11 +23,12 @@ public interface IOrderGrain : IGrainWithGuidKey
 // PlaceOrder is one durable task. After a deactivation, the runtime replays it from the start: completed child tasks
 // return their recorded results, so the workflow resumes where it stopped. Each state transition is a durable task
 // method which the workflow awaits as an identified child, so its state change commits once with its recorded result,
-// which a replay returns without running the transition again. Cancel and ship are ordinary methods. Cancel records the
-// buyer's decision and cancels the workflow, which observes the cancellation and releases the stock it reserved through
-// a detached task. Ship sends the workflow its Shipped signal.
+// which a replay returns without running the transition again. Cancel and ship are ordinary methods: cancel requests
+// durable cancellation of the workflow with the buyer's reason, and ship sends the workflow its Shipped signal.
 public sealed class OrderGrain : DurableGrain, IOrderGrain
 {
+    private const string CancelledByBuyer = "Cancelled by the buyer.";
+
     // A paid order's workflow waits for this signal, which ShipAsync sends.
     private static readonly DurableSignal<Shipment> Shipped = new("shipped");
 
@@ -63,70 +60,60 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
     public async DurableTask<OrderResult> PlaceOrderAsync(SubmitOrder request)
     {
-        var summary = await Submit(request).WithId("submit");
-        await RecordAsync(request.BuyerId, summary);
-
-        // The grace period gives the buyer time to cancel before stock is reserved. Cancelling this task cancels the
-        // delay, which ends the workflow.
-        await DurableTask.Delay(_options.GracePeriod).WithId("grace-period");
-        if (await BeginValidation().WithId("validate") is not { } validating)
-        {
-            // The buyer cancelled after the delay completed, before the workflow resumed.
-            return Result(_order.Value!.ToSummary());
-        }
-
-        await RecordAsync(request.BuyerId, validating);
-
-        // Reserve each line's stock concurrently, and await every outcome, so a cancellation knows what was reserved.
         var lines = request.Lines;
-        var reservations = await Task.WhenAll(lines.Select(line =>
-            Catalog(line.ProductId).ReserveAsync(OrderId, line.Units).WithId($"reserve-{line.ProductId}").ScheduleAsync()));
-        var outcomes = await Task.WhenAll(reservations.Select(reservation => reservation.GetResponseAsync()));
-        var reserved = lines.Where((_, i) => outcomes[i].Status is DurableTaskStatus.CompletedSuccessfully && outcomes[i].GetResult<bool>())
-            .Select(line => line.ProductId)
-            .ToArray();
+        var summary = await Submit(request).WithId("submit");
+        await RecordAsync(summary);
+
+        // Until stock is confirmed, CancelAsync can cancel this task. The step which observes the cancellation throws
+        // OperationCanceledException, and the workflow releases the lines which validation may have reserved.
+        OrderLine[] reservable = [];
+        bool[] confirmed;
         try
         {
-            var confirmed = Array.ConvertAll(outcomes, outcome => outcome.GetResult<bool>());
-            if (Array.IndexOf(confirmed, false) is var rejected and >= 0)
-            {
-                await RecordStock(lines, confirmed).WithId("reject-stock");
-                return await CompensateAsync(request.BuyerId, reserved, $"'{lines[rejected].ProductName}' is out of stock.");
-            }
+            await DurableTask.Delay(_options.GracePeriod).WithId("grace-period");
+            summary = await BeginValidation().WithId("validate");
+            reservable = lines;
+            await RecordAsync(summary);
 
-            summary = await RecordStock(lines, confirmed).WithId("confirm-stock");
+            // Reserves every line concurrently, as the children reserve/0, reserve/1, and so on. WhenAll waits for every
+            // reservation, including after a cancellation, so each line's reservation is settled when it returns or throws.
+            confirmed = await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units)))
+                .WithId("reserve");
+            summary = await RecordStock(lines, confirmed).WithId("record-stock");
         }
-        catch (OperationCanceledException) when (_order.Value!.Status is OrderStatus.Cancelled)
+        catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
         {
-            // The buyer cancelled during validation. The workflow's further steps are canceled, so a task detached on this
-            // order releases the reserved stock; cancellation doesn't reach it.
-            await GrainFactory.GetGrain<IOrderGrain>(OrderId).ReleaseReservationsAsync(reserved)
-                .DetachAsync($"{PlaceOrderTaskId(OrderId)}-compensate");
-            return Result(_order.Value!.ToSummary());
+            return await CancelOrderAsync(reservable, DurableExecutionContext.Current.CancellationReason);
         }
 
-        await RecordAsync(request.BuyerId, summary);
+        if (Array.IndexOf(confirmed, false) is var rejected and >= 0)
+        {
+            return await CancelOrderAsync(lines, $"'{lines[rejected].ProductName}' is out of stock.");
+        }
+
+        await RecordAsync(summary);
 
         var payment = await GrainFactory.GetGrain<IPaymentGrain>(OrderId)
             .AuthorizeAsync(lines.Sum(line => line.UnitPrice * line.Units), request.CardLast4)
             .WithId("authorize-payment");
         if (!payment.Succeeded)
         {
-            return await CompensateAsync(request.BuyerId, reserved, payment.Reason);
+            return await CancelOrderAsync(lines, payment.Reason);
         }
 
         summary = await MarkPaid().WithId("pay");
-        await RecordAsync(request.BuyerId, summary);
-        await DurableTask.WhenAll(reserved.Select(productId => Catalog(productId).CommitAsync(OrderId)).ToArray());
+        await RecordAsync(summary);
+        await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).CommitAsync(OrderId))).WithId("commit");
 
         // The order ships when ShipAsync signals it; the wait returns at once for a shipment which arrived earlier.
         await Shipped.WaitAsync();
         summary = await MarkShipped().WithId("ship");
-        await RecordAsync(request.BuyerId, summary);
+        await RecordAsync(summary);
         return Result(summary);
     }
 
-    // The order records the buyer's decision and detaches the projection update, which commit in one journal write.
+    // The workflow observes the cancellation during its grace period or stock validation, releases the stock it
+    // reserved, and records the cancellation with this reason.
     public async Task<bool> CancelAsync()
     {
         if (_order.Value?.Status is not (OrderStatus.Submitted or OrderStatus.AwaitingValidation))
@@ -134,10 +121,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             return false;
         }
 
-        await DetachRecordAsync(SetStatus(OrderStatus.Cancelled, "Cancelled by the buyer."));
-
-        // Durable cancellation ends the workflow's grace period, or its validation, whose reservations it then releases.
-        await _tasks.CancelAsync(TaskId.CreateRoot(PlaceOrderTaskId(OrderId)));
+        await _tasks.CancelAsync(PlaceOrderTaskId(OrderId), CancelledByBuyer);
         return true;
     }
 
@@ -150,37 +134,23 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             return false;
         }
 
-        try
-        {
-            await _tasks.SignalAsync(TaskId.CreateRoot(PlaceOrderTaskId(OrderId)), Shipped, new Shipment(DateTimeOffset.UtcNow));
-            return true;
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
+        var result = await _tasks.TrySignalAsync(PlaceOrderTaskId(OrderId), Shipped, new Shipment(DateTimeOffset.UtcNow));
+        return result is DurableSignalResult.Accepted;
     }
 
-    // Releases reserved stock in reverse order of reservation, then cancels the order.
-    private async Task<OrderResult> CompensateAsync(string buyerId, int[] reserved, string? reason)
+    // Releases the lines' reservations concurrently, then records the cancellation. Releasing is idempotent and returns
+    // whether the line held a reservation, so the workflow releases each line without tracking which reservations ran.
+    // The suppression scope keeps the workflow's cancellation from reaching this compensation, so it runs to completion.
+    private async Task<OrderResult> CancelOrderAsync(OrderLine[] lines, string? reason)
     {
-        await ReleaseStockAsync(reserved);
-        var summary = await Cancel(reserved, reason).WithId("cancel");
-        await RecordAsync(buyerId, summary);
-        return Result(summary);
-    }
-
-    public async DurableTask ReleaseReservationsAsync(int[] productIds)
-    {
-        await ReleaseStockAsync(productIds);
-        await MarkReleased(productIds).WithId("mark-released");
-    }
-
-    private async Task ReleaseStockAsync(int[] reserved)
-    {
-        for (var i = reserved.Length - 1; i >= 0; i--)
+        using (DurableExecutionContext.SuppressCancellation())
         {
-            await Catalog(reserved[i]).ReleaseAsync(OrderId).WithId($"release-{reserved[i]}");
+            var released = await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
+                .WithId("release");
+            var releasedIds = lines.Where((_, i) => released[i]).Select(line => line.ProductId).ToArray();
+            var summary = await Cancel(releasedIds, reason).WithId("cancel");
+            await RecordAsync(summary);
+            return Result(summary);
         }
     }
 
@@ -200,15 +170,10 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         return _order.Value.ToSummary();
     }
 
-    private async DurableTask<OrderSummary?> BeginValidation()
+    private async DurableTask<OrderSummary> BeginValidation()
     {
-        var order = _order.Value!;
-        if (order.Status is not OrderStatus.Submitted)
-        {
-            return null;
-        }
-
-        foreach (var line in order.Lines)
+        Debug.Assert(_order.Value!.Status is OrderStatus.Submitted, "Only the workflow changes the order's status.");
+        foreach (var line in _order.Value.Lines)
         {
             _stock[line.ProductId] = StockLineStatus.Pending;
         }
@@ -218,7 +183,6 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
     private async DurableTask<OrderSummary> RecordStock(OrderLine[] lines, bool[] confirmed)
     {
-        ThrowIfCancelledByBuyer();
         for (var i = 0; i < lines.Length; i++)
         {
             _stock[lines[i].ProductId] = confirmed[i] ? StockLineStatus.Confirmed : StockLineStatus.Rejected;
@@ -241,31 +205,12 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
     private async DurableTask<OrderSummary> Cancel(int[] released, string? reason)
     {
-        ThrowIfCancelledByBuyer();
         foreach (var productId in released)
         {
             _stock[productId] = StockLineStatus.Released;
         }
 
         return SetStatus(OrderStatus.Cancelled, reason);
-    }
-
-    private async DurableTask MarkReleased(int[] released)
-    {
-        foreach (var productId in released)
-        {
-            _stock[productId] = StockLineStatus.Released;
-        }
-    }
-
-    // A transition which starts after the buyer cancelled during validation leaves the order unchanged; the workflow
-    // observes the cancellation instead.
-    private void ThrowIfCancelledByBuyer()
-    {
-        if (_order.Value!.Status is OrderStatus.Cancelled)
-        {
-            throw new OperationCanceledException("The buyer cancelled the order.");
-        }
     }
 
     private OrderSummary SetStatus(OrderStatus status, string? description = null)
@@ -275,14 +220,12 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         return _order.Value.ToSummary();
     }
 
-    // Delivery order across tasks is unspecified; the buyer keeps the summary with the highest version.
-    private ConfiguredDurableTask RecordAsync(string buyerId, OrderSummary summary) =>
-        GrainFactory.GetGrain<IBuyerGrain>(buyerId).RecordOrderAsync(summary).WithId($"buyer-{summary.Version}");
-
-    // A detached task under a root ID derived from the order and version, which the buyer retains, not the order.
-    private ValueTask DetachRecordAsync(OrderSummary summary) =>
+    // Detaches the buyer's projection update under a root ID derived from the workflow's ID and the version, such as
+    // "place-order-{orderId}:buyer-v2", so the workflow doesn't wait for the buyer and its cancellation doesn't reach the
+    // update. Updates arrive in any order; the buyer keeps the summary with the highest version.
+    private ValueTask RecordAsync(OrderSummary summary) =>
         GrainFactory.GetGrain<IBuyerGrain>(_order.Value!.BuyerId).RecordOrderAsync(summary)
-            .DetachAsync($"order-{OrderId:N}-v{summary.Version}");
+            .DetachAsync(DetachedTaskId.For($"buyer-v{summary.Version}"));
 
     private ICatalogItemGrain Catalog(int productId) => GrainFactory.GetGrain<ICatalogItemGrain>(productId);
 
