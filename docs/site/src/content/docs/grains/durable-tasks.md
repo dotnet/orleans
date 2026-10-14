@@ -187,32 +187,55 @@ external service. A replay returns the delegate's recorded result, and runs a de
 whose result wasn't recorded again, so the delegate's external effect needs its own
 idempotency.
 
-## Progress reports
+## Publish progress and stream drafts
 
-A workflow publishes its progress to observers by reporting entries to a journaled
-<xref:Orleans.Journaling.IDurableLog`1> of its grain with
-<xref:Orleans.DurableTasks.DurableLogExtensions.Report*?displayProperty=nameWithType>.
-A report is an unnamed recorded effect which appends its entry: each report takes the
-next position within the task, and appends exactly once per position. The entry commits
-with the task's next durable write, and a replay returns the recorded sequence number
-without appending again. Observers of the log therefore see each report once, in the
-order in which the task made it, including after replays. Outside a durable task, a
-report appends directly.
-
-Use reports for progress which callers and user interfaces watch, such as each status
-of an order or each completed partition of an export. Compute each entry from the
-task's arguments, recorded results, and logical time, so each replay reports the same
-entries at the same positions. Observers read the log with
+A workflow publishes progress to observers through a journaled
+<xref:Orleans.Journaling.IDurableLog`1> of its grain. Observers read the log with
 <xref:Orleans.Journaling.IDurableLog`1.ReadAsync*>, typically through an
-`IAsyncEnumerable<T>` grain method; the committed mode delivers each report once it is
-durable. [Observe journaled state](journaling/observe-state.md) describes reading,
-resuming, and trimming logs.
+`IAsyncEnumerable<T>` grain method. [Observe journaled state](journaling/observe-state.md)
+describes reading, resuming, and trimming logs.
+
+To publish an entry, append it in a recorded effect,
+`DurableTask.Once(() => log.Append(item))`. The effect appends once for its position in
+the task, and the entry commits together with the effect's record in the task's next
+durable write. A replay returns the recorded sequence number without appending again, so
+a reader in the committed mode receives each entry once, in the order in which the task
+appended it. Compute each entry from the task's arguments, recorded results, and logical
+time, so each replay makes the same appends at the same positions. Entries suit progress
+which callers and user interfaces watch, such as each status of an order or each
+completed partition of an export:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_progress" language="csharp":::
 
 The `playground/DurableOrderProcessing` project keeps each order's state as a log of
-snapshots which its workflow reports, and streams them to the browser as server-sent
-events.
+snapshots which its workflow appends this way, and streams them to the browser as
+server-sent events.
+
+To stream content as it's produced, such as a model's response, run the stream in a
+local step. The step opens a draft with
+<xref:Orleans.Journaling.IDurableLog`1.BeginDraft*>, writes each item to it, and commits
+the final content in its final synchronous code, after its last `await`:
+
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_stream_draft" language="csharp":::
+
+- A draft's items are volatile. Readers which include
+  <xref:Orleans.Journaling.DurableWatchMode.Drafts?displayProperty=nameWithType> receive
+  each item as the step writes it, and the content becomes durable when `Commit` appends
+  the entries which replace the draft.
+- The step's result is staged in the work item which runs its final synchronous code, so
+  the entries which `Commit` appends and the step's recorded result commit in the same
+  journal write. Readers in the committed mode receive the entries once that write is
+  durable.
+- The content therefore commits exactly once: every committed journal holds both the
+  entries and the step's record, or neither. A replay after that write returns the
+  recorded result without running the step. A run which ends before that write loses
+  both, so the next run runs the step, which streams and commits the content.
+- A step which throws, including after cancellation, disposes the draft, which abandons
+  it, and the step's failure is recorded, so a replay rethrows it without streaming again.
+- Journaled changes inside a step belong in its final synchronous code. A change which
+  the step makes before an `await`, such as an `Append`, can commit with a journal write
+  which other grain work requests before the step completes, and a replay which runs the
+  step again makes the change again.
 
 ## Replay and determinism
 
@@ -229,8 +252,7 @@ three kinds of code:
 
 - **Recorded operations** run once per execution, and a replay returns their recorded
   outcomes: durable calls to other grains, local steps, `DurableTask.Run` delegates,
-  delays, signal waits and sends, detaches, `DurableTask.Once` effects, and progress
-  reports.
+  delays, signal waits and sends, detaches, and `DurableTask.Once` effects.
 - **Re-executed code** precedes the body's last recorded operation and runs again in
   every replay. It computes values from the method's arguments, recorded results, the
   execution's logical time and cancellation state, and configuration which stays the

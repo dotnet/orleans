@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.DurableTasks;
@@ -668,18 +669,18 @@ public sealed class ExportGrain : DurableGrain, IExportGrain
 
     public async DurableTask<int> ExportAsync(string[] partitions)
     {
-        // Each report appends once for its position in the task, so a replay doesn't publish older progress again.
-        _progress.Report(new ExportProgress(0, partitions.Length));
+        // Each append runs once for its position in the task, so a replay doesn't publish older progress again.
+        DurableTask.Once(() => _progress.Append(new ExportProgress(0, partitions.Length)));
         for (var i = 0; i < partitions.Length; i++)
         {
             await GrainFactory.GetGrain<IPartitionGrain>(partitions[i]).ExportAsync().WithId("partition");
-            _progress.Report(new ExportProgress(i + 1, partitions.Length));
+            DurableTask.Once(() => _progress.Append(new ExportProgress(i + 1, partitions.Length)));
         }
 
         return partitions.Length;
     }
 
-    // Observers read committed reports in order, from the first.
+    // Observers read committed entries in order, from the first.
     public async IAsyncEnumerable<ExportProgress> WatchAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         await foreach (var change in _progress.ReadAsync(cancellationToken: cancellationToken))
@@ -696,6 +697,52 @@ public sealed class ExportGrain : DurableGrain, IExportGrain
     }
 }
 // </durable_tasks_progress>
+
+// <durable_tasks_stream_draft>
+public interface IChatModel
+{
+    IAsyncEnumerable<string> StreamAsync(string prompt, CancellationToken cancellationToken);
+}
+
+public interface IConversationGrain : IGrainWithStringKey
+{
+    DurableTask<long> AskAsync(string prompt);
+
+    IAsyncEnumerable<LogEvent<string>> WatchAsync(long fromSequence, CancellationToken cancellationToken);
+}
+
+public sealed class ConversationGrain : DurableGrain, IConversationGrain
+{
+    private readonly IChatModel _model;
+    private readonly IDurableLog<string> _transcript;
+
+    public ConversationGrain(IChatModel model)
+    {
+        _model = model;
+        _transcript = StateManager.GetOrAddLog<string>("transcript");
+    }
+
+    // Returns the sequence number of the committed response.
+    public async DurableTask<long> AskAsync(string prompt) => await DurableTask.Run(async cancellationToken =>
+    {
+        using var draft = _transcript.BeginDraft();
+        var response = new StringBuilder();
+        await foreach (var chunk in _model.StreamAsync(prompt, cancellationToken))
+        {
+            // Volatile: watchers receive each chunk as it arrives, and no journal write includes it.
+            draft.Write(chunk);
+            response.Append(chunk);
+        }
+
+        // The step's final synchronous code: the entry commits in the same journal write as the step's result.
+        return draft.Commit(response.ToString());
+    }).WithId("respond");
+
+    // Watchers receive the draft's chunks live, then the committed entry which replaces them.
+    public IAsyncEnumerable<LogEvent<string>> WatchAsync(long fromSequence, CancellationToken cancellationToken) =>
+        _transcript.ReadAsync(fromSequence, DurableWatchMode.Drafts, cancellationToken: cancellationToken);
+}
+// </durable_tasks_stream_draft>
 
 internal static class InvoiceClient
 {
