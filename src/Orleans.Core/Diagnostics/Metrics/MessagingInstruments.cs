@@ -10,6 +10,8 @@ namespace Orleans.Runtime
     {
         private long _headerBytesSent;
         private long _headerBytesReceived;
+        private long _messageBytesSent;
+        private long _messageBytesReceived;
 
         public MessagingInstruments(OrleansInstruments instruments)
         {
@@ -29,6 +31,16 @@ namespace Orleans.Runtime
             MessageSentSizeHistogram = instruments.Meter.CreateHistogram<int>(InstrumentNames.MESSAGING_SENT_MESSAGES_SIZE, "bytes");
             MessageReceivedSizeHistogram = instruments.Meter.CreateHistogram<int>(InstrumentNames.MESSAGING_RECEIVED_MESSAGES_SIZE, "bytes");
         }
+
+        /// <summary>
+        /// Gets the cumulative size, in bytes, of messages sent by this process.
+        /// </summary>
+        internal long MessageBytesSent => Interlocked.Read(ref _messageBytesSent);
+
+        /// <summary>
+        /// Gets the cumulative size, in bytes, of messages received by this process.
+        /// </summary>
+        internal long MessageBytesReceived => Interlocked.Read(ref _messageBytesReceived);
 
         internal readonly ObservableCounter<long> HeaderBytesSentCounter;
         internal readonly ObservableCounter<long> HeaderBytesReceivedCounter;
@@ -126,6 +138,7 @@ namespace Orleans.Runtime
                 }
             }
 
+            Interlocked.Add(ref _messageBytesReceived, numTotalBytes);
             Interlocked.Add(ref _headerBytesReceived, headerBytes);
         }
 
@@ -145,6 +158,7 @@ namespace Orleans.Runtime
                 }
             }
 
+            Interlocked.Add(ref _messageBytesSent, numTotalBytes);
             Interlocked.Add(ref _headerBytesSent, headerBytes);
         }
     }

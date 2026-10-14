@@ -26,6 +26,8 @@ namespace Orleans.Runtime
         private readonly IActivationWorkingSet _activationWorkingSet;
         private readonly IEnvironmentStatisticsProvider _environmentStatisticsProvider;
         private readonly IOptions<LoadSheddingOptions> _loadSheddingOptions;
+        private readonly MessagingInstruments _messagingInstruments;
+        private readonly IConnectedClientCollection _connectedClients;
         private readonly ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics> _periodicStats;
         private readonly TimeSpan _statisticsRefreshTime;
         private readonly List<ISiloStatisticsChangeListener> _siloStatisticsChangeListeners;
@@ -48,6 +50,8 @@ namespace Orleans.Runtime
             IActivationWorkingSet activationWorkingSet,
             IEnvironmentStatisticsProvider environmentStatisticsProvider,
             IOptions<LoadSheddingOptions> loadSheddingOptions,
+            MessagingInstruments messagingInstruments,
+            IConnectedClientCollection connectedClients,
             SystemTargetShared shared)
             : base(Constants.DeploymentLoadPublisherSystemTargetType, shared)
         {
@@ -59,6 +63,8 @@ namespace Orleans.Runtime
             _activationWorkingSet = activationWorkingSet;
             _environmentStatisticsProvider = environmentStatisticsProvider;
             _loadSheddingOptions = loadSheddingOptions;
+            _messagingInstruments = messagingInstruments;
+            _connectedClients = connectedClients;
             _statisticsRefreshTime = options.Value.DeploymentLoadPublisherRefreshTime;
             _periodicStats = new ConcurrentDictionary<SiloAddress, SiloRuntimeStatistics>();
             _siloStatisticsChangeListeners = new List<ISiloStatisticsChangeListener>();
@@ -104,6 +110,9 @@ namespace Orleans.Runtime
                     _activationWorkingSet.Count,
                     _environmentStatisticsProvider,
                     _loadSheddingOptions,
+                    _connectedClients.Count,
+                    _messagingInstruments.MessageBytesReceived,
+                    _messagingInstruments.MessageBytesSent,
                     new DateTime(ticks, DateTimeKind.Utc));
 
                 // Update statistics locally.

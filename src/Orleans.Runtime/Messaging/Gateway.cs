@@ -122,6 +122,8 @@ namespace Orleans.Runtime.Messaging
 
         long IConnectedClientCollection.Version => Interlocked.Read(ref clientsCollectionVersion);
 
+        int IConnectedClientCollection.Count => clients.Count;
+
         List<GrainId> IConnectedClientCollection.GetConnectedClientIds()
         {
             var result = new List<GrainId>();

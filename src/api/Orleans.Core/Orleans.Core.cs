@@ -1809,6 +1809,7 @@ namespace Orleans.Runtime
         public static void Import(System.Collections.Generic.Dictionary<string, object>? contextData) { }
     }
 
+    [System.Obsolete("This type will be removed. Use IManagementGrain.GetRuntimeStatistics to read silo client and message statistics.", false)]
     public static partial class SiloRuntimeMetricsListener
     {
         public static long ConnectedClientCount { get { throw null; } }
