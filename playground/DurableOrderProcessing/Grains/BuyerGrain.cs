@@ -11,7 +11,7 @@ public interface IBuyerGrain : IGrainWithStringKey
 }
 
 // A per-buyer projection of order status, which serves the buyer's order list.
-// Orders record each status change with a durable call.
+// Each order's workflow records its status changes with detached durable calls.
 public sealed class BuyerGrain : DurableGrain, IBuyerGrain
 {
     private readonly IDurableDictionary<Guid, OrderSummary> _orders;
@@ -27,8 +27,7 @@ public sealed class BuyerGrain : DurableGrain, IBuyerGrain
     // The change commits with the task's result.
     public async DurableTask RecordOrderAsync(OrderSummary summary)
     {
-        // An order's workflow and its cancel and ship commands record changes independently;
-        // the highest version is the latest.
+        // An order's workflow detaches each change, so changes arrive in any order; the highest version is the latest.
         if (!_orders.TryGetValue(summary.OrderId, out var current) || current.Version < summary.Version)
         {
             _orders[summary.OrderId] = summary;

@@ -9,7 +9,8 @@ public interface ICatalogItemGrain : IGrainWithIntegerKey
 
     DurableTask<bool> ReserveAsync(Guid orderId, int units);
 
-    DurableTask ReleaseAsync(Guid orderId);
+    // Returns whether the order held a reservation, so releasing is idempotent.
+    DurableTask<bool> ReleaseAsync(Guid orderId);
 
     DurableTask CommitAsync(Guid orderId);
 }
@@ -51,17 +52,20 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
         return confirmed;
     }
 
-    public async DurableTask ReleaseAsync(Guid orderId)
+    public async DurableTask<bool> ReleaseAsync(Guid orderId)
     {
-        if (_reservations.Remove(orderId, out var units))
+        if (!_reservations.Remove(orderId, out var units))
         {
-            var item = Item!;
-            _item.Value = item with
-            {
-                AvailableStock = item.AvailableStock + units,
-                ReservedStock = item.ReservedStock - units,
-            };
+            return false;
         }
+
+        var item = Item!;
+        _item.Value = item with
+        {
+            AvailableStock = item.AvailableStock + units,
+            ReservedStock = item.ReservedStock - units,
+        };
+        return true;
     }
 
     public async DurableTask CommitAsync(Guid orderId)
