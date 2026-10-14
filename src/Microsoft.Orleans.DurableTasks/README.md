@@ -164,7 +164,8 @@ framework assets; its first published version establishes the compatibility base
 
 - `(target GrainId, TaskId)` identifies one execution. A stable request
   fingerprint detects reuse with a different interface, method, argument type,
-  or argument value.
+  or argument value: such a schedule throws `DurableTaskConflictException`, an
+  `InvalidOperationException`, and leaves the existing task unchanged.
 - Request identity, task state, caller subscription, inbox completion, and
   recovery ownership commit before execution begins.
 - Task state and outgoing messages share the grain's Journaling commit boundary,

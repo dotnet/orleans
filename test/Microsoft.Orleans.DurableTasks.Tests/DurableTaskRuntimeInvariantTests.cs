@@ -130,10 +130,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var taskId = TaskId.Parse("root");
         runtime.ScheduleFromInbox(taskId, CreateRequest(1));
 
-        var exception = Assert.Throws<InvalidOperationException>(
+        var exception = Assert.Throws<DurableTaskConflictException>(
             () => runtime.ScheduleFromInbox(taskId, CreateRequest(2)));
 
         Assert.Contains("different request", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(taskId, exception.TaskId);
     }
 
     [Fact]
@@ -1241,9 +1242,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         var remoteTaskId = TaskId.Parse("remote-identity");
         await runtime.ScheduleChildAsync(remoteTaskId, new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(3)), TestContext.Current.CancellationToken);
-        var topLevelException = Assert.Throws<InvalidOperationException>(
+        var topLevelException = Assert.Throws<DurableTaskConflictException>(
             () => runtime.ScheduleFromInbox(remoteTaskId, CreateRequest(4)));
         Assert.Contains("remote child request", topLevelException.Message, StringComparison.Ordinal);
+        Assert.Equal(remoteTaskId, topLevelException.TaskId);
         Assert.NotNull(storage.Get(remoteTaskId).RemoteRequestFingerprint);
 
         var delayTaskId = TaskId.Parse("delay-identity");
@@ -3550,9 +3552,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(1, first.CreateTaskCallCount);
         Assert.Equal(0, again.CreateTaskCallCount);
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<DurableTaskConflictException>(
             () => runtime.DetachAsync(rootId, CreateRequest(2), markerId: default, TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("different request", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(rootId, exception.TaskId);
     });
 
     [Fact]
