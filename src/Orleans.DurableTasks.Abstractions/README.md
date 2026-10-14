@@ -335,13 +335,15 @@ method body runs again from the start, and every child which already completed r
 recorded result. A workflow resumes correctly when each replay
 schedules the same children, with the same identifiers and arguments, in the same order.
 
-- Put each side effect in a child: a durable call to another grain, a `DurableTask.Run`
-  delegate, or an `async DurableTask` method awaited with `WithId`. The child runs once, and a
-  replay returns its recorded result. Code between children runs on every replay, so it
-  computes values from the method's arguments, the results of earlier children, and other
-  values which are the same on every replay.
-- Read time from `DurableTask.Current.UtcNow`, and produce random values and identifiers
-  inside children, so a replay observes the values the first execution recorded.
+- Put each side effect in a recorded operation: a durable call to another grain, a
+  `DurableTask.Run` delegate, an `async DurableTask` method awaited with `WithId`, or a
+  `DurableTask.Once` effect. The operation runs once, and a replay returns its recorded result.
+  Code between recorded operations runs on every replay, so it computes values from the
+  method's arguments, the results of earlier operations, and other values which are the same on
+  every replay.
+- Read time from `DurableTask.Current.UtcNow`, and produce random values and identifiers in
+  `DurableTask.Once` or inside children, so a replay observes the values the first execution
+  recorded.
 - Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
   or concurrently outside a combinator, and to combinators. Generated identifiers are stable only when unnamed
   children and combinators are created in the same order.
@@ -352,6 +354,35 @@ schedules the same children, with the same identifiers and arguments, in the sam
 - An `async DurableTask` method which completes without awaiting is a normal step, for example
   a state transition whose result the parent records. The Orleans analyzers suppress CS1998 for
   such methods ([ORLEANS0028](https://aka.ms/orleans/diagnostics#orleans0028)).
+
+## Recorded effects
+
+`DurableTask.Once(name, effect)` runs a synchronous effect once for the running task and records its
+outcome. Every later run of the body, including a replay, returns the recorded result, or throws the
+recorded exception, without running the effect:
+
+```csharp
+var summary = DurableTask.Once("pay", () => SetStatus(OrderStatus.Paid));
+var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
+```
+
+- The record commits with the task's next durable write, together with the state changes which the
+  effect made, such as journaled grain state, so the effect's changes and its result commit together
+  and apply once. It adds no write and no await. A run which ends before that write loses both, and
+  the next run runs the effect again.
+- The effect passes data to the body through its result. It reads state which later steps change,
+  changes state, and produces values such as identifiers and random numbers.
+- A failure is recorded too, because journaled state has no rollback: changes made before the throw
+  commit with the recorded exception. A result which the host can't store, for example because it
+  doesn't serialize, is recorded as that failure.
+- A name repeated in one run identifies later occurrences by their order: `pay`, then `pay$2`. Names
+  don't contain `$`.
+- The effect is synchronous. Asynchronous and durable effects don't compile, and a result type which
+  is asynchronous through generic code, such as `ValueTask<T>`, throws `NotSupportedException`
+  before the effect runs. Asynchronous work runs as an awaited child, such as an `async DurableTask`
+  step.
+- The record applies only within a durable task. Outside one, the effect runs every time, so helpers
+  which ordinary methods share with durable task bodies can call it.
 
 ## Host responsibilities
 
@@ -369,4 +400,8 @@ propagate the parent's later request to it. Hosts which support detached tasks
 override `DurableTaskContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`.
 Hosts which support signals override `DurableTaskContext.WaitForSignalAsync`, record each
 task's first value for each signal name, and deliver signals from senders. Hosts which support abort
-implement `IScheduledTaskHandle.AbortAsync`.
+implement `IScheduledTaskHandle.AbortAsync`. Hosts which support recorded effects override
+`DurableTaskContext.RunEffect`: they return an effect's recorded outcome, or run the effect and stage its
+record in the same synchronous work, so the record commits with the state changes the effect made. Hosts
+which commit a body's state changes with its result stage the result in
+`DurableTaskContext.OnBodyCompleted`, which runs synchronously with the body's final code.

@@ -103,6 +103,26 @@ namespace Orleans.DurableTasks
 
         public static DurableTask<TResult> FromResult<TResult>(TResult value) { throw null; }
 
+        public static void Once(string name, System.Action effect) { }
+
+        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void Once(string name, System.Func<DurableTask> effect) { }
+
+        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static void Once(string name, System.Func<System.Threading.Tasks.Task> effect) { }
+
+        public static TResult Once<TResult>(string name, System.Func<TResult> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult Once<TResult>(string name, System.Func<DurableTask<TResult>> effect) { throw null; }
+
+        [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
+        [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+        public static TResult Once<TResult>(string name, System.Func<System.Threading.Tasks.Task<TResult>> effect) { throw null; }
+
         public static DurableTask Run(System.Action<System.Threading.CancellationToken> action) { throw null; }
 
         public static DurableTask Run(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> function) { throw null; }
@@ -218,6 +238,8 @@ namespace Orleans.DurableTasks
         protected internal virtual void OnBodyCompleted(DurableTaskResponse response) { }
 
         public System.Threading.Tasks.ValueTask<System.IAsyncDisposable> RegisterCancellationCallbackAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        protected internal virtual DurableTaskResponse RunEffect<TState>(TaskId effectId, TState state, System.Func<TState, DurableTaskResponse> effect) { throw null; }
 
         protected internal abstract System.Threading.Tasks.ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken);
         protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken);
