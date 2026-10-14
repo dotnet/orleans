@@ -79,8 +79,9 @@ public class DurableMessagingOptions
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The outbox applies exponential backoff from this duration when delivery fails or the target inbox
-    /// returns <c>DeliveryResult.Backpressured()</c>. The inbox applies the same backoff after a handler fails.
+    /// The outbox applies exponential backoff from this duration after each failed delivery attempt, including when
+    /// the target inbox returns <c>DeliveryResult.Backpressured()</c>. The inbox applies the same backoff after a
+    /// handler fails.
     /// </para>
     /// <para>
     /// A shorter delay (e.g., 100ms) enables faster recovery when the target processes messages quickly,
@@ -103,18 +104,34 @@ public class DurableMessagingOptions
     public int MaxProcessingAttempts { get; set; } = 5;
 
     /// <summary>
-    /// Gets or sets the maximum number of delivery attempts which receivers answer without taking an outbox message
-    /// before the message is dead-lettered.
+    /// Gets or sets how long the outbox retries a message whose delivery attempts end without an answer from the
+    /// receiver, such as during an infrastructure outage, before the message is dead-lettered.
     /// </summary>
     /// <remarks>
-    /// Attempts which fail with an exception retry until <see cref="MaxOutboxRetryAge"/> elapses.
+    /// <para>
+    /// The period starts with the first unanswered attempt and restarts whenever the receiver answers. A receiver
+    /// checks its deduplication records before answering, so only unanswered attempts can have been accepted, and this
+    /// period stays within <see cref="DeduplicationWindow"/> to keep their retries deduplicated.
+    /// </para>
+    /// <para>
+    /// The outbox retries a message which the receiver answers with <c>DeliveryResult.Backpressured()</c> until the
+    /// receiver takes it.
+    /// </para>
     /// </remarks>
-    public int MaxDeliveryAttempts { get; set; } = 100;
+    /// <value>Must be greater than zero and less than <see cref="DeduplicationWindow"/>. Defaults to 1 day.</value>
+    public TimeSpan MaxOutboxRetryAge { get; set; } = TimeSpan.FromDays(1);
 
     /// <summary>
-    /// Gets or sets the maximum age of an outbox message.
+    /// Gets or sets how long the outbox retries a message whose receiver reports no inbox handler, before the message
+    /// is dead-lettered.
     /// </summary>
-    public TimeSpan MaxOutboxRetryAge { get; set; } = TimeSpan.FromDays(1);
+    /// <remarks>
+    /// The period starts when the receiver first answers with <c>DeliveryResult.HandlerNotFound()</c>, which gives a
+    /// deployment time to register the handler, and restarts whenever the receiver answers otherwise. The outbox logs
+    /// each such answer as an error.
+    /// </remarks>
+    /// <value>Must be greater than zero. Defaults to 6 hours.</value>
+    public TimeSpan MaxHandlerNotFoundRetryAge { get; set; } = TimeSpan.FromHours(6);
 
     /// <summary>
     /// Gets or sets how long inbox and outbox dead letters are retained.
@@ -142,25 +159,17 @@ public class DurableMessagingOptions
     /// <remarks>
     /// <para>
     /// The outbox calls each receiver through this pipeline, so its strategies, such as timeouts, retries, and circuit
-    /// breakers, act within one delivery attempt. When an exception leaves the pipeline, the outbox retries the
-    /// delivery durably after the maximum <see cref="BackpressureRetryDelay"/> backoff until
-    /// <see cref="MaxOutboxRetryAge"/> elapses, so an infrastructure outage delays messages rather than
-    /// dead-lettering them. Receiving inboxes deduplicate by message ID, so retrying a delivery whose outcome is
-    /// unknown is safe.
+    /// breakers, act within one delivery attempt. When an attempt fails, the outbox schedules the next attempt with
+    /// <see cref="BackpressureRetryDelay"/> backoff and continues delivering other messages. Receiving inboxes
+    /// deduplicate by message ID, so retrying a delivery whose outcome is unknown is safe.
     /// </para>
     /// <para>
-    /// One pipeline instance serves every outbox delivery in the silo, so a stateful strategy such as a circuit
-    /// breaker observes correlated failures across all receivers.
-    /// </para>
-    /// <para>
-    /// When this property is <see langword="null"/>, messaging uses a default pipeline built from the silo's
-    /// response timeout, timed by the durable jobs clock. The default retries a failed call five times with jittered exponential
-    /// backoff from one second, limits the attempt to six response timeouts, and opens a circuit breaker for one
-    /// response timeout when at least half of 20 or more calls within 30 seconds fail.
-    /// <see cref="ResiliencePipeline.Empty"/> calls the receiver directly.
+    /// The outbox treats a receiver's answer as proof that no earlier call for the message is still in flight, so the
+    /// pipeline makes one receiver call at a time. One pipeline instance serves every outbox delivery in the silo.
     /// </para>
     /// </remarks>
-    public ResiliencePipeline? DeliveryResiliencePipeline { get; set; }
+    /// <value>Defaults to <see cref="ResiliencePipeline.Empty"/>, which calls the receiver directly.</value>
+    public ResiliencePipeline DeliveryResiliencePipeline { get; set; } = ResiliencePipeline.Empty;
 
     /// <summary>
     /// Validates the configuration values and throws if any are invalid.
@@ -170,6 +179,7 @@ public class DurableMessagingOptions
     /// or if <see cref="DeduplicationWindow"/> is less than or equal to <see cref="TimeSpan.Zero"/>,
     /// or if a retry, retention, or batch option is outside its supported range.
     /// </exception>
+    /// <exception cref="ArgumentNullException">Thrown if <see cref="DeliveryResiliencePipeline"/> is <see langword="null"/>.</exception>
     /// <remarks>
     /// This method is typically called by the dependency injection container during service registration
     /// to ensure configuration values are valid before the system starts.
@@ -204,11 +214,6 @@ public class DurableMessagingOptions
             throw new ArgumentOutOfRangeException(nameof(MaxProcessingAttempts), MaxProcessingAttempts, "MaxProcessingAttempts must be greater than zero.");
         }
 
-        if (MaxDeliveryAttempts <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(MaxDeliveryAttempts), MaxDeliveryAttempts, "MaxDeliveryAttempts must be greater than zero.");
-        }
-
         if (MaxOutboxRetryAge <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(MaxOutboxRetryAge), MaxOutboxRetryAge, "MaxOutboxRetryAge must be greater than TimeSpan.Zero.");
@@ -220,6 +225,19 @@ public class DurableMessagingOptions
                 nameof(MaxOutboxRetryAge),
                 MaxOutboxRetryAge,
                 "MaxOutboxRetryAge must be less than DeduplicationWindow.");
+        }
+
+        if (MaxHandlerNotFoundRetryAge <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaxHandlerNotFoundRetryAge),
+                MaxHandlerNotFoundRetryAge,
+                "MaxHandlerNotFoundRetryAge must be greater than TimeSpan.Zero.");
+        }
+
+        if (DeliveryResiliencePipeline is null)
+        {
+            throw new ArgumentNullException(nameof(DeliveryResiliencePipeline));
         }
 
         if (DeadLetterRetentionPeriod <= TimeSpan.Zero)

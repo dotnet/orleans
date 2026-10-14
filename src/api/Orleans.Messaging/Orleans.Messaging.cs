@@ -318,13 +318,13 @@ namespace Orleans.Messaging.Configuration
 
         public System.TimeSpan DeduplicationWindow { get { throw null; } set { } }
 
-        public Polly.ResiliencePipeline? DeliveryResiliencePipeline { get { throw null; } set { } }
+        public Polly.ResiliencePipeline DeliveryResiliencePipeline { get { throw null; } set { } }
 
         public int InboxBatchSize { get { throw null; } set { } }
 
         public int MaxCapacity { get { throw null; } set { } }
 
-        public int MaxDeliveryAttempts { get { throw null; } set { } }
+        public System.TimeSpan MaxHandlerNotFoundRetryAge { get { throw null; } set { } }
 
         public System.TimeSpan MaxOutboxRetryAge { get { throw null; } set { } }
 
