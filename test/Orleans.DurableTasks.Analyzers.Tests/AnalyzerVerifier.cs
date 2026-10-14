@@ -32,7 +32,8 @@ internal static partial class AnalyzerVerifier
 
         """;
 
-    private static readonly ImmutableArray<MetadataReference> References =
+    /// <summary>The framework and logging assemblies which test sources compile against.</summary>
+    internal static readonly ImmutableArray<MetadataReference> References =
     [
         .. ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
             .Split(Path.PathSeparator)

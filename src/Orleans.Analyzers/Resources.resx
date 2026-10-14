@@ -337,7 +337,4 @@
   <data name="InvalidIdentityDescription" xml:space="preserve">
     <value>Orleans aliases, grain types, and grain interface types must use non-empty identities containing no quotes, whitespace, control characters, or reserved type-name delimiters ([](),*&amp;). Generic arity suffixes must be decimal integers at the end of each nested type name, totaling at most 64.</value>
   </data>
-  <data name="DurableTaskAsyncMethodLacksAwaitSuppressionJustification" xml:space="preserve">
-    <value>An async DurableTask method defines a deferred durable step which the host runs under replay control, so a body which completes without awaiting is a normal step.</value>
-  </data>
 </root>
