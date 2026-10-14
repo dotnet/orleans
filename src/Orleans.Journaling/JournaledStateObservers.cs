@@ -421,7 +421,7 @@ internal sealed class ValueWatcher<T> : StateWatcher, IChangeSink<T>
     private long _pendingVersion1;
     private int _pendingCount;
 
-    // Speculative mode: the version delivered as staged which awaits confirmation. Zero when none.
+    // Staged mode: the version delivered as staged which awaits confirmation. Zero when none.
     private long _awaitingConfirmation;
 
     public ValueWatcher(JournaledStateObservers hub, IStateMachine state, DurableWatchMode mode, T? initialValue, long initialVersion)
@@ -560,7 +560,7 @@ internal static class DurableStateObservation
 
     public static void ValidateWatch(DurableWatchMode mode, int capacity)
     {
-        if ((mode & ~DurableWatchMode.Speculative) != 0)
+        if ((mode & ~(DurableWatchMode.Staged | DurableWatchMode.Drafts)) != 0)
         {
             throw new ArgumentOutOfRangeException(nameof(mode), mode, "The watch mode is not supported.");
         }

@@ -49,11 +49,6 @@ public enum DurableWatchMode : byte
     /// State without drafts ignores this flag.
     /// </summary>
     Drafts = 2,
-
-    /// <summary>
-    /// Delivers draft and staged changes as they are made, followed by commit watermarks as journal writes are acknowledged.
-    /// </summary>
-    Speculative = Staged | Drafts,
 }
 
 /// <summary>

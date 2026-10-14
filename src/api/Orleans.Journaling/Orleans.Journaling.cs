@@ -142,8 +142,7 @@ namespace Orleans.Journaling
     {
         Committed = 0,
         Staged = 1,
-        Drafts = 2,
-        Speculative = 3
+        Drafts = 2
     }
 
     public partial interface IDurableDictionaryCommandCodec<TKey, TValue>

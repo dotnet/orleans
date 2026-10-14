@@ -65,7 +65,7 @@ public class JsonDurableLogTests
         var value = new DurableValue<int>("value", manager, services.GetRequiredKeyedService<IDurableValueCommandCodec<int>>(JsonLinesJournalFormat.JournalFormatKey));
         await manager.InitializeAsync(CancellationToken);
 
-        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await using var watch = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(DurableChangeStatus.Committed, (await watch.NextAsync()).Status);
         Assert.Equal(LogEventKind.CaughtUp, (await read.NextAsync()).Kind);

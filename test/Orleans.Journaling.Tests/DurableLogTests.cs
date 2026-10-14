@@ -112,7 +112,7 @@ public class DurableLogTests : JournalingTestBase
     });
 
     [Fact]
-    public Task SpeculativeRead_DeliversStagedEntriesThenWatermark() => RunOnActivationSchedulerAsync(async () =>
+    public Task StagedRead_DeliversStagedEntriesThenWatermark() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
         var log = CreateLog(sut.Manager);
@@ -120,7 +120,7 @@ public class DurableLogTests : JournalingTestBase
         log.Append("committed");
         await sut.Manager.WriteStateAsync(CancellationToken);
 
-        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Entry(0, "committed"), await read.NextAsync());
         Assert.Equal(CaughtUp(1), await read.NextAsync());
 
@@ -199,7 +199,7 @@ public class DurableLogTests : JournalingTestBase
     });
 
     [Fact]
-    public Task SpeculativeRead_ReportsStagedTrim() => RunOnActivationSchedulerAsync(async () =>
+    public Task StagedRead_ReportsStagedTrim() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
         var log = CreateLog(sut.Manager);
@@ -207,7 +207,7 @@ public class DurableLogTests : JournalingTestBase
         log.Append("a");
         await sut.Manager.WriteStateAsync(CancellationToken);
 
-        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Entry(0, "a"), await read.NextAsync());
         Assert.Equal(CaughtUp(1), await read.NextAsync());
 
@@ -227,7 +227,7 @@ public class DurableLogTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken);
 
         await using var committed = log.ReadAsync(0, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
-        await using var speculative = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var speculative = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Entry(0, "a"), await committed.NextAsync());
         Assert.Equal(Entry(1, "b"), await committed.NextAsync());
         Assert.Equal(CaughtUp(2), await committed.NextAsync());
@@ -296,7 +296,7 @@ public class DurableLogTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken);
         log.Append("staged");
 
-        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Entry(0, "a"), await read.NextAsync());
         Assert.Equal(CaughtUp(1), await read.NextAsync());
         Assert.Equal(Entry(1, "staged", DurableChangeStatus.Staged), await read.NextAsync());
@@ -317,7 +317,7 @@ public class DurableLogTests : JournalingTestBase
         await sut.Lifecycle.OnStart(CancellationToken);
 
         await using var committed = log.ReadAsync(0, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
-        await using var speculative = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var speculative = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(CaughtUp(0), await committed.NextAsync());
         Assert.Equal(CaughtUp(0), await speculative.NextAsync());
 
@@ -433,7 +433,7 @@ public class DurableLogTests : JournalingTestBase
         var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
 
-        await using var speculative = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var speculative = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await using var committed = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(CaughtUp(0), await speculative.NextAsync());
         Assert.Equal(CaughtUp(0), await committed.NextAsync());
@@ -470,7 +470,7 @@ public class DurableLogTests : JournalingTestBase
         var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
 
-        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(CaughtUp(0), await read.NextAsync());
         var failed = log.BeginDraft();
         failed.Write("partial");
@@ -530,7 +530,7 @@ public class DurableLogTests : JournalingTestBase
     });
 
     [Fact]
-    public Task SpeculativeRead_StartingMidDraft_ReceivesItemsSoFar() => RunOnActivationSchedulerAsync(async () =>
+    public Task DraftRead_StartingMidDraft_ReceivesItemsSoFar() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
         var log = CreateLog(sut.Manager);
@@ -542,7 +542,7 @@ public class DurableLogTests : JournalingTestBase
         draft.Write("a");
         draft.Write("b");
 
-        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Entry(0, "history"), await read.NextAsync());
         Assert.Equal(CaughtUp(1), await read.NextAsync());
         Assert.Equal(DraftItem(draft.Id, 0, "a"), await read.NextAsync());
@@ -572,7 +572,7 @@ public class DurableLogTests : JournalingTestBase
         var draft = log.BeginDraft();
         draft.Write("a");
 
-        await using (var first = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken))
+        await using (var first = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken))
         {
             Assert.Equal(CaughtUp(0), await first.NextAsync());
             Assert.Equal(DraftItem(draft.Id, 0, "a"), await first.NextAsync());
@@ -580,7 +580,7 @@ public class DurableLogTests : JournalingTestBase
 
         draft.Write("b");
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-        await using var reconnected = log.ReadAsync(0, DurableWatchMode.Speculative, draft.Id, cancellation.Token).GetAsyncEnumerator(CancellationToken);
+        await using var reconnected = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, draft.Id, cancellation.Token).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(CaughtUp(0), await reconnected.NextAsync());
         Assert.Equal(DraftItem(draft.Id, 0, "a"), await reconnected.NextAsync());
         Assert.Equal(DraftItem(draft.Id, 1, "b"), await reconnected.NextAsync());
@@ -601,7 +601,7 @@ public class DurableLogTests : JournalingTestBase
         draft.Commit("Hello");
         await sut.Manager.WriteStateAsync(CancellationToken);
 
-        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, draft.Id, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, draft.Id, CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Committed(draft.Id, 0, 1), await read.NextAsync());
         Assert.Equal(Entry(0, "Hello"), await read.NextAsync());
     });
@@ -650,7 +650,7 @@ public class DurableLogTests : JournalingTestBase
 
         async Task<LogEvent<string>> ResumeAsync(LogDraftId id)
         {
-            await using var read = log.ReadAsync(log.NextSequence, DurableWatchMode.Speculative, id, CancellationToken).GetAsyncEnumerator(CancellationToken);
+            await using var read = log.ReadAsync(log.NextSequence, DurableWatchMode.Staged | DurableWatchMode.Drafts, id, CancellationToken).GetAsyncEnumerator(CancellationToken);
             return await read.NextAsync();
         }
     });
@@ -662,7 +662,7 @@ public class DurableLogTests : JournalingTestBase
         var sut = CreateSystem(storage);
         var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
-        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(CaughtUp(0), await read.NextAsync());
 
         var draft = log.BeginDraft();
@@ -770,7 +770,7 @@ public class DurableLogTests : JournalingTestBase
         await recovered.Lifecycle.OnStart(CancellationToken);
         Assert.Equal(1, log.NextSequence);
 
-        await using var read = log.ReadAsync(committedCursor, DurableWatchMode.Speculative, draft.Id, CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(committedCursor, DurableWatchMode.Staged | DurableWatchMode.Drafts, draft.Id, CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(Abandoned(draft.Id, LogDraftAbandonReason.PreviousActivation), await read.NextAsync());
         Assert.Equal(CaughtUp(1), await read.NextAsync());
 
@@ -790,7 +790,7 @@ public class DurableLogTests : JournalingTestBase
         var sut = CreateSystem();
         var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
-        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Staged | DurableWatchMode.Drafts, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         Assert.Equal(CaughtUp(0), await read.NextAsync());
         var draft = log.BeginDraft();
         draft.Write("a");
