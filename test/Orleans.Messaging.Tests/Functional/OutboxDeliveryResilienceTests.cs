@@ -69,14 +69,10 @@ public sealed class OutboxDeliveryResilienceTests
     }
 
     [Fact]
-    public async Task Backpressured_RetriesBeyondEveryRetryAgeUntilTheReceiverTakesTheMessage()
+    public async Task Backpressured_RetriesBeyondTheRetryAgeUntilTheReceiverTakesTheMessage()
     {
         var retryAge = TimeSpan.FromMilliseconds(100);
-        await using var fixture = await StartAsync(Scripted, options =>
-        {
-            options.MaxOutboxRetryAge = retryAge;
-            options.MaxHandlerNotFoundRetryAge = retryAge;
-        });
+        await using var fixture = await StartAsync(Scripted, options => options.MaxOutboxRetryAge = retryAge);
         const int BackpressuredAttempts = 8;
         fixture.Strategy.Script(Enumerable.Repeat(Step.Answer(DeliveryResult.Backpressured()), BackpressuredAttempts).ToArray());
         var elapsed = Stopwatch.StartNew();
@@ -105,16 +101,16 @@ public sealed class OutboxDeliveryResilienceTests
     }
 
     [Fact]
-    public async Task AReceiverAnswer_RestartsTheUnansweredRetryAge()
+    public async Task Backpressured_RestartsTheRetryAge()
     {
-        // Each unanswered span stays within the retry age, while both spans together exceed it.
+        // Each failing span stays within the retry age, while both spans together exceed it.
         var timeout = TimeSpan.FromMilliseconds(1600);
         await using var fixture = await StartAsync(Scripted, static options =>
         {
             options.MaxOutboxRetryAge = TimeSpan.FromSeconds(3);
             options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(1);
         });
-        fixture.Strategy.Script(Step.Unanswered(timeout), Step.Answer(DeliveryResult.Backpressured()), Step.Unanswered(timeout));
+        fixture.Strategy.Script(Step.Unanswered(timeout), Step.Answer(DeliveryResult.Backpressured()), Step.Answer(DeliveryResult.HandlerNotFound(), timeout));
 
         var (sender, receiver) = await SendAsync(fixture, "answered-between-outages");
 
@@ -125,9 +121,9 @@ public sealed class OutboxDeliveryResilienceTests
     }
 
     [Fact]
-    public async Task HandlerNotFound_DeadLettersAfterMaxHandlerNotFoundRetryAge()
+    public async Task HandlerNotFound_DeadLettersAfterMaxOutboxRetryAge()
     {
-        await using var fixture = await StartAsync(Scripted, static options => options.MaxHandlerNotFoundRetryAge = TimeSpan.FromMilliseconds(100));
+        await using var fixture = await StartAsync(Scripted, static options => options.MaxOutboxRetryAge = TimeSpan.FromSeconds(3));
         fixture.Strategy.Repeat(Step.Answer(DeliveryResult.HandlerNotFound()));
 
         var (sender, receiver) = await SendAsync(fixture, "unhandled");
@@ -136,27 +132,6 @@ public sealed class OutboxDeliveryResilienceTests
         Assert.True(deadLetter.AttemptCount > 1);
         Assert.Equal(DeliveryResult.HandlerNotFound().Message, deadLetter.Reason);
         Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
-    }
-
-    [Fact]
-    public async Task AnotherReceiverAnswer_RestartsTheHandlerNotFoundRetryAge()
-    {
-        await using var fixture = await StartAsync(Scripted, static options =>
-        {
-            options.MaxHandlerNotFoundRetryAge = TimeSpan.FromMilliseconds(400);
-            options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(1);
-        });
-        fixture.Strategy.Script(
-            Step.Answer(DeliveryResult.HandlerNotFound()),
-            Step.Answer(DeliveryResult.Backpressured(), TimeSpan.FromMilliseconds(600)),
-            Step.Answer(DeliveryResult.HandlerNotFound()));
-
-        var (sender, receiver) = await SendAsync(fixture, "handler-registered");
-
-        var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.Equal("handler-registered", Assert.Single(delivered.Effects).Value);
-        Assert.Equal(4, fixture.Strategy.Executions);
-        Assert.Empty((await fixture.WaitForOutboxCountAsync(sender, 0)).OutboxDeadLetters);
     }
 
     private static ResiliencePipeline Scripted(ScriptedStrategy strategy) => new ResiliencePipelineBuilder()

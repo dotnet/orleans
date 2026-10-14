@@ -148,7 +148,7 @@ public sealed class MessagingCommandSerializationTests
             new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("enqueue"), State = new() },
             new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("scheduled", Now), State = new() },
             new() { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() },
-            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", UnansweredSince = Now, HandlerNotFoundSince = Now } },
+            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", RetryingSince = Now } },
             new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "dead"), DeadLetter = deadLetter },
             new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [MessageId.Create("orders", "dead")] },
             new()
@@ -158,8 +158,8 @@ public sealed class MessagingCommandSerializationTests
                 {
                     Messages =
                     [
-                        new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, UnansweredSince = Now } },
-                        new() { Reference = Reference("pending-reference"), State = new() { AttemptCount = 2, HandlerNotFoundSince = Now } }
+                        new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, RetryingSince = Now } },
+                        new() { Reference = Reference("pending-reference"), State = new() { AttemptCount = 2 } }
                     ],
                     DeadLetters = [deadLetter]
                 }
