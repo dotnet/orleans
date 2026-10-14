@@ -312,8 +312,6 @@ namespace Orleans.Messaging.Configuration
 {
     public partial class DurableMessagingOptions
     {
-        public System.TimeSpan BackpressureRetryDelay { get { throw null; } set { } }
-
         public System.TimeSpan DeadLetterRetentionPeriod { get { throw null; } set { } }
 
         public System.TimeSpan DeduplicationWindow { get { throw null; } set { } }
@@ -324,13 +322,15 @@ namespace Orleans.Messaging.Configuration
 
         public int MaxCapacity { get { throw null; } set { } }
 
-        public System.TimeSpan MaxOutboxRetryAge { get { throw null; } set { } }
-
         public int MaxProcessingAttempts { get { throw null; } set { } }
 
         public int MaxRetainedDeadLetters { get { throw null; } set { } }
 
         public int OutboxBatchSize { get { throw null; } set { } }
+
+        public System.TimeSpan OutboxRetryTimeout { get { throw null; } set { } }
+
+        public System.TimeSpan RetryInitialInterval { get { throw null; } set { } }
 
         public void Validate() { }
     }
