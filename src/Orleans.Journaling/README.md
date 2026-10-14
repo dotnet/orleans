@@ -240,7 +240,7 @@ the activation which opened them, so a reader reconnecting to a new activation r
 `PreviousActivation` and resumes from its position.
 
 A failed journal write faults watch streams; a stopped manager completes them without `Sealed`.
-`IJournaledStateManager.GetStateMachines()` enumerates registered state names and instances for
+`GetStateMachines()` on a grain's `StateManager` enumerates registered state names and instances for
 diagnostic tools, and `GetRetiredStateNames()` lists retired state which may require migration.
 
 To test code which uses durable state, host it in a grain on an `InProcessTestCluster` whose silos call `AddJournaling()`,
