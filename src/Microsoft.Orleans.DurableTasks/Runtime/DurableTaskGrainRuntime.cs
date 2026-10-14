@@ -50,7 +50,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// <para>
 /// An invoked task, which was scheduled as a request, owns an execution tree: the task and its descendants which are
 /// not invoked tasks themselves, such as local children, delays, completion decisions, detach markers, effect records,
-/// and remote-child stubs. Task identifiers are chosen by callers, so an invoked descendant keeps its own lifecycle.
+/// observations and observation subscriptions, and remote-child stubs. Task identifiers are chosen by callers, so an
+/// invoked descendant keeps its own lifecycle.
 /// Once an invoked task is terminal and no completion is pending, the runtime deletes its execution tree: in the write
 /// which retires its last completion as delivered, because that destination durably holds the result, or otherwise once
 /// <see cref="Orleans.Configuration.DurableTaskOptions.ResultRetentionPeriod"/> has elapsed since completion or since a
@@ -375,6 +376,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(DetachMarkerFingerprintPrefix, StringComparison.Ordinal) => "a detached task's start",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalSendFingerprintPrefix, StringComparison.Ordinal) => "a signal's send",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal) => "a signal's value",
+        { RequestFingerprint: { } fingerprint } when TryParseIdentity(ObservationFingerprintPrefix, fingerprint, out var target, out var observed) => DescribeObservation(target, observed),
+        { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(ObserverFingerprintPrefix, StringComparison.Ordinal) => "an observation's subscription",
         { RequestFingerprint: EffectFingerprint } => "a DurableTask.Once effect",
         { RequestFingerprint: { } fingerprint } => $"a request ({AbbreviateFingerprint(fingerprint)})",
         { CancellationRequestedAt: not null, CompletedAt: null } => "a cancellation which arrived before its request",
@@ -521,7 +524,9 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             // Every completed task's destination has a completion pending in the outbox: the completion is staged with
-            // the result, and the destination is removed when the outbox retires it.
+            // the result, and the destination is removed when the outbox retires it. Likewise, every subscription which
+            // another grain's observation recorded on a completed task has a pending completion, whose retirement
+            // removes the record.
             pending = [];
             var transport = MessageTransport;
             foreach (var (taskId, state) in _storage.Tasks)
@@ -532,6 +537,14 @@ internal sealed partial class DurableTaskGrainRuntime(
                     {
                         pending[transport.GetCompletionMessageId(GrainId, destination, taskId)] = new(taskId, destination);
                     }
+                }
+
+                if (TryGetObserver(taskId, state, out var observer)
+                    && _storage.TryGetTask(observer.TaskId, out var observed)
+                    && observed.CompletedAt.HasValue)
+                {
+                    Debug.Assert(observer.Destination != GrainId, "This grain's observations complete with the observed result.");
+                    pending[transport.GetObservationCompletionMessageId(GrainId, observer.Destination, observer.TaskId, observer.ObserverId)] = observer;
                 }
             }
 
@@ -554,17 +567,25 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         var found = _storage.TryGetTask(completion.TaskId, out var state);
         Debug.Assert(found && state!.Result is { IsCompleted: true }, "A pending completion retains its task's result.");
-        message = MessageTransport.CreateCompletionMessage(messageId, GrainId, completion.Destination, completion.TaskId, state!.Result!);
+        message = MessageTransport.CreateCompletionMessage(
+            messageId,
+            GrainId,
+            completion.Destination,
+            completion.TaskId,
+            state!.Result!,
+            completion.ObserverId);
         return true;
     }
 
     /// <summary>
-    /// Removes a retired completion's destination, deleting the task with its execution tree once its result has been
-    /// delivered to every destination.
+    /// Removes a retired completion's destination or observer record, deleting the task with its execution tree once its
+    /// result has been delivered to every destination and observation.
     /// </summary>
     /// <remarks>
     /// The outbox stages the completion's removal in the same journal write, so the deletion commits with the retirement.
-    /// A delivered destination durably holds the result, so the task needs no retention for it. A dead-lettered completion
+    /// A delivered destination durably holds the result, so the task needs no retention for it. A task without a grain
+    /// caller, such as a task which a client scheduled or detached, keeps its result for the retention period after its
+    /// observations' completions retire. A dead-lettered completion
     /// restarts the result's retention period, so a poller, or a caller which invokes the task again, can still observe
     /// it; the task is then deleted when that period ends. Retirement updates only the task's metadata, so it succeeds
     /// when the stored result no longer decodes; polling such a result surfaces the decoding error to the poller.
@@ -579,8 +600,17 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        Debug.Assert(IsInvoked(state), "Only invoked tasks have completion destinations.");
-        _storage.RemoveCompletionDestination(completion.TaskId, state, completion.Destination);
+        Debug.Assert(IsInvoked(state), "Only invoked tasks have completion destinations and observers.");
+        if (completion.ObserverId.IsDefault)
+        {
+            _storage.RemoveCompletionDestination(completion.TaskId, state, completion.Destination);
+        }
+        else
+        {
+            var recordRemoved = _storage.RemoveTask(GetObserverRecordId(completion.TaskId, completion.Destination, completion.ObserverId));
+            Debug.Assert(recordRemoved, "A pending observation completion retains its record.");
+        }
+
         if (retirement == OutboxMessageRetirement.DeadLettered)
         {
             // Retention starts now: the dead letter can follow a long retry period, and the result must remain
@@ -588,12 +618,12 @@ internal sealed partial class DurableTaskGrainRuntime(
             _storage.RetainResult(completion.TaskId, state);
         }
 
-        if (state.CompletionDestinations.Count > 0)
+        if (state.CompletionDestinations.Count > 0 || HasObservers(completion.TaskId))
         {
             return;
         }
 
-        if (state.RetainedSince.HasValue)
+        if (state.RetainedSince.HasValue || state.CallerId.IsDefault)
         {
             TrackExpiry(GetRetentionExpiry(state));
         }
@@ -603,7 +633,8 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
-    private readonly record struct PendingCompletion(TaskId TaskId, GrainId Destination);
+    /// <summary>A completion pending in the outbox: to a caller, or to the observation <see cref="ObserverId"/>.</summary>
+    private readonly record struct PendingCompletion(TaskId TaskId, GrainId Destination, TaskId ObserverId = default);
 
     private void StageCancellation(TaskId taskId, GrainId target, string? reason) =>
         MessageTransport.SendCancellation(GrainId, target, taskId, reason);
@@ -1429,6 +1460,11 @@ internal sealed partial class DurableTaskGrainRuntime(
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
+        if (durableTask is IDurableTaskObservation observation)
+        {
+            return await ScheduleObservationAsync(taskId, observation, suppressCancellation, cancellationToken);
+        }
+
         if (durableTask is ISchedulableTask schedulableTask and not IDurableTaskRequest)
         {
             return await ScheduleCustomChildAsync(
@@ -2024,9 +2060,23 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>
     /// Stores a task's terminal result. Without completion destinations, the result's retention period starts now.
     /// </summary>
-    private void StoreResult(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
+    /// <param name="observed">
+    /// Whether the result of an observation is the observed task's outcome. An observation which ends otherwise, such as
+    /// a canceled or aborted one, ends its subscription.
+    /// </param>
+    /// <remarks>An invoked task's result completes its subscribed observations in the same write.</remarks>
+    private void StoreResult(TaskId taskId, IDurableTaskState state, DurableTaskResponse response, bool observed = false)
     {
         _storage.SetResponse(taskId, state, response);
+        if (IsInvoked(state))
+        {
+            CompleteObservers(taskId, response);
+        }
+        else if (!observed && IsObservation(state))
+        {
+            Unsubscribe(taskId, state);
+        }
+
         if (state.CompletionDestinations.Count == 0)
         {
             TrackExpiry(GetRetentionExpiry(state));
@@ -2154,6 +2204,13 @@ internal sealed partial class DurableTaskGrainRuntime(
                 continue;
             }
 
+            if (IsInvoked(state) && HasObservers(taskId))
+            {
+                // Each subscribed observation's completion is pending; its retirement deletes the task or starts its
+                // retention.
+                continue;
+            }
+
             var expiry = state.CompletedAt.HasValue ? GetRetentionExpiry(state) : DateTimeOffset.MinValue;
             if (isCancellationRecord)
             {
@@ -2166,6 +2223,11 @@ internal sealed partial class DurableTaskGrainRuntime(
                 // A signal record without its task preceded the invocation, which arrives within the sender's retry timeout,
                 // or never.
                 expiry = GetEarlySignalExpiry(state);
+            }
+            else if (IsObserverRecord(state))
+            {
+                // Likewise, a subscription without its task preceded the invocation.
+                expiry = GetEarlyObserverExpiry(state);
             }
 
             if (expiry <= now)
@@ -2263,6 +2325,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private void DeleteTree(TaskId taskId, IDurableTaskState state)
     {
         Debug.Assert(state.CompletionDestinations.Count == 0, "A pending completion retains its task's result.");
+        Debug.Assert(!IsInvoked(state) || !HasObservers(taskId), "A subscribed observation retains its task's result.");
         List<GrainDurableTaskContext>? contexts = null;
         List<IScheduledTaskHandle>? handles = null;
         DeleteTreeCore(taskId, state, ref contexts, ref handles);
@@ -2297,6 +2360,16 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             StageCancellation(taskId, state.RemoteTarget, state.CancellationReason);
             _preStagedCancellations.TryRemove((taskId, state.RemoteTarget), out _);
+        }
+        else if (!terminal && IsObservation(state))
+        {
+            Unsubscribe(taskId, state);
+        }
+        else if (IsObserverRecord(state)
+            && !(_storage.TryGetTask(taskId.Parent(), out var observed) && HasStoredResult(observed)))
+        {
+            // The subscription preceded an invocation which didn't arrive.
+            DropObserver(taskId, state);
         }
 
         if (_executionContexts.TryRemove(taskId, out var context))
@@ -2424,6 +2497,11 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         static string? DescribeRequest(IDurableTaskState taskState)
         {
+            if (TryParseIdentity(ObservationFingerprintPrefix, taskState.RequestFingerprint, out var target, out var observed))
+            {
+                return DescribeObservation(target, observed);
+            }
+
             try
             {
                 return taskState.Request?.ToMethodCallString();
@@ -2773,8 +2851,9 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <remarks>
     /// An execution's recorded operations are its nearest stored descendants: descendants which are themselves executions,
-    /// such as local steps, hold their own operations. Signal values belong to the invoked task, which senders deliver
-    /// independently of its attempts; invoked descendants keep their own lifecycle; and a cancellation which arrived
+    /// such as local steps, hold their own operations. Signal values and observation subscriptions belong to the invoked
+    /// task, which other grains and executions record independently of its attempts; invoked descendants keep their own
+    /// lifecycle; and a cancellation which arrived
     /// before its request records no operation of this execution.
     /// </remarks>
     public HashSet<TaskId>? GetRecordedOperations(TaskId executionId)
@@ -2782,7 +2861,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         HashSet<TaskId>? operations = null;
         foreach (var (id, state) in _storage.GetChildren(executionId))
         {
-            if (!IsInvoked(state) && !IsSignalRecord(state) && !IsCancellationRecord(state))
+            if (!IsInvoked(state) && !IsSignalRecord(state) && !IsObserverRecord(state) && !IsCancellationRecord(state))
             {
                 (operations ??= []).Add(id);
             }
