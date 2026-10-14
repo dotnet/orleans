@@ -144,11 +144,13 @@ inputs under a generated operation identifier of that execution.
 
 `ScheduledTask.WhenAll` waits for scheduled tasks like `WhenAll`: it completes after every task is terminal, then throws
 the first failure in input order, or otherwise the first cancellation in input order. `ScheduledTask.WhenAny` returns the
-first task whose durable response arrives, including a
-failed or canceled response. It captures its candidates when called, preserving the selected
-task's identity when the caller subsequently reuses or changes the input collection. Caller
-cancellation and host wait failures are propagated. After selection, it cancels and drains the
-losing wait operations without canceling the durable tasks.
+first task to complete, including a failed or canceled task. Within a durable execution, the host selects it like
+`WhenAny`'s winner, from its durable completion order or from a selection which it records under `$winner` beneath a
+generated `$when-any-N` operation identifier, so every replay returns the same task. Outside a durable execution, it
+returns the first task whose durable response arrives. It captures its candidates when called, preserving the selected
+task's identity when the caller subsequently reuses or changes the input collection, and the returned task has observed
+its terminal response. Caller cancellation and host wait failures are propagated. Outside a durable execution, after
+selection, it cancels and drains the losing wait operations without canceling the durable tasks.
 
 ## Scheduled task handles
 
