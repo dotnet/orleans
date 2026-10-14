@@ -327,7 +327,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         var startedAt = TimeProvider.GetUtcNow();
         if (IsRetryExpired(entry.State, startedAt))
         {
-            return new(entry, message, null, $"The receiver did not answer delivery attempts within {Options.MaxOutboxRetryAge}.", TimeSpan.Zero, startedAt, true);
+            return new(entry, message, null, entry.State.LastError, TimeSpan.Zero, startedAt, true);
         }
         var start = Stopwatch.GetTimestamp();
         try
@@ -559,16 +559,10 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         var now = TimeProvider.GetUtcNow();
         var attemptCount = outcome.Expired ? previous.AttemptCount : checked(previous.AttemptCount + 1);
 
-        // A receiver checks its deduplication records before it answers, so an answer proves that no earlier attempt was
-        // accepted. Only attempts since the receiver last answered can have been accepted, which bounds their retry by
+        // A receiver checks its deduplication records before it answers, so a Backpressured answer proves that no earlier
+        // attempt was accepted. Only attempts since then can have been accepted, which bounds their retry by
         // MaxOutboxRetryAge, within the receiver's deduplication window.
-        var unansweredSince = outcome.Result is null ? previous.UnansweredSince ?? outcome.StartedAt : (DateTimeOffset?)null;
-        var handlerNotFoundSince = status switch
-        {
-            null => previous.HandlerNotFoundSince,
-            DeliveryStatus.HandlerNotFound => previous.HandlerNotFoundSince ?? outcome.StartedAt,
-            _ => null
-        };
+        var retryingSince = status is DeliveryStatus.Backpressured ? (DateTimeOffset?)null : previous.RetryingSince ?? outcome.StartedAt;
         var error = outcome.Error ?? status switch
         {
             DeliveryStatus.Backpressured => "The receiver is backpressured.",
@@ -577,8 +571,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         };
         if (outcome.Expired
             || status is not (null or DeliveryStatus.Backpressured or DeliveryStatus.HandlerNotFound)
-            || status is DeliveryStatus.HandlerNotFound && MessagingTime.IsExpired(now, handlerNotFoundSince!.Value, Options.MaxHandlerNotFoundRetryAge)
-            || unansweredSince is { } since && MessagingTime.IsExpired(now, since, Options.MaxOutboxRetryAge))
+            || retryingSince is { } since && MessagingTime.IsExpired(now, since, Options.MaxOutboxRetryAge))
         {
             var letter = new OutboxDeadLetter
             {
@@ -597,8 +590,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         {
             AttemptCount = attemptCount,
             LastError = error,
-            UnansweredSince = unansweredSince,
-            HandlerNotFoundSince = handlerNotFoundSince,
+            RetryingSince = retryingSince,
             NextAttemptAt = MessagingTime.AddClamped(now, TimeSpan.FromTicks(Options.BackpressureRetryDelay.Ticks * (1L << exponent)))
         }, null);
     }
@@ -648,7 +640,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     }
 
     private bool IsRetryExpired(OutboxMessageState state, DateTimeOffset now) =>
-        state.UnansweredSince is { } since && MessagingTime.IsExpired(now, since, Options.MaxOutboxRetryAge);
+        state.RetryingSince is { } since && MessagingTime.IsExpired(now, since, Options.MaxOutboxRetryAge);
 
     private bool IsReadyForAttempt(OutboxMessageState state, DateTimeOffset now) =>
         IsRetryExpired(state, now) || state.NextAttemptAt is null || state.NextAttemptAt <= now;
@@ -656,7 +648,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private DateTimeOffset GetNextAttemptAt(OutboxMessageState state, DateTimeOffset now)
     {
         var retryAt = state.NextAttemptAt ?? now;
-        var expiresAt = state.UnansweredSince is { } since ? MessagingTime.AddClamped(since, Options.MaxOutboxRetryAge) : retryAt;
+        var expiresAt = state.RetryingSince is { } since ? MessagingTime.AddClamped(since, Options.MaxOutboxRetryAge) : retryAt;
         return retryAt <= expiresAt ? retryAt : expiresAt;
     }
 
