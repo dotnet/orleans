@@ -295,15 +295,19 @@ public sealed class DurableTaskSignalTests
         await harness.ScheduleAsync(WorkflowId, async () => await Approved.WaitAsync());
         await harness.WaitForSignalWaitsAsync(1);
 
-        Assert.True(handler.TryAccept(SignalMessage(sender, WorkflowId, "ada")));
+        Assert.True(handler.TryAccept(SignalMessage(sender, WorkflowId, "ada"), out _));
         Assert.Equal(DurableTaskStatus.Pending, await harness.PollAsync(WorkflowId));
         await harness.Manager.WriteStateAsync(TestCancellation);
         Assert.Equal("ada", await harness.GetResultAsync<string>(WorkflowId));
 
-        // A duplicate is accepted; conflicting values and unknown tasks throw, so the inbox dead-letters them.
-        Assert.True(handler.TryAccept(SignalMessage(sender, WorkflowId, "ada")));
-        Assert.Throws<InvalidOperationException>(() => handler.TryAccept(SignalMessage(sender, WorkflowId, "grace")));
-        Assert.Throws<DurableTaskNotFoundException>(() => handler.TryAccept(SignalMessage(sender, TaskId.CreateRoot("missing"), "ada")));
+        // A duplicate is accepted; the sink dead-letters a conflicting value and a signal for an unknown task with the
+        // rejection as the reason.
+        Assert.True(handler.TryAccept(SignalMessage(sender, WorkflowId, "ada"), out var duplicate));
+        Assert.IsType<DeliveryResult.Accepted>(duplicate.Value);
+        Assert.True(handler.TryAccept(SignalMessage(sender, WorkflowId, "grace"), out var conflict));
+        Assert.False(string.IsNullOrEmpty(Assert.IsType<DeliveryResult.DeadLettered>(conflict.Value).Reason));
+        Assert.True(handler.TryAccept(SignalMessage(sender, TaskId.CreateRoot("missing"), "ada"), out var unknown));
+        Assert.Contains("missing", Assert.IsType<DeliveryResult.DeadLettered>(unknown.Value).Reason, StringComparison.Ordinal);
         Assert.Equal("ada", harness.Storage.Get(RecordId).Result!.GetResult<string>());
 
         InboxMessage SignalMessage(GrainId from, TaskId taskId, string value) =>
@@ -370,7 +374,7 @@ public sealed class DurableTaskSignalTests
 
         var message = Assert.Single(outbox.Messages);
         Assert.Equal((first, target, DurableTaskMessageTypes.SignalSubject), (message.Envelope.MessageId, message.ReceiverId, message.Envelope.Subject));
-        var body = MessagingTestHelpers.MessageTypes.Signal.Decode(message);
+        var body = MessagingTestHelpers.MessageTypes.Signal.Decode(message.Envelope);
         Assert.Equal((WorkflowId, "approved", "ada", sender), (body.TaskId, body.Name, body.Value.GetResult<string>(), body.Sender));
         Assert.Equal(first, DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved", "$signal:AA"));
         Assert.NotEqual(first, DurableTaskMessageTransport.CreateSignalMessageId(sender, target, WorkflowId, "approved", "$signal:BB"));

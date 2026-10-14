@@ -429,8 +429,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.NotEqual(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
         Assert.Equal(messages[1].Envelope.MessageId, messages[2].Envelope.MessageId);
         Assert.All(messages, static message => Assert.Equal(DurableTaskMessageTypes.CancellationSubject, message.Envelope.Subject));
-        Assert.Null(MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[0]).AbortReason);
-        var abort = MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[1]);
+        Assert.Null(MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[0].Envelope).AbortReason);
+        var abort = MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[1].Envelope);
         Assert.Equal((taskId, sender, "operator"), (abort.TaskId, abort.Sender, abort.AbortReason));
     }
 
