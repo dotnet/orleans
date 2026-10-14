@@ -133,29 +133,6 @@
     <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
     <PackageVersion Update="System.Text.Json" Version="10.0.5" />
   </ItemGroup>
-  <!-- Microsoft.Garnet depends on Microsoft.Extensions 10.x on every target framework. -->
-  <ItemGroup Condition=" '$(TargetFramework)' == 'net8.0' and $(MSBuildProjectName.StartsWith('Orleans.Journaling.Garnet')) ">
-    <PackageVersion Update="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Configuration.Binder" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Configuration.Json" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Configuration" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.DependencyModel" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Hosting" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Http" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Logging" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.ObjectPool" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.5" />
-    <PackageVersion Update="Microsoft.Extensions.Options" Version="10.0.5" />
-    <PackageVersion Update="System.Collections.Immutable" Version="10.0.0" />
-    <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
-    <PackageVersion Update="System.Text.Json" Version="10.0.5" />
-  </ItemGroup>
   <!-- Updates for later TFMs -->
   <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' ">
     <PackageVersion Update="Aspire.Azure.Data.Tables" Version="13.2.4" />

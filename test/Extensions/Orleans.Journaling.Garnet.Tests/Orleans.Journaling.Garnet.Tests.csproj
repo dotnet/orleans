@@ -4,8 +4,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <TargetFrameworks>net10.0</TargetFrameworks>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <!-- Solution-wide test runs for other frameworks skip this net10.0-only project. -->
+  <PropertyGroup Condition="'$(TargetFramework)' != '' and '$(TargetFramework)' != 'net10.0'">
+    <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
   </PropertyGroup>
 
   <ItemGroup>
