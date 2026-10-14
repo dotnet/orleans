@@ -19,7 +19,7 @@ An `async` method, local function, lambda, or anonymous method returns `Orleans.
 
 ## Behavior
 
-The durable task method builder defers the method body. The durable task host runs the body as a durable step under replay control and records its result, so a body which completes without awaiting is a normal step, for example a state transition whose result the parent workflow records. For the execution model, see [Durable tasks](../grains/durable-tasks.md#local-steps-and-calls-to-other-grains).
+The durable task method builder defers the method body. The durable task host runs the body as a durable step under replay control and records its result, so a body which completes without awaiting is a normal step, for example a state transition whose result the parent workflow records. For the execution model, see [Durable tasks](../grains/durable-tasks.md#recorded-effects-local-steps-and-calls-to-other-grains).
 
 The `Microsoft.Orleans.DurableTasks.Abstractions` package carries the suppressor with the other durable task analyzers, so it applies to every project which references the package. The suppressor matches the return type by its fully qualified metadata name. CS1998 remains reported for other task-like return types, including `Task`, `ValueTask`, and types named `DurableTask` in other namespaces.
 
