@@ -82,7 +82,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>The journal state machine name of the runtime's commit hook.</summary>
     internal const string StateMachineName = "orleans.durable-tasks.runtime";
 
-    private readonly ConcurrentDictionary<TaskId, GrainDurableExecutionContext> _executionContexts = [];
+    private readonly ConcurrentDictionary<TaskId, GrainDurableTaskContext> _executionContexts = [];
     private readonly ConcurrentDictionary<TaskId, RunningRequest> _runningRequests = [];
     private readonly ConcurrentDictionary<TaskId, IScheduledTaskHandle> _taskHandles = [];
     private readonly ConcurrentDictionary<TaskId, byte> _pendingStarts = [];
@@ -396,10 +396,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <returns>The new execution context.</returns>
     /// <remarks>
     /// A body which starts, or replays, after cancellation of its task was requested observes the request from the start:
-    /// its durable token is canceled, <see cref="DurableExecutionContext.IsCancellationRequested"/> is set, and
-    /// <see cref="DurableExecutionContext.CancellationReason"/> reports the recorded reason.
+    /// its durable token is canceled, <see cref="DurableTaskContext.IsCancellationRequested"/> is set, and
+    /// <see cref="DurableTaskContext.CancellationReason"/> reports the recorded reason.
     /// </remarks>
-    private GrainDurableExecutionContext CreateExecutionContext(TaskId taskId)
+    private GrainDurableTaskContext CreateExecutionContext(TaskId taskId)
     {
         var utcNow = GetOrCreateLogicalTime(taskId);
 
@@ -436,7 +436,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <param name="taskId">The task to get an execution context from.</param>
     /// <param name="executionContext">The execution context.</param>
     /// <returns><see langword="true"/> if the execution context was found, <see langword="false"/> otherwise.</returns>
-    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out GrainDurableExecutionContext? executionContext) => _executionContexts.TryGetValue(taskId, out executionContext);
+    private bool TryGetExecutionContext(TaskId taskId, [NotNullWhen(true)] out GrainDurableTaskContext? executionContext) => _executionContexts.TryGetValue(taskId, out executionContext);
 
     private TaskHandle GetOrCreateRunningTaskHandle(TaskId taskId, GrainId remoteTarget = default)
     {
@@ -1728,7 +1728,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         TaskId taskId,
         Func<TState, DurableTask> createTask,
         TState state,
-        GrainDurableExecutionContext context)
+        GrainDurableTaskContext context)
     {
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var invocation = Invoke(createTask, state, context, start.Task);
@@ -1746,7 +1746,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private async Task Invoke<TState>(
         Func<TState, DurableTask> createTask,
         TState state,
-        GrainDurableExecutionContext context,
+        GrainDurableTaskContext context,
         Task start)
     {
         await start;
@@ -1769,7 +1769,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         // flight, cancels only the attempt's token. The attempt then terminalizes the task, so a pending operation
         // which it returns, such as a delay, does not outlive the cancellation.
         if (!response.IsCompleted
-            && _storage.TryGetTask(context.TaskId, out var taskState)
+            && _storage.TryGetTask(context.Id, out var taskState)
             && taskState.CancellationRequestedAt.HasValue)
         {
             response = DurableTaskResponse.Canceled;
@@ -1779,12 +1779,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             if (response.IsCompleted && !_stopping && !IsDiscarded(context))
             {
-                await SetResponseAsync(context.TaskId, response, CancellationToken.None);
+                await SetResponseAsync(context.Id, response, CancellationToken.None);
             }
         }
         catch (Exception exception)
         {
-            _shared.Logger.LogWarning(exception, "{Id} error committing the response of durable task '{TaskId}'.", GrainId, context.TaskId);
+            _shared.Logger.LogWarning(exception, "{Id} error committing the response of durable task '{TaskId}'.", GrainId, context.Id);
 
             // A preparation failure retains the staged response, so a later write commits it and completes the handle.
             if (exception is JournaledStatePreCommitException && !_stopping)
@@ -1795,27 +1795,27 @@ internal sealed partial class DurableTaskGrainRuntime(
         finally
         {
             context.OnAttemptCompleted();
-            if (_runningRequests.TryGetValue(context.TaskId, out var running)
+            if (_runningRequests.TryGetValue(context.Id, out var running)
                 && ReferenceEquals(running.Context, context))
             {
                 ((ICollection<KeyValuePair<TaskId, RunningRequest>>)_runningRequests)
-                    .Remove(new(context.TaskId, running));
-                ((ICollection<KeyValuePair<TaskId, GrainDurableExecutionContext>>)_executionContexts)
-                    .Remove(new(context.TaskId, context));
+                    .Remove(new(context.Id, running));
+                ((ICollection<KeyValuePair<TaskId, GrainDurableTaskContext>>)_executionContexts)
+                    .Remove(new(context.Id, context));
             }
         }
     }
 
     private sealed record RunningRequest(
         Task Task,
-        GrainDurableExecutionContext Context);
+        GrainDurableTaskContext Context);
 
     /// <summary>
     /// Returns whether an attempt's task was deleted with its execution tree, which unregisters the attempt's context,
     /// so the attempt's result is discarded.
     /// </summary>
-    private bool IsDiscarded(GrainDurableExecutionContext context) =>
-        !_executionContexts.TryGetValue(context.TaskId, out var registered) || !ReferenceEquals(registered, context);
+    private bool IsDiscarded(GrainDurableTaskContext context) =>
+        !_executionContexts.TryGetValue(context.Id, out var registered) || !ReferenceEquals(registered, context);
 
     /// <summary>
     /// The cancellation which a committed write propagates: durable cancellation, carrying
@@ -1823,7 +1823,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <see cref="AbortReason"/>, the attempts' host abort and the children's abort.
     /// </summary>
     private sealed record CancellationPropagation(
-        List<GrainDurableExecutionContext> Contexts,
+        List<GrainDurableTaskContext> Contexts,
         List<IScheduledTaskHandle> Handles,
         string? AbortReason = null,
         string? CancellationReason = null);
@@ -2143,7 +2143,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private void DeleteTree(TaskId taskId, IDurableTaskState state)
     {
         Debug.Assert(state.CompletionDestinations.Count == 0, "A pending completion retains its task's result.");
-        List<GrainDurableExecutionContext>? contexts = null;
+        List<GrainDurableTaskContext>? contexts = null;
         List<IScheduledTaskHandle>? handles = null;
         DeleteTreeCore(taskId, state, ref contexts, ref handles);
         if (contexts is not null || handles is not null)
@@ -2156,7 +2156,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private void DeleteTreeCore(
         TaskId taskId,
         IDurableTaskState state,
-        ref List<GrainDurableExecutionContext>? contexts,
+        ref List<GrainDurableTaskContext>? contexts,
         ref List<IScheduledTaskHandle>? handles)
     {
         foreach (var (childId, child) in _storage.GetChildren(taskId).ToList())
@@ -2366,7 +2366,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// Each task which the request newly reaches records <paramref name="reason"/>, so every execution and handle which
     /// the request collects is canceled carrying that reason.
     /// </remarks>
-    private (bool Changed, List<GrainDurableExecutionContext> Contexts, List<IScheduledTaskHandle> Handles) StageCancellationTree(
+    private (bool Changed, List<GrainDurableTaskContext> Contexts, List<IScheduledTaskHandle> Handles) StageCancellationTree(
         TaskId taskId,
         GrainId callerId,
         string? reason)
@@ -2389,7 +2389,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         ValidateCaller(taskId, taskState, callerId);
         StageCaller(taskId, taskState, callerId);
-        List<GrainDurableExecutionContext> canceledContexts = [];
+        List<GrainDurableTaskContext> canceledContexts = [];
         List<IScheduledTaskHandle> canceledHandles = [];
         var changed = RequestCancellationCore(taskId, taskState, canceledContexts, canceledHandles);
         return (changed, canceledContexts, canceledHandles);
@@ -2397,7 +2397,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         bool RequestCancellationCore(
             TaskId currentTaskId,
             IDurableTaskState currentTaskState,
-            List<GrainDurableExecutionContext> contexts,
+            List<GrainDurableTaskContext> contexts,
             List<IScheduledTaskHandle> handles)
         {
             if (currentTaskState.CompletedAt.HasValue)
@@ -2450,7 +2450,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     private static async Task PropagateCancellationAsync(
-        List<GrainDurableExecutionContext> canceledContexts,
+        List<GrainDurableTaskContext> canceledContexts,
         List<IScheduledTaskHandle> canceledHandles,
         string? reason,
         CancellationToken cancellationToken)
@@ -2529,7 +2529,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         // Every task in the tree records the same failure, so one response serves them all.
         var response = DurableTaskResponse.FromException(new DurableTaskAbortedException(reason));
-        List<GrainDurableExecutionContext>? contexts = null;
+        List<GrainDurableTaskContext>? contexts = null;
         List<IScheduledTaskHandle>? handles = null;
         AbortTreeCore(taskId, state, reason, response, ref contexts, ref handles);
         if (contexts is not null || handles is not null)
@@ -2546,7 +2546,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         IDurableTaskState state,
         string reason,
         DurableTaskResponse response,
-        ref List<GrainDurableExecutionContext>? contexts,
+        ref List<GrainDurableTaskContext>? contexts,
         ref List<IScheduledTaskHandle>? handles)
     {
         foreach (var (childId, child) in _storage.GetChildren(taskId).ToList())

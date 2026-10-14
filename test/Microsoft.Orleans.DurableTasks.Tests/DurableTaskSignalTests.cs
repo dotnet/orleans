@@ -203,7 +203,7 @@ public sealed partial class DurableTaskSignalTests
         await harness.ScheduleAsync(WorkflowId, async () =>
         {
             await Approved.WaitAsync();
-            return DurableExecutionContext.Current!.UtcNow.ToString("O");
+            return DurableTask.Current.UtcNow.ToString("O");
         });
         await harness.WaitForSignalWaitsAsync(1);
 
@@ -226,7 +226,7 @@ public sealed partial class DurableTaskSignalTests
             if (observed.Count == 1)
             {
                 firstAttemptWaiting.TrySetResult();
-                await Task.Delay(Timeout.InfiniteTimeSpan, DurableExecutionContext.Current!.CancellationToken);
+                await Task.Delay(Timeout.InfiniteTimeSpan, DurableTask.Current.CancellationToken);
             }
 
             return value;
