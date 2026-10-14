@@ -5,12 +5,14 @@ namespace Orleans.DurableTasks.Abstractions.Tests;
 
 public partial class DurableSignalTests
 {
+    private const string RaceLostReason = "Another task won the race.";
+    private static readonly TaskId SignalSlot = TaskId.Parse("workflow/$race-1/0");
+    private static readonly TaskId DeadlineSlot = TaskId.Parse("workflow/$race-1/1");
+
     [Fact]
-    public async Task TryWaitReturnsTheSignalWhenItWinsTheRaceWithTheDeadline()
+    public async Task TryWaitReturnsTheSignalAndCancelsTheDeadlineWhenTheSignalWins()
     {
         var host = new SignalHost();
-        var delay = new TaskCompletionSource<DurableTaskResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
-        host.Delay = (_, _) => new(delay.Task);
         var running = DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(async _ => await Approved.TryWaitAsync(Deadline)),
             new SignalContext(host, TaskId.CreateRoot("workflow"))).AsTask();
@@ -21,18 +23,20 @@ public partial class DurableSignalTests
         Assert.Equal((true, new Approval("ada")), (await running).GetResult<(bool, Approval)>());
         Assert.Equal(Deadline, host.LastDueTime);
 
-        // The race schedules the wait and the deadline in indexed slots, and reads the winner's recorded result.
+        // The race schedules the wait and the deadline in indexed slots, and completes once the deadline's delay, which
+        // lost, has ended canceled.
         Assert.Equal(
-            [(TaskId.Parse("workflow/$when-any-1/0"), "approved")],
+            [(SignalSlot, "approved")],
             host.Waits.Select(static wait => (wait.ExecutionId, wait.Name)));
-        Assert.Equal(
-            [TaskId.Parse("workflow/$when-any-1/0"), TaskId.Parse("workflow/$when-any-1/1")],
-            host.Children.OrderBy(static id => id.ToString(), StringComparer.Ordinal));
-        delay.SetResult(DurableTaskResponse.Completed);
+        Assert.Equal([SignalSlot, DeadlineSlot], host.Children.OrderBy(static id => id.ToString(), StringComparer.Ordinal));
+        var deadline = host.GetChild(DeadlineSlot);
+        Assert.Equal(DurableTaskStatus.Canceled, deadline.Status);
+        Assert.Equal(RaceLostReason, deadline.CancellationReason);
+        Assert.Null(host.GetChild(SignalSlot).CancellationReason);
     }
 
     [Fact]
-    public async Task TryWaitReturnsNoValueWhenTheDeadlineWins()
+    public async Task TryWaitReturnsNoValueAndCancelsTheWaitWhenTheDeadlineWins()
     {
         var host = new SignalHost { Delay = static (_, _) => new(DurableTaskResponse.Completed) };
 
@@ -42,6 +46,12 @@ public partial class DurableSignalTests
 
         Assert.Equal((false, (Approval?)null), response.GetResult<(bool, Approval)>());
         Assert.Equal(Deadline, host.LastDueTime);
+
+        // The race completes once the wait, which lost, has ended canceled.
+        var wait = host.GetChild(SignalSlot);
+        Assert.Equal(DurableTaskStatus.Canceled, wait.Status);
+        Assert.Equal(RaceLostReason, wait.CancellationReason);
+        Assert.Null(host.GetChild(DeadlineSlot).CancellationReason);
     }
 
     [Fact]
@@ -60,7 +70,7 @@ public partial class DurableSignalTests
     }
 
     [Fact]
-    public async Task TryWaitPropagatesACanceledDeadline()
+    public async Task TryWaitPropagatesACanceledDeadlineOnceTheWaitHasEnded()
     {
         var host = new SignalHost { Delay = static (_, _) => new(DurableTaskResponse.Canceled) };
 
@@ -69,6 +79,7 @@ public partial class DurableSignalTests
             new SignalContext(host, TaskId.CreateRoot("workflow")));
 
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+        Assert.Equal(DurableTaskStatus.Canceled, host.GetChild(SignalSlot).Status);
     }
 
     [Fact]
