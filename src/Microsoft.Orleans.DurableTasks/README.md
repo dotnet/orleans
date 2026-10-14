@@ -122,7 +122,7 @@ await tasks.SignalAsync(workflowId, Shipped, shipment);
 - A sender can commit an invocation and a signal for it in one write, and the outbox delivers
   them independently, so a signal message can arrive first. The inbox records a signal message
   for a task which the grain doesn't hold yet, and the invocation finds the value when it
-  arrives. When no invocation arrives within Messaging's `MaxOutboxRetryAge`, after which it no
+  arrives. When no invocation arrives within Messaging's `OutboxRetryTimeout`, after which it no
   longer can, the grain deletes the value and logs a warning.
 - In a durable task, the send and a marker in the execution's tree commit in one journal write,
   like `DetachAsync`, so a replay which reaches the marker doesn't send it again. A signal to
@@ -217,7 +217,7 @@ framework assets; its first published version establishes the compatibility base
   Completions and delay resumes which arrive for deleted tasks are ignored. A
   cancellation which arrives before its invocation is recorded, so the invocation
   terminalizes as canceled when it arrives; the record is deleted once Messaging's
-  `MaxOutboxRetryAge` has elapsed, after which the invocation can no longer arrive.
+  `OutboxRetryTimeout` has elapsed, after which the invocation can no longer arrive.
 - A completion whose stored result no longer decodes, for example after a later
   deployment removes the result type, can't be materialized. The outbox
   dead-letters that completion, recording the decoding error as the reason, and the

@@ -2313,7 +2313,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         storage.SetResponse(childId, storage.GetOrCreate(childId), DurableTaskResponse.Completed);
         var completion = Assert.Single(transport.Completions);
 
-        // The outbox dead-letters the completion after MaxOutboxRetryAge, which exceeds the retention period.
+        // The outbox dead-letters the completion after OutboxRetryTimeout, which exceeds the retention period.
         clock.Advance(TimeSpan.FromDays(1));
         ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.DeadLettered);
         Assert.Equal(clock.GetUtcNow(), storage.Get(taskId).RetainedSince);
@@ -2498,14 +2498,14 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
-    public Task LateCancellationRecordIsDeletedOnceTheOutboxRetryAgeEnds() => ActivationScheduler.RunAsync(async () =>
+    public Task LateCancellationRecordIsDeletedOnceTheOutboxRetryTimeoutEnds() => ActivationScheduler.RunAsync(async () =>
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
         var retryAge = TimeSpan.FromHours(2);
         var (runtime, storage, manager, _) = CreateRuntime(
             TimeSpan.FromHours(1),
             timeProvider: clock,
-            maxOutboxRetryAge: retryAge);
+            outboxRetryTimeout: retryAge);
         var taskId = TaskId.Parse("root");
         var caller = GrainId.Create("caller", "one");
 
@@ -3443,7 +3443,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
             TimeProvider? timeProvider = null,
-            TimeSpan? maxOutboxRetryAge = null)
+            TimeSpan? outboxRetryTimeout = null)
     {
         var manager = new TestStateManager();
         var storage = new TestStorage(manager, timeProvider);
@@ -3453,7 +3453,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             resultRetentionPeriod,
             initialize,
             timeProvider,
-            maxOutboxRetryAge);
+            outboxRetryTimeout);
     }
 
     /// <summary>
@@ -3470,7 +3470,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             TimeSpan? resultRetentionPeriod = null,
             bool initialize = true,
             TimeProvider? timeProvider = null,
-            TimeSpan? maxOutboxRetryAge = null)
+            TimeSpan? outboxRetryTimeout = null)
     {
         var context = Substitute.For<IGrainContext>();
         context.GrainId.Returns(GrainId.Create("test", "one"));
@@ -3486,7 +3486,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             }),
             Options.Create(new DurableMessagingOptions
             {
-                MaxOutboxRetryAge = maxOutboxRetryAge ?? TimeSpan.FromDays(1),
+                OutboxRetryTimeout = outboxRetryTimeout ?? TimeSpan.FromDays(1),
             }),
             CreateSerializer());
         var transport = new RecordingDurableTaskMessageTransport();
