@@ -34,7 +34,7 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
 
             // One delivery attempt fails in the first callee activation; the retry falls due only when the test
             // advances the Durable Jobs clock.
-            silo.Services.Configure<DurableMessagingOptions>(options => options.BackpressureRetryDelay = RetryDelay);
+            silo.Services.Configure<DurableMessagingOptions>(options => options.RetryInitialInterval = RetryDelay);
         });
     }
 

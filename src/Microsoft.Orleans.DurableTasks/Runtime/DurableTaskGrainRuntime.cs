@@ -58,7 +58,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// execution, is deleted on the same retention schedule. Deleting a tree cancels its non-terminal tasks: it stages a
 /// cancellation to each pending remote child and signals each running execution, whose result is then discarded.
 /// Completions and resumes which arrive for a deleted task are ignored. A cancellation which arrives before its
-/// invocation is recorded until <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.MaxOutboxRetryAge"/>
+/// invocation is recorded until <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxRetryTimeout"/>
 /// has elapsed, after which the invocation can no longer arrive, and so is a signal which arrives before its invocation.
 /// </para>
 /// <para>
@@ -2037,13 +2037,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             var expiry = state.CompletedAt.HasValue ? GetRetentionExpiry(state) : DateTimeOffset.MinValue;
             if (isCancellationRecord)
             {
-                // The invocation which the cancellation precedes is delivered within the sender's retry age, or never.
-                var recordExpiry = AddSaturating(state.CreatedAt, _shared.MaxOutboxRetryAge);
+                // The invocation which the cancellation precedes is delivered within the sender's retry timeout, or never.
+                var recordExpiry = AddSaturating(state.CreatedAt, _shared.OutboxRetryTimeout);
                 expiry = recordExpiry > expiry ? recordExpiry : expiry;
             }
             else if (IsSignalRecord(state))
             {
-                // A signal record without its task preceded the invocation, which arrives within the sender's retry age,
+                // A signal record without its task preceded the invocation, which arrives within the sender's retry timeout,
                 // or never.
                 expiry = GetEarlySignalExpiry(state);
             }
@@ -2053,7 +2053,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 if (IsSignalRecord(state))
                 {
                     _shared.Logger.LogWarning(
-                        "{Id} discarding a signal for durable task '{TaskId}', whose invocation didn't arrive within the sender's retry age.",
+                        "{Id} discarding a signal for durable task '{TaskId}', whose invocation didn't arrive within the sender's retry timeout.",
                         GrainId,
                         taskId.Parent());
                 }
@@ -2383,7 +2383,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             taskState = _storage.GetOrCreateTask(taskId, request: null);
             StageCaller(taskId, taskState, callerId);
             _storage.RequestCancellation(taskId, taskState, reason);
-            TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.MaxOutboxRetryAge));
+            TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.OutboxRetryTimeout));
             return (true, [], []);
         }
 
