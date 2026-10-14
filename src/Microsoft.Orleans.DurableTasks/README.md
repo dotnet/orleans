@@ -73,7 +73,8 @@ await buyer.RecordOrderAsync(summary).DetachAsync($"order-{orderId:N}-v{summary.
 
 - In a durable task, the call and a marker in the execution's tree commit in one journal
   write. A replay which reaches the marker doesn't send the call again, and the marker is
-  deleted with the tree.
+  deleted with the tree. `DetachedTaskId.For(segment)` derives the root ID from the durable
+  task's ID, so the target retains the detached task under `{taskId}:{segment}`.
 - In an ordinary method of a durable grain, the call is staged with the grain's pending
   state changes, and `DetachAsync` completes once the journal write which commits them
   completes.
@@ -121,7 +122,8 @@ await tasks.SignalAsync(TaskId.CreateRoot(workflowId), Shipped, shipment);
   completes once the task durably holds the value. A grain signals its own tasks through
   `IDurableTaskManager.SignalAsync`, which commits with the grain's pending state changes.
 - A wait advances its execution's logical time to when the signal was recorded. A deadline is
-  a `WhenAny` race between the wait and `DurableTask.DelayUntil`.
+  `TryWaitAsync(deadline)`, a `WhenAny` race between the wait and `DurableTask.DelayUntil`, whose
+  indexed slots and winner record belong to the waiting execution's tree.
 
 Repository consumers which need a preview package can opt this project into
 packing with `-p:PackDurableTaskAdapter=true`. The project keeps package
