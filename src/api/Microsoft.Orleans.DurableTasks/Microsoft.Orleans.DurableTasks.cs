@@ -51,6 +51,10 @@ namespace Orleans.DurableTasks
     {
         public static ScheduledTask<TResult> GetDurableTask<TResult>(this Orleans.Runtime.IAddressable target, string rootId) { throw null; }
 
+        public static DurableTask<TResult> ObserveDurableTask<TResult>(this Orleans.Runtime.IAddressable target, TaskId taskId) { throw null; }
+
+        public static DurableTask<TResult> ObserveDurableTask<TResult>(this Orleans.Runtime.IAddressable target, string rootId) { throw null; }
+
         public static System.Threading.Tasks.ValueTask SignalDurableTaskAsync<T>(this Orleans.Runtime.IAddressable target, TaskId taskId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public static System.Threading.Tasks.ValueTask SignalDurableTaskAsync<T>(this Orleans.Runtime.IAddressable target, string rootId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default) { throw null; }

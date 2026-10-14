@@ -10,11 +10,11 @@ namespace Orleans.DurableTasks.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// As an <see cref="IInboxMessageSink"/>, it accepts invocations, completions, cancellations, and signals directly into
-/// task state, so the request, result, or signal payload is journaled once, in task state, and the inbox journals only
-/// the message's processed record in the same write. Each message is decoded and validated before any change is
-/// staged; a message which fails validation throws, and a rejected signal reports a dead-lettered result, so the inbox
-/// dead-letters either one.
+/// As an <see cref="IInboxMessageSink"/>, it accepts invocations, completions, cancellations, signals, and observation
+/// subscriptions directly into task state, so the request, result, or signal payload is journaled once, in task state,
+/// and the inbox journals only the message's processed record in the same write. Each message is decoded and validated
+/// before any change is staged; a message which fails validation throws, and a rejected signal reports a dead-lettered
+/// result, so the inbox dead-letters either one.
 /// </para>
 /// <para>
 /// As an <see cref="IInboxHandler"/>, it handles the delay resumes the grain schedules for itself, which the inbox holds
@@ -52,7 +52,32 @@ internal sealed class DurableTaskMessageHandler(
                 var completion = messageTypes.Completion.Decode(message.Envelope);
                 var response = completion.Response
                     ?? throw new InvalidOperationException("The durable task completion response is missing.");
-                runtime.AcceptResponseFromInbox(completion.TaskId, response, GetSender(completion.Sender));
+                if (completion.ObserverId is not { } observerId)
+                {
+                    runtime.AcceptResponseFromInbox(completion.TaskId, response, GetSender(completion.Sender));
+                }
+                else
+                {
+                    runtime.AcceptObservationFromInbox(observerId, completion.TaskId, response, GetSender(completion.Sender));
+                }
+
+                return true;
+            case DurableTaskMessageTypes.ObservationSubject:
+                var observation = messageTypes.Observation.Decode(message.Envelope);
+                if (observation.ObserverId.IsDefault)
+                {
+                    throw new InvalidOperationException("The durable task observation has no observer.");
+                }
+
+                if (observation.Unsubscribe)
+                {
+                    runtime.UnsubscribeObservationFromInbox(observation.TaskId, observation.ObserverId, GetSender(observation.Sender));
+                }
+                else
+                {
+                    runtime.SubscribeObservationFromInbox(observation.TaskId, observation.ObserverId, GetSender(observation.Sender));
+                }
+
                 return true;
             case DurableTaskMessageTypes.CancellationSubject:
                 var cancellation = messageTypes.Cancellation.Decode(message.Envelope);

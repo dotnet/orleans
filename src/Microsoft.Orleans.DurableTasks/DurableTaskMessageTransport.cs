@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using Orleans.DurableTasks.Protocol;
@@ -20,7 +21,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// A delay resume is a message the grain sends to itself
 /// with <see cref="Envelope.DeliverAt"/> set to the delay's due time, which the grain's own inbox accepts in the delay's
 /// journal write; its identity also covers the delay generation and due time. A signal's identity also covers its name
-/// and value. The runtime derives readiness from journaled state, so duplicate and stale resumes are harmless.
+/// and value. An observation's subscription and completion identities also cover the observation, so each observation of
+/// a task has its own messages. The runtime derives readiness from journaled state, so duplicate and stale resumes are
+/// harmless.
 /// </remarks>
 internal sealed class DurableTaskMessageTransport(
     Lazy<IOutbox> outbox,
@@ -54,11 +57,68 @@ internal sealed class DurableTaskMessageTransport(
         GrainId sender,
         GrainId target,
         TaskId taskId,
-        DurableTaskResponse response) =>
+        DurableTaskResponse response,
+        TaskId observerId = default) =>
         messageTypes.Completion.Create(
             messageId,
             target,
-            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
+            new DurableTaskCompletionMessage
+            {
+                TaskId = taskId,
+                Response = response,
+                Sender = sender,
+                ObserverId = observerId.IsDefault ? null : observerId,
+            });
+
+    /// <remarks>
+    /// The identity covers the observation, so each observation of a task, including one which follows a delivered
+    /// completion of that task to the same grain, receives its own completion.
+    /// </remarks>
+    public MessageId GetObservationCompletionMessageId(GrainId sender, GrainId target, TaskId taskId, TaskId observerId) =>
+        CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject, observerId.ToString());
+
+    public void SendObservationNotFound(GrainId sender, GrainId target, TaskId taskId, TaskId observerId) =>
+        Send(
+            messageTypes.Completion,
+            sender,
+            target,
+            taskId,
+            new DurableTaskCompletionMessage
+            {
+                TaskId = taskId,
+                Response = DurableTaskResponse.FromException(new DurableTaskNotFoundException(taskId)),
+                Sender = sender,
+                ObserverId = observerId,
+            },
+            CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject, observerId.ToString(), NotFoundQualifier),
+            deliverAt: null);
+
+    private const string NotFoundQualifier = "not-found";
+
+    public void SendObservation(GrainId sender, GrainId target, TaskId taskId, TaskId observerId, bool unsubscribe)
+    {
+        if (observerId.IsDefault)
+        {
+            throw new ArgumentException("The observer id must not be empty.", nameof(observerId));
+        }
+
+        Send(
+            messageTypes.Observation,
+            sender,
+            target,
+            taskId,
+            new DurableTaskObservationMessage { TaskId = taskId, ObserverId = observerId, Sender = sender, Unsubscribe = unsubscribe },
+            CreateMessageId(
+                sender,
+                target,
+                taskId,
+                DurableTaskMessageTypes.ObservationSubject,
+                observerId.ToString(),
+                unsubscribe ? UnsubscribeQualifier : null),
+            deliverAt: null);
+    }
+
+    private const string UnsubscribeQualifier = "unsubscribe";
 
     /// <remarks>
     /// The message carries the cancellation's <paramref name="reason"/>, if any. Its identity covers only the sender,
@@ -179,7 +239,8 @@ internal sealed class DurableTaskMessageTransport(
         GrainId target,
         TaskId taskId,
         string subject,
-        string? discriminator = null)
+        string? discriminator = null,
+        string? qualifier = null)
     {
         if (!subject.StartsWith(DurableTaskMessageTypes.SubjectPrefix, StringComparison.Ordinal))
         {
@@ -194,6 +255,12 @@ internal sealed class DurableTaskMessageTransport(
         if (discriminator is not null)
         {
             Append(hash, discriminator);
+        }
+
+        if (qualifier is not null)
+        {
+            Debug.Assert(discriminator is not null, "A qualifier refines a discriminated identity.");
+            Append(hash, qualifier);
         }
 
         return MessageId.Create(

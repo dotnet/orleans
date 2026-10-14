@@ -37,6 +37,36 @@ internal sealed class DurableTaskCompletionMessage
 
     [Id(2)]
     public GrainId Sender { get; init; }
+
+    /// <summary>
+    /// Gets the observation, in the receiver's execution tree, which the completion completes, or
+    /// <see langword="null"/> for a completion addressed to the task's caller.
+    /// </summary>
+    [Id(3)]
+    public TaskId? ObserverId { get; init; }
+}
+
+/// <summary>
+/// Subscribes an observation in the sender's execution tree to the terminal result of an invoked task of the receiver,
+/// or ends that subscription.
+/// </summary>
+[GenerateSerializer]
+internal sealed class DurableTaskObservationMessage
+{
+    /// <summary>Gets the observed task.</summary>
+    [Id(0)]
+    public TaskId TaskId { get; init; }
+
+    /// <summary>Gets the observation in the sender's execution tree.</summary>
+    [Id(1)]
+    public TaskId ObserverId { get; init; }
+
+    [Id(2)]
+    public GrainId Sender { get; init; }
+
+    /// <summary>Gets whether the message ends the observation's subscription.</summary>
+    [Id(3)]
+    public bool Unsubscribe { get; init; }
 }
 
 [GenerateSerializer]
@@ -112,6 +142,7 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public const string CancellationSubject = SubjectPrefix + "cancel";
     public const string ResumeSubject = SubjectPrefix + "resume";
     public const string SignalSubject = SubjectPrefix + "signal";
+    public const string ObservationSubject = SubjectPrefix + "observe";
 
     public MessageType<DurableTaskInvocationMessage> Invocation { get; } = new(InvocationSubject, serializer);
 
@@ -122,4 +153,6 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public MessageType<DurableTaskResumeMessage> Resume { get; } = new(ResumeSubject, serializer);
 
     public MessageType<DurableTaskSignalMessage> Signal { get; } = new(SignalSubject, serializer);
+
+    public MessageType<DurableTaskObservationMessage> Observation { get; } = new(ObservationSubject, serializer);
 }
