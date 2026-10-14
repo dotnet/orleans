@@ -136,11 +136,14 @@ namespace Orleans.Journaling
         Canceled = 3
     }
 
+    [System.Flags]
     [GenerateSerializer]
     public enum DurableWatchMode : byte
     {
         Committed = 0,
-        Speculative = 1
+        Staged = 1,
+        Drafts = 2,
+        Speculative = 3
     }
 
     public partial interface IDurableDictionaryCommandCodec<TKey, TValue>

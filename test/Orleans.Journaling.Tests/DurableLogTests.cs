@@ -273,6 +273,42 @@ public class DurableLogTests : JournalingTestBase
     });
 
     [Fact]
+    public Task CommittedWithDraftsRead_DeliversDraftsAndOnlyDurableEntries() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+
+        await using var read = log.ReadAsync(0, DurableWatchMode.Committed | DurableWatchMode.Drafts, cancellationToken: CancellationToken)
+            .GetAsyncEnumerator(CancellationToken);
+        log.Append("question");
+        var draft = log.BeginDraft();
+        draft.Write("Hel");
+        Assert.Equal(DraftItem(draft.Id, 0, "Hel"), await read.NextAsync());
+
+        // The commit is reported with its entry once the entry is durable.
+        draft.Commit("Hello");
+        var next = read.MoveNextAsync();
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(
+            new LogEvent<string> { Kind = LogEventKind.DraftCommitted, Sequence = 1, DraftId = draft.Id, Status = DurableChangeStatus.Committed },
+            read.Current);
+        Assert.Equal(Entry(0, "question"), await read.NextAsync());
+        Assert.Equal(Entry(1, "Hello"), await read.NextAsync());
+
+        // The reader receives no watermarks.
+        next = read.MoveNextAsync();
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        log.Append("later");
+        Assert.False(next.IsCompleted);
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.True(await next);
+        Assert.Equal(Entry(2, "later"), read.Current);
+    });
+
+    [Fact]
     public Task SpeculativeRead_StartingMidDraft_ReceivesItemsSoFar() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();

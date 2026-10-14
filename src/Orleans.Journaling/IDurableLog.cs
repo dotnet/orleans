@@ -79,15 +79,19 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
     /// Reads the log from a sequence number, then waits for new entries.
     /// </summary>
     /// <param name="fromSequence">The sequence number of the first entry to read.</param>
-    /// <param name="mode">The entries and events to deliver.</param>
+    /// <param name="mode">
+    /// The entries and events to deliver. <see cref="DurableWatchMode.Staged"/> adds staged entries and watermarks, and
+    /// <see cref="DurableWatchMode.Drafts"/> adds draft events.
+    /// </param>
     /// <param name="resumeDraftId">
-    /// The draft a reconnecting speculative reader was viewing. The stream reports <see cref="LogEventKind.DraftAbandoned"/>
+    /// The draft a reconnecting reader with <see cref="DurableWatchMode.Drafts"/> was viewing. The stream reports <see cref="LogEventKind.DraftAbandoned"/>
     /// for it when it is no longer open, or repeats its items from the beginning when it is still open.
     /// </param>
     /// <param name="cancellationToken">The token which ends the read.</param>
     /// <returns>
-    /// A stream of entries in sequence order. In <see cref="DurableWatchMode.Speculative"/> mode, the stream also delivers
-    /// staged entries, watermarks, and draft events.
+    /// A stream of entries in sequence order. With <see cref="DurableWatchMode.Staged"/>, the stream also delivers staged
+    /// entries and watermarks. With <see cref="DurableWatchMode.Drafts"/>, it also delivers draft events. Without
+    /// <see cref="DurableWatchMode.Staged"/>, the stream reports a committed draft once the entry which replaced it is durable.
     /// </returns>
     /// <remarks>
     /// <para>
