@@ -212,9 +212,15 @@ validation disabled until its first published version establishes a baseline.
   task, and terminalizes delays and tasks whose bodies haven't started as canceled. A started body
   decides its task's outcome: the task is canceled when the cancellation escapes it, and otherwise
   completes with the body's result or failure. Attached children which the body schedules after the
-  request are canceled without running, and a body detaches work which must outlive the cancellation,
-  such as compensation. Recovery replays a canceled body with its cancellation requested, so completed
-  children return their recorded results. The first durable terminal result wins a race.
+  request outside a cancellation suppression scope are canceled without running. Recovery replays a canceled body with its cancellation
+  requested, so completed children return their recorded results. The first durable terminal result
+  wins a race.
+- A body runs compensation inline in a `DurableExecutionContext.SuppressCancellation()` scope. Each
+  child which it schedules in the scope, such as a local step, a delay, or a call to another grain,
+  records that its ancestors' cancellation doesn't reach it: it is created and runs when its parent's
+  cancellation was already requested, a later request skips it and its descendants, and recovery
+  replays it with its own cancellation state. Its own cancellation, an abort of its tree, and deletion
+  of its tree still reach it. A body detaches work which must outlive the task itself.
 - A cancellation request's reason commits with the request on each task it reaches, travels with the
   cancellation to each pending call to another grain, and is what a replay of a canceled body reads
   from `DurableExecutionContext.CancellationReason`. Diagnostics report it as the `Response` of a
