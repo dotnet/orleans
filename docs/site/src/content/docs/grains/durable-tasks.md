@@ -75,7 +75,7 @@ How a durable call starts depends on the caller:
 ## Example: an order workflow
 
 The following grain runs an order as one durable task. It records each status change
-as a local step, waits out a grace period, reserves every line concurrently, authorizes
+as a recorded effect, waits out a grace period, reserves every line concurrently, authorizes
 payment, and waits for a shipment signal. Ordinary grain methods cancel the workflow
 with a reason, abort it, and deliver the shipment. When the workflow is canceled, a line
 is out of stock, or payment is declined, it releases the reserved stock inline:
@@ -85,7 +85,7 @@ is out of stock, or payment is declined, it releases the reserved stock inline:
 A basket grain schedules the workflow under the root ID `place-order-{orderId}`. After
 a deactivation, the next activation replays `PlaceOrderAsync` from the start: `submit`,
 `grace-period`, `validate`, and the `reserve` inputs return their recorded results, and
-the workflow continues with the first step which hasn't completed. The
+the workflow continues with the first operation which hasn't completed. The
 `playground/DurableOrderProcessing` project in the Orleans repository runs a complete
 version of this workflow with a browser UI, detached projection updates, and diagnostics
 endpoints.
@@ -98,14 +98,15 @@ one segment per level of nesting. The order workflow above produces this tree:
 
 ```text
 place-order-{orderId}
-place-order-{orderId}/submit
+place-order-{orderId}/$once:submit
 place-order-{orderId}/grace-period
-place-order-{orderId}/validate
+place-order-{orderId}/$once:validate
 place-order-{orderId}/reserve/0
 place-order-{orderId}/reserve/1
 place-order-{orderId}/authorize-payment
-place-order-{orderId}/pay
-place-order-{orderId}/ship
+place-order-{orderId}/$once:pay
+place-order-{orderId}/$signal:shipped
+place-order-{orderId}/$once:ship
 ```
 
 - <xref:Orleans.DurableTasks.DurableTaskExtensions.WithId*> names a child with a stable
@@ -124,19 +125,46 @@ place-order-{orderId}/ship
   fails, so a task ID deduplicates schedules while the grain retains the task.
 
 A durable task calls its own grain's durable methods directly, as local steps, such as
-`await SetStatus(...).WithId("pay")`. A durable call through a reference to the task's own
-grain is rejected.
+`await RefreshPricesAsync().WithId("refresh")`. A durable call through a reference to the
+task's own grain is rejected.
 
-## Local steps and calls to other grains
+## Recorded effects, local steps, and calls to other grains
 
-A *local step* is an `async DurableTask` method of the same grain, awaited as a child.
-It records its result in the grain's task state, and the record commits with its first
-durable write: its result, or a child, delay, or message which it schedules. A step
-which changes journaled state and returns without awaiting therefore costs one journal
-write, and its state change and recorded result commit atomically. On replay, a step
-with a recorded result returns that result without running again.
+A *recorded effect*,
+<xref:Orleans.DurableTasks.DurableTask.Once*?displayProperty=nameWithType>, runs
+synchronous code once for the running task and records its result, or the exception it
+threw, in the task's tree under `$once:{name}`. The record commits with the task's next
+durable write together with the journaled state which the effect changed, without a
+write of its own, and a replay returns the recorded result without running the effect
+again. The order workflow changes its status this way:
 
-:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_local_step" language="csharp":::
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_once" language="csharp":::
+
+- An effect changes grain state exactly once, reads state which later operations change,
+  and produces identifiers, random values, and wall-clock times which every replay
+  observes.
+- The effect passes data to the workflow through its result: assignments to captured
+  variables don't happen in later runs.
+- A failure is recorded too, because journaled state has no rollback: changes made
+  before the throw commit with the recorded exception. A result which doesn't serialize
+  is recorded as that failure. A run which ends before a journal write commits the
+  record also loses the effect's state changes, so the next run runs the effect again.
+- A name which one run repeats identifies later occurrences by their order, such as
+  `pay$2`. Effects and children named with `WithId` share the count, so a deployment
+  which turns a recorded step into an effect, or an effect into a step, fails with the
+  divergence error instead of running the work again.
+- Effects are synchronous: asynchronous and durable effects don't compile, and run as
+  awaited children instead. An effect runs on the activation's scheduler, so `Once`
+  after `ConfigureAwait(false)` throws `InvalidOperationException` without running it.
+- The record applies only within a durable task. Outside one, such as in a helper which
+  an ordinary grain method shares, the effect runs every time.
+
+A *local step* is an `async DurableTask` method of the same grain, awaited as a child,
+for work which awaits. It records its result in the grain's task state, and the record
+commits with its first durable write: its result, or a child, delay, or message which it
+schedules. Its result is staged in the work item which runs its final code, so the state
+changes which that code makes commit with the result. On replay, a step with a recorded
+result returns that result without running again.
 
 A *call to another grain* is a durable invocation. The calling grain records the call
 in its task state and stages the invocation in its outbox; both commit with the
@@ -155,26 +183,64 @@ idempotency.
 ## Replay and determinism
 
 After a deactivation or a failure, the next activation replays each pending task: the
-method body runs again from the start, and every child which already completed returns
-its recorded result. Replay starts once the grain's `OnActivateAsync` has completed, and
-a deactivation signals running tasks to abort before the grain's `OnDeactivateAsync`
-runs. A workflow resumes correctly when each replay schedules the same
-children, with the same IDs and arguments, in the same order.
+method body runs again from the start, and every recorded operation returns its recorded
+outcome. Replay starts once the grain's `OnActivateAsync` has completed, and a
+deactivation signals running tasks to abort before the grain's `OnDeactivateAsync` runs.
+A workflow resumes correctly when each replay schedules the same operations, with the
+same IDs and arguments, in the same order.
 
-- Put each side effect in a child: a durable grain call, a local step, or a
-  `DurableTask.Run` delegate. Code between children runs on every replay, so it computes
-  values from the method's arguments, earlier results, and other values which are the
-  same on every replay.
-- Read time from
-  <xref:Orleans.DurableTasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>,
-  the execution's logical time. The runtime persists it before the execution's effects
-  commit and advances it to the recorded completion time of each child result the
-  execution observes, so a replay observes the same times and a delay starts when the
-  work before it completed.
-- Produce random values and identifiers inside children.
+Replay doesn't rebuild the grain's journaled state, which holds the latest committed
+changes, including changes which later operations made. A durable body therefore has
+three kinds of code:
+
+- **Recorded operations** run once per execution, and a replay returns their recorded
+  outcomes: durable calls to other grains, local steps, `DurableTask.Run` delegates,
+  delays, signal waits and sends, detaches, and `DurableTask.Once` effects.
+- **Re-executed code** precedes the body's last recorded operation and runs again in
+  every replay. It computes values from the method's arguments, recorded results, the
+  execution's logical time and cancellation state, and configuration which stays the
+  same while executions are pending.
+- **The synchronous tail** follows the body's last recorded operation, with no other
+  `await` before the body returns. It runs only in a run which completes the body, and
+  its state changes commit in the same journal write as the task's result, whichever
+  operation requests that write, so no replay runs it again.
+
+The following grain allocates a ticket number in an effect, authorizes a payment, and
+records the outcome in its synchronous tail:
+
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_replay_regions" language="csharp":::
+
+Follow these rules in re-executed code:
+
+- Put each side effect in a recorded operation or in the synchronous tail. Code between
+  recorded operations computes values from the method's arguments, earlier results, and
+  other values which are the same on every replay.
+- Read and change grain state in recorded effects, steps, or the synchronous tail. Grain
+  state holds every committed change, so code which replays reads the state which later
+  operations wrote.
+- Read time from `DurableTask.Current.UtcNow`, the execution's logical time, which
+  <xref:Orleans.DurableTasks.DurableTask.Current?displayProperty=nameWithType> exposes.
+  The runtime persists it before the execution's effects commit and advances it to the
+  recorded completion time of each child result the execution observes, so a replay
+  observes the same times and a delay starts when the work before it completed.
+- Produce random values and identifiers in recorded effects or children, and call
+  external services in steps or `DurableTask.Run` delegates, whose external effects need
+  their own idempotency.
 - Name children with `WithId` when they're scheduled conditionally, in loops, or
   concurrently outside a combinator, and name combinators. Generated segments are stable
-  only when unnamed children are created in the same order.
+  only when unnamed children are created in the same order. Detaches and signal sends
+  are recorded under IDs derived from their target and root ID or signal, so adding one
+  doesn't move others.
+- Log through a logger which `logger.ReplaySafe()` returns, so each event is logged once.
+
+<xref:Orleans.DurableTasks.DurableTaskContext.IsReplaying?displayProperty=nameWithType>
+reports whether a run is re-running operations which earlier runs recorded: it is `true`
+from the start of a run which finds recorded operations in the task's tree, other than
+signal values, until the run has reached each of them or starts an operation which no
+earlier run recorded, and then stays `false`. Use it for logging and diagnostics only. A
+run which ended before a journal write committed its work is replayed, so code which runs
+only while `IsReplaying` is `false` can run twice or never, and code which branches on it
+schedules different operations in different runs.
 
 A replay which schedules a different operation under a recorded ID fails with an
 `InvalidOperationException` which names the recorded and the requested operations. See
@@ -291,7 +357,10 @@ client-scheduled root, and its result is available by polling its root ID.
 - Cancellation and deletion of the starter's execution tree leave the detached task
   running.
 - Inside a durable task, the start and a marker in the execution's tree commit in one
-  journal write, so a replay which reaches the marker starts nothing.
+  journal write, so a replay which reaches the marker starts nothing. The marker,
+  `$detach:{target}:{rootId}`, derives from the detached task's identity, so adding
+  operations to a workflow doesn't move it, and detaching the same task again reaches
+  the same marker.
   <xref:Orleans.DurableTasks.DetachedTaskId.For*?displayProperty=nameWithType> derives a
   replay-stable root ID, `{taskId}:{segment}`, from the running task's ID.
 - In an ordinary method of a durable grain, the start commits with the grain's pending
@@ -321,9 +390,11 @@ descriptor, which names the signal:
   `TrySignalAsync`, which commit with the grain's pending state changes. Clients and
   ordinary methods of other grains use the `SignalDurableTaskAsync` and
   `TrySignalDurableTaskAsync` grain-reference extensions, and durable tasks on other
-  grains use `SignalDurableTaskAsync`, which records the send for replay. The `Try`
-  forms return a `DurableSignalResult`: `Accepted`, `Duplicate`, `Conflict`,
-  `TaskNotFound`, or `TaskCompleted`.
+  grains use `SignalDurableTaskAsync`, which records the send for replay under
+  `$send:{target}:{taskId}:{name}`. Repeated sends of one signal in an execution, such
+  as a retry after `TaskNotFound`, are numbered by occurrence, `$send:...$2` and so on,
+  so each sends again. The `Try` forms return a `DurableSignalResult`: `Accepted`,
+  `Duplicate`, `Conflict`, `TaskNotFound`, or `TaskCompleted`.
 - A grain can commit an invocation on another grain and a signal for it in one journal
   write. The signal message can then arrive first; the receiving grain records its value,
   and the invocation observes it when it arrives.
@@ -346,6 +417,10 @@ descriptor, which names the signal:
   are replay-stable.
 - Terminal results and the completion notifications to callers commit together. The
   first durable terminal result wins a race between completion and cancellation.
+- A body's result is staged in the work item which runs the body's final code on the
+  activation, so it commits in the same journal write as the state which that code
+  changed, whichever operation requests the write. A `DurableTask.Once` record is
+  staged in the same work item as the effect's state changes, and commits with them.
 
 Durability covers state and messages which participate in Orleans Journaling and
 Messaging commits. External side effects, such as calls to a payment provider, need
@@ -355,7 +430,8 @@ their own idempotency, for example a request key derived from the task ID.
 
 An *invoked task*, which a client or another grain scheduled, owns an execution tree:
 the task and its descendants which aren't invoked tasks themselves, such as local
-steps, delays, and the records of calls to other grains. Once an invoked task is
+steps, delays, `DurableTask.Once` records, detach and signal-send markers, and the
+records of calls to other grains. Once an invoked task is
 terminal, its grain deletes the tree:
 
 - When a grain called the task, in the journal write which retires the completion after
