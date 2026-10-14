@@ -1,85 +1,389 @@
 ---
-title: Durable tasks (experimental)
-description: Understand the experimental Orleans durable task programming model, which runs asynchronous workflows that survive deactivation, crashes, and redeployment by replaying their recorded operations.
-ms.date: 10/19/2026
+title: Durable tasks
+description: Understand the durable task programming model, its replay and commit guarantees, cancellation, signals, and task lifecycle.
+ms.date: 10/13/2026
 ms.topic: conceptual
 ---
 
-# Durable tasks (experimental)
+# Durable tasks
 
-A durable task is an asynchronous operation whose progress survives grain deactivation, silo crashes, and redeployment. Its host records each operation which the task completes, such as a call to another grain, a delay, or a recorded effect. A task which didn't finish runs its body again from the start, and every recorded operation returns its recorded outcome, so the body resumes where it stopped. The programming model lives in the pre-release `Microsoft.Orleans.Durable.Abstractions` package, in the `Orleans.DurableTasks` namespace, which also carries the [durable task analyzers](../diagnostics/index.md).
+Orleans Durable Tasks runs grain methods which return
+<xref:Orleans.DurableTasks.DurableTask> or <xref:Orleans.DurableTasks.DurableTask`1>
+as durable executions. A workflow is ordinary sequential C#: it awaits calls to other
+grains, local state transitions, delays, and external signals. Each step's result is
+recorded in the grain's journal, so the workflow survives activation loss and resumes
+where it stopped. Durable tasks run over [Messaging](messaging.md), which carries
+invocations, results, cancellations, and signals between grains through each grain's
+durable inbox and outbox, and over Durable Jobs, which wakes grains when delays are due.
 
-## Execution model
+> [!IMPORTANT]
+> `Microsoft.Orleans.DurableTasks` and `Microsoft.Orleans.Durable.Abstractions` are
+> pre-release alpha packages awaiting their first NuGet publication. Evaluate them with an
+> explicit upgrade, rollback, backup, and recovery plan because their APIs and persisted
+> formats can change before stabilization. Projects in the Orleans repository reference
+> them as source projects.
 
-A method which returns `DurableTask` or `DurableTask<T>` defines a task, and the task runs when the caller awaits it, schedules it with `ScheduleAsync`, or posts it with `Post`. Each run of a task's body is an attempt, which runs on its grain activation's scheduler and reads its context from `DurableTask.Current`: its identifier, its logical time `UtcNow`, and its cancellation state.
+This page describes the programming model and its guarantees. Continue with:
 
-- **Task cancellation** is durable. A caller requests it, for example with `CancelAsync` on the task's handle, and the host records the request together with the point at which each execution first observes it. The body observes it through `IsTaskCancellationRequested`, `TaskCancellationReason`, and `CancellationToken`, and every replay observes it at that same recorded point. The body decides the task's outcome, for example by compensating.
-- **Attempt cancellation** ends the current attempt when its activation stops, when the task is aborted or deleted, or when its replay diverges from its record. Every durable operation of a canceled attempt throws `DurableTaskAttemptCanceledException`, the host discards the attempt's outcome, and a later attempt runs the task again when it still needs an outcome. `AttemptCancellationToken` is canceled only by attempt cancellation.
+- [Practical recipes](durable-tasks-recipes.md) for fan-out, races, compensation,
+  signals, detached work, cancellation, and scheduling workflows from other grains.
+- [Operations and troubleshooting](durable-tasks-operations.md) for configuration,
+  retention, diagnostics, replay divergence, workflow versioning, and capacity.
 
-## Writing replay-safe workflows
+## Choose durable tasks or message handlers
 
-A replay runs the body from the start, and each recorded operation returns its recorded outcome. A body therefore has three kinds of code:
+Both models commit business state, received messages, and outgoing messages in the
+grain's journal, and they share one inbox and outbox per grain.
 
-- **Recorded operations** run once per execution: children such as durable grain calls, `async DurableTask` methods, and `DurableTask.Run` steps, delays, signal waits, detached and posted starts, and `DurableTask.RunInline` effects.
-- **Replayed code** precedes the body's last recorded operation and runs again in every replay. It computes values from the method's arguments, recorded results, `DurableTask.Current.UtcNow`, and the cancellation state.
-- **The tail** follows the body's last recorded operation and runs once, in the run which completes the body. The host commits the tail's state changes together with the task's result.
+| Use durable tasks for | Use [message handlers](messaging.md) for |
+| --- | --- |
+| Multi-step workflows written as sequential code, with results flowing between steps. | Reacting to individual commands and events, one handler call per message. |
+| Fan-out, races, and completion-order processing over durable calls. | Application-defined message identities, subjects, headers, and raw payloads. |
+| Durable timers, deadlines, and waits for external events inside a workflow. | Scheduled messages and state machines which the application models explicitly. |
+| Cooperative cancellation with inline compensation and recorded reasons. | Business replies and rejections exchanged as typed messages. |
 
-Replayed code changes grain state, reads state whose value decides later operations, and produces identifiers, random numbers, and clock values only inside recorded operations or in the tail. Each replay schedules the same operations, with the same identifiers and arguments, in the same order. `WithId` gives an operation a stable identifier, which loops, conditions, and deployments don't shift. A replay which schedules another operation under a recorded identifier diverges: the host cancels the attempt with `DurableTaskAttemptCancellationReason.Diverged` and keeps the task pending until code which matches the record replays it.
+## Define durable task methods
 
-A body awaits the tasks which it observes, or waits for them with a durable timeout, and continues on its scheduler: durable operations which code starts after `ConfigureAwait(false)`, and polls such as `IsCompletedAsync`, throw.
+A grain interface declares a durable method by returning `DurableTask` or
+`DurableTask<TResult>`. Arguments and results cross grains and persist in task state,
+so their types need Orleans serializers:
 
-## Recorded effects
+:::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_contracts" language="csharp":::
 
-`DurableTask.RunInline(name, effect)` runs a synchronous effect immediately and records its result or the exception which it threw. The record commits with the task's next journal write, together with the state changes which the effect made, and every replay returns the recorded outcome without running the effect. An effect returns every output which the body uses:
+The implementing grain derives from <xref:Orleans.Journaling.DurableGrain>. The grain's
+durable state change
+and the task's result commit in one journal write, and the caller receives the result
+once that write completes:
 
-:::code source="../diagnostics/snippets/durable-tasks/Orleans0204.cs" id="orleans0204_fix" language="csharp":::
+:::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_catalog_grain" language="csharp":::
 
-A name identifies an effect as `WithId` identifies a step, and `DurableTask.RunInline(effect)` takes the execution's next generated identifier. A `RunInline` call inside an effect runs as part of the enclosing effect. Every other durable operation inside an effect throws `InvalidOperationException`, which the effect records as its outcome.
+An `async DurableTask` method body is a deferred definition: calling the method creates
+the definition, and the durable task runtime runs it under the task's identity. A body
+which completes without awaiting is a normal step.
 
-## Combinators
+How a durable call starts depends on the caller:
 
-`DurableTask.WhenAll`, `WhenAny`, `Race`, `WhenAllCompleted`, `ScheduleAll`, and `WhenEach` start their inputs as children of the awaiting execution, identified by their input indexes beneath the combinator's identifier, so concurrent inputs keep stable identifiers in any completion order. The host selects `WhenAny` and `Race` winners and the `WhenEach` order from its durable completion order, so every replay observes the same selection:
+- Inside a durable task, awaiting the call schedules it as a child task of the running
+  execution.
+- From a client or an ordinary grain method,
+  <xref:Orleans.DurableTasks.DurableTaskExtensions.ScheduleAsync*> starts it as a root
+  task under a caller-chosen root ID and returns a
+  <xref:Orleans.DurableTasks.ScheduledTask`1> handle.
+- From anywhere, <xref:Orleans.DurableTasks.DurableTaskExtensions.DetachAsync*> starts
+  it as an independent root task whose result the starter doesn't observe.
 
-:::code source="../diagnostics/snippets/durable-tasks/Orleans0210.cs" id="orleans0210_fix_when_all" language="csharp":::
+## Example: an order workflow
 
-`WaitAsync(timeout)` races a task with a durable delay, whose due time a replay keeps, and requests the task's cancellation when the delay wins.
+The following grain runs an order as one durable task. It records each status change
+as a local step, waits out a grace period, reserves every line concurrently, authorizes
+payment, and waits for a shipment signal. Ordinary grain methods cancel the workflow
+with a reason, abort it, and deliver the shipment. When the workflow is canceled, a line
+is out of stock, or payment is declined, it releases the reserved stock inline:
 
-## Scheduled task handles
+:::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_order_grain" language="csharp":::
 
-`ScheduleAsync` returns a `ScheduledTask` handle once the task's host has accepted and stored the task. Awaiting the handle returns the task's result, and combinators such as `ScheduledTask.WhenAll` and `ScheduledTask.WhenAny` wait for several handles. A handle caches the outcome which it observes, so `Status`, `Exception`, and `TryGetResult` inspect it synchronously. A durable task body observes each child which it schedules:
+A basket grain schedules the workflow under the root ID `place-order-{orderId}`. After
+a deactivation, the next activation replays `PlaceOrderAsync` from the start: `submit`,
+`grace-period`, `validate`, and the `reserve` inputs return their recorded results, and
+the workflow continues with the first step which hasn't completed. The
+`playground/DurableOrderProcessing` project in the Orleans repository runs a complete
+version of this workflow with a browser UI, detached projection updates, and diagnostics
+endpoints.
 
-:::code source="../diagnostics/snippets/durable-tasks/Orleans0219.cs" id="orleans0219_fix_await" language="csharp":::
+## Task identity
 
-## Starting and observing tasks
+A durable task is identified by its grain and its <xref:Orleans.DurableTasks.TaskId>.
+Task IDs are hierarchical: a root ID, which the scheduling caller chooses, followed by
+one segment per level of nesting. The order workflow above produces this tree:
 
-The configuration of a task says what it is, and the verb which starts it says when the caller continues:
+```text
+place-order-{orderId}
+place-order-{orderId}/submit
+place-order-{orderId}/grace-period
+place-order-{orderId}/validate
+place-order-{orderId}/reserve/0
+place-order-{orderId}/reserve/1
+place-order-{orderId}/authorize-payment
+place-order-{orderId}/pay
+place-order-{orderId}/ship
+```
 
-- `await task` runs the task and returns its result once the result is durable.
-- `task.ScheduleAsync()` returns the task's handle once its host has accepted and stored the task.
-- `task.Post()` stages the start with the caller's next durable write and returns the handle at once. The host delivers the start and the task's host deduplicates it by the task's identifier.
+- <xref:Orleans.DurableTasks.DurableTaskExtensions.WithId*> names a child with a stable
+  segment. A child awaited without a name receives a generated segment, which begins
+  with `$` and follows the order in which the execution creates unnamed children. The
+  `$` prefix is reserved for generated segments.
+- A named combinator gives its inputs IDs beneath its own:
+  `DurableTask.WhenAll(...).WithId("reserve")` identifies its inputs as `reserve/0`,
+  `reserve/1`, and so on, in input order.
+- A call to another grain runs on that grain under the same task ID, so
+  `place-order-{orderId}/reserve/0` identifies both the order's record of the call and
+  the reservation task on the catalog grain.
+- Scheduling a task ID again with the same request reattaches to the existing task and
+  its recorded result. Scheduling it with a different interface, method, or argument
+  fails, so a task ID deduplicates schedules while the grain retains the task.
 
-Within a durable execution, a task is an attached child, which the execution owns and whose outcome it observes. `.Shielded()` keeps the execution's cancellation from reaching the child. `.Detached()` starts a durable grain call as an independent root task, which continues after the execution completes, and `.Detached(rootId)` gives that root task an identifier which other parties know in advance. Outside a durable execution, every task is a root task, and `WithId` supplies its identifier, which makes a start safe to retry:
+A durable task calls its own grain's durable methods directly, as local steps, such as
+`await SetStatus(...).WithId("pay")`. A durable call through a reference to the task's own
+grain is rejected.
 
-:::code source="../diagnostics/snippets/durable-tasks/Orleans0216.cs" id="orleans0216_fix_schedule" language="csharp":::
+## Local steps and calls to other grains
+
+A *local step* is an `async DurableTask` method of the same grain, awaited as a child.
+It records its result in the grain's task state, and the record commits with its first
+durable write: its result, or a child, delay, or message which it schedules. A step
+which changes journaled state and returns without awaiting therefore costs one journal
+write, and its state change and recorded result commit atomically. On replay, a step
+with a recorded result returns that result without running again.
+
+:::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_local_step" language="csharp":::
+
+A *call to another grain* is a durable invocation. The calling grain records the call
+in its task state and stages the invocation in its outbox; both commit with the
+execution's next journal write. The callee's inbox accepts the invocation directly into
+its task state, runs the method, and returns the result through the caller's inbox,
+which records it in the caller's task state. Messages use identities derived from the
+sender, receiver, task, and subject, so redeliveries and replayed sends are
+deduplicated.
+
+<xref:Orleans.DurableTasks.DurableTask.Run*?displayProperty=nameWithType> runs a
+delegate as a child task, for work which isn't a grain call, such as a call to an
+external service. A replay returns the delegate's recorded result, and runs a delegate
+whose result wasn't recorded again, so the delegate's external effect needs its own
+idempotency.
+
+## Replay and determinism
+
+After a deactivation or a failure, the next activation replays each pending task: the
+method body runs again from the start, and every child which already completed returns
+its recorded result. A workflow resumes correctly when each replay schedules the same
+children, with the same IDs and arguments, in the same order.
+
+- Put each side effect in a child: a durable grain call, a local step, or a
+  `DurableTask.Run` delegate. Code between children runs on every replay, so it computes
+  values from the method's arguments, earlier results, and other values which are the
+  same on every replay.
+- Read time from
+  <xref:Orleans.DurableTasks.DurableExecutionContext.UtcNow?displayProperty=nameWithType>,
+  the execution's logical time. The runtime persists it before the execution's effects
+  commit and advances it to the recorded completion time of each child result the
+  execution observes, so a replay observes the same times and a delay starts when the
+  work before it completed.
+- Produce random values and identifiers inside children.
+- Name children with `WithId` when they're scheduled conditionally, in loops, or
+  concurrently outside a combinator, and name combinators. Generated segments are stable
+  only when unnamed children are created in the same order.
+
+A replay which schedules a different operation under a recorded ID fails with an
+`InvalidOperationException` which names the recorded and the requested operations. See
+[Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence)
+for workflow versioning.
+
+## Combinators and handles
+
+Combinators schedule their inputs concurrently, so the runtime commits the batch of
+invocations together. Awaited, a combinator runs as part of the awaiting execution and
+records no result of its own; each input runs as a child identified by its input index
+under the combinator's operation ID. Name the operation with `WithId`, so its inputs
+keep their IDs when a later deployment adds or removes earlier combinators.
+
+- <xref:Orleans.DurableTasks.DurableTask.WhenAll*?displayProperty=nameWithType> follows
+  `Task.WhenAll`. It completes after every input is terminal, including inputs which
+  durable cancellation reaches. It then throws the first failure in input order;
+  otherwise the first cancellation in input order; otherwise `WhenAll<TResult>` returns
+  the results in input order. Input order selects the exception, so a replay observes
+  the same one.
+- <xref:Orleans.DurableTasks.DurableTask.WhenAny*?displayProperty=nameWithType> returns
+  the index of the input which completed first, and `WhenAny<TResult>` also returns its
+  result. A winner which failed or was canceled fails the combinator. The other inputs
+  keep running.
+- <xref:Orleans.DurableTasks.DurableTask.ScheduleAll*?displayProperty=nameWithType>
+  schedules every input and returns their <xref:Orleans.DurableTasks.ScheduledTask>
+  handles in input order, without waiting for results.
+- <xref:Orleans.DurableTasks.DurableTask.WhenAllCompleted*?displayProperty=nameWithType>
+  waits until every input is terminal and returns the handles. An input's failure or
+  cancellation leaves the combinator successful, so the workflow can act on each
+  outcome, for example by compensating exactly the inputs which succeeded.
+- <xref:Orleans.DurableTasks.DurableTask.WhenEach*?displayProperty=nameWithType> schedules
+  its inputs and yields each one's handle as an `IAsyncEnumerable`, in completion order.
+  An input's failure or cancellation is yielded like a success.
+
+The grain stamps each child's terminal result with a durable completion sequence, in
+the journal write which records the result. `WhenAny` and `WhenEach` select the
+remaining input with the lowest sequence, so every replay selects the same winner and
+yields the same order, including a replay in which more inputs have already completed.
+`ScheduleAll`, `WhenAllCompleted`, and `WhenEach` run only when awaited inside a durable
+execution, because their handles belong to that execution.
+
+A <xref:Orleans.DurableTasks.ScheduledTask> handle observes one task. Once a wait, a
+poll, or a combinator observes its terminal response, `IsCompleted`, `Status`, and
+`Exception` report it synchronously.
+<xref:Orleans.DurableTasks.ScheduledTask`1.GetResult*> returns the result or throws the
+recorded failure or cancellation, and
+<xref:Orleans.DurableTasks.ScheduledTask`1.TryGetResult*> returns `true` with the result
+of a task which completed successfully. Before the handle observes a terminal response,
+`Status` is `Pending`. For existing handles,
+<xref:Orleans.DurableTasks.ScheduledTask.WhenAll*?displayProperty=nameWithType>,
+<xref:Orleans.DurableTasks.ScheduledTask.WhenAllCompleted*?displayProperty=nameWithType>,
+and <xref:Orleans.DurableTasks.ScheduledTask.WhenEach*?displayProperty=nameWithType>
+provide the same semantics. `WhenEach` accepts no `WithId`, so the named form schedules
+the inputs with `ScheduleAll(...).WithId(name)` and enumerates
+`ScheduledTask.WhenEach(handles)`.
+
+<xref:Orleans.DurableTasks.DurableTask.Delay*?displayProperty=nameWithType> and
+<xref:Orleans.DurableTasks.DurableTask.DelayUntil*?displayProperty=nameWithType> are
+durable timers measured in logical time. The runtime records the delay's due time and
+sends the grain a scheduled resume message, which its inbox holds until the Durable Jobs
+clock reaches the due time. A recorded due time is a commitment: a replay which requests
+another due time, for example after a configured duration changed, keeps the recorded
+one and logs a warning.
+
+## Cancellation
+
+Cancellation is cooperative, durable, and idempotent. A grain requests it for its own
+tasks with `IDurableTaskManager.CancelAsync(rootId, reason)`, and clients and other
+callers request it through
+<xref:Orleans.DurableTasks.ScheduledTask.CancelAsync*?displayProperty=nameWithType>.
+The request commits before it propagates through the task's execution tree:
+
+- Delays, children whose bodies haven't started, and new children which the canceled
+  task schedules terminate as canceled without running.
+- Running children observe the request through
+  <xref:Orleans.DurableTasks.DurableExecutionContext.CancellationToken?displayProperty=nameWithType>,
+  and pending calls to other grains receive a cancellation which their callee applies
+  to its own task.
+- The task's body decides its outcome. Awaiting a canceled child throws
+  `OperationCanceledException`. The task is canceled when that exception escapes the
+  body; a body which catches it completes with its own result or failure.
+- Completed children keep their recorded results, and a replay of a canceled task
+  observes the request from the start, so the body takes the same path.
+
+The first request's reason is durable:
+<xref:Orleans.DurableTasks.DurableExecutionContext.CancellationReason?displayProperty=nameWithType>
+returns it in the canceled execution, its descendants, and every replay, and the
+cancellation carries it to pending calls to other grains.
+
+A body compensates inline inside a
+<xref:Orleans.DurableTasks.DurableExecutionContext.SuppressCancellation*?displayProperty=nameWithType>
+scope. Each child which the body schedules in the scope, including local steps, delays,
+calls to other grains, and combinator inputs, runs to completion although the task's
+cancellation was requested, and a later request skips it. The scope follows the
+asynchronous flow which entered it and covers children of that execution. An abort and
+the deletion of the task's execution tree still reach these children.
+
+An administrative abort, through `IDurableTaskManager.AbortAsync(rootId, reason)` or
+<xref:Orleans.DurableTasks.ScheduledTask.AbortAsync*?displayProperty=nameWithType>,
+commits the task and its execution tree as failed with
+<xref:Orleans.DurableTasks.DurableTaskAbortedException> in one journal write, stops
+their running attempts, and sends an abort to each pending call to another grain. Abort
+runs no task code, including cancellation callbacks and compensation, so use it for a
+task whose body ignores cancellation or whose cleanup is stuck.
+
+## Detached tasks
+
+`DetachAsync(rootId)` starts a durable call as a new root task on its target, for
+fire-and-forget work, cleanup which outlives the starter, and durable calls from code
+which doesn't await their results. The target retains the detached task like a
+client-scheduled root, and its result is available by polling its root ID.
+
+- Cancellation and deletion of the starter's execution tree leave the detached task
+  running.
+- Inside a durable task, the start and a marker in the execution's tree commit in one
+  journal write, so a replay which reaches the marker starts nothing.
+  <xref:Orleans.DurableTasks.DetachedTaskId.For*?displayProperty=nameWithType> derives a
+  replay-stable root ID, `{taskId}:{segment}`, from the running task's ID.
+- In an ordinary method of a durable grain, the start commits with the grain's pending
+  state changes.
+- Detaching the same request under the same root ID again leaves the task unchanged.
 
 ## Signals
 
-`DurableSignal<T>` carries a value into a running task, such as an approval. Each signal name of a task holds the first value which a sender delivers, a value which arrives before the wait is buffered, and every wait for the name returns it, including waits during replay. `DurableSignal<T>.For(suffix)` derives a name for each occurrence of a repeated wait, and `TryWaitAsync(deadline)` waits until a durable deadline.
+A <xref:Orleans.DurableTasks.DurableSignal`1> carries an external event, such as a
+shipment notice or an approval, into a running task. Senders and waiters share one
+descriptor, which names the signal:
 
-## Compensating canceled work
+- <xref:Orleans.DurableTasks.DurableSignal`1.WaitAsync*> waits for the signal's value.
+  <xref:Orleans.DurableTasks.DurableSignal`1.TryWaitAsync*> races the wait with a
+  deadline and returns `(true, value)` or `(false, default)`, and the same outcome on
+  every replay.
+- A signal addresses an *invoked task*: a task which a client, another grain, or
+  `DetachAsync` started on the grain. Waits anywhere in that task's execution tree
+  observe its signals.
+- The task records the first value for each signal name and returns it to every wait for
+  that name, including waits during replay. A signal which arrives before its wait is
+  recorded, and the wait returns it at once. A repeated signal with an equal value
+  leaves the task unchanged, and a different value is rejected.
+  <xref:Orleans.DurableTasks.DurableSignal`1.For*> derives a distinct name, such as
+  `approved/round-2`, for each occurrence of a repeated event.
+- A grain signals its own tasks with `IDurableTaskManager.SignalAsync` or
+  `TrySignalAsync`, which commit with the grain's pending state changes. Clients and
+  ordinary methods of other grains use the `SignalDurableTaskAsync` and
+  `TrySignalDurableTaskAsync` grain-reference extensions, and durable tasks on other
+  grains use `SignalDurableTaskAsync`, which records the send for replay. The `Try`
+  forms return a `DurableSignalResult`: `Accepted`, `Duplicate`, `Conflict`,
+  `TaskNotFound`, or `TaskCompleted`.
 
-A body which observes task cancellation compensates for the work which it completed. A handler filtered by `DurableTask.Current.IsTaskCancellationRequested` runs for task cancellation and lets attempt cancellation end the attempt. A `.Shielded()` child runs to completion after the execution's cancellation, so compensation which runs as a child completes, and calls which cleanup makes receive `AttemptCancellationToken`:
+## Commit model and guarantees
 
-:::code source="../diagnostics/snippets/durable-tasks/Orleans0212.cs" id="orleans0212_fix_filter" language="csharp":::
+- `(grain, TaskId)` identifies one execution. A stable request fingerprint detects reuse
+  of a task ID with a different interface, method, argument type, or argument value.
+- Request identity, task state, caller subscription, and inbox completion commit before
+  execution begins.
+- Task state and outgoing messages share the grain's journal commit boundary with the
+  grain's own journaled state. A failed journal write deactivates the grain, and the
+  next activation recovers from committed state.
+- Scheduling a durable call from a durable grain, including from an ordinary method,
+  stages the invocation in the outbox, so it commits atomically with the grain's state
+  changes.
+- Each request and result payload is journaled once per grain, in task state.
+- Recovery precedes new execution. Child IDs, completion order, and outgoing messages
+  are replay-stable.
+- Terminal results and the completion notifications to callers commit together. The
+  first durable terminal result wins a race between completion and cancellation.
 
-## Versioned changes
+Durability covers state and messages which participate in Orleans Journaling and
+Messaging commits. External side effects, such as calls to a payment provider, need
+their own idempotency, for example a request key derived from the task ID.
 
-`DurableTask.GetVersion(name, minSupported, maxSupported)` returns the version of a change which the running execution follows, so one body holds the code of every version while executions which started on earlier code are pending. The first check of a name records the version: an execution which reaches the check first records `maxSupported`, and one which earlier code ran past records `0`. `DurableVersion` declares a change's name and range once. Raising `minSupported` retires a version, and an execution which recorded a retired version stays pending until code which supports it replays it:
+## Lifecycle and retention
 
-:::code source="../diagnostics/snippets/durable-tasks/Orleans0218.cs" id="orleans0218_fix_descriptor" language="csharp":::
+An *invoked task*, which a client or another grain scheduled, owns an execution tree:
+the task and its descendants which aren't invoked tasks themselves, such as local
+steps, delays, and the records of calls to other grains. Once an invoked task is
+terminal, its grain deletes the tree:
 
-## Replay diagnostics and logging
+- When a grain called the task, in the journal write which retires the completion after
+  the calling grain has durably accepted the result.
+- When the task has no calling grain, such as a task which a client scheduled or a
+  detached task, `DurableTaskOptions.ResultRetentionPeriod` after completion. Polls
+  during that period return the retained result, and later polls throw
+  `DurableTaskNotFoundException`.
 
-`DurableTask.Current.IsReplaying` reports whether a run re-runs operations which an earlier run recorded. Use it for logging and diagnostics only: work which runs once belongs in a recorded effect, a step, or the tail. `logger.ReplaySafe()` returns a logger which skips events while the task replays, so each event is logged once:
+Deleting a tree cancels its unfinished tasks. A task ID therefore deduplicates schedules
+until its task is deleted, and scheduling it after the deletion runs the request again.
+Completions and delay resumes which arrive for deleted tasks are ignored. See
+[Retention and deletion](durable-tasks-operations.md#retention-and-deletion) for
+operational details.
 
-:::code source="../diagnostics/snippets/durable-tasks/Orleans0215.cs" id="orleans0215_fix" language="csharp":::
+## Configure the silo and clients
+
+Durable tasks need Journaling storage and Durable Jobs storage.
+`AddDurableTasks` on the silo builder adds Messaging and the durable task runtime,
+stores task state in the grain's journal, and registers the JSON metadata which the
+JSON journal format needs for task state. Its optional callback configures
+`DurableTaskOptions`. For development, configure in-memory storage:
+
+:::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_registration" language="csharp":::
+
+External clients which schedule, observe, cancel, or signal durable tasks register the
+client-side adapter:
+
+:::code source="../snippets/compiled-durable/Grains/DurableTaskSnippets.cs" id="durable_tasks_client_registration" language="csharp":::
+
+Grains which derive from <xref:Orleans.Journaling.DurableGrain> host durable tasks, and
+`AddDurableTasks` gives every such grain an inbox and an outbox. During activation setup,
+before journal recovery, the runtime binds to the grain's journal, inbox, and outbox,
+and the grain can inject `IDurableTaskManager` to observe, cancel, abort, and signal its
+own tasks. Task state can use any journal format; requests and results are stored with
+the Orleans serializer. Use shared, production-grade Journaling and Durable Jobs
+providers for multi-silo deployments; see
+[Journaling configuration](journaling/configuration.md).

@@ -94,8 +94,6 @@ items:
             href: grains/event-sourcing/log-consistency-providers.md
           - name: Replicated instances
             href: grains/event-sourcing/replicated-instances.md
-      - name: Durable tasks (experimental)
-        href: grains/durable-tasks.md
       - name: Journaling (experimental)
         items:
           - name: Overview
@@ -128,6 +126,14 @@ items:
             href: grains/messaging-recipes.md
           - name: Operations and throughput
             href: grains/messaging-operations.md
+      - name: Durable tasks
+        items:
+          - name: Programming model and guarantees
+            href: grains/durable-tasks.md
+          - name: Practical recipes
+            href: grains/durable-tasks-recipes.md
+          - name: Operations and troubleshooting
+            href: grains/durable-tasks-operations.md
       - name: Transactions
         href: grains/transactions.md
   - name: Serialization and code generation
