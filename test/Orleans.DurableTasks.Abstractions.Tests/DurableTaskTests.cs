@@ -4885,6 +4885,31 @@ public class SchedulingTests
     }
 
     [Fact]
+    public async Task ConfiguredTaskCopiesTargetTheScheduledTask()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var parent = host.CreateContext(TaskId.CreateRoot("copy-parent"));
+        var release = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        ScheduledTask<int>? scheduled = null;
+
+        await host.RunWithAmbientAsync(parent, async () =>
+        {
+            var configured = DurableTask.Run(async _ => await release.Task).WithId("copied-child");
+            var copy = configured;
+            scheduled = await configured.ScheduleAsync();
+            Assert.Equal(DurableTaskStatus.Pending, await copy.PollAsync());
+            await copy.CancelAsync();
+            Assert.Throws<InvalidOperationException>(() => copy.WithId("renamed"));
+        });
+
+        var childId = TaskId.Parse("copy-parent/copied-child");
+        Assert.Equal(childId, scheduled!.Id);
+        Assert.Equal([childId], host.EntryIds);
+        Assert.True(host.IsCancellationRequested(childId));
+        release.SetResult(1);
+    }
+
+    [Fact]
     public async Task ConfiguredTaskControlOperationsSelectParentAndRootHandles()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
