@@ -104,7 +104,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
         await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, payload, write: true);
 
-        // The receiver has no handler, so delivery attempts fail until MaxOutboxRetryAge elapses.
+        // The receiver has no handler, so delivery attempts fail until OutboxRetryTimeout elapses.
         await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 1);
         var (state, deadLetters) = await OnGrainAsync(sender, context => (
             Grain(context).GetState(),
@@ -117,7 +117,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(payload, letter.Message.Envelope.Payload);
         Assert.Equal(SourceSinkGrain.Subject, letter.Message.Envelope.Subject);
         Assert.True(letter.AttemptCount > 1);
-        // Each attempt materializes the message, as does a final wake which finds the retry period expired.
+        // Each attempt materializes the message, as does a final wake which finds the retry timeout expired.
         Assert.InRange(Probe.For(sender).Materializations, letter.AttemptCount + 1, letter.AttemptCount + 2);
 
         // The dead letter keeps its own copy for diagnosis.

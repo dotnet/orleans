@@ -178,7 +178,7 @@ message. Any other outcome schedules a durable retry with exponential backoff,
 and later batches deliver other messages meanwhile. The outbox retries
 `Backpressured` until the receiver takes the message. It logs `HandlerNotFound` as
 an error. Other failures, including calls which fail without an answer during an
-outage, dead-letter the message after `MaxOutboxRetryAge` (6 hours) from the first
+outage, dead-letter the message after `OutboxRetryTimeout` (6 hours) from the first
 failed attempt since the last `Backpressured` answer. Each attempt runs through the
 `DeliveryResiliencePipeline` Polly pipeline, which can add timeouts, retries, or a
 circuit breaker. Delivery order is unspecified.

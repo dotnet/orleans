@@ -69,10 +69,10 @@ public sealed class OutboxDeliveryResilienceTests
     }
 
     [Fact]
-    public async Task Backpressured_RetriesBeyondTheRetryAgeUntilTheReceiverTakesTheMessage()
+    public async Task Backpressured_RetriesBeyondTheRetryTimeoutUntilTheReceiverTakesTheMessage()
     {
-        var retryAge = TimeSpan.FromMilliseconds(100);
-        await using var fixture = await StartAsync(Scripted, options => options.MaxOutboxRetryAge = retryAge);
+        var retryTimeout = TimeSpan.FromMilliseconds(100);
+        await using var fixture = await StartAsync(Scripted, options => options.OutboxRetryTimeout = retryTimeout);
         const int BackpressuredAttempts = 8;
         fixture.Strategy.Script(Enumerable.Repeat(Step.Answer(DeliveryResult.Backpressured()), BackpressuredAttempts).ToArray());
         var elapsed = Stopwatch.StartNew();
@@ -80,16 +80,16 @@ public sealed class OutboxDeliveryResilienceTests
         var (sender, receiver) = await SendAsync(fixture, "backpressured");
 
         var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
-        Assert.True(elapsed.Elapsed > retryAge);
+        Assert.True(elapsed.Elapsed > retryTimeout);
         Assert.Equal("backpressured", Assert.Single(delivered.Effects).Value);
         Assert.Equal(BackpressuredAttempts + 1, fixture.Strategy.Executions);
         Assert.Empty((await fixture.WaitForOutboxCountAsync(sender, 0)).OutboxDeadLetters);
     }
 
     [Fact]
-    public async Task UnansweredAttempts_DeadLetterAfterMaxOutboxRetryAge()
+    public async Task UnansweredAttempts_DeadLetterAfterOutboxRetryTimeout()
     {
-        await using var fixture = await StartAsync(Scripted, static options => options.MaxOutboxRetryAge = TimeSpan.FromMilliseconds(100));
+        await using var fixture = await StartAsync(Scripted, static options => options.OutboxRetryTimeout = TimeSpan.FromMilliseconds(100));
         fixture.Strategy.Repeat(Step.Unanswered());
 
         var (sender, receiver) = await SendAsync(fixture, "unanswered");
@@ -101,14 +101,14 @@ public sealed class OutboxDeliveryResilienceTests
     }
 
     [Fact]
-    public async Task Backpressured_RestartsTheRetryAge()
+    public async Task Backpressured_RestartsTheRetryTimeout()
     {
-        // Each failing span stays within the retry age, while both spans together exceed it.
+        // Each failing span stays within the retry timeout, while both spans together exceed it.
         var timeout = TimeSpan.FromMilliseconds(1600);
         await using var fixture = await StartAsync(Scripted, static options =>
         {
-            options.MaxOutboxRetryAge = TimeSpan.FromSeconds(3);
-            options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(1);
+            options.OutboxRetryTimeout = TimeSpan.FromSeconds(3);
+            options.RetryInitialInterval = TimeSpan.FromMilliseconds(1);
         });
         fixture.Strategy.Script(Step.Unanswered(timeout), Step.Answer(DeliveryResult.Backpressured()), Step.Answer(DeliveryResult.HandlerNotFound(), timeout));
 
@@ -121,9 +121,9 @@ public sealed class OutboxDeliveryResilienceTests
     }
 
     [Fact]
-    public async Task HandlerNotFound_DeadLettersAfterMaxOutboxRetryAge()
+    public async Task HandlerNotFound_DeadLettersAfterOutboxRetryTimeout()
     {
-        await using var fixture = await StartAsync(Scripted, static options => options.MaxOutboxRetryAge = TimeSpan.FromSeconds(3));
+        await using var fixture = await StartAsync(Scripted, static options => options.OutboxRetryTimeout = TimeSpan.FromSeconds(3));
         fixture.Strategy.Repeat(Step.Answer(DeliveryResult.HandlerNotFound()));
 
         var (sender, receiver) = await SendAsync(fixture, "unhandled");
@@ -168,7 +168,7 @@ public sealed class OutboxDeliveryResilienceTests
         protected override void ConfigureOptions(DurableMessagingOptions options)
         {
             base.ConfigureOptions(options);
-            options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(5);
+            options.RetryInitialInterval = TimeSpan.FromMilliseconds(5);
             options.DeliveryResiliencePipeline = createPipeline(Strategy);
             configure?.Invoke(options);
         }

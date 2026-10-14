@@ -35,9 +35,9 @@ internal sealed class OutboxMessageState
     [Id(2)]
     public string? LastError { get; set; }
 
-    /// <summary>Gets or sets when the current run of failed attempts started; a backpressured attempt ends the run.</summary>
+    /// <summary>Gets or sets when the outbox stops retrying and dead-letters the message; a backpressured attempt clears it.</summary>
     [Id(3)]
-    public DateTimeOffset? RetryingSince { get; set; }
+    public DateTimeOffset? ExpirationTime { get; set; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetter")]
