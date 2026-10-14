@@ -24,6 +24,11 @@ public interface IDurableTaskGrainStorage
     void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint);
     void SetRemoteRequest(TaskId taskId, IDurableTaskState state, GrainId target, string fingerprint);
     void SetCallerId(TaskId taskId, IDurableTaskState state, GrainId callerId);
+
+    /// <summary>
+    /// Stores the task's terminal <paramref name="response"/>, stamping its completion time and the next
+    /// <see cref="IDurableTaskState.CompletionSequence"/>.
+    /// </summary>
     void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response);
 
     /// <summary>Records that cancellation of a non-terminal task was requested, with the request's reason, if any.</summary>

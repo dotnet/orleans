@@ -1641,6 +1641,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var rootId = TaskId.Parse("root");
         var first = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(1, () => DurableTask.Run(async _ =>
         {
             var (index, result) = await DurableTask.WhenAny(
@@ -1652,6 +1653,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 }),
                 DurableTask.Run(async cancellationToken =>
                 {
+                    secondStarted.TrySetResult();
                     await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                     return 0;
                 }),
@@ -1662,8 +1664,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        // Complete the first candidate only once the selection has found no winner and waits.
-        await WaitUntilAsync(() => storage.Tasks.Any(task => task.Id.ToString().EndsWith("/$winner", StringComparison.Ordinal)));
+        // Complete the first candidate only once both candidates run, so the selection has found no winner and waits.
+        await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
         first.SetResult(7);
         var response = await runtime.GetScheduledTaskHandle(rootId)
@@ -1672,6 +1674,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Equal(7, response.GetResult<int>());
+
+        // The candidates' completion order selects the winner, so no decision is recorded.
+        Assert.DoesNotContain(storage.Tasks, task => task.Id.ToString().EndsWith("/$winner", StringComparison.Ordinal));
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     });
 
@@ -3598,6 +3603,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         private readonly Dictionary<TaskId, TestTaskState> _states = [];
         private readonly DurableTaskHierarchy _hierarchy = new();
         private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+        private long _lastCompletionSequence;
 
         public TestDurableDictionary<TaskId, DateTimeOffset> LogicalTimes { get; } = [];
 
@@ -3657,6 +3663,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         {
             ((TestTaskState)state).Result = response;
             ((TestTaskState)state).CompletedAt = _timeProvider.GetUtcNow();
+            ((TestTaskState)state).CompletionSequence = ++_lastCompletionSequence;
             ((TestTaskState)state).DueTime = null;
             if (((TestTaskState)state).ResumeGeneration > 0)
             {
@@ -3739,6 +3746,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public GrainId RemoteTarget { get; set; }
         public string? RemoteRequestFingerprint { get; set; }
         public GrainId CallerId { get; set; }
+        public long CompletionSequence { get; set; }
         IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     }
 

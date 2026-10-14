@@ -129,6 +129,25 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     internal Task OnActivateAsync(CancellationToken cancellationToken) => ResumePendingTasksAsync(cancellationToken);
 
+    /// <summary>
+    /// Returns the candidate which completed first: the stored candidate with the lowest completion sequence, which needs
+    /// no record, or a winner recorded under <paramref name="decisionId"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Storage stamps each result with a sequence when it stages the result, and a later result receives a higher
+    /// sequence. A candidate whose result is staged commits in the same write as, or an earlier write than, every result
+    /// with a higher sequence, so when a candidate's handle completes, every candidate with a lower sequence is stored.
+    /// The lowest stored sequence is therefore the same in a live attempt, which selects among the results staged so far,
+    /// and in every replay, in which more candidates can have completed.
+    /// </para>
+    /// <para>
+    /// A candidate can complete without a sequence: a child which a custom scheduler runs, a child of a canceled ancestor
+    /// which isn't stored, or a result stored before sequences were stamped. When such a completion is observed first, or a
+    /// recorded decision already exists, the selection is recorded under <paramref name="decisionId"/> and replays from
+    /// that record.
+    /// </para>
+    /// </remarks>
     public async ValueTask<TaskId> SelectCompletionAsync(
         TaskId decisionId,
         IReadOnlyList<TaskId> candidates,
@@ -136,8 +155,73 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         ThrowIfStopping();
         cancellationToken.ThrowIfCancellationRequested();
-        var fingerprint = GetCompletionDecisionFingerprint(candidates);
         if (_storage.TryGetTask(decisionId, out var decision))
+        {
+            return await SelectRecordedCompletionAsync(decisionId, decision, candidates, cancellationToken);
+        }
+
+        for (var observedCompletion = false; ; observedCompletion = true)
+        {
+            var (first, unordered) = FindFirstStoredCompletion(candidates);
+            if (!unordered && first >= 0)
+            {
+                return candidates[first];
+            }
+
+            // A handle which completed without a stored, sequenced result has no durable order.
+            if (unordered || observedCompletion)
+            {
+                return await SelectRecordedCompletionAsync(decisionId, decision: null, candidates, cancellationToken);
+            }
+
+            await WaitForAnyAsync(candidates, cancellationToken);
+            ThrowIfStopping();
+        }
+    }
+
+    /// <summary>
+    /// Returns the index of the stored candidate with the lowest completion sequence, or -1, and whether a candidate's
+    /// stored result has no sequence.
+    /// </summary>
+    /// <remarks>Reads stored completion metadata only, without decoding results.</remarks>
+    private (int Index, bool Unordered) FindFirstStoredCompletion(IReadOnlyList<TaskId> candidates)
+    {
+        var first = -1;
+        var firstSequence = long.MaxValue;
+        for (var index = 0; index < candidates.Count; index++)
+        {
+            if (!_storage.TryGetTask(candidates[index], out var state) || !HasStoredResult(state))
+            {
+                continue;
+            }
+
+            var sequence = state.CompletionSequence;
+            if (sequence <= 0)
+            {
+                return (-1, true);
+            }
+
+            if (sequence < firstSequence)
+            {
+                (first, firstSequence) = (index, sequence);
+            }
+        }
+
+        return (first, false);
+    }
+
+    /// <summary>
+    /// Returns the winner recorded under <paramref name="decisionId"/>, or records the first candidate in candidate order
+    /// whose handle has completed.
+    /// </summary>
+    private async ValueTask<TaskId> SelectRecordedCompletionAsync(
+        TaskId decisionId,
+        IDurableTaskState? decision,
+        IReadOnlyList<TaskId> candidates,
+        CancellationToken cancellationToken)
+    {
+        var fingerprint = GetCompletionDecisionFingerprint(candidates);
+        if (decision is not null)
         {
             if (decision.Request is not null
                 || !decision.RemoteTarget.IsDefault

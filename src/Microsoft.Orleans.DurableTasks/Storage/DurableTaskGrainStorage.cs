@@ -23,6 +23,12 @@ namespace Orleans.DurableTasks.Storage;
 /// The task hierarchy is indexed in memory. The index is built from the recovered tasks on first use, then maintained
 /// as tasks are created and removed; the journal recovers once per activation, before the runtime uses the storage.
 /// </para>
+/// <para>
+/// Each stored result is stamped with the next completion sequence. The last sequence isn't journaled: it is derived
+/// from the recovered tasks on first use, as their highest sequence, so a stamp costs no journal entry of its own.
+/// Deleting a terminal execution tree can lower the derived value, but the combinators which compare sequences only
+/// compare tasks of a running execution, which remain stored.
+/// </para>
 /// </remarks>
 internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
 {
@@ -34,6 +40,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     private readonly Serializer _serializer;
     private readonly Func<TaskId, bool> _isStored;
     private DurableTaskHierarchy? _hierarchy;
+    private long? _lastCompletionSequence;
 
     public DurableTaskGrainStorage(
         [FromKeyedServices("$tasks")] IDurableDictionary<TaskId, DurableTaskState> items,
@@ -133,6 +140,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         var typedState = GetState(taskId, state);
         typedState.SetResult(response);
         typedState.CompletedAt = _timeProvider.GetUtcNow();
+        typedState.CompletionSequence = NextCompletionSequence();
         typedState.DueTime = null;
         if (typedState.ResumeGeneration > 0)
         {
@@ -140,6 +148,21 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         }
         _items[taskId] = typedState;
         _results[taskId] = typedState.ResultPayload!;
+    }
+
+    private long NextCompletionSequence()
+    {
+        if (_lastCompletionSequence is not { } last)
+        {
+            last = 0;
+            foreach (var (_, state) in _items)
+            {
+                last = Math.Max(last, state.CompletionSequence);
+            }
+        }
+
+        _lastCompletionSequence = ++last;
+        return last;
     }
 
     public void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null)
@@ -231,6 +254,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _requests.Clear();
         _results.Clear();
         _hierarchy = null;
+        _lastCompletionSequence = null;
     }
 
     public ValueTask WriteAsync(CancellationToken cancellationToken) =>
@@ -239,6 +263,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
     public ValueTask ReadAsync(CancellationToken cancellationToken)
     {
         _hierarchy = null;
+        _lastCompletionSequence = null;
         return _stateManager.InitializeAsync(cancellationToken);
     }
 

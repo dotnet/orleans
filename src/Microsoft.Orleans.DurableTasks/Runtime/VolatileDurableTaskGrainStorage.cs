@@ -28,6 +28,9 @@ public class VolatileDurableTaskGrainStorage(
     private Dictionary<TaskId, DurableTaskState> _persistedCopy = [];
     private DurableTaskHierarchy _hierarchy = new();
 
+    // The last completion sequence, derived from the working copy's tasks on first use after a read.
+    private long? _lastCompletionSequence;
+
     public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks => _workingCopy.Select(static pair => (pair.Key, (IDurableTaskState)pair.Value));
 
     public void AddOrUpdateTask(TaskId taskId, DurableTaskState state)
@@ -80,6 +83,7 @@ public class VolatileDurableTaskGrainStorage(
         }
 
         _hierarchy = DurableTaskHierarchy.Create(_workingCopy.Keys);
+        _lastCompletionSequence = null;
         return default;
     }
 
@@ -150,12 +154,20 @@ public class VolatileDurableTaskGrainStorage(
         var typedState = GetState(taskId, state);
         typedState.SetResult(response);
         typedState.CompletedAt = _timeProvider.GetUtcNow();
+        typedState.CompletionSequence = NextCompletionSequence();
         typedState.DueTime = null;
         if (typedState.ResumeGeneration > 0)
         {
             typedState.ResumeGeneration = checked(typedState.ResumeGeneration + 1);
         }
         AddOrUpdateTask(taskId, typedState);
+    }
+
+    private long NextCompletionSequence()
+    {
+        var last = _lastCompletionSequence ?? (_workingCopy.Count == 0 ? 0 : _workingCopy.Values.Max(static state => state.CompletionSequence));
+        _lastCompletionSequence = ++last;
+        return last;
     }
 
     public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination)
@@ -241,6 +253,7 @@ public class VolatileDurableTaskGrainStorage(
     {
         _workingCopy.Clear();
         _hierarchy.Clear();
+        _lastCompletionSequence = null;
     }
 
     public void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null)
