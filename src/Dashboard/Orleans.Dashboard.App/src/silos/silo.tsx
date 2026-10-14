@@ -6,6 +6,19 @@ import ChartWidget from '../components/multi-series-chart-widget';
 import Panel from '../components/panel';
 import Chart from '../components/time-series-chart';
 
+const byteUnits = ['B', 'KB', 'MB', 'GB', 'TB'];
+
+function formatBytes(bytes: number): string {
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < byteUnits.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+
+  return unit === 0 ? `${value} B` : `${value.toFixed(1)} ${byteUnits[unit]}`;
+}
+
 interface SiloDataPoint {
   count: number;
   elapsedTime: number;
@@ -19,9 +32,6 @@ interface SiloDataPoint {
   clientCount?: number;
   receivedMessages?: number;
   sentMessages?: number;
-  receiveQueueLength?: number;
-  requestQueueLength?: number;
-  sendQueueLength?: number;
 }
 
 interface SiloStatsData {
@@ -146,11 +156,8 @@ export default class Silo extends React.Component<SiloProps> {
     const last = this.props.data[this.props.data.length - 1]!;
     const properties: { [key: string]: string | number } = {
       Clients: last.clientCount || '0',
-      'Messages received': last.receivedMessages || '0',
-      'Messages sent': last.sentMessages || '0',
-      'Receive queue': last.receiveQueueLength || '0',
-      'Request queue': last.requestQueueLength || '0',
-      'Send queue': last.sendQueueLength || '0'
+      'Bytes received': formatBytes(last.receivedMessages || 0),
+      'Bytes sent': formatBytes(last.sentMessages || 0)
     };
 
     const grainStats = (

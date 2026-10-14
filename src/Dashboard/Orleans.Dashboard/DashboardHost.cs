@@ -15,6 +15,7 @@ namespace Orleans.Dashboard;
 internal sealed partial class DashboardHost(
     ILogger<DashboardHost> logger,
     ILocalSiloDetails localSiloDetails,
+    OrleansInstruments instruments,
     IGrainFactory grainFactory,
     DashboardTelemetryExporter dashboardTelemetryExporter,
     ISiloGrainClient siloGrainClient) : IHostedService, IAsyncDisposable, IDisposable
@@ -60,7 +61,9 @@ internal sealed partial class DashboardHost(
     private Task StartOpenTelemetryConsumerAsync()
     {
         _meterProvider = Sdk.CreateMeterProviderBuilder()
-            .AddMeter("Orleans")
+            .AddMeter(instruments.Meter.Name)
+            // Multiple silos and clients can publish identically named meters in one process.
+            .AddView(instrument => ReferenceEquals(instrument.Meter, instruments.Meter) ? null : MetricStreamConfiguration.Drop)
             .AddReader(new PeriodicExportingMetricReader(dashboardTelemetryExporter, 1000, 1000))
             .Build();
         return Task.CompletedTask;

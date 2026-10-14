@@ -1,5 +1,10 @@
 /* Custom styles for Orleans Dashboard layout */
 
+/* AdminLTE limits the sidebar to the viewport height. Scroll menus taller than it. */
+.app-sidebar {
+  overflow-y: auto;
+}
+
 /* Brand logo styling */
 .brand-logo {
   height: 45px;
