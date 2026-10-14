@@ -342,12 +342,12 @@ public sealed partial class DurableTaskSignalTests
     });
 
     [Fact]
-    public Task SignalWhoseInvocationNeverArrivesIsDeletedAfterTheSendersRetryAge() => ActivationScheduler.RunAsync(async () =>
+    public Task SignalWhoseInvocationNeverArrivesIsDeletedAfterTheSendersRetryTimeout() => ActivationScheduler.RunAsync(async () =>
     {
         var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
         var harness = new Harness(time);
         var handler = new DurableTaskMessageHandler(harness.Runtime, MessagingTestHelpers.MessageTypes);
-        var retryAge = new DurableMessagingOptions().MaxOutboxRetryAge;
+        var retryAge = new DurableMessagingOptions().OutboxRetryTimeout;
         Assert.True(handler.TryAccept(CreateSignalMessage(harness, GrainId.Create("caller", "one"), WorkflowId, "ada"), out _));
         await harness.Manager.WriteStateAsync(TestCancellation);
 
