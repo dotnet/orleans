@@ -220,7 +220,7 @@ internal sealed partial class DurableTaskGrainRuntime
         var response = DurableTaskResponse.FromResult(value);
 
         // A durable execution records the send, so its replay doesn't depend on the target's current state.
-        return DurableExecutionContext.Current is GrainDurableExecutionContext context
+        return DurableTaskContext.TryGetCurrent(out var current) && current is GrainDurableTaskContext context
             ? context.SendSignalAsync(GrainId, taskId, signal.Name, response, throwOnRejection, cancellationToken)
             : SignalOwnTaskAsync(taskId, signal.Name, response, throwOnRejection, cancellationToken);
     }

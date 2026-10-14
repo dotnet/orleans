@@ -58,12 +58,12 @@ public static class DurableTaskGrainExtensions
         }
 
         var response = DurableTaskResponse.FromResult(value);
-        return DurableExecutionContext.Current is GrainDurableExecutionContext context
+        return DurableTaskContext.TryGetCurrent(out var current) && current is GrainDurableTaskContext context
             ? SendFromExecutionAsync(context, target.GetGrainId(), taskId, signal.Name, response, cancellationToken)
             : target.AsReference<IDurableTaskGrainExtension>().SignalAsync(taskId, signal.Name, response, cancellationToken);
 
         static async ValueTask SendFromExecutionAsync(
-            GrainDurableExecutionContext context,
+            GrainDurableTaskContext context,
             GrainId target,
             TaskId taskId,
             string name,
@@ -131,7 +131,7 @@ public static class DurableTaskGrainExtensions
             throw new ArgumentException("A signal requires a task identifier.", nameof(taskId));
         }
 
-        if (DurableExecutionContext.Current is not null)
+        if (DurableTaskContext.TryGetCurrent(out _))
         {
             throw new InvalidOperationException(
                 "A durable execution sends signals to other grains with SignalDurableTaskAsync, which records the send for replay.");

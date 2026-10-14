@@ -28,7 +28,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 await BlockedChild(started).WithId("work");
                 return "completed";
             }
-            catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+            catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
             {
                 return "compensated";
             }
@@ -76,7 +76,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 await DurableTask.WhenAll([BlockedChild(started), DurableTask.Delay(TimeSpan.FromDays(1))]).WithId("work");
                 return "completed";
             }
-            catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+            catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
             {
                 return "canceled";
             }
@@ -170,7 +170,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var firstAttemptBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(1, () => DurableTask.Run(async _ =>
         {
-            var context = DurableExecutionContext.Current!;
+            var context = DurableTask.Current;
             var step = await DurableTask.Run(_ => Interlocked.Increment(ref stepRuns)).WithId("step");
             if (Interlocked.Increment(ref attempts) == 1)
             {
@@ -298,7 +298,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             {
                 return await DurableTask.Run(async cancellationToken =>
                 {
-                    var context = DurableExecutionContext.Current!;
+                    var context = DurableTask.Current;
                     workStarted.TrySetResult();
                     try
                     {

@@ -30,12 +30,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                     await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                     return "completed";
                 }
-                catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+                catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
                 {
-                    return DurableExecutionContext.Current.CancellationReason;
+                    return DurableTask.Current.CancellationReason;
                 }
             }).WithId("work");
-            return $"{DurableExecutionContext.Current!.CancellationReason}|{childReason}";
+            return $"{DurableTask.Current.CancellationReason}|{childReason}";
         })));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
@@ -154,7 +154,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             }
             catch (OperationCanceledException)
             {
-                return DurableExecutionContext.Current!.CancellationReason;
+                return DurableTask.Current.CancellationReason;
             }
         })));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -181,7 +181,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var firstAttemptBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(1, () => DurableTask.Run(async _ =>
         {
-            var context = DurableExecutionContext.Current!;
+            var context = DurableTask.Current;
             if (Interlocked.Increment(ref attempts) == 1)
             {
                 firstAttemptBlocked.TrySetResult();
@@ -313,7 +313,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var results = new List<DurableSignalResult>();
         var request = CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
         {
-            var context = DurableExecutionContext.Current!;
+            var context = DurableTask.Current;
             var result = await ((IDurableTaskManager)Volatile.Read(ref current)).TrySignalAsync(targetId, ShippedSignal, "parcel", cancellationToken);
             lock (results)
             {

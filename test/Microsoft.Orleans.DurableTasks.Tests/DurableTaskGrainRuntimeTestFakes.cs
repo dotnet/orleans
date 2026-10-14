@@ -178,7 +178,7 @@ internal sealed class RuntimeTestDurableTaskRequestCopier : IDeepCopier<RuntimeT
 /// <summary>
 /// A hand-written <see cref="DurableTask"/> which also implements <see cref="ISchedulableTask"/>, allowing tests to fully
 /// control the "schedulable task" branch of <c>DurableTaskGrainRuntime.ScheduleChildAsync</c> without depending on ambient
-/// <see cref="DurableExecutionContext.CurrentContext"/> state (unlike, e.g., <c>DurableTask.Delay</c>).
+/// <see cref="DurableTaskContext.CurrentContext"/> state (unlike, e.g., <c>DurableTask.Delay</c>).
 /// </summary>
 internal sealed class TestSchedulableTask(
     Func<TaskId, CancellationToken, ValueTask<DurableTaskResponse>> scheduleAsync,
@@ -196,7 +196,7 @@ internal sealed class TestSchedulableTask(
         ? getHandle(taskId)
         : new PendingScheduledTaskHandle(taskId);
 
-    protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context) => throw new NotSupportedException("This test task is not directly runnable.");
+    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) => throw new NotSupportedException("This test task is not directly runnable.");
 
     private sealed class PendingScheduledTaskHandle(TaskId taskId) : IScheduledTaskHandle
     {

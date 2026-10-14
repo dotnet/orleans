@@ -109,9 +109,10 @@ place-order-{orderId}/ship
 ```
 
 - <xref:Orleans.DurableTasks.DurableTaskExtensions.WithId*> names a child with a stable
-  segment. A child awaited without a name receives a generated segment, which begins
-  with `$` and follows the order in which the execution creates unnamed children. The
-  `$` prefix is reserved for generated segments.
+  segment. A name which one run repeats, for example in a loop, identifies its later
+  occurrences by their order: `line`, `line$2`, `line$3`. A child awaited without a name
+  receives a generated segment, which begins with `$` and follows the order in which the
+  execution creates unnamed children. Names don't contain `$`.
 - A named combinator gives its inputs IDs beneath its own:
   `DurableTask.WhenAll(...).WithId("reserve")` identifies its inputs as `reserve/0`,
   `reserve/1`, and so on, in input order.
@@ -165,7 +166,7 @@ children, with the same IDs and arguments, in the same order.
   values from the method's arguments, earlier results, and other values which are the
   same on every replay.
 - Read time from
-  <xref:Orleans.DurableTasks.DurableExecutionContext.UtcNow?displayProperty=nameWithType>,
+  <xref:Orleans.DurableTasks.DurableTaskContext.UtcNow?displayProperty=nameWithType>,
   the execution's logical time. The runtime persists it before the execution's effects
   commit and advances it to the recorded completion time of each child result the
   execution observes, so a replay observes the same times and a delay starts when the
@@ -250,7 +251,7 @@ The request commits before it propagates through the task's execution tree:
 - Delays, children whose bodies haven't started, and new children which the canceled
   task schedules terminate as canceled without running.
 - Running children observe the request through
-  <xref:Orleans.DurableTasks.DurableExecutionContext.CancellationToken?displayProperty=nameWithType>,
+  <xref:Orleans.DurableTasks.DurableTaskContext.CancellationToken?displayProperty=nameWithType>,
   and pending calls to other grains receive a cancellation which their callee applies
   to its own task.
 - The task's body decides its outcome. Awaiting a canceled child throws
@@ -260,12 +261,12 @@ The request commits before it propagates through the task's execution tree:
   observes the request from the start, so the body takes the same path.
 
 The first request's reason is durable:
-<xref:Orleans.DurableTasks.DurableExecutionContext.CancellationReason?displayProperty=nameWithType>
+<xref:Orleans.DurableTasks.DurableTaskContext.CancellationReason?displayProperty=nameWithType>
 returns it in the canceled execution, its descendants, and every replay, and the
 cancellation carries it to pending calls to other grains.
 
 A body compensates inline inside a
-<xref:Orleans.DurableTasks.DurableExecutionContext.SuppressCancellation*?displayProperty=nameWithType>
+<xref:Orleans.DurableTasks.DurableTaskContext.SuppressCancellation*?displayProperty=nameWithType>
 scope. Each child which the body schedules in the scope, including local steps, delays,
 calls to other grains, and combinator inputs, runs to completion although the task's
 cancellation was requested, and a later request skips it. The scope follows the
