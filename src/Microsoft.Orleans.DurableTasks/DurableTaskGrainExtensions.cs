@@ -17,7 +17,7 @@ public static class DurableTaskGrainExtensions
     /// <typeparam name="TResult">The durable task result type.</typeparam>
     /// <param name="target">The grain which owns the durable task.</param>
     /// <param name="rootId">The stable root task identifier.</param>
-    /// <returns>A handle which can poll, wait for, or cancel the existing durable task.</returns>
+    /// <returns>A handle which can poll, wait for, cancel, or abort the existing durable task.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="target"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException"><paramref name="rootId"/> is empty or whitespace.</exception>
     public static ScheduledTask<TResult> GetDurableTask<TResult>(this IAddressable target, string rootId)
@@ -41,6 +41,9 @@ internal sealed class AttachedScheduledTask<TResult>(
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) =>
         _handle.CancelAsync(cancellationToken);
+
+    protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) =>
+        _handle.AbortAsync(reason, cancellationToken);
 
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(
         PollingOptions options,

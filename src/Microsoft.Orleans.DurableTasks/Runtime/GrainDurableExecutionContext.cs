@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using System.Threading;
@@ -12,28 +13,57 @@ namespace Orleans.DurableTasks.Runtime;
 /// Executes one attempt of a durable task within a grain activation.
 /// </summary>
 /// <remarks>
-/// The activation shutdown token is the attempt's host execution-abort token: <see cref="DurableExecutionContext.CancellationToken"/>
-/// observes it, while <see cref="DurableExecutionContext.IsCancellationRequested"/> reports durable cancellation only.
-/// Shutdown drains the aborted attempt, discards its response, and the next activation replays the task in a new context.
+/// The attempt's host execution-abort token is canceled when the activation shuts down or when the task is aborted:
+/// <see cref="DurableExecutionContext.CancellationToken"/> observes it, while
+/// <see cref="DurableExecutionContext.IsCancellationRequested"/> reports durable cancellation only. The runtime drains the
+/// aborted attempt and discards its response; after shutdown, the next activation replays the task in a new context.
 /// </remarks>
-internal sealed class GrainDurableExecutionContext(
-    TaskId taskId,
-    IDurableTaskGrainRuntime runtime,
-    TaskScheduler scheduler,
-    CancellationToken shutdownToken,
-    DateTimeOffset? utcNow = null) : DurableExecutionContext(taskId, shutdownToken)
+internal sealed class GrainDurableExecutionContext : DurableExecutionContext
 {
-    private readonly IDurableTaskGrainRuntime _runtime = runtime;
-    private readonly TaskScheduler _scheduler = scheduler;
-    private long _utcNowTicks = (utcNow ?? runtime.UtcNow).UtcTicks;
-    private readonly CancellationToken _shutdownToken = shutdownToken;
+    private readonly IDurableTaskGrainRuntime _runtime;
+    private readonly TaskScheduler _scheduler;
+    private long _utcNowTicks;
+
+    // The attempt's abort source. It is linked to activation shutdown through a registration which the attempt releases
+    // when it ends, so a completed attempt retains nothing on the shutdown token.
+    private readonly CancellationTokenSource _abortSource;
+    private readonly CancellationTokenRegistration _shutdownRegistration;
     private HashSet<string>? _childNames;
     private bool _deleted;
+    private bool _aborted;
 #if NET9_0_OR_GREATER
     private readonly Lock _idLock = new();
 #else
     private readonly object _idLock = new();
 #endif
+
+    public GrainDurableExecutionContext(
+        TaskId taskId,
+        IDurableTaskGrainRuntime runtime,
+        TaskScheduler scheduler,
+        CancellationToken shutdownToken,
+        DateTimeOffset? utcNow = null)
+        : this(taskId, runtime, scheduler, shutdownToken, new CancellationTokenSource(), utcNow)
+    {
+    }
+
+    private GrainDurableExecutionContext(
+        TaskId taskId,
+        IDurableTaskGrainRuntime runtime,
+        TaskScheduler scheduler,
+        CancellationToken shutdownToken,
+        CancellationTokenSource abortSource,
+        DateTimeOffset? utcNow)
+        : base(taskId, abortSource.Token)
+    {
+        _runtime = runtime;
+        _scheduler = scheduler;
+        _utcNowTicks = (utcNow ?? runtime.UtcNow).UtcTicks;
+        _abortSource = abortSource;
+        _shutdownRegistration = shutdownToken.UnsafeRegister(
+            static state => ((CancellationTokenSource)state!).Cancel(),
+            abortSource);
+    }
 
     /// <summary>
     /// Gets this execution's logical time: when the task first ran, advanced to the recorded completion time of each
@@ -71,8 +101,29 @@ internal sealed class GrainDurableExecutionContext(
     /// <remarks>The runtime deletes tasks on the activation scheduler, where this attempt schedules its work.</remarks>
     internal void MarkDeleted() => _deleted = true;
 
+    /// <summary>
+    /// Marks this attempt's task as aborted, so the attempt can no longer schedule durable work. The runtime discards the
+    /// attempt's result and calls <see cref="SignalAbort"/> once the abort is durable.
+    /// </summary>
+    internal void MarkAborted() => _aborted = true;
+
+    /// <summary>Cancels the attempt's host execution-abort token, so the attempt stops.</summary>
+    internal void SignalAbort()
+    {
+        Debug.Assert(_aborted, "Only an aborted attempt is signaled.");
+        _abortSource.Cancel();
+    }
+
+    /// <summary>Releases the attempt's link to activation shutdown once the attempt has ended.</summary>
+    internal void OnAttemptCompleted() => _shutdownRegistration.Dispose();
+
     private void ThrowIfDeleted()
     {
+        if (_aborted)
+        {
+            throw new OperationCanceledException($"Durable task '{TaskId}' was aborted.", _abortSource.Token);
+        }
+
         if (_deleted)
         {
             throw new OperationCanceledException($"Durable task '{TaskId}' was deleted with its execution tree.");
@@ -224,7 +275,7 @@ internal sealed class GrainDurableExecutionContext(
     private CancellationTokenSource CreateExecutionCancellationSource(CancellationToken cancellationToken) =>
         CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
-            _shutdownToken);
+            _abortSource.Token);
 
     private static ValueTask RunOnScheduler(TaskScheduler scheduler, Func<ValueTask> callback)
     {
@@ -292,8 +343,21 @@ internal sealed class GrainDurableExecutionContext(
         {
             using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
-                owner._shutdownToken);
+                owner._abortSource.Token);
             await inner.CancelAsync(executionCts.Token);
+        }
+
+        public ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
+            RunOnScheduler(
+                owner._scheduler,
+                () => AbortCoreAsync(reason, cancellationToken));
+
+        private async ValueTask AbortCoreAsync(string reason, CancellationToken cancellationToken)
+        {
+            using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                owner._abortSource.Token);
+            await inner.AbortAsync(reason, executionCts.Token);
         }
 
         public ValueTask<DurableTaskResponse> PollAsync(
@@ -309,7 +373,7 @@ internal sealed class GrainDurableExecutionContext(
         {
             using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
-                owner._shutdownToken);
+                owner._abortSource.Token);
             return Observe(await inner.PollAsync(options, executionCts.Token));
         }
 
@@ -322,7 +386,7 @@ internal sealed class GrainDurableExecutionContext(
         {
             using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
-                owner._shutdownToken);
+                owner._abortSource.Token);
             return Observe(await inner.WaitAsync(executionCts.Token));
         }
 

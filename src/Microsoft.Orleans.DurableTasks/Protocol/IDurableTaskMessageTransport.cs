@@ -24,6 +24,9 @@ internal interface IDurableTaskMessageTransport
 
     void SendCancellation(GrainId sender, GrainId target, TaskId taskId);
 
+    /// <summary>Stages an administrative abort of a task which <paramref name="target"/> executes for <paramref name="sender"/>.</summary>
+    void SendAbort(GrainId sender, GrainId target, TaskId taskId, string reason);
+
     void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime);
 
 }

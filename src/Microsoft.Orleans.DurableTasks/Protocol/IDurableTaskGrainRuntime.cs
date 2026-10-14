@@ -31,6 +31,18 @@ public interface IDurableTaskServer : IGrainExtension
 
     [Alias("CancelAsync")]
     ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Administratively aborts a task of this grain: commits the task and its execution tree as failed with
+    /// <see cref="DurableTaskAbortedException"/> in one write, and stops their running attempts without running further
+    /// task code.
+    /// </summary>
+    /// <param name="taskId">The task identifier.</param>
+    /// <param name="reason">The reason for the abort, recorded as the exception message.</param>
+    /// <param name="cancellationToken">A token which abandons waiting for the abort to commit.</param>
+    /// <remarks>A task which is terminal, or which this grain doesn't retain, is unchanged.</remarks>
+    [Alias("AbortAsync")]
+    ValueTask AbortAsync(TaskId taskId, string reason, CancellationToken cancellationToken = default);
 }
 
 [GenerateSerializer, Immutable, Alias(nameof(SubscribeOrPollOptions))]

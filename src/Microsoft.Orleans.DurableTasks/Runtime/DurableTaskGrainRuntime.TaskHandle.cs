@@ -46,6 +46,9 @@ internal sealed partial class DurableTaskGrainRuntime
             await cancellation.AsTask().WaitAsync(cancellationToken);
         }
 
+        public async ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
+            await runtime.AbortTaskAsync(TaskId, reason, CancellationToken.None).AsTask().WaitAsync(cancellationToken);
+
         public async ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

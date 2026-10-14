@@ -36,8 +36,25 @@ public interface IDurableTaskManager
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
     /// <returns>An operation which completes once the cancellation request has committed and propagated.</returns>
     /// <remarks>
-    /// The request is monotonic and idempotent, and a terminal task is unchanged. A request for a task which doesn't
-    /// exist yet is recorded, so the task terminalizes as canceled when its invocation arrives.
+    /// The request is monotonic and idempotent, and a terminal task is unchanged. A running task observes the request
+    /// through its durable cancellation token and decides its own outcome; the operation doesn't wait for it to finish.
+    /// A request for a task which doesn't exist yet is recorded, so the task terminalizes as canceled when its
+    /// invocation arrives.
     /// </remarks>
     ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Administratively aborts a task of this grain: commits the task and its execution tree as failed with
+    /// <see cref="DurableTaskAbortedException"/> in one write, and stops their running attempts without running further
+    /// task code.
+    /// </summary>
+    /// <param name="taskId">The task identifier.</param>
+    /// <param name="reason">The reason for the abort, recorded as the exception message.</param>
+    /// <param name="cancellationToken">A token which abandons waiting for the abort to commit.</param>
+    /// <returns>An operation which completes once the abort has committed.</returns>
+    /// <remarks>
+    /// Pending calls to other grains in the tree receive an abort of their own tasks. A task which is terminal, or which
+    /// this grain doesn't retain, is unchanged.
+    /// </remarks>
+    ValueTask AbortAsync(TaskId taskId, string reason, CancellationToken cancellationToken = default);
 }
