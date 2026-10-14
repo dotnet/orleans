@@ -1,4 +1,4 @@
-using StackExchange.Redis;
+using Orleans.Journaling.Ranges;
 
 namespace Orleans.Journaling;
 
@@ -6,10 +6,17 @@ namespace Orleans.Journaling;
 /// Options for journal storage on embedded Garnet partitions.
 /// </summary>
 /// <remarks>
-/// Each journal maps to one of <see cref="BucketCount"/> buckets by a hash of its id, and each bucket is owned by one
-/// partition: one Garnet instance with its own append-only file and checkpoints. A silo either hosts the partition in
-/// process, writing its durable state under <see cref="DataDirectory"/>, or connects to a partition hosted by another
-/// process through <see cref="ConfigurationOptions"/>.
+/// <para>
+/// Each journal maps to one of the range map's buckets by a hash of its id, and each bucket is owned by one partition:
+/// one Garnet instance with its own append-only file and checkpoints. The range map, held in <see cref="MetaStore"/>,
+/// assigns ranges of buckets to partitions and partitions to hosts. A silo hosts the partitions assigned to
+/// <see cref="HostId"/>, with their durable state under <see cref="DataDirectory"/>, and connects to the others at the
+/// endpoints their hosts publish in the map.
+/// </para>
+/// <para>
+/// The first silo to start writes <see cref="InitialRangeMap"/> to an empty MetaStore. If no initial map is configured,
+/// a silo with a <see cref="DataDirectory"/> writes a map with one partition, <c>p0</c>, which it hosts.
+/// </para>
 /// </remarks>
 public sealed class GarnetJournalStorageOptions
 {
@@ -29,34 +36,55 @@ public sealed class GarnetJournalStorageOptions
     public const string DEFAULT_CHECKPOINT_AOF_SIZE = "256m";
 
     /// <summary>
-    /// Gets or sets the directory in which this silo hosts an embedded partition.
+    /// Gets or sets the store holding the range map. Every silo of the cluster must use the same store.
     /// </summary>
     /// <remarks>
-    /// The directory holds the partition's append-only file and checkpoints, and must persist across silo restarts.
-    /// Set either this property or <see cref="ConfigurationOptions"/>.
+    /// Use <see cref="AzureBlobRangeMetaStore"/> for durable clusters, or one shared <see cref="InMemoryRangeMetaStore"/>
+    /// for tests and single-process development.
+    /// </remarks>
+    public IRangeMetaStore? MetaStore { get; set; }
+
+    /// <summary>
+    /// Gets or sets the identifier of this silo in <see cref="PartitionHosting.Host"/>. Defaults to the silo name.
+    /// </summary>
+    /// <remarks>The identifier must be stable across restarts, since the range map assigns partitions to hosts by it.</remarks>
+    public string? HostId { get; set; }
+
+    /// <summary>
+    /// Gets or sets the range map written to an empty <see cref="MetaStore"/>.
+    /// </summary>
+    /// <remarks>
+    /// Once the MetaStore holds a map, this property is ignored. If it is <see langword="null"/>, a silo with a
+    /// <see cref="DataDirectory"/> writes a map in which one partition, <c>p0</c>, owns all <see cref="BucketCount"/>
+    /// buckets and is hosted by this silo; other silos wait for a map.
+    /// </remarks>
+    public RangeMap? InitialRangeMap { get; set; }
+
+    /// <summary>
+    /// Gets or sets the directory under which this silo stores the partitions it hosts.
+    /// </summary>
+    /// <remarks>
+    /// Each hosted partition's append-only file and checkpoints live in the subdirectory named by its
+    /// <see cref="PartitionHosting.StorageLocation"/>. The directory must persist across silo restarts. Silos which host
+    /// no partitions need no directory.
     /// </remarks>
     public string? DataDirectory { get; set; }
 
     /// <summary>
-    /// Gets or sets the client configuration for a partition hosted by another process.
-    /// </summary>
-    /// <remarks>Set either this property or <see cref="DataDirectory"/>.</remarks>
-    [RedactGarnetConfigurationOptions]
-    public ConfigurationOptions? ConfigurationOptions { get; set; }
-
-    /// <summary>
-    /// Gets or sets the endpoint on which the embedded partition accepts connections.
+    /// Gets or sets the endpoint on which this silo's partitions accept connections.
     /// </summary>
     /// <remarks>
-    /// Defaults to a free port on the loopback interface. Silos which connect to this partition through
-    /// <see cref="ConfigurationOptions"/> require an endpoint reachable from their hosts. Port 0 chooses a free port.
+    /// Defaults to free ports on the loopback interface, which suits single-machine clusters; multi-machine clusters
+    /// require an address reachable from every silo. With port 0, each partition listens on a free port; otherwise the
+    /// partitions this silo hosts listen on consecutive ports from this one, in partition id order. Hosts publish the
+    /// address, or the machine's host name for a wildcard address, in the range map.
     /// </remarks>
     public System.Net.IPEndPoint? ListenEndPoint { get; set; }
 
     /// <summary>
-    /// Gets or sets the number of buckets journals are hashed into. Must be a power of two.
+    /// Gets or sets the number of buckets in the default initial range map. Must be a power of two.
     /// </summary>
-    /// <remarks>The bucket count is fixed when a partition is first initialized.</remarks>
+    /// <remarks>The bucket count is fixed when the range map is created.</remarks>
     public int BucketCount { get; set; } = DEFAULT_BUCKET_COUNT;
 
     /// <summary>
@@ -65,7 +93,8 @@ public sealed class GarnetJournalStorageOptions
     public long CompactionThresholdBytes { get; set; } = DEFAULT_COMPACTION_THRESHOLD_BYTES;
 
     /// <summary>
-    /// Gets or sets how long an operation retries while its partition is unreachable or its outcome is unknown.
+    /// Gets or sets how long an operation retries while its partition is unreachable, its outcome is unknown, or its
+    /// bucket is moving between partitions.
     /// </summary>
     /// <remarks>
     /// Retries reuse the operation's ETags, so a retry of an operation which already committed reports its success
@@ -73,14 +102,14 @@ public sealed class GarnetJournalStorageOptions
     /// </remarks>
     public TimeSpan OperationTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>Gets or sets the in-memory size of the embedded partition's hybrid log, for example <c>1g</c>.</summary>
+    /// <summary>Gets or sets the in-memory size of each hosted partition's hybrid log, for example <c>1g</c>.</summary>
     public string LogMemorySize { get; set; } = DEFAULT_LOG_MEMORY_SIZE;
 
-    /// <summary>Gets or sets the size of the embedded partition's hash index, for example <c>64m</c>.</summary>
+    /// <summary>Gets or sets the size of each hosted partition's hash index, for example <c>64m</c>.</summary>
     public string IndexMemorySize { get; set; } = DEFAULT_INDEX_MEMORY_SIZE;
 
     /// <summary>
-    /// Gets or sets the size of the embedded partition's append-only file at which it takes a checkpoint, for example <c>256m</c>.
+    /// Gets or sets the size of a hosted partition's append-only file at which it takes a checkpoint, for example <c>256m</c>.
     /// </summary>
     /// <remarks>
     /// A checkpoint compacts the hybrid log and truncates the append-only file, bounding disk use and recovery time.
@@ -91,11 +120,4 @@ public sealed class GarnetJournalStorageOptions
     /// Gets or sets the stage of the silo lifecycle when storage is initialized.
     /// </summary>
     public int InitStage { get; set; } = ServiceLifecycleStage.RuntimeInitialize;
-}
-
-internal sealed class RedactGarnetConfigurationOptionsAttribute : RedactAttribute
-{
-    public override string Redact(object? value) => value is ConfigurationOptions configuration
-        ? configuration.ToString(includePassword: false)
-        : base.Redact(value);
 }

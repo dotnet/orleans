@@ -346,7 +346,7 @@ public sealed class GarnetJournalStorageTests(GarnetPartitionFixture fixture) : 
     public async Task Replace_ResetsCompactionAccounting()
     {
         var id = NewId("compaction");
-        var storage = new GarnetJournalStorage(Provider.Client, id, "json", compactionThresholdBytes: 3);
+        var storage = new GarnetJournalStorage(Provider.Router, id, "json", compactionThresholdBytes: 3);
 
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([1, 2, 3, 4]), CancellationToken);
         Assert.False(storage.IsCompactionRequested);
@@ -355,7 +355,7 @@ public sealed class GarnetJournalStorageTests(GarnetPartitionFixture fixture) : 
         await storage.AppendAsync(new ReadOnlySequence<byte>([7]), CancellationToken);
         Assert.True(storage.IsCompactionRequested);
 
-        var reader = new GarnetJournalStorage(Provider.Client, id, "json", compactionThresholdBytes: 3);
+        var reader = new GarnetJournalStorage(Provider.Router, id, "json", compactionThresholdBytes: 3);
         await reader.GetMetadataAsync(CancellationToken);
         Assert.True(reader.IsCompactionRequested);
     }

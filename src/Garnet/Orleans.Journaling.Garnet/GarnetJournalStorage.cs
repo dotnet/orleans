@@ -8,18 +8,19 @@ using StackExchange.Redis;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Journal storage for one journal in a Garnet partition.
+/// Journal storage for one journal, in the partition which owns its bucket.
 /// </summary>
 /// <remarks>
 /// The journal's data is a list with one element per append, its metadata is a hash, and the bucket's index set lists
-/// the journals the bucket holds. Each operation runs as one transaction procedure (see <see cref="GarnetJournalProcedure"/>).
+/// the journals the bucket holds. Each operation runs as one transaction procedure (see <see cref="GarnetJournalProcedure"/>),
+/// routed to the bucket's partition by <see cref="GarnetJournalRouter"/>.
 /// </remarks>
 internal sealed class GarnetJournalStorage : IJournalStorage
 {
     private static readonly IReadOnlyDictionary<string, string> EmptyProperties
         = new ReadOnlyDictionary<string, string>(new Dictionary<string, string>());
 
-    private readonly GarnetJournalPartitionClient _client;
+    private readonly GarnetJournalRouter _router;
     private readonly JournalId _journalId;
     private readonly string _journalFormatKey;
     private readonly long _compactionThresholdBytes;
@@ -38,24 +39,24 @@ internal sealed class GarnetJournalStorage : IJournalStorage
     private long _appendLength;
 
     public GarnetJournalStorage(
-        GarnetJournalPartitionClient client,
+        GarnetJournalRouter router,
         JournalId journalId,
         string journalFormatKey,
         long compactionThresholdBytes)
     {
-        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(router);
         ArgumentException.ThrowIfNullOrWhiteSpace(journalFormatKey);
         if (journalId.IsDefault)
         {
             throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
         }
 
-        _client = client;
+        _router = router;
         _journalId = journalId;
         _journalFormatKey = journalFormatKey;
         _compactionThresholdBytes = compactionThresholdBytes;
         var encoded = GarnetJournalKeys.EncodeJournalId(journalId.Value);
-        Bucket = GarnetJournalKeys.GetBucket(encoded, client.BucketCount);
+        Bucket = GarnetJournalKeys.GetBucket(encoded, router.BucketCount);
         _bucketKey = GarnetJournalKeys.GetBucketKey(Bucket);
         _metadataKey = GarnetJournalKeys.GetMetadataKey(Bucket, encoded);
         _dataKey = GarnetJournalKeys.GetDataKey(Bucket, encoded);
@@ -109,7 +110,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
 
             var ambiguous = new StrongBox<bool>();
             var result = await ExecuteAsync(GarnetJournalProtocol.Create, args, cancellationToken, ambiguous).ConfigureAwait(false);
-            var status = GarnetJournalPartitionClient.GetStatus(result);
+            var status = GarnetJournalRouter.GetStatus(result);
             if (status == GarnetJournalProtocol.ConflictStatus && !ambiguous.Value)
             {
                 // The journal was deleted after this instance observed its absence: observe it again and retry.
@@ -142,7 +143,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         var args = new object[5];
         WriteKeys(args);
         var result = await ExecuteAsync(GarnetJournalProtocol.GetMetadata, args, cancellationToken).ConfigureAwait(false);
-        var status = GarnetJournalPartitionClient.GetStatus(result);
+        var status = GarnetJournalRouter.GetStatus(result);
         if (status == GarnetJournalProtocol.MissingStatus)
         {
             ClearState(GetAbsenceETag(result));
@@ -204,7 +205,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
 
             var ambiguous = new StrongBox<bool>();
             var result = await ExecuteAsync(GarnetJournalProtocol.UpdateMetadata, args, cancellationToken, ambiguous).ConfigureAwait(false);
-            var status = GarnetJournalPartitionClient.GetStatus(result);
+            var status = GarnetJournalRouter.GetStatus(result);
             if (ambiguous.Value && status is GarnetJournalProtocol.MissingStatus or GarnetJournalProtocol.ConflictStatus)
             {
                 // An earlier attempt may have committed before its ETag left the journal's history.
@@ -241,7 +242,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         var args = new object[5];
         WriteKeys(args);
         var result = await ExecuteAsync(GarnetJournalProtocol.Read, args, cancellationToken).ConfigureAwait(false);
-        var status = GarnetJournalPartitionClient.GetStatus(result);
+        var status = GarnetJournalRouter.GetStatus(result);
         if (status == GarnetJournalProtocol.MissingStatus)
         {
             ClearState(GetAbsenceETag(result));
@@ -289,7 +290,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         args[7] = newETag;
         var ambiguous = new StrongBox<bool>();
         var result = await ExecuteAsync(GarnetJournalProtocol.Delete, args, cancellationToken, ambiguous).ConfigureAwait(false);
-        var status = GarnetJournalPartitionClient.GetStatus(result);
+        var status = GarnetJournalRouter.GetStatus(result);
         if (status == GarnetJournalProtocol.AppearedStatus)
         {
             // The journal exists, though this instance last observed it absent: observe it again before the next write.
@@ -333,7 +334,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         args[9] = _journalFormatKey;
         var ambiguous = new StrongBox<bool>();
         var result = await ExecuteAsync(procedure, args, cancellationToken, ambiguous).ConfigureAwait(false);
-        var status = GarnetJournalPartitionClient.GetStatus(result);
+        var status = GarnetJournalRouter.GetStatus(result);
         ThrowForStatus(status, operation, expectedContentETag, ambiguous.Value);
         if (result.Length < 2 || !long.TryParse(result[1].ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var appendLength))
         {
@@ -346,7 +347,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
     }
 
     private ValueTask<RedisResult[]> ExecuteAsync(string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous = null)
-        => _client.ExecuteAsync(procedure, args, cancellationToken, ambiguous);
+        => _router.ExecuteAsync(Bucket, procedure, args, cancellationToken);
 
     private void WriteKeys(object[] args)
     {
@@ -374,12 +375,9 @@ internal sealed class GarnetJournalStorage : IJournalStorage
             case GarnetJournalProtocol.UnsupportedSchemaVersionStatus:
                 throw new NotSupportedException(
                     $"Garnet journal '{_journalId}' does not use supported storage schema version '{GarnetJournalProtocol.CurrentSchemaVersion}'.");
-            case GarnetJournalProtocol.WrongPartitionStatus:
-                throw new InvalidOperationException(
-                    $"Garnet journal '{_journalId}' bucket {Bucket} is not open in its partition ({operation}).");
             case GarnetJournalProtocol.NeedPullStatus:
                 throw new InvalidOperationException(
-                    $"Garnet journal '{_journalId}' bucket {Bucket} has an incomplete migration ({operation}).");
+                    $"Garnet journal '{_journalId}' bucket {Bucket} has an incomplete migration ({operation}), which this version cannot complete.");
             default:
                 throw new InvalidOperationException($"The Garnet journal {operation} procedure returned unexpected status {status}.");
         }
