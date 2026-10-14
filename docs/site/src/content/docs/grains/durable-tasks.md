@@ -339,7 +339,8 @@ descriptor, which names the signal:
 - Scheduling a durable call from a durable grain, including from an ordinary method,
   stages the invocation in the outbox, so it commits atomically with the grain's state
   changes.
-- Each request and result payload is journaled once per grain, in task state.
+- Each request and result payload is journaled once per grain, in task state. A
+  dead-lettered completion's dead letter also holds its result, for inspection and replay.
 - Recovery precedes new execution. Child IDs, completion order, and outgoing messages
   are replay-stable.
 - Terminal results and the completion notifications to callers commit together. The

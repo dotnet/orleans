@@ -186,7 +186,10 @@ framework assets; its first published version establishes the compatibility base
   the runtime materializes the message from the stored result for every delivery
   attempt. Task state persists
   request and result payloads separately from the task's metadata, so updates to
-  the metadata do not rewrite them.
+  the metadata do not rewrite them. A dead-lettered completion is the exception:
+  its dead letter holds a copy of the result for inspection and replay, while
+  task state keeps its own for `ResultRetentionPeriod`, so a poller or a
+  re-invocation still observes the result.
 - Terminal responses and completion notifications commit together. The callee
   retains the result until the completion retires from its outbox.
 - An invoked task, which a client or another grain scheduled as a request, owns
@@ -265,12 +268,20 @@ framework assets; its first published version establishes the compatibility base
   in one write, and the inbox processes the resume once the Durable Jobs clock
   reaches the due time. Resumes are generation-fenced: a resume for a canceled delay
   terminalizes it as canceled, and duplicate and stale resumes are harmless.
+  Like every scheduled message, a resume doesn't count toward Messaging's
+  `MaxCapacity`: its sender bounds it, and the grain holds one resume for each
+  delay it scheduled, until that delay's due time.
   A delay's due time is a commitment: a replay which requests another due time,
   for example after a configured duration changed, keeps the recorded one and
   logs a warning. A delay canceled while its write is in flight terminalizes as
   canceled when that write completes.
 - Messages use stable identities derived from the sender, receiver, task, and
-  subject, so replayed sends coalesce and redeliveries are deduplicated.
+  subject, so replayed sends coalesce and redeliveries are deduplicated. A
+  message's sender routes completions and detects a message which doesn't match
+  the task's recorded caller or callee. It isn't an authorization mechanism:
+  like any grain method, a durable task, its signals, and its cancellation are
+  available to every client and grain in the cluster, which is Orleans' trust
+  boundary.
 - A local step's record commits with its first durable write: its result, or a
   child, delay, or message it schedules. A synchronous step therefore costs one
   journal write. A step's identity and inputs follow from its parent's inputs and
