@@ -181,9 +181,14 @@ internal class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, Task<TR
     }
 }
 
-internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
+/// <summary>
+/// An immutable durable task configuration. A configuration without an identifier is created only to await its task,
+/// and that run generates the child identifier; handle operations are reachable only from configurations which carry an
+/// identifier.
+/// </summary>
+internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 {
-    private TaskId _taskId;
+    private readonly TaskId _taskId;
 
     internal ConfiguredDurableTaskCore(TTask task) : this(task, DurableExecutionContext.Current)
     {
@@ -195,45 +200,52 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
         ParentContext = parentContext;
     }
 
+    private ConfiguredDurableTaskCore(TTask task, DurableExecutionContext? parentContext, TaskId taskId)
+    {
+        Task = task;
+        ParentContext = parentContext;
+        _taskId = taskId;
+    }
+
     internal TTask Task { get; }
 
     internal DurableExecutionContext? ParentContext { get; }
 
-    internal readonly TaskId TaskId => _taskId;
+    internal TaskId TaskId => _taskId;
 
-    internal void SetId(string segment)
+    internal ConfiguredDurableTaskCore<TTask> WithId(string segment)
     {
-        if (!_taskId.IsDefault)
-        {
-            throw new InvalidOperationException("The durable task identifier has already been specified.");
-        }
-
-        _taskId = ParentContext is { } parent ? parent.CreateChildTaskId(segment) : TaskId.CreateRoot(segment);
+        ThrowIfIdSpecified();
+        return new(Task, ParentContext, ParentContext is { } parent ? parent.CreateChildTaskId(segment) : TaskId.CreateRoot(segment));
     }
 
-    internal void SetId(TaskId taskId)
+    internal ConfiguredDurableTaskCore<TTask> WithId(TaskId taskId)
     {
-        if (!_taskId.IsDefault)
-        {
-            throw new InvalidOperationException("The durable task identifier has already been specified.");
-        }
-
+        ThrowIfIdSpecified();
         if (taskId.IsDefault)
         {
             throw new ArgumentException("A durable task identifier cannot be empty.", nameof(taskId));
         }
 
-        _taskId = taskId;
+        return new(Task, ParentContext, taskId);
     }
 
-    private void EnsureId()
+    private void ThrowIfIdSpecified()
     {
         if (!_taskId.IsDefault)
         {
-            return;
+            throw new InvalidOperationException("The durable task identifier has already been specified.");
+        }
+    }
+
+    private TaskId GetOrCreateId()
+    {
+        if (!_taskId.IsDefault)
+        {
+            return _taskId;
         }
 
-        _taskId = ParentContext is { } parent
+        return ParentContext is { } parent
             ? parent.CreateChildTaskId(null)
             : throw new InvalidOperationException("Root durable tasks require an explicit stable identifier.");
     }
@@ -266,10 +278,10 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
             throw IInlineOperation.CreateInlineOnlyException();
         }
 
-        EnsureId();
+        var taskId = GetOrCreateId();
         if (ParentContext is { } parent)
         {
-            return (null, await parent.ScheduleChildTaskAsync(_taskId, Task, cancellationToken).ConfigureAwait(false));
+            return (null, await parent.ScheduleChildTaskAsync(taskId, Task, cancellationToken).ConfigureAwait(false));
         }
 
         if (Task is not ISchedulableTask schedulable)
@@ -277,15 +289,19 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
             throw new InvalidOperationException("The durable task definition does not support root scheduling.");
         }
 
-        var response = await schedulable.ScheduleAsync(_taskId, cancellationToken).ConfigureAwait(false);
+        var response = await schedulable.ScheduleAsync(taskId, cancellationToken).ConfigureAwait(false);
         return response.IsCompleted
             ? (response, null)
-            : (null, schedulable.GetHandle(_taskId));
+            : (null, schedulable.GetHandle(taskId));
     }
 
     internal IScheduledTaskHandle GetHandle()
     {
-        EnsureId();
+        if (_taskId.IsDefault)
+        {
+            throw new InvalidOperationException("The durable task identifier has not been specified.");
+        }
+
         if (ParentContext is { } parent)
         {
             return parent.GetChildTaskHandle(_taskId);
@@ -298,33 +314,30 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
 }
 
 /// <summary>Configures and schedules a durable task.</summary>
-[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable fluent configuration value has no equality contract.")]
-public struct ConfiguredDurableTask
+/// <remarks><see cref="WithId(string)"/> returns a new configuration and leaves this one unchanged.</remarks>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This fluent configuration value has no equality contract.")]
+public readonly struct ConfiguredDurableTask
 {
-    private ConfiguredDurableTaskCore<DurableTask> _core;
+    private readonly ConfiguredDurableTaskCore<DurableTask> _core;
 
     internal ConfiguredDurableTask(DurableTask task) => _core = new(task);
 
     internal ConfiguredDurableTask(DurableTask task, string rootId)
-    {
-        _core = new(task, parentContext: null);
-        _core.SetId(TaskId.CreateRoot(rootId));
-    }
+        => _core = new ConfiguredDurableTaskCore<DurableTask>(task, parentContext: null).WithId(TaskId.CreateRoot(rootId));
 
-    internal ConfiguredDurableTask(DurableTask task, TaskId taskId)
-    {
-        _core = new(task);
-        _core.SetId(taskId);
-    }
+    internal ConfiguredDurableTask(DurableTask task, TaskId taskId) => _core = new ConfiguredDurableTaskCore<DurableTask>(task).WithId(taskId);
+
+    private ConfiguredDurableTask(ConfiguredDurableTaskCore<DurableTask> core) => _core = core;
 
     /// <summary>Gets an awaiter which runs or attaches to the task.</summary>
     public DurableTaskAwaiter GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
 
     /// <summary>
-    /// Assigns a stable logical identifier segment. Within a durable execution, segments beginning
-    /// with <c>$</c> are reserved for generated identifiers.
+    /// Returns a configuration which assigns a stable logical identifier segment. Within a durable execution, segments
+    /// beginning with <c>$</c> are reserved for generated identifiers.
     /// </summary>
-    public ConfiguredDurableTask WithId(string segment) { _core.SetId(segment); return this; }
+    /// <exception cref="InvalidOperationException">This configuration already has an identifier.</exception>
+    public ConfiguredDurableTask WithId(string segment) => new(_core.WithId(segment));
 
     /// <summary>Schedules the configured definition and returns its handle.</summary>
     public async Task<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default)
@@ -356,33 +369,31 @@ public struct ConfiguredDurableTask
 }
 
 /// <summary>Configures and schedules a durable task with a result.</summary>
-[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This mutable fluent configuration value has no equality contract.")]
-public struct ConfiguredDurableTask<TResult>
+/// <remarks><see cref="WithId(string)"/> returns a new configuration and leaves this one unchanged.</remarks>
+[SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "This fluent configuration value has no equality contract.")]
+public readonly struct ConfiguredDurableTask<TResult>
 {
-    private ConfiguredDurableTaskCore<DurableTask<TResult>> _core;
+    private readonly ConfiguredDurableTaskCore<DurableTask<TResult>> _core;
 
     internal ConfiguredDurableTask(DurableTask<TResult> task) => _core = new(task);
 
     internal ConfiguredDurableTask(DurableTask<TResult> task, string rootId)
-    {
-        _core = new(task, parentContext: null);
-        _core.SetId(TaskId.CreateRoot(rootId));
-    }
+        => _core = new ConfiguredDurableTaskCore<DurableTask<TResult>>(task, parentContext: null).WithId(TaskId.CreateRoot(rootId));
 
     internal ConfiguredDurableTask(DurableTask<TResult> task, TaskId taskId)
-    {
-        _core = new(task);
-        _core.SetId(taskId);
-    }
+        => _core = new ConfiguredDurableTaskCore<DurableTask<TResult>>(task).WithId(taskId);
+
+    private ConfiguredDurableTask(ConfiguredDurableTaskCore<DurableTask<TResult>> core) => _core = core;
 
     /// <summary>Gets an awaiter which runs or attaches to the task.</summary>
     public DurableTaskAwaiter<TResult> GetAwaiter() => new(_core.RunAsync(CancellationToken.None));
 
     /// <summary>
-    /// Assigns a stable logical identifier segment. Within a durable execution, segments beginning
-    /// with <c>$</c> are reserved for generated identifiers.
+    /// Returns a configuration which assigns a stable logical identifier segment. Within a durable execution, segments
+    /// beginning with <c>$</c> are reserved for generated identifiers.
     /// </summary>
-    public ConfiguredDurableTask<TResult> WithId(string segment) { _core.SetId(segment); return this; }
+    /// <exception cref="InvalidOperationException">This configuration already has an identifier.</exception>
+    public ConfiguredDurableTask<TResult> WithId(string segment) => new(_core.WithId(segment));
 
     /// <summary>Schedules the configured definition and returns its typed handle.</summary>
     public async Task<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default)

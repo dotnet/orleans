@@ -435,8 +435,8 @@ public abstract partial class DurableTask
         var scheduling = new Task<IScheduledTaskHandle>[inputs.Length];
         for (var index = 0; index < inputs.Length; index++)
         {
-            var input = new ConfiguredDurableTaskCore<DurableTask>(inputs[index], context);
-            input.SetId(operationId.Child(index.ToString(CultureInfo.InvariantCulture)));
+            var input = new ConfiguredDurableTaskCore<DurableTask>(inputs[index], context)
+                .WithId(operationId.Child(index.ToString(CultureInfo.InvariantCulture)));
             scheduling[index] = ScheduleInputAsync(input, cancellationToken);
         }
 
