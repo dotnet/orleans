@@ -257,8 +257,8 @@ Pitfalls:
   derives the ID from a running durable task.
 
 **Verify:** the notification grain lists `issue-{invoiceId}:receipt`, and the invoice
-grain lists a completed `issue-{invoiceId}/$detach:{notification}:issue-{invoiceId}\:receipt`
-marker, named by the detached task's target and root ID, until the invoice's tree is deleted.
+grain lists a completed `$detach:…` marker beneath `issue-{invoiceId}`, named by the notification grain
+and the detached task's root ID, until the invoice's tree is deleted.
 
 ## Cancel and abort from ordinary grain methods
 

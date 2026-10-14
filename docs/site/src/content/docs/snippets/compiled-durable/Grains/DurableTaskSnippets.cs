@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
@@ -151,14 +152,14 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
     public async DurableTask<OrderResult> PlaceOrderAsync(SubmitOrder order)
     {
-        await SetStatus(OrderStatus.Submitted).WithId("submit");
+        DurableTask.Once("submit", () => SetStatus(OrderStatus.Submitted));
 
         // <durable_tasks_fan_out>
         bool[] reserved;
         try
         {
             await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("grace-period");
-            await SetStatus(OrderStatus.AwaitingValidation).WithId("validate");
+            DurableTask.Once("validate", () => SetStatus(OrderStatus.AwaitingValidation));
 
             // Reserves every line concurrently, as the children reserve/0, reserve/1, and so on.
             reserved = await DurableTask.WhenAll(
@@ -185,11 +186,11 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             return await CancelOrderAsync(order.Lines, payment.Reason);
         }
 
-        await SetStatus(OrderStatus.Paid).WithId("pay");
+        DurableTask.Once("pay", () => SetStatus(OrderStatus.Paid));
 
         // Returns at once when the shipment arrived before the wait.
         var shipment = await Shipped.WaitAsync();
-        await SetStatus(OrderStatus.Shipped).WithId("ship");
+        DurableTask.Once("ship", () => SetStatus(OrderStatus.Shipped));
         return new OrderResult(OrderStatus.Shipped, shipment.TrackingNumber);
     }
 
@@ -227,20 +228,21 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         {
             await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
                 .WithId("release");
-            await SetStatus(OrderStatus.Cancelled).WithId("cancel");
+            DurableTask.Once("cancel", () => SetStatus(OrderStatus.Cancelled));
             return new OrderResult(OrderStatus.Cancelled, reason);
         }
     }
     // </durable_tasks_compensation>
 
-    // <durable_tasks_local_step>
-    // A local step: its state change commits with its recorded result, which a replay returns.
-    private async DurableTask<OrderStatus> SetStatus(OrderStatus status)
+    // <durable_tasks_once>
+    // The workflow runs each status change as a recorded effect, such as DurableTask.Once("pay", ...): the state change
+    // commits with its recorded result, and a replay returns the result without changing the state again.
+    private OrderStatus SetStatus(OrderStatus status)
     {
         _status.Value = status;
         return status;
     }
-    // </durable_tasks_local_step>
+    // </durable_tasks_once>
 
     private ICatalogItemGrain Catalog(int productId) => GrainFactory.GetGrain<ICatalogItemGrain>(productId);
 }
@@ -586,6 +588,51 @@ public sealed class InvoiceGrain : DurableGrain, IInvoiceGrain
     private async DurableTask<decimal> Record(decimal amount) => _issued.Value = amount;
 }
 // </durable_tasks_detach>
+
+// <durable_tasks_replay_regions>
+[GenerateSerializer, Immutable]
+public sealed record Ticket(int Number, Guid Reference, DateTimeOffset IssuedAt);
+
+public interface ITicketGrain : IGrainWithStringKey
+{
+    DurableTask<Ticket> IssueAsync(decimal amount, string cardLast4);
+}
+
+public sealed class TicketGrain : DurableGrain, ITicketGrain
+{
+    private readonly ILogger _logger;
+    private readonly IDurableValue<int> _lastNumber;
+    private readonly IDurableDictionary<int, bool> _paid;
+
+    public TicketGrain(ILogger<TicketGrain> logger)
+    {
+        // Skips events while a task replays, so each is logged once.
+        _logger = logger.ReplaySafe();
+        _lastNumber = StateManager.GetOrAddValue<int>("last-number");
+        _paid = StateManager.GetOrAddDictionary<int, bool>("paid");
+    }
+
+    public async DurableTask<Ticket> IssueAsync(decimal amount, string cardLast4)
+    {
+        // Re-executed code: it runs in every replay, and logs once through the replay-safe logger.
+        _logger.LogInformation("Issuing a ticket for {Amount}.", amount);
+
+        // A recorded effect advances the counter, draws a reference, and reads the clock once. Its change to the counter
+        // commits with its recorded ticket, and a replay returns that ticket without running the effect again.
+        var ticket = DurableTask.Once(
+            "allocate",
+            () => new Ticket(++_lastNumber.Value, Guid.NewGuid(), DateTimeOffset.UtcNow));
+
+        var payment = await GrainFactory.GetGrain<IPaymentGrain>(ticket.Reference)
+            .AuthorizeAsync(amount, cardLast4)
+            .WithId("authorize");
+
+        // The synchronous tail: no durable operation follows this change, so it commits with the task's result.
+        _paid[ticket.Number] = payment.Succeeded;
+        return ticket;
+    }
+}
+// </durable_tasks_replay_regions>
 
 internal static class InvoiceClient
 {
