@@ -14,8 +14,8 @@ namespace Orleans.Journaling;
 /// Enumeration yields the retained entries in sequence order.
 /// </para>
 /// <para>
-/// A draft streams volatile content to speculative readers before its durable entry exists. Use drafts for
-/// incremental output, such as model responses, whose final form is committed as one entry.
+/// A draft streams volatile content to readers which include drafts before its durable entries exist. Use drafts for
+/// incremental output, such as model responses, whose final form is committed as one or more entries.
 /// </para>
 /// </remarks>
 public interface IDurableLog<T> : IReadOnlyCollection<T>
@@ -70,9 +70,9 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
     void TrimBefore(long sequence);
 
     /// <summary>
-    /// Opens a draft which streams volatile items to speculative readers.
+    /// Opens a draft which streams volatile items to readers which include drafts.
     /// </summary>
-    /// <returns>The open draft. Dispose it to abandon the draft unless it was committed.</returns>
+    /// <returns>The open draft. Dispose it to abandon the draft unless it was closed.</returns>
     IDurableLogDraft<T> BeginDraft();
 
     /// <summary>
@@ -84,8 +84,12 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
     /// <see cref="DurableWatchMode.Drafts"/> adds draft events.
     /// </param>
     /// <param name="resumeDraftId">
-    /// The draft a reconnecting reader with <see cref="DurableWatchMode.Drafts"/> was viewing. The stream reports <see cref="LogEventKind.DraftAbandoned"/>
-    /// for it when it is no longer open, or repeats its items from the beginning when it is still open.
+    /// The draft a reconnecting reader with <see cref="DurableWatchMode.Drafts"/> was viewing. When the draft is still open,
+    /// the stream repeats its items from the beginning. When it closed in this activation, the stream reports its outcome:
+    /// <see cref="LogEventKind.DraftCommitted"/> with the entries which replaced it, or <see cref="LogEventKind.DraftAbandoned"/>
+    /// with its <see cref="LogDraftAbandonReason"/>. The log retains a bounded number of recent outcomes, and reports
+    /// <see cref="LogDraftAbandonReason.Unknown"/> for an older draft and <see cref="LogDraftAbandonReason.PreviousActivation"/>
+    /// for a draft opened by another activation.
     /// </param>
     /// <param name="cancellationToken">The token which ends the read.</param>
     /// <returns>
@@ -114,12 +118,21 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
 }
 
 /// <summary>
-/// Streams volatile items to the speculative readers of an <see cref="IDurableLog{T}"/> until it commits one durable entry or is abandoned.
+/// Streams volatile items to the readers of an <see cref="IDurableLog{T}"/> which include drafts, until the draft commits
+/// durable entries or is abandoned.
 /// </summary>
 /// <typeparam name="T">The type of items and entries.</typeparam>
 /// <remarks>
-/// The draft holds its items in memory only while it is open. Committing or abandoning the draft releases them.
-/// Disposing an open draft abandons it.
+/// <para>
+/// The draft holds its items in memory only while it is open. Closing the draft releases them, so a reader which has not
+/// read every item when the draft closes receives the draft's outcome next and never receives the remaining items. The
+/// committed entries carry the draft's final content.
+/// </para>
+/// <para>
+/// The draft closes when its owner commits, abandons, or disposes it, and when the log closes it because the log's journal
+/// was deleted. Disposing an open draft abandons it. Use the draft in the owning activation's execution context and check
+/// <see cref="IsOpen"/> before committing a draft which the log may have closed.
+/// </para>
 /// </remarks>
 public interface IDurableLogDraft<T> : IDisposable
 {
@@ -129,8 +142,12 @@ public interface IDurableLogDraft<T> : IDisposable
     LogDraftId Id { get; }
 
     /// <summary>
-    /// Gets a value indicating whether the draft accepts items.
+    /// Gets a value indicating whether the draft is open.
     /// </summary>
+    /// <remarks>
+    /// The value becomes <see langword="false"/> when the draft is committed, abandoned, or disposed, and when the log closes it.
+    /// <see cref="Write"/> and <see cref="Commit"/> throw <see cref="InvalidOperationException"/> for a closed draft.
+    /// </remarks>
     bool IsOpen { get; }
 
     /// <summary>
@@ -139,30 +156,35 @@ public interface IDurableLogDraft<T> : IDisposable
     int Count { get; }
 
     /// <summary>
-    /// Writes a volatile item and delivers it to speculative readers.
+    /// Writes a volatile item and delivers it to readers which include drafts.
     /// </summary>
     /// <param name="item">The item.</param>
-    /// <exception cref="InvalidOperationException">The draft is closed.</exception>
+    /// <exception cref="InvalidOperationException">The draft is closed. The message states why.</exception>
     void Write(T item);
 
     /// <summary>
-    /// Closes the draft and appends its durable entry to the log.
+    /// Closes the draft and appends the durable entries which replace its items.
     /// </summary>
-    /// <param name="entry">The durable entry which replaces the draft's items.</param>
-    /// <returns>The entry's sequence number.</returns>
+    /// <param name="entries">The entries, in order. Pass none to close the draft cleanly without appending entries.</param>
+    /// <returns>
+    /// The sequence number of the first entry. When <paramref name="entries"/> is empty, the sequence number which the next
+    /// appended entry receives.
+    /// </returns>
     /// <remarks>
-    /// Speculative readers receive <see cref="LogEventKind.DraftCommitted"/> followed by the staged entry. The entry becomes
-    /// durable when the next journal write is acknowledged.
+    /// The entries are appended as one journal entry, so one journal write makes all of them durable. Readers receive
+    /// <see cref="LogEventKind.DraftCommitted"/> with the committed range, then the entries. If an entry cannot be encoded,
+    /// the exception propagates, no entry is appended, and the draft remains open.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">The draft is closed.</exception>
-    long Commit(T entry);
+    /// <exception cref="InvalidOperationException">The draft is closed. The message states why.</exception>
+    long Commit(params ReadOnlySpan<T> entries);
 
     /// <summary>
-    /// Closes the draft without a durable entry and reports <see cref="LogEventKind.DraftAbandoned"/> to speculative readers.
+    /// Closes the draft without entries and reports <see cref="LogEventKind.DraftAbandoned"/> with
+    /// <see cref="LogDraftAbandonReason.Abandoned"/>.
     /// </summary>
-    /// <param name="reason">The reason reported to readers.</param>
-    /// <remarks>Abandoning a closed draft has no effect.</remarks>
-    void Abandon(string? reason = null);
+    /// <param name="message">A description of the failure reported to readers in <see cref="LogEvent{T}.Message"/>.</param>
+    /// <remarks>Abandoning a closed draft has no effect. Use <see cref="Commit"/> with no entries to close a draft without a failure.</remarks>
+    void Abandon(string? message = null);
 }
 
 /// <summary>
@@ -255,14 +277,54 @@ public enum LogEventKind : byte
     DraftItem = 3,
 
     /// <summary>
-    /// Draft <see cref="LogEvent{T}.DraftId"/> closed and its content is replaced by the entry with sequence number <see cref="LogEvent{T}.Sequence"/>.
+    /// Draft <see cref="LogEvent{T}.DraftId"/> closed, and its content is replaced by the <see cref="LogEvent{T}.Count"/>
+    /// entries which begin at sequence number <see cref="LogEvent{T}.Sequence"/>. Discard its items. A count of zero means
+    /// that the draft closed cleanly without entries.
     /// </summary>
     DraftCommitted = 4,
 
     /// <summary>
-    /// Draft <see cref="LogEvent{T}.DraftId"/> closed without a durable entry. Discard its items.
+    /// Draft <see cref="LogEvent{T}.DraftId"/> closed without entries for the reason in <see cref="LogEvent{T}.AbandonReason"/>.
+    /// Discard its items.
     /// </summary>
     DraftAbandoned = 5,
+}
+
+/// <summary>
+/// Identifies why a draft of an <see cref="IDurableLog{T}"/> closed without entries.
+/// </summary>
+[GenerateSerializer]
+public enum LogDraftAbandonReason : byte
+{
+    /// <summary>
+    /// The event does not describe an abandoned draft.
+    /// </summary>
+    None = 0,
+
+    /// <summary>
+    /// The owner abandoned the draft with <see cref="IDurableLogDraft{T}.Abandon"/>.
+    /// </summary>
+    Abandoned = 1,
+
+    /// <summary>
+    /// The owner disposed the draft without closing it.
+    /// </summary>
+    Disposed = 2,
+
+    /// <summary>
+    /// The log's journal was deleted.
+    /// </summary>
+    Reset = 3,
+
+    /// <summary>
+    /// Another activation opened the draft. Drafts exist only in memory, so its content is lost.
+    /// </summary>
+    PreviousActivation = 4,
+
+    /// <summary>
+    /// This activation does not know the draft's outcome, because the draft closed too long ago or never existed.
+    /// </summary>
+    Unknown = 5,
 }
 
 /// <summary>
@@ -279,7 +341,8 @@ public readonly record struct LogEvent<T>
     public LogEventKind Kind { get; init; }
 
     /// <summary>
-    /// Gets the entry sequence number, the reset or watermark position, or the item's position within its draft.
+    /// Gets the entry sequence number, the reset or watermark position, the item's position within its draft, or the
+    /// first sequence number of a committed draft's entries.
     /// </summary>
     [Id(1)]
     public long Sequence { get; init; }
@@ -297,14 +360,26 @@ public readonly record struct LogEvent<T>
     public LogDraftId? DraftId { get; init; }
 
     /// <summary>
-    /// Gets the reason for <see cref="LogEventKind.DraftAbandoned"/>.
+    /// Gets the description which the owner passed to <see cref="IDurableLogDraft{T}.Abandon"/>, for <see cref="LogEventKind.DraftAbandoned"/>.
     /// </summary>
     [Id(4)]
-    public string? Reason { get; init; }
+    public string? Message { get; init; }
 
     /// <summary>
     /// Gets the durability status of the event.
     /// </summary>
     [Id(5)]
     public DurableChangeStatus Status { get; init; }
+
+    /// <summary>
+    /// Gets the number of entries which replaced a draft, for <see cref="LogEventKind.DraftCommitted"/>.
+    /// </summary>
+    [Id(6)]
+    public int Count { get; init; }
+
+    /// <summary>
+    /// Gets why a draft closed without entries, for <see cref="LogEventKind.DraftAbandoned"/>.
+    /// </summary>
+    [Id(7)]
+    public LogDraftAbandonReason AbandonReason { get; init; }
 }

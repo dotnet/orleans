@@ -260,8 +260,11 @@ public interface IDurableTaskCompletionSourceCommandHandler<T>
 /// </summary>
 public interface IDurableLogCommandCodec<T>
 {
-    /// <summary>Writes an append command.</summary>
-    void WriteAppend(T item, JournalStreamWriter writer);
+    /// <summary>Writes one command which appends <paramref name="items"/>, in order.</summary>
+    /// <remarks>
+    /// The command is one journal entry, so replay applies all of the items or none of them. <paramref name="items"/> is not empty.
+    /// </remarks>
+    void WriteAppend(ReadOnlySpan<T> items, JournalStreamWriter writer);
 
     /// <summary>Writes a command which discards entries before <paramref name="sequence"/>.</summary>
     void WriteTrimBefore(long sequence, JournalStreamWriter writer);
@@ -278,7 +281,7 @@ public interface IDurableLogCommandCodec<T>
 /// </summary>
 public interface IDurableLogCommandHandler<T>
 {
-    /// <summary>Applies an append command.</summary>
+    /// <summary>Applies one appended item. An append command applies each of its items in order.</summary>
     void ApplyAppend(T item);
 
     /// <summary>Applies a command which discards entries before <paramref name="sequence"/>.</summary>

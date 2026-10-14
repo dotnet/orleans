@@ -306,12 +306,6 @@ internal abstract class StateWatcher(JournaledStateObservers hub, IStateMachine 
 }
 
 /// <summary>
-/// Watches a state machine which readers query directly when signaled.
-/// </summary>
-internal sealed class SignalWatcher(JournaledStateObservers hub, IStateMachine state, DurableWatchMode mode)
-    : StateWatcher(hub, state, mode);
-
-/// <summary>
 /// Buffers a bounded number of collection changes and resynchronizes the reader after an overflow.
 /// </summary>
 internal sealed class ChangeWatcher<TChange> : StateWatcher, IChangeSink<TChange>

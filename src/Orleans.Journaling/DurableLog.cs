@@ -9,12 +9,6 @@ namespace Orleans.Journaling;
 [DebuggerDisplay("Count = {Count}, NextSequence = {NextSequence}")]
 internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLogCommandHandler<T>
 {
-    private const string AbandonedReason = "The draft was abandoned.";
-    private const string DisposedReason = "The draft was disposed before it was committed.";
-    private const string ResetReason = "The log was reset.";
-    private const string ClosedReason = "The draft is no longer open.";
-    private const string PreviousActivationReason = "The draft belonged to a previous activation.";
-
     private readonly IDurableLogCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
     private readonly List<T> _items = [];
@@ -72,14 +66,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         return false;
     }
 
-    public long Append(T item)
-    {
-        var sequence = NextSequence;
-        _codec.WriteAppend(item, GetWriter());
-        _items.Add(item);
-        SignalReaders(DurableWatchMode.Staged);
-        return sequence;
-    }
+    public long Append(T item) => AppendRange(new ReadOnlySpan<T>(in item));
 
     public void TrimBefore(long sequence)
     {
@@ -130,9 +117,11 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         _writer = writer;
         if (_drafts is { } drafts)
         {
+            // Recorded commits describe entries which no longer exist.
+            drafts.ClearOutcomes();
             while (drafts.Open.Count > 0)
             {
-                CloseDraft(drafts.Open[^1], ResetReason);
+                CloseDraft(drafts.Open[^1], DraftOutcome.Abandoned(LogDraftAbandonReason.Reset, message: null));
             }
         }
 
@@ -186,6 +175,20 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         _firstSequence = firstSequence;
     }
 
+    // Appends the items as one journal entry, so that one write makes all of them durable.
+    private long AppendRange(ReadOnlySpan<T> items)
+    {
+        var sequence = NextSequence;
+        if (!items.IsEmpty)
+        {
+            _codec.WriteAppend(items, GetWriter());
+            _items.AddRange(items);
+            SignalReaders(DurableWatchMode.Staged);
+        }
+
+        return sequence;
+    }
+
     private void ApplyTrimBefore(long sequence)
     {
         if (sequence <= _firstSequence)
@@ -226,29 +229,36 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         }
     }
 
-    private void CloseDraft(Draft draft, string? abandonReason)
+    private void CloseDraft(Draft draft, DraftOutcome outcome)
     {
         Debug.Assert(draft.IsOpen);
-        var removed = _drafts!.Open.Remove(draft);
+        var drafts = _drafts!;
+        var removed = drafts.Open.Remove(draft);
         Debug.Assert(removed);
-        draft.Close(abandonReason);
+        draft.Close(outcome);
+        drafts.RecordOutcome(draft.Id.Number, outcome);
         SignalReaders(DurableWatchMode.Drafts);
     }
 
-    private Draft? FindOpenDraft(LogDraftId id)
+    // Follows the draft a reconnecting reader was viewing: its items while it is open, otherwise its recorded outcome.
+    private FollowedDraft ResumeDraft(LogDraftId id)
     {
-        if (_drafts is { } drafts && drafts.ActivationId == id.ActivationId)
+        if (_drafts is not { } drafts || drafts.ActivationId != id.ActivationId)
         {
-            foreach (var draft in drafts.Open)
+            return new(id, DraftOutcome.Abandoned(LogDraftAbandonReason.PreviousActivation, message: null));
+        }
+
+        foreach (var draft in drafts.Open)
+        {
+            if (draft.Id == id)
             {
-                if (draft.Id == id)
-                {
-                    return draft;
-                }
+                return new(draft);
             }
         }
 
-        return null;
+        return new(id, drafts.TryGetOutcome(id.Number, out var outcome)
+            ? outcome
+            : DraftOutcome.Abandoned(LogDraftAbandonReason.Unknown, message: null));
     }
 
     private async IAsyncEnumerable<LogEvent<T>> ReadCoreAsync(
@@ -260,29 +270,16 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         cancellationToken.ThrowIfCancellationRequested();
         var hub = manager.GetOrCreateObservers();
-        var reader = new Reader(new SignalWatcher(hub, this, mode), fromSequence);
-        hub.Add(reader.Watcher);
-        using var registration = DurableStateObservation.RegisterCancellation(reader.Watcher, cancellationToken);
+        var reader = new Reader(hub, this, mode, fromSequence);
+        if (reader.IncludesDrafts && resumeDraftId is { } draftId)
+        {
+            reader.FollowedDrafts = [ResumeDraft(draftId)];
+        }
+
+        hub.Add(reader);
+        using var registration = DurableStateObservation.RegisterCancellation(reader, cancellationToken);
         try
         {
-            if (reader.IncludesDrafts && resumeDraftId is { } draftId)
-            {
-                if (FindOpenDraft(draftId) is { } draft)
-                {
-                    reader.FollowedDrafts = [new FollowedDraft(draft)];
-                }
-                else
-                {
-                    yield return new()
-                    {
-                        Kind = LogEventKind.DraftAbandoned,
-                        DraftId = draftId,
-                        Reason = _drafts?.ActivationId == draftId.ActivationId ? ClosedReason : PreviousActivationReason,
-                        Status = DurableChangeStatus.Draft,
-                    };
-                }
-            }
-
             while (true)
             {
                 while (TryGetNextEvent(reader, out var logEvent))
@@ -290,18 +287,18 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
                     yield return logEvent;
                 }
 
-                if (reader.Watcher.CheckCompleted())
+                if (reader.CheckCompleted())
                 {
                     yield break;
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                await reader.Watcher.WaitAsync();
+                await reader.WaitAsync();
             }
         }
         finally
         {
-            hub.Remove(reader.Watcher);
+            hub.Remove(reader);
         }
     }
 
@@ -309,36 +306,9 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     // mutations made while the reader was suspended.
     private bool TryGetNextEvent(Reader reader, out LogEvent<T> logEvent)
     {
-        if (reader.FollowedDrafts is { } followed)
+        if (reader.FollowedDrafts is { } followed && TryGetDraftOutcomeEvent(reader, followed, out logEvent))
         {
-            for (var i = 0; i < followed.Count; i++)
-            {
-                var draft = followed[i].Draft;
-                if (draft.IsOpen
-                    || (draft.CommittedSequence >= _committedSequence && !reader.Watcher.IncludesStaged))
-                {
-                    // Readers without staged entries learn of a commit once its entry is durable.
-                    continue;
-                }
-
-                followed.RemoveAt(i);
-                logEvent = draft.CommittedSequence >= 0
-                    ? new()
-                    {
-                        Kind = LogEventKind.DraftCommitted,
-                        Sequence = draft.CommittedSequence,
-                        DraftId = draft.Id,
-                        Status = GetEntryStatus(draft.CommittedSequence),
-                    }
-                    : new()
-                    {
-                        Kind = LogEventKind.DraftAbandoned,
-                        DraftId = draft.Id,
-                        Reason = draft.AbandonReason,
-                        Status = DurableChangeStatus.Draft,
-                    };
-                return true;
-            }
+            return true;
         }
 
         if (reader.Cursor < _firstSequence || reader.Cursor > NextSequence)
@@ -349,7 +319,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             return true;
         }
 
-        var limit = reader.Watcher.IncludesStaged ? NextSequence : _committedSequence;
+        var limit = reader.IncludesStaged ? NextSequence : _committedSequence;
         if (reader.Cursor < limit)
         {
             var sequence = reader.Cursor++;
@@ -371,33 +341,87 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             return true;
         }
 
-        if (reader.IncludesDrafts && _drafts is { Open.Count: > 0 } drafts)
+        if (reader.IncludesDrafts && _drafts is { Open.Count: > 0 } drafts && TryGetDraftItemEvent(reader, drafts, out logEvent))
         {
-            var followedDrafts = reader.FollowedDrafts ??= [];
-            foreach (var draft in drafts.Open)
+            return true;
+        }
+
+        logEvent = default;
+        return false;
+    }
+
+    private bool TryGetDraftOutcomeEvent(Reader reader, List<FollowedDraft> followed, out LogEvent<T> logEvent)
+    {
+        for (var i = 0; i < followed.Count; i++)
+        {
+            var followedDraft = followed[i];
+            if (!followedDraft.TryGetOutcome(out var outcome))
             {
-                if (!IsFollowed(followedDrafts, draft))
-                {
-                    followedDrafts.Add(new FollowedDraft(draft));
-                }
+                continue;
             }
 
-            foreach (var followedDraft in followedDrafts)
+            if (outcome.IsCommitted)
             {
-                var draft = followedDraft.Draft;
-                if (draft.IsOpen && followedDraft.Position < draft.Count)
+                // Readers without staged entries learn of a commit once its entries are durable.
+                var end = outcome.Sequence + outcome.Count;
+                if (end > _committedSequence && !reader.IncludesStaged)
                 {
-                    var position = followedDraft.Position++;
-                    logEvent = new()
-                    {
-                        Kind = LogEventKind.DraftItem,
-                        Sequence = position,
-                        Item = draft.GetItem(position),
-                        DraftId = draft.Id,
-                        Status = DurableChangeStatus.Draft,
-                    };
-                    return true;
+                    continue;
                 }
+
+                followed.RemoveAt(i);
+                logEvent = new()
+                {
+                    Kind = LogEventKind.DraftCommitted,
+                    Sequence = outcome.Sequence,
+                    Count = outcome.Count,
+                    DraftId = followedDraft.Id,
+                    Status = end <= _committedSequence ? DurableChangeStatus.Committed : DurableChangeStatus.Staged,
+                };
+                return true;
+            }
+
+            followed.RemoveAt(i);
+            logEvent = new()
+            {
+                Kind = LogEventKind.DraftAbandoned,
+                DraftId = followedDraft.Id,
+                AbandonReason = outcome.AbandonReason,
+                Message = outcome.Message,
+                Status = DurableChangeStatus.Draft,
+            };
+            return true;
+        }
+
+        logEvent = default;
+        return false;
+    }
+
+    private static bool TryGetDraftItemEvent(Reader reader, DraftTable drafts, out LogEvent<T> logEvent)
+    {
+        var followed = reader.FollowedDrafts ??= [];
+        foreach (var draft in drafts.Open)
+        {
+            if (!IsFollowed(followed, draft))
+            {
+                followed.Add(new FollowedDraft(draft));
+            }
+        }
+
+        foreach (var followedDraft in followed)
+        {
+            if (followedDraft.Draft is { IsOpen: true } draft && followedDraft.Position < draft.Count)
+            {
+                var position = followedDraft.Position++;
+                logEvent = new()
+                {
+                    Kind = LogEventKind.DraftItem,
+                    Sequence = position,
+                    Item = draft.GetItem(position),
+                    DraftId = draft.Id,
+                    Status = DurableChangeStatus.Draft,
+                };
+                return true;
             }
         }
 
@@ -418,13 +442,74 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         }
     }
 
+    /// <summary>
+    /// How a draft closed: the range of entries which replaced it, or why it was abandoned.
+    /// </summary>
+    private readonly record struct DraftOutcome(long Sequence, int Count, LogDraftAbandonReason AbandonReason, string? Message)
+    {
+        public bool IsCommitted => AbandonReason is LogDraftAbandonReason.None;
+
+        public static DraftOutcome Committed(long sequence, int count) => new(sequence, count, LogDraftAbandonReason.None, Message: null);
+
+        public static DraftOutcome Abandoned(LogDraftAbandonReason reason, string? message) => new(0, 0, reason, message);
+    }
+
+    /// <summary>
+    /// The open drafts of one log instance and the outcomes of its most recently closed drafts.
+    /// </summary>
     private sealed class DraftTable
     {
+        // Reconnecting readers learn the outcomes of this many recently closed drafts.
+        private const int MaxRecentOutcomes = 16;
+
+        private (long Number, DraftOutcome Outcome)[] _recentOutcomes = [];
+        private int _recentCount;
+        private int _oldestRecent;
+
         public Guid ActivationId { get; } = Guid.NewGuid();
 
         public long LastNumber { get; set; }
 
         public List<Draft> Open { get; } = [];
+
+        public void RecordOutcome(long number, DraftOutcome outcome)
+        {
+            if (_recentCount < MaxRecentOutcomes)
+            {
+                if (_recentCount == _recentOutcomes.Length)
+                {
+                    Array.Resize(ref _recentOutcomes, Math.Max(4, _recentCount * 2));
+                }
+
+                _recentOutcomes[_recentCount++] = (number, outcome);
+                return;
+            }
+
+            _recentOutcomes[_oldestRecent] = (number, outcome);
+            _oldestRecent = (_oldestRecent + 1) % MaxRecentOutcomes;
+        }
+
+        public bool TryGetOutcome(long number, out DraftOutcome outcome)
+        {
+            for (var i = 0; i < _recentCount; i++)
+            {
+                if (_recentOutcomes[i].Number == number)
+                {
+                    outcome = _recentOutcomes[i].Outcome;
+                    return true;
+                }
+            }
+
+            outcome = default;
+            return false;
+        }
+
+        public void ClearOutcomes()
+        {
+            Array.Clear(_recentOutcomes);
+            _recentCount = 0;
+            _oldestRecent = 0;
+        }
     }
 
     private sealed class Draft(DurableLog<T> log, LogDraftId id) : IDurableLogDraft<T>
@@ -437,9 +522,7 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
         public int Count => _items?.Count ?? 0;
 
-        public long CommittedSequence { get; private set; } = -1;
-
-        public string? AbandonReason { get; private set; }
+        public DraftOutcome Outcome { get; private set; }
 
         public T GetItem(int position) => _items![position];
 
@@ -450,28 +533,33 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             log.SignalReaders(DurableWatchMode.Drafts);
         }
 
-        public long Commit(T entry)
+        public long Commit(params ReadOnlySpan<T> entries)
         {
             ThrowIfClosed();
-            var sequence = log.Append(entry);
-            CommittedSequence = sequence;
-            log.CloseDraft(this, abandonReason: null);
+            var sequence = log.AppendRange(entries);
+            log.CloseDraft(this, DraftOutcome.Committed(sequence, entries.Length));
             return sequence;
         }
 
-        public void Abandon(string? reason = null)
+        public void Abandon(string? message = null)
         {
             if (IsOpen)
             {
-                log.CloseDraft(this, reason ?? AbandonedReason);
+                log.CloseDraft(this, DraftOutcome.Abandoned(LogDraftAbandonReason.Abandoned, message));
             }
         }
 
-        public void Dispose() => Abandon(DisposedReason);
-
-        internal void Close(string? abandonReason)
+        public void Dispose()
         {
-            AbandonReason = abandonReason;
+            if (IsOpen)
+            {
+                log.CloseDraft(this, DraftOutcome.Abandoned(LogDraftAbandonReason.Disposed, message: null));
+            }
+        }
+
+        internal void Close(DraftOutcome outcome)
+        {
+            Outcome = outcome;
             _items = null;
         }
 
@@ -479,16 +567,28 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         {
             if (!IsOpen)
             {
-                throw new InvalidOperationException("The draft is closed.");
+                throw new InvalidOperationException(Outcome.AbandonReason switch
+                {
+                    LogDraftAbandonReason.None => $"Draft {Id} is closed because it was committed.",
+                    LogDraftAbandonReason.Abandoned => $"Draft {Id} is closed because it was abandoned.",
+                    LogDraftAbandonReason.Disposed => $"Draft {Id} is closed because it was disposed.",
+                    _ => $"Draft {Id} was closed by the log because {DescribeLogClosure(Outcome.AbandonReason)}. "
+                        + "Check IsOpen before using a draft which the log can close.",
+                });
             }
         }
+
+        private static string DescribeLogClosure(LogDraftAbandonReason reason) => reason switch
+        {
+            LogDraftAbandonReason.Reset => "the log's journal was deleted",
+            _ => reason.ToString(),
+        };
     }
 
-    private sealed class Reader(SignalWatcher watcher, long cursor)
+    private sealed class Reader(JournaledStateObservers hub, DurableLog<T> log, DurableWatchMode mode, long cursor)
+        : StateWatcher(hub, log, mode)
     {
-        public SignalWatcher Watcher { get; } = watcher;
-
-        public bool IncludesDrafts => (Watcher.Mode & DurableWatchMode.Drafts) != 0;
+        public bool IncludesDrafts => (Mode & DurableWatchMode.Drafts) != 0;
 
         public long Cursor { get; set; } = cursor;
 
@@ -498,10 +598,41 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         public List<FollowedDraft>? FollowedDrafts { get; set; }
     }
 
-    private sealed class FollowedDraft(Draft draft)
+    /// <summary>
+    /// A draft which a reader follows: an open draft, or the recorded outcome of a draft which closed before the reader resumed it.
+    /// </summary>
+    private sealed class FollowedDraft
     {
-        public Draft Draft { get; } = draft;
+        private readonly DraftOutcome _outcome;
+
+        public FollowedDraft(Draft draft)
+        {
+            Draft = draft;
+            Id = draft.Id;
+        }
+
+        public FollowedDraft(LogDraftId id, DraftOutcome outcome)
+        {
+            Id = id;
+            _outcome = outcome;
+        }
+
+        public LogDraftId Id { get; }
+
+        public Draft? Draft { get; }
 
         public int Position { get; set; }
+
+        public bool TryGetOutcome(out DraftOutcome outcome)
+        {
+            if (Draft is { } draft)
+            {
+                outcome = draft.Outcome;
+                return !draft.IsOpen;
+            }
+
+            outcome = _outcome;
+            return true;
+        }
     }
 }
