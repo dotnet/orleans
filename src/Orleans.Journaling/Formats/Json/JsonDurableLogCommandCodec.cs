@@ -7,7 +7,7 @@ namespace Orleans.Journaling.Json;
 /// JSON codec for durable log journal entries.
 /// </summary>
 /// <remarks>
-/// Commands are encoded as <c>["append", item]</c>, <c>["trimBefore", sequence]</c>, and
+/// Commands are encoded as <c>["append", item, ...]</c>, <c>["trimBefore", sequence]</c>, and
 /// <c>["snapshot", firstSequence, [items]]</c>.
 /// </remarks>
 /// <typeparam name="T">The type of entries in the log.</typeparam>
@@ -17,16 +17,28 @@ public sealed class JsonDurableLogCommandCodec<T>(JsonSerializerOptions? options
     private readonly JsonTypeInfo<T> _itemTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WriteAppend(T item, JournalStreamWriter writer)
+    public void WriteAppend(ReadOnlySpan<T> items, JournalStreamWriter writer)
     {
-        JsonCommandWriter.Write(
-            writer,
-            (typeInfo: _itemTypeInfo, item),
-            static (jsonWriter, command) =>
+        if (items.IsEmpty)
+        {
+            throw new ArgumentException("An append command requires at least one item.", nameof(items));
+        }
+
+        using var entry = writer.BeginEntry();
+        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        {
+            jsonWriter.WriteStartArray();
+            jsonWriter.WriteStringValue(JsonJournalEntryCommands.Append);
+            foreach (var item in items)
             {
-                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Append);
-                JsonSerializer.Serialize(jsonWriter, command.item, command.typeInfo);
-            });
+                JsonSerializer.Serialize(jsonWriter, item, _itemTypeInfo);
+            }
+
+            jsonWriter.WriteEndArray();
+            jsonWriter.Flush();
+        }
+
+        entry.Commit();
     }
 
     /// <inheritdoc/>
@@ -93,7 +105,11 @@ public sealed class JsonDurableLogCommandCodec<T>(JsonSerializerOptions? options
         {
             case JsonJournalEntryCommands.Append:
                 consumer.ApplyAppend(reader.DeserializeAllowNull(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
-                reader.EnsureEnd(2);
+                while (reader.TryReadNextOperand())
+                {
+                    consumer.ApplyAppend(reader.DeserializeCurrentAllowNull(JsonJournalEntryFields.Item, _itemTypeInfo)!);
+                }
+
                 break;
             case JsonJournalEntryCommands.TrimBefore:
                 var sequence = ReadSequence(ref reader, 1);

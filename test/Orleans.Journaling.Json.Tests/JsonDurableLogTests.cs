@@ -26,11 +26,12 @@ public class JsonDurableLogTests
         var codec = new JsonDurableLogCommandCodec<string>(Options);
         var handler = new DurableLogTests.RecordingLogHandler();
 
-        Apply(codec, """["append","a"]""", writer => codec.WriteAppend("a", writer), handler);
+        Apply(codec, """["append","a"]""", writer => codec.WriteAppend(["a"], writer), handler);
+        Apply(codec, """["append","b","c"]""", writer => codec.WriteAppend(["b", "c"], writer), handler);
         Apply(codec, """["trimBefore",3]""", writer => codec.WriteTrimBefore(3, writer), handler);
-        Apply(codec, """["snapshot",2,["b","c"]]""", writer => codec.WriteSnapshot(2, ["b", "c"], writer), handler);
+        Apply(codec, """["snapshot",2,["d","e"]]""", writer => codec.WriteSnapshot(2, ["d", "e"], writer), handler);
 
-        Assert.Equal(["append a", "trim 3", "reset 2 2", "append b", "append c"], handler.Commands);
+        Assert.Equal(["append a", "append b", "append c", "trim 3", "reset 2 2", "append d", "append e"], handler.Commands);
     }
 
     [Fact]
@@ -39,6 +40,8 @@ public class JsonDurableLogTests
         var codec = new JsonDurableLogCommandCodec<string>(Options);
         var handler = new DurableLogTests.RecordingLogHandler();
 
+        Assert.Throws<JsonException>(() => codec.Apply(Read("""["append"]"""), handler));
+        Assert.ThrowsAny<JsonException>(() => codec.Apply(Read("""["append","a"] []"""), handler));
         Assert.Throws<JsonException>(() => codec.Apply(Read("""["trimBefore",-1]"""), handler));
         Assert.Throws<JsonException>(() => codec.Apply(Read("""["snapshot",0,["a"],1]"""), handler));
         Assert.Throws<NotSupportedException>(() => codec.Apply(Read("""["rewrite"]"""), handler));

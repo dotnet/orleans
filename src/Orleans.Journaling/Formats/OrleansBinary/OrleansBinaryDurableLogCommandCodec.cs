@@ -16,14 +16,24 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
     private const uint SnapshotCommand = 2;
 
     /// <inheritdoc/>
-    public void WriteAppend(T item, JournalStreamWriter writer)
+    public void WriteAppend(ReadOnlySpan<T> items, JournalStreamWriter writer)
     {
+        if (items.IsEmpty)
+        {
+            throw new ArgumentException("An append command requires at least one item.", nameof(items));
+        }
+
         using var entry = writer.BeginEntry();
         var output = entry.Writer;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(AppendCommand);
+        payloadWriter.WriteVarUInt32((uint)items.Length);
         payloadWriter.Commit();
-        OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
+        foreach (var item in items)
+        {
+            OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
+        }
+
         entry.Commit();
     }
 
@@ -84,7 +94,17 @@ internal sealed class OrleansBinaryDurableLogCommandCodec<T>(
         switch (command)
         {
             case AppendCommand:
-                consumer.ApplyAppend(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
+                var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
+                if (count == 0)
+                {
+                    throw new InvalidOperationException("Malformed binary journal entry: a durable log append command has no items.");
+                }
+
+                for (var i = 0; i < count; i++)
+                {
+                    consumer.ApplyAppend(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
+                }
+
                 break;
             case TrimBeforeCommand:
                 consumer.ApplyTrimBefore(ReadSequence(ref reader));

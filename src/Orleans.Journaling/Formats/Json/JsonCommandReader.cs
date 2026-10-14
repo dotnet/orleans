@@ -269,6 +269,31 @@ internal ref struct JsonCommandReader
         }
     }
 
+    /// <summary>
+    /// Advances to the next operand of a command with a variable number of operands.
+    /// </summary>
+    /// <returns><see langword="true"/> when the reader is positioned on the next operand; <see langword="false"/> at the end of the command.</returns>
+    public bool TryReadNextOperand()
+    {
+        if (!_reader.Read())
+        {
+            throw new JsonException("JSON journal command array is incomplete.");
+        }
+
+        if (_reader.TokenType is JsonTokenType.EndArray)
+        {
+            if (_reader.Read())
+            {
+                throw new JsonException("Additional JSON content was found after the journal entry.");
+            }
+
+            return false;
+        }
+
+        _nextIndex++;
+        return true;
+    }
+
     public void SkipToEnd()
     {
         while (_reader.Read())

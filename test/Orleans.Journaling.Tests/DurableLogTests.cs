@@ -233,7 +233,7 @@ public class DurableLogTests : JournalingTestBase
         Assert.Throws<InvalidOperationException>(() => draft.Write("!"));
         Assert.Throws<InvalidOperationException>(() => draft.Commit("!"));
         Assert.Equal(
-            new LogEvent<string> { Kind = LogEventKind.DraftCommitted, Sequence = 0, DraftId = draft.Id, Status = DurableChangeStatus.Staged },
+            Committed(draft.Id, 0, 1, DurableChangeStatus.Staged),
             await speculative.NextAsync());
         Assert.Equal(Entry(0, "Hello", DurableChangeStatus.Staged), await speculative.NextAsync());
         Assert.False(committedNext.IsCompleted);
@@ -257,13 +257,13 @@ public class DurableLogTests : JournalingTestBase
         Assert.Equal(DraftItem(failed.Id, 0, "partial"), await read.NextAsync());
         failed.Abandon("The model stream failed.");
         failed.Abandon("ignored");
-        Assert.Equal(Abandoned(failed.Id, "The model stream failed."), await read.NextAsync());
+        Assert.Equal(Abandoned(failed.Id, LogDraftAbandonReason.Abandoned, "The model stream failed."), await read.NextAsync());
 
         var disposed = log.BeginDraft();
         disposed.Write("partial");
         Assert.Equal(DraftItem(disposed.Id, 0, "partial"), await read.NextAsync());
         disposed.Dispose();
-        Assert.Equal(Abandoned(disposed.Id, "The draft was disposed before it was committed."), await read.NextAsync());
+        Assert.Equal(Abandoned(disposed.Id, LogDraftAbandonReason.Disposed), await read.NextAsync());
 
         var next = read.MoveNextAsync();
         Assert.False(next.IsCompleted);
@@ -293,7 +293,7 @@ public class DurableLogTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken);
         Assert.True(await next);
         Assert.Equal(
-            new LogEvent<string> { Kind = LogEventKind.DraftCommitted, Sequence = 1, DraftId = draft.Id, Status = DurableChangeStatus.Committed },
+            Committed(draft.Id, 1, 1),
             read.Current);
         Assert.Equal(Entry(0, "question"), await read.NextAsync());
         Assert.Equal(Entry(1, "Hello"), await read.NextAsync());
@@ -334,7 +334,7 @@ public class DurableLogTests : JournalingTestBase
         var committedNext = committed.MoveNextAsync();
         Assert.False(committedNext.IsCompleted);
         draft.Abandon();
-        Assert.Equal(Abandoned(draft.Id, "The draft was abandoned."), await read.NextAsync());
+        Assert.Equal(Abandoned(draft.Id, LogDraftAbandonReason.Abandoned), await read.NextAsync());
         Assert.False(committedNext.IsCompleted);
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await committedNext);
@@ -366,7 +366,7 @@ public class DurableLogTests : JournalingTestBase
     });
 
     [Fact]
-    public Task Reconnect_ToClosedDraft_ReportsAbandonmentThenCommittedEntries() => RunOnActivationSchedulerAsync(async () =>
+    public Task Reconnect_ToCommittedDraft_ReportsItsEntries() => RunOnActivationSchedulerAsync(async () =>
     {
         var sut = CreateSystem();
         var log = CreateLog(sut.Manager);
@@ -377,8 +377,147 @@ public class DurableLogTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken);
 
         await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, draft.Id, CancellationToken).GetAsyncEnumerator(CancellationToken);
-        Assert.Equal(Abandoned(draft.Id, "The draft is no longer open."), await read.NextAsync());
+        Assert.Equal(Committed(draft.Id, 0, 1), await read.NextAsync());
         Assert.Equal(Entry(0, "Hello"), await read.NextAsync());
+    });
+
+    [Fact]
+    public Task Reconnect_ToClosedDrafts_ReportsRecordedOutcomes() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("question");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+
+        var failed = log.BeginDraft();
+        failed.Abandon("The model stream failed.");
+        var disposed = log.BeginDraft();
+        disposed.Dispose();
+        var staged = log.BeginDraft();
+        staged.Commit("answer", "follow-up");
+
+        Assert.Equal(Abandoned(failed.Id, LogDraftAbandonReason.Abandoned, "The model stream failed."), await ResumeAsync(failed.Id));
+        Assert.Equal(Abandoned(disposed.Id, LogDraftAbandonReason.Disposed), await ResumeAsync(disposed.Id));
+        Assert.Equal(Committed(staged.Id, 1, 2, DurableChangeStatus.Staged), await ResumeAsync(staged.Id));
+        Assert.Equal(Abandoned(new(staged.Id.ActivationId, 99), LogDraftAbandonReason.Unknown), await ResumeAsync(new(staged.Id.ActivationId, 99)));
+
+        // A reader without staged entries learns of the commit once its entries are durable.
+        await using (var read = log.ReadAsync(1, DurableWatchMode.Drafts, staged.Id, CancellationToken).GetAsyncEnumerator(CancellationToken))
+        {
+            var next = read.MoveNextAsync();
+            Assert.False(next.IsCompleted);
+            await sut.Manager.WriteStateAsync(CancellationToken);
+            Assert.True(await next);
+            Assert.Equal(Committed(staged.Id, 1, 2), read.Current);
+            Assert.Equal(Entry(1, "answer"), await read.NextAsync());
+            Assert.Equal(Entry(2, "follow-up"), await read.NextAsync());
+        }
+
+        // The log retains a bounded number of outcomes.
+        for (var i = 0; i < 16; i++)
+        {
+            log.BeginDraft().Commit();
+        }
+
+        Assert.Equal(Abandoned(failed.Id, LogDraftAbandonReason.Unknown), await ResumeAsync(failed.Id));
+
+        async Task<LogEvent<string>> ResumeAsync(LogDraftId id)
+        {
+            await using var read = log.ReadAsync(log.NextSequence, DurableWatchMode.Speculative, id, CancellationToken).GetAsyncEnumerator(CancellationToken);
+            return await read.NextAsync();
+        }
+    });
+
+    [Fact]
+    public Task Draft_CommitsSeveralEntriesAsOneJournalEntry() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var storage = new GatedJournalStorage();
+        var sut = CreateSystem(storage);
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        await using var read = log.ReadAsync(0, DurableWatchMode.Speculative, cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+
+        var draft = log.BeginDraft();
+        draft.Write("partial");
+        Assert.Equal(DraftItem(draft.Id, 0, "partial"), await read.NextAsync());
+        Assert.Equal(0, draft.Commit("tool call", "tool result", "answer"));
+        Assert.Equal((3L, 3), (log.NextSequence, log.Count));
+        Assert.Equal(Committed(draft.Id, 0, 3, DurableChangeStatus.Staged), await read.NextAsync());
+        Assert.Equal(Entry(0, "tool call", DurableChangeStatus.Staged), await read.NextAsync());
+        Assert.Equal(Entry(1, "tool result", DurableChangeStatus.Staged), await read.NextAsync());
+        Assert.Equal(Entry(2, "answer", DurableChangeStatus.Staged), await read.NextAsync());
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        Assert.Equal(new LogEvent<string> { Kind = LogEventKind.Watermark, Sequence = 3, Status = DurableChangeStatus.Committed }, await read.NextAsync());
+
+        var recovered = CreateSystem(storage);
+        var recoveredLog = CreateLog(recovered.Manager);
+        await recovered.Lifecycle.OnStart(CancellationToken);
+        Assert.Equal(["tool call", "tool result", "answer"], recoveredLog);
+    });
+
+    [Fact]
+    public Task Draft_CommitWithoutEntries_ClosesCleanly() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+        log.Append("question");
+        await sut.Manager.WriteStateAsync(CancellationToken);
+        await using var read = log.ReadAsync(1, DurableWatchMode.Committed | DurableWatchMode.Drafts, cancellationToken: CancellationToken)
+            .GetAsyncEnumerator(CancellationToken);
+
+        var draft = log.BeginDraft();
+        draft.Write("Thinking");
+        Assert.Equal(DraftItem(draft.Id, 0, "Thinking"), await read.NextAsync());
+        Assert.Equal(1, draft.Commit());
+        Assert.False(draft.IsOpen);
+        Assert.Equal(Committed(draft.Id, 1, 0), await read.NextAsync());
+        Assert.Equal((1L, 1L), (log.NextSequence, log.CommittedSequence));
+    });
+
+    [Fact]
+    public Task Draft_EncodingFailure_AppendsNothingAndLeavesDraftOpen() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var storage = new GatedJournalStorage();
+        var sut = CreateSystem(storage);
+        var log = new DurableLog<string>("log", sut.Manager, new PoisonLogCodec(CreateCodec()));
+        await sut.Lifecycle.OnStart(CancellationToken);
+
+        var draft = log.BeginDraft();
+        Assert.Throws<InvalidOperationException>(() => draft.Commit("answer", PoisonLogCodec.Poison));
+        Assert.True(draft.IsOpen);
+        Assert.Equal(0, log.NextSequence);
+        Assert.Equal(0, draft.Commit("answer"));
+        await sut.Manager.WriteStateAsync(CancellationToken);
+
+        var recovered = CreateSystem(storage);
+        var recoveredLog = CreateLog(recovered.Manager);
+        await recovered.Lifecycle.OnStart(CancellationToken);
+        Assert.Equal(["answer"], recoveredLog);
+    });
+
+    [Fact]
+    public Task ClosedDraft_ExplainsWhyItIsClosed() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var sut = CreateSystem();
+        var log = CreateLog(sut.Manager);
+        await sut.Lifecycle.OnStart(CancellationToken);
+
+        var committed = log.BeginDraft();
+        committed.Commit("a");
+        Assert.Contains("committed", Assert.Throws<InvalidOperationException>(() => committed.Commit("b")).Message);
+
+        var reset = log.BeginDraft();
+        await sut.Manager.DeleteStateAsync(CancellationToken);
+        Assert.False(reset.IsOpen);
+        var exception = Assert.Throws<InvalidOperationException>(() => reset.Write("b"));
+        Assert.Contains("journal was deleted", exception.Message);
+        Assert.Contains(nameof(IDurableLogDraft<string>.IsOpen), exception.Message);
+
+        // Closing a closed draft has no effect.
+        reset.Abandon();
+        reset.Dispose();
     });
 
     [Fact]
@@ -404,7 +543,7 @@ public class DurableLogTests : JournalingTestBase
         Assert.Equal(1, log.NextSequence);
 
         await using var read = log.ReadAsync(committedCursor, DurableWatchMode.Speculative, draft.Id, CancellationToken).GetAsyncEnumerator(CancellationToken);
-        Assert.Equal(Abandoned(draft.Id, "The draft belonged to a previous activation."), await read.NextAsync());
+        Assert.Equal(Abandoned(draft.Id, LogDraftAbandonReason.PreviousActivation), await read.NextAsync());
 
         // The recovered activation regenerates the response from the last stored entry.
         using var retry = log.BeginDraft();
@@ -429,7 +568,7 @@ public class DurableLogTests : JournalingTestBase
 
         await sut.Manager.DeleteStateAsync(CancellationToken);
         Assert.False(draft.IsOpen);
-        Assert.Equal(Abandoned(draft.Id, "The log was reset."), await read.NextAsync());
+        Assert.Equal(Abandoned(draft.Id, LogDraftAbandonReason.Reset), await read.NextAsync());
     });
 
     [Fact]
@@ -460,11 +599,13 @@ public class DurableLogTests : JournalingTestBase
         var codec = new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
         var handler = new RecordingLogHandler();
 
-        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteAppend("a", writer))), handler);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteAppend(["a"], writer))), handler);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteAppend(["b", "c"], writer))), handler);
         codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteTrimBefore(long.MaxValue, writer))), handler);
-        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(7, ["b", "c"], writer))), handler);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(7, ["d", "e"], writer))), handler);
 
-        Assert.Equal(["append a", $"trim {long.MaxValue}", "reset 7 2", "append b", "append c"], handler.Commands);
+        Assert.Equal(["append a", "append b", "append c", $"trim {long.MaxValue}", "reset 7 2", "append d", "append e"], handler.Commands);
+        Assert.Throws<ArgumentException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteAppend([], writer)));
     }
 
     private static LogEvent<string> Entry(long sequence, string item, DurableChangeStatus status = DurableChangeStatus.Committed) =>
@@ -476,8 +617,11 @@ public class DurableLogTests : JournalingTestBase
     private static LogEvent<string> DraftItem(LogDraftId id, long position, string item) =>
         new() { Kind = LogEventKind.DraftItem, Sequence = position, Item = item, DraftId = id, Status = DurableChangeStatus.Draft };
 
-    private static LogEvent<string> Abandoned(LogDraftId id, string reason) =>
-        new() { Kind = LogEventKind.DraftAbandoned, DraftId = id, Reason = reason, Status = DurableChangeStatus.Draft };
+    private static LogEvent<string> Committed(LogDraftId id, long sequence, int count, DurableChangeStatus status = DurableChangeStatus.Committed) =>
+        new() { Kind = LogEventKind.DraftCommitted, Sequence = sequence, Count = count, DraftId = id, Status = status };
+
+    private static LogEvent<string> Abandoned(LogDraftId id, LogDraftAbandonReason reason, string? message = null) =>
+        new() { Kind = LogEventKind.DraftAbandoned, DraftId = id, AbandonReason = reason, Message = message, Status = DurableChangeStatus.Draft };
 
     private (IJournaledStateManager Manager, GatedJournalStorage Storage, ILifecycleSubject Lifecycle) CreateSystem(GatedJournalStorage? storage = null)
     {
@@ -487,8 +631,44 @@ public class DurableLogTests : JournalingTestBase
         return (sut.Manager, storage, sut.Lifecycle);
     }
 
-    private DurableLog<string> CreateLog(IJournaledStateManager manager, string name = "log") =>
-        new(name, manager, new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+    private DurableLog<string> CreateLog(IJournaledStateManager manager, string name = "log") => new(name, manager, CreateCodec());
+
+    private OrleansBinaryDurableLogCommandCodec<string> CreateCodec() => new(CodecProvider.GetCodec<string>(), SessionPool);
+
+    /// <summary>
+    /// Fails to encode <see cref="Poison"/> after writing the items before it, as an encoder failing mid-command would.
+    /// </summary>
+    private sealed class PoisonLogCodec(IDurableLogCommandCodec<string> inner) : IDurableLogCommandCodec<string>
+    {
+        public const string Poison = "poison";
+
+        public void WriteAppend(ReadOnlySpan<string> items, JournalStreamWriter writer)
+        {
+            if (!items.Contains(Poison))
+            {
+                inner.WriteAppend(items, writer);
+                return;
+            }
+
+            using var entry = writer.BeginEntry();
+            foreach (var item in items)
+            {
+                if (item == Poison)
+                {
+                    throw new InvalidOperationException("The item cannot be encoded.");
+                }
+
+                System.Buffers.BuffersExtensions.Write(entry.Writer, "x"u8);
+            }
+        }
+
+        public void WriteTrimBefore(long sequence, JournalStreamWriter writer) => inner.WriteTrimBefore(sequence, writer);
+
+        public void WriteSnapshot(long firstSequence, IReadOnlyCollection<string> items, JournalStreamWriter writer) =>
+            inner.WriteSnapshot(firstSequence, items, writer);
+
+        public void Apply(JournalBufferReader input, IDurableLogCommandHandler<string> consumer) => inner.Apply(input, consumer);
+    }
 
     internal sealed class RecordingLogHandler : IDurableLogCommandHandler<string>
     {

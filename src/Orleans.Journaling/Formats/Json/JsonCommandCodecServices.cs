@@ -79,7 +79,7 @@ internal sealed class JsonDurableLogCommandCodecService<T>(IOptions<JsonJournalO
 {
     private readonly JsonDurableLogCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
 
-    public void WriteAppend(T item, JournalStreamWriter writer) => _inner.WriteAppend(item, writer);
+    public void WriteAppend(ReadOnlySpan<T> items, JournalStreamWriter writer) => _inner.WriteAppend(items, writer);
 
     public void WriteTrimBefore(long sequence, JournalStreamWriter writer) => _inner.WriteTrimBefore(sequence, writer);
 
