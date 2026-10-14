@@ -219,7 +219,8 @@ internal sealed class CassandraJournalStorageQueries
     public BoundStatement ReadHeader(string journalId)
     {
         var statement = Get(_readHeader).Bind(journalId, CassandraJournalStorageOptions.HeaderGenerationId, -1L);
-        statement.SetConsistencyLevel(_options.ReadConsistencyLevel);
+        // SERIAL here requests a serial read, which completes any pending Paxos round for this partition.
+        statement.SetConsistencyLevel(_options.SerialConsistencyLevel);
         return statement;
     }
 

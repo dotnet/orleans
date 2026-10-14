@@ -75,6 +75,12 @@ The header has two random revision tokens:
 - `revision` changes on every header mutation, including metadata-only updates.
 - `content_revision` changes when journal bytes or the active generation change.
 
+Header reads use a `SERIAL` read consistency level to complete any pending Paxos
+round for that journal partition before interpreting the header. This is distinct
+from the serial consistency setting on LWT statements: those use `QUORUM` for
+the regular consistency level and `SERIAL` for the Paxos phase. Entry reads
+remain at the configured regular read consistency level.
+
 Append and replacement publication compare the expected header revision,
 active generation, and next sequence. A mismatch means another writer changed
 the header. A metadata-only revision change can be refreshed and retried when
