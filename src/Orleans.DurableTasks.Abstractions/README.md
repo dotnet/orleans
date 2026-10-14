@@ -43,6 +43,12 @@ on this abstractions assembly.
   otherwise it completes with the body's result or failure. The durable token enters the canceled
   state before cancellation is published to durable callbacks, including callbacks registered
   concurrently with the request.
+- `CancelAsync(reason)` attaches a reason to the request, which the task's code reads from
+  `DurableExecutionContext.CancellationReason`, for example in the `catch` block which decides its
+  outcome. The first request determines the reason, the host retains it with the task's cancellation
+  and passes it to the task's attached children, and a replay observes the same reason.
+  `CancellationReason` is `null` until cancellation is requested and when the request carries no
+  reason. A host supplies the reason through `DurableTaskRuntimeHelper.RequestCancellationAsync`.
 - `RegisterCancellationCallbackAsync` establishes cancellation-operation causality. Its callbacks
   execute with their durable context ambient and participate in durable dependency and failure
   tracking. Causality flows through ordinary awaits and safe `Task.Run` dispatch. Suppressing
@@ -274,7 +280,8 @@ and `IScheduledTaskHandle` handles, and persists the mapping from `TaskId` to de
 response, and cancellation state. The host returns the recorded response when an existing
 ID is scheduled again, records `SelectCompletionAsync` decisions, and supplies
 replay-consistent `UtcNow` values. It runs and replays the body of a canceled task with the durable
-request applied, and terminalizes canceled leaves as canceled. Hosts which support detached tasks
+request and its recorded reason applied, and terminalizes canceled leaves as canceled. Hosts which record
+cancellation reasons implement `IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`. Hosts which support detached tasks
 override `DurableExecutionContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`.
 Hosts which support signals override `DurableExecutionContext.WaitForSignalAsync`, record each
 task's first value for each signal name, and deliver signals from senders. Hosts which support abort
