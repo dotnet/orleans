@@ -25,6 +25,12 @@ public enum DurableChangeStatus : byte
 /// <summary>
 /// Selects which changes a watch stream delivers.
 /// </summary>
+/// <remarks>
+/// Every stream delivers durable changes. <see cref="Staged"/> and <see cref="Drafts"/> add the changes which are not
+/// yet durable, and can be combined. A stream without <see cref="Staged"/> never delivers a change before the journal
+/// write which contains it is acknowledged.
+/// </remarks>
+[Flags]
 [GenerateSerializer]
 public enum DurableWatchMode : byte
 {
@@ -34,9 +40,20 @@ public enum DurableWatchMode : byte
     Committed = 0,
 
     /// <summary>
+    /// Also delivers staged changes as they are made, followed by commit watermarks as journal writes are acknowledged.
+    /// </summary>
+    Staged = 1,
+
+    /// <summary>
+    /// Also delivers volatile draft content, such as the items of an open <see cref="IDurableLogDraft{T}"/>.
+    /// State without drafts ignores this flag.
+    /// </summary>
+    Drafts = 2,
+
+    /// <summary>
     /// Delivers draft and staged changes as they are made, followed by commit watermarks as journal writes are acknowledged.
     /// </summary>
-    Speculative = 1,
+    Speculative = Staged | Drafts,
 }
 
 /// <summary>
