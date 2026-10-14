@@ -332,29 +332,47 @@ separately.
 ## Writing replay-safe workflows
 
 A host replays an execution which didn't finish, for example after its grain is deactivated: the
-method body runs again from the start, and every child which already completed returns its
-recorded result. A workflow resumes correctly when each replay
-schedules the same children, with the same identifiers and arguments, in the same order.
+method body runs again from the start, and every recorded operation returns its recorded outcome. A
+workflow resumes correctly when each replay schedules the same operations, with the same
+identifiers and arguments, in the same order.
 
-- Put each side effect in a recorded operation: a durable call to another grain, a
-  `DurableTask.Run` delegate, an `async DurableTask` method awaited with `WithId`, or a
-  `DurableTask.Once` effect. The operation runs once, and a replay returns its recorded result.
-  Code between recorded operations runs on every replay, so it computes values from the
-  method's arguments, the results of earlier operations, and other values which are the same on
-  every replay.
-- Read time from `DurableTask.Current.UtcNow`, and produce random values and identifiers in
-  `DurableTask.Once` or inside children, so a replay observes the values the first execution
-  recorded.
+Replay doesn't rebuild the grain's journaled state, which holds the latest committed changes,
+including changes which later operations made. A durable body therefore has three kinds of code:
+
+- **Recorded operations** run once per execution, and a replay returns their recorded outcomes:
+  children such as durable grain calls, `async DurableTask` methods, `DurableTask.Run` delegates,
+  and delays, as well as signal waits, detaches, and `DurableTask.Once` effects.
+- **Re-executed code** precedes the body's last recorded operation and runs again in every replay.
+  It computes values from the method's arguments, recorded results, `DurableTask.Current.UtcNow`,
+  the cancellation state, and configuration which stays the same while executions are pending.
+- **The synchronous tail** follows the body's last recorded operation, with no other `await`
+  before the body returns. It runs only in a run which completes the body. Hosts which implement
+  `DurableTaskContext.OnBodyCompleted` commit its state changes in the same write as the task's
+  result, so no replay runs it again.
+
+Follow these rules in re-executed code:
+
+- Put each side effect in a recorded operation, or in the synchronous tail. Change grain state, read
+  grain state whose value decides later operations, and produce random values, identifiers, and
+  wall-clock times in `DurableTask.Once` or in a child, so a replay observes the values the first
+  run recorded. Read logical time from `DurableTask.Current.UtcNow`. Call external services in
+  children, whose external effects need their own idempotency.
 - Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
   or concurrently outside a combinator, and to combinators. Generated identifiers are stable only when unnamed
-  children and combinators are created in the same order.
+  children and combinators are created in the same order. Hosts name detach records by the
+  detached task's identity, so they're stable without names.
 - Scheduling an existing identifier with different arguments fails, so a replay which diverges
   from the recorded execution surfaces as an error.
   When a deployment changes a workflow while executions are pending, keep the existing steps
-  and identifiers, and give new steps new identifiers.
-- An `async DurableTask` method which completes without awaiting is a normal step, for example
-  a state transition whose result the parent records. The Orleans analyzers suppress CS1998 for
-  such methods ([ORLEANS0028](https://aka.ms/orleans/diagnostics#orleans0028)).
+  and identifiers, and give new steps new identifiers. A changed `Once` delegate doesn't affect
+  executions which recorded it.
+- An `async DurableTask` method which completes without awaiting is a normal step whose result the
+  parent records. The Orleans analyzers suppress CS1998 for such methods
+  ([ORLEANS0028](https://aka.ms/orleans/diagnostics#orleans0028)). A synchronous state transition
+  runs as a `DurableTask.Once` effect, which commits with the next durable write without a write of
+  its own.
+- Logs in re-executed code repeat on replay. `logger.ReplaySafe()` writes each event once; see
+  [Replay diagnostics and logging](#replay-diagnostics-and-logging).
 
 ## Recorded effects
 
@@ -391,7 +409,7 @@ var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
 
 `DurableTask.Current.IsReplaying` reports whether a run of the body is re-running operations which an
 earlier run recorded. It is `true` from the start of a run which finds operations that earlier runs
-recorded in the task's tree, such as children, detach and signal-send markers, and `Once` records,
+recorded in the task's tree, such as children, detach markers, and `Once` records,
 until the run has reached each of them or starts an operation which no earlier run recorded. It then
 stays `false`. A first run reports `false` throughout. Signal values which callers sent to the task
 don't count as recorded operations.
