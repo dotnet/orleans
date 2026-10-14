@@ -238,7 +238,8 @@ public abstract partial class DurableTask
     /// The host selects each next input: the remaining input which completed first in the host's durable completion order,
     /// so every replay yields the same order, including a replay in which more inputs have already completed. Inputs which
     /// the enumeration doesn't reach keep running, and durable cancellation reaches the inputs, which are attached
-    /// children.
+    /// children. The enumeration's cancellation token abandons scheduling the inputs and waiting for them, without
+    /// canceling the inputs.
     /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">The method is called outside a durable execution.</exception>
@@ -285,7 +286,13 @@ public abstract partial class DurableTask
         [EnumeratorCancellation] CancellationToken cancellationToken)
         where TTask : ScheduledTask
     {
-        var tasks = await ScheduleInputsAsync(inputs, context, operationId, createTask, context.ExecutionAbortToken).ConfigureAwait(false);
+        TTask[] tasks;
+        using (var linked = ScheduledTask.CreateLinkedWaitCancellation(context, cancellationToken))
+        {
+            tasks = await ScheduleInputsAsync(inputs, context, operationId, createTask, linked?.Token ?? context.ExecutionAbortToken)
+                .ConfigureAwait(false);
+        }
+
         await foreach (var task in ScheduledTask.WhenEachSelectedAsync(context, operationId, tasks, cancellationToken).ConfigureAwait(false))
         {
             yield return task;
