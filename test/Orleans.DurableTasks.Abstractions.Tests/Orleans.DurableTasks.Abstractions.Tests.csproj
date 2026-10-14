@@ -6,6 +6,7 @@
   <ItemGroup>
     <PackageReference Include="CsCheck" />
     <PackageReference Include="Microsoft.Accordant" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 
   <ItemGroup>

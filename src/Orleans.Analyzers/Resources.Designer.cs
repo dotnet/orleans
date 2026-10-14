@@ -637,11 +637,5 @@ namespace Orleans.Analyzers {
                 return ResourceManager.GetString("GrainClassDuplicateDeclarationDescription", resourceCulture);
             }
         }
-
-        internal static string DurableTaskAsyncMethodLacksAwaitSuppressionJustification {
-            get {
-                return ResourceManager.GetString("DurableTaskAsyncMethodLacksAwaitSuppressionJustification", resourceCulture);
-            }
-        }
     }
 }
