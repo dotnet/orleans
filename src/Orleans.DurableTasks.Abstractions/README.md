@@ -122,8 +122,9 @@ durable cancellation reaches. Awaiting it then throws the first failure in input
 otherwise it throws the first input's `OperationCanceledException` in input order when any input was canceled;
 otherwise `WhenAll<T>` returns an array of the results in input order. Input order selects the exception, so a
 replay observes the same one in any completion order. `WhenAny` returns the winner's input index,
-and `WhenAny<T>` also returns its result; a winner which failed or was canceled fails the combinator. `WhenAny`
-asks the host to persist its selected winner under a deterministic decision ID, then leaves all other scheduled
+and `WhenAny<T>` also returns its result; a winner which failed or was canceled fails the combinator. The winner is the
+input which completed first, and the host selects the same winner on replay: it derives the winner from a durable
+completion order, or persists its selection under a deterministic decision ID. `WhenAny` leaves all other scheduled
 tasks running. Durable cancellation reaches the inputs, which are attached children, and the combinators wait for
 their outcomes.
 
@@ -136,16 +137,74 @@ var reserved = await DurableTask.WhenAll(lines.Select(line => Catalog(line.Produ
     .WithId("reserve");
 ```
 
-The inputs are `{taskId}/reserve/0`, `{taskId}/reserve/1`, and so on, and a named `WhenAny` records its winner
-under `{taskId}/{name}/$winner`. `WithId(name).ScheduleAsync()` schedules the combinator as a child task under that
-identifier, which runs as its own execution, records the combined result, and identifies its inputs under a
-generated operation identifier of that execution.
+The inputs are `{taskId}/reserve/0`, `{taskId}/reserve/1`, and so on, and a host which records selections records a
+named `WhenAny`'s winner under `{taskId}/{name}/$winner`. `WithId(name).ScheduleAsync()` schedules the combinator as a
+child task under that identifier, which runs as its own execution, records the combined result, and identifies its
+inputs under a generated operation identifier of that execution.
 
-`ScheduledTask.WhenAny` returns the first task whose durable response arrives, including a
+`ScheduledTask.WhenAll` waits for scheduled tasks like `WhenAll`: it completes after every task is terminal, then throws
+the first failure in input order, or otherwise the first cancellation in input order. `ScheduledTask.WhenAny` returns the
+first task whose durable response arrives, including a
 failed or canceled response. It captures its candidates when called, preserving the selected
 task's identity when the caller subsequently reuses or changes the input collection. Caller
 cancellation and host wait failures are propagated. After selection, it cancels and drains the
 losing wait operations without canceling the durable tasks.
+
+## Scheduled task handles
+
+A `ScheduledTask` is the durable counterpart of a hot `Task`: it carries the task's ID and observes its response.
+Once a wait, a poll, or a combinator observes the terminal response, the handle caches it, so `IsCompleted`, `Status`,
+and `Exception` inspect the task synchronously, and `ScheduledTask<T>.GetResult()` returns the result or throws the
+recorded failure or cancellation, as awaiting does. `TryGetResult(out value)` returns `true` with the result of a task
+which completed successfully. Before the handle observes the terminal response, `Status` is `Pending`.
+
+`DurableTask.ScheduleAll(inputs)` schedules every input concurrently, so a host can commit the batch in one write, and
+returns their handles in input order without waiting for results. `DurableTask.WhenAllCompleted(inputs)` also waits until
+every input is terminal and returns the handles, each with its observed outcome; an input's failure or cancellation
+doesn't fail it, and host abort of the attempt does. `ScheduledTask.WhenAllCompleted(tasks)` waits for existing handles
+the same way. Their inputs are identified like `WhenAll` inputs, under `$schedule-all-N` or `$when-all-completed-N`, or
+under the segment which `WithId` assigns. The handles belong to the awaiting execution, so these combinators run only
+when awaited within a durable execution, and scheduling one as a task of its own with `ScheduleAsync()` throws
+`NotSupportedException`.
+
+`WhenAllCompleted` compensates exactly the inputs which succeeded:
+
+```csharp
+var reservations = await DurableTask.WhenAllCompleted(
+        lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units)))
+    .WithId("reserve");
+var reserved = lines.Where((line, i) => reservations[i].TryGetResult(out var ok) && ok).ToList();
+if (reserved.Count < lines.Count)
+{
+    await DurableTask.WhenAll(reserved.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId))).WithId("release");
+}
+```
+
+## Completion order
+
+`ScheduledTask.WhenEach(tasks)` yields each task once, in completion order, as an `IAsyncEnumerable`, and
+`DurableTask.WhenEach(inputs)` schedules its inputs under a generated `$when-each-N` operation identifier when the
+enumeration begins, then yields them the same way. A yielded handle has observed its terminal response, and a failure or
+a cancellation doesn't fail the enumeration. Inputs which the enumeration doesn't reach keep running.
+
+Within a durable execution, the host selects each next task: the remaining task which completed first in its durable
+completion order. Every replay yields the same order, including a replay in which more tasks have already completed, so
+code which acts on each result as it arrives replays the same steps:
+
+```csharp
+var quotes = await DurableTask.ScheduleAll(suppliers.Select(supplier => Supplier(supplier).QuoteAsync(order)))
+    .WithId("quotes");
+await foreach (var quote in ScheduledTask.WhenEach(quotes))
+{
+    if (quote.TryGetResult(out var offer) && offer.Price <= budget)
+    {
+        return await Supplier(offer.SupplierId).AcceptAsync(order).WithId("accept");
+    }
+}
+```
+
+`ScheduleAll(...).WithId(name)` names the inputs, as in this example. Outside a durable execution,
+`ScheduledTask.WhenEach` yields tasks in the order in which their waits observe their responses.
 
 ## Detached tasks
 
@@ -200,8 +259,8 @@ var approval = await Approved.WaitAsync();
 - A signal which arrives before its wait is recorded, and the wait returns it immediately.
 - `WaitAsync()` awaited directly runs as part of the awaiting execution, so it creates no child
   task. `TryWaitAsync(deadline)` races the wait with `DelayUntil(deadline)` as a `WhenAny` and returns
-  `(true, value)` when the signal wins and `(false, default)` when the deadline wins. The host records the
-  winner, so a replay returns the same outcome, and `WithId` names the race like other combinators:
+  `(true, value)` when the signal wins and `(false, default)` when the deadline wins. The host selects the same
+  winner on replay, so a replay returns the same outcome, and `WithId` names the race like other combinators:
 
 ```csharp
 var (received, approval) = await Approved.TryWaitAsync(deadline).WithId("approval");
@@ -294,7 +353,8 @@ schedules the same children, with the same identifiers and arguments, in the sam
 A host derives from `DurableExecutionContext`, implements `ISchedulableTask` definitions
 and `IScheduledTaskHandle` handles, and persists the mapping from `TaskId` to definition,
 response, and cancellation state. The host returns the recorded response when an existing
-ID is scheduled again, records `SelectCompletionAsync` decisions, and supplies
+ID is scheduled again, returns the same `SelectCompletionAsync` selection for a decision ID on every call, by recording
+the selection or by deriving it from a durable completion order, and supplies
 replay-consistent `UtcNow` values. It runs and replays the body of a canceled task with the durable
 request and its recorded reason applied, and terminalizes canceled leaves as canceled. Hosts which record
 cancellation reasons implement `IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`. Hosts which

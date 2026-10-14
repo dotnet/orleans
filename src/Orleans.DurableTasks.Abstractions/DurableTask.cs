@@ -261,6 +261,11 @@ internal struct ConfiguredDurableTaskCore<TTask> where TTask : DurableTask
     internal async Task<(DurableTaskResponse? Response, IScheduledTaskHandle? Handle)> ScheduleCoreAsync(
         CancellationToken cancellationToken)
     {
+        if (Task is IInlineOperation { InlineOnly: true })
+        {
+            throw IInlineOperation.CreateInlineOnlyException();
+        }
+
         EnsureId();
         if (ParentContext is { } parent)
         {
