@@ -44,6 +44,9 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     internal IReadOnlyDictionary<MessageId, OutboxDeadLetter> DeadLetterState => _deadLetters;
     internal int Count => _messages.Count;
 
+    /// <summary>Gets whether delivery attempts are in flight or awaiting application by the pump.</summary>
+    internal bool IsDelivering => _deliveries is not null;
+
     public IOutbox Register(IOutboxMessageSource source)
     {
         ArgumentNullException.ThrowIfNull(source);

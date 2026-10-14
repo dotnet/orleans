@@ -19,7 +19,7 @@ namespace Orleans.Messaging;
 /// earlier wake-up supersedes completes when it runs.
 /// Wake-ups may be early, late, or duplicated: every pass derives the work to perform from current state.
 /// Wake-up bookkeeping runs on the activation scheduler: journal writes prepare on it and serialize with job runs.
-/// The loop keeps the activation alive while a pass runs over queued work.
+/// The loop keeps the activation alive while a pass runs over queued work and while outbox deliveries are in flight.
 /// Work which only becomes due later relies on the durable job, so the activation can be collected while it waits.
 /// </remarks>
 internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecycleObserver
@@ -224,7 +224,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         var cancellationToken = _shutdown.Token;
         while (!cancellationToken.IsCancellationRequested)
         {
-            SetKeepAlive(Inbox.Count > 0);
+            SetKeepAlive(Inbox.Count > 0 || Outbox.Count > 0);
             var pass = _nextPass;
             _nextPass = null;
             var progress = false;
@@ -247,7 +247,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             pass?.TrySetResult();
             if (!progress)
             {
-                SetKeepAlive(false);
+                SetKeepAlive(Outbox.IsDelivering);
                 await _signal.WaitAsync().ConfigureAwait(true);
             }
         }
