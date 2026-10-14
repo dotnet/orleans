@@ -205,7 +205,11 @@ namespace Tester.CodeGenTests
             var localObject = new ObserverWithGenericMethods();
 
             var grain = this.GrainFactory.GetGrain<IGrainWithGenericMethods>(Guid.NewGuid());
-            // Root the observer and its suspended callback continuation independently of the test runner.
+
+            // Orleans references observers weakly. After SetValueOnObserver returns, only localObject.ValueTask's
+            // continuation references this test's async state machine: xUnit starts tests from a detached work item,
+            // so no rooted caller retains it, and GC.KeepAlive cannot root the state machine which holds the local.
+            // The handle keeps the observer, and through its pending continuation this test, alive until the callback runs.
             var observerRoot = GCHandle.Alloc(localObject);
             try
             {
