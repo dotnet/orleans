@@ -6,6 +6,8 @@ Microsoft Orleans Dashboard is a web-based monitoring and diagnostics tool for O
 ## Features
 - **Real-time Grain Statistics**: Monitor active grain counts, call rates, and exception rates
 - **Silo Health Monitoring**: View silo status, CPU usage, memory consumption, and network activity
+- **Silo Counters**: Track connected clients and cumulative message bytes, and inspect runtime metrics with totals across tagged series refreshed every second
+- **Responsive Navigation**: Open the navigation menu using the header button on narrow screens; dismiss it with Escape, the backdrop, or a navigation link
 - **Performance Metrics**: Track method call latencies, throughput, and error rates
 - **Grain Method Profiling**: Analyze individual grain method performance
 - **Reminders Tracking**: View scheduled reminders across the cluster

@@ -1,16 +1,22 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using Orleans;
+using Orleans.Concurrency;
 using Orleans.Dashboard;
 using Orleans.Dashboard.Core;
 using Orleans.Dashboard.Implementation;
+using Orleans.Dashboard.Model;
 using Orleans.Runtime;
 using Xunit;
 
@@ -30,6 +36,81 @@ public class DashboardHostTests
     private static readonly FieldInfo MeterProviderField = typeof(DashboardHost)
         .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
         .Single(field => field.FieldType == typeof(MeterProvider));
+
+    [Fact]
+    public async Task StartAsync_ExportsRuntimeMeterCounters()
+    {
+        using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        var instruments = new OrleansInstruments(services.GetRequiredService<IMeterFactory>());
+        var counter = instruments.Meter.CreateCounter<long>("dashboard.test.messages");
+        var fixture = new HostFixture();
+        await using var host = fixture.CreateHost();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+
+        counter.Add(7);
+        Assert.True(GetMeterProvider(host).ForceFlush());
+
+        var report = Assert.Single(fixture.CounterReports);
+        var exported = Assert.Single(report, value => value.Name == counter.Name);
+        Assert.Equal("7", exported.Value);
+        Assert.Equal("7", exported.Delta);
+    }
+
+    [Fact]
+    public void Export_AggregatesTaggedPointsBeforeComputingDelta()
+    {
+        using var meter = new Meter("dashboard.test." + Guid.NewGuid());
+        var counter = meter.CreateCounter<long>("messages");
+        var connectedClients = meter.CreateUpDownCounter<int>("connected-clients");
+        var load = meter.CreateUpDownCounter<double>("load");
+        var gauge = meter.CreateObservableGauge("clients", () => new[]
+        {
+            new Measurement<long>(2, new KeyValuePair<string, object?>("gateway", "one")),
+            new Measurement<long>(3, new KeyValuePair<string, object?>("gateway", "two")),
+        });
+        var histogram = meter.CreateHistogram<int>("bytes");
+        var fixture = new HostFixture();
+        using var provider = Sdk.CreateMeterProviderBuilder()
+            .AddMeter(meter.Name)
+            .AddReader(new PeriodicExportingMetricReader(fixture.TelemetryExporter, int.MaxValue, 1_000))
+            .Build();
+
+        counter.Add(7, new KeyValuePair<string, object?>("direction", "request"));
+        counter.Add(11, new KeyValuePair<string, object?>("direction", "response"));
+        histogram.Record(100, new KeyValuePair<string, object?>("direction", "request"));
+        histogram.Record(200, new KeyValuePair<string, object?>("direction", "response"));
+        connectedClients.Add(2);
+        load.Add(2.5);
+        Assert.True(provider.ForceFlush());
+
+        var first = Assert.Single(fixture.CounterReports);
+        AssertCounter(first, counter.Name, "18", "18");
+        AssertCounter(first, gauge.Name, "5", "5");
+        AssertCounter(first, connectedClients.Name, "2", "2");
+        AssertCounter(first, load.Name, "2.5", "2.5");
+        AssertCounter(first, histogram.Name, "300", "300");
+
+        counter.Add(5, new KeyValuePair<string, object?>("direction", "request"));
+        histogram.Record(50, new KeyValuePair<string, object?>("direction", "response"));
+        connectedClients.Add(-1);
+        load.Add(-0.5);
+        Assert.True(provider.ForceFlush());
+
+        var second = fixture.CounterReports.Last();
+        Assert.Equal(2, fixture.CounterReports.Count);
+        AssertCounter(second, counter.Name, "23", "5");
+        AssertCounter(second, gauge.Name, "5", "0");
+        AssertCounter(second, connectedClients.Name, "1", "-1");
+        AssertCounter(second, load.Name, "2", "-0.5");
+        AssertCounter(second, histogram.Name, "350", "50");
+    }
+
+    private static void AssertCounter(StatCounter[] report, string name, string value, string delta)
+    {
+        var counter = Assert.Single(report, counter => counter.Name == name);
+        Assert.Equal(value, counter.Value);
+        Assert.Equal(delta, counter.Delta);
+    }
 
     [Fact]
     public async Task StartAsync_ValidDependencies_ActivatesDashboardGrainAndSiloGrainServiceOnce()
@@ -343,10 +424,16 @@ public class DashboardHostTests
                 _siloGrainService,
                 destination => SiloGrainDestinations.Add(destination));
 
-            var telemetryService = CreateProxy<ISiloGrainService>((method, _) =>
-                method.Name == nameof(ISiloGrainService.ReportCounters)
-                    ? Task.CompletedTask
-                    : throw new NotSupportedException(method.Name));
+            var telemetryService = CreateProxy<ISiloGrainService>((method, arguments) =>
+            {
+                if (method.Name != nameof(ISiloGrainService.ReportCounters))
+                {
+                    throw new NotSupportedException(method.Name);
+                }
+
+                CounterReports.Enqueue(Assert.IsType<Immutable<StatCounter[]>>(arguments![0]).Value);
+                return Task.CompletedTask;
+            });
             var telemetryClient = new RecordingSiloGrainClient(telemetryService);
             _telemetryExporter = new DashboardTelemetryExporter(
                 LocalSiloDetails,
@@ -377,6 +464,10 @@ public class DashboardHostTests
         public List<SiloAddress> SiloGrainDestinations { get; } = [];
 
         public List<(string OrleansVersion, string HostVersion)> SetVersionCalls { get; } = [];
+
+        public ConcurrentQueue<StatCounter[]> CounterReports { get; } = new();
+
+        public DashboardTelemetryExporter TelemetryExporter => _telemetryExporter;
 
         public DashboardHost CreateHost() =>
             new(Logger, LocalSiloDetails, _grainFactory, _telemetryExporter, _siloGrainClient);

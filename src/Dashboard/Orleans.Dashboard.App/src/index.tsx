@@ -1,5 +1,6 @@
 // Import styles
 import './styles.css';
+import './lib/navigation';
 
 // Register Chart.js components
 import {
@@ -344,20 +345,24 @@ function renderPage(jsx: JSX.Element, path: string) {
   scroll();
   renderLoading();
 
-  http.get(`SiloCounters/${host}`, (err, data) => {
-    if (routeIndex != thisRouteIndex) return;
-    const subTitle = <a href={`#/host/${host}`}>Silo Details</a>;
-    renderPage(
-      <Page title={`Silo ${host}`} subTitle={subTitle}>
-        <SiloCounters
-          silo={host}
-          dashboardCounters={dashboardCounters}
-          counters={data}
-        />
-      </Page>,
-      '#/silos'
-    );
-  });
+  let loadDataIsPending = false;
+  const loadData = function () {
+    if (loadDataIsPending) return;
+    loadDataIsPending = true;
+    http.get(`SiloCounters/${host}`, (_err, data) => {
+      if (routeIndex != thisRouteIndex) return;
+      const subTitle = <a href={`#/host/${host}`}>Silo Details</a>;
+      renderPage(
+        <Page title={`Silo ${host}`} subTitle={subTitle}>
+          <SiloCounters counters={data} />
+        </Page>,
+        '#/silos'
+      );
+    }).finally(() => loadDataIsPending = false);
+  };
+
+  events.on('refresh', loadData);
+  loadData();
 });
 
 (routie as any)('/grain/:grainType', function (grainType: string) {

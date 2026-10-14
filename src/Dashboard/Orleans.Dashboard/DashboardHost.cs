@@ -60,7 +60,7 @@ internal sealed partial class DashboardHost(
     private Task StartOpenTelemetryConsumerAsync()
     {
         _meterProvider = Sdk.CreateMeterProviderBuilder()
-            .AddMeter("Orleans")
+            .AddMeter("Microsoft.Orleans")
             .AddReader(new PeriodicExportingMetricReader(dashboardTelemetryExporter, 1000, 1000))
             .Build();
         return Task.CompletedTask;
