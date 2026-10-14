@@ -18,7 +18,7 @@ namespace Orleans.DurableTasks.Runtime;
 /// value. The record commits with the change which delivered it and is deleted with the tree, so every wait in the tree,
 /// including waits during replay, observes the same value. A signal with an equal value is a duplicate, and a signal
 /// with a different value, or for a task which this grain doesn't retain as invoked or which is terminal without that
-/// record, is rejected.
+/// record, is rejected. A signal which the inbox delivers ahead of its invocation is recorded for that invocation.
 /// </para>
 /// <para>
 /// Waits complete once the record commits. A wait which is abandoned, for example because durable cancellation or tree
@@ -178,7 +178,7 @@ internal sealed partial class DurableTaskGrainRuntime
     {
         ThrowIfStopping();
         ValidateSignal(taskId, name, value);
-        return CreateSignalRejection(taskId, name, StageSignal(taskId, name, value, GetSignalFingerprint(value)));
+        return CreateSignalRejection(taskId, name, StageSignal(taskId, name, value, GetSignalFingerprint(value), fromInbox: true));
     }
 
     async ValueTask IDurableTaskGrainExtension.SignalAsync(
@@ -253,8 +253,23 @@ internal sealed partial class DurableTaskGrainRuntime
     }
 
     /// <summary>Records the first value of a signal for an invoked task, without writing.</summary>
+    /// <param name="fromInbox">
+    /// <see langword="true"/> when the signal was delivered through the inbox, so it can precede its invocation.
+    /// </param>
     /// <returns>Whether the signal is recorded, is a duplicate, or why it is rejected; a rejection stages nothing.</returns>
-    private DurableSignalResult StageSignal(TaskId taskId, string name, DurableTaskResponse value, string payloadFingerprint)
+    /// <remarks>
+    /// A sender can commit an invocation and a signal for it in one write, and the outbox delivers them independently.
+    /// A delivered signal for a task which isn't stored, or which records only a cancellation that preceded its
+    /// invocation, is therefore recorded ahead of the invocation, which finds the record in its tree. The record is
+    /// deleted once Messaging's <c>MaxOutboxRetryAge</c> has elapsed without the invocation, after which the invocation
+    /// can no longer arrive.
+    /// </remarks>
+    private DurableSignalResult StageSignal(
+        TaskId taskId,
+        string name,
+        DurableTaskResponse value,
+        string payloadFingerprint,
+        bool fromInbox = false)
     {
         var recordId = GetSignalRecordId(taskId, name);
         if (_storage.TryGetTask(recordId, out var record))
@@ -264,22 +279,41 @@ internal sealed partial class DurableTaskGrainRuntime
                 : DurableSignalResult.Conflict;
         }
 
-        if (!_storage.TryGetTask(taskId, out var task) || !IsInvoked(task))
+        var found = _storage.TryGetTask(taskId, out var task);
+        var precedesInvocation = fromInbox && (!found || IsCancellationRecord(task!));
+        if (!precedesInvocation)
         {
-            return DurableSignalResult.TaskNotFound;
-        }
+            if (!found || !IsInvoked(task!))
+            {
+                return DurableSignalResult.TaskNotFound;
+            }
 
-        if (task.CompletedAt.HasValue)
-        {
-            return DurableSignalResult.TaskCompleted;
+            if (task!.CompletedAt.HasValue)
+            {
+                return DurableSignalResult.TaskCompleted;
+            }
         }
 
         record = _storage.GetOrCreateTask(recordId, request: null);
         _storage.SetRequestFingerprint(recordId, record, payloadFingerprint);
         _storage.SetResponse(recordId, record, value);
         _pendingHandleResponses[recordId] = value;
+        if (precedesInvocation)
+        {
+            TrackExpiry(GetEarlySignalExpiry(record));
+        }
+
         return DurableSignalResult.Accepted;
     }
+
+    /// <summary>Returns whether a task records a signal's value.</summary>
+    private static bool IsSignalRecord(IDurableTaskState state) =>
+        state.RequestFingerprint is { } fingerprint
+        && fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal);
+
+    /// <summary>Returns when a signal which arrived before its invocation is deleted unless the invocation arrives.</summary>
+    private DateTimeOffset GetEarlySignalExpiry(IDurableTaskState record) =>
+        AddSaturating(record.CreatedAt, _shared.MaxOutboxRetryAge);
 
     /// <summary>Creates the exception which reports a rejected signal, or returns <see langword="null"/> for a recorded one.</summary>
     private static Exception? CreateSignalRejection(TaskId taskId, string name, DurableSignalResult result) => result switch

@@ -119,6 +119,11 @@ await tasks.SignalAsync(workflowId, Shipped, shipment);
   name, and a signal for a task which the grain doesn't retain as an invoked task are rejected:
   callers receive `InvalidOperationException` or `DurableTaskNotFoundException`, and the inbox
   dead-letters a rejected signal message with the rejection as its reason.
+- A sender can commit an invocation and a signal for it in one write, and the outbox delivers
+  them independently, so a signal message can arrive first. The inbox records a signal message
+  for a task which the grain doesn't hold yet, and the invocation finds the value when it
+  arrives. When no invocation arrives within Messaging's `MaxOutboxRetryAge`, after which it no
+  longer can, the grain deletes the value and logs a warning.
 - In a durable task, the send and a marker in the execution's tree commit in one journal write,
   like `DetachAsync`, so a replay which reaches the marker doesn't send it again. A signal to
   another grain is a `durable-rpc/signal` message in the outbox, whose identity covers the
