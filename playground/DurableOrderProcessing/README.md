@@ -20,7 +20,7 @@ sequenceDiagram
     participant Catalog as CatalogItemGrain (per product)
     participant Payment as PaymentGrain
     participant Buyer as BuyerGrain
-    Basket->>Order: PlaceOrderAsync, root task place-order-{orderId}
+    Basket-)Order: PlaceOrderAsync, detached root task place-order-{orderId}
     Order--)Buyer: RecordOrderAsync (each status change, detached)
     Note over Order: DurableTask.Delay(grace period)
     par each line, WhenAll(...).WithId("reserve")
@@ -60,16 +60,16 @@ records the `Cancelled` status. Ship sends the task its `Shipped` signal with `T
 expose the durable task runtime:
 
 - `GET /api/orders/{orderId}/workflow` polls the order's PlaceOrder task. The task is pending until the order is
-  cancelled or ships. The order keeps it until the basket which scheduled it accepts the result, then returns `404`.
-- `GET /api/orders/{orderId}/tasks`, `/api/buyers/{buyerId}/basket/tasks`, and `/api/catalog/{productId}/tasks` list
-  the tasks a grain retains. The UI links each order ID to its task list.
+  cancelled or ships, and the order then retains its result for `DurableTaskOptions.ResultRetentionPeriod`.
+- `GET /api/orders/{orderId}/tasks`, `/api/buyers/{buyerId}/tasks`, and `/api/catalog/{productId}/tasks` list the
+  tasks a grain retains, such as the buyer's detached projection updates. The UI links each order ID to its task list.
 - `POST /api/orders/{orderId}/deactivate` deactivates an order, so its next activation replays the pending workflow.
 
 ## Compare with OrderProcessing
 
 | Step | OrderProcessing (Messaging) | DurableOrderProcessing (Durable Tasks) |
 | --- | --- | --- |
-| Checkout | The basket stages `SubmitOrder` in its outbox and clears itself in one journal write. | The basket clears itself and schedules `PlaceOrderAsync` under root ID `place-order-{orderId}`. A durable grain stages the invocation in its outbox, so both commit in one journal write. |
+| Checkout | The basket stages `SubmitOrder` in its outbox and clears itself in one journal write. | The basket clears itself and detaches `PlaceOrderAsync` under root ID `place-order-{orderId}`. A durable grain stages the invocation in its outbox, so both commit in one journal write, and the order retains the workflow and its result. |
 | Grace period | The order sends itself `GracePeriodElapsed` with `Envelope.DeliverAt`; the handler ignores it unless the order is still `Submitted`. | `await DurableTask.Delay(gracePeriod).WithId("grace-period")`. The runtime sends the same kind of scheduled self-message. |
 | Cancellation | `CancelAsync` cancels a `Submitted` or `AwaitingValidation` order; late stock confirmations release their reservations. | `CancelAsync` is an ordinary grain method which, for a `Submitted` or `AwaitingValidation` order, requests durable cancellation of the PlaceOrder task with the buyer's reason through the grain's `IDurableTaskManager`. During the grace period, the cancellation ends the delay at once. During validation, `WhenAll` waits for every reservation to settle, then throws `OperationCanceledException`, so the workflow compensates knowing that no reservation is still running. |
 | Reservation fan-out | One `ReserveStock` message per line; `StockResult` replies arrive in any order and the handler tracks each line. | `await DurableTask.WhenAll(lines.Select(...ReserveAsync...)).WithId("reserve")` schedules one call per line concurrently, as children `reserve/0`, `reserve/1`, and so on, and returns each line's result in line order. |
@@ -80,7 +80,7 @@ expose the durable task runtime:
 | Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | Task IDs derived from the order ID, such as `place-order-{orderId}/reserve/0` and `place-order-{orderId}/authorize-payment`; `(grain, task ID)` identifies one execution, and a reused ID with different arguments fails while the task exists. |
 | Recovery | The inbox and outbox resume pending messages; each handler runs from the state it finds. | The next activation replays pending tasks from the start; completed children return their recorded results, so the workflow resumes where it stopped. Durable Jobs wakes the order when the delay is due or a completion arrives. |
 | Observability | Order state and the dashboard. | Order state, the dashboard, and per-grain task lists with each task's status, timestamps, due time, remote target, and result. |
-| Non-blank lines of code | Grains 403, contracts 112, host 49. | Grains 374, contracts 89, host 90, including the diagnostics endpoints. |
+| Non-blank lines of code | Grains 403, contracts 112, host 49. | Grains 375, contracts 89, host 90, including the diagnostics endpoints. |
 
 Both samples produce the same outcomes for a successful order, a cancellation during the grace period, a rejected line,
 and a declined card, including statuses, versions, descriptions, and stock levels.

@@ -12,7 +12,7 @@ public interface IBasketGrain : IGrainWithStringKey
     Task<Guid?> CheckoutAsync(CheckoutRequest request);
 }
 
-// The buyer's basket. Checkout clears the basket and schedules the order's PlaceOrder workflow in one journal write:
+// The buyer's basket. Checkout clears the basket and detaches the order's PlaceOrder workflow in one journal write:
 // a durable grain stages the invocation in its outbox, which replaces eShop's integration event log.
 public sealed class BasketGrain : DurableGrain, IBasketGrain
 {
@@ -64,11 +64,12 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
         _items.Clear();
         _lastCheckout.Value = orderId;
 
-        // Scheduling stages the invocation and writes the journal, committing the cleared basket with it.
-        // The order ID derives the workflow's root task ID, so the order runs one workflow.
+        // The detached workflow is staged in the outbox with the cleared basket, and both commit in one journal write.
+        // The order ID derives the workflow's root task ID, so the order runs one workflow, which it retains with its
+        // result; the basket keeps no state for it.
         await GrainFactory.GetGrain<IOrderGrain>(orderId)
             .PlaceOrderAsync(new SubmitOrder(this.GetPrimaryKeyString(), lines, request.Address, request.CardNumber[^4..]))
-            .ScheduleAsync(OrderGrain.PlaceOrderTaskId(orderId));
+            .DetachAsync(OrderGrain.PlaceOrderTaskId(orderId));
         return orderId;
     }
 }
