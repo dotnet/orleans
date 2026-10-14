@@ -2752,6 +2752,26 @@ internal sealed partial class DurableTaskGrainRuntime(
     public DateTimeOffset? GetCompletedAt(TaskId taskId) =>
         _storage.TryGetTask(taskId, out var state) ? state.CompletedAt : null;
 
+    /// <remarks>
+    /// An execution's recorded operations are its nearest stored descendants: descendants which are themselves executions,
+    /// such as local steps, hold their own operations. Signal values belong to the invoked task, which senders deliver
+    /// independently of its attempts; invoked descendants keep their own lifecycle; and a cancellation which arrived
+    /// before its request records no operation of this execution.
+    /// </remarks>
+    public HashSet<TaskId>? GetRecordedOperations(TaskId executionId)
+    {
+        HashSet<TaskId>? operations = null;
+        foreach (var (id, state) in _storage.GetChildren(executionId))
+        {
+            if (!IsInvoked(state) && !IsSignalRecord(state) && !IsCancellationRecord(state))
+            {
+                (operations ??= []).Add(id);
+            }
+        }
+
+        return operations;
+    }
+
     internal Task StopAsync(CancellationToken _)
     {
         lock (_stopLock)

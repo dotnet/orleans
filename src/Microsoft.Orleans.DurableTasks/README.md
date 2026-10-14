@@ -296,6 +296,12 @@ framework assets; its first published version establishes the compatibility base
   next journal write, and a replay returns the recorded outcome without running
   the effect. The record is deleted with the tree. Code which continues off the
   activation, for example after `ConfigureAwait(false)`, can't record effects.
+- A run of a task's body reports `IsReplaying` from its start while earlier runs
+  recorded operations in the task's tree: children, detach and signal-send
+  markers, and recorded effects, but not signal values or invoked descendants.
+  It stops once the run has reached each of them, or starts an operation which
+  no earlier run recorded; reaching an operation again doesn't stop it. It
+  serves logging and diagnostics only.
 - Recovery precedes new execution. Child identifiers, selection decisions, and
   outbound durable messages remain replay-stable. A replay which schedules another
   operation under a recorded identifier fails with an error which names the
