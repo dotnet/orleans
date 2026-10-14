@@ -13,7 +13,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// As an <see cref="IInboxMessageSink"/>, it accepts invocations, completions, cancellations, and signals directly into
 /// task state, so the request, result, or signal payload is journaled once, in task state, and the inbox journals only
 /// the message's processed record in the same write. Each message is decoded and validated before any change is
-/// staged; a message which fails validation throws, so the inbox dead-letters it.
+/// staged; a message which fails validation throws, and a rejected signal reports a dead-lettered result, so the inbox
+/// dead-letters either one.
 /// </para>
 /// <para>
 /// As an <see cref="IInboxHandler"/>, it handles the delay resumes the grain schedules for itself, which the inbox holds
@@ -28,12 +29,13 @@ internal sealed class DurableTaskMessageHandler(
     DurableTaskGrainRuntime runtime,
     DurableTaskMessageTypes messageTypes) : IInboxMessageSink, IInboxHandler
 {
-    public bool TryAccept(InboxMessage message)
+    public bool TryAccept(InboxMessage message, out DeliveryResult result)
     {
+        result = DeliveryResult.Accepted();
         switch (message.Envelope.Subject)
         {
             case DurableTaskMessageTypes.InvocationSubject:
-                var invocation = messageTypes.Invocation.Decode(message);
+                var invocation = messageTypes.Invocation.Decode(message.Envelope);
                 var request = invocation.Request
                     ?? throw new InvalidOperationException("The durable task invocation request is missing.");
                 var requestContext = request.Context
@@ -47,13 +49,13 @@ internal sealed class DurableTaskMessageHandler(
                 runtime.ScheduleFromInbox(invocation.TaskId, request);
                 return true;
             case DurableTaskMessageTypes.CompletionSubject:
-                var completion = messageTypes.Completion.Decode(message);
+                var completion = messageTypes.Completion.Decode(message.Envelope);
                 var response = completion.Response
                     ?? throw new InvalidOperationException("The durable task completion response is missing.");
                 runtime.AcceptResponseFromInbox(completion.TaskId, response, GetSender(completion.Sender));
                 return true;
             case DurableTaskMessageTypes.CancellationSubject:
-                var cancellation = messageTypes.Cancellation.Decode(message);
+                var cancellation = messageTypes.Cancellation.Decode(message.Envelope);
                 if (cancellation.AbortReason is { } abortReason)
                 {
                     runtime.AbortFromInbox(cancellation.TaskId, abortReason, GetSender(cancellation.Sender));
@@ -65,18 +67,21 @@ internal sealed class DurableTaskMessageHandler(
 
                 return true;
             case DurableTaskMessageTypes.SignalSubject:
-                var signal = messageTypes.Signal.Decode(message);
+                var signal = messageTypes.Signal.Decode(message.Envelope);
                 _ = GetSender(signal.Sender);
 
-                // A rejected signal, such as one for an unknown or terminal task or with a conflicting value, is
-                // dead-lettered with the rejection as its reason.
+                // A rejected signal, such as one for an unknown or terminal task or with a conflicting value, stages
+                // nothing and is dead-lettered with the rejection as its reason.
                 if (runtime.StageSignalFromInbox(signal.TaskId, signal.Name, signal.Value) is { } rejection)
                 {
-                    throw rejection;
+                    result = DeliveryResult.DeadLettered(rejection.Message);
                 }
 
                 return true;
             default:
+                // Delay resumes are declined, so the inbox holds each one until its due time and then dispatches it to
+                // the handler.
+                result = default;
                 return false;
         }
     }
@@ -87,7 +92,7 @@ internal sealed class DurableTaskMessageHandler(
     public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var resume = messageTypes.Resume.Decode(context.Message);
+        var resume = messageTypes.Resume.Decode(context.Message.Envelope);
         runtime.ResumeDelayFromInbox(resume.TaskId, resume.Generation, GetSender(resume.Sender));
         context.Complete();
         return ValueTask.CompletedTask;

@@ -96,7 +96,7 @@ internal sealed record RecordedCompletion(GrainId Sender, GrainId Target, TaskId
         Xunit.Assert.True(((IOutboxMessageSource)runtime).TryGetMessage(MessageId, out var message));
         Xunit.Assert.Equal(MessageId, message.Envelope.MessageId);
         Xunit.Assert.Equal(Target, message.ReceiverId);
-        return MessagingTestHelpers.MessageTypes.Completion.Decode(message);
+        return MessagingTestHelpers.MessageTypes.Completion.Decode(message.Envelope);
     }
 }
 
