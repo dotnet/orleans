@@ -1817,6 +1817,31 @@ internal sealed partial class DurableTaskGrainRuntime(
     private bool IsDiscarded(GrainDurableTaskContext context) =>
         !_executionContexts.TryGetValue(context.Id, out var registered) || !ReferenceEquals(registered, context);
 
+    /// <remarks>
+    /// Journaling commits every staged change in the next write, whichever operation requests it, so a body's state
+    /// changes and its result commit together only when both are staged in one work item. The attempt commits the staged
+    /// response once the body's run returns it.
+    /// </remarks>
+    void IDurableTaskGrainRuntime.StageBodyResponse(GrainDurableTaskContext context, DurableTaskResponse response)
+    {
+        if (_stopping || IsDiscarded(context))
+        {
+            return;
+        }
+
+        try
+        {
+            // The handle completes when a write commits the response, as it does for a response which the attempt commits.
+            _pendingHandleResponses[context.Id] = StageResponse(context.Id, response);
+        }
+        catch (Exception exception)
+        {
+            // This runs from the body's continuation, which has no caller to observe a failure. The attempt stages the
+            // response again once the body's run returns it.
+            _shared.Logger.LogWarning(exception, "{Id} error staging the response of durable task '{TaskId}'.", GrainId, context.Id);
+        }
+    }
+
     /// <summary>
     /// The cancellation which a committed write propagates: durable cancellation, carrying
     /// <see cref="CancellationReason"/>, of running attempts and of scheduler-owned children, or, for an abort with

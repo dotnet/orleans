@@ -2071,6 +2071,60 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal(1, manager.WriteCount);
     });
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public Task LocalStepStagesItsResultInTheWorkItemWhichRunsItsFinalCode(bool asyncMethod) => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/local");
+        var suspended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Task<bool>? probe = null;
+
+        // The step's final code queues work on the activation, as a grain operation which requests a journal write while
+        // the step completes would. That work runs before any continuation of the step, so the write it requests commits
+        // the step's state changes; it must find the step's result staged with them.
+        int FinalCode()
+        {
+            probe = Task.Factory.StartNew(
+                () => storage.Get(taskId).Result is { IsCompleted: true },
+                CancellationToken.None,
+                TaskCreationOptions.None,
+                TaskScheduler.Current);
+            return 42;
+        }
+
+        async Task Suspend()
+        {
+            suspended.SetResult();
+            await resume.Task;
+        }
+
+        async DurableTask<int> Step()
+        {
+            await Suspend();
+            return FinalCode();
+        }
+
+        var definition = asyncMethod
+            ? Step()
+            : DurableTask.Run(async _ =>
+            {
+                await Suspend();
+                return FinalCode();
+            });
+        var handle = await runtime.ScheduleChildAsync(taskId, definition, TestContext.Current.CancellationToken);
+        await suspended.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        resume.SetResult();
+        var response = await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(42, response.GetResult<int>());
+        Assert.NotNull(probe);
+        Assert.True(await probe);
+    });
+
     [Fact]
     public Task LocalStepAwaitingADelayCommitsItsRecordWithTheDelay() => ActivationScheduler.RunAsync(async () =>
     {

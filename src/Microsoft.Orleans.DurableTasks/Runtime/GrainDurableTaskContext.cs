@@ -185,6 +185,21 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             () => GetChildTaskHandleCore(taskId));
 
     /// <remarks>
+    /// The body's final code runs in the work item which calls this, so staging the response here commits it in the same
+    /// journal write as the journaled state that code changed, whichever operation requests that write. A body which
+    /// completes on another scheduler, or after its attempt was aborted, has its response handled by the attempt.
+    /// </remarks>
+    protected override void OnBodyCompleted(DurableTaskResponse response)
+    {
+        if (TaskScheduler.Current != _scheduler || _aborted || _deleted || _abortSource.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _runtime.StageBodyResponse(this, response);
+    }
+
+    /// <remarks>
     /// Only durable grain calls can be detached: the target recovers a root task from its serialized request. The start
     /// is recorded under <c>$detach:{target}:{rootId}</c>, so each detached task which this execution starts has one
     /// record, independently of other operations which a deployment adds or removes. Durable cancellation of this
