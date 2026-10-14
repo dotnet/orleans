@@ -153,6 +153,14 @@ namespace Orleans.DurableTasks
         public static DurableTask<TResult> Run<TState, TResult>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> function, TState state) { throw null; }
 
         protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
+        public static DurableTask<ScheduledTask[]> ScheduleAll(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static DurableTask<ScheduledTask[]> ScheduleAll(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
+
+        public static DurableTask<ScheduledTask<TResult>[]> ScheduleAll<TResult>(System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static DurableTask<ScheduledTask<TResult>[]> ScheduleAll<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+
         public static DurableTask WhenAll(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
 
         public static DurableTask WhenAll(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
@@ -161,6 +169,14 @@ namespace Orleans.DurableTasks
 
         public static DurableTask<TResult[]> WhenAll<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
 
+        public static DurableTask<ScheduledTask[]> WhenAllCompleted(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static DurableTask<ScheduledTask[]> WhenAllCompleted(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
+
+        public static DurableTask<ScheduledTask<TResult>[]> WhenAllCompleted<TResult>(System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static DurableTask<ScheduledTask<TResult>[]> WhenAllCompleted<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+
         public static DurableTask<int> WhenAny(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
 
         public static DurableTask<int> WhenAny(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
@@ -168,6 +184,14 @@ namespace Orleans.DurableTasks
         public static DurableTask<(int Index, TResult Result)> WhenAny<TResult>(System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
 
         public static DurableTask<(int Index, TResult Result)> WhenAny<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask> WhenEach(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask> WhenEach(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask<TResult>> WhenEach<TResult>(System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask<TResult>> WhenEach<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
     }
 
     public sealed partial class DurableTaskAbortedException : System.Exception
@@ -417,7 +441,13 @@ namespace Orleans.DurableTasks
     {
         internal ScheduledTask() { }
 
+        public System.Exception? Exception { get { throw null; } }
+
         public abstract TaskId Id { get; }
+
+        public bool IsCompleted { get { throw null; } }
+
+        public DurableTaskStatus Status { get { throw null; } }
 
         public System.Threading.Tasks.ValueTask AbortAsync(string reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
@@ -446,9 +476,17 @@ namespace Orleans.DurableTasks
 
         public static System.Threading.Tasks.Task WhenAll<TResult>(System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        public static System.Threading.Tasks.Task<ScheduledTask[]> WhenAllCompleted(System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task<ScheduledTask<TResult>[]> WhenAllCompleted<TResult>(System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public static System.Threading.Tasks.Task<ScheduledTask> WhenAny(System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public static System.Threading.Tasks.Task<ScheduledTask<TResult>> WhenAny<TResult>(System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask> WhenEach(System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask<TResult>> WhenEach<TResult>(System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks) { throw null; }
     }
 
     public readonly partial struct ScheduledTaskAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
@@ -464,6 +502,9 @@ namespace Orleans.DurableTasks
 
     public readonly partial struct ScheduledTaskAwaiter<TResult> : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
     {
+        private readonly ScheduledTask<TResult> _task;
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
         public bool IsCompleted { get { throw null; } }
 
         public readonly TResult GetResult() { throw null; }
@@ -478,6 +519,10 @@ namespace Orleans.DurableTasks
         protected ScheduledTask() { }
 
         public new ScheduledTaskAwaiter<TResult> GetAwaiter() { throw null; }
+
+        public TResult GetResult() { throw null; }
+
+        public bool TryGetResult(out TResult value) { throw null; }
 
         public new ConfiguredScheduledTaskAwaitable<TResult> WaitAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
