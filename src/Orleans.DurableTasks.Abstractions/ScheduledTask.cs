@@ -42,6 +42,27 @@ public abstract class ScheduledTask
     /// </remarks>
     public abstract ValueTask CancelAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Durably requests cancellation carrying <paramref name="reason"/>.</summary>
+    /// <param name="reason">
+    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// <see langword="null"/> for none.
+    /// </param>
+    /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
+    /// <remarks>
+    /// The request behaves as <see cref="CancelAsync(CancellationToken)"/>. The first request determines the reason, so the
+    /// task's body, for example in a <see langword="catch"/> block, can tell why it was canceled.
+    /// </remarks>
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken = default)
+        => CancelAsyncCore(reason, cancellationToken);
+
+    /// <summary>Asks the host to cancel the task carrying <paramref name="reason"/>.</summary>
+    /// <remarks>
+    /// Hosts which record reasons override this default implementation, which requests cancellation through
+    /// <see cref="CancelAsync(CancellationToken)"/> without the reason.
+    /// </remarks>
+    protected virtual ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken)
+        => CancelAsync(cancellationToken);
+
     /// <summary>
     /// Administratively aborts the task: the host terminalizes it and its attached descendants as failed with a
     /// <see cref="DurableTaskAbortedException"/> carrying <paramref name="reason"/>, without running further task code.
@@ -236,6 +257,8 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
 
+    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => handle.CancelAsync(reason, cancellationToken);
+
     protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => handle.AbortAsync(reason, cancellationToken);
 
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => handle.WaitAsync(cancellationToken);
@@ -249,6 +272,8 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
     public override TaskId Id => handle.TaskId;
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
+
+    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => handle.CancelAsync(reason, cancellationToken);
 
     protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => handle.AbortAsync(reason, cancellationToken);
 
