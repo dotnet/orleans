@@ -287,9 +287,10 @@ var approval = await Approved.WaitAsync();
   repeated event.
 - A signal which arrives before its wait is recorded, and the wait returns it immediately.
 - `WaitAsync()` awaited directly runs as part of the awaiting execution, so it creates no child
-  task. `TryWaitAsync(deadline)` races the wait with `DelayUntil(deadline)` as a `WhenAny` and returns
-  `(true, value)` when the signal wins and `(false, default)` when the deadline wins. The host selects the same
-  winner on replay, so a replay returns the same outcome, and `WithId` names the race like other combinators:
+  task. `TryWaitAsync(deadline)` races the wait with `DelayUntil(deadline)` as a `Race` and returns
+  `(true, value)` when the signal wins and `(false, default)` when the deadline wins. The race cancels the
+  other input and completes once both are terminal. The host selects the same winner on replay, so a replay
+  returns the same outcome, and `WithId` names the race like other combinators:
 
 ```csharp
 var (received, approval) = await Approved.TryWaitAsync(deadline).WithId("approval");
