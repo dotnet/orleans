@@ -58,7 +58,7 @@ once that write completes:
 
 An `async DurableTask` method body is a deferred definition: calling the method creates
 the definition, and the durable task runtime runs it under the task's identity. A body
-which completes without awaiting is a normal step; the Orleans analyzers suppress CS1998
+which completes without awaiting is a normal step; the durable task analyzers suppress CS1998
 for such methods, as described in [ORLEANS0028](../diagnostics/orleans0028.md).
 
 How a durable call starts depends on the caller:
