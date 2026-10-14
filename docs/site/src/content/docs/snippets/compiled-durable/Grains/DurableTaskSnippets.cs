@@ -362,33 +362,42 @@ public interface IShippingGrain : IGrainWithGuidKey
 {
     DurableTask<ShippingQuote?> QuoteFirstAsync(string route);
 
+    DurableTask<ShippingQuote?> QuoteGroundAsync(string route);
+
     DurableTask<ShippingQuote[]> CollectQuotesAsync(string route, string[] carriers, int count);
 }
 
 public sealed partial class ShippingGrain : DurableGrain, IShippingGrain
 {
+    // Returns the first carrier's quote once the other carrier's request has settled.
     public async DurableTask<ShippingQuote?> QuoteFirstAsync(string route)
     {
-        var (_, quote) = await DurableTask.WhenAny(
-            [
-                Carrier("ground").QuoteAsync(route),
-                Carrier("air").QuoteAsync(route),
-                QuoteDeadline(TimeSpan.FromMinutes(2)),
-            ])
+        var (_, quote) = await DurableTask.Race([Carrier("ground").QuoteAsync(route), Carrier("air").QuoteAsync(route)])
             .WithId("first-quote");
         return quote;
-    }
-
-    // Returns null when the deadline wins the race.
-    private static async DurableTask<ShippingQuote?> QuoteDeadline(TimeSpan timeout)
-    {
-        await DurableTask.Delay(timeout);
-        return null;
     }
 
     private ICarrierGrain Carrier(string name) => GrainFactory.GetGrain<ICarrierGrain>(name);
 }
 // </durable_tasks_race>
+
+public sealed partial class ShippingGrain
+{
+    // <durable_tasks_timeout>
+    public async DurableTask<ShippingQuote?> QuoteGroundAsync(string route)
+    {
+        try
+        {
+            return await Carrier("ground").QuoteAsync(route).WaitAsync(TimeSpan.FromMinutes(2)).WithId("ground-quote");
+        }
+        catch (TimeoutException)
+        {
+            // The carrier's request ended canceled after the timeout requested its cancellation.
+            return null;
+        }
+    }
+    // </durable_tasks_timeout>
+}
 
 public sealed partial class ShippingGrain
 {

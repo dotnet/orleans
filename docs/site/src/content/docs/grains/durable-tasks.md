@@ -300,6 +300,19 @@ keep their IDs when a later deployment adds or removes earlier combinators.
   the index of the input which completed first, and `WhenAny<TResult>` also returns its
   result. A winner which failed or was canceled fails the combinator. The other inputs
   keep running.
+- <xref:Orleans.DurableTasks.DurableTask.Race*?displayProperty=nameWithType> selects its
+  winner like `WhenAny` and returns the same values, then requests cancellation of every
+  other input with the reason `Another task won the race.` and waits until each is
+  terminal, so no input outlives the race. A winner which failed or was canceled fails
+  it; the other inputs' outcomes don't.
+- <xref:Orleans.DurableTasks.DurableTaskExtensions.WaitAsync*> and
+  <xref:Orleans.DurableTasks.DurableTaskExtensions.WaitUntilAsync*> race a task, input
+  `0`, with a durable delay, input `1`. When the task completes first, the combinator
+  cancels the delay and returns the task's outcome. When the delay elapses first, the
+  task receives a cancellation request whose reason names the timeout, and the
+  combinator waits for the task's outcome: a task which ends canceled fails it with a
+  <xref:System.TimeoutException>, and any other outcome, such as a result which the task
+  returns anyway, is its outcome.
 - <xref:Orleans.DurableTasks.DurableTask.ScheduleAll*?displayProperty=nameWithType>
   schedules every input and returns their <xref:Orleans.DurableTasks.ScheduledTask>
   handles in input order, without waiting for results.
@@ -312,7 +325,7 @@ keep their IDs when a later deployment adds or removes earlier combinators.
   An input's failure or cancellation is yielded like a success.
 
 The grain stamps each child's terminal result with a durable completion sequence, in
-the journal write which records the result. `WhenAny` and `WhenEach` select the
+the journal write which records the result. `WhenAny`, `Race`, and `WhenEach` select the
 remaining input with the lowest sequence, so every replay selects the same winner and
 yields the same order, including a replay in which more inputs have already completed.
 `ScheduleAll`, `WhenAllCompleted`, and `WhenEach` run only when awaited inside a durable
@@ -329,9 +342,13 @@ of a task which completed successfully. Before the handle observes a terminal re
 <xref:Orleans.DurableTasks.ScheduledTask.WhenAll*?displayProperty=nameWithType>,
 <xref:Orleans.DurableTasks.ScheduledTask.WhenAllCompleted*?displayProperty=nameWithType>,
 and <xref:Orleans.DurableTasks.ScheduledTask.WhenEach*?displayProperty=nameWithType>
-provide the same semantics. `WhenEach` accepts no `WithId`, so the named form schedules
-the inputs with `ScheduleAll(...).WithId(name)` and enumerates
-`ScheduledTask.WhenEach(handles)`.
+provide the same semantics, and
+<xref:Orleans.DurableTasks.ScheduledTask.Race*?displayProperty=nameWithType> returns the
+winning handle once every handle has observed its outcome. A handle's `WaitAsync` and
+`WaitUntilAsync` with a timeout follow the combinators' timeout rules; outside a durable
+task, such as in a client, they measure the timeout on the system clock. `WhenEach`
+accepts no `WithId`, so the named form schedules the inputs with
+`ScheduleAll(...).WithId(name)` and enumerates `ScheduledTask.WhenEach(handles)`.
 
 <xref:Orleans.DurableTasks.DurableTask.Delay*?displayProperty=nameWithType> and
 <xref:Orleans.DurableTasks.DurableTask.DelayUntil*?displayProperty=nameWithType> are
@@ -339,7 +356,8 @@ durable timers measured in logical time. The runtime records the delay's due tim
 sends the grain a scheduled resume message, which its inbox holds until the Durable Jobs
 clock reaches the due time. A recorded due time is a commitment: a replay which requests
 another due time, for example after a configured duration changed, keeps the recorded
-one and logs a warning.
+one and logs a warning. Timeouts use these delays, so a timeout counts from the run which
+first awaited it.
 
 ## Cancellation
 
