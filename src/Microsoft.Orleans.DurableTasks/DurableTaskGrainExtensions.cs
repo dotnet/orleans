@@ -169,6 +169,10 @@ public static class DurableTaskGrainExtensions
     /// <param name="target">The grain which owns the durable task.</param>
     /// <param name="rootId">The stable root task identifier.</param>
     /// <returns>A handle which can poll, wait for, cancel, or abort the existing durable task.</returns>
+    /// <remarks>
+    /// The handle polls the target with grain calls, which a durable execution doesn't record. A durable execution
+    /// awaits another task's result with <see cref="ObserveDurableTask{TResult}(IAddressable, string)"/>.
+    /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="target"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException"><paramref name="rootId"/> is empty or whitespace.</exception>
     public static ScheduledTask<TResult> GetDurableTask<TResult>(this IAddressable target, string rootId)
@@ -179,6 +183,104 @@ public static class DurableTaskGrainExtensions
             TaskId.CreateRoot(rootId),
             target.AsReference<IDurableTaskGrainExtension>());
     }
+
+    /// <summary>
+    /// Creates a durable task which completes with the terminal result of the existing invoked task
+    /// <paramref name="taskId"/> on <paramref name="target"/>, for a durable execution which didn't invoke it.
+    /// </summary>
+    /// <typeparam name="TResult">The observed task's result type.</typeparam>
+    /// <param name="target">The grain which owns the observed task, which can be the calling grain.</param>
+    /// <param name="taskId">
+    /// The identifier of a task which a client, another grain, or <c>DetachAsync</c> invoked on <paramref name="target"/>.
+    /// </param>
+    /// <returns>
+    /// An observation which the calling durable execution awaits, schedules, or passes to combinators such as
+    /// <see cref="DurableTask.WhenAny{TResult}(IReadOnlyList{DurableTask{TResult}})"/>, <c>Race</c>, and <c>WaitAsync</c>.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// The observation is a child of the calling execution, recorded in its tree under the identifier which awaiting or
+    /// scheduling it assigns, like a call to another grain. Scheduling it commits the record and a subscription in one
+    /// journal write; a replay which reaches the record doesn't subscribe again and observes the recorded outcome.
+    /// </para>
+    /// <para>
+    /// The subscription travels through the outbox to <paramref name="target"/>, which sends the observed task's terminal
+    /// result through its outbox, as it does to the task's caller, and retains that result until the completion retires.
+    /// An observed task which is already terminal completes the observation promptly. A subscription can arrive before
+    /// the invocation of the task which it observes, for example when one write of another grain starts both the task and
+    /// the observing execution, so <paramref name="target"/> holds a subscription to a task which it doesn't store until
+    /// that invocation arrives, or until Messaging's <c>OutboxRetryTimeout</c> has elapsed, after which it can no longer
+    /// arrive. A task which <paramref name="target"/> doesn't retain as an invoked task then, such as one whose retention
+    /// ended, completes the observation with <see cref="DurableTaskNotFoundException"/>; so does a stored task which isn't
+    /// an invoked task, at once. The observation's result
+    /// is the observed task's outcome: its result, failure, or cancellation.
+    /// </para>
+    /// <para>
+    /// Canceling the observation, for example when a <c>WaitAsync</c> deadline passes or a <c>Race</c> input loses, ends it
+    /// as canceled and ends its subscription; the observed task continues. Durable cancellation of the observing execution
+    /// reaches the observation like any child, unless the execution scheduled it in a cancellation suppression scope.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="taskId"/> is empty.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The caller isn't a durable execution of a grain. Clients and ordinary grain methods poll with
+    /// <see cref="GetDurableTask{TResult}(IAddressable, string)"/>.
+    /// </exception>
+    public static DurableTask<TResult> ObserveDurableTask<TResult>(this IAddressable target, TaskId taskId)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        if (taskId.IsDefault)
+        {
+            throw new ArgumentException("An observation requires a task identifier.", nameof(taskId));
+        }
+
+        if (!DurableTaskContext.TryGetCurrent(out var current) || current is not GrainDurableTaskContext)
+        {
+            throw new InvalidOperationException(
+                "A durable task observation is created in a durable execution of a grain, which records it. Clients and ordinary grain methods poll existing tasks with GetDurableTask.");
+        }
+
+        return new DurableTaskObservation<TResult>(target.GetGrainId(), taskId);
+    }
+
+    /// <summary>
+    /// Creates a durable task which completes with the terminal result of the existing root task <paramref name="rootId"/>
+    /// on <paramref name="target"/>, for a durable execution which didn't invoke it.
+    /// </summary>
+    /// <typeparam name="TResult">The observed task's result type.</typeparam>
+    /// <param name="target">The grain which owns the observed task, which can be the calling grain.</param>
+    /// <param name="rootId">The root ID under which a client, another grain, or <c>DetachAsync</c> invoked the task.</param>
+    /// <returns>An observation, as <see cref="ObserveDurableTask{TResult}(IAddressable, TaskId)"/> returns.</returns>
+    /// <remarks>The observation behaves as <see cref="ObserveDurableTask{TResult}(IAddressable, TaskId)"/> for <c>TaskId.CreateRoot(rootId)</c>.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="rootId"/> is empty or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">The caller isn't a durable execution of a grain.</exception>
+    public static DurableTask<TResult> ObserveDurableTask<TResult>(this IAddressable target, string rootId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootId);
+        return target.ObserveDurableTask<TResult>(TaskId.CreateRoot(rootId));
+    }
+}
+
+/// <summary>An observation of an existing invoked task, which the durable task runtime schedules as a child.</summary>
+internal interface IDurableTaskObservation
+{
+    /// <summary>Gets the grain which owns the observed task.</summary>
+    GrainId Target { get; }
+
+    /// <summary>Gets the observed task.</summary>
+    TaskId TaskId { get; }
+}
+
+internal sealed class DurableTaskObservation<TResult>(GrainId target, TaskId taskId) : DurableTask<TResult>, IDurableTaskObservation
+{
+    public GrainId Target => target;
+
+    public TaskId TaskId => taskId;
+
+    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) =>
+        throw new InvalidOperationException("A durable task observation is scheduled by the durable task runtime of a grain.");
 }
 
 internal sealed class AttachedScheduledTask<TResult>(
