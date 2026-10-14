@@ -172,7 +172,7 @@ internal sealed class CassandraJournalStorageQueries
             """, cancellationToken).ConfigureAwait(false);
         _appendHeader = await PrepareAsync($"""
             UPDATE {_tableName}
-            SET next_sequence = ?, total_length = ?, append_count = ?, append_length = ?,
+            SET journal_format = ?, next_sequence = ?, total_length = ?, append_count = ?, append_length = ?,
                 revision = ?, content_revision = ?
             WHERE journal_id = ? AND generation = ? AND sequence = ?
             IF revision = ? AND active_generation = ? AND next_sequence = ?
@@ -233,7 +233,7 @@ internal sealed class CassandraJournalStorageQueries
     }
 
     public BatchStatement Append(string journalId, Guid generation, long sequence, Guid operationId, byte[] payload,
-        long newNextSequence, long totalLength, long appendCount, long appendLength, Guid revision, Guid contentRevision,
+        long newNextSequence, long totalLength, long appendCount, long appendLength, string format, Guid revision, Guid contentRevision,
         Guid expectedRevision, long expectedNextSequence)
     {
         var batch = new BatchStatement();
@@ -243,7 +243,7 @@ internal sealed class CassandraJournalStorageQueries
         entry.SetSerialConsistencyLevel(_options.SerialConsistencyLevel);
         batch.Add(entry);
         var header = Get(_appendHeader).Bind(
-            newNextSequence, totalLength, appendCount, appendLength, revision, contentRevision,
+            format, newNextSequence, totalLength, appendCount, appendLength, revision, contentRevision,
             journalId, CassandraJournalStorageOptions.HeaderGenerationId, -1L,
             expectedRevision, generation, expectedNextSequence);
         header.SetConsistencyLevel(_options.WriteConsistencyLevel);
