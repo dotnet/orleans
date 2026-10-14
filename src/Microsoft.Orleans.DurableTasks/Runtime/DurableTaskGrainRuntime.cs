@@ -1296,29 +1296,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             return await ScheduleRemoteChildAsync(taskId, remoteRequest, cancellationToken);
         }
 
-        // Otherwise, the task must be a local method invocation. Commit its state before invoking it, including when
-        // an earlier attempt staged that state but its write did not complete.
+        // Otherwise, the task must be a local method invocation. Its state is staged and commits with the next write,
+        // such as the first durable operation of its body or its result, so a synchronous step costs one write. A step's
+        // identity and inputs follow from its parent's inputs and earlier results, so a replay which finds no record
+        // runs the step again.
         if (state is null)
         {
             _ = _storage.GetOrCreateTask(taskId, null);
-        }
-
-        await WriteStateAsync(cancellationToken);
-        if (_storage.TryGetTask(taskId, out var committed))
-        {
-            if (committed.CancellationRequestedAt.HasValue
-                && committed.Result is not { IsCompleted: true }
-                && IsCancellationLeaf(taskId, committed))
-            {
-                return new CompletedTaskHandle(
-                    taskId,
-                    await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, cancellationToken));
-            }
-
-            if (committed.Result is { IsCompleted: true })
-            {
-                return GetScheduledTaskHandle(taskId);
-            }
         }
 
         var executionContext = CreateExecutionContext(taskId);
@@ -1621,6 +1605,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         catch (Exception exception)
         {
             _shared.Logger.LogWarning(exception, "{Id} error committing the response of durable task '{TaskId}'.", GrainId, context.TaskId);
+
+            // A preparation failure retains the staged response, so a later write commits it and completes the handle.
+            if (exception is JournaledStatePreCommitException && !_stopping)
+            {
+                QueueBackgroundWrite();
+            }
         }
         finally
         {
@@ -1680,8 +1670,11 @@ internal sealed partial class DurableTaskGrainRuntime(
         CancellationToken cancellationToken)
     {
         var winningResponse = StageResponse(taskId, response);
+
+        // The handle completes when a write commits the response: this write, or a later one when this write fails
+        // before it commits, because a failed preparation retains staged changes.
+        _pendingHandleResponses[taskId] = winningResponse;
         await WriteStateAsync(cancellationToken);
-        CompleteTaskHandle(taskId, winningResponse);
         if (DeleteExpiredTasks())
         {
             await WriteStateAsync(cancellationToken);
