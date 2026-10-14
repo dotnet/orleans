@@ -24,6 +24,7 @@ public class DurableStateObservationTests : JournalingTestBase
         var list = CreateList(sut.Manager);
         var set = CreateSet(sut.Manager);
         var queue = CreateQueue(sut.Manager);
+        var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
 
         value.Value = "value";
@@ -31,9 +32,15 @@ public class DurableStateObservationTests : JournalingTestBase
         list.Add(1);
         set.Add(1);
         queue.Enqueue(1);
+        log.Append("entry");
+        using (var draft = log.BeginDraft())
+        {
+            draft.Write("draft item");
+        }
 
         // Creating a stream without enumerating it does not subscribe.
         _ = dictionary.WatchAsync(cancellationToken: CancellationToken);
+        _ = log.ReadAsync(cancellationToken: CancellationToken);
         await sut.Manager.WriteStateAsync(CancellationToken);
 
         Assert.Null(sut.Manager.AsJournaledStateManager().Observers);
@@ -315,11 +322,13 @@ public class DurableStateObservationTests : JournalingTestBase
         var value = CreateValue(sut.Manager);
         var dictionary = CreateDictionary(sut.Manager);
         var list = CreateList(sut.Manager);
+        var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
 
         await using var valueWatch = value.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await using var dictionaryWatch = dictionary.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await using var listWatch = list.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var logRead = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await valueWatch.NextAsync();
         await dictionaryWatch.NextAsync();
         await listWatch.NextAsync();
@@ -329,7 +338,8 @@ public class DurableStateObservationTests : JournalingTestBase
         value.Value = "v";
         dictionary["k"] = 1;
         list.Add(2);
-        var pending = new[] { valueWatch.MoveNextAsync().AsTask(), dictionaryWatch.MoveNextAsync().AsTask(), listWatch.MoveNextAsync().AsTask() };
+        log.Append("e");
+        var pending = new[] { valueWatch.MoveNextAsync().AsTask(), dictionaryWatch.MoveNextAsync().AsTask(), listWatch.MoveNextAsync().AsTask(), logRead.MoveNextAsync().AsTask() };
         Assert.All(pending, static task => Assert.False(task.IsCompleted));
 
         await sut.Manager.WriteStateAsync(CancellationToken);
@@ -338,6 +348,7 @@ public class DurableStateObservationTests : JournalingTestBase
         Assert.Equal(Committed("v", version: 1), valueWatch.Current);
         Assert.Equal((DictionaryChangeKind.Set, 1L), (dictionaryWatch.Current.Kind, dictionaryWatch.Current.Version));
         Assert.Equal((ListChangeKind.Added, 1L), (listWatch.Current.Kind, listWatch.Current.Version));
+        Assert.Equal((LogEventKind.Entry, 0L, "e", DurableChangeStatus.Committed), (logRead.Current.Kind, logRead.Current.Sequence, logRead.Current.Item, logRead.Current.Status));
     });
 
     [Fact]
@@ -384,19 +395,25 @@ public class DurableStateObservationTests : JournalingTestBase
     {
         var sut = CreateSystem();
         var dictionary = CreateDictionary(sut.Manager);
+        var log = CreateLog(sut.Manager);
         await sut.Lifecycle.OnStart(CancellationToken);
 
         await using var watch = dictionary.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
+        await using var read = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await watch.NextAsync();
         var watchNext = watch.MoveNextAsync().AsTask();
+        var readNext = read.MoveNextAsync().AsTask();
 
         var failure = new IOException("Storage is unavailable.");
         sut.Storage.Failure = failure;
         dictionary["lost"] = 1;
+        log.Append("lost");
         await Assert.ThrowsAsync<IOException>(async () => await sut.Manager.WriteStateAsync(CancellationToken));
 
         var watchException = await Assert.ThrowsAsync<InvalidOperationException>(() => watchNext);
         Assert.Same(failure, watchException.InnerException);
+        var readException = await Assert.ThrowsAsync<InvalidOperationException>(() => readNext);
+        Assert.Same(failure, readException.InnerException);
 
         // The fenced manager accepts no new watchers.
         await using var lateWatch = dictionary.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
@@ -595,6 +612,9 @@ public class DurableStateObservationTests : JournalingTestBase
 
     private DurableQueue<int> CreateQueue(IJournaledStateManager manager, string name = "queue") =>
         new(name, manager, new OrleansBinaryDurableQueueCommandCodec<int>(CodecProvider.GetCodec<int>(), SessionPool));
+
+    private DurableLog<string> CreateLog(IJournaledStateManager manager, string name = "log") =>
+        new(name, manager, new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
 
     private sealed class UnsupportedValue : IDurableValue<int>
     {

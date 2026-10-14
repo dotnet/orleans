@@ -254,3 +254,36 @@ public interface IDurableTaskCompletionSourceCommandHandler<T>
     /// <summary>Applies a canceled command.</summary>
     void ApplyCanceled();
 }
+
+/// <summary>
+/// Serializes one durable log command and applies one decoded command.
+/// </summary>
+public interface IDurableLogCommandCodec<T>
+{
+    /// <summary>Writes an append command.</summary>
+    void WriteAppend(T item, JournalStreamWriter writer);
+
+    /// <summary>Writes a command which discards entries before <paramref name="sequence"/>.</summary>
+    void WriteTrimBefore(long sequence, JournalStreamWriter writer);
+
+    /// <summary>Writes a snapshot command containing the retained entries, which begin at <paramref name="firstSequence"/>.</summary>
+    void WriteSnapshot(long firstSequence, IReadOnlyCollection<T> items, JournalStreamWriter writer);
+
+    /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
+    void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer);
+}
+
+/// <summary>
+/// Receives decoded durable log commands from a codec implementation.
+/// </summary>
+public interface IDurableLogCommandHandler<T>
+{
+    /// <summary>Applies an append command.</summary>
+    void ApplyAppend(T item);
+
+    /// <summary>Applies a command which discards entries before <paramref name="sequence"/>.</summary>
+    void ApplyTrimBefore(long sequence);
+
+    /// <summary>Resets the receiver before applying snapshot entries, which begin at <paramref name="firstSequence"/>.</summary>
+    void Reset(long firstSequence, int capacityHint);
+}
