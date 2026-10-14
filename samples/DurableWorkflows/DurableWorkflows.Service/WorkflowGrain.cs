@@ -91,8 +91,10 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
             [inventory.ReserveAsync($"{orderId}:reserve"), payment.ChargeAsync($"{orderId}:charge")])
             .WithId("prepare");
         var (reserve, charge) = (prepared[0], prepared[1]);
-        var failure = reserve.Exception ?? charge.Exception;
-        if (failure is null)
+
+        // The result names the step which failed; each step's task retains its exception for diagnostics.
+        var failedStep = reserve.Exception is not null ? "reserve" : charge.Exception is not null ? "charge" : null;
+        if (failedStep is null)
         {
             try
             {
@@ -103,7 +105,7 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                failure = exception;
+                failedStep = "ship";
             }
         }
 
@@ -119,7 +121,7 @@ public sealed class WorkflowGrain(ILocalSiloDetails localSiloDetails) : DurableG
         }
 
         var undone = await DurableTask.WhenAll(compensations).WithId("compensate");
-        return new(orderId, OrderWorkflowStatus.Compensated, [.. undone.Select(effect => effect.Kind)], failure.Message);
+        return new(orderId, OrderWorkflowStatus.Compensated, [.. undone.Select(effect => effect.Kind)], $"The {failedStep} step failed.");
     }
 
     public Task<WorkflowRuntimeInfo> GetRuntimeInfoAsync() => Task.FromResult(CreateRuntimeInfo());

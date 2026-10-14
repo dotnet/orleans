@@ -181,7 +181,7 @@ public sealed class WorkflowTests : IAsyncLifetime
 
         Assert.Equal(OrderWorkflowStatus.Compensated, first.Status);
         Assert.Equal(["refund-payment", "release-inventory"], first.Compensations);
-        Assert.Equal($"Injected failure for {orderId}:ship.", first.Failure);
+        Assert.Equal("The ship step failed.", first.Failure);
         Assert.Equal(first.OrderId, replay.OrderId);
         Assert.Equal(first.Status, replay.Status);
         Assert.Equal(first.Compensations, replay.Compensations);
