@@ -56,7 +56,7 @@ public interface IScheduledTaskHandle
     /// The token abandons waiting for acknowledgement.
     /// </summary>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
     /// <see langword="null"/> for none.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>

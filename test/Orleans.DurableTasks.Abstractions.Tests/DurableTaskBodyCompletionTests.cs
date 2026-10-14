@@ -93,7 +93,7 @@ public sealed class DurableTaskBodyCompletionTests
         Assert.Equal(["completed:Failed"], events);
     }
 
-    private sealed class CompletionRecordingContext(TaskId taskId, ConcurrentQueue<string> events) : DurableExecutionContext(taskId)
+    private sealed class CompletionRecordingContext(TaskId taskId, ConcurrentQueue<string> events) : DurableTaskContext(taskId)
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 

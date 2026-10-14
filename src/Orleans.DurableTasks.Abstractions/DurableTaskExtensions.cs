@@ -59,7 +59,7 @@ public static class DurableTaskExtensions
     {
         ArgumentNullException.ThrowIfNull(task);
         var taskId = TaskId.CreateRoot(rootId);
-        if (DurableExecutionContext.Current is { } context)
+        if (DurableTaskContext.Ambient is { } context)
         {
             return context.DetachTaskAsync(context.CreateOperationId("detach"), taskId, task, cancellationToken);
         }

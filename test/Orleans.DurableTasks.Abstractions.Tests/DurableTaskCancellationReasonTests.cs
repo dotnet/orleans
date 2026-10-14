@@ -52,9 +52,9 @@ public class DurableTaskCancellationReasonTests
                     await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                     return "completed";
                 }
-                catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+                catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
                 {
-                    return DurableExecutionContext.Current.CancellationReason;
+                    return DurableTask.Current.CancellationReason;
                 }
             }),
             context).AsTask();
@@ -73,7 +73,7 @@ public class DurableTaskCancellationReasonTests
         await using var registration = await context.RegisterCancellationCallbackAsync(
             _ =>
             {
-                observed = DurableExecutionContext.Current!.CancellationReason;
+                observed = DurableTask.Current.CancellationReason;
                 return ValueTask.CompletedTask;
             },
             TestCancellation);
@@ -91,7 +91,7 @@ public class DurableTaskCancellationReasonTests
         await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "recorded", TestCancellation);
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => (DurableExecutionContext.Current!.IsCancellationRequested, DurableExecutionContext.Current.CancellationReason)),
+            DurableTask.Run(_ => (DurableTask.Current.IsCancellationRequested, DurableTask.Current.CancellationReason)),
             context);
 
         Assert.Equal((true, "recorded"), response.GetResult<(bool, string?)>());
@@ -147,7 +147,7 @@ public class DurableTaskCancellationReasonTests
 
         public IScheduledTaskHandle GetHandle(TaskId taskId) => handle;
 
-        protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
             => throw new NotSupportedException();
     }
 
@@ -158,7 +158,7 @@ public class DurableTaskCancellationReasonTests
 
         public IScheduledTaskHandle GetHandle(TaskId taskId) => handle;
 
-        protected override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+        protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
             => throw new NotSupportedException();
     }
 

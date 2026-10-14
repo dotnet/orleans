@@ -26,12 +26,12 @@ on this abstractions assembly.
   prefix is reserved and rejected for explicit child names.
 - Scheduling the same definition under an existing ID reattaches to the response recorded
   for that ID. Hosts preserve the first definition associated with an ID.
-- A host can supply an execution-abort token when constructing `DurableExecutionContext`.
-  `DurableExecutionContext.CancellationToken`, which delegate and delay operations receive,
+- A host can supply an execution-abort token when constructing `DurableTaskContext`.
+  `DurableTask.Current.CancellationToken`, which delegate and delay operations receive,
   combines host abort and durable cancellation. Host abort stops an execution attempt, for example
   to drain it before replaying it in a new context, or when an operator aborts the task;
   `IsCancellationRequested` and durable callbacks report the durable request only. An `async
-  DurableTask` method reads the token from `DurableExecutionContext.Current`. Hosts discard
+  DurableTask` method reads the token from `DurableTask.Current`. Hosts discard
   responses from aborted attempts; a drained task replays from its durable state.
 - A wait cancellation token abandons that scheduling, polling, or wait operation. It does
   not request durable task cancellation.
@@ -44,7 +44,7 @@ on this abstractions assembly.
   state before cancellation is published to durable callbacks, including callbacks registered
   concurrently with the request.
 - `CancelAsync(reason)` attaches a reason to the request, which the task's code reads from
-  `DurableExecutionContext.CancellationReason`, for example in the `catch` block which decides its
+  `DurableTask.Current.CancellationReason`, for example in the `catch` block which decides its
   outcome. The first request determines the reason, the host retains it with the task's cancellation
   and passes it to the task's attached children, and a replay observes the same reason.
   `CancellationReason` is `null` until cancellation is requested and when the request carries no
@@ -77,7 +77,7 @@ on this abstractions assembly.
 - Disposing a durable cancellation registration prevents a snapshotted callback which has not
   started, or waits for an active callback to finish, including when that callback fails. A callback
   can dispose its own registration without blocking.
-- Delays use `DurableExecutionContext.UtcNow`, supplied by the host, so replay observes the
+- Delays use `DurableTask.Current.UtcNow`, supplied by the host, so replay observes the
   same logical time. `DurableTask.DelayUntil` waits for an absolute due time.
 
 ### Cancellation completion and cycles
@@ -279,7 +279,7 @@ var (received, approval) = await Approved.TryWaitAsync(deadline).WithId("approva
 ## Compensating canceled work
 
 A canceled workflow keeps running until its body completes, so it can undo the work it has done. It
-runs compensation inline in a `DurableExecutionContext.SuppressCancellation()` scope: the children it
+runs compensation inline in a `DurableTask.Current.SuppressCancellation()` scope: the children it
 schedules in the scope run to completion, and the workflow awaits their results as usual:
 
 ```csharp
@@ -290,14 +290,14 @@ public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
     {
         return await payment.ChargeAsync(order.Id, order.Total).WithId("charge");
     }
-    catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+    catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
     {
-        using (DurableExecutionContext.SuppressCancellation())
+        using (DurableTask.Current.SuppressCancellation())
         {
             await inventory.ReleaseAsync(order.Id).WithId("release");
         }
 
-        return OrderResult.Canceled(DurableExecutionContext.Current.CancellationReason);
+        return OrderResult.Canceled(DurableTask.Current.CancellationReason);
     }
 }
 ```
@@ -340,7 +340,7 @@ schedules the same children, with the same identifiers and arguments, in the sam
   replay returns its recorded result. Code between children runs on every replay, so it
   computes values from the method's arguments, the results of earlier children, and other
   values which are the same on every replay.
-- Read time from `DurableExecutionContext.UtcNow`, and produce random values and identifiers
+- Read time from `DurableTask.Current.UtcNow`, and produce random values and identifiers
   inside children, so a replay observes the values the first execution recorded.
 - Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
   or concurrently outside a combinator, and to combinators. Generated identifiers are stable only when unnamed
@@ -355,7 +355,7 @@ schedules the same children, with the same identifiers and arguments, in the sam
 
 ## Host responsibilities
 
-A host derives from `DurableExecutionContext`, implements `ISchedulableTask` definitions
+A host derives from `DurableTaskContext`, implements `ISchedulableTask` definitions
 and `IScheduledTaskHandle` handles, and persists the mapping from `TaskId` to definition,
 response, and cancellation state. The host returns the recorded response when an existing
 ID is scheduled again, returns the same `SelectCompletionAsync` selection for a decision ID on every call, by recording
@@ -363,10 +363,10 @@ the selection or by deriving it from a durable completion order, and supplies
 replay-consistent `UtcNow` values. It runs and replays the body of a canceled task with the durable
 request and its recorded reason applied, and terminalizes canceled leaves as canceled. Hosts which record
 cancellation reasons implement `IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`. Hosts which
-support cancellation suppression read `DurableExecutionContext.IsCancellationSuppressed` when they schedule
+support cancellation suppression read `DurableTaskContext.IsCancellationSuppressed` when they schedule
 a child, record it with the child, and neither cancel such a child for its parent's earlier request nor
 propagate the parent's later request to it. Hosts which support detached tasks
-override `DurableExecutionContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`.
-Hosts which support signals override `DurableExecutionContext.WaitForSignalAsync`, record each
+override `DurableTaskContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`.
+Hosts which support signals override `DurableTaskContext.WaitForSignalAsync`, record each
 task's first value for each signal name, and deliver signals from senders. Hosts which support abort
 implement `IScheduledTaskHandle.AbortAsync`.

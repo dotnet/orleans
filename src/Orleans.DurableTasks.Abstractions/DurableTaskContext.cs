@@ -3,12 +3,16 @@ using System.Globalization;
 
 namespace Orleans.DurableTasks;
 
-/// <summary>Supplies host services and deterministic execution state to a durable task.</summary>
-public abstract class DurableExecutionContext
+/// <summary>Describes a running durable task and supplies its host's services.</summary>
+/// <remarks>
+/// Task code reads the running task's context from <see cref="DurableTask.Current"/>. Hosts derive from this type to
+/// schedule and record the task's operations.
+/// </remarks>
+public abstract class DurableTaskContext
 {
     private const char GeneratedSegmentPrefix = '$';
-    private static readonly AsyncLocal<DurableExecutionContext?> AmbientContext = new();
-    private static readonly AsyncLocal<DurableExecutionContext?> CancellationSuppressedContext = new();
+    private static readonly AsyncLocal<DurableTaskContext?> AmbientContext = new();
+    private static readonly AsyncLocal<DurableTaskContext?> CancellationSuppressedContext = new();
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cancellationSource = new();
     private readonly CancellationTokenSource? _executionCancellationSource;
@@ -21,7 +25,7 @@ public abstract class DurableExecutionContext
     private long _nextOperationId;
 
     /// <summary>Initializes an execution with durable cancellation.</summary>
-    protected DurableExecutionContext(TaskId taskId) : this(taskId, CancellationToken.None)
+    protected DurableTaskContext(TaskId taskId) : this(taskId, CancellationToken.None)
     {
     }
 
@@ -34,14 +38,14 @@ public abstract class DurableExecutionContext
     /// observe the durable request only. The host owns the abort source for this execution's lifetime, drains
     /// the aborted attempt, discards its response, and replays it in a new context.
     /// </remarks>
-    protected DurableExecutionContext(TaskId taskId, CancellationToken executionAbortToken)
+    protected DurableTaskContext(TaskId taskId, CancellationToken executionAbortToken)
     {
         if (taskId.IsDefault)
         {
             throw new ArgumentException("A durable execution requires an explicit task identifier.", nameof(taskId));
         }
 
-        TaskId = taskId;
+        Id = taskId;
         _executionAbortToken = executionAbortToken;
         if (executionAbortToken.CanBeCanceled)
         {
@@ -51,11 +55,21 @@ public abstract class DurableExecutionContext
         }
     }
 
-    /// <summary>Gets the current durable execution context.</summary>
-    public static DurableExecutionContext? Current => AmbientContext.Value;
+    /// <summary>Gets the context of the durable task which the calling code runs in, if any.</summary>
+    /// <param name="context">The running task's context, or <see langword="null"/> outside a durable task.</param>
+    /// <returns><see langword="true"/> when the calling code runs in a durable task.</returns>
+    /// <remarks>Code which runs only in durable tasks reads <see cref="DurableTask.Current"/>.</remarks>
+    public static bool TryGetCurrent([NotNullWhen(true)] out DurableTaskContext? context)
+    {
+        context = AmbientContext.Value;
+        return context is not null;
+    }
+
+    /// <summary>Gets the context of the durable task which the calling code runs in, or <see langword="null"/>.</summary>
+    internal static DurableTaskContext? Ambient => AmbientContext.Value;
 
     /// <summary>Gets this execution's identifier.</summary>
-    public TaskId TaskId { get; }
+    public TaskId Id { get; }
 
     /// <summary>Gets the host-provided logical UTC time for this execution.</summary>
     public abstract DateTimeOffset UtcNow { get; }
@@ -93,8 +107,8 @@ public abstract class DurableExecutionContext
     }
 
     /// <summary>
-    /// Starts a scope in which the current durable execution schedules children which its durable cancellation doesn't
-    /// reach, such as compensation which a canceled workflow runs inline.
+    /// Starts a scope in which this execution schedules children which its durable cancellation doesn't reach, such as
+    /// compensation which a canceled workflow runs inline.
     /// </summary>
     /// <returns>The scope, which ends when it is disposed.</returns>
     /// <remarks>
@@ -112,13 +126,10 @@ public abstract class DurableExecutionContext
     /// scope restores the state which preceded it. Work which must outlive the execution itself runs as a detached task.
     /// </para>
     /// </remarks>
-    /// <exception cref="InvalidOperationException">The caller isn't running in a durable execution.</exception>
-    public static CancellationSuppressionScope SuppressCancellation()
+    public CancellationSuppressionScope SuppressCancellation()
     {
-        var context = Current
-            ?? throw new InvalidOperationException("Durable cancellation can be suppressed only within a durable execution.");
         var previous = CancellationSuppressedContext.Value;
-        CancellationSuppressedContext.Value = context;
+        CancellationSuppressedContext.Value = this;
         return new(previous);
     }
 
@@ -133,7 +144,7 @@ public abstract class DurableExecutionContext
     /// </remarks>
     protected internal bool IsCancellationSuppressed => ReferenceEquals(CancellationSuppressedContext.Value, this);
 
-    internal static void RestoreCancellationSuppression(DurableExecutionContext? previous) =>
+    internal static void RestoreCancellationSuppression(DurableTaskContext? previous) =>
         CancellationSuppressedContext.Value = previous;
 
     /// <summary>
@@ -153,7 +164,7 @@ public abstract class DurableExecutionContext
     ///
     /// <para>
     /// These observers must return promptly. They must not call, block on, await, or otherwise
-    /// orchestrate <see cref="DurableTaskRuntimeHelper.RequestCancellationAsync(DurableExecutionContext, CancellationToken)"/> or durable
+    /// orchestrate <see cref="DurableTaskRuntimeHelper.RequestCancellationAsync(DurableTaskContext, CancellationToken)"/> or durable
     /// cancellation of any context. Doing so is outside this contract and has the usual synchronous
     /// reentrancy and sync-over-async risks. Use <see cref="RegisterCancellationCallbackAsync"/> for
     /// all cancellation work which requests another durable context, awaits asynchronous work, needs
@@ -194,7 +205,7 @@ public abstract class DurableExecutionContext
     /// A host which commits the state changes a body makes together with the body's result, such as journaled grain
     /// state, stages the result here. Work which runs after the body's final code, such as a commit which another
     /// operation requests, then commits the result together with the changes that code made. The host still receives the
-    /// response from <see cref="DurableTask.RunAsync(DurableExecutionContext)"/>. Implementations return without
+    /// response from <see cref="DurableTask.RunAsync(DurableTaskContext)"/>. Implementations return without
     /// throwing. The default implementation does nothing.
     /// </para>
     /// </remarks>
@@ -281,22 +292,22 @@ public abstract class DurableExecutionContext
                     nameof(name));
             }
 
-            return TaskId.Child(name);
+            return Id.Child(name);
         }
 
-        return TaskId.Child(
+        return Id.Child(
             $"$child-{Interlocked.Increment(ref _nextChildId).ToString(CultureInfo.InvariantCulture)}");
     }
 
     internal TaskId CreateOperationId(string kind)
-        => TaskId.Child($"${kind}-{Interlocked.Increment(ref _nextOperationId).ToString(CultureInfo.InvariantCulture)}");
+        => Id.Child($"${kind}-{Interlocked.Increment(ref _nextOperationId).ToString(CultureInfo.InvariantCulture)}");
 
     /// <summary>
     /// Registers an asynchronous callback which observes the durable cancellation request.
     /// </summary>
     /// <remarks>
     /// This API establishes cancellation-operation causality. The callback executes with this durable
-    /// context as <see cref="Current"/> and participates in durable cancellation dependency tracking
+    /// context as <see cref="DurableTask.Current"/> and participates in durable cancellation dependency tracking
     /// and failure aggregation. Its cancellation operation flows with <see cref="ExecutionContext"/>
     /// across ordinary awaits and safe thread-pool dispatch, including <see cref="Task.Run(Action)"/>.
     /// Suppressing execution-context flow or using unsafe dispatch detaches subsequent asynchronous
@@ -476,19 +487,19 @@ public abstract class DurableExecutionContext
         }
     }
 
-    internal static ContextScope Enter(DurableExecutionContext context)
+    internal static ContextScope Enter(DurableTaskContext context)
     {
         var previous = AmbientContext.Value;
         AmbientContext.Value = context;
         return new(previous);
     }
 
-    internal readonly struct ContextScope(DurableExecutionContext? previous) : IDisposable
+    internal readonly struct ContextScope(DurableTaskContext? previous) : IDisposable
     {
         public void Dispose() => AmbientContext.Value = previous;
     }
 
-    private sealed class CancellationOperation(DurableExecutionContext context)
+    private sealed class CancellationOperation(DurableTaskContext context)
     {
         private static readonly object GraphLock = new();
         private static readonly AsyncLocal<CancellationOperation?> AmbientOperation = new();
@@ -615,7 +626,7 @@ public abstract class DurableExecutionContext
         private const int Invoking = 1;
         private const int Completed = 2;
         private const int DisposedState = 3;
-        private readonly DurableExecutionContext? _context;
+        private readonly DurableTaskContext? _context;
         private readonly Func<CancellationToken, ValueTask>? _callback;
         private readonly bool _propagateInvocationExceptionOnDispose;
         private TaskCompletionSource? _completion;
@@ -624,7 +635,7 @@ public abstract class DurableExecutionContext
         private int _state;
 
         public CancellationRegistration(
-            DurableExecutionContext context,
+            DurableTaskContext context,
             Func<CancellationToken, ValueTask> callback,
             bool propagateInvocationExceptionOnDispose = false)
         {

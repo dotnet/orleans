@@ -7,6 +7,15 @@ namespace Orleans.DurableTasks;
 [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder))]
 public abstract partial class DurableTask
 {
+    /// <summary>Gets the context of the durable task which the calling code runs in.</summary>
+    /// <remarks>
+    /// The context describes the running task: its identifier, logical time, and cancellation. Code which also runs
+    /// outside durable tasks checks with <see cref="DurableTaskContext.TryGetCurrent"/>.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The calling code isn't running in a durable task.</exception>
+    public static DurableTaskContext Current => DurableTaskContext.Ambient
+        ?? throw new InvalidOperationException("The calling code isn't running in a durable task.");
+
     /// <summary>Creates a successfully completed durable task.</summary>
     public static DurableTask<TResult> FromResult<TResult>(TResult value) => new CompletedDurableTask<TResult>(value);
 
@@ -78,7 +87,7 @@ public abstract partial class DurableTask
     }
 
     /// <summary>Runs the definition in the supplied execution context.</summary>
-    protected internal abstract ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
+    protected internal abstract ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context);
 
     internal virtual bool RunsInlineInParent => false;
 }
@@ -89,20 +98,20 @@ public abstract class DurableTask<TResult> : DurableTask;
 
 internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask<TResult>
 {
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => new(DurableTaskResponse.FromResult(value));
 }
 
 internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask
 {
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-        => context.ScheduleDelayAsync(context.TaskId, context.UtcNow + duration, context.CancellationToken);
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
+        => context.ScheduleDelayAsync(context.Id, context.UtcNow + duration, context.CancellationToken);
 }
 
 internal sealed class DelayUntilDurableTask(DateTimeOffset dueTime) : DurableTask
 {
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
-        => context.ScheduleDelayAsync(context.TaskId, dueTime, context.CancellationToken);
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
+        => context.ScheduleDelayAsync(context.Id, dueTime, context.CancellationToken);
 }
 
 /// <summary>Runs delegate bodies and reports their completion to the execution context.</summary>
@@ -110,12 +119,12 @@ internal static class DelegateBody
 {
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
     public static ValueTask<DurableTaskResponse> Run<TState>(
-        DurableExecutionContext context,
+        DurableTaskContext context,
         Func<TState, CancellationToken, DurableTaskResponse> body,
         TState state)
     {
         DurableTaskResponse response;
-        using (DurableExecutionContext.Enter(context))
+        using (DurableTaskContext.Enter(context))
         {
             try
             {
@@ -140,13 +149,13 @@ internal static class DelegateBody
     /// </remarks>
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
     public static ValueTask<DurableTaskResponse> RunAsync<TTask>(
-        DurableExecutionContext context,
+        DurableTaskContext context,
         Func<CancellationToken, TTask> function,
         Func<TTask, DurableTaskResponse> getResponse)
         where TTask : Task
     {
         TTask task;
-        using (DurableExecutionContext.Enter(context))
+        using (DurableTaskContext.Enter(context))
         {
             try
             {
@@ -169,8 +178,8 @@ internal static class DelegateBody
         return new(task.ContinueWith(
             static (completed, state) =>
             {
-                var (context, getResponse) = ((DurableExecutionContext, Func<TTask, DurableTaskResponse>))state!;
-                using (DurableExecutionContext.Enter(context))
+                var (context, getResponse) = ((DurableTaskContext, Func<TTask, DurableTaskResponse>))state!;
+                using (DurableTaskContext.Enter(context))
                 {
                     return Complete(context, (TTask)completed, getResponse);
                 }
@@ -183,7 +192,7 @@ internal static class DelegateBody
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Durable task failures are represented as terminal responses.")]
     private static DurableTaskResponse Complete<TTask>(
-        DurableExecutionContext context,
+        DurableTaskContext context,
         TTask task,
         Func<TTask, DurableTaskResponse> getResponse)
         where TTask : Task
@@ -205,7 +214,7 @@ internal static class DelegateBody
 
 internal sealed class DelegateDurableTask(Action<CancellationToken> action) : DurableTask
 {
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => DelegateBody.Run(
             context,
             static (action, token) =>
@@ -218,13 +227,13 @@ internal sealed class DelegateDurableTask(Action<CancellationToken> action) : Du
 
 internal sealed class DelegateDurableTask<TResult>(Func<CancellationToken, TResult> function) : DurableTask<TResult>
 {
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => DelegateBody.Run(context, static (function, token) => DurableTaskResponse.FromResult(function(token)), function);
 }
 
 internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, Task> function) : DurableTask
 {
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => DelegateBody.RunAsync(
             context,
             function,
@@ -237,7 +246,7 @@ internal sealed class AsyncDelegateDurableTask(Func<CancellationToken, Task> fun
 
 internal sealed class AsyncDelegateDurableTask<TResult>(Func<CancellationToken, Task<TResult>> function) : DurableTask<TResult>
 {
-    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context)
+    protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
         => DelegateBody.RunAsync(context, function, static task => DurableTaskResponse.FromResult(task.GetAwaiter().GetResult()));
 }
 
@@ -250,17 +259,17 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
 {
     private readonly TaskId _taskId;
 
-    internal ConfiguredDurableTaskCore(TTask task) : this(task, DurableExecutionContext.Current)
+    internal ConfiguredDurableTaskCore(TTask task) : this(task, DurableTaskContext.Ambient)
     {
     }
 
-    internal ConfiguredDurableTaskCore(TTask task, DurableExecutionContext? parentContext)
+    internal ConfiguredDurableTaskCore(TTask task, DurableTaskContext? parentContext)
     {
         Task = task ?? throw new ArgumentNullException(nameof(task));
         ParentContext = parentContext;
     }
 
-    private ConfiguredDurableTaskCore(TTask task, DurableExecutionContext? parentContext, TaskId taskId)
+    private ConfiguredDurableTaskCore(TTask task, DurableTaskContext? parentContext, TaskId taskId)
     {
         Task = task;
         ParentContext = parentContext;
@@ -269,7 +278,7 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
 
     internal TTask Task { get; }
 
-    internal DurableExecutionContext? ParentContext { get; }
+    internal DurableTaskContext? ParentContext { get; }
 
     internal TaskId TaskId => _taskId;
 
@@ -414,7 +423,7 @@ public readonly struct ConfiguredDurableTask
 
     /// <summary>Requests durable cancellation carrying <paramref name="reason"/>.</summary>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
     /// <see langword="null"/> for none. The first request determines the reason.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
@@ -470,7 +479,7 @@ public readonly struct ConfiguredDurableTask<TResult>
 
     /// <summary>Requests durable cancellation carrying <paramref name="reason"/>.</summary>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
     /// <see langword="null"/> for none. The first request determines the reason.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
