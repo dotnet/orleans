@@ -300,24 +300,71 @@ public sealed partial class DurableTaskSignalTests
         await harness.Manager.WriteStateAsync(TestCancellation);
         Assert.Equal("ada", await harness.GetResultAsync<string>(WorkflowId));
 
-        // A duplicate is accepted; the sink dead-letters a conflicting value and a signal for an unknown task with the
-        // rejection as the reason.
+        // A duplicate is accepted; the sink dead-letters a conflicting value and a signal for a task which isn't invoked
+        // with the rejection as the reason.
         Assert.True(handler.TryAccept(SignalMessage(sender, WorkflowId, "ada"), out var duplicate));
         Assert.IsType<DeliveryResult.Accepted>(duplicate.Value);
         Assert.True(handler.TryAccept(SignalMessage(sender, WorkflowId, "grace"), out var conflict));
         Assert.False(string.IsNullOrEmpty(Assert.IsType<DeliveryResult.DeadLettered>(conflict.Value).Reason));
-        Assert.True(handler.TryAccept(SignalMessage(sender, TaskId.CreateRoot("missing"), "ada"), out var unknown));
-        Assert.Contains("missing", Assert.IsType<DeliveryResult.DeadLettered>(unknown.Value).Reason, StringComparison.Ordinal);
+        Assert.True(handler.TryAccept(SignalMessage(sender, RecordId, "ada"), out var notInvoked));
+        Assert.Contains(RecordId.ToString(), Assert.IsType<DeliveryResult.DeadLettered>(notInvoked.Value).Reason, StringComparison.Ordinal);
         Assert.Equal("ada", harness.Storage.Get(RecordId).Result!.GetResult<string>());
+        Assert.Equal([WorkflowId, RecordId], harness.Storage.Ids);
 
         InboxMessage SignalMessage(GrainId from, TaskId taskId, string value) =>
-            MessagingTestHelpers.CreateMessage(
-                MessagingTestHelpers.MessageTypes.Signal,
-                from,
-                harness.Runtime.GrainId,
-                taskId,
-                new DurableTaskSignalMessage { TaskId = taskId, Name = Approved.Name, Value = DurableTaskResponse.FromResult(value), Sender = from });
+            CreateSignalMessage(harness, from, taskId, value);
     });
+
+    [Fact]
+    public Task InvocationObservesASignalWhichTheInboxAcceptedBeforeIt() => ActivationScheduler.RunAsync(async () =>
+    {
+        var harness = new Harness();
+        var caller = GrainId.Create("caller", "one");
+        var handler = new DurableTaskMessageHandler(harness.Runtime, MessagingTestHelpers.MessageTypes);
+
+        // The caller committed the invocation and the signal together, and the signal is delivered first.
+        Assert.True(handler.TryAccept(CreateSignalMessage(harness, caller, WorkflowId, "ada"), out var accepted));
+        Assert.IsType<DeliveryResult.Accepted>(accepted.Value);
+        await harness.Manager.WriteStateAsync(TestCancellation);
+        Assert.Equal([RecordId], harness.Storage.Ids);
+
+        harness.Runtime.ScheduleFromInbox(WorkflowId, Harness.CreateRequest(async () => await Approved.WaitAsync(), caller));
+        await harness.Manager.WriteStateAsync(TestCancellation);
+
+        Assert.Equal("ada", await harness.GetResultAsync<string>(WorkflowId));
+        Assert.Equal([WorkflowId, RecordId], harness.Storage.Ids);
+
+        // The record belongs to the invoked task's tree once the invocation arrives, so it is deleted with that tree.
+        ((IOutboxMessageSource)harness.Runtime).OnRetired(Assert.Single(harness.Transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+        Assert.Empty(harness.Storage.Ids);
+    });
+
+    [Fact]
+    public Task SignalWhoseInvocationNeverArrivesIsDeletedAfterTheSendersRetryAge() => ActivationScheduler.RunAsync(async () =>
+    {
+        var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
+        var harness = new Harness(time);
+        var handler = new DurableTaskMessageHandler(harness.Runtime, MessagingTestHelpers.MessageTypes);
+        var retryAge = new DurableMessagingOptions().MaxOutboxRetryAge;
+        Assert.True(handler.TryAccept(CreateSignalMessage(harness, GrainId.Create("caller", "one"), WorkflowId, "ada"), out _));
+        await harness.Manager.WriteStateAsync(TestCancellation);
+
+        time.Advance(retryAge - TimeSpan.FromTicks(1));
+        await harness.Runtime.ResumePendingTasksAsync(TestCancellation);
+        Assert.Equal([RecordId], harness.Storage.Ids);
+
+        time.Advance(TimeSpan.FromTicks(1));
+        await harness.Runtime.ResumePendingTasksAsync(TestCancellation);
+        Assert.Empty(harness.Storage.Ids);
+    });
+
+    private static InboxMessage CreateSignalMessage(Harness harness, GrainId from, TaskId taskId, string value) =>
+        MessagingTestHelpers.CreateMessage(
+            MessagingTestHelpers.MessageTypes.Signal,
+            from,
+            harness.Runtime.GrainId,
+            taskId,
+            new DurableTaskSignalMessage { TaskId = taskId, Name = Approved.Name, Value = DurableTaskResponse.FromResult(value), Sender = from });
 
     [Fact]
     public Task DurableExecutionRecordsEachSendSoReplayDoesNotSendAgain() => ActivationScheduler.RunAsync(async () =>
