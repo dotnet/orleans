@@ -116,6 +116,20 @@ public class DurableTaskCancellationReasonTests
     }
 
     [Fact]
+    public async Task ConfiguredTaskPassesTheReasonToItsHostHandle()
+    {
+        var handle = new ReasonRecordingHandle(TaskId.CreateRoot("root"));
+
+        await new RootDefinition(handle).WithId("root").CancelAsync("buyer", TestCancellation);
+        await new RootDefinition<int>(handle).WithId("root").CancelAsync("operator", TestCancellation);
+
+        Assert.Equal(
+            new (string?, CancellationToken)[] { ("buyer", TestCancellation), ("operator", TestCancellation) },
+            handle.Reasons);
+        Assert.Equal(0, handle.CancelCount);
+    }
+
+    [Fact]
     public async Task HostWithoutReasonsCancelsWithoutTheReason()
     {
         var handle = new CancelOnlyHandle(TaskId.CreateRoot("root"));
