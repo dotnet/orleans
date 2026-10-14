@@ -7,7 +7,7 @@ ms.topic: reference
 
 # Orleans analyzer diagnostics
 
-Orleans analyzers detect unsupported RPC contracts, serialization schema problems, unsafe grain execution patterns, and compatibility changes. Select a diagnostic ID for its cause, impact, remediation, code-fix behavior, and suppression guidance.
+Orleans analyzers detect unsupported RPC contracts, serialization schema problems, unsafe grain execution patterns, replay hazards in durable tasks, and compatibility changes. Select a diagnostic ID for its cause, impact, remediation, code-fix behavior, and suppression guidance.
 
 Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic ID as a URL fragment. The single redirect can therefore remain stable while this index and the detailed pages evolve.
 
@@ -118,3 +118,67 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0028
 
 [Suppress CS1998 for async durable task methods](orleans0028.md) — Suppressor. An `async DurableTask` method which completes without awaiting is a normal durable step.
+
+## ORLEANS0100
+
+[Access grain state in recorded effects or after the last durable operation](orleans0100.md) â€” Warning. Durable task code accesses grain state in replayed code.
+
+## ORLEANS0101
+
+[Produce non-deterministic values in recorded effects](orleans0101.md) â€” Warning. Durable task code produces non-deterministic values in replayed code.
+
+## ORLEANS0102
+
+[Await external operations in steps or after the last durable operation](orleans0102.md) â€” Warning. Durable task code awaits an external operation in replayed code.
+
+## ORLEANS0103
+
+[Change grain state after the last external await](orleans0103.md) â€” Warning. Durable task code changes grain state before an external await in the body's final code.
+
+## ORLEANS0104
+
+[Return the outputs of a DurableTask.Once effect](orleans0104.md) â€” Warning. Durable task code assigns a captured variable in a `DurableTask.Once` effect.
+
+## ORLEANS0105
+
+[Await or schedule durable task definitions](orleans0105.md) â€” Warning. Durable task code creates a durable task definition which the code never observes.
+
+## ORLEANS0106
+
+[Run each durable task definition once](orleans0106.md) â€” Warning. Durable task code runs a single-use durable task definition more than once.
+
+## ORLEANS0107
+
+[Use durable operation names without '$'](orleans0107.md) â€” Error. Durable task code names a durable operation with '$'.
+
+## ORLEANS0108
+
+[Give each durable operation call site its own name](orleans0108.md) â€” Warning. Durable task code repeats a durable operation name at another call site.
+
+## ORLEANS0109
+
+[Keep durable task bodies on their scheduler](orleans0109.md) â€” Warning. Durable task code moves durable task work off the activation scheduler.
+
+## ORLEANS0110
+
+[Run concurrent durable work through durable combinators](orleans0110.md) â€” Warning. Durable task code combines durable work with a Task combinator.
+
+## ORLEANS0111
+
+[Wait with durable delays](orleans0111.md) â€” Warning. Durable task code waits with a non-durable delay.
+
+## ORLEANS0112
+
+[Filter cancellation handlers by IsCancellationRequested](orleans0112.md) â€” Info. Durable task code catches cancellation without filtering by IsCancellationRequested.
+
+## ORLEANS0113
+
+[Return a task from asynchronous code in durable task bodies](orleans0113.md) â€” Warning. Durable task code uses asynchronous void code in a durable task body.
+
+## ORLEANS0114
+
+[Derive a signal name for each repeated wait](orleans0114.md) â€” Info. Durable task code waits for one signal name repeatedly.
+
+## ORLEANS0115
+
+[Log through a replay-safe logger](orleans0115.md) â€” Info. Durable task code logs through a logger which replays.
