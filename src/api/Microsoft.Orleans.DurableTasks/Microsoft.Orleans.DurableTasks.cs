@@ -316,6 +316,8 @@ namespace Orleans.DurableTasks.Protocol
 
         System.Collections.Generic.IReadOnlySet<Orleans.Runtime.GrainId> CompletionDestinations { get; }
 
+        long CompletionSequence { get; }
+
         System.DateTimeOffset CreatedAt { get; }
 
         System.DateTimeOffset? DueTime { get; }
@@ -373,6 +375,10 @@ namespace Orleans.DurableTasks.Runtime
 
         [Id(6)]
         public System.Collections.Generic.HashSet<Orleans.Runtime.GrainId> CompletionDestinations { get { throw null; } set { } }
+
+        [Id(20)]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        public long CompletionSequence { get { throw null; } set { } }
 
         [Id(4)]
         public System.DateTimeOffset CreatedAt { get { throw null; } set { } }

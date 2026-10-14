@@ -76,4 +76,16 @@ public interface IDurableTaskState
     /// Gets the grain which created this task through durable messaging.
     /// </summary>
     public GrainId CallerId { get; }
+
+    /// <summary>
+    /// Gets the grain-wide completion sequence which stamped the task's terminal result when it was staged, or zero when
+    /// the task has no result or its storage doesn't order completions.
+    /// </summary>
+    /// <remarks>
+    /// Storage stamps each stored result with a sequence higher than every stored task's, in the same journal write as the
+    /// result, so results staged later have higher sequences. A combinator which selects the earliest completion, such as
+    /// <c>WhenAny</c> or <c>WhenEach</c>, selects the completed candidate with the lowest sequence, which is the same in
+    /// every replay. Candidates without a sequence are selected by a recorded decision.
+    /// </remarks>
+    public long CompletionSequence { get; }
 }

@@ -144,6 +144,11 @@ public class DurableTaskState : IDurableTaskState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public DateTimeOffset? RetainedSince { get; set; }
 
+    /// <inheritdoc cref="IDurableTaskState.CompletionSequence"/>
+    [Id(20)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public long CompletionSequence { get; set; }
+
     IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
 
     /// <summary>

@@ -142,7 +142,7 @@ if (result is DurableSignalResult.Conflict or DurableSignalResult.TaskCompleted)
 ```
 - A wait advances its execution's logical time to when the signal was recorded. A deadline is
   `TryWaitAsync(deadline)`, a `WhenAny` race between the wait and `DurableTask.DelayUntil`, whose
-  indexed slots and winner record belong to the waiting execution's tree.
+  indexed slots belong to the waiting execution's tree.
 
 Repository consumers which need a preview package can opt this project into
 packing with `-p:PackDurableTaskAdapter=true`. The project keeps package
@@ -266,6 +266,17 @@ validation disabled until its first published version establishes a baseline.
   time is persisted before its effects commit and reused during replay; it
   advances to the recorded completion time of each child result the execution
   observes, so a delay starts when the work before it completed.
+- Each terminal result carries a completion sequence, which the grain stamps when it
+  stages the result, in the same journal write: a local child's result, a call's result
+  when the caller's inbox accepts it, a delay's outcome when its resume is processed,
+  and cancellations and aborts. A result staged later receives a higher sequence. The
+  sequence adds one integer to the task's state and no journal entry: activation derives
+  the last sequence from the recovered tasks. `WhenAny` and `WhenEach` select the
+  completed candidate with the lowest sequence, so a replay selects the same
+  candidates without a recorded decision, including when several results commit in
+  one write. A candidate which completes without a sequence, such as a child run by a
+  custom scheduler or a result stored before sequences were stamped, is selected by a
+  decision recorded in the execution's tree, and a recorded decision keeps its winner.
 - Activation shutdown stops new execution, signals the attempt-scoped execution-abort
   token observed by delegate and delay operations and adapter-controlled waits,
   drains active execution, discards its results, and leaves committed work
