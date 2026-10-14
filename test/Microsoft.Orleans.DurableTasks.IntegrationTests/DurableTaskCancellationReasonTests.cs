@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 
-/// <summary>Exercises cancellation reasons and signal results across grains.</summary>
+/// <summary>Exercises cancellation reasons, inline compensation with suppressed cancellation, and signal results across grains.</summary>
 public abstract class DurableTaskCancellationReasonTests(string journalFormatKey) : IAsyncLifetime
 {
     private readonly DurableTaskRecoveryFixture _fixture = new(journalFormatKey);
@@ -26,6 +26,22 @@ public abstract class DurableTaskCancellationReasonTests(string journalFormatKey
 
         var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         Assert.Equal("workflow: Cancelled by the buyer; holder: Cancelled by the buyer", response.GetResult<string>());
+    }
+
+    [Fact]
+    public async Task CanceledWorkflowCompensatesInlineThroughASuppressedRemoteCall()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var holderKey = Guid.NewGuid();
+        var workflow = _fixture.Client.GetGrain<IDurableTaskReasonWorkflowGrain>(Guid.NewGuid());
+        var blocking = _fixture.MessagingProbe.WaitForStartedAsync(holderKey, 1);
+
+        var scheduled = await workflow.CompensateInlineAsync(holderKey).ScheduleAsync("compensate", cancellationToken);
+        await blocking.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        await scheduled.CancelAsync("Cancelled by the buyer", cancellationToken);
+
+        var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        Assert.Equal("released 2 after Cancelled by the buyer", response.GetResult<string>());
     }
 
     [Fact]
@@ -61,11 +77,17 @@ public sealed class OrleansBinaryDurableTaskCancellationReasonTests() : DurableT
 public interface IDurableTaskReasonWorkflowGrain : IGrainWithGuidKey
 {
     DurableTask<string> RunAsync(Guid holderKey);
+
+    DurableTask<string> CompensateInlineAsync(Guid holderKey);
 }
 
 public interface IDurableTaskReasonHolderGrain : IGrainWithGuidKey
 {
     DurableTask<string> HoldAsync();
+
+    DurableTask BlockAsync();
+
+    DurableTask<int> ReleaseAsync(int count);
 }
 
 [GrainType("durable-task-reason-workflow-test")]
@@ -75,6 +97,24 @@ public sealed class DurableTaskReasonWorkflowGrain : DurableGrain, IDurableTaskR
     {
         var holder = await GrainFactory.GetGrain<IDurableTaskReasonHolderGrain>(holderKey).HoldAsync().WithId("hold");
         return $"workflow: {DurableExecutionContext.Current!.CancellationReason}; holder: {holder}";
+    }
+
+    public async DurableTask<string> CompensateInlineAsync(Guid holderKey)
+    {
+        var holder = GrainFactory.GetGrain<IDurableTaskReasonHolderGrain>(holderKey);
+        try
+        {
+            await holder.BlockAsync().WithId("block");
+            return "completed";
+        }
+        catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+        {
+            using (DurableExecutionContext.SuppressCancellation())
+            {
+                var released = await holder.ReleaseAsync(2).WithId("release");
+                return $"released {released} after {DurableExecutionContext.Current.CancellationReason}";
+            }
+        }
     }
 }
 
@@ -95,4 +135,13 @@ public sealed class DurableTaskReasonHolderGrain(DurableTaskMessagingProbe probe
                 return DurableExecutionContext.Current.CancellationReason!;
             }
         });
+
+    public DurableTask BlockAsync() =>
+        DurableTask.Run(async cancellationToken =>
+        {
+            probe.RecordStarted(this.GetPrimaryKey());
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        });
+
+    public DurableTask<int> ReleaseAsync(int count) => DurableTask.FromResult(count);
 }
