@@ -16,6 +16,9 @@
     <ProjectReference Include="..\..\src\Orleans.Journaling\Orleans.Journaling.csproj" />
     <ProjectReference Include="..\..\src\Microsoft.Orleans.DurableTasks\Microsoft.Orleans.DurableTasks.csproj" />
     <ProjectReference Include="..\..\src\Dashboard\Orleans.Dashboard\Orleans.Dashboard.csproj" />
+
+    <!-- The abstractions package carries the replay-safety analyzers; this sample references the project directly. -->
+    <ProjectReference Include="..\..\src\Orleans.DurableTasks.Analyzers\Orleans.DurableTasks.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>
