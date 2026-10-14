@@ -27,7 +27,7 @@ A durable task body observes the operations which it awaits: their results, thei
 - A failure to send escapes the body, so the task completes successfully, and the exception surfaces outside the task.
 - Durable operations which the code performs after its first `await` run after the body completed, outside the task's execution.
 
-For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
+For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
 
 ## How to fix violations
 
