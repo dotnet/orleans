@@ -338,13 +338,13 @@ namespace Orleans.Runtime
                     response = Response.FromException(exc1);
                 }
 
-                var localRequest = message.IsLocalOnly ? message.BodyObject as ILocalRequest : null;
-                localRequest?.OnInvoked(response);
+                // Local requests report the response's exception through their tasks unless a filter failed after the callback completed.
+                var reportedByRequest = message.IsLocalOnly && message.BodyObject is ILocalRequest localRequest && localRequest.OnInvoked(response);
 
                 if (response.Exception is { } invocationException)
                 {
-                    // Callers observe two-way failures, and local requests report failures through their tasks.
-                    var logLevel = message.Direction != Message.Directions.OneWay || localRequest is not null ? LogLevel.Debug : LogLevel.Warning;
+                    // Callers observe two-way failures.
+                    var logLevel = message.Direction != Message.Directions.OneWay || reportedByRequest ? LogLevel.Debug : LogLevel.Warning;
                     LogGrainInvokeException(this.invokeExceptionLogger, logLevel, invocationException, message);
 
                     // If a grain allowed an inconsistent state exception to escape and the exception originated from

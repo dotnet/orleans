@@ -30,9 +30,16 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
     public ValueTask<Response> Invoke()
     {
         var cancellationToken = _registration.Token;
-        if (Task.IsCompleted || cancellationToken.CanBeCanceled && !_registration.Unregister())
+        if (Task.IsCompleted)
         {
             // The request was canceled while it was queued.
+            return new(Response.Completed);
+        }
+
+        // Unregistering succeeds while cancellation is still running earlier callbacks, so check the token too.
+        if (cancellationToken.CanBeCanceled && (!_registration.Unregister() || cancellationToken.IsCancellationRequested))
+        {
+            TrySetCanceled(cancellationToken);
             return new(Response.Completed);
         }
 
@@ -84,23 +91,29 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
         TrySetException(exception);
     }
 
-    void ILocalRequest.OnInvoked(Response response)
+    bool ILocalRequest.OnInvoked(Response response)
     {
-        if (Task.IsCompleted)
+        var task = Task;
+        if (task.IsCompleted)
         {
-            return;
+            // The callback completed the task, so the task reports the callback's failure but not a later filter's failure.
+            return response.Exception is not { } exception
+                || task.IsCanceled && exception is OperationCanceledException
+                || task.IsFaulted && ReferenceEquals(task.Exception!.InnerException, exception);
         }
 
         // A call filter completed the invocation without running the callback.
         _registration.Dispose();
-        if (response.Exception is { } exception)
+        if (response.Exception is { } filterException)
         {
-            TrySetException(exception);
+            TrySetException(filterException);
         }
         else
         {
             TrySetResult(response.Result is TResult result ? result : default!);
         }
+
+        return true;
     }
 
     public object? GetTarget() => this;
@@ -165,5 +178,6 @@ internal interface ILocalRequest
     /// <summary>
     /// Completes the request with the invocation's <paramref name="response"/> if the invocation did not run the request.
     /// </summary>
-    void OnInvoked(Response response);
+    /// <returns><see langword="true"/> if the request's task reports the response's exception, if any.</returns>
+    bool OnInvoked(Response response);
 }

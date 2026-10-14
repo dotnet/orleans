@@ -15,6 +15,8 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task StartValueRequest(int value);
 
+    Task<List<string>> QueueRequests(int count);
+
     Task SetRequestFilterMode(RequestFilterMode mode);
 
     Task StartRequestContextRequest(string value);
@@ -53,5 +55,6 @@ public enum RequestFilterMode
 {
     Invoke,
     Throw,
+    ThrowAfterInvoke,
     ShortCircuit,
 }

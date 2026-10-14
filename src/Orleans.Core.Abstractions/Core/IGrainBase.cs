@@ -138,6 +138,8 @@ namespace Orleans
         /// <para>
         /// If the activation deactivates before the request starts, the returned task faults with
         /// <see cref="OrleansMessageRejectionException"/>.
+        /// If the activation's queue exceeds the configured maximum number of enqueued requests, the returned task faults with
+        /// <see cref="LimitExceededException"/>.
         /// </para>
         /// </remarks>
         public static Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, Func<TState, CancellationToken, Task<TResult>> callback, TState state, CancellationToken cancellationToken = default)

@@ -1746,11 +1746,21 @@ internal sealed partial class ActivationData :
     private void ReceiveRequest(Message message)
     {
         var overloadException = CheckOverloaded();
-        if (overloadException != null && !message.IsLocalOnly)
+        if (overloadException != null)
         {
-            _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
-            _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
-            return;
+            if (!message.IsLocalOnly)
+            {
+                _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
+                _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
+                return;
+            }
+
+            // Requests queued by RunRequestAsync honor the limit. Grain timer ticks are exempt.
+            if (message.BodyObject is ILocalRequest localRequest)
+            {
+                localRequest.Reject(overloadException);
+                return;
+            }
         }
 
         lock (_lock)

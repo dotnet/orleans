@@ -1,4 +1,6 @@
+using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
@@ -153,6 +155,17 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
     }
 
     [Fact]
+    public async Task RunRequest_FilterThrowsAfterInvoke_CompletesWithCallbackResult()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+        await grain.SetRequestFilterMode(RequestFilterMode.ThrowAfterInvoke);
+
+        await grain.StartValueRequest(21);
+
+        Assert.Equal("42", await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task RunRequest_FromOutsideActivation_RunsOnActivation()
     {
         var key = Guid.NewGuid();
@@ -194,5 +207,43 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
         {
             await Task.Delay(20, timeout.Token);
         }
+    }
+}
+
+/// <summary>
+/// Tests that requests queued by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>
+/// honor <see cref="SiloMessagingOptions.MaxEnqueuedRequestsHardLimit"/>.
+/// </summary>
+[TestCategory("BVT"), TestCategory("Scheduler")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
+public class RunRequestQueueLimitTests : TestClusterPerTest
+{
+    private const int HardLimit = 3;
+
+    protected override void ConfigureTestCluster(TestClusterBuilder builder)
+    {
+        builder.Options.InitialSilosCount = 1;
+        builder.AddSiloBuilderConfigurator<SiloConfigurator>();
+    }
+
+    [Fact]
+    public async Task RunRequest_BeyondHardLimit_FaultsWithLimitExceeded()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        // The queuing call counts toward the limit, so the activation admits requests until its count exceeds the limit.
+        var outcomes = await grain.QueueRequests(HardLimit + 2);
+        await grain.AwaitPendingRequest().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal(["queued", "queued", "queued", nameof(LimitExceededException), nameof(LimitExceededException)], outcomes);
+        Assert.Equal(["request-0", "request-1", "request-2"], await grain.GetLog());
+    }
+
+    private sealed class SiloConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder) =>
+            hostBuilder.Configure<SiloMessagingOptions>(options => options.MaxEnqueuedRequestsHardLimit = HardLimit);
     }
 }

@@ -22,6 +22,9 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
             {
                 case RequestFilterMode.Throw:
                     throw new InvalidOperationException("Filter failed.");
+                case RequestFilterMode.ThrowAfterInvoke:
+                    await context.Invoke();
+                    throw new InvalidOperationException("Filter failed after invoke.");
                 case RequestFilterMode.ShortCircuit:
                     context.Result = "filtered";
                     return;
@@ -79,6 +82,34 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
     {
         _pending = this.RunRequestAsync(static (value, _) => Task.FromResult<string?>((value * 2).ToString()), value);
         return Task.CompletedTask;
+    }
+
+    public Task<List<string>> QueueRequests(int count)
+    {
+        var outcomes = new List<string>(count);
+        var admitted = new List<Task>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var entry = $"request-{i}";
+            var request = this.RunRequestAsync(static (state, _) =>
+            {
+                state.Grain._log.Add(state.Entry);
+                return Task.CompletedTask;
+            }, (Grain: this, Entry: entry));
+
+            if (request.IsFaulted)
+            {
+                outcomes.Add(request.Exception!.InnerException!.GetType().Name);
+            }
+            else
+            {
+                outcomes.Add("queued");
+                admitted.Add(request);
+            }
+        }
+
+        _pending = Task.WhenAll(admitted);
+        return Task.FromResult(outcomes);
     }
 
     public Task StartRequestContextRequest(string value)
