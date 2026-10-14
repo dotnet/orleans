@@ -214,8 +214,9 @@ var (received, approval) = await Approved.TryWaitAsync(deadline).WithId("approva
 
 ## Compensating canceled work
 
-A canceled workflow keeps running until its body completes, so it can undo the work it has done. Work
-which outlives the cancellation runs as a detached task, which the cancellation doesn't reach:
+A canceled workflow keeps running until its body completes, so it can undo the work it has done. It
+runs compensation inline in a `DurableExecutionContext.SuppressCancellation()` scope: the children it
+schedules in the scope run to completion, and the workflow awaits their results as usual:
 
 ```csharp
 public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
@@ -227,17 +228,32 @@ public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
     }
     catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
     {
-        await inventory.ReleaseAsync(order.Id).DetachAsync(DetachedTaskId.For("release"));
-        return OrderResult.Canceled;
+        using (DurableExecutionContext.SuppressCancellation())
+        {
+            await inventory.ReleaseAsync(order.Id).WithId("release");
+        }
+
+        return OrderResult.Canceled(DurableExecutionContext.Current.CancellationReason);
     }
 }
 ```
 
+- Children scheduled in the scope, including local steps, delays, calls to other grains, and combinator
+  inputs, run even though the workflow's cancellation was requested, and its cancellation doesn't reach
+  them later, including after a replay. The workflow's own token, `IsCancellationRequested`, and
+  `CancellationReason` still report its cancellation. An administrative abort still stops them, and
+  they are deleted with the workflow's execution tree.
+- The scope follows the asynchronous flow which entered it, across awaits, and covers only children of
+  the execution which entered it. Scopes nest, and disposing a scope restores the state which preceded
+  it.
+- Work which must outlive the workflow, such as cleanup which continues after the workflow's result is
+  observed, runs as a detached task, which the workflow's cancellation doesn't reach either:
+  `inventory.ReleaseAsync(order.Id).DetachAsync($"order-{order.Id:N}-release")`.
 - Hosts terminalize leaves of a canceled task as canceled promptly: delays, children whose bodies
-  haven't started, and attached children scheduled after the request, which don't run. A child which
-  already completed keeps its recorded result, and a running child observes the request itself.
+  haven't started, and attached children scheduled after the request outside a suppression scope,
+  which don't run. A child which already completed keeps its recorded result, and a running child
+  observes the request itself.
 - A replay of a canceled task observes the request from the start, so the body takes the same path.
-
 ## Aborting tasks
 
 `ScheduledTask.AbortAsync(reason)` is for operators, for example when a body ignores cancellation or
@@ -281,7 +297,10 @@ response, and cancellation state. The host returns the recorded response when an
 ID is scheduled again, records `SelectCompletionAsync` decisions, and supplies
 replay-consistent `UtcNow` values. It runs and replays the body of a canceled task with the durable
 request and its recorded reason applied, and terminalizes canceled leaves as canceled. Hosts which record
-cancellation reasons implement `IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`. Hosts which support detached tasks
+cancellation reasons implement `IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`. Hosts which
+support cancellation suppression read `DurableExecutionContext.IsCancellationSuppressed` when they schedule
+a child, record it with the child, and neither cancel such a child for its parent's earlier request nor
+propagate the parent's later request to it. Hosts which support detached tasks
 override `DurableExecutionContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`.
 Hosts which support signals override `DurableExecutionContext.WaitForSignalAsync`, record each
 task's first value for each signal name, and deliver signals from senders. Hosts which support abort
