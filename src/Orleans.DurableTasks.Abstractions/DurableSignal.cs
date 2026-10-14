@@ -66,10 +66,10 @@ public sealed class DurableSignal<T>
     /// <remarks>
     /// <para>
     /// The definition is a <see cref="DurableTask.WhenAny(IReadOnlyList{DurableTask})"/> race between
-    /// <see cref="WaitAsync"/> and <see cref="DurableTask.DelayUntil(DateTimeOffset)"/>, whose inputs and recorded winner
-    /// are identified under its operation identifier: the segment assigned with <c>WithId</c>, or a segment generated in
-    /// execution order. The host records the winner, so replay returns the same outcome. When the signal and the deadline
-    /// have both completed, the host records whichever it observes first.
+    /// <see cref="WaitAsync"/> and <see cref="DurableTask.DelayUntil(DateTimeOffset)"/>, whose inputs are identified under
+    /// its operation identifier: the segment assigned with <c>WithId</c>, or a segment generated in execution order. The
+    /// winner is the input which completed first, and the host selects the same winner on replay, so replay returns the same
+    /// outcome.
     /// </para>
     /// <para>
     /// After the deadline wins, the signal keeps its latch: a later <see cref="WaitAsync"/> returns a value which arrives

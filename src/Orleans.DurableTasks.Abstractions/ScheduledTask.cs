@@ -1,38 +1,99 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.DurableTasks;
 
 /// <summary>Represents a host-scheduled durable task.</summary>
+/// <remarks>
+/// A handle caches the task's terminal response once a wait, a poll, or a combinator observes it. A terminal response
+/// never changes, so <see cref="IsCompleted"/>, <see cref="Status"/>, and <see cref="Exception"/> then inspect the task
+/// synchronously, without contacting the host.
+/// </remarks>
 public abstract class ScheduledTask
 {
+    private DurableTaskResponse? _response;
+
     internal ScheduledTask() { }
 
     /// <summary>Gets the stable durable task identifier.</summary>
     public abstract TaskId Id { get; }
+
+    /// <summary>Gets whether this handle has observed the task's terminal response.</summary>
+    /// <remarks>
+    /// The handle observes the terminal response when a wait, such as awaiting the handle or
+    /// <see cref="GetResponseAsync(CancellationToken)"/>, or a poll returns it, or when a combinator such as
+    /// <see cref="WhenAllCompleted(IReadOnlyList{ScheduledTask}, CancellationToken)"/> returns or yields the handle. Use
+    /// <see cref="IsCompletedAsync"/> to poll the host.
+    /// </remarks>
+    public bool IsCompleted => Volatile.Read(ref _response) is not null;
+
+    /// <summary>
+    /// Gets the terminal status which this handle observed, or <see cref="DurableTaskStatus.Pending"/> until it observes
+    /// the terminal response.
+    /// </summary>
+    /// <remarks>Use <see cref="GetStatusAsync"/> to poll the host.</remarks>
+    public DurableTaskStatus Status => Volatile.Read(ref _response)?.Status ?? DurableTaskStatus.Pending;
+
+    /// <summary>
+    /// Gets the recorded failure or cancellation of a task which failed or was canceled, once this handle has observed its
+    /// terminal response; otherwise <see langword="null"/>.
+    /// </summary>
+    public Exception? Exception => Volatile.Read(ref _response)?.Exception;
+
+    /// <summary>Gets the terminal response which this handle observed, or <see langword="null"/>.</summary>
+    internal DurableTaskResponse? Response => Volatile.Read(ref _response);
 
     /// <summary>Gets an awaiter which waits for successful completion.</summary>
     public ScheduledTaskAwaiter GetAwaiter() => new(this, CancellationToken.None);
 
     /// <summary>Polls whether the task has reached a terminal state.</summary>
     public async Task<bool> IsCompletedAsync(PollingOptions options = default, CancellationToken cancellationToken = default)
-        => (await PollAsyncCore(options, cancellationToken).ConfigureAwait(false)).IsCompleted;
+        => (await PollAsync(options, cancellationToken).ConfigureAwait(false)).IsCompleted;
 
     /// <summary>Polls the current task status.</summary>
     public async Task<DurableTaskStatus> GetStatusAsync(PollingOptions options = default, CancellationToken cancellationToken = default)
-        => (await PollAsyncCore(options, cancellationToken).ConfigureAwait(false)).Status;
+        => (await PollAsync(options, cancellationToken).ConfigureAwait(false)).Status;
 
     /// <summary>Waits for and returns the terminal response.</summary>
     public Task<DurableTaskResponse> GetResponseAsync(CancellationToken cancellationToken = default)
-        => WaitAsyncCore(cancellationToken).AsTask();
+        => ObserveAsync(cancellationToken).AsTask();
 
     /// <summary>Polls and returns the current response.</summary>
     public Task<DurableTaskResponse> GetResponseAsync(PollingOptions options, CancellationToken cancellationToken = default)
-        => PollAsyncCore(options, cancellationToken).AsTask();
+        => PollAsync(options, cancellationToken).AsTask();
 
     /// <summary>Waits for successful completion.</summary>
     public async ValueTask WaitAsync(CancellationToken cancellationToken = default)
-        => (await WaitAsyncCore(cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
+        => (await ObserveAsync(cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
+
+    /// <summary>Caches <paramref name="response"/> when it is terminal, and returns it.</summary>
+    internal DurableTaskResponse Observe(DurableTaskResponse response)
+    {
+        if (response.IsCompleted)
+        {
+            Interlocked.CompareExchange(ref _response, response, null);
+        }
+
+        return response;
+    }
+
+    /// <summary>Waits for the terminal response and caches it.</summary>
+    /// <remarks>A host failure which <see cref="WaitAsyncCore"/> throws synchronously propagates synchronously.</remarks>
+    internal ValueTask<DurableTaskResponse> ObserveAsync(CancellationToken cancellationToken)
+    {
+        var wait = WaitAsyncCore(cancellationToken);
+        return wait.IsCompletedSuccessfully ? new(Observe(wait.Result)) : ObserveAsync(wait);
+    }
+
+    private ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
+    {
+        var poll = PollAsyncCore(options, cancellationToken);
+        return poll.IsCompletedSuccessfully ? new(Observe(poll.Result)) : ObserveAsync(poll);
+    }
+
+    private async ValueTask<DurableTaskResponse> ObserveAsync(ValueTask<DurableTaskResponse> response)
+        => Observe(await response.ConfigureAwait(false));
 
     /// <summary>Durably requests cancellation.</summary>
     /// <remarks>
@@ -94,17 +155,218 @@ public abstract class ScheduledTask
     protected abstract ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken);
 
     /// <summary>Waits for every scheduled task to complete successfully.</summary>
+    /// <remarks>
+    /// The returned task completes only after every input is terminal. It then throws the first failure in input order
+    /// when any input failed; otherwise it throws the first input's <see cref="OperationCanceledException"/> in input
+    /// order when any input was canceled. Input order selects the exception, so a replay observes the same one in any
+    /// completion order. Wait cancellation and host wait failures are propagated.
+    /// </remarks>
     public static async Task WhenAll(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        await Task.WhenAll(tasks.Select(task => task.WaitAsync(cancellationToken).AsTask())).ConfigureAwait(false);
+        EnsureSuccessfulCompletion(await WaitForAllAsync(tasks.ToArray(), cancellationToken).ConfigureAwait(false));
     }
 
-    /// <summary>Waits for every scheduled task to complete successfully.</summary>
+    /// <inheritdoc cref="WhenAll(IReadOnlyList{ScheduledTask}, CancellationToken)"/>
     public static async Task WhenAll<TResult>(IReadOnlyList<ScheduledTask<TResult>> tasks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
-        await Task.WhenAll(tasks.Select(task => WaitForSuccessAsync(task, cancellationToken))).ConfigureAwait(false);
+        EnsureSuccessfulCompletion(await WaitForAllAsync(tasks.ToArray<ScheduledTask>(), cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>Waits until every scheduled task is terminal, and returns the tasks in input order.</summary>
+    /// <param name="tasks">The tasks, which are captured when this method is called.</param>
+    /// <param name="cancellationToken">A token which abandons the wait. It doesn't cancel the tasks.</param>
+    /// <returns>
+    /// The tasks, in input order. Each has observed its terminal response, so <see cref="Status"/>,
+    /// <see cref="Exception"/>, and <see cref="ScheduledTask{TResult}.TryGetResult(out TResult)"/> inspect it.
+    /// </returns>
+    /// <remarks>
+    /// A task's failure or cancellation doesn't fail the wait; wait cancellation and host wait failures are propagated.
+    /// </remarks>
+    public static async Task<ScheduledTask[]> WhenAllCompleted(
+        IReadOnlyList<ScheduledTask> tasks,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        var candidates = tasks.ToArray();
+        _ = await WaitForAllAsync(candidates, cancellationToken).ConfigureAwait(false);
+        return candidates;
+    }
+
+    /// <inheritdoc cref="WhenAllCompleted(IReadOnlyList{ScheduledTask}, CancellationToken)"/>
+    public static async Task<ScheduledTask<TResult>[]> WhenAllCompleted<TResult>(
+        IReadOnlyList<ScheduledTask<TResult>> tasks,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        var candidates = tasks.ToArray();
+        _ = await WaitForAllAsync(candidates, cancellationToken).ConfigureAwait(false);
+        return candidates;
+    }
+
+    /// <summary>Yields each scheduled task once, in completion order, as it reaches a terminal state.</summary>
+    /// <param name="tasks">The tasks, which are captured when this method is called.</param>
+    /// <returns>
+    /// The tasks in completion order. Each yielded task has observed its terminal response, including a failure or a
+    /// cancellation, which doesn't fail the enumeration.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// Called within a durable execution, the tasks are children of that execution, and the host selects each next task:
+    /// the remaining task which completed first in the host's durable completion order, so every replay yields the same
+    /// order, including a replay in which more tasks have already completed. A host without a durable completion order
+    /// records each selection, under a decision identifier beneath an operation identifier which this method generates in
+    /// execution order when called. Outside a durable execution, tasks are yielded in the order their waits observe their
+    /// responses.
+    /// </para>
+    /// <para>
+    /// The enumeration's cancellation token abandons the wait without canceling the tasks, and host wait failures are
+    /// propagated. Tasks which the enumeration doesn't reach keep running.
+    /// </para>
+    /// </remarks>
+    public static IAsyncEnumerable<ScheduledTask> WhenEach(IReadOnlyList<ScheduledTask> tasks)
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        return WhenEachCoreAsync(tasks.ToArray(), DurableExecutionContext.Current);
+    }
+
+    /// <inheritdoc cref="WhenEach(IReadOnlyList{ScheduledTask})"/>
+    public static IAsyncEnumerable<ScheduledTask<TResult>> WhenEach<TResult>(IReadOnlyList<ScheduledTask<TResult>> tasks)
+    {
+        ArgumentNullException.ThrowIfNull(tasks);
+        return WhenEachCoreAsync(tasks.ToArray(), DurableExecutionContext.Current);
+    }
+
+    private static IAsyncEnumerable<TTask> WhenEachCoreAsync<TTask>(TTask[] tasks, DurableExecutionContext? context)
+        where TTask : ScheduledTask
+        => context is null
+            ? WhenEachObservedAsync(tasks, CancellationToken.None)
+            : WhenEachSelectedAsync(context, context.CreateOperationId(WhenEachOperation), tasks, CancellationToken.None);
+
+    internal const string WhenEachOperation = "when-each";
+
+    /// <summary>
+    /// Yields <paramref name="tasks"/> in the order in which the host of <paramref name="context"/> selects their
+    /// completions, each under a decision identifier beneath <paramref name="operationId"/>.
+    /// </summary>
+    internal static async IAsyncEnumerable<TTask> WhenEachSelectedAsync<TTask>(
+        DurableExecutionContext context,
+        TaskId operationId,
+        TTask[] tasks,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+        where TTask : ScheduledTask
+    {
+        using var linked = cancellationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.ExecutionAbortToken)
+            : null;
+        var waitToken = linked?.Token ?? context.ExecutionAbortToken;
+        var remaining = new List<TTask>(tasks);
+        var candidates = new List<TaskId>(tasks.Length);
+        foreach (var task in tasks)
+        {
+            candidates.Add(task.Id);
+        }
+
+        for (var step = 0; remaining.Count > 0; step++)
+        {
+            var decisionId = operationId.Child($"$next-{step.ToString(CultureInfo.InvariantCulture)}");
+            var selected = await context.SelectCompletionAsync(decisionId, candidates, waitToken).ConfigureAwait(false);
+            var index = candidates.IndexOf(selected);
+            if (index < 0)
+            {
+                throw new InvalidOperationException($"The host selected '{selected}', which is not a remaining candidate of '{operationId}'.");
+            }
+
+            var next = remaining[index];
+            remaining.RemoveAt(index);
+            candidates.RemoveAt(index);
+            _ = await next.ObserveAsync(waitToken).ConfigureAwait(false);
+            yield return next;
+        }
+    }
+
+    private static async IAsyncEnumerable<TTask> WhenEachObservedAsync<TTask>(
+        TTask[] tasks,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+        where TTask : ScheduledTask
+    {
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var remaining = new List<TTask>(tasks.Length);
+        var waits = new List<Task<DurableTaskResponse>>(tasks.Length);
+        try
+        {
+            foreach (var task in tasks)
+            {
+                remaining.Add(task);
+                waits.Add(task.ObserveAsync(waitCancellation.Token).AsTask());
+            }
+
+            while (waits.Count > 0)
+            {
+                var completed = await Task.WhenAny(waits).ConfigureAwait(false);
+                var index = waits.IndexOf(completed);
+                _ = await completed.ConfigureAwait(false);
+                var next = remaining[index];
+                remaining.RemoveAt(index);
+                waits.RemoveAt(index);
+                yield return next;
+            }
+        }
+        finally
+        {
+            await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Waits for the terminal response of every task, caching it in the task, and returns the responses in input order.
+    /// </summary>
+    /// <remarks>
+    /// Every wait completes before the first failed wait, in input order, is propagated.
+    /// </remarks>
+    private static async Task<DurableTaskResponse[]> WaitForAllAsync(ScheduledTask[] tasks, CancellationToken cancellationToken)
+    {
+        var waits = new Task<DurableTaskResponse>[tasks.Length];
+        for (var index = 0; index < waits.Length; index++)
+        {
+            waits[index] = ObserveTaskAsync(tasks[index], cancellationToken);
+        }
+
+        await ((Task)Task.WhenAll(waits)).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        var responses = new DurableTaskResponse[waits.Length];
+        for (var index = 0; index < responses.Length; index++)
+        {
+            responses[index] = await waits[index].ConfigureAwait(false);
+        }
+
+        return responses;
+
+        // A wait which fails synchronously fails only its own observation, so the other waits still start.
+        static async Task<DurableTaskResponse> ObserveTaskAsync(ScheduledTask task, CancellationToken cancellationToken)
+            => await task.ObserveAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Throws the first failure in input order or, when no response failed, the first cancellation in input order.
+    /// </summary>
+    internal static void EnsureSuccessfulCompletion(DurableTaskResponse[] responses)
+    {
+        DurableTaskResponse? canceled = null;
+        foreach (var response in responses)
+        {
+            if (response.Status is DurableTaskStatus.Failed)
+            {
+                response.EnsureSuccessfulCompletion();
+            }
+
+            if (response.Status is DurableTaskStatus.Canceled)
+            {
+                canceled ??= response;
+            }
+        }
+
+        canceled?.EnsureSuccessfulCompletion();
     }
 
     /// <summary>
@@ -148,7 +410,7 @@ public abstract class ScheduledTask
         {
             foreach (var task in tasks)
             {
-                waits.Add(task.WaitAsyncCore(waitCancellation.Token).AsTask());
+                waits.Add(task.ObserveAsync(waitCancellation.Token).AsTask());
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -235,9 +497,6 @@ public abstract class ScheduledTask
             }
         }
     }
-
-    private static async Task WaitForSuccessAsync(ScheduledTask task, CancellationToken cancellationToken)
-        => (await task.WaitAsyncCore(cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
 }
 
 /// <summary>Represents a host-scheduled durable task with a result.</summary>
@@ -249,6 +508,35 @@ public abstract class ScheduledTask<TResult> : ScheduledTask
     /// <summary>Configures a typed wait with a wait-cancellation token.</summary>
     public new ConfiguredScheduledTaskAwaitable<TResult> WaitAsync(CancellationToken cancellationToken = default)
         => new(this, cancellationToken);
+
+    /// <summary>
+    /// Returns the result which this handle observed, or throws the recorded failure or cancellation, as awaiting the task
+    /// does.
+    /// </summary>
+    /// <returns>The task's successful result.</returns>
+    /// <exception cref="InvalidOperationException">This handle hasn't observed the task's terminal response.</exception>
+    public TResult GetResult()
+        => (Response ?? throw new InvalidOperationException(
+            $"Durable task '{Id}' has no observed terminal response. Await the task, or a combinator which returns it, first."))
+            .GetResult<TResult>();
+
+    /// <summary>Gets the result, when this handle has observed that the task completed successfully.</summary>
+    /// <param name="value">The successful result, or <see langword="default"/>.</param>
+    /// <returns>
+    /// <see langword="true"/> when this handle observed a successful completion; otherwise <see langword="false"/>, for a
+    /// task which failed, was canceled, or whose terminal response this handle hasn't observed.
+    /// </returns>
+    public bool TryGetResult([MaybeNullWhen(false)] out TResult value)
+    {
+        if (Response is { Status: DurableTaskStatus.CompletedSuccessfully } response)
+        {
+            value = response.GetResult<TResult>();
+            return true;
+        }
+
+        value = default;
+        return false;
+    }
 }
 
 internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : ScheduledTask
@@ -283,30 +571,48 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
         => handle.PollAsync(options, cancellationToken);
 }
 
-internal sealed class CompletedScheduledTask(TaskId id, DurableTaskResponse response) : ScheduledTask
+internal sealed class CompletedScheduledTask : ScheduledTask
 {
-    public override TaskId Id => id;
+    private readonly TaskId _id;
+    private readonly DurableTaskResponse _response;
+
+    public CompletedScheduledTask(TaskId id, DurableTaskResponse response)
+    {
+        _id = id;
+        _response = Observe(response);
+    }
+
+    public override TaskId Id => _id;
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
     protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(response);
+    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(_response);
 
-    protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken) => new(response);
+    protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken) => new(_response);
 }
 
-internal sealed class CompletedScheduledTask<TResult>(TaskId id, DurableTaskResponse response) : ScheduledTask<TResult>
+internal sealed class CompletedScheduledTask<TResult> : ScheduledTask<TResult>
 {
-    public override TaskId Id => id;
+    private readonly TaskId _id;
+    private readonly DurableTaskResponse _response;
+
+    public CompletedScheduledTask(TaskId id, DurableTaskResponse response)
+    {
+        _id = id;
+        _response = Observe(response);
+    }
+
+    public override TaskId Id => _id;
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
     protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
-    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(response);
+    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(_response);
 
-    protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken) => new(response);
+    protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken) => new(_response);
 }
 
 /// <summary>Provides an awaiter for a scheduled durable task without a result.</summary>
@@ -336,11 +642,15 @@ public readonly struct ScheduledTaskAwaiter : ICriticalNotifyCompletion
 [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Awaiters are compiler protocol values whose equality is not part of their contract.")]
 public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
 {
+    private readonly ScheduledTask<TResult> _task;
     private readonly ValueTaskAwaiter<DurableTaskResponse> _awaiter;
 
     [SuppressMessage("Reliability", "CA2012:Use ValueTasks correctly", Justification = "The compiler consumes this awaiter once, and the stored awaiter preserves allocation-free IValueTaskSource implementations.")]
     internal ScheduledTaskAwaiter(ScheduledTask<TResult> task, CancellationToken cancellationToken)
-        => _awaiter = task.WaitAsyncCore(cancellationToken).GetAwaiter();
+    {
+        _task = task;
+        _awaiter = task.WaitAsyncCore(cancellationToken).GetAwaiter();
+    }
 
     /// <inheritdoc />
     public bool IsCompleted => _awaiter.IsCompleted;
@@ -352,7 +662,7 @@ public readonly struct ScheduledTaskAwaiter<TResult> : ICriticalNotifyCompletion
     public void UnsafeOnCompleted(Action continuation) => _awaiter.UnsafeOnCompleted(continuation);
 
     /// <summary>Returns the successful result.</summary>
-    public TResult GetResult() => _awaiter.GetResult().GetResult<TResult>();
+    public TResult GetResult() => _task.Observe(_awaiter.GetResult()).GetResult<TResult>();
 }
 
 /// <summary>Provides an awaitable scheduled durable task with a wait-cancellation token.</summary>

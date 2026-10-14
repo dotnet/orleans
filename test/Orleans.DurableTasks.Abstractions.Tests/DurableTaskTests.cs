@@ -3614,6 +3614,39 @@ public class SchedulingTests
     }
 
     [Fact]
+    public async Task ScheduledWhenAllWaitsForLaterWaitsWhenAnEarlierWaitThrowsSynchronously()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var firstCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstDefinition = host.CreateRootDefinition<object?>(async _ =>
+        {
+            await firstCompletion.Task;
+            return DurableTaskResponse.Completed;
+        });
+        var secondDefinition = host.CreateRootDefinition<object?>(async _ =>
+        {
+            await secondCompletion.Task;
+            return DurableTaskResponse.Completed;
+        });
+        ScheduledTask first = await firstDefinition.WithId("synchronous-wait-failure").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask second = await secondDefinition.WithId("started-after-failure").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var expected = new InvalidOperationException("synchronous host wait failure");
+        host.GetEntry(first.Id).WaitException = expected;
+        host.GetEntry(first.Id).WaitExceptionIsSynchronous = true;
+
+        var whenAll = ScheduledTask.WhenAll([first, second], Xunit.TestContext.Current.CancellationToken);
+
+        await host.GetEntry(second.Id).WaitStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
+        Assert.False(whenAll.IsCompleted);
+        secondCompletion.SetResult();
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => whenAll);
+        Assert.Same(expected, exception);
+        Assert.Equal(0, host.ActiveWaitCount);
+        firstCompletion.SetResult();
+    }
+
+    [Fact]
     public async Task GenericAndNonGenericWaitsObserveTheSameSuccessfulResponse()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
