@@ -149,8 +149,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 || (decision.RequestFingerprint is null
                     && TryGetScheduledTaskHandle(decisionId, out _)))
             {
-                throw new InvalidOperationException(
-                    $"Durable completion decision '{decisionId}' is already associated with another operation.");
+                throw CreateDivergenceException(
+                    $"Durable completion decision '{decisionId}' is already associated with another operation.",
+                    decision,
+                    $"a WhenAny decision among {candidates.Count} candidates");
             }
 
             if (decision.RequestFingerprint is null)
@@ -225,6 +227,31 @@ internal sealed partial class DurableTaskGrainRuntime(
     // A request fingerprint is a hexadecimal hash, so it never has this prefix.
     private const string CompletionDecisionFingerprintPrefix = "$completion-decision:";
 
+    /// <summary>
+    /// Creates the error for scheduling an operation under an identifier which records another operation, which is how a
+    /// replay which diverges from its recorded execution surfaces.
+    /// </summary>
+    private static InvalidOperationException CreateDivergenceException(string message, IDurableTaskState recorded, string requested) =>
+        new($"{message} It records {DescribeOperation(recorded)}, and this attempt requested {requested}. A replay schedules the same operation, with the same arguments, under each identifier; new workflow steps use new identifiers.");
+
+    private static string DescribeOperation(IDurableTaskState state) => state switch
+    {
+        { RemoteTarget.IsDefault: false } => $"a call to grain '{state.RemoteTarget}' ({AbbreviateFingerprint(state.RemoteRequestFingerprint)})",
+        { DueTime: { } dueTime } => $"a delay due at {dueTime:O}",
+        { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(CompletionDecisionFingerprintPrefix, StringComparison.Ordinal) => "a WhenAny decision",
+        { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(DetachMarkerFingerprintPrefix, StringComparison.Ordinal) => "a detached task's start",
+        { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalSendFingerprintPrefix, StringComparison.Ordinal) => "a signal's send",
+        { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal) => "a signal's value",
+        { RequestFingerprint: { } fingerprint } => $"a request ({AbbreviateFingerprint(fingerprint)})",
+        { CancellationRequestedAt: not null, CompletedAt: null } => "a cancellation which arrived before its request",
+        _ => "a local child task",
+    };
+
+    private static string DescribeRequest(IDurableTaskRequest request, string fingerprint) =>
+        $"{request.GetInterfaceName()}.{request.GetMethodName()} ({AbbreviateFingerprint(fingerprint)})";
+
+    private static string AbbreviateFingerprint(string? fingerprint) =>
+        fingerprint is null ? "no fingerprint" : $"fingerprint {fingerprint[..Math.Min(12, fingerprint.Length)]}";
     private static string GetCompletionDecisionFingerprint(IReadOnlyList<TaskId> candidates)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
@@ -470,8 +497,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 || (state.RemoteRequestFingerprint is { } existing
                     && !string.Equals(existing, fingerprint, StringComparison.Ordinal)))
             {
-                throw new InvalidOperationException(
-                    $"Durable task '{taskId}' is already associated with a different request.");
+                throw CreateDivergenceException(
+                    $"Durable task '{taskId}' is already associated with a different request.",
+                    state,
+                    $"a call to grain '{context.TargetId}' ({AbbreviateFingerprint(fingerprint)})");
             }
 
             if (state.Result is { IsCompleted: true } completed)
@@ -523,8 +552,10 @@ internal sealed partial class DurableTaskGrainRuntime(
             {
                 if (!string.Equals(recorded.RequestFingerprint, markerFingerprint, StringComparison.Ordinal))
                 {
-                    throw new InvalidOperationException(
-                        $"Durable task '{markerId}' is already associated with another operation.");
+                    throw CreateDivergenceException(
+                        $"Durable task '{markerId}' is already associated with another operation.",
+                        recorded,
+                        $"detaching root task '{rootId}'");
                 }
 
                 // The marker commits with the start, possibly in a write which an earlier attempt is still awaiting.
@@ -940,8 +971,10 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (!state.RemoteTarget.IsDefault
             || state.RemoteRequestFingerprint is not null)
         {
-            throw new InvalidOperationException(
-                $"Durable task '{taskId}' is already associated with a remote child request.");
+            throw CreateDivergenceException(
+                $"Durable task '{taskId}' is already associated with a remote child request.",
+                state,
+                DescribeRequest(request, fingerprint));
         }
 
         ValidateCaller(taskId, state, requestContext.CallerId);
@@ -949,15 +982,19 @@ internal sealed partial class DurableTaskGrainRuntime(
             && state.RequestFingerprint is null
             && state.CancellationRequestedAt is null)
         {
-            throw new InvalidOperationException(
-                $"Durable task '{taskId}' is already associated with a non-request operation.");
+            throw CreateDivergenceException(
+                $"Durable task '{taskId}' is already associated with a non-request operation.",
+                state,
+                DescribeRequest(request, fingerprint));
         }
 
         if (state.RequestFingerprint is { } existingFingerprint
             && !string.Equals(existingFingerprint, fingerprint, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException(
-                $"Durable task '{taskId}' is already associated with a different request.");
+            throw CreateDivergenceException(
+                $"Durable task '{taskId}' is already associated with a different request.",
+                state,
+                DescribeRequest(request, fingerprint));
         }
 
         if (state.RequestFingerprint is null
@@ -967,8 +1004,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 fingerprint,
                 StringComparison.Ordinal))
         {
-            throw new InvalidOperationException(
-                $"Durable task '{taskId}' is already associated with a different request.");
+            throw CreateDivergenceException(
+                $"Durable task '{taskId}' is already associated with a different request.",
+                state,
+                DescribeRequest(request, fingerprint));
         }
 
         StageCaller(taskId, state, requestContext.CallerId);
@@ -1193,8 +1232,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                     || (handle is not null
                         && (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)))
                 {
-                    throw new InvalidOperationException(
-                        $"Durable child task '{taskId}' is already associated with a different request.");
+                    throw CreateDivergenceException(
+                        $"Durable child task '{taskId}' is already associated with a different request.",
+                        state,
+                        $"a call to grain '{target}' ({AbbreviateFingerprint(fingerprint)})");
                 }
 
                 if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
@@ -1210,8 +1251,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 || !state.RemoteTarget.IsDefault
                 || state.RemoteRequestFingerprint is not null))
         {
-            throw new InvalidOperationException(
-                $"Durable child task '{taskId}' is already associated with a different request.");
+            throw CreateDivergenceException(
+                $"Durable child task '{taskId}' is already associated with a different request.",
+                state,
+                "a local child task");
         }
 
         // A requested cancellation terminalizes a leaf, such as a delay or a child whose body hasn't started. A remote
@@ -1342,8 +1385,10 @@ internal sealed partial class DurableTaskGrainRuntime(
                 || !state.RemoteTarget.IsDefault
                 || state.RemoteRequestFingerprint is not null))
         {
-            throw new InvalidOperationException(
-                $"Durable child task '{taskId}' is already associated with a different request.");
+            throw CreateDivergenceException(
+                $"Durable child task '{taskId}' is already associated with a different request.",
+                state,
+                "a custom child task");
         }
 
         IScheduledTaskHandle? replaceableHandle = null;
