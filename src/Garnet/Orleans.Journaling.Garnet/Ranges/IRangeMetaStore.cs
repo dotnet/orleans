@@ -12,7 +12,9 @@ namespace Orleans.Journaling.Ranges;
 /// </para>
 /// <para>
 /// Implementations are linearizable: a read returns the latest completed write, and a write that completed is
-/// durable. Implementations validate written maps with <see cref="RangeMap.Validate"/>.
+/// durable. Implementations validate written maps with <see cref="RangeMap.Validate"/>. A write whose outcome cannot be
+/// determined, for example because a later write superseded it before its reply arrived, throws; the caller reads the
+/// map to continue.
 /// </para>
 /// </remarks>
 public interface IRangeMetaStore

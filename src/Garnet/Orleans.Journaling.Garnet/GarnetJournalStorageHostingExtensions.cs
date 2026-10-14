@@ -1,6 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
 using Orleans.Providers;
 
 namespace Orleans.Journaling;
@@ -48,7 +46,6 @@ public static class GarnetJournalStorageHostingExtensions
             options.Configure(configure);
         }
 
-        options.PostConfigure<IOptions<SiloOptions>>(static (configuration, silo) => configuration.HostId ??= silo.Value.SiloName);
 
         if (!services.Any(service => service.IsKeyedService
             && service.ServiceType == typeof(GarnetJournalStorageOptionsValidator)

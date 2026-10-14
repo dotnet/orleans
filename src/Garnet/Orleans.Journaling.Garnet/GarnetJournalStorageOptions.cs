@@ -45,9 +45,14 @@ public sealed class GarnetJournalStorageOptions
     public IRangeMetaStore? MetaStore { get; set; }
 
     /// <summary>
-    /// Gets or sets the identifier of this silo in <see cref="PartitionHosting.Host"/>. Defaults to the silo name.
+    /// Gets or sets the identifier of this silo in <see cref="PartitionHosting.Host"/>.
     /// </summary>
-    /// <remarks>The identifier must be stable across restarts, since the range map assigns partitions to hosts by it.</remarks>
+    /// <remarks>
+    /// The range map assigns partitions to hosts by this identifier, so it must be stable across restarts. If it is
+    /// <see langword="null"/>, a silo with a <see cref="DataDirectory"/> generates an identifier on first start and
+    /// stores it in the directory, and a silo without one hosts no partitions. Set it explicitly to name hosts in
+    /// <see cref="InitialRangeMap"/>.
+    /// </remarks>
     public string? HostId { get; set; }
 
     /// <summary>

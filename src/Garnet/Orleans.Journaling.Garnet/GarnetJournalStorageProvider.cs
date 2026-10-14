@@ -12,6 +12,7 @@ namespace Orleans.Journaling;
 internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog, ILifecycleParticipant<ISiloLifecycle>, IAsyncDisposable
 {
     private const int ConcurrentBucketReads = 32;
+    private const string HostIdFileName = "host-id";
     private static readonly PartitionId DefaultPartitionId = new("p0");
 
     private readonly GarnetJournalStorageOptions _options;
@@ -81,7 +82,7 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
                 reads[i] = router.ExecuteAsync(
                     bucket,
                     GarnetJournalProtocol.Index,
-                    [(RedisKey)GarnetJournalKeys.GetBucketKey(bucket), (RedisKey)GarnetJournalKeys.GetIndexKey(bucket)],
+                    [(RedisKey)GarnetJournalKeys.GetBucketKey(router.MapId, bucket), (RedisKey)GarnetJournalKeys.GetIndexKey(bucket)],
                     cancellationToken).AsTask();
             }
 
@@ -124,9 +125,8 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
         cancellationToken.ThrowIfCancellationRequested();
         var metaStore = _options.MetaStore
             ?? throw new InvalidOperationException($"{nameof(GarnetJournalStorageOptions)}.{nameof(GarnetJournalStorageOptions.MetaStore)} is required.");
-        var hostId = _options.HostId is { Length: > 0 } id
-            ? id
-            : throw new InvalidOperationException($"{nameof(GarnetJournalStorageOptions)}.{nameof(GarnetJournalStorageOptions.HostId)} is required.");
+        var hostId = _options.HostId
+            ?? (string.IsNullOrWhiteSpace(_options.DataDirectory) ? null : GetOrCreateHostId(_options.DataDirectory));
         var view = await GetRangeMapAsync(metaStore, hostId, cancellationToken).ConfigureAwait(false);
         _partitions = await GarnetJournalPartitionManager.StartAsync(_options, hostId, metaStore, view, _loggerFactory, cancellationToken).ConfigureAwait(false);
         _router = new GarnetJournalRouter(metaStore, _partitions.View, _options.OperationTimeout, _telemetry, _logger);
@@ -147,12 +147,49 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
     public async ValueTask DisposeAsync() => await StopAsync(CancellationToken.None).ConfigureAwait(false);
 
     /// <summary>
+    /// Reads this host's identifier from <paramref name="dataDirectory"/>, generating and storing one on first use, so
+    /// the identifier is stable for as long as the directory, which holds the host's partitions, persists.
+    /// </summary>
+    internal static string GetOrCreateHostId(string dataDirectory)
+    {
+        Directory.CreateDirectory(dataDirectory);
+        var path = Path.Combine(dataDirectory, HostIdFileName);
+        if (!File.Exists(path))
+        {
+            var temporary = $"{path}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write))
+                {
+                    stream.Write(System.Text.Encoding.ASCII.GetBytes($"host-{Guid.NewGuid():N}"));
+                    stream.Flush(flushToDisk: true);
+                }
+
+                // Another silo sharing the directory may have stored an identifier first; keep that one.
+                File.Move(temporary, path, overwrite: false);
+            }
+            catch (IOException) when (File.Exists(path))
+            {
+            }
+            finally
+            {
+                File.Delete(temporary);
+            }
+        }
+
+        var hostId = File.ReadAllText(path).Trim();
+        return hostId.Length > 0
+            ? hostId
+            : throw new InvalidOperationException($"The Garnet journal host identifier file '{path}' is empty.");
+    }
+
+    /// <summary>
     /// Reads the range map, writing the initial map to an empty MetaStore, or waiting for another silo to write it.
     /// </summary>
-    private async Task<RangeMapSnapshot> GetRangeMapAsync(IRangeMetaStore metaStore, string hostId, CancellationToken cancellationToken)
+    private async Task<RangeMapSnapshot> GetRangeMapAsync(IRangeMetaStore metaStore, string? hostId, CancellationToken cancellationToken)
     {
         var initial = _options.InitialRangeMap;
-        if (initial is null && !string.IsNullOrWhiteSpace(_options.DataDirectory))
+        if (initial is null && hostId is not null && !string.IsNullOrWhiteSpace(_options.DataDirectory))
         {
             initial = RangeMap.CreateUniform(
                 _options.BucketCount,
@@ -165,7 +202,16 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
             var snapshot = await metaStore.ReadAsync(cancellationToken).ConfigureAwait(false);
             if (snapshot is null && initial is not null)
             {
-                snapshot = (await metaStore.TryWriteAsync(initial, expectedVersion: 0, cancellationToken).ConfigureAwait(false)).Current;
+                try
+                {
+                    snapshot = (await metaStore.TryWriteAsync(initial, expectedVersion: 0, cancellationToken).ConfigureAwait(false)).Current;
+                }
+                catch (IOException exception)
+                {
+                    // The write's outcome is unknown: read the map again.
+                    _logger?.LogWarning(exception, "The outcome of writing the initial Garnet journal range map is unknown.");
+                    continue;
+                }
             }
 
             if (snapshot is not null)

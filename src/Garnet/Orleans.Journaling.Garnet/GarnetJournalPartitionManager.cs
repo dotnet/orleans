@@ -39,17 +39,17 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
     public RangeMapSnapshot View { get; }
 
     /// <summary>
-    /// Starts every partition which <paramref name="view"/> assigns to <paramref name="hostId"/>, and publishes their endpoints.
+    /// Starts every partition which <paramref name="view"/> assigns to <paramref name="hostId"/>, if any, and publishes their endpoints.
     /// </summary>
     public static async Task<GarnetJournalPartitionManager> StartAsync(
         GarnetJournalStorageOptions options,
-        string hostId,
+        string? hostId,
         IRangeMetaStore metaStore,
         RangeMapSnapshot view,
         ILoggerFactory? loggerFactory,
         CancellationToken cancellationToken)
     {
-        var hosted = view.Map.Partitions.Where(partition => string.Equals(partition.Value.Host, hostId, StringComparison.Ordinal)).ToList();
+        List<KeyValuePair<PartitionId, PartitionHosting>> hosted = hostId is null ? [] : view.Map.Partitions.Where(partition => string.Equals(partition.Value.Host, hostId, StringComparison.Ordinal)).ToList();
         var hosts = new Dictionary<PartitionId, GarnetJournalPartitionHost>();
         if (hosted.Count == 0)
         {
@@ -86,7 +86,7 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
                 endpoints.Add(id, FormatEndpoint(host.EndPoint));
             }
 
-            var published = await PublishEndpointsAsync(metaStore, hostId, endpoints, view, cancellationToken).ConfigureAwait(false);
+            var published = await PublishEndpointsAsync(metaStore, hostId!, endpoints, view, cancellationToken).ConfigureAwait(false);
             logger?.LogInformation(
                 "Host {HostId} serves Garnet journal partitions {Partitions} in range map version {Version}.",
                 hostId,
@@ -102,7 +102,8 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
     }
 
     /// <summary>
-    /// Opens the buckets <paramref name="map"/> assigns to a new partition and records the partition's descriptor, or
+    /// Opens the buckets <paramref name="map"/> assigns to a new partition and records the partition's descriptor (its map,
+    /// id, and bucket count), or
     /// verifies the descriptor of an initialized partition.
     /// </summary>
     /// <remarks>
@@ -121,13 +122,15 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
             .ToDictionary(entry => entry.Name.ToString(), entry => entry.Value.ToString(), StringComparer.Ordinal);
         if (descriptor.Count > 0)
         {
+            var mapId = descriptor.GetValueOrDefault(GarnetJournalKeys.MapIdField);
             var bucketCount = descriptor.GetValueOrDefault(GarnetJournalKeys.BucketCountField);
             var id = descriptor.GetValueOrDefault(GarnetJournalKeys.PartitionIdField);
-            if (!string.Equals(id, partitionId.Value, StringComparison.Ordinal)
+            if (!string.Equals(mapId, map.Id, StringComparison.Ordinal)
+                || !string.Equals(id, partitionId.Value, StringComparison.Ordinal)
                 || !string.Equals(bucketCount, map.BucketCount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"The storage of Garnet journal partition '{partitionId}' holds partition '{id}' with {bucketCount} buckets, but the range map expects partition '{partitionId}' with {map.BucketCount} buckets.");
+                    $"The storage of Garnet journal partition '{partitionId}' holds partition '{id}' of map '{mapId}' with {bucketCount} buckets, but the range map expects partition '{partitionId}' of map '{map.Id}' with {map.BucketCount} buckets.");
             }
 
             return;
@@ -143,7 +146,7 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
             {
                 tasks.Add(database.ExecuteAsync(
                     GarnetJournalProtocol.Bucket,
-                    [(RedisKey)GarnetJournalKeys.GetBucketKey(bucket), GarnetJournalProtocol.BucketOpenOperation, version.ToString(CultureInfo.InvariantCulture), GarnetJournalProtocol.NoSource, "1"]));
+                    [(RedisKey)GarnetJournalKeys.GetBucketKey(map.Id, bucket), GarnetJournalProtocol.BucketOpenOperation, version.ToString(CultureInfo.InvariantCulture), GarnetJournalProtocol.NoSource, "1"]));
             }
 
             foreach (var result in await Task.WhenAll(tasks).WaitAsync(cancellationToken).ConfigureAwait(false))
@@ -161,6 +164,7 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
         await database.HashSetAsync(
             GarnetJournalKeys.PartitionKey,
             [
+                new(GarnetJournalKeys.MapIdField, map.Id),
                 new(GarnetJournalKeys.PartitionIdField, partitionId.Value),
                 new(GarnetJournalKeys.BucketCountField, map.BucketCount),
                 new(GarnetJournalKeys.SchemaVersionField, GarnetJournalProtocol.CurrentSchemaVersion),
@@ -247,8 +251,19 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
                 return view;
             }
 
-            var result = await metaStore.TryWriteAsync(view.Map with { Partitions = partitions }, view.Version, cancellationToken).ConfigureAwait(false);
+            RangeMapWriteResult result;
+            try
+            {
+                result = await metaStore.TryWriteAsync(view.Map with { Partitions = partitions }, view.Version, cancellationToken).ConfigureAwait(false);
+            }
+            catch (IOException)
+            {
+                // The write's outcome is unknown: read the map and publish again if needed.
+                result = new(false, await metaStore.ReadAsync(cancellationToken).ConfigureAwait(false));
+            }
+
             view = result.Current ?? throw new InvalidOperationException("The Garnet journal range map was removed from its MetaStore.");
+            view.Map.Validate();
             if (result.Written)
             {
                 return view;
