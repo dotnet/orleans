@@ -367,7 +367,7 @@ Follow these rules in re-executed code:
   and identifiers, and give new steps new identifiers. A changed `Once` delegate doesn't affect
   executions which recorded it.
 - An `async DurableTask` method which completes without awaiting is a normal step whose result the
-  parent records. The Orleans analyzers suppress CS1998 for such methods
+  parent records. The package's analyzers suppress CS1998 for such methods
   ([ORLEANS0028](https://aka.ms/orleans/diagnostics#orleans0028)). A synchronous state transition
   runs as a `DurableTask.Once` effect, which commits with the next durable write without a write of
   its own.
@@ -435,6 +435,10 @@ public async DurableTask<OrderResult> PlaceOrderAsync(SubmitOrder request)
 The logger reads the running task when it logs, so one instance serves durable task bodies and
 ordinary grain methods. Logs inside a `DurableTask.Once` effect, or inside a step which completed,
 don't repeat without it, because a replay returns their recorded results without running them.
+
+The package carries analyzers which report code that a replay would run differently, as
+diagnostics ORLEANS0100 to ORLEANS0115. Each diagnostic links to a page which describes the
+hazard and its fix.
 
 ## Host responsibilities
 
