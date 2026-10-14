@@ -51,8 +51,9 @@ multi-silo deployments; see [Journaling configuration](journaling/configuration.
 ## Retention and deletion
 
 Each invoked task owns an execution tree: the task, its local steps, delays,
-combinator records, signal records, detach markers, and its records of calls to other
-grains. The grain deletes the tree in one journal write:
+combinator records, `DurableTask.Once` records, signal records, detach and signal-send
+markers, and its records of calls to other grains. The grain deletes the tree in one
+journal write:
 
 | Invoked by | Deleted |
 | --- | --- |
@@ -120,11 +121,12 @@ same arguments, under each identifier; new workflow steps use new identifiers.
 ```
 
 The message names the recorded operation, such as a call to a grain, a delay, a
-`WhenAny` decision, a detached task's start, or a signal, and the requested one.
-Typical causes:
+`WhenAny` decision, a `DurableTask.Once` effect, a detached task's start, or a signal,
+and the requested one. Typical causes:
 
 - Code between children reads a value which differs on replay, such as
   `DateTime.UtcNow`, a random number, or mutable grain state, and passes it to a child.
+  `DurableTask.Once` records such a value, so every replay passes the same one.
 - A deployment changed a step's arguments, reordered unnamed children, or added an
   unnamed child or combinator before existing ones.
 - A loop or condition schedules children under IDs which depend on a nondeterministic
@@ -139,11 +141,15 @@ caller observe the failure.
 When a deployment changes a workflow while executions are pending, those executions
 replay under the new code:
 
-- Keep existing steps, their IDs, and their arguments.
+- Keep existing steps, `Once` effects, and detaches, with their IDs and arguments. A
+  changed `Once` delegate doesn't affect executions which recorded it: they return the
+  recorded result. Turning a recorded step into an effect under the same name, or the
+  reverse, fails as a divergence.
 - Give new steps new IDs, and place steps which depend on new behavior after the
   existing ones.
 - Name every child and combinator which a later change might move, so generated IDs
-  don't shift.
+  don't shift. Detaches and signal sends derive their IDs from the detached task or the
+  signal, so they don't shift.
 - Keep argument, result, and signal types decodable by the Orleans serializer, adding
   members with new `[Id(n)]` values.
 - A changed delay duration applies to new delays. A replayed delay keeps its recorded
@@ -191,6 +197,9 @@ cause.
 
 ## Capacity and throughput
 
+- A recorded effect, `DurableTask.Once`, adds no journal write: its record and the state
+  it changed commit with the task's next durable write. Each effect retains one record,
+  holding its result, until the task's tree is deleted.
 - A local step costs one journal write: its record commits with its first durable
   write, so a step which changes state and returns without awaiting commits its state
   change and result together.

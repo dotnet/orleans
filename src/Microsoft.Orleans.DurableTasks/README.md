@@ -77,10 +77,13 @@ ordinary grain methods:
 await buyer.RecordOrderAsync(summary).DetachAsync($"order-{orderId:N}-v{summary.Version}");
 ```
 
-- In a durable task, the call and a marker in the execution's tree commit in one journal
-  write. A replay which reaches the marker doesn't send the call again, and the marker is
-  deleted with the tree. `DetachedTaskId.For(segment)` derives the root ID from the durable
-  task's ID, so the target retains the detached task under `{taskId}:{segment}`.
+- In a durable task, the call and a marker in the execution's tree,
+  `{taskId}/$detach:{target}:{rootId}`, commit in one journal write. A replay which reaches
+  the marker doesn't send the call again, and the marker is deleted with the tree. The marker
+  derives from the detached task's identity, so adding operations to a workflow doesn't move
+  it, and detaching the same task again reaches the same marker.
+  `DetachedTaskId.For(segment)` derives the root ID from the durable task's ID, so the target
+  retains the detached task under `{taskId}:{segment}`.
 - In an ordinary method of a durable grain, the call is staged with the grain's pending
   state changes, and `DetachAsync` completes once the journal write which commits them
   completes.
@@ -125,7 +128,10 @@ await tasks.SignalAsync(workflowId, Shipped, shipment);
   arrives. When no invocation arrives within Messaging's `OutboxRetryTimeout`, after which it no
   longer can, the grain deletes the value and logs a warning.
 - In a durable task, the send and a marker in the execution's tree commit in one journal write,
-  like `DetachAsync`, so a replay which reaches the marker doesn't send it again. A signal to
+  like `DetachAsync`, so a replay which reaches the marker doesn't send it again. The marker is
+  `{taskId}/$send:{target}:{task}:{name}`, and repeated sends of one signal in an execution,
+  such as retries after `TaskNotFound`, are numbered `$send:...$2`, and so on, so each sends
+  again and the target reports an equal value as `Duplicate`. A signal to
   another grain is a `durable-rpc/signal` message in the outbox, whose identity covers the
   sender, target, task, name, and value; the target's inbox records the value directly in task
   state. A signal to the grain itself is recorded in the same write.
@@ -294,8 +300,12 @@ framework assets; its first published version establishes the compatibility base
   as a terminal entry of the execution's tree, `{taskId}/$once:{name}`, staged in
   the same work item as the journaled state the effect changed. Both commit in the
   next journal write, and a replay returns the recorded outcome without running
-  the effect. The record is deleted with the tree. Code which continues off the
-  activation, for example after `ConfigureAwait(false)`, can't record effects.
+  the effect. The record is deleted with the tree, and an activation which ends
+  before that write loses both, so the next attempt runs the effect again. A result
+  which doesn't serialize is recorded as that failure. Code which continues off the
+  activation, for example after `ConfigureAwait(false)`, can't record effects. An
+  effect and a child which use the same occurrence of a name, `$once:x$2` and
+  `x$2`, fail as a divergence in either direction.
 - A run of a task's body reports `IsReplaying` from its start while earlier runs
   recorded operations in the task's tree: children, detach and signal-send
   markers, and recorded effects, but not signal values or invoked descendants.
