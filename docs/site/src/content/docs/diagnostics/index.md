@@ -118,3 +118,4 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0028
 
 [Invalid Orleans identity](orleans0028.md) — Error. An alias, grain type, or grain interface type violates the identity syntax.
+[Suppress CS1998 for async durable task methods](orleans0028.md) — Suppressor. An `async DurableTask` method which completes without awaiting is a normal durable step.

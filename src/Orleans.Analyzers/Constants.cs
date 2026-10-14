@@ -17,6 +17,9 @@ namespace Orleans.Analyzers
         public const string GrainTypeAttributeFullyQualifiedName = "Orleans.GrainTypeAttribute";
         public const string VersionAttributeFullyQualifiedName = "Orleans.CodeGeneration.VersionAttribute";
 
+        public const string DurableTaskFullyQualifiedName = "Orleans.DurableTasks.DurableTask";
+        public const string GenericDurableTaskFullyQualifiedName = "Orleans.DurableTasks.DurableTask`1";
+
         public const string SerializableAttributeFullyQualifiedName = "System.SerializableAttribute";
         public const string NonSerializedAttributeFullyQualifiedName = "System.NonSerializedAttribute";
 
