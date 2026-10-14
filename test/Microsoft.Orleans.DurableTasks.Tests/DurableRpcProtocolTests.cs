@@ -176,7 +176,7 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(grain, message.ReceiverId);
         Assert.Equal(DurableTaskMessageTypes.ResumeSubject, message.Envelope.Subject);
         Assert.Equal(dueTime, message.Envelope.DeliverAt);
-        var body = MessagingTestHelpers.MessageTypes.Resume.Decode(message);
+        var body = MessagingTestHelpers.MessageTypes.Resume.Decode(message.Envelope);
         Assert.Equal(taskId, body.TaskId);
         Assert.Equal(7, body.Generation);
         Assert.Equal(grain, body.Sender);
@@ -307,7 +307,7 @@ public sealed class DurableRpcProtocolTests
         Assert.NotEqual(messages[0].Envelope.MessageId, messages[2].Envelope.MessageId);
         Assert.Equal(DurableTaskMessageTypes.InvocationSubject, messages[0].Envelope.Subject);
         Assert.Equal(target, messages[0].ReceiverId);
-        var body = MessagingTestHelpers.MessageTypes.Invocation.Decode(messages[0]);
+        var body = MessagingTestHelpers.MessageTypes.Invocation.Decode(messages[0].Envelope);
         Assert.Equal(taskId, body.TaskId);
         Assert.Equal(sender, body.Sender);
         var decodedRequest = Assert.IsType<TestDurableTaskRequest>(body.Request);
@@ -337,7 +337,7 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
         Assert.NotEqual(messages[0].Envelope.MessageId, messages[2].Envelope.MessageId);
         Assert.Equal(DurableTaskMessageTypes.CancellationSubject, messages[0].Envelope.Subject);
-        var body = MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[0]);
+        var body = MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[0].Envelope);
         Assert.Equal(taskId, body.TaskId);
         Assert.Equal(sender, body.Sender);
     }
