@@ -231,9 +231,8 @@ public class MessagingClusterFixture : IAsyncLifetime
     {
         options.MaxCapacity = 2;
         options.DeduplicationWindow = TimeSpan.FromMinutes(10);
-        options.MaxOutboxRetryAge = TimeSpan.FromMinutes(5);
+        options.MaxOutboxRetryAge = TimeSpan.FromSeconds(3);
         options.MaxProcessingAttempts = 1;
-        options.MaxHandlerNotFoundRetryAge = TimeSpan.FromMilliseconds(200);
         options.MaxRetainedDeadLetters = 2;
         options.DeadLetterRetentionPeriod = TimeSpan.FromHours(1);
         options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(25);
