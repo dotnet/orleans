@@ -351,6 +351,7 @@ public class DurableStateObservationTests : JournalingTestBase
         await valueWatch.NextAsync();
         await dictionaryWatch.NextAsync();
         await listWatch.NextAsync();
+        Assert.Equal(LogEventKind.CaughtUp, (await logRead.NextAsync()).Kind);
         var observers = sut.Manager.AsJournaledStateManager().Observers;
         Assert.NotNull(observers);
 
@@ -420,6 +421,7 @@ public class DurableStateObservationTests : JournalingTestBase
         await using var watch = dictionary.WatchAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await using var read = log.ReadAsync(cancellationToken: CancellationToken).GetAsyncEnumerator(CancellationToken);
         await watch.NextAsync();
+        Assert.Equal(LogEventKind.CaughtUp, (await read.NextAsync()).Kind);
         var watchNext = watch.MoveNextAsync().AsTask();
         var readNext = read.MoveNextAsync().AsTask();
 
