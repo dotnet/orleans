@@ -23,6 +23,13 @@ namespace Orleans.DurableTasks
         public override T GetResult<T>() { throw null; }
     }
 
+    public readonly partial struct CancellationSuppressionScope : System.IDisposable
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public readonly void Dispose() { }
+    }
+
     public partial struct ConfiguredDurableTask
     {
         public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
@@ -80,6 +87,8 @@ namespace Orleans.DurableTasks
 
         public bool IsCancellationRequested { get { throw null; } }
 
+        protected internal bool IsCancellationSuppressed { get { throw null; } }
+
         public TaskId TaskId { get { throw null; } }
 
         public abstract System.DateTimeOffset UtcNow { get; }
@@ -94,6 +103,8 @@ namespace Orleans.DurableTasks
         protected internal abstract System.Threading.Tasks.ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, System.Threading.CancellationToken cancellationToken);
         protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken);
         protected internal abstract System.Threading.Tasks.ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, System.Collections.Generic.IReadOnlyList<TaskId> candidates, System.Threading.CancellationToken cancellationToken);
+        public static CancellationSuppressionScope SuppressCancellation() { throw null; }
+
         protected internal virtual System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
