@@ -49,7 +49,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         // Both candidates are complete when the replacement activation replays the selection.
         var (replacement, _, _, _) = CreateRuntime(storage, manager);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         var response = await replacement.GetScheduledTaskHandle(rootId)
             .WaitAsync(TestContext.Current.CancellationToken)
             .AsTask()

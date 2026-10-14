@@ -65,7 +65,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         // Every input is complete when the replacement activation replays the enumeration.
         var (replacement, _, _, _) = CreateRuntime(storage, manager);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         var response = await replacement.GetScheduledTaskHandle(rootId)
             .WaitAsync(TestContext.Current.CancellationToken)
             .AsTask()
@@ -110,7 +110,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         var (replacement, _, _, _) = CreateRuntime(storage, manager);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         var response = await replacement.GetScheduledTaskHandle(rootId)
             .WaitAsync(TestContext.Current.CancellationToken)
             .AsTask()
