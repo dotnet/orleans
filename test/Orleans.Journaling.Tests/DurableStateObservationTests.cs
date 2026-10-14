@@ -383,6 +383,35 @@ public class DurableStateObservationTests : JournalingTestBase
         Assert.Equal(["history", "status"], stateMachines.Select(static pair => pair.Key));
         Assert.Same(dictionary, stateMachines[0].Value);
         Assert.Same(value, stateMachines[1].Value);
+        Assert.Empty(sut.Manager.GetRetiredStateNames());
+    });
+
+    [Fact]
+    public Task GetRetiredStateNames_ListsJournaledStateWhichIsNotRegistered() => RunOnActivationSchedulerAsync(async () =>
+    {
+        var storage = new GatedJournalStorage();
+        var first = CreateSystem(storage);
+        var legacy = CreateValue(first.Manager, "legacy");
+        var firstStatus = CreateValue(first.Manager, "status");
+        await first.Lifecycle.OnStart(CancellationToken);
+        legacy.Value = "old";
+        firstStatus.Value = "current";
+        await first.Manager.WriteStateAsync(CancellationToken);
+
+        var second = CreateSystem(storage);
+        var status = CreateValue(second.Manager, "status");
+        await second.Lifecycle.OnStart(CancellationToken);
+
+        Assert.Equal(["legacy"], second.Manager.GetRetiredStateNames());
+        Assert.Equal(["status"], second.Manager.GetStateMachines().Select(static pair => pair.Key));
+
+        // Registering the state again restores it.
+        var third = CreateSystem(storage);
+        var restored = CreateValue(third.Manager, "legacy");
+        CreateValue(third.Manager, "status");
+        await third.Lifecycle.OnStart(CancellationToken);
+        Assert.Empty(third.Manager.GetRetiredStateNames());
+        Assert.Equal("old", restored.Value);
     });
 
     [Fact]
