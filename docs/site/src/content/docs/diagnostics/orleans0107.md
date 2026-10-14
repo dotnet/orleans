@@ -21,7 +21,7 @@ A constant name passed to `WithId` or `DurableTask.Once` contains `$`.
 
 Generated identifiers contain `$`, for example `$child-1`, `$once:pay`, and `reserve$2`, the second occurrence of the name `reserve` in a run. Names without `$` never collide with generated identifiers, and the host rejects names which contain it.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

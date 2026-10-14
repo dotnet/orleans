@@ -21,7 +21,7 @@ A durable task body calls `Task.Delay` or `Thread.Sleep` at a point from which i
 
 A durable delay records its due time in logical time, so a replay resumes the remaining wait, and an elapsed delay returns immediately. Other waits restart for their whole duration on each run.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 

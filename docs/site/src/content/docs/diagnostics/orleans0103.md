@@ -21,7 +21,7 @@ Code after a durable task body's last durable operation changes grain state, and
 
 The host records a body's result with the state changes which its final code makes, in one journal write. A change which an external await follows can commit in an earlier journal write than the body's result, for example when another operation on the grain writes the journal during the await. A run which ends before the result commits runs the final code again on replay, and applies the change twice.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
