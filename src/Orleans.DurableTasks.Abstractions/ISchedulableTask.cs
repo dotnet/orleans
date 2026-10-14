@@ -45,7 +45,25 @@ public interface IScheduledTaskHandle
     /// Durably requests task cancellation. The request is monotonic and idempotent. The token abandons
     /// waiting for acknowledgement.
     /// </summary>
+    /// <remarks>
+    /// The operation completes once the host has durably recorded the request; the task's response reports the outcome.
+    /// A running task observes the request through its durable cancellation token and decides its own outcome.
+    /// </remarks>
     ValueTask CancelAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Administratively aborts the task: the host terminalizes it and its attached descendants as failed with
+    /// <see cref="DurableTaskAbortedException"/>, without running further task code. The token abandons waiting for
+    /// acknowledgement.
+    /// </summary>
+    /// <param name="reason">The reason for the abort, recorded as the exception message.</param>
+    /// <param name="cancellationToken">A token which abandons waiting for the abort to commit.</param>
+    /// <remarks>
+    /// Aborting a terminal task leaves it unchanged. Hosts which don't support abort keep this default implementation,
+    /// which throws <see cref="NotSupportedException"/>.
+    /// </remarks>
+    ValueTask AbortAsync(string reason, CancellationToken cancellationToken)
+        => throw new NotSupportedException("The durable task host does not support aborting tasks.");
 }
 
 /// <summary>Configures a polling operation.</summary>
