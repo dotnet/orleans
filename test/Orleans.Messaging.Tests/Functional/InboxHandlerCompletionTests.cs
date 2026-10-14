@@ -160,7 +160,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
             {
                 base.ConfigureOptions(options);
                 options.MaxProcessingAttempts = 5;
-                options.BackpressureRetryDelay = TimeSpan.FromHours(1);
+                options.RetryInitialInterval = TimeSpan.FromHours(1);
                 options.DeduplicationWindow = TimeSpan.FromDays(7);
             }
         }
