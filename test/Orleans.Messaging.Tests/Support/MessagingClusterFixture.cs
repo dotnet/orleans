@@ -204,6 +204,23 @@ public class MessagingClusterFixture : IAsyncLifetime
         }
     }
 
+    /// <summary>Forces idle activation collection until <paramref name="context"/> deactivates.</summary>
+    internal async Task CollectAsync(IGrainContext context)
+    {
+        var management = Client.GetGrain<IManagementGrain>(0);
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (!context.Deactivated.IsCompleted)
+        {
+            if (DateTime.UtcNow > deadline)
+            {
+                throw new TimeoutException($"Activation '{context.GrainId}' was not collected.");
+            }
+
+            await management.ForceActivationCollection(TimeSpan.Zero, TestContext.Current.CancellationToken);
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+    }
+
     internal IGrainContext GetGrainContext(IAddressable grain)
     {
         if (!Cluster.TryGetGrainContext(grain.GetGrainId(), out var context))
