@@ -309,7 +309,7 @@ public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
   it.
 - Work which must outlive the workflow, such as cleanup which continues after the workflow's result is
   observed, runs as a detached task, which the workflow's cancellation doesn't reach either:
-  `inventory.ReleaseAsync(order.Id).DetachAsync($"order-{order.Id:N}-release")`.
+  `inventory.ReleaseAsync(order.Id).DetachAsync(DetachedTaskId.For("release"))`.
 - Hosts terminalize leaves of a canceled task as canceled promptly: delays, children whose bodies
   haven't started, and attached children scheduled after the request outside a suppression scope,
   which don't run. A child which already completed keeps its recorded result, and a running child
