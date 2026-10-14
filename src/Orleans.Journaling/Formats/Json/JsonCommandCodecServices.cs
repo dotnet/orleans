@@ -74,6 +74,20 @@ internal sealed class JsonDurableSetCommandCodecService<T>(IOptions<JsonJournalO
 
 }
 
+internal sealed class JsonDurableLogCommandCodecService<T>(IOptions<JsonJournalOptions> options)
+    : IDurableLogCommandCodec<T>
+{
+    private readonly JsonDurableLogCommandCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).Value.SerializerOptions);
+
+    public void WriteAppend(T item, JournalStreamWriter writer) => _inner.WriteAppend(item, writer);
+
+    public void WriteTrimBefore(long sequence, JournalStreamWriter writer) => _inner.WriteTrimBefore(sequence, writer);
+
+    public void WriteSnapshot(long firstSequence, IReadOnlyCollection<T> items, JournalStreamWriter writer) => _inner.WriteSnapshot(firstSequence, items, writer);
+
+    public void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer) => _inner.Apply(input, consumer);
+}
+
 internal sealed class JsonDurableValueCommandCodecService<T>(IOptions<JsonJournalOptions> options)
     : IDurableValueCommandCodec<T>
 {
