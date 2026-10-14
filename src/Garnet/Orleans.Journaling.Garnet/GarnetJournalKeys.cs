@@ -23,6 +23,15 @@ internal static class GarnetJournalKeys
     /// <summary>The key of the partition descriptor hash.</summary>
     public static readonly byte[] PartitionKey = "oj:partition"u8.ToArray();
 
+    /// <summary>The partition descriptor field holding the partition's id.</summary>
+    public const string PartitionIdField = "partition-id";
+
+    /// <summary>The partition descriptor field holding the bucket count.</summary>
+    public const string BucketCountField = "bucket-count";
+
+    /// <summary>The partition descriptor field holding the storage schema version.</summary>
+    public const string SchemaVersionField = "schema-version";
+
     public static int GetBucket(ReadOnlySpan<byte> encodedJournalId, int bucketCount)
     {
         // Bucket counts are powers of two, so masking is equivalent to the modulus.

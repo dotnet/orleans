@@ -42,11 +42,7 @@ public sealed class GarnetJournalDurabilityTests
                     // SAVE checkpoints while writers append, which can exceed the default timeout on a loaded machine.
                     AsyncTimeout = (int)TimeSpan.FromSeconds(60).TotalMilliseconds,
                 });
-                var client = new GarnetJournalPartitionClient(
-                    connection.GetDatabase(),
-                    GarnetJournalStorageOptions.DEFAULT_BUCKET_COUNT,
-                    TimeSpan.FromSeconds(2));
-                await client.EnsureSinglePartitionInitializedAsync(CancellationToken);
+                await using var client = await GarnetTestRouting.CreateSinglePartitionRouterAsync(host.EndPoint, TimeSpan.FromSeconds(2), CancellationToken);
 
                 // Every acknowledged append is present, in order, with no gaps. Appends whose replies were lost may
                 // also be present; they become the baseline for the next cycle.
@@ -102,7 +98,7 @@ public sealed class GarnetJournalDurabilityTests
         }
     }
 
-    private static async Task WriteAsync(GarnetJournalPartitionClient client, JournalId id, int[] acknowledged, int index, CancellationToken stop)
+    private static async Task WriteAsync(GarnetJournalRouter client, JournalId id, int[] acknowledged, int index, CancellationToken stop)
     {
         var storage = new GarnetJournalStorage(client, id, "json", compactionThresholdBytes: 0);
         try
@@ -123,7 +119,7 @@ public sealed class GarnetJournalDurabilityTests
         }
     }
 
-    private static async Task<List<int>> ReadValuesAsync(GarnetJournalPartitionClient client, JournalId id)
+    private static async Task<List<int>> ReadValuesAsync(GarnetJournalRouter client, JournalId id)
     {
         var consumer = new CapturingConsumer();
         await new GarnetJournalStorage(client, id, "json", compactionThresholdBytes: 0).ReadAsync(consumer, CancellationToken);

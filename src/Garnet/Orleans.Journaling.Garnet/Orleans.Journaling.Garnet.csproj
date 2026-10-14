@@ -18,6 +18,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="Microsoft.Garnet" />
     <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="System.IO.Hashing" />
