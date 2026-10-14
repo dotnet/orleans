@@ -10,12 +10,16 @@ namespace Orleans.Journaling;
 /// <remarks>
 /// <para>
 /// Each appended entry receives the next value of a durable, monotonically increasing sequence number.
-/// Sequence numbers are never reused: <see cref="TrimBefore"/> discards old entries while preserving the sequence.
+/// Sequence numbers are never reused: <see cref="TrimBefore"/> discards old entries while preserving the sequence,
+/// and <see cref="Clear"/> replaces the log's history after consuming one sequence number.
 /// Enumeration yields the retained entries in sequence order.
 /// </para>
 /// <para>
 /// A draft streams volatile content to readers which include drafts before its durable entries exist. Use drafts for
 /// incremental output, such as model responses, whose final form is committed as one or more entries.
+/// </para>
+/// <para>
+/// <see cref="Seal"/> durably ends the log, so that readers' streams end after its final entry.
 /// </para>
 /// </remarks>
 public interface IDurableLog<T> : IReadOnlyCollection<T>
@@ -34,6 +38,11 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
     /// Gets the sequence number after the last committed entry. Entries with lower sequence numbers are durable.
     /// </summary>
     long CommittedSequence { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether <see cref="Seal"/> has ended the log.
+    /// </summary>
+    bool IsSealed { get; }
 
     /// <summary>
     /// Gets the retained entry with the specified sequence number.
@@ -56,6 +65,7 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
     /// </summary>
     /// <param name="item">The entry.</param>
     /// <returns>The entry's sequence number.</returns>
+    /// <exception cref="InvalidOperationException">The log is sealed.</exception>
     long Append(T item);
 
     /// <summary>
@@ -63,16 +73,54 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
     /// </summary>
     /// <param name="sequence">The sequence number of the first entry to retain.</param>
     /// <remarks>
-    /// Trimming bounds retention and preserves <see cref="NextSequence"/>. Readers positioned before the trim point
-    /// receive <see cref="LogEventKind.Reset"/> and continue from <see cref="FirstSequence"/>.
+    /// Trimming bounds retention and preserves <see cref="NextSequence"/>; the retained entries remain valid. Every active
+    /// reader receives <see cref="LogEventKind.Trimmed"/> with the new <see cref="FirstSequence"/>, and a reader positioned
+    /// before it continues from it. Readers without <see cref="DurableWatchMode.Staged"/> receive the event once the trim is durable.
+    /// A sealed log can be trimmed.
     /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="sequence"/> is negative or greater than <see cref="NextSequence"/>.</exception>
     void TrimBefore(long sequence);
 
     /// <summary>
+    /// Discards every entry and begins a new history, such as a compacted replacement of the discarded entries.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Clearing consumes one sequence number: afterwards, <see cref="FirstSequence"/> and <see cref="NextSequence"/> equal
+    /// the previous <see cref="NextSequence"/> plus one. A reader positioned at or before the cleared sequence number has
+    /// observed history which the clear replaced. It receives <see cref="LogEventKind.Reset"/>, including when it resumes
+    /// in a later activation, and a reader positioned after it does not. Readers without <see cref="DurableWatchMode.Staged"/>
+    /// receive the event once the clear is durable.
+    /// </para>
+    /// <para>
+    /// Use <see cref="TrimBefore"/> instead to discard old entries whose successors remain valid. Open drafts remain open.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The log is sealed.</exception>
+    void Clear();
+
+    /// <summary>
+    /// Durably ends the log.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Once the seal is durable, each reader receives the remaining entries and then <see cref="LogEventKind.Sealed"/>, and
+    /// its stream ends. A reader which begins reading a sealed log receives its retained entries and then
+    /// <see cref="LogEventKind.Sealed"/>. A stream which ends because the activation stopped ends without the event.
+    /// </para>
+    /// <para>
+    /// Sealing abandons open drafts with <see cref="LogDraftAbandonReason.Sealed"/>. A sealed log rejects <see cref="Append"/>,
+    /// <see cref="Clear"/>, and <see cref="BeginDraft"/>, and can still be trimmed. Sealing a sealed log has no effect.
+    /// Only deleting the journal unseals the log.
+    /// </para>
+    /// </remarks>
+    void Seal();
+
+    /// <summary>
     /// Opens a draft which streams volatile items to readers which include drafts.
     /// </summary>
     /// <returns>The open draft. Dispose it to abandon the draft unless it was closed.</returns>
+    /// <exception cref="InvalidOperationException">The log is sealed.</exception>
     IDurableLogDraft<T> BeginDraft();
 
     /// <summary>
@@ -95,17 +143,19 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
     /// <returns>
     /// A stream of entries in sequence order. With <see cref="DurableWatchMode.Staged"/>, the stream also delivers staged
     /// entries and watermarks. With <see cref="DurableWatchMode.Drafts"/>, it also delivers draft events. Without
-    /// <see cref="DurableWatchMode.Staged"/>, the stream reports a committed draft once the entry which replaced it is durable.
+    /// <see cref="DurableWatchMode.Staged"/>, the stream reports a committed draft once the entries which replaced it are durable.
     /// </returns>
     /// <remarks>
     /// <para>
     /// Readers re-read retained entries from their position rather than buffering them, so a slow reader retains no entries.
-    /// When <paramref name="fromSequence"/> precedes <see cref="FirstSequence"/> or follows <see cref="NextSequence"/>,
-    /// the stream begins with <see cref="LogEventKind.Reset"/> and continues from <see cref="FirstSequence"/>.
+    /// The stream begins with <see cref="LogEventKind.Reset"/> when <paramref name="fromSequence"/> is at or before a cleared
+    /// sequence number or follows <see cref="NextSequence"/>, and with <see cref="LogEventKind.Trimmed"/> when it precedes
+    /// <see cref="FirstSequence"/>. Either way, it continues from the first retained entry. After it delivers every entry which
+    /// was committed when the read began, the stream delivers <see cref="LogEventKind.CaughtUp"/> once.
     /// </para>
     /// <para>
     /// To resume after a disconnection, pass the sequence after the last committed entry the reader observed, which is the
-    /// latest <see cref="LogEventKind.Watermark"/> sequence for speculative readers.
+    /// latest <see cref="LogEventKind.Watermark"/> sequence for readers with <see cref="DurableWatchMode.Staged"/>.
     /// Enumerate the stream in the owning activation's execution context.
     /// </para>
     /// </remarks>
@@ -130,7 +180,7 @@ public interface IDurableLog<T> : IReadOnlyCollection<T>
 /// </para>
 /// <para>
 /// The draft closes when its owner commits, abandons, or disposes it, and when the log closes it because the log's journal
-/// was deleted. Disposing an open draft abandons it. Use the draft in the owning activation's execution context and check
+/// was deleted or the log was sealed. Disposing an open draft abandons it. Use the draft in the owning activation's execution context and check
 /// <see cref="IsOpen"/> before committing a draft which the log may have closed.
 /// </para>
 /// </remarks>
@@ -260,8 +310,9 @@ public enum LogEventKind : byte
     Entry = 0,
 
     /// <summary>
-    /// The reader's position is outside the retained log, because entries were trimmed or the log was reset.
-    /// The stream continues from <see cref="LogEvent{T}.Sequence"/>, the first retained entry.
+    /// The log's history was replaced, because <see cref="IDurableLog{T}.Clear"/> discarded it, the journal was deleted, or
+    /// the reader's position follows the end of the log. Discard any entries read before this event. The stream continues
+    /// from <see cref="LogEvent{T}.Sequence"/>, the first retained entry.
     /// </summary>
     Reset = 1,
 
@@ -288,6 +339,24 @@ public enum LogEventKind : byte
     /// Discard its items.
     /// </summary>
     DraftAbandoned = 5,
+
+    /// <summary>
+    /// <see cref="IDurableLog{T}.TrimBefore"/> discarded the entries before <see cref="LogEvent{T}.Sequence"/>, the new
+    /// first retained entry. Entries read from that sequence onward remain valid. A reader positioned before it continues from it.
+    /// </summary>
+    Trimmed = 6,
+
+    /// <summary>
+    /// The stream has delivered every entry which was committed when the read began. <see cref="LogEvent{T}.Sequence"/> is
+    /// the reader's position. The stream delivers this event once.
+    /// </summary>
+    CaughtUp = 7,
+
+    /// <summary>
+    /// <see cref="IDurableLog{T}.Seal"/> ended the log, whose entries end before <see cref="LogEvent{T}.Sequence"/>. This is
+    /// the stream's final event.
+    /// </summary>
+    Sealed = 8,
 }
 
 /// <summary>
@@ -325,6 +394,11 @@ public enum LogDraftAbandonReason : byte
     /// This activation does not know the draft's outcome, because the draft closed too long ago or never existed.
     /// </summary>
     Unknown = 5,
+
+    /// <summary>
+    /// <see cref="IDurableLog{T}.Seal"/> ended the log while the draft was open.
+    /// </summary>
+    Sealed = 6,
 }
 
 /// <summary>
@@ -341,8 +415,10 @@ public readonly record struct LogEvent<T>
     public LogEventKind Kind { get; init; }
 
     /// <summary>
-    /// Gets the entry sequence number, the reset or watermark position, the item's position within its draft, or the
-    /// first sequence number of a committed draft's entries.
+    /// Gets the entry sequence number; the first retained sequence number for <see cref="LogEventKind.Reset"/> and
+    /// <see cref="LogEventKind.Trimmed"/>; the position for <see cref="LogEventKind.Watermark"/>, <see cref="LogEventKind.CaughtUp"/>,
+    /// and <see cref="LogEventKind.Sealed"/>; the item's position within its draft; or the first sequence number of a
+    /// committed draft's entries.
     /// </summary>
     [Id(1)]
     public long Sequence { get; init; }
