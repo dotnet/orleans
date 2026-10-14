@@ -37,6 +37,7 @@ internal static class DurableTaskStubs
                 public static DurableTask WhenAll(IEnumerable<DurableTask> inputs) => null!;
                 public static DurableTask<int> WhenAny(IEnumerable<DurableTask> inputs) => null!;
                 public static IAsyncEnumerable<ScheduledTask> WhenEach(IEnumerable<DurableTask> inputs) => null!;
+                public static DurableTask<(int Index, T Result)> Race<T>(IReadOnlyList<DurableTask<T>> inputs) => null!;
             }
 
             [AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
@@ -89,10 +90,16 @@ internal static class DurableTaskStubs
                 public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string segment) => default;
                 public static ValueTask DetachAsync(this DurableTask task, string rootId, CancellationToken cancellationToken = default) => default;
                 public static Task<ScheduledTask> ScheduleAsync(this DurableTask task, string rootId, CancellationToken cancellationToken = default) => null!;
+                public static DurableTask<TResult> WaitAsync<TResult>(this DurableTask<TResult> task, TimeSpan timeout) => null!;
             }
 
             public abstract class ScheduledTask
             {
+            }
+
+            public abstract class ScheduledTask<TResult> : ScheduledTask
+            {
+                public Task<TResult> WaitUntilAsync(DateTimeOffset dueTime, CancellationToken cancellationToken = default) => null!;
             }
 
             public sealed class DurableSignal<T>

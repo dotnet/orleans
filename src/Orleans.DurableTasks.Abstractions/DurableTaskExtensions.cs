@@ -1,6 +1,6 @@
 namespace Orleans.DurableTasks;
 
-/// <summary>Provides awaiting, identification, and scheduling operations for durable task definitions.</summary>
+/// <summary>Provides awaiting, identification, scheduling, and timeout operations for durable task definitions.</summary>
 public static class DurableTaskExtensions
 {
     /// <summary>Gets an awaiter for a durable task in the current execution context.</summary>
@@ -28,6 +28,99 @@ public static class DurableTaskExtensions
     /// <summary>Schedules a root task using one explicit stable identifier segment.</summary>
     public static Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, string rootId, CancellationToken cancellationToken = default)
         => new ConfiguredDurableTask<TResult>(task, rootId).ScheduleAsync(cancellationToken);
+
+    /// <summary>
+    /// Creates a durable task which runs <paramref name="task"/> and requests its durable cancellation once
+    /// <paramref name="timeout"/> elapses.
+    /// </summary>
+    /// <param name="task">The task to run.</param>
+    /// <param name="timeout">The time to wait before requesting cancellation, which is zero or positive.</param>
+    /// <returns>
+    /// A combinator which, awaited within a durable execution, runs as part of that execution and completes once
+    /// <paramref name="task"/> is terminal.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// The combinator races <paramref name="task"/> with <see cref="DurableTask.Delay(TimeSpan)"/>, as
+    /// <see cref="DurableTask.Race(IReadOnlyList{DurableTask})"/> does, and the host selects the same winner on replay. The
+    /// delay is measured using host logical time from its first run, and a replay keeps its recorded due time, so the
+    /// timeout counts from the first time the combinator runs. The task runs as the child <c>0</c> and the delay as the child
+    /// <c>1</c> under the combinator's operation identifier, which also identifies a recorded selection: the segment
+    /// assigned with <c>WithId</c>, or a segment generated in execution order.
+    /// </para>
+    /// <para>
+    /// When the task completes first, the combinator cancels the delay and completes with the task's outcome: its result,
+    /// failure, or cancellation. When the timeout elapses first, the combinator requests cancellation of the task carrying
+    /// the reason <c>The operation timed out after {timeout}.</c>, which the task's
+    /// <see cref="DurableTaskContext.CancellationReason"/> reports when the request is the task's first, and waits until the
+    /// task is terminal: nothing which the combinator started outlives it. A task which then ends canceled fails the
+    /// combinator with a <see cref="TimeoutException"/> whose inner exception is the task's
+    /// <see cref="OperationCanceledException"/>, and any other outcome, such as a result which the task returns after
+    /// observing the request, is the combinator's outcome. A delay which ends without elapsing, for example because durable
+    /// cancellation of the awaiting execution reached it, also requests cancellation of the task, and the combinator then
+    /// fails with the delay's exception once the task is terminal.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="task"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="timeout"/> is negative, including <see cref="Timeout.InfiniteTimeSpan"/>; await the task itself to
+    /// wait without a timeout.
+    /// </exception>
+    public static DurableTask WaitAsync(this DurableTask task, TimeSpan timeout)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentOutOfRangeException.ThrowIfLessThan(timeout, TimeSpan.Zero);
+        return DurableTask.WithTimeout(task, DurableTask.Delay(timeout), ScheduledTask.GetTimeoutReason(timeout));
+    }
+
+    /// <summary>
+    /// Creates a durable task which runs <paramref name="task"/>, returns its result, and requests its durable cancellation
+    /// once <paramref name="timeout"/> elapses.
+    /// </summary>
+    /// <inheritdoc cref="WaitAsync(DurableTask, TimeSpan)"/>
+    public static DurableTask<TResult> WaitAsync<TResult>(this DurableTask<TResult> task, TimeSpan timeout)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentOutOfRangeException.ThrowIfLessThan(timeout, TimeSpan.Zero);
+        return DurableTask.WithTimeout(task, DurableTask.Delay(timeout), ScheduledTask.GetTimeoutReason(timeout));
+    }
+
+    /// <summary>
+    /// Creates a durable task which runs <paramref name="task"/> and requests its durable cancellation once
+    /// <paramref name="dueTime"/> passes.
+    /// </summary>
+    /// <param name="task">The task to run.</param>
+    /// <param name="dueTime">
+    /// The time, measured using host logical time, at which to request cancellation. A time which has passed times out
+    /// promptly.
+    /// </param>
+    /// <returns>
+    /// A combinator which, awaited within a durable execution, runs as part of that execution and completes once
+    /// <paramref name="task"/> is terminal.
+    /// </returns>
+    /// <remarks>
+    /// The combinator behaves as <see cref="WaitAsync(DurableTask, TimeSpan)"/>, racing <paramref name="task"/> with
+    /// <see cref="DurableTask.DelayUntil(DateTimeOffset)"/>, and requests cancellation with the reason
+    /// <c>The operation timed out because its deadline {dueTime} passed.</c>, which formats <paramref name="dueTime"/> with
+    /// the round-trip format, <c>O</c>.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="task"/> is <see langword="null"/>.</exception>
+    public static DurableTask WaitUntilAsync(this DurableTask task, DateTimeOffset dueTime)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        return DurableTask.WithTimeout(task, DurableTask.DelayUntil(dueTime), ScheduledTask.GetDeadlineReason(dueTime));
+    }
+
+    /// <summary>
+    /// Creates a durable task which runs <paramref name="task"/>, returns its result, and requests its durable cancellation
+    /// once <paramref name="dueTime"/> passes.
+    /// </summary>
+    /// <inheritdoc cref="WaitUntilAsync(DurableTask, DateTimeOffset)"/>
+    public static DurableTask<TResult> WaitUntilAsync<TResult>(this DurableTask<TResult> task, DateTimeOffset dueTime)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        return DurableTask.WithTimeout(task, DurableTask.DelayUntil(dueTime), ScheduledTask.GetDeadlineReason(dueTime));
+    }
 
     /// <summary>
     /// Starts <paramref name="task"/> as a new root task with identifier <paramref name="rootId"/>, detached from its

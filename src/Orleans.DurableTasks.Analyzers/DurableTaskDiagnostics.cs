@@ -80,7 +80,7 @@ internal static class DurableTaskDiagnostics
     public static readonly DiagnosticDescriptor NonDurableCombinator = Create(
         "ORLEANS0110",
         "Run concurrent durable work through durable combinators",
-        "Use DurableTask.WhenAll, WhenAny, or ScheduleAll instead of '{0}': their inputs keep stable identifiers when they run concurrently",
+        "Use DurableTask.WhenAll, WhenAny, Race, or ScheduleAll instead of '{0}': their inputs keep stable identifiers when they run concurrently",
         DiagnosticSeverity.Warning,
         "Concurrent durable operations which a Task combinator starts receive generated identifiers in the order in which they begin, which can differ on replay. Durable combinators identify each input by its index.");
 

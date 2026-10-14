@@ -5272,7 +5272,16 @@ internal sealed class TestHost(DateTimeOffset utcNow)
 
     public Func<CancellationToken, ValueTask<DurableTaskResponse>>? DelayCallback { get; init; }
 
-    public TestContext CreateContext(TaskId taskId) => new(this, taskId, utcNow);
+    /// <summary>Gets or sets the logical time of the executions which the host creates from now on.</summary>
+    public DateTimeOffset UtcNow { get; set; } = utcNow;
+
+    /// <summary>
+    /// Gets whether a handle's cancellation request reaches the execution of its task, carrying the request's reason, as
+    /// it does in a host which runs the task.
+    /// </summary>
+    public bool PropagatesCancellation { get; init; }
+
+    public TestContext CreateContext(TaskId taskId) => new(this, taskId, UtcNow);
 
     public RootDefinition<TResult> CreateRootDefinition<TResult>(Func<TestContext, ValueTask<DurableTaskResponse>> run) => new(this, run);
 
@@ -5329,14 +5338,14 @@ internal sealed class TestHost(DateTimeOffset utcNow)
     private Entry ScheduleChild(TaskId id, DurableTask definition)
     {
         var entry = _entries.GetOrAdd(id, static (taskId, state) => state.CreateEntry(taskId), this);
-        entry.StartOnce(() => RunDefinitionAsync(definition, id));
+        entry.StartOnce(() => RunDefinitionAsync(definition, entry));
         return entry;
     }
 
-    internal async Task<DurableTaskResponse> RunDefinitionAsync(DurableTask definition, TaskId id)
+    internal async Task<DurableTaskResponse> RunDefinitionAsync(DurableTask definition, Entry entry)
     {
         Interlocked.Increment(ref ExecutionCount);
-        return await DurableTaskRuntimeHelper.RunAsync(definition, CreateContext(id));
+        return await DurableTaskRuntimeHelper.RunAsync(definition, entry.Context = CreateContext(entry.TaskId));
     }
 
     internal ValueTask<DurableTaskResponse> ScheduleDelayAsync(
@@ -5387,6 +5396,12 @@ internal sealed class TestHost(DateTimeOffset utcNow)
         public TaskId TaskId => id;
 
         public bool CancellationRequested { get; private set; }
+
+        /// <summary>Gets the reason of the first cancellation request.</summary>
+        public string? CancellationReason { get; private set; }
+
+        /// <summary>Gets or sets the context of the task's execution, once the host runs it.</summary>
+        public TestContext? Context { get; set; }
 
         public Exception? WaitException { get; set; }
 
@@ -5453,11 +5468,20 @@ internal sealed class TestHost(DateTimeOffset utcNow)
                 : new(DurableTaskResponse.Pending);
         }
 
-        public ValueTask CancelAsync(CancellationToken cancellationToken)
+        public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
+
+        public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            CancellationRequested = true;
-            return ValueTask.CompletedTask;
+            if (!CancellationRequested)
+            {
+                CancellationReason = reason;
+                CancellationRequested = true;
+            }
+
+            return host.PropagatesCancellation && Context is { } context
+                ? new(DurableTaskRuntimeHelper.RequestCancellationAsync(context, reason, cancellationToken))
+                : ValueTask.CompletedTask;
         }
     }
 }
@@ -5502,7 +5526,7 @@ internal sealed class RootDefinition<TResult>(
         entry.StartOnce(async () =>
         {
             Interlocked.Increment(ref host.ExecutionCount);
-            var context = host.CreateContext(taskId);
+            var context = entry.Context = host.CreateContext(taskId);
             return await DurableTaskRuntimeHelper.RunAsync(new CallbackDurableTask(run), context);
         });
         return entry.PollAsync(default, cancellationToken);
