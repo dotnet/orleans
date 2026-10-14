@@ -35,7 +35,36 @@ public abstract class ScheduledTask
         => (await WaitAsyncCore(cancellationToken).ConfigureAwait(false)).EnsureSuccessfulCompletion();
 
     /// <summary>Durably requests cancellation.</summary>
+    /// <remarks>
+    /// The operation completes once the host has durably recorded the request, without waiting for the task to finish.
+    /// The task's body observes the request and decides its outcome: the task is canceled when the cancellation escapes
+    /// its body, and otherwise completes with the body's result or failure. Await the task to observe the outcome.
+    /// </remarks>
     public abstract ValueTask CancelAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Administratively aborts the task: the host terminalizes it and its attached descendants as failed with a
+    /// <see cref="DurableTaskAbortedException"/> carrying <paramref name="reason"/>, without running further task code.
+    /// </summary>
+    /// <param name="reason">The reason for the abort, recorded as the exception message.</param>
+    /// <param name="cancellationToken">A token which abandons waiting for the abort to commit.</param>
+    /// <remarks>
+    /// Abort is for operators, for example when a task's body ignores cancellation or its cleanup is stuck. It runs no
+    /// cancellation callbacks or compensation. The operation completes once the host has durably recorded the abort.
+    /// Aborting a terminal task leaves it unchanged. Detached tasks are independent roots, which are aborted separately.
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="reason"/> is <see langword="null"/>, empty, or whitespace.</exception>
+    /// <exception cref="NotSupportedException">The host doesn't support aborting tasks.</exception>
+    public ValueTask AbortAsync(string reason, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        return AbortAsyncCore(reason, cancellationToken);
+    }
+
+    /// <summary>Asks the host to abort the task for a validated <paramref name="reason"/>.</summary>
+    /// <remarks>Hosts which support abort override this default implementation, which throws <see cref="NotSupportedException"/>.</remarks>
+    protected virtual ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken)
+        => throw new NotSupportedException("The durable task host does not support aborting tasks.");
 
     /// <summary>Waits for a terminal host response.</summary>
     protected internal abstract ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken);
@@ -207,6 +236,8 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
 
+    protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => handle.AbortAsync(reason, cancellationToken);
+
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => handle.WaitAsync(cancellationToken);
 
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken)
@@ -218,6 +249,8 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
     public override TaskId Id => handle.TaskId;
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
+
+    protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => handle.AbortAsync(reason, cancellationToken);
 
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => handle.WaitAsync(cancellationToken);
 
@@ -231,6 +264,8 @@ internal sealed class CompletedScheduledTask(TaskId id, DurableTaskResponse resp
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
 
+    protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(response);
 
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken) => new(response);
@@ -241,6 +276,8 @@ internal sealed class CompletedScheduledTask<TResult>(TaskId id, DurableTaskResp
     public override TaskId Id => id;
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => ValueTask.CompletedTask;
+
+    protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => new(response);
 

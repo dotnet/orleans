@@ -136,6 +136,15 @@ namespace Orleans.DurableTasks
         public static DurableTask<(int Index, TResult Result)> WhenAny<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
     }
 
+    public sealed partial class DurableTaskAbortedException : System.Exception
+    {
+        public DurableTaskAbortedException() { }
+
+        public DurableTaskAbortedException(string reason, System.Exception? innerException) { }
+
+        public DurableTaskAbortedException(string reason) { }
+    }
+
     public readonly partial struct DurableTaskAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
     {
         public bool IsCompleted { get { throw null; } }
@@ -328,6 +337,7 @@ namespace Orleans.DurableTasks
     {
         TaskId TaskId { get; }
 
+        System.Threading.Tasks.ValueTask AbortAsync(string reason, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsync(System.Threading.CancellationToken cancellationToken);
@@ -371,6 +381,10 @@ namespace Orleans.DurableTasks
         internal ScheduledTask() { }
 
         public abstract TaskId Id { get; }
+
+        public System.Threading.Tasks.ValueTask AbortAsync(string reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        protected virtual System.Threading.Tasks.ValueTask AbortAsyncCore(string reason, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public abstract System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default);
         public ScheduledTaskAwaiter GetAwaiter() { throw null; }
