@@ -196,7 +196,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         storage.RequestCancellation(rootId, storage.Get(rootId), "recorded");
         var (replacement, _, _, _) = CreateRuntime(storage, manager);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("recorded", (await WaitForResponseAsync(replacement, rootId)).GetResult<string>());
         Assert.Equal(2, Volatile.Read(ref attempts));
@@ -337,7 +337,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         storage.SetRequestFingerprint(targetId, target, "target-fingerprint");
         var (replacement, _, _, _) = CreateRuntime(storage, manager);
         Volatile.Write(ref current, replacement);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal((int)DurableSignalResult.TaskNotFound, (await WaitForResponseAsync(replacement, rootId)).GetResult<int>());
         Assert.Equal([DurableSignalResult.TaskNotFound, DurableSignalResult.TaskNotFound], results);

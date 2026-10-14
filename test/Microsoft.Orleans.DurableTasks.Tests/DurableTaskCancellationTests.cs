@@ -202,7 +202,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         // The cancellation request is durable, and the body's next attempt observes it.
         storage.RequestCancellation(rootId, storage.Get(rootId));
         var (replacement, _, _, _) = CreateRuntime(storage, manager);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(10, (await WaitForResponseAsync(replacement, rootId)).GetResult<int>());
         Assert.Equal(2, Volatile.Read(ref attempts));
@@ -221,7 +221,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         storage.RequestCancellation(rootId, state);
         var (recovered, _, _, _) = CreateRuntime(storage, manager);
 
-        await recovered.OnActivateAsync(TestContext.Current.CancellationToken);
+        await recovered.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(DurableTaskStatus.Canceled, storage.Get(rootId).Result!.Status);
         Assert.Equal(0, request.CreateTaskCallCount);

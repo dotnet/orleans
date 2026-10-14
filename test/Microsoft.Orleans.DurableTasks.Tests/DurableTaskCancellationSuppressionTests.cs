@@ -155,7 +155,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
 
         var (replacement, _, _, _) = CreateRuntime(storage, manager);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("False|False|True", (await WaitForResponseAsync(replacement, rootId)).GetResult<string>());
         Assert.Equal(2, Volatile.Read(ref childAttempts));

@@ -155,7 +155,9 @@ idempotency.
 
 After a deactivation or a failure, the next activation replays each pending task: the
 method body runs again from the start, and every child which already completed returns
-its recorded result. A workflow resumes correctly when each replay schedules the same
+its recorded result. Replay starts once the grain's `OnActivateAsync` has completed, and
+a deactivation signals running tasks to abort before the grain's `OnDeactivateAsync`
+runs. A workflow resumes correctly when each replay schedules the same
 children, with the same IDs and arguments, in the same order.
 
 - Put each side effect in a child: a durable grain call, a local step, or a

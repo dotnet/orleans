@@ -102,6 +102,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     private TaskId[] _committingStarts = [];
     private KeyValuePair<TaskId, DurableTaskResponse>[] _committingHandleResponses = [];
     private long[] _committingCancellationPropagations = [];
+
+    // The executions which recovery found and which start once the activation has completed.
+    private List<TaskId>? _recoveredStarts;
     private Task? _stopTask;
     private long _backgroundWriteId;
     private long _cancellationPropagationId;
@@ -127,7 +130,40 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     internal void InitializeForActivation() => Volatile.Write(ref _initialized, 1);
 
-    internal Task OnActivateAsync(CancellationToken cancellationToken) => ResumePendingTasksAsync(cancellationToken);
+    /// <summary>
+    /// Recovers committed task state during the activation's lifecycle, deferring the recovered executions to
+    /// <see cref="StartRecoveredExecutions"/>.
+    /// </summary>
+    internal async Task RecoverAsync(CancellationToken cancellationToken)
+    {
+        await _resumePendingGate.WaitAsync(cancellationToken);
+        try
+        {
+            await ResumePendingTasksCoreAsync(cancellationToken);
+        }
+        finally
+        {
+            _resumePendingGate.Release();
+        }
+    }
+
+    /// <summary>Starts the executions which <see cref="RecoverAsync"/> recovered, once.</summary>
+    /// <remarks>
+    /// Runs after the grain's <c>OnActivateAsync</c> has completed, so recovered grain code observes an initialized
+    /// grain, as grain calls do. A call which reaches a recovered task first starts it, and this skips it.
+    /// </remarks>
+    internal void StartRecoveredExecutions()
+    {
+        if (Interlocked.Exchange(ref _recoveredStarts, null) is not { } starts)
+        {
+            return;
+        }
+
+        foreach (var taskId in starts)
+        {
+            StartRequest(taskId);
+        }
+    }
 
     /// <summary>
     /// Returns the candidate which completed first: the stored candidate with the lowest completion sequence, which needs
@@ -894,17 +930,11 @@ internal sealed partial class DurableTaskGrainRuntime(
         _pendingHandleResponses[taskId] = StageAcceptedResponse(taskId, state, response);
     }
 
+    /// <summary>Recovers committed task state and starts the recovered executions.</summary>
     internal async Task ResumePendingTasksAsync(CancellationToken cancellationToken)
     {
-        await _resumePendingGate.WaitAsync(cancellationToken);
-        try
-        {
-            await ResumePendingTasksCoreAsync(cancellationToken);
-        }
-        finally
-        {
-            _resumePendingGate.Release();
-        }
+        await RecoverAsync(cancellationToken);
+        StartRecoveredExecutions();
     }
 
     /// <summary>Returns whether the task stores its terminal result, without decoding the result.</summary>
@@ -918,6 +948,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private async Task ResumePendingTasksCoreAsync(CancellationToken cancellationToken)
     {
         ThrowIfStopping();
+        List<TaskId>? starts = null;
         var tasks = _storage.Tasks.ToList();
         foreach (var (taskId, state) in tasks)
         {
@@ -957,10 +988,12 @@ internal sealed partial class DurableTaskGrainRuntime(
                 continue;
             }
 
-            var executionContext = CreateExecutionContext(taskId);
-            _ = GetOrCreateRunningTaskHandle(taskId);
-            state.Request.SetTarget(_shared.GrainContextAccessor.GrainContext);
-            StartInvocation(taskId, static request => request.CreateTask(), state.Request, executionContext);
+            (starts ??= []).Add(taskId);
+        }
+
+        if (starts is not null)
+        {
+            _recoveredStarts = starts;
         }
 
         if (DeleteExpiredTasks())

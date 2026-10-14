@@ -152,6 +152,43 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         Assert.All(observations, observation => Assert.Equal(observations[0], observation));
     }
 
+    [Fact]
+    public async Task RecoveredExecutionStartsAfterTheGrainActivationCompletes()
+    {
+        const string rootId = "activation-order";
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+        _ = await grain.ObserveActivationAsync().ScheduleAsync(rootId, cancellationToken);
+        await _fixture.Probe.WaitForActivationObservationCountAsync(grainId, 1, cancellationToken);
+
+        // The next activation's OnActivateAsync yields to the work which the activation queued before it, so a recovered
+        // execution which started during the activation's lifecycle would observe the grain before its initialization.
+        await DeactivateAsync(grain, cancellationToken);
+        await _fixture.Probe.WaitForActivationObservationCountAsync(grainId, 2, cancellationToken);
+
+        Assert.Equal([true, true], _fixture.Probe.GetActivationObservations(grainId));
+        await grain.GetDurableTask<bool>(rootId).CancelAsync(cancellationToken);
+    }
+
+    [Fact]
+    public async Task DeactivationSignalsRunningExecutionsToAbortBeforeTheGrainDeactivates()
+    {
+        const string rootId = "deactivation-order";
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+        _ = await grain.ObserveDeactivationAsync().ScheduleAsync(rootId, cancellationToken);
+        await _fixture.Probe.WaitForActivationObservationCountAsync(grainId, 1, cancellationToken);
+
+        // The grain's OnDeactivateAsync waits for the running execution's abort, which the runtime would otherwise
+        // signal only after OnDeactivateAsync returns.
+        await DeactivateAsync(grain, cancellationToken);
+
+        Assert.Equal([true], _fixture.Probe.GetDeactivationObservations(grainId));
+        await grain.GetDurableTask<bool>(rootId).CancelAsync(cancellationToken);
+    }
+
     private async Task DeactivateAsync(IDurableTaskRecoveryTestGrain grain, CancellationToken cancellationToken)
     {
         var activations = _fixture.Probe.GetActivationCount(grain.GetGrainId());
@@ -167,6 +204,8 @@ public interface IDurableTaskRecoveryTestGrain : IGrainWithGuidKey
     DurableTask<DateTimeOffset> ObserveLogicalTimeAsync();
     DurableTask<int> DelayThenComputeAsync(int value);
     DurableTask<int> DelayAcrossDeactivationAsync(int value);
+    DurableTask<bool> ObserveActivationAsync();
+    DurableTask<bool> ObserveDeactivationAsync();
     Task<Guid> GetActivationIdAsync();
     Task RequestDeactivationAsync();
 }
@@ -178,7 +217,83 @@ public sealed class DurableTaskRecoveryProbe
     private readonly ConcurrentDictionary<GrainId, DurableTaskInvocationSnapshot> _invocations = [];
     private readonly ConcurrentDictionary<GrainId, int> _activations = [];
     private readonly ConcurrentDictionary<GrainId, List<DateTimeOffset>> _logicalTimes = [];
+    private readonly ConcurrentDictionary<GrainId, List<bool>> _activationObservations = [];
+    private readonly ConcurrentDictionary<GrainId, List<bool>> _deactivationObservations = [];
     private TaskCompletionSource _changed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Records whether a running durable execution was signaled to abort during the grain's deactivation.</summary>
+    public void RecordDeactivationObservation(GrainId grainId, bool aborted)
+    {
+        var values = _deactivationObservations.GetOrAdd(grainId, static _ => []);
+        lock (values)
+        {
+            values.Add(aborted);
+        }
+
+        SignalChanged();
+    }
+
+    public IReadOnlyList<bool> GetDeactivationObservations(GrainId grainId)
+    {
+        if (!_deactivationObservations.TryGetValue(grainId, out var values))
+        {
+            return [];
+        }
+
+        lock (values)
+        {
+            return [.. values];
+        }
+    }
+
+    /// <summary>Records whether a durable execution observed a fully activated grain.</summary>
+    public void RecordActivationObservation(GrainId grainId, bool activated)
+    {
+        var values = _activationObservations.GetOrAdd(grainId, static _ => []);
+        lock (values)
+        {
+            values.Add(activated);
+        }
+
+        SignalChanged();
+    }
+
+    public IReadOnlyList<bool> GetActivationObservations(GrainId grainId)
+    {
+        if (!_activationObservations.TryGetValue(grainId, out var values))
+        {
+            return [];
+        }
+
+        lock (values)
+        {
+            return [.. values];
+        }
+    }
+
+    public async Task WaitForActivationObservationCountAsync(
+        GrainId grainId,
+        int expected,
+        CancellationToken cancellationToken)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        while (GetActivationObservations(grainId).Count < expected)
+        {
+            Task changed;
+            lock (_activations)
+            {
+                if (GetActivationObservations(grainId).Count >= expected)
+                {
+                    return;
+                }
+
+                changed = _changed.Task;
+            }
+
+            await changed.WaitAsync(timeout.Token);
+        }
+    }
 
     public void RecordActivation(GrainId grainId)
     {
@@ -287,11 +402,50 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
     : DurableGrain, IDurableTaskRecoveryTestGrain
 {
     private readonly Guid _activationId = Guid.NewGuid();
+    private bool _activated;
+    private CancellationToken? _executionToken;
 
-    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
         probe.RecordActivation(this.GetGrainId());
-        return base.OnActivateAsync(cancellationToken);
+
+        // Work which the activation queued before this method, such as recovery's, runs before initialization completes.
+        await Task.Yield();
+        _activated = true;
+        await base.OnActivateAsync(cancellationToken);
+    }
+
+    public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        if (_executionToken is { } executionToken)
+        {
+            // The deactivation's token ends the wait if the execution isn't signaled while this method runs.
+            var aborted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            using (executionToken.Register(() => aborted.TrySetResult()))
+            using (cancellationToken.Register(() => aborted.TrySetResult()))
+            {
+                await aborted.Task;
+            }
+
+            probe.RecordDeactivationObservation(this.GetGrainId(), executionToken.IsCancellationRequested);
+        }
+
+        await base.OnDeactivateAsync(reason, cancellationToken);
+    }
+
+    public async DurableTask<bool> ObserveActivationAsync()
+    {
+        probe.RecordActivationObservation(this.GetGrainId(), _activated);
+        await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("wait");
+        return _activated;
+    }
+
+    public async DurableTask<bool> ObserveDeactivationAsync()
+    {
+        _executionToken = DurableExecutionContext.Current!.CancellationToken;
+        probe.RecordActivationObservation(this.GetGrainId(), _activated);
+        await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("wait");
+        return _activated;
     }
 
     public DurableTask<int> ComputeAsync(int value)
