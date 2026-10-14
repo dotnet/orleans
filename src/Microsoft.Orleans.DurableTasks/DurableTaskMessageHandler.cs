@@ -70,8 +70,8 @@ internal sealed class DurableTaskMessageHandler(
                 var signal = messageTypes.Signal.Decode(message.Envelope);
                 _ = GetSender(signal.Sender);
 
-                // A rejected signal, such as one for an unknown or terminal task or with a conflicting value, stages
-                // nothing and is dead-lettered with the rejection as its reason.
+                // A rejected signal, such as one for a terminal task or with a conflicting value, stages nothing and is
+                // dead-lettered with the rejection as its reason. A signal which precedes its invocation is recorded.
                 if (runtime.StageSignalFromInbox(signal.TaskId, signal.Name, signal.Value) is { } rejection)
                 {
                     result = DeliveryResult.DeadLettered(rejection.Message);
