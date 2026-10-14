@@ -301,7 +301,7 @@ public sealed class SelfAddressedMessageTests() : MessagingBehaviorTestBase(new 
             {
                 Kind = OutboxCommandKind.Enqueue,
                 Message = message,
-                State = new() { EnqueuedAt = Fixture.Clock.GetUtcNow() }
+                State = new()
             });
             ((IStateMachine)outbox).OnRecoveryCompleted();
         }));

@@ -6,7 +6,6 @@ using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Messaging.Configuration;
 using Orleans.Runtime;
-using Polly;
 
 namespace Orleans.Messaging;
 
@@ -23,7 +22,6 @@ internal sealed class MessagingShared
     {
         GrainType = grainType.ToString();
         Options = services.GetRequiredService<IOptions<DurableMessagingOptions>>().Value;
-        DeliveryPipeline = Options.DeliveryResiliencePipeline ?? services.GetRequiredService<DefaultDeliveryResiliencePipeline>().Pipeline;
         TimeProvider = services.GetRequiredService<TimeProvider>();
         JobTimeProvider = services.GetRequiredKeyedService<TimeProvider>(DurableJobTimeProviderNames.DurableJobs);
         JobManager = services.GetRequiredService<ILocalDurableJobManager>();
@@ -42,9 +40,6 @@ internal sealed class MessagingShared
     public string GrainType { get; }
 
     public DurableMessagingOptions Options { get; }
-
-    /// <summary>Gets the pipeline which runs each outbox delivery attempt.</summary>
-    public ResiliencePipeline DeliveryPipeline { get; }
 
     public TimeProvider TimeProvider { get; }
 

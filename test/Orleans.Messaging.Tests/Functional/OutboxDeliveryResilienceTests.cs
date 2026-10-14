@@ -1,10 +1,9 @@
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using Orleans.Messaging.Configuration;
 using Orleans.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Polly;
-using Polly.CircuitBreaker;
 using Polly.Retry;
 using Xunit;
 
@@ -27,9 +26,9 @@ public sealed class OutboxDeliveryResilienceTests
                 MaxRetryAttempts = InPipelineRetries,
                 Delay = TimeSpan.Zero,
             })
-            .AddStrategy(_ => strategy, new FaultStrategyOptions())
+            .AddStrategy(_ => strategy, new ScriptedStrategyOptions())
             .Build());
-        fixture.Strategy.FailNext(InPipelineRetries);
+        fixture.Strategy.Script(Step.Unanswered(), Step.Unanswered());
 
         var (sender, receiver) = await SendAsync(fixture, "retried-in-attempt");
 
@@ -41,13 +40,11 @@ public sealed class OutboxDeliveryResilienceTests
     }
 
     [Fact]
-    public async Task FailuresLeavingThePipeline_RetryDurablyWithoutConsumingDeliveryAttempts()
+    public async Task FailuresLeavingThePipeline_RetryInLaterBatches()
     {
-        await using var fixture = await StartAsync(static strategy => new ResiliencePipelineBuilder()
-            .AddStrategy(_ => strategy, new FaultStrategyOptions())
-            .Build());
+        await using var fixture = await StartAsync(Scripted);
         const int FailedAttempts = 3;
-        fixture.Strategy.FailNext(FailedAttempts);
+        fixture.Strategy.Script(Step.Unanswered(), Step.Unanswered(), Step.Unanswered());
 
         var (sender, receiver) = await SendAsync(fixture, "retried-durably");
 
@@ -72,35 +69,105 @@ public sealed class OutboxDeliveryResilienceTests
     }
 
     [Fact]
-    public async Task DefaultPipeline_RetriesFailedCallsAndPropagatesOpenCircuit()
+    public async Task Backpressured_RetriesBeyondEveryRetryAgeUntilTheReceiverTakesTheMessage()
     {
-        Assert.Null(new DurableMessagingOptions().DeliveryResiliencePipeline);
-        var pipeline = new DefaultDeliveryResiliencePipeline(
-            Options.Create(new SiloMessagingOptions { ResponseTimeout = TimeSpan.FromMilliseconds(100) }),
-            TimeProvider.System).Pipeline;
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var retryAge = TimeSpan.FromMilliseconds(100);
+        await using var fixture = await StartAsync(Scripted, options =>
+        {
+            options.MaxOutboxRetryAge = retryAge;
+            options.MaxHandlerNotFoundRetryAge = retryAge;
+        });
+        const int BackpressuredAttempts = 8;
+        fixture.Strategy.Script(Enumerable.Repeat(Step.Answer(DeliveryResult.Backpressured()), BackpressuredAttempts).ToArray());
+        var elapsed = Stopwatch.StartNew();
 
-        var calls = 0;
-        var result = await pipeline.ExecuteAsync(
-            _ => ++calls == 1 ? throw new IOException("Injected outage.") : ValueTask.FromResult(DeliveryResult.Accepted()),
-            cancellationToken);
-        Assert.Equal(DeliveryStatus.Accepted, result.Status);
-        Assert.Equal(2, calls);
+        var (sender, receiver) = await SendAsync(fixture, "backpressured");
 
-        calls = 0;
-        await Assert.ThrowsAsync<BrokenCircuitException>(() => pipeline.ExecuteAsync<DeliveryResult>(
-            _ =>
-            {
-                calls++;
-                throw new BrokenCircuitException();
-            },
-            cancellationToken).AsTask());
-        Assert.Equal(1, calls);
+        var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.True(elapsed.Elapsed > retryAge);
+        Assert.Equal("backpressured", Assert.Single(delivered.Effects).Value);
+        Assert.Equal(BackpressuredAttempts + 1, fixture.Strategy.Executions);
+        Assert.Empty((await fixture.WaitForOutboxCountAsync(sender, 0)).OutboxDeadLetters);
     }
 
-    private static async Task<DeliveryResilienceClusterFixture> StartAsync(Func<FaultStrategy, ResiliencePipeline> createPipeline)
+    [Fact]
+    public async Task UnansweredAttempts_DeadLetterAfterMaxOutboxRetryAge()
     {
-        var fixture = new DeliveryResilienceClusterFixture(createPipeline);
+        await using var fixture = await StartAsync(Scripted, static options => options.MaxOutboxRetryAge = TimeSpan.FromMilliseconds(100));
+        fixture.Strategy.Repeat(Step.Unanswered());
+
+        var (sender, receiver) = await SendAsync(fixture, "unanswered");
+
+        var deadLetter = Assert.Single((await fixture.WaitForDeadLetterCountAsync(sender, 1)).OutboxDeadLetters);
+        Assert.True(deadLetter.AttemptCount > 1);
+        Assert.Equal(fixture.Strategy.Executions, deadLetter.AttemptCount);
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+    }
+
+    [Fact]
+    public async Task AReceiverAnswer_RestartsTheUnansweredRetryAge()
+    {
+        // Each unanswered span stays within the retry age, while both spans together exceed it.
+        var timeout = TimeSpan.FromMilliseconds(1600);
+        await using var fixture = await StartAsync(Scripted, static options =>
+        {
+            options.MaxOutboxRetryAge = TimeSpan.FromSeconds(3);
+            options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(1);
+        });
+        fixture.Strategy.Script(Step.Unanswered(timeout), Step.Answer(DeliveryResult.Backpressured()), Step.Unanswered(timeout));
+
+        var (sender, receiver) = await SendAsync(fixture, "answered-between-outages");
+
+        var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal("answered-between-outages", Assert.Single(delivered.Effects).Value);
+        Assert.Equal(4, fixture.Strategy.Executions);
+        Assert.Empty((await fixture.WaitForOutboxCountAsync(sender, 0)).OutboxDeadLetters);
+    }
+
+    [Fact]
+    public async Task HandlerNotFound_DeadLettersAfterMaxHandlerNotFoundRetryAge()
+    {
+        await using var fixture = await StartAsync(Scripted, static options => options.MaxHandlerNotFoundRetryAge = TimeSpan.FromMilliseconds(100));
+        fixture.Strategy.Repeat(Step.Answer(DeliveryResult.HandlerNotFound()));
+
+        var (sender, receiver) = await SendAsync(fixture, "unhandled");
+
+        var deadLetter = Assert.Single((await fixture.WaitForDeadLetterCountAsync(sender, 1)).OutboxDeadLetters);
+        Assert.True(deadLetter.AttemptCount > 1);
+        Assert.Equal(DeliveryResult.HandlerNotFound().Message, deadLetter.Reason);
+        Assert.Empty((await receiver.GetSnapshotAsync()).Effects);
+    }
+
+    [Fact]
+    public async Task AnotherReceiverAnswer_RestartsTheHandlerNotFoundRetryAge()
+    {
+        await using var fixture = await StartAsync(Scripted, static options =>
+        {
+            options.MaxHandlerNotFoundRetryAge = TimeSpan.FromMilliseconds(400);
+            options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(1);
+        });
+        fixture.Strategy.Script(
+            Step.Answer(DeliveryResult.HandlerNotFound()),
+            Step.Answer(DeliveryResult.Backpressured(), TimeSpan.FromMilliseconds(600)),
+            Step.Answer(DeliveryResult.HandlerNotFound()));
+
+        var (sender, receiver) = await SendAsync(fixture, "handler-registered");
+
+        var delivered = await fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal("handler-registered", Assert.Single(delivered.Effects).Value);
+        Assert.Equal(4, fixture.Strategy.Executions);
+        Assert.Empty((await fixture.WaitForOutboxCountAsync(sender, 0)).OutboxDeadLetters);
+    }
+
+    private static ResiliencePipeline Scripted(ScriptedStrategy strategy) => new ResiliencePipelineBuilder()
+        .AddStrategy(_ => strategy, new ScriptedStrategyOptions())
+        .Build();
+
+    private static async Task<DeliveryResilienceClusterFixture> StartAsync(
+        Func<ScriptedStrategy, ResiliencePipeline> createPipeline,
+        Action<DurableMessagingOptions>? configure = null)
+    {
+        var fixture = new DeliveryResilienceClusterFixture(createPipeline, configure);
         await fixture.InitializeAsync();
         return fixture;
     }
@@ -116,29 +183,45 @@ public sealed class OutboxDeliveryResilienceTests
         return (sender, receiver);
     }
 
-    private sealed class DeliveryResilienceClusterFixture(Func<FaultStrategy, ResiliencePipeline> createPipeline)
+    private sealed class DeliveryResilienceClusterFixture(
+        Func<ScriptedStrategy, ResiliencePipeline> createPipeline,
+        Action<DurableMessagingOptions>? configure)
         : MessagingClusterFixture(initialSilos: 1)
     {
-        public FaultStrategy Strategy { get; } = new();
+        public ScriptedStrategy Strategy { get; } = new();
 
         protected override void ConfigureOptions(DurableMessagingOptions options)
         {
             base.ConfigureOptions(options);
-            options.MaxDeliveryAttempts = 1;
             options.BackpressureRetryDelay = TimeSpan.FromMilliseconds(5);
             options.DeliveryResiliencePipeline = createPipeline(Strategy);
+            configure?.Invoke(options);
         }
     }
 
-    /// <summary>Fails a configured number of tries before calling the receiver.</summary>
-    private sealed class FaultStrategy : ResilienceStrategy
+    /// <summary>A scripted outcome of one try: a receiver answer, or a failure without an answer.</summary>
+    private readonly record struct Step(DeliveryResult? Result, TimeSpan Delay)
     {
-        private int _failures;
+        public static Step Answer(DeliveryResult result, TimeSpan delay = default) => new(result, delay);
+
+        public static Step Unanswered(TimeSpan delay = default) => new(null, delay);
+    }
+
+    /// <summary>Plays scripted steps in place of calling the receiver, then repeats a step or calls the receiver.</summary>
+    private sealed class ScriptedStrategy : ResilienceStrategy
+    {
+        private readonly ConcurrentQueue<Step> _steps = new();
+        private Step? _then;
         private int _executions;
 
         public int Executions => Volatile.Read(ref _executions);
 
-        public void FailNext(int count) => Volatile.Write(ref _failures, count);
+        public void Script(params Step[] steps)
+        {
+            foreach (var step in steps) _steps.Enqueue(step);
+        }
+
+        public void Repeat(Step step) => _then = step;
 
         protected override ValueTask<Outcome<TResult>> ExecuteCore<TResult, TState>(
             Func<ResilienceContext, TState, ValueTask<Outcome<TResult>>> callback,
@@ -146,11 +229,31 @@ public sealed class OutboxDeliveryResilienceTests
             TState state)
         {
             Interlocked.Increment(ref _executions);
-            return Interlocked.Decrement(ref _failures) >= 0
-                ? ValueTask.FromResult(Outcome.FromException<TResult>(new TimeoutException("Injected delivery failure.")))
-                : callback(context, state);
+            if (!_steps.TryDequeue(out var step))
+            {
+                if (_then is not { } then)
+                {
+                    return callback(context, state);
+                }
+
+                step = then;
+            }
+
+            return PlayAsync<TResult>(step, context.CancellationToken);
+        }
+
+        private static async ValueTask<Outcome<TResult>> PlayAsync<TResult>(Step step, CancellationToken cancellationToken)
+        {
+            if (step.Delay > TimeSpan.Zero)
+            {
+                await Task.Delay(step.Delay, cancellationToken);
+            }
+
+            return step.Result is { } result
+                ? Outcome.FromResult((TResult)(object)result)
+                : Outcome.FromException<TResult>(new TimeoutException("Injected delivery failure."));
         }
     }
 
-    private sealed class FaultStrategyOptions : ResilienceStrategyOptions;
+    private sealed class ScriptedStrategyOptions : ResilienceStrategyOptions;
 }

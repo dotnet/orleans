@@ -35,8 +35,13 @@ internal sealed class OutboxMessageState
     [Id(2)]
     public string? LastError { get; set; }
 
+    /// <summary>Gets or sets when the first delivery attempt without a receiver answer started, since the receiver last answered.</summary>
     [Id(3)]
-    public DateTimeOffset? EnqueuedAt { get; set; }
+    public DateTimeOffset? UnansweredSince { get; set; }
+
+    /// <summary>Gets or sets when the receiver first reported no inbox handler, since it last answered otherwise.</summary>
+    [Id(4)]
+    public DateTimeOffset? HandlerNotFoundSince { get; set; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetter")]

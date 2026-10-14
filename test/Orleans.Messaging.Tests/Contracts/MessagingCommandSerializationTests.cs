@@ -72,7 +72,7 @@ public sealed class MessagingCommandSerializationTests
         Assert.Null(JsonSerializer.Deserialize(immediateJson, InboxJsonContext.Default.InboxCommand)!.Message!.Value.Envelope.DeliverAt);
         Assert.Null(serializer.Deserialize(serializer.SerializeToArray(immediate))!.Message!.Value.Envelope.DeliverAt);
         Assert.DoesNotContain("DeliverAt",
-            JsonSerializer.Serialize(new OutboxCommand { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("immediate"), State = new() { EnqueuedAt = Now } },
+            JsonSerializer.Serialize(new OutboxCommand { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("immediate"), State = new() },
                 OutboxJsonContext.Default.OutboxCommand),
             StringComparison.Ordinal);
     }
@@ -80,7 +80,7 @@ public sealed class MessagingCommandSerializationTests
     [Fact]
     public void ReferenceEnqueue_CarriesNoMessageInJsonAndOrleansSerialization()
     {
-        var command = new OutboxCommand { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() { EnqueuedAt = Now } };
+        var command = new OutboxCommand { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() };
         using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
         var serializer = services.GetRequiredService<Serializer<OutboxCommand>>();
 
@@ -145,10 +145,10 @@ public sealed class MessagingCommandSerializationTests
         var deadLetter = new OutboxDeadLetter { Message = OutboxMessage("dead"), DeadLetteredAt = Now, Reason = "rejected", AttemptCount = 3 };
         return
         [
-            new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("enqueue"), State = new() { EnqueuedAt = Now } },
-            new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("scheduled", Now), State = new() { EnqueuedAt = Now } },
-            new() { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() { EnqueuedAt = Now } },
-            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", EnqueuedAt = Now } },
+            new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("enqueue"), State = new() },
+            new() { Kind = OutboxCommandKind.Enqueue, Message = OutboxMessage("scheduled", Now), State = new() },
+            new() { Kind = OutboxCommandKind.Enqueue, Reference = Reference("reference"), State = new() },
+            new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom", UnansweredSince = Now, HandlerNotFoundSince = Now } },
             new() { Kind = OutboxCommandKind.Delivery, MessageId = MessageId.Create("orders", "dead"), DeadLetter = deadLetter },
             new() { Kind = OutboxCommandKind.RemoveDeadLetters, RemovedDeadLetters = [MessageId.Create("orders", "dead")] },
             new()
@@ -158,8 +158,8 @@ public sealed class MessagingCommandSerializationTests
                 {
                     Messages =
                     [
-                        new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, EnqueuedAt = Now } },
-                        new() { Reference = Reference("pending-reference"), State = new() { AttemptCount = 2, EnqueuedAt = Now } }
+                        new() { Message = OutboxMessage("pending", Now), State = new() { AttemptCount = 1, UnansweredSince = Now } },
+                        new() { Reference = Reference("pending-reference"), State = new() { AttemptCount = 2, HandlerNotFoundSince = Now } }
                     ],
                     DeadLetters = [deadLetter]
                 }

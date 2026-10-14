@@ -75,7 +75,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
         try
         {
-            Emit(new() { Kind = OutboxCommandKind.Enqueue, Message = message, State = new() { EnqueuedAt = TimeProvider.GetUtcNow() } });
+            Emit(new() { Kind = OutboxCommandKind.Enqueue, Message = message, State = new() });
             Shared.Instruments.OnOutboxMessageSent(Shared.GrainType);
         }
         catch (Exception exception)
@@ -110,7 +110,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             {
                 Kind = OutboxCommandKind.Enqueue,
                 Reference = new() { MessageId = messageId },
-                State = new() { EnqueuedAt = TimeProvider.GetUtcNow() }
+                State = new()
             });
             _messages[messageId].Source = source;
             Shared.Instruments.OnOutboxMessageSent(Shared.GrainType);
@@ -222,10 +222,6 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 EnvelopeValidation.ValidateMessageId(key);
             }
 
-            if (entry.State.EnqueuedAt is null)
-            {
-                throw new InvalidOperationException("A recovered outbox message requires its enqueue time.");
-            }
             if (key != entry.MessageId)
             {
                 throw new InvalidOperationException("The recovered outbox key does not match its command identity.");
@@ -328,17 +324,17 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
 
     private async Task<DeliveryOutcome> DeliverAsync(OutboxEntry entry, OutboxMessage message, CancellationToken cancellationToken)
     {
-        if (entry.State.EnqueuedAt is { } enqueuedAt
-            && MessagingTime.IsExpired(TimeProvider.GetUtcNow(), enqueuedAt, Options.MaxOutboxRetryAge))
+        var startedAt = TimeProvider.GetUtcNow();
+        if (IsRetryExpired(entry.State, startedAt))
         {
-            return new(entry, message, null, $"The message exceeded the maximum retry age of {Options.MaxOutboxRetryAge}.", TimeSpan.Zero, true);
+            return new(entry, message, null, $"The receiver did not answer delivery attempts within {Options.MaxOutboxRetryAge}.", TimeSpan.Zero, startedAt, true);
         }
         var start = Stopwatch.GetTimestamp();
         try
         {
             var target = Shared.GrainFactory.GetGrain<IMessagingExtension>(message.ReceiverId);
             var inboxMessage = message.ToInboxMessage();
-            var pipeline = Shared.DeliveryPipeline;
+            var pipeline = Options.DeliveryResiliencePipeline;
             DeliveryResult result;
             if (ReferenceEquals(pipeline, ResiliencePipeline.Empty))
             {
@@ -361,11 +357,11 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 }
             }
 
-            return new(entry, message, result, null, Stopwatch.GetElapsedTime(start), false);
+            return new(entry, message, result, null, Stopwatch.GetElapsedTime(start), startedAt, false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return new(entry, message, null, "Delivery was canceled.", Stopwatch.GetElapsedTime(start), false);
+            return new(entry, message, null, "Delivery was canceled.", Stopwatch.GetElapsedTime(start), startedAt, false);
         }
         catch (Exception exception)
         {
@@ -373,7 +369,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             {
                 LogDeliveryError(Logger, exception, message.Envelope.MessageId, message.ReceiverId);
             }
-            return new(entry, message, null, exception.ToString(), Stopwatch.GetElapsedTime(start), false);
+            return new(entry, message, null, exception.ToString(), Stopwatch.GetElapsedTime(start), startedAt, false);
         }
     }
 
@@ -561,17 +557,28 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         var previous = outcome.Entry.State;
         var status = outcome.Result?.Status;
         var now = TimeProvider.GetUtcNow();
-        // Receivers answer counted attempts; failed calls, such as those during an outage, retry until the message expires.
-        var answered = outcome.Result is not null;
-        var attemptCount = answered ? checked(previous.AttemptCount + 1) : previous.AttemptCount;
+        var attemptCount = outcome.Expired ? previous.AttemptCount : checked(previous.AttemptCount + 1);
+
+        // A receiver checks its deduplication records before it answers, so an answer proves that no earlier attempt was
+        // accepted. Only attempts since the receiver last answered can have been accepted, which bounds their retry by
+        // MaxOutboxRetryAge, within the receiver's deduplication window.
+        var unansweredSince = outcome.Result is null ? previous.UnansweredSince ?? outcome.StartedAt : (DateTimeOffset?)null;
+        var handlerNotFoundSince = status switch
+        {
+            null => previous.HandlerNotFoundSince,
+            DeliveryStatus.HandlerNotFound => previous.HandlerNotFoundSince ?? outcome.StartedAt,
+            _ => null
+        };
         var error = outcome.Error ?? status switch
         {
             DeliveryStatus.Backpressured => "The receiver is backpressured.",
             DeliveryStatus.HandlerNotFound => outcome.Result?.Message ?? "The receiver has no registered inbox handler.",
             _ => $"Unexpected delivery status '{status}'."
         };
-        if (outcome.Expired || answered && attemptCount >= Options.MaxDeliveryAttempts
-            || MessagingTime.IsExpired(now, previous.EnqueuedAt!.Value, Options.MaxOutboxRetryAge))
+        if (outcome.Expired
+            || status is not (null or DeliveryStatus.Backpressured or DeliveryStatus.HandlerNotFound)
+            || status is DeliveryStatus.HandlerNotFound && MessagingTime.IsExpired(now, handlerNotFoundSince!.Value, Options.MaxHandlerNotFoundRetryAge)
+            || unansweredSince is { } since && MessagingTime.IsExpired(now, since, Options.MaxOutboxRetryAge))
         {
             var letter = new OutboxDeadLetter
             {
@@ -583,12 +590,15 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             AddDeadLetter(ref deadLetters, letter);
             return (null, letter);
         }
-        var exponent = answered ? Math.Min(attemptCount - 1, DurableMessagingOptions.MaximumBackoffExponent) : DurableMessagingOptions.MaximumBackoffExponent;
+
+        // Failed attempts return to the outbox with a durable backoff, so later batches deliver other messages meanwhile.
+        var exponent = Math.Min(attemptCount - 1, DurableMessagingOptions.MaximumBackoffExponent);
         return (new OutboxMessageState
         {
             AttemptCount = attemptCount,
             LastError = error,
-            EnqueuedAt = previous.EnqueuedAt,
+            UnansweredSince = unansweredSince,
+            HandlerNotFoundSince = handlerNotFoundSince,
             NextAttemptAt = MessagingTime.AddClamped(now, TimeSpan.FromTicks(Options.BackpressureRetryDelay.Ticks * (1L << exponent)))
         }, null);
     }
@@ -623,7 +633,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 LogDeliveryBackpressured(Logger, message.Envelope.MessageId, message.ReceiverId);
                 break;
             case DeliveryStatus.HandlerNotFound:
-                if (Logger.IsEnabled(LogLevel.Warning))
+                if (Logger.IsEnabled(LogLevel.Error))
                 {
                     LogDeliveryHandlerNotFound(Logger, message.Envelope.MessageId, message.ReceiverId, outcome.Result?.Message);
                 }
@@ -637,14 +647,16 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         }
     }
 
+    private bool IsRetryExpired(OutboxMessageState state, DateTimeOffset now) =>
+        state.UnansweredSince is { } since && MessagingTime.IsExpired(now, since, Options.MaxOutboxRetryAge);
+
     private bool IsReadyForAttempt(OutboxMessageState state, DateTimeOffset now) =>
-        state.EnqueuedAt is { } enqueuedAt && MessagingTime.IsExpired(now, enqueuedAt, Options.MaxOutboxRetryAge)
-        || state.NextAttemptAt is null || state.NextAttemptAt <= now;
+        IsRetryExpired(state, now) || state.NextAttemptAt is null || state.NextAttemptAt <= now;
 
     private DateTimeOffset GetNextAttemptAt(OutboxMessageState state, DateTimeOffset now)
     {
         var retryAt = state.NextAttemptAt ?? now;
-        var expiresAt = state.EnqueuedAt is { } enqueuedAt ? MessagingTime.AddClamped(enqueuedAt, Options.MaxOutboxRetryAge) : retryAt;
+        var expiresAt = state.UnansweredSince is { } since ? MessagingTime.AddClamped(since, Options.MaxOutboxRetryAge) : retryAt;
         return retryAt <= expiresAt ? retryAt : expiresAt;
     }
 
@@ -704,7 +716,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     [LoggerMessage(Level = LogLevel.Debug, Message = "Delivered message {MessageId} to {ReceiverId} (Status: {Status})")]
     private static partial void LogMessageDelivered(ILogger logger, MessageId messageId, GrainId receiverId, DeliveryStatus status);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "No inbox handler for message {MessageId} to {ReceiverId}: {Message}")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "No inbox handler for message {MessageId} to {ReceiverId}: {Message}")]
     private static partial void LogDeliveryHandlerNotFound(ILogger logger, MessageId messageId, GrainId receiverId, string? message);
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Backpressured delivering message {MessageId} to {ReceiverId}, will retry later")]
@@ -728,5 +740,12 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     [LoggerMessage(Level = LogLevel.Information, Message = "Outbox delivery complete: {DeliveredCount} delivered, {BackpressuredCount} backpressured, {FailedCount} failed, {RemainingCount} remaining")]
     private static partial void LogDeliveryComplete(ILogger logger, int deliveredCount, int backpressuredCount, int failedCount, int remainingCount);
 
-    private readonly record struct DeliveryOutcome(OutboxEntry Entry, OutboxMessage Message, DeliveryResult? Result, string? Error, TimeSpan Duration, bool Expired);
+    private readonly record struct DeliveryOutcome(
+        OutboxEntry Entry,
+        OutboxMessage Message,
+        DeliveryResult? Result,
+        string? Error,
+        TimeSpan Duration,
+        DateTimeOffset StartedAt,
+        bool Expired);
 }
