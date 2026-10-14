@@ -21,11 +21,11 @@ A durable task body waits for the same `DurableSignal<T>` inside a loop.
 
 Each signal name of a task holds the first value which a sender delivers, so every wait for that name returns the same value. A loop which waits once per iteration derives a distinct signal for each iteration.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
-Wait for `signal.For(name)`, with a name which identifies the iteration, and send to the same derived signal. For signal semantics, see [Signals](../grains/durable-tasks.md#signals).
+Wait for `signal.For(name)`, with a name which identifies the iteration, and send to the same derived signal. For signal semantics, see [Signals](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#signals).
 
 ## When to suppress
 
