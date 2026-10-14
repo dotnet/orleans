@@ -18,9 +18,9 @@ public sealed class GarnetJournalStorageOptionsTests
     private static readonly Dictionary<string, Action<GarnetJournalStorageOptions>> InvalidOptionsByReason = new()
     {
         ["no MetaStore"] = options => options.MetaStore = null,
-        ["no HostId"] = options => options.HostId = " ",
+        ["empty HostId"] = options => options.HostId = " ",
         ["bucket count"] = options => options.BucketCount = 3,
-        ["invalid initial map"] = options => options.InitialRangeMap = new RangeMap(4, [], [], RangeMap.CreateUniform(4, [new(new PartitionId("p0"), new PartitionHosting("h", 0, "p0"))]).Partitions),
+        ["invalid initial map"] = options => options.InitialRangeMap = new RangeMap("map", 4, [], [], RangeMap.CreateUniform(4, [new(new PartitionId("p0"), new PartitionHosting("h", 0, "p0"))]).Partitions),
         ["compaction threshold"] = options => options.CompactionThresholdBytes = -1,
         ["operation timeout"] = options => options.OperationTimeout = TimeSpan.Zero,
         ["log memory size"] = options => options.LogMemorySize = "",

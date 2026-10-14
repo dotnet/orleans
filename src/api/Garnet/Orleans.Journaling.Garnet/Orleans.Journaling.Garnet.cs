@@ -124,8 +124,10 @@ namespace Orleans.Journaling.Ranges
     {
     }
 
-    public sealed partial record RangeMap(int BucketCount, System.Collections.Immutable.ImmutableArray<RangeAssignment> Ranges, System.Collections.Immutable.ImmutableArray<Migration> Migrations, System.Collections.Immutable.ImmutableSortedDictionary<PartitionId, PartitionHosting> Partitions)
+    public sealed partial record RangeMap(string Id, int BucketCount, System.Collections.Immutable.ImmutableArray<RangeAssignment> Ranges, System.Collections.Immutable.ImmutableArray<Migration> Migrations, System.Collections.Immutable.ImmutableSortedDictionary<PartitionId, PartitionHosting> Partitions)
     {
+        public static string CreateId() { throw null; }
+
         public static RangeMap CreateUniform(int bucketCount, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<PartitionId, PartitionHosting>> partitions) { throw null; }
 
         public bool Equals(RangeMap? other) { throw null; }
