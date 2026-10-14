@@ -334,6 +334,15 @@ public struct ConfiguredDurableTask
     public ValueTask CancelAsync(CancellationToken cancellationToken = default)
         => _core.GetHandle().CancelAsync(cancellationToken);
 
+    /// <summary>Requests durable cancellation carrying <paramref name="reason"/>.</summary>
+    /// <param name="reason">
+    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// <see langword="null"/> for none. The first request determines the reason.
+    /// </param>
+    /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken = default)
+        => _core.GetHandle().CancelAsync(reason, cancellationToken);
+
     /// <summary>Polls the task and returns its current status.</summary>
     public async Task<DurableTaskStatus> PollAsync(
         PollingOptions options = default,
@@ -382,6 +391,15 @@ public struct ConfiguredDurableTask<TResult>
     /// <summary>Requests durable cancellation.</summary>
     public ValueTask CancelAsync(CancellationToken cancellationToken = default)
         => _core.GetHandle().CancelAsync(cancellationToken);
+
+    /// <summary>Requests durable cancellation carrying <paramref name="reason"/>.</summary>
+    /// <param name="reason">
+    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// <see langword="null"/> for none. The first request determines the reason.
+    /// </param>
+    /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken = default)
+        => _core.GetHandle().CancelAsync(reason, cancellationToken);
 
     /// <summary>Polls the task and returns its current status.</summary>
     public async Task<DurableTaskStatus> PollAsync(
