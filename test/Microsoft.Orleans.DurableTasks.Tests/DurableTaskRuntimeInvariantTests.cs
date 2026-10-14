@@ -2126,6 +2126,92 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task OnceCommitsItsRecordWithTheNextWriteAndReplayReturnsItWithoutRunningTheEffect() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root");
+        var effectId = TaskId.Parse("root/$once:effect");
+        var runs = 0;
+        var observed = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async _ =>
+            {
+                var value = DurableTask.Once("effect", () => 40 + Interlocked.Increment(ref runs));
+                observed.TrySetResult(value);
+                await DurableTask.Delay(TimeSpan.FromDays(1));
+                return value;
+            }));
+
+        // The record stages without a write of its own, and commits with the delay's write.
+        manager.BeforeWrite = () =>
+        {
+            if (storage.Contains(effectId))
+            {
+                Assert.True(storage.Contains(TaskId.Parse("root/$child-1")));
+            }
+        };
+        runtime.ScheduleFromInbox(taskId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(41, await observed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        await transport.ResumeSent.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(41, storage.Get(effectId).Result!.GetResult<int>());
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        observed = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var (replacement, _, _, _) = CreateRuntime(storage, manager);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(41, await observed.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.Equal(1, runs);
+        await replacement.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    });
+
+    [Fact]
+    public Task OnceOffTheActivationSchedulerFails() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/local");
+        var runs = 0;
+
+        var handle = await runtime.ScheduleChildAsync(
+            taskId,
+            DurableTask.Run(async token =>
+            {
+                await Task.Delay(1, token).ConfigureAwait(false);
+                return DurableTask.Once("effect", () => ++runs);
+            }),
+            TestContext.Current.CancellationToken);
+        var response = await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.IsType<InvalidOperationException>(response.Exception);
+        Assert.Equal(0, runs);
+        Assert.False(storage.Contains(TaskId.Parse("root/local/$once:effect")));
+    });
+
+    [Fact]
+    public Task OnceUnderAnIdentifierRecordedForAnotherOperationDiverges() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var taskId = TaskId.Parse("root/local");
+        var effectId = TaskId.Parse("root/local/$once:effect");
+        storage.SetRequestFingerprint(effectId, storage.GetOrCreate(effectId), "$detach:other");
+        var runs = 0;
+
+        var handle = await runtime.ScheduleChildAsync(
+            taskId,
+            DurableTask.Run(_ => DurableTask.Once("effect", () => ++runs)),
+            TestContext.Current.CancellationToken);
+        var response = await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
+        Assert.Contains("a DurableTask.Once effect", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, runs);
+    });
+
+    [Fact]
     public Task LocalStepAwaitingADelayCommitsItsRecordWithTheDelay() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();

@@ -290,6 +290,12 @@ framework assets; its first published version establishes the compatibility base
   it commits in the same journal write as the journaled state which that code
   changed, whichever operation requests the write. A replay which returns the
   recorded result therefore finds those changes applied once.
+- A `DurableTask.Once` effect runs on the activation, and its outcome is recorded
+  as a terminal entry of the execution's tree, `{taskId}/$once:{name}`, staged in
+  the same work item as the journaled state the effect changed. Both commit in the
+  next journal write, and a replay returns the recorded outcome without running
+  the effect. The record is deleted with the tree. Code which continues off the
+  activation, for example after `ConfigureAwait(false)`, can't record effects.
 - Recovery precedes new execution. Child identifiers, selection decisions, and
   outbound durable messages remain replay-stable. A replay which schedules another
   operation under a recorded identifier fails with an error which names the

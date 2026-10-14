@@ -48,11 +48,11 @@ namespace Orleans.DurableTasks.Runtime;
 /// doesn't decode the result, and activation never decodes stored results.
 /// </para>
 /// <para>
-/// An invoked task, which was scheduled as a request, owns an execution tree: the task and its descendants which are not
-/// invoked tasks themselves, such as local children, delays, completion decisions, detach markers, and remote-child stubs. Task
-/// identifiers are chosen by callers, so an invoked descendant keeps its own lifecycle. Once an invoked task is terminal
-/// and no completion is pending, the runtime deletes its execution tree: in the write which retires its last completion
-/// as delivered, because that destination durably holds the result, or otherwise once
+/// An invoked task, which was scheduled as a request, owns an execution tree: the task and its descendants which are
+/// not invoked tasks themselves, such as local children, delays, completion decisions, detach markers, effect records,
+/// and remote-child stubs. Task identifiers are chosen by callers, so an invoked descendant keeps its own lifecycle.
+/// Once an invoked task is terminal and no completion is pending, the runtime deletes its execution tree: in the write
+/// which retires its last completion as delivered, because that destination durably holds the result, or otherwise once
 /// <see cref="Orleans.Configuration.DurableTaskOptions.ResultRetentionPeriod"/> has elapsed since completion or since a
 /// completion was dead-lettered. A task without a stored ancestor, such as a remote child scheduled outside a durable
 /// execution, is deleted on the same retention schedule. Deleting a tree cancels its non-terminal tasks: it stages a
@@ -364,6 +364,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(DetachMarkerFingerprintPrefix, StringComparison.Ordinal) => "a detached task's start",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalSendFingerprintPrefix, StringComparison.Ordinal) => "a signal's send",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal) => "a signal's value",
+        { RequestFingerprint: EffectFingerprint } => "a DurableTask.Once effect",
         { RequestFingerprint: { } fingerprint } => $"a request ({AbbreviateFingerprint(fingerprint)})",
         { CancellationRequestedAt: not null, CompletedAt: null } => "a cancellation which arrived before its request",
         _ => "a local child task",
@@ -717,6 +718,81 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     // Fingerprints of operations in an execution tree begin with '$', so they never equal a hexadecimal request fingerprint.
+    private const string EffectFingerprint = "$once";
+
+    /// <summary>
+    /// Returns the outcome which <paramref name="effectId"/> records, or runs <paramref name="effect"/> and stages a
+    /// record of its outcome, without writing.
+    /// </summary>
+    /// <remarks>
+    /// The caller runs on the activation, so the record and the state changes which the effect made are staged in the
+    /// same work item and commit in the next journal write, whichever operation requests it. The record is a terminal
+    /// entry of the execution's tree and is deleted with the tree. The outcome is serialized as task results are, and a
+    /// result which doesn't serialize is recorded and returned as that failure, so every run observes the same failure.
+    /// </remarks>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A result which can't be recorded is recorded as that failure.")]
+    DurableTaskResponse IDurableTaskGrainRuntime.RunEffect<TState>(
+        TaskId effectId,
+        TState state,
+        Func<TState, DurableTaskResponse> effect)
+    {
+        ThrowIfStopping();
+        if (_storage.TryGetTask(effectId, out var record))
+        {
+            if (!string.Equals(record.RequestFingerprint, EffectFingerprint, StringComparison.Ordinal)
+                || record.Result is not { IsCompleted: true } outcome)
+            {
+                throw CreateDivergenceException(
+                    $"Durable child task '{effectId}' is already associated with a different operation.",
+                    record,
+                    "a DurableTask.Once effect");
+            }
+
+            return outcome;
+        }
+
+        var response = effect(state);
+        record = _storage.GetOrCreateTask(effectId, request: null);
+        _storage.SetRequestFingerprint(effectId, record, EffectFingerprint);
+        try
+        {
+            _storage.SetResponse(effectId, record, response);
+        }
+        catch (Exception exception) when (response.Exception is null)
+        {
+            response = DurableTaskResponse.FromException(exception);
+            _storage.SetResponse(effectId, record, response);
+        }
+
+        return response;
+    }
+
+    /// <remarks>
+    /// A record of the other kind is the operation itself or, for a named combinator, which records only its inputs, a
+    /// descendant of it.
+    /// </remarks>
+    void IDurableTaskGrainRuntime.ThrowIfRecordedAsOtherKind(TaskId operationId, TaskId otherKindId, string requested)
+    {
+        if (_storage.TryGetTask(operationId, out _))
+        {
+            return;
+        }
+
+        if (!_storage.TryGetTask(otherKindId, out var recorded))
+        {
+            (_, recorded) = _storage.GetChildren(otherKindId).FirstOrDefault();
+            if (recorded is null)
+            {
+                return;
+            }
+        }
+
+        throw CreateDivergenceException(
+            $"Durable task '{operationId}' uses the same name and occurrence as '{otherKindId}', which an earlier run recorded.",
+            recorded,
+            requested);
+    }
+
     private const string DetachMarkerFingerprintPrefix = "$detach:";
 
     private string GetDetachMarkerFingerprint(TaskId rootId, GrainId target, IDurableTaskRequest request)
@@ -2128,8 +2204,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>Returns whether a task was scheduled as a request, so it owns its execution tree.</summary>
     /// <remarks>
-    /// Completion decisions, detach markers, signal records, and signal send markers record fingerprints which begin with
-    /// <c>$</c>, but they are part of their parent's tree; request fingerprints are hexadecimal.
+    /// Completion decisions, detach markers, signal records, signal send markers, and effect records have fingerprints
+    /// which begin with <c>$</c>, but they are part of their parent's tree; request fingerprints are hexadecimal.
     /// </remarks>
     private static bool IsInvoked(IDurableTaskState state) =>
         state.RequestFingerprint is { } fingerprint
