@@ -15,6 +15,8 @@ namespace Orleans.Messaging;
 /// A single loop runs on the activation scheduler and services the inbox whenever it is signaled.
 /// One durable job keeps waking the grain while the inbox holds work. Wake-ups may be early,
 /// late, or duplicated: every pass derives the work to perform from current state.
+/// The loop keeps the activation alive while a pass runs over queued work.
+/// Work which only becomes due later relies on the durable job, so the activation can be collected while it waits.
 /// </remarks>
 internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecycleObserver
 {
@@ -27,6 +29,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     private TaskCompletionSource? _nextPass;
     private Task<DurableJob>? _scheduling;
     private bool _wakeupScheduled;
+    private bool _keepingAlive;
 
     // Advances whenever a job run stops guaranteeing a future wake-up. A schedule requested in an earlier epoch may
     // belong to a job which has already run and completed, so it no longer guarantees a wake-up.
@@ -169,6 +172,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         var cancellationToken = _shutdown.Token;
         while (!cancellationToken.IsCancellationRequested)
         {
+            SetKeepAlive(Inbox.Count > 0);
             var pass = _nextPass;
             _nextPass = null;
             var progress = false;
@@ -190,11 +194,27 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
             pass?.TrySetResult();
             if (!progress)
             {
+                SetKeepAlive(false);
                 await _signal.WaitAsync().ConfigureAwait(true);
             }
         }
 
+        SetKeepAlive(false);
         _nextPass?.TrySetCanceled(cancellationToken);
+    }
+
+    private void SetKeepAlive(bool keepAlive)
+    {
+        if (keepAlive == _keepingAlive || GrainContext is not IActivationKeepAlive activation) return;
+        _keepingAlive = keepAlive;
+        if (keepAlive)
+        {
+            activation.AcquireKeepAlive();
+        }
+        else
+        {
+            activation.ReleaseKeepAlive();
+        }
     }
 
     public async Task OnStart(CancellationToken cancellationToken)
