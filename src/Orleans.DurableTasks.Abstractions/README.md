@@ -27,16 +27,21 @@ on this abstractions assembly.
   for that ID. Hosts preserve the first definition associated with an ID.
 - A host can supply an execution-abort token when constructing `DurableExecutionContext`.
   `DurableExecutionContext.CancellationToken`, which delegate and delay operations receive,
-  combines host abort and durable cancellation. Host abort lets the host drain an execution attempt
-  before replaying it in a new context; `IsCancellationRequested` and durable callbacks report the
-  durable request only. An `async DurableTask` method reads the token from
-  `DurableExecutionContext.Current`. Hosts discard responses from aborted attempts and retain the
-  task's durable state for replay.
+  combines host abort and durable cancellation. Host abort stops an execution attempt, for example
+  to drain it before replaying it in a new context, or when an operator aborts the task;
+  `IsCancellationRequested` and durable callbacks report the durable request only. An `async
+  DurableTask` method reads the token from `DurableExecutionContext.Current`. Hosts discard
+  responses from aborted attempts; a drained task replays from its durable state.
 - A wait cancellation token abandons that scheduling, polling, or wait operation. It does
   not request durable task cancellation.
-- `CancelAsync` requests durable cancellation. The request is monotonic and idempotent, and
-  hosts retain it with task state. The durable token enters the canceled state before cancellation
-  is published to durable callbacks, including callbacks registered concurrently with the request.
+- `CancelAsync` requests durable cancellation and completes once the host has recorded the request.
+  The request is monotonic and idempotent, and hosts retain it with task state. Cancellation is
+  cooperative: the durable token is canceled, `IsCancellationRequested` becomes true, the request
+  reaches the task's attached children, and the task's body decides its outcome. When the
+  cancellation escapes the body, for example from awaiting a canceled child, the task is canceled;
+  otherwise it completes with the body's result or failure. The durable token enters the canceled
+  state before cancellation is published to durable callbacks, including callbacks registered
+  concurrently with the request.
 - `RegisterCancellationCallbackAsync` establishes cancellation-operation causality. Its callbacks
   execute with their durable context ambient and participate in durable dependency and failure
   tracking. Causality flows through ordinary awaits and safe `Task.Run` dispatch. Suppressing
@@ -166,6 +171,42 @@ var approval = index == 0 ? await Approved.WaitAsync() : null;
 
 - Durable cancellation of the waiting execution cancels its wait.
 
+## Compensating canceled work
+
+A canceled workflow keeps running until its body completes, so it can undo the work it has done. Work
+which outlives the cancellation runs as a detached task, which the cancellation doesn't reach:
+
+```csharp
+public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
+{
+    await inventory.ReserveAsync(order.Id).WithId("reserve");
+    try
+    {
+        return await payment.ChargeAsync(order.Id, order.Total).WithId("charge");
+    }
+    catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+    {
+        await inventory.ReleaseAsync(order.Id).DetachAsync($"order-{order.Id:N}-release");
+        return OrderResult.Canceled;
+    }
+}
+```
+
+- Hosts terminalize leaves of a canceled task as canceled promptly: delays, children whose bodies
+  haven't started, and attached children scheduled after the request, which don't run. A child which
+  already completed keeps its recorded result, and a running child observes the request itself.
+- A replay of a canceled task observes the request from the start, so the body takes the same path.
+
+## Aborting tasks
+
+`ScheduledTask.AbortAsync(reason)` is for operators, for example when a body ignores cancellation or
+its cleanup is stuck. The host terminalizes the task and its attached descendants as failed with
+`DurableTaskAbortedException`, whose message is the reason, and signals host abort to their running
+attempts, whose responses it discards. Abort runs no task code: neither durable cancellation callbacks
+nor compensation run. Awaiting an aborted task throws `DurableTaskAbortedException`. Aborting a
+terminal task leaves it unchanged, and detached tasks, which are independent roots, are aborted
+separately.
+
 ## Writing replay-safe workflows
 
 A host replays an execution which didn't finish, for example after its grain is deactivated: the
@@ -197,7 +238,9 @@ A host derives from `DurableExecutionContext`, implements `ISchedulableTask` def
 and `IScheduledTaskHandle` handles, and persists the mapping from `TaskId` to definition,
 response, and cancellation state. The host returns the recorded response when an existing
 ID is scheduled again, records `SelectCompletionAsync` decisions, and supplies
-replay-consistent `UtcNow` values. Hosts which support detached tasks override
-`DurableExecutionContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`. Hosts which
-support signals override `DurableExecutionContext.WaitForSignalAsync`, record each task's first value
-for each signal name, and deliver signals from senders.
+replay-consistent `UtcNow` values. It runs and replays the body of a canceled task with the durable
+request applied, and terminalizes canceled leaves as canceled. Hosts which support detached tasks
+override `DurableExecutionContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`.
+Hosts which support signals override `DurableExecutionContext.WaitForSignalAsync`, record each
+task's first value for each signal name, and deliver signals from senders. Hosts which support abort
+implement `IScheduledTaskHandle.AbortAsync`.
