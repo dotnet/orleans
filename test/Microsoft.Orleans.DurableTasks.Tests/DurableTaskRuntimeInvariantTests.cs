@@ -1410,7 +1410,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Empty(transport.Completions);
 
         var (replacement, _, _, replacementTransport) = CreateRuntime(storage, manager);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         var response = await replacement.GetScheduledTaskHandle(taskId)
             .WaitAsync(TestContext.Current.CancellationToken)
             .AsTask()
@@ -1478,8 +1478,54 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.False(started.Task.IsCompleted);
         Assert.Equal(0, request.CreateTaskCallCount);
 
-        await runtime.OnActivateAsync(TestContext.Current.CancellationToken);
+        await runtime.RecoverAsync(TestContext.Current.CancellationToken);
+
+        // Recovery defers the execution until the activation has completed.
+        Assert.Equal(0, request.CreateTaskCallCount);
+
+        runtime.StartRecoveredExecutions();
+        runtime.StartRecoveredExecutions();
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(1, request.CreateTaskCallCount);
+    });
+
+    [Fact]
+    public Task RecoveredRequestWhichACallStartsFirstStartsOnce() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var stateMachine = (IStateMachine)runtime;
+        var taskId = TaskId.Parse("root/call-starts-recovered");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            started.TrySetResult();
+            await release.Task;
+        }));
+
+        stateMachine.Reset(default);
+        var state = storage.GetOrCreate(taskId);
+        storage.SetRequest(taskId, state, request);
+        storage.SetRequestFingerprint(
+            taskId,
+            state,
+            IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
+        stateMachine.OnRecoveryCompleted();
+        await runtime.RecoverAsync(TestContext.Current.CancellationToken);
+
+        // A call which reaches the recovered task before the activation completes starts it.
+        var response = await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request, TestContext.Current.CancellationToken);
+        Assert.Equal(DurableTaskStatus.Pending, response.Status);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(1, request.CreateTaskCallCount);
+
+        runtime.StartRecoveredExecutions();
+        release.SetResult();
+        var result = await runtime.GetScheduledTaskHandle(taskId)
+            .WaitAsync(TestContext.Current.CancellationToken)
+            .AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, result.Status);
         Assert.Equal(1, request.CreateTaskCallCount);
     });
 
@@ -1713,7 +1759,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         time.Advance(TimeSpan.FromHours(4));
 
         var (replacement, _, _, _) = CreateRuntime(storage, manager, timeProvider: time);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         await replacement.GetScheduledTaskHandle(rootId)
             .WaitAsync(TestContext.Current.CancellationToken)
             .AsTask()
@@ -3043,7 +3089,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         // A replacement activation replays the starter, which reaches the marker without sending the invocation again.
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var (replacement, _, _, replacementTransport) = CreateRuntime(storage, manager);
-        await replacement.OnActivateAsync(TestContext.Current.CancellationToken);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         await detached[1].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         Assert.Empty(replacementTransport.DetachedInvocations);
