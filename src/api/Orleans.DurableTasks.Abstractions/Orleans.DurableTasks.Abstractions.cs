@@ -59,6 +59,13 @@ namespace Orleans.DurableTasks
         public readonly ScheduledTaskAwaiter<TResult> GetAwaiter() { throw null; }
     }
 
+    public static partial class DetachedTaskId
+    {
+        public static string For(TaskId starterId, string segment) { throw null; }
+
+        public static string For(string segment) { throw null; }
+    }
+
     public abstract partial class DurableExecutionContext
     {
         protected DurableExecutionContext(TaskId taskId, System.Threading.CancellationToken executionAbortToken) { }
@@ -98,6 +105,8 @@ namespace Orleans.DurableTasks
 
         public override string ToString() { throw null; }
 
+        public DurableTask<(bool Received, T Value)> TryWaitAsync(System.DateTimeOffset deadline) { throw null; }
+
         public DurableTask<T> WaitAsync() { throw null; }
     }
 
@@ -127,11 +136,19 @@ namespace Orleans.DurableTasks
         public static DurableTask<TResult> Run<TState, TResult>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> function, TState state) { throw null; }
 
         protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableExecutionContext context);
+        public static DurableTask WhenAll(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
         public static DurableTask WhenAll(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
 
-        public static DurableTask<System.Collections.Generic.IReadOnlyList<TResult>> WhenAll<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+        public static DurableTask<TResult[]> WhenAll<TResult>(System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static DurableTask<TResult[]> WhenAll<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+
+        public static DurableTask<int> WhenAny(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
 
         public static DurableTask<int> WhenAny(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
+
+        public static DurableTask<(int Index, TResult Result)> WhenAny<TResult>(System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
 
         public static DurableTask<(int Index, TResult Result)> WhenAny<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
     }
