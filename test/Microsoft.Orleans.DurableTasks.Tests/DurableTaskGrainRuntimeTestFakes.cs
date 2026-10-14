@@ -75,6 +75,11 @@ internal sealed class RecordingDurableTaskMessageTransport : IDurableTaskMessage
         Cancellations.Add((sender, target, taskId));
     }
 
+    public List<(GrainId Sender, GrainId Target, TaskId TaskId, string Reason)> Aborts { get; } = [];
+
+    public void SendAbort(GrainId sender, GrainId target, TaskId taskId, string reason) =>
+        Aborts.Add((sender, target, taskId, reason));
+
     public void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime)
     {
         Resumes.Add((grainId, taskId, generation, dueTime));

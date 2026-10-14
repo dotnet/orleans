@@ -68,6 +68,22 @@ internal sealed class DurableTaskMessageTransport(
             taskId,
             new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender });
 
+    /// <remarks>
+    /// An abort is a cancellation message with its reason. Its identity differs from the task's cancellation, so an abort
+    /// which follows a cancellation is delivered rather than deduplicated against it.
+    /// </remarks>
+    public void SendAbort(GrainId sender, GrainId target, TaskId taskId, string reason) =>
+        Send(
+            messageTypes.Cancellation,
+            sender,
+            target,
+            taskId,
+            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender, AbortReason = reason },
+            CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CancellationSubject, AbortDiscriminator),
+            deliverAt: null);
+
+    private const string AbortDiscriminator = "abort";
+
     public void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(generation);

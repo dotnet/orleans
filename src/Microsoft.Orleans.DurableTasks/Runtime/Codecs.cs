@@ -391,3 +391,22 @@ internal sealed class CanceledDurableTaskResponseCopier : IDeepCopier<CanceledDu
         return result;
     }
 }
+
+/// <summary>
+/// Serializes <see cref="DurableTaskAbortedException"/>, whose abstractions assembly has no Orleans serializers, by its
+/// reason, so an aborted task's stored result and its completion keep the exception type and reason.
+/// </summary>
+[RegisterConverter]
+internal sealed class DurableTaskAbortedExceptionConverter : IConverter<DurableTaskAbortedException, DurableTaskAbortedExceptionSurrogate>
+{
+    public DurableTaskAbortedException ConvertFromSurrogate(in DurableTaskAbortedExceptionSurrogate surrogate) => new(surrogate.Reason);
+
+    public DurableTaskAbortedExceptionSurrogate ConvertToSurrogate(in DurableTaskAbortedException value) => new(value.Message);
+}
+
+[GenerateSerializer, Immutable]
+internal readonly struct DurableTaskAbortedExceptionSurrogate(string reason)
+{
+    [Id(0)]
+    public string Reason { get; } = reason;
+}
