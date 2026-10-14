@@ -83,7 +83,12 @@ internal sealed class JsonDurableLogCommandCodecService<T>(IOptions<JsonJournalO
 
     public void WriteTrimBefore(long sequence, JournalStreamWriter writer) => _inner.WriteTrimBefore(sequence, writer);
 
-    public void WriteSnapshot(long firstSequence, IReadOnlyCollection<T> items, JournalStreamWriter writer) => _inner.WriteSnapshot(firstSequence, items, writer);
+    public void WriteClear(JournalStreamWriter writer) => _inner.WriteClear(writer);
+
+    public void WriteSeal(JournalStreamWriter writer) => _inner.WriteSeal(writer);
+
+    public void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, IReadOnlyCollection<T> items, JournalStreamWriter writer) =>
+        _inner.WriteSnapshot(firstSequence, resetSequence, isSealed, items, writer);
 
     public void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer) => _inner.Apply(input, consumer);
 }
