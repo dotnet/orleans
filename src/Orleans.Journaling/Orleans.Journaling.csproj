@@ -25,6 +25,7 @@
     <InternalsVisibleTo Include="Orleans.Journaling.AzureStorage" />
     <InternalsVisibleTo Include="Orleans.Journaling.S3" />
     <InternalsVisibleTo Include="Orleans.Journaling.Redis" />
+    <InternalsVisibleTo Include="Orleans.Journaling.Cassandra" />
   </ItemGroup>
 
   <ItemGroup>
