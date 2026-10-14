@@ -198,15 +198,19 @@ namespace Orleans.Journaling
     {
         void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer);
         void WriteAppend(System.ReadOnlySpan<T> items, JournalStreamWriter writer);
-        void WriteSnapshot(long firstSequence, System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
+        void WriteClear(JournalStreamWriter writer);
+        void WriteSeal(JournalStreamWriter writer);
+        void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
         void WriteTrimBefore(long sequence, JournalStreamWriter writer);
     }
 
     public partial interface IDurableLogCommandHandler<T>
     {
         void ApplyAppend(T item);
+        void ApplyClear();
+        void ApplySeal();
         void ApplyTrimBefore(long sequence);
-        void Reset(long firstSequence, int capacityHint);
+        void Reset(long firstSequence, long resetSequence, bool isSealed, int capacityHint);
     }
 
     public partial interface IDurableLogDraft<T> : System.IDisposable
@@ -228,13 +232,17 @@ namespace Orleans.Journaling
 
         long FirstSequence { get; }
 
+        bool IsSealed { get; }
+
         T this[long sequence] { get; }
 
         long NextSequence { get; }
 
         long Append(T item);
         IDurableLogDraft<T> BeginDraft();
+        void Clear();
         System.Collections.Generic.IAsyncEnumerable<LogEvent<T>> ReadAsync(long fromSequence = 0, DurableWatchMode mode = DurableWatchMode.Committed, LogDraftId? resumeDraftId = null, System.Threading.CancellationToken cancellationToken = default);
+        void Seal();
         void TrimBefore(long sequence);
         bool TryGet(long sequence, out T item);
     }
@@ -791,7 +799,8 @@ namespace Orleans.Journaling
         Disposed = 2,
         Reset = 3,
         PreviousActivation = 4,
-        Unknown = 5
+        Unknown = 5,
+        Sealed = 6
     }
 
     [GenerateSerializer]
@@ -835,7 +844,10 @@ namespace Orleans.Journaling
         Watermark = 2,
         DraftItem = 3,
         DraftCommitted = 4,
-        DraftAbandoned = 5
+        DraftAbandoned = 5,
+        Trimmed = 6,
+        CaughtUp = 7,
+        Sealed = 8
     }
 
     [GenerateSerializer]
@@ -1114,7 +1126,11 @@ namespace Orleans.Journaling.Json
 
         public void WriteAppend(System.ReadOnlySpan<T> items, JournalStreamWriter writer) { }
 
-        public void WriteSnapshot(long firstSequence, System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer) { }
+        public void WriteClear(JournalStreamWriter writer) { }
+
+        public void WriteSeal(JournalStreamWriter writer) { }
+
+        public void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer) { }
 
         public void WriteTrimBefore(long sequence, JournalStreamWriter writer) { }
     }

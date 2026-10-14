@@ -15,9 +15,22 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     private JournalStreamWriter _writer;
     private long _firstSequence;
 
+    // The first sequence after the most recent clear. Readers positioned before it observed history which the clear replaced.
+    private long _resetSequence;
+
     // The next sequence when the most recent write was captured, and when the most recent acknowledged write was captured.
     private long _capturedSequence;
     private long _committedSequence;
+
+    // The first sequence when the most recent write was captured, and when the most recent acknowledged write was captured.
+    private long _capturedFirstSequence;
+    private long _committedFirstSequence;
+
+    // Incremented when the journal is deleted, which restarts the sequence.
+    private int _resetCount;
+    private bool _isSealed;
+    private bool _isSealCaptured;
+    private bool _isSealCommitted;
 
     // Allocated by the first draft.
     private DraftTable? _drafts;
@@ -50,6 +63,8 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     public long CommittedSequence => _committedSequence;
 
+    public bool IsSealed => _isSealed;
+
     public T this[long sequence] => TryGetIndex(sequence, out var index)
         ? _items[index]
         : throw new ArgumentOutOfRangeException(nameof(sequence), sequence, "The log does not retain an entry with this sequence number.");
@@ -79,11 +94,38 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
         _codec.WriteTrimBefore(sequence, GetWriter());
         ApplyTrimBefore(sequence);
-        SignalReaders(DurableWatchMode.Committed);
+        SignalReaders(DurableWatchMode.Staged);
+    }
+
+    public void Clear()
+    {
+        ThrowIfSealed();
+        _codec.WriteClear(GetWriter());
+        ApplyClear();
+        SignalReaders(DurableWatchMode.Staged);
+    }
+
+    public void Seal()
+    {
+        if (_isSealed)
+        {
+            return;
+        }
+
+        _codec.WriteSeal(GetWriter());
+        _isSealed = true;
+        if (_drafts is { } drafts)
+        {
+            while (drafts.Open.Count > 0)
+            {
+                CloseDraft(drafts.Open[^1], DraftOutcome.Abandoned(LogDraftAbandonReason.Sealed, message: null));
+            }
+        }
     }
 
     public IDurableLogDraft<T> BeginDraft()
     {
+        ThrowIfSealed();
         var drafts = _drafts ??= new DraftTable();
         var draft = new Draft(this, new LogDraftId(drafts.ActivationId, ++drafts.LastNumber));
         drafts.Open.Add(draft);
@@ -112,8 +154,15 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         _items.Clear();
         _firstSequence = 0;
+        _resetSequence = 0;
         _capturedSequence = 0;
         _committedSequence = 0;
+        _capturedFirstSequence = 0;
+        _committedFirstSequence = 0;
+        _isSealed = false;
+        _isSealCaptured = false;
+        _isSealCommitted = false;
+        _resetCount++;
         _writer = writer;
         if (_drafts is { } drafts)
         {
@@ -130,25 +179,28 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
     void IStateMachine.OnRecoveryCompleted()
     {
-        _capturedSequence = NextSequence;
-        _committedSequence = NextSequence;
+        _capturedSequence = _committedSequence = NextSequence;
+        _capturedFirstSequence = _committedFirstSequence = _firstSequence;
+        _isSealCaptured = _isSealCommitted = _isSealed;
         SignalReaders(DurableWatchMode.Committed);
     }
 
-    void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
-    {
-        // Entries are journaled when they are appended. Capturing records which entries this write makes durable.
-        _capturedSequence = NextSequence;
-    }
+    // Entries and commands are journaled when they are made. Capturing records which of them this write makes durable.
+    void IStateMachine.WritePendingEntries(JournalStreamWriter writer) => CaptureWrite();
 
     void IStateMachine.WriteSnapshot(JournalStreamWriter writer)
     {
-        _codec.WriteSnapshot(_firstSequence, _items, writer);
-        _capturedSequence = NextSequence;
+        _codec.WriteSnapshot(_firstSequence, _resetSequence, _isSealed, _items, writer);
+        CaptureWrite();
     }
 
     // The manager publishes the write's watermark after this callback, which wakes readers.
-    void IStateMachine.OnWriteCompleted() => _committedSequence = Math.Max(_committedSequence, _capturedSequence);
+    void IStateMachine.OnWriteCompleted()
+    {
+        _committedSequence = Math.Max(_committedSequence, _capturedSequence);
+        _committedFirstSequence = Math.Max(_committedFirstSequence, _capturedFirstSequence);
+        _isSealCommitted |= _isSealCaptured;
+    }
 
     void IDurableLogCommandHandler<T>.ApplyAppend(T item) => _items.Add(item);
 
@@ -163,21 +215,36 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         ApplyTrimBefore(sequence);
     }
 
-    void IDurableLogCommandHandler<T>.Reset(long firstSequence, int capacityHint)
+    void IDurableLogCommandHandler<T>.ApplyClear() => ApplyClear();
+
+    void IDurableLogCommandHandler<T>.ApplySeal() => _isSealed = true;
+
+    void IDurableLogCommandHandler<T>.Reset(long firstSequence, long resetSequence, bool isSealed, int capacityHint)
     {
-        if (firstSequence < 0)
+        if (resetSequence < 0 || firstSequence < resetSequence)
         {
-            throw new InvalidOperationException($"Malformed durable log snapshot: the first sequence {firstSequence} is negative.");
+            throw new InvalidOperationException(
+                $"Malformed durable log snapshot: the first sequence {firstSequence} precedes the reset sequence {resetSequence}, or the reset sequence is negative.");
         }
 
         _items.Clear();
         _items.EnsureCapacity(capacityHint);
         _firstSequence = firstSequence;
+        _resetSequence = resetSequence;
+        _isSealed = isSealed;
+    }
+
+    private void CaptureWrite()
+    {
+        _capturedSequence = NextSequence;
+        _capturedFirstSequence = _firstSequence;
+        _isSealCaptured = _isSealed;
     }
 
     // Appends the items as one journal entry, so that one write makes all of them durable.
     private long AppendRange(ReadOnlySpan<T> items)
     {
+        ThrowIfSealed();
         var sequence = NextSequence;
         if (!items.IsEmpty)
         {
@@ -187,6 +254,23 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         }
 
         return sequence;
+    }
+
+    // The clear consumes one sequence number, so a reader's position shows whether it observed the replaced history.
+    private void ApplyClear()
+    {
+        var sequence = NextSequence + 1;
+        _items.Clear();
+        _firstSequence = sequence;
+        _resetSequence = sequence;
+    }
+
+    private void ThrowIfSealed()
+    {
+        if (_isSealed)
+        {
+            throw new InvalidOperationException("The log is sealed. A sealed log accepts no entries, clears, or drafts.");
+        }
     }
 
     private void ApplyTrimBefore(long sequence)
@@ -270,7 +354,8 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
     {
         cancellationToken.ThrowIfCancellationRequested();
         var hub = manager.GetOrCreateObservers();
-        var reader = new Reader(hub, this, mode, fromSequence);
+        var reader = new Reader(hub, this, mode, fromSequence, _resetCount, catchUpSequence: _committedSequence);
+        reader.KnownFirstSequence = Math.Min(fromSequence, GetVisibleFirstSequence(reader));
         if (reader.IncludesDrafts && resumeDraftId is { } draftId)
         {
             reader.FollowedDrafts = [ResumeDraft(draftId)];
@@ -285,6 +370,10 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
                 while (TryGetNextEvent(reader, out var logEvent))
                 {
                     yield return logEvent;
+                    if (logEvent.Kind is LogEventKind.Sealed)
+                    {
+                        yield break;
+                    }
                 }
 
                 if (reader.CheckCompleted())
@@ -302,25 +391,81 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         }
     }
 
+    // Readers without staged changes observe a trim once it is durable.
+    private long GetVisibleFirstSequence(Reader reader) => reader.IncludesStaged ? _firstSequence : _committedFirstSequence;
+
     // Computes the reader's next event from the current log state. Called between yields, so each call observes
     // mutations made while the reader was suspended.
     private bool TryGetNextEvent(Reader reader, out LogEvent<T> logEvent)
     {
-        if (reader.FollowedDrafts is { } followed && TryGetDraftOutcomeEvent(reader, followed, out logEvent))
+        if (reader.FollowedDrafts is { Count: > 0 } followed && TryGetDraftOutcomeEvent(reader, followed, out logEvent))
         {
             return true;
         }
 
-        if (reader.Cursor < _firstSequence || reader.Cursor > NextSequence)
+        if (reader.ResetCount != _resetCount)
         {
-            reader.Cursor = _firstSequence;
-            reader.UnconfirmedSequence = -1;
-            logEvent = new() { Kind = LogEventKind.Reset, Sequence = _firstSequence, Status = DurableChangeStatus.Committed };
+            // The journal was deleted, which restarted the sequence. Commits recorded before then describe deleted entries.
+            reader.ResetCount = _resetCount;
+            reader.FollowedDrafts?.RemoveAll(static followedDraft => followedDraft.TryGetOutcome(out _));
+
+            // The entries which were committed when the read began no longer exist.
+            reader.CatchUpSequence = 0;
+            logEvent = ResetReader(reader, GetVisibleFirstSequence(reader), DurableChangeStatus.Committed, unconfirmedSequence: -1);
             return true;
         }
 
+        if (reader.Cursor > NextSequence)
+        {
+            logEvent = ResetReader(reader, GetVisibleFirstSequence(reader), DurableChangeStatus.Committed, unconfirmedSequence: -1);
+            return true;
+        }
+
+        if (reader.Cursor < _resetSequence)
+        {
+            // The clear consumed sequence _resetSequence - 1, so a write which captured that sequence made the clear durable.
+            var isClearCommitted = _resetSequence <= _committedSequence;
+            if (reader.IncludesStaged)
+            {
+                logEvent = isClearCommitted
+                    ? ResetReader(reader, _firstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1)
+                    : ResetReader(reader, _firstSequence, DurableChangeStatus.Staged, unconfirmedSequence: _resetSequence - 1);
+                return true;
+            }
+
+            if (isClearCommitted)
+            {
+                logEvent = ResetReader(reader, _committedFirstSequence, DurableChangeStatus.Committed, unconfirmedSequence: -1);
+                return true;
+            }
+
+            // Otherwise, the reader awaits the clear's write. The clear discarded every committed entry.
+        }
+
+        var firstSequence = GetVisibleFirstSequence(reader);
+        if (firstSequence > reader.KnownFirstSequence)
+        {
+            reader.KnownFirstSequence = firstSequence;
+            reader.Cursor = Math.Max(reader.Cursor, firstSequence);
+            logEvent = new()
+            {
+                Kind = LogEventKind.Trimmed,
+                Sequence = firstSequence,
+                Status = firstSequence <= _committedFirstSequence ? DurableChangeStatus.Committed : DurableChangeStatus.Staged,
+            };
+            return true;
+        }
+
+        if (!reader.IsCaughtUp && reader.Cursor >= reader.CatchUpSequence)
+        {
+            reader.IsCaughtUp = true;
+            logEvent = new() { Kind = LogEventKind.CaughtUp, Sequence = reader.Cursor, Status = DurableChangeStatus.Committed };
+            return true;
+        }
+
+        // A committed reader positioned before an uncommitted trim awaits the trim's write.
         var limit = reader.IncludesStaged ? NextSequence : _committedSequence;
-        if (reader.Cursor < limit)
+        if (reader.Cursor >= _firstSequence && reader.Cursor < limit)
         {
             var sequence = reader.Cursor++;
             var status = GetEntryStatus(sequence);
@@ -341,6 +486,13 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
             return true;
         }
 
+        if (_isSealCommitted && reader.Cursor >= NextSequence && reader.UnconfirmedSequence < 0)
+        {
+            Debug.Assert(reader.IsCaughtUp && _drafts is not { Open.Count: > 0 });
+            logEvent = new() { Kind = LogEventKind.Sealed, Sequence = NextSequence, Status = DurableChangeStatus.Committed };
+            return true;
+        }
+
         if (reader.IncludesDrafts && _drafts is { Open.Count: > 0 } drafts && TryGetDraftItemEvent(reader, drafts, out logEvent))
         {
             return true;
@@ -348,6 +500,14 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
 
         logEvent = default;
         return false;
+    }
+
+    private static LogEvent<T> ResetReader(Reader reader, long firstSequence, DurableChangeStatus status, long unconfirmedSequence)
+    {
+        reader.Cursor = firstSequence;
+        reader.KnownFirstSequence = firstSequence;
+        reader.UnconfirmedSequence = unconfirmedSequence;
+        return new() { Kind = LogEventKind.Reset, Sequence = firstSequence, Status = status };
     }
 
     private bool TryGetDraftOutcomeEvent(Reader reader, List<FollowedDraft> followed, out LogEvent<T> logEvent)
@@ -581,19 +741,31 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IDurableLog
         private static string DescribeLogClosure(LogDraftAbandonReason reason) => reason switch
         {
             LogDraftAbandonReason.Reset => "the log's journal was deleted",
+            LogDraftAbandonReason.Sealed => "the log was sealed",
             _ => reason.ToString(),
         };
     }
 
-    private sealed class Reader(JournaledStateObservers hub, DurableLog<T> log, DurableWatchMode mode, long cursor)
+    private sealed class Reader(JournaledStateObservers hub, DurableLog<T> log, DurableWatchMode mode, long cursor, int resetCount, long catchUpSequence)
         : StateWatcher(hub, log, mode)
     {
         public bool IncludesDrafts => (Mode & DurableWatchMode.Drafts) != 0;
 
         public long Cursor { get; set; } = cursor;
 
+        // The first retained sequence the reader has been told of. A higher first sequence is reported as a trim.
+        public long KnownFirstSequence { get; set; }
+
         // The first sequence delivered as staged which no watermark has confirmed, or -1.
         public long UnconfirmedSequence { get; set; } = -1;
+
+        // The log's reset count when the reader last observed a deletion.
+        public int ResetCount { get; set; } = resetCount;
+
+        // The position after the entries which were committed when the read began.
+        public long CatchUpSequence { get; set; } = catchUpSequence;
+
+        public bool IsCaughtUp { get; set; }
 
         public List<FollowedDraft>? FollowedDrafts { get; set; }
     }
