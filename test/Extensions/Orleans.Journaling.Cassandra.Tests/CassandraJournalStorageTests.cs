@@ -64,6 +64,71 @@ public sealed class CassandraJournalStorageTests : IClassFixture<CassandraJourna
     }
 
     [Fact]
+    public async Task AppendAsync_RejectsJournalCreatedAfterThisHandleObservedAbsence()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var id = NewJournalId();
+        var staleStorage = harness.Provider.CreateStorage(id);
+        var consumer = new CapturingConsumer();
+        await staleStorage.ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.True(consumer.IsCompleted);
+
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([1]),
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => staleStorage.AppendAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
+
+        consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([1], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_RejectsJournalCreatedAfterThisHandleObservedAbsence()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var id = NewJournalId();
+        var staleStorage = harness.Provider.CreateStorage(id);
+        var consumer = new CapturingConsumer();
+        await staleStorage.ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.True(consumer.IsCompleted);
+
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([1]),
+            TestContext.Current.CancellationToken);
+
+        await Assert.ThrowsAsync<InconsistentStateException>(
+            () => staleStorage.ReplaceAsync(new ReadOnlySequence<byte>([2]), TestContext.Current.CancellationToken).AsTask());
+
+        consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([1], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
+    public async Task AppendAndReplaceAsync_ColdHandlesUseCurrentJournal()
+    {
+        await using var harness = await CreateHarnessAsync();
+        var id = NewJournalId();
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([1]),
+            TestContext.Current.CancellationToken);
+
+        await harness.Provider.CreateStorage(id).AppendAsync(
+            new ReadOnlySequence<byte>([2]),
+            TestContext.Current.CancellationToken);
+        await harness.Provider.CreateStorage(id).ReplaceAsync(
+            new ReadOnlySequence<byte>([3]),
+            TestContext.Current.CancellationToken);
+
+        var consumer = new CapturingConsumer();
+        await harness.Provider.CreateStorage(id).ReadAsync(consumer, TestContext.Current.CancellationToken);
+        Assert.Equal([3], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
     public async Task CreateIfNotExistsAsync_AppliesMetadataOnlyOnCreation()
     {
         await using var harness = await CreateHarnessAsync();
