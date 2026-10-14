@@ -48,6 +48,8 @@ public class DurableTaskAsyncMethodLacksAwaitSuppressorTests
         "public Func<DurableTask<int>> M() => async () => 1;",
         "public Func<int, DurableTask<int>> M() => async x => x;",
         "public Func<DurableTask> M() => async delegate { };",
+        "public async DurableTask<int> Get() => DurableTask.Once(() => 1);",
+        "public async DurableTask Run() { DurableTask.Once(() => { }); }",
     };
 
     public static TheoryData<string> OtherAsyncFunctions => new()
