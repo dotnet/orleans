@@ -52,6 +52,22 @@ public interface IScheduledTaskHandle
     ValueTask CancelAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    /// Durably requests task cancellation carrying <paramref name="reason"/>. The request is monotonic and idempotent.
+    /// The token abandons waiting for acknowledgement.
+    /// </summary>
+    /// <param name="reason">
+    /// The reason which the task's <see cref="DurableExecutionContext.CancellationReason"/> reports, or
+    /// <see langword="null"/> for none.
+    /// </param>
+    /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
+    /// <remarks>
+    /// The first request determines the reason, and the host retains it with the task's cancellation. Hosts which don't
+    /// record reasons keep this default implementation, which requests cancellation through
+    /// <see cref="CancelAsync(CancellationToken)"/> without the reason.
+    /// </remarks>
+    ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) => CancelAsync(cancellationToken);
+
+    /// <summary>
     /// Administratively aborts the task: the host terminalizes it and its attached descendants as failed with
     /// <see cref="DurableTaskAbortedException"/>, without running further task code. The token abandons waiting for
     /// acknowledgement.

@@ -15,6 +15,7 @@ public abstract class DurableExecutionContext
     private List<CancellationRegistration>? _registrations;
     private CancellationOperation? _cancellationOperation;
     private bool _cancellationRequested;
+    private string? _cancellationReason;
     private long _nextChildId;
     private long _nextOperationId;
 
@@ -71,6 +72,26 @@ public abstract class DurableExecutionContext
     }
 
     /// <summary>
+    /// Gets the reason which the durable cancellation request carries, or <see langword="null"/> when cancellation hasn't
+    /// been requested or its request carries no reason.
+    /// </summary>
+    /// <remarks>
+    /// The first cancellation request determines the reason, and later requests leave it unchanged. The host retains the
+    /// reason with the task's cancellation, so a replay observes the same reason. The reason is set before the durable
+    /// token is canceled, so code which observes the cancellation, such as a <see langword="catch"/> block, reads it.
+    /// </remarks>
+    public string? CancellationReason
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _cancellationReason;
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets the token which is canceled when durable cancellation is requested or the host aborts this execution attempt.
     /// </summary>
     /// <remarks>
@@ -87,7 +108,7 @@ public abstract class DurableExecutionContext
     ///
     /// <para>
     /// These observers must return promptly. They must not call, block on, await, or otherwise
-    /// orchestrate <see cref="DurableTaskRuntimeHelper.RequestCancellationAsync"/> or durable
+    /// orchestrate <see cref="DurableTaskRuntimeHelper.RequestCancellationAsync(DurableExecutionContext, CancellationToken)"/> or durable
     /// cancellation of any context. Doing so is outside this contract and has the usual synchronous
     /// reentrancy and sync-over-async risks. Use <see cref="RegisterCancellationCallbackAsync"/> for
     /// all cancellation work which requests another durable context, awaits asynchronous work, needs
@@ -242,13 +263,18 @@ public abstract class DurableExecutionContext
         return new(registration);
     }
 
-    internal Task RequestCancellationAsync(CancellationToken cancellationToken)
+    internal Task RequestCancellationAsync(string? reason, CancellationToken cancellationToken)
     {
         CancellationOperation operation;
         lock (_lock)
         {
+            if (!_cancellationRequested)
+            {
+                _cancellationReason = reason;
+                _cancellationRequested = true;
+            }
+
             operation = _cancellationOperation ??= new(this);
-            _cancellationRequested = true;
         }
 
         var waitForCompletion = CancellationOperation.TryAddDependency(

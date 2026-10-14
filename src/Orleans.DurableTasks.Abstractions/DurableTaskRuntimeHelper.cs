@@ -52,6 +52,29 @@ public static class DurableTaskRuntimeHelper
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return context.RequestCancellationAsync(cancellationToken);
+        return context.RequestCancellationAsync(reason: null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Requests monotonic durable cancellation carrying <paramref name="reason"/> and waits for callback acknowledgement.
+    /// </summary>
+    /// <param name="context">The execution whose cancellation is requested.</param>
+    /// <param name="reason">
+    /// The reason which <see cref="DurableExecutionContext.CancellationReason"/> reports, or <see langword="null"/> for
+    /// none. The first request determines the reason, so a host which replays a canceled execution passes the reason it
+    /// recorded with the task's cancellation.
+    /// </param>
+    /// <param name="cancellationToken">A token which abandons this caller's wait.</param>
+    /// <remarks>
+    /// Apart from the reason, this request behaves as
+    /// <see cref="RequestCancellationAsync(DurableExecutionContext, CancellationToken)"/>.
+    /// </remarks>
+    public static Task RequestCancellationAsync(
+        DurableExecutionContext context,
+        string? reason,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return context.RequestCancellationAsync(reason, cancellationToken);
     }
 }
