@@ -763,6 +763,10 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 }
             }
 
+            /// <summary>
+            /// Returns the constant name which a <c>WithId</c> or <c>DurableTask.Once</c> invocation passes, or null. An
+            /// unnamed <c>DurableTask.Once</c> takes the execution's next generated identifier and has no name.
+            /// </summary>
             private static (string Value, Location Location)? GetName(IInvocationOperation invocation)
             {
                 foreach (var argument in invocation.Arguments)

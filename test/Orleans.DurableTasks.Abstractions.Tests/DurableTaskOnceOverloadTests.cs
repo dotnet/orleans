@@ -32,6 +32,19 @@ public class DurableTaskOnceOverloadTests
         "Guid id = DurableTask.Once(\"a\", Guid.NewGuid);",
         "DurableTask.Once(\"a\", () => { if (Environment.ProcessorCount > 0) throw new InvalidOperationException(); });",
         "int value = DurableTask.Once(\"a\", Compute);",
+        "int counter = 0; int value = DurableTask.Once(\"a\", () => counter++);",
+        "int value = DurableTask.Once(() => 1);",
+        "DurableTask.Once(() => { });",
+        "Guid id = DurableTask.Once(Guid.NewGuid);",
+        "DurableTask.Once(() => { if (Environment.ProcessorCount > 0) throw new InvalidOperationException(); });",
+        "int value = DurableTask.Once(Compute);",
+        "string value = DurableTask.Once(() => \"a\");",
+        "DurableTask.Once(Mark);",
+        "DurableTask.Once(() => Mark());",
+
+        // A lambda whose expression has a value converts to Action and to Func<T>; the effect returns the value.
+        "int counter = 0; int value = DurableTask.Once(() => counter++);",
+        "int value = DurableTask.Once(() => Compute());",
     };
 
     public static TheoryData<string> AsynchronousEffects => new()
@@ -42,6 +55,15 @@ public class DurableTaskOnceOverloadTests
         "_ = DurableTask.Once(\"a\", ComputeAsync);",
         "_ = DurableTask.Once(\"a\", () => DurableTask.FromResult(1));",
         "_ = DurableTask.Once(\"a\", Step);",
+        "_ = DurableTask.Once(async () => { await Task.Yield(); return 1; });",
+        "DurableTask.Once(async () => await Task.Yield());",
+        "DurableTask.Once(async () => { });",
+        "_ = DurableTask.Once(() => Task.FromResult(1));",
+        "DurableTask.Once(() => Task.CompletedTask);",
+        "_ = DurableTask.Once(ComputeAsync);",
+        "_ = DurableTask.Once(() => DurableTask.FromResult(1));",
+        "_ = DurableTask.Once(Step);",
+        "DurableTask.Once(Run);",
     };
 
     [Theory]
@@ -83,9 +105,13 @@ public class DurableTaskOnceOverloadTests
 
                 private static int Compute() => 1;
 
+                private static void Mark() { }
+
                 private static Task<int> ComputeAsync() => Task.FromResult(1);
 
                 private static async DurableTask<int> Step() => 1;
+
+                private static async DurableTask Run() { }
             }
             """;
         var compilation = CSharpCompilation.Create(
