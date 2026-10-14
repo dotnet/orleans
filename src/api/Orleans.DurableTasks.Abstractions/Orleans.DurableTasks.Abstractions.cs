@@ -143,6 +143,14 @@ namespace Orleans.DurableTasks
         [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
         public static TResult Once<TResult>(string name, System.Func<System.Threading.Tasks.Task<TResult>> effect) { throw null; }
 
+        public static DurableTask<int> Race(System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static DurableTask<int> Race(System.Collections.Generic.IReadOnlyList<DurableTask> tasks) { throw null; }
+
+        public static DurableTask<(int Index, TResult Result)> Race<TResult>(System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static DurableTask<(int Index, TResult Result)> Race<TResult>(System.Collections.Generic.IReadOnlyList<DurableTask<TResult>> tasks) { throw null; }
+
         public static DurableTask Run(System.Action<System.Threading.CancellationToken> action) { throw null; }
 
         public static DurableTask Run(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> function) { throw null; }
@@ -284,6 +292,14 @@ namespace Orleans.DurableTasks
         public static System.Threading.Tasks.Task<ScheduledTask> ScheduleAsync(this DurableTask task, string rootId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public static System.Threading.Tasks.Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, string rootId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static DurableTask WaitAsync(this DurableTask task, System.TimeSpan timeout) { throw null; }
+
+        public static DurableTask<TResult> WaitAsync<TResult>(this DurableTask<TResult> task, System.TimeSpan timeout) { throw null; }
+
+        public static DurableTask WaitUntilAsync(this DurableTask task, System.DateTimeOffset dueTime) { throw null; }
+
+        public static DurableTask<TResult> WaitUntilAsync<TResult>(this DurableTask<TResult> task, System.DateTimeOffset dueTime) { throw null; }
 
         public static ConfiguredDurableTask WithId(this DurableTask task, string segment) { throw null; }
 
@@ -522,9 +538,17 @@ namespace Orleans.DurableTasks
         public System.Threading.Tasks.Task<bool> IsCompletedAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         protected abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, System.Threading.CancellationToken cancellationToken);
+        public static System.Threading.Tasks.Task<ScheduledTask> Race(System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.Task<ScheduledTask<TResult>> Race<TResult>(System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.ValueTask WaitAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        public System.Threading.Tasks.Task WaitAsync(System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         protected internal abstract System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsyncCore(System.Threading.CancellationToken cancellationToken);
+        public System.Threading.Tasks.Task WaitUntilAsync(System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public static System.Threading.Tasks.Task WhenAll(System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public static System.Threading.Tasks.Task WhenAll<TResult>(System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
@@ -578,6 +602,10 @@ namespace Orleans.DurableTasks
         public bool TryGetResult(out TResult value) { throw null; }
 
         public new ConfiguredScheduledTaskAwaitable<TResult> WaitAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public new System.Threading.Tasks.Task<TResult> WaitAsync(System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public new System.Threading.Tasks.Task<TResult> WaitUntilAsync(System.DateTimeOffset dueTime, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public sealed partial class SubscribedDurableTaskResponse : DurableTaskResponse

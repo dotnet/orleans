@@ -253,6 +253,32 @@ public class DurableTaskReplayRegionTests
         """);
 
     [Fact]
+    public Task RacesAndTimeoutsAreDurableOperations() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            public async DurableTask<int> RaceAsync()
+            {
+                var status = {|ORLEANS0100:_status|}.Value;
+                var (index, value) = await DurableTask.Race(new[] { Step(status), Step(2) }).WithId("race");
+                return index + value;
+            }
+
+            public async DurableTask<int> TimeoutAsync()
+            {
+                var status = {|ORLEANS0100:_status|}.Value;
+                return await Step(status).WaitAsync(TimeSpan.FromMinutes(1)).WithId("pay");
+            }
+
+            public async DurableTask<int> HandleTimeoutAsync(ScheduledTask<int> payment)
+            {
+                var status = {|ORLEANS0100:_status|}.Value;
+                return status + await payment.WaitUntilAsync(DurableTask.Current.UtcNow.AddMinutes(1));
+            }
+        }
+        """);
+
+    [Fact]
     public Task OrdinaryMethodsAreNotAnalyzed() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
