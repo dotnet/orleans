@@ -599,7 +599,9 @@ internal sealed partial class ActivationData :
         lock (_lock)
         {
             Debug.Assert(_extras is { KeepAliveHolds: > 0 });
-            if (--_extras!.KeepAliveHolds == 0)
+
+            // A deactivating or disposed activation must not re-enter the working set.
+            if (--_extras!.KeepAliveHolds == 0 && State is ActivationState.Valid)
             {
                 MarkActive();
             }

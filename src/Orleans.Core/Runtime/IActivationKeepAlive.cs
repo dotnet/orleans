@@ -14,7 +14,7 @@ internal interface IActivationKeepAlive
     void AcquireKeepAlive();
 
     /// <summary>
-    /// Releases a hold acquired by <see cref="AcquireKeepAlive"/>. Releasing the last hold restarts the activation's idle period.
+    /// Releases a hold acquired by <see cref="AcquireKeepAlive"/>. Releasing the last hold restarts the idle period of a valid activation.
     /// </summary>
     void ReleaseKeepAlive();
 }
