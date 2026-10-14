@@ -4,7 +4,11 @@
     <IsPackable Condition="'$(PackDurableTaskAdapter)' != 'true'">false</IsPackable>
     <IsPackable Condition="'$(PackDurableTaskAdapter)' == 'true'">true</IsPackable>
     <PackageInventoryPackable>true</PackageInventoryPackable>
-    <EnablePackageValidation>false</EnablePackageValidation>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+    <!-- Validate framework assets while the first release establishes a package baseline. -->
+    <OrleansPackageValidationBaselineVersion></OrleansPackageValidationBaselineVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenAPITargetDirectory>$(SourceRoot)src\api\Microsoft.Orleans.DurableTasks\</GenAPITargetDirectory>
     <GenAPITargetPath>$(GenAPITargetDirectory)$(AssemblyName).cs</GenAPITargetPath>
