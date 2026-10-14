@@ -228,6 +228,8 @@ namespace Orleans.DurableTasks
 
         protected internal bool IsCancellationSuppressed { get { throw null; } }
 
+        public virtual bool IsReplaying { get { throw null; } }
+
         public abstract System.DateTimeOffset UtcNow { get; }
 
         protected internal virtual TaskId CreateChildTaskId(string? name) { throw null; }
@@ -266,6 +268,11 @@ namespace Orleans.DurableTasks
         public static ConfiguredDurableTask WithId(this DurableTask task, string segment) { throw null; }
 
         public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string segment) { throw null; }
+    }
+
+    public static partial class DurableTaskLoggerExtensions
+    {
+        public static Microsoft.Extensions.Logging.ILogger ReplaySafe(this Microsoft.Extensions.Logging.ILogger logger) { throw null; }
     }
 
     public partial struct DurableTaskMethodBuilder
