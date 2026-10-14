@@ -127,7 +127,7 @@ public abstract partial class DurableTask
     /// Waits for every input's terminal response, then throws the first failure in input order or, when no input failed,
     /// the first cancellation in input order.
     /// </summary>
-    /// <remarks>Input order, rather than completion order, selects the exception, so a replay observes the same one.</remarks>
+    /// <remarks>Input order selects the exception, so a replay observes the same one in any completion order.</remarks>
     private static async Task<DurableTaskResponse[]> WaitForAllAsync(
         DurableTask[] inputs,
         DurableExecutionContext context,
