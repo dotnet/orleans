@@ -77,6 +77,7 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.3.0" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
+    <PackageVersion Include="Microsoft.Garnet" Version="2.2.0" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="10.0.111" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.111" />
@@ -128,6 +129,29 @@
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
   </ItemGroup>
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'Orleans.Clustering.TestKit'">
+    <PackageVersion Update="System.Collections.Immutable" Version="10.0.0" />
+    <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
+    <PackageVersion Update="System.Text.Json" Version="10.0.5" />
+  </ItemGroup>
+  <!-- Microsoft.Garnet depends on Microsoft.Extensions 10.x on every target framework. -->
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net8.0' and $(MSBuildProjectName.StartsWith('Orleans.Journaling.Garnet')) ">
+    <PackageVersion Update="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration.Binder" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration.Json" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.DependencyModel" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Hosting" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Http" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Logging.Console" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Logging.Debug" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Logging" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.ObjectPool" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.5" />
+    <PackageVersion Update="Microsoft.Extensions.Options" Version="10.0.5" />
     <PackageVersion Update="System.Collections.Immutable" Version="10.0.0" />
     <PackageVersion Update="System.IO.Pipelines" Version="10.0.5" />
     <PackageVersion Update="System.Text.Json" Version="10.0.5" />
