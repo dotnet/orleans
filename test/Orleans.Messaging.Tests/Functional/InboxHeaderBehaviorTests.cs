@@ -254,7 +254,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         {
             base.ConfigureOptions(options);
             options.MaxProcessingAttempts = 2;
-            options.BackpressureRetryDelay = TimeSpan.FromHours(1);
+            options.RetryInitialInterval = TimeSpan.FromHours(1);
         }
     }
 }
