@@ -20,7 +20,8 @@ namespace Orleans.Runtime
         IOptions<GrainCollectionOptions> collectionOptions,
         ILocalGrainDirectory localGrainDirectory,
         IActivationWorkingSet activationWorkingSet,
-        ActivationCollector activationCollector)
+        ActivationCollector activationCollector,
+        MessageFactory messageFactory)
     {
         public InsideRuntimeClient RuntimeClient { get; } = catalog.RuntimeClient;
         public MessageCenter MessageCenter { get; } = messageCenter;
@@ -33,5 +34,6 @@ namespace Orleans.Runtime
         public ILocalGrainDirectory LocalGrainDirectory { get; } = localGrainDirectory;
         public IActivationWorkingSet ActivationWorkingSet { get; } = activationWorkingSet;
         public ActivationCollector ActivationCollector { get; } = activationCollector;
+        public MessageFactory MessageFactory { get; } = messageFactory;
     }
 }

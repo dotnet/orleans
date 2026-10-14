@@ -30,6 +30,7 @@ internal sealed partial class ActivationData :
     IGrainContext,
     ICollectibleGrainContext,
     IActivationKeepAlive,
+    IGrainRequestRunner,
     IGrainExtensionBinder,
     IActivationWorkingSetMember,
     IGrainTimerRegistry,
@@ -534,6 +535,7 @@ internal sealed partial class ActivationData :
                 // Local-only messages are not allowed to escape the activation.
                 if (message.IsLocalOnly)
                 {
+                    (message.BodyObject as ILocalRequest)?.Reject(new OrleansMessageRejectionException($"Activation {this} is no longer valid."));
                     continue;
                 }
 
@@ -606,6 +608,32 @@ internal sealed partial class ActivationData :
                 MarkActive();
             }
         }
+    }
+
+    Task<TResult> IGrainRequestRunner.RunRequestAsync<TState, TResult>(Func<TState, CancellationToken, Task> callback, TState state, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled<TResult>(cancellationToken);
+        }
+
+        var request = new GrainRequest<TState, TResult>(callback, state, cancellationToken);
+
+        // Requests start a new call chain, matching timer ticks.
+        var message = _shared.InternalRuntime.MessageFactory.CreateMessage(body: request, options: CodeGeneration.InvokeMethodOptions.OneWay, requestContextData: null);
+        message.SetInfiniteTimeToLive();
+        message.SendingGrain = GrainId;
+        message.TargetGrain = GrainId;
+        message.SendingSilo = Address.SiloAddress;
+        message.TargetSilo = Address.SiloAddress;
+        message.InterfaceType = IGrainRequestInvoker.InterfaceType;
+        message.IsKeepAlive = true;
+
+        // The request completes on this activation or is rejected with it.
+        message.IsLocalOnly = true;
+
+        ReceiveMessage(message);
+        return request.Task;
     }
 
     public void ResetKeepAliveRequest()
@@ -1252,6 +1280,10 @@ internal sealed partial class ActivationData :
                         if (!message.IsLocalOnly)
                         {
                             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
+                        }
+                        else
+                        {
+                            (message.BodyObject as ILocalRequest)?.Reject(exception);
                         }
 
                         _waitingRequests.RemoveAt(i);
