@@ -19,7 +19,8 @@ on this abstractions assembly.
 - Every root execution has an explicit `TaskId`. Child IDs append either a caller-provided
   segment or a generated segment to the parent ID. Generated segments are replay-stable when
   unnamed children are created in the same deterministic order. One `WhenAll` or `WhenAny`
-  invocation assigns stable indexed slots to its concurrent batch. Independent concurrent
+  invocation assigns stable indexed slots to its concurrent batch, beneath an operation ID which
+  `WithId` names. Independent concurrent
   scheduling operations, including concurrent combinator invocations, use explicit `WithId`
   segments or otherwise begin in deterministic order. Generated segments begin with `$`; that
   prefix is reserved and rejected for explicit child names.
@@ -104,14 +105,35 @@ cancellation or failure.
 
 ## Combinators
 
-`WhenAll` and `WhenAny` assign child IDs from input indexes, preserving identity across
-replay when the input order is stable. They schedule their inputs concurrently, so a host can
-commit the batch together. `WhenAll<T>` returns the inputs' results in input order.
-`WhenAny` returns the winner's input index, and `WhenAny<T>` also returns its result; a winner
-which failed or was canceled fails the combinator. `WhenAny` asks the host to persist its
-selected winner under a deterministic decision ID, then leaves all other scheduled tasks running. Durable
-cancellation reaches the inputs, which are attached children, and the combinators wait for their
-outcomes.
+`WhenAll` and `WhenAny` accept a list or any sequence of inputs, which they capture when called. Awaited,
+a combinator runs as part of the awaiting execution and records no result of its own. Each input runs as a
+child identified by its input index under the combinator's operation identifier, so its identity is stable
+across replay when the input order is stable. The combinators schedule their inputs concurrently, so a host
+can commit the batch together.
+
+`WhenAll` follows `Task.WhenAll`: it completes only after every input is terminal, including inputs which
+durable cancellation reaches. Awaiting it then throws the first failure in input order when any input failed;
+otherwise it throws the first input's `OperationCanceledException` in input order when any input was canceled;
+otherwise `WhenAll<T>` returns an array of the results in input order. Input order, rather than completion order,
+selects the exception, so a replay observes the same one. `WhenAny` returns the winner's input index,
+and `WhenAny<T>` also returns its result; a winner which failed or was canceled fails the combinator. `WhenAny`
+asks the host to persist its selected winner under a deterministic decision ID, then leaves all other scheduled
+tasks running. Durable cancellation reaches the inputs, which are attached children, and the combinators wait for
+their outcomes.
+
+A combinator's generated operation identifier, such as `$when-all-2`, counts the combinators which ran before it in
+the execution. `WithId` names the operation, so its inputs keep their identifiers when a deployment adds or removes
+earlier combinators:
+
+```csharp
+var reserved = await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units)))
+    .WithId("reserve");
+```
+
+The inputs are `{taskId}/reserve/0`, `{taskId}/reserve/1`, and so on, and a named `WhenAny` records its winner
+under `{taskId}/{name}/$winner`. `WithId(name).ScheduleAsync()` schedules the combinator as a child task under that
+identifier, which runs as its own execution, records the combined result, and identifies its inputs under a
+generated operation identifier of that execution.
 
 `ScheduledTask.WhenAny` returns the first task whose durable response arrives, including a
 failed or canceled response. It captures its candidates when called, preserving the selected
@@ -139,6 +161,14 @@ await buyer.RecordOrderAsync(summary).DetachAsync($"order-{orderId:N}-v{summary.
   execution and commits the record with the start, so a replay doesn't start the task again.
   Detach calls begin in deterministic order, like unnamed children. Outside a durable execution,
   the definition starts through `ISchedulableTask.DetachAsync`.
+- Within a durable execution, `DetachedTaskId.For(segment)` derives a root ID from the execution's
+  task ID, `{taskId}:{segment}`, which is unique to that execution and segment and the same on every
+  replay. Segments contain no `:`. Observers derive the same ID with
+  `DetachedTaskId.For(starterTaskId, segment)` to poll or signal the detached task:
+
+```csharp
+await inventory.ReleaseAsync(order.Id).DetachAsync(DetachedTaskId.For("release"));
+```
 
 ## Signals
 
@@ -163,14 +193,17 @@ var approval = await Approved.WaitAsync();
   repeated event.
 - A signal which arrives before its wait is recorded, and the wait returns it immediately.
 - `WaitAsync()` awaited directly runs as part of the awaiting execution, so it creates no child
-  task. As a `WhenAny` input it races other inputs, so a deadline is a race with `DelayUntil`; after
-  the signal wins, awaiting `WaitAsync()` again returns the recorded value:
+  task. `TryWaitAsync(deadline)` races the wait with `DelayUntil(deadline)` as a `WhenAny` and returns
+  `(true, value)` when the signal wins and `(false, default)` when the deadline wins. The host records the
+  winner, so a replay returns the same outcome, and `WithId` names the race like other combinators:
 
 ```csharp
-var index = await DurableTask.WhenAny([Approved.WaitAsync(), DurableTask.DelayUntil(deadline)]);
-var approval = index == 0 ? await Approved.WaitAsync() : null;
+var (received, approval) = await Approved.TryWaitAsync(deadline).WithId("approval");
 ```
 
+- After the deadline wins, the signal keeps its latch, so a later `WaitAsync()` returns a value which
+  arrives after the deadline. As a `WhenAny` input, a wait races other inputs, and after the signal wins,
+  awaiting `WaitAsync()` again returns the recorded value.
 - Durable cancellation of the waiting execution cancels its wait.
 
 ## Compensating canceled work
@@ -188,7 +221,7 @@ public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
     }
     catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
     {
-        await inventory.ReleaseAsync(order.Id).DetachAsync($"order-{order.Id:N}-release");
+        await inventory.ReleaseAsync(order.Id).DetachAsync(DetachedTaskId.For("release"));
         return OrderResult.Canceled;
     }
 }
@@ -224,8 +257,8 @@ schedules the same children, with the same identifiers and arguments, in the sam
 - Read time from `DurableExecutionContext.UtcNow`, and produce random values and identifiers
   inside children, so a replay observes the values the first execution recorded.
 - Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
-  or concurrently outside a combinator. Generated identifiers are stable only when unnamed
-  children are created in the same order.
+  or concurrently outside a combinator, and to combinators. Generated identifiers are stable only when unnamed
+  children and combinators are created in the same order.
 - Scheduling an existing identifier with different arguments fails, so a replay which diverges
   from the recorded execution surfaces as an error.
   When a deployment changes a workflow while executions are pending, keep the existing steps

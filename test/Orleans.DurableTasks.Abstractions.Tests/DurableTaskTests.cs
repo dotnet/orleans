@@ -3217,7 +3217,7 @@ public class SchedulingTests
         var whenAll = DurableTask.WhenAll(inputs);
         var whenAny = DurableTask.WhenAny(inputs);
         inputs.Clear();
-        var root = host.CreateRootDefinition<(IReadOnlyList<int> All, (int Index, int Result) Any)>(async _ =>
+        var root = host.CreateRootDefinition<(int[] All, (int Index, int Result) Any)>(async _ =>
         {
             var all = await whenAll;
             var any = await whenAny;
