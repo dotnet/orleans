@@ -105,6 +105,9 @@
   <Folder Name="/src/Extensions/Cassandra/">
     <Project Path="src/Cassandra/Orleans.Clustering.Cassandra/Orleans.Clustering.Cassandra.csproj" />
   </Folder>
+  <Folder Name="/src/Extensions/Garnet/">
+    <Project Path="src/Garnet/Orleans.Journaling.Garnet/Orleans.Journaling.Garnet.csproj" />
+  </Folder>
   <Folder Name="/src/Extensions/Google/">
     <Project Path="src/Google/Orleans.Clustering.Firestore/Orleans.Clustering.Firestore.csproj" />
     <Project Path="src/Google/Orleans.GrainDirectory.Firestore/Orleans.GrainDirectory.Firestore.csproj" />
@@ -183,6 +186,8 @@
     <Project Path="test/Extensions/Orleans.Clustering.Cassandra.Tests/Orleans.Clustering.Cassandra.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Redis.Tests/Orleans.Redis.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Journaling.Garnet.Tests/Orleans.Journaling.Garnet.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Journaling.Garnet.CrashHost/Orleans.Journaling.Garnet.CrashHost.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.Firestore.Tests/Orleans.Clustering.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.GrainDirectory.Firestore.Tests/Orleans.GrainDirectory.Firestore.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Persistence.Firestore.Tests/Orleans.Persistence.Firestore.Tests.csproj" />
