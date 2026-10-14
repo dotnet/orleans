@@ -93,7 +93,6 @@ internal class TestInvokable : IInvokable
     string IInvokable.GetMethodName() => nameof(IInvokable.Invoke);
     string IInvokable.GetInterfaceName() => InterfaceType.FullName!;
     string IInvokable.GetActivityName() => $"{InterfaceType.FullName}.{nameof(IInvokable.Invoke)}";
-    // IInvokable permits null metadata; these fixtures use the no-incoming-filters fast path.
     MethodInfo IInvokable.GetMethod() => null!;
     CancellationToken IInvokable.GetCancellationToken() => RequestCancellationToken;
     bool IInvokable.TryCancel() => CancelRequest();
