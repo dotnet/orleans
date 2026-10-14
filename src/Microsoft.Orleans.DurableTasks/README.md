@@ -193,7 +193,9 @@ framework assets; its first published version establishes the compatibility base
   therefore deduplicates schedules for `ResultRetentionPeriod` after completion,
   and scheduling it after the deletion executes the request again. External
   clients poll retained results, and a poll after the deletion throws
-  `DurableTaskNotFoundException`. Polls interleave with the grain's other
+  `DurableTaskNotFoundException`. The grain applies retention when it activates,
+  after each journal write, and before it answers a poll or a client's schedule,
+  so neither observes a task whose retention has ended. Polls interleave with the grain's other
   requests and messages, so a waiting client doesn't delay the work which
   completes the task.
 - Deleting an execution tree cancels its unfinished tasks: the deletion's journal

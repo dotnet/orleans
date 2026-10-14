@@ -67,6 +67,10 @@ after that write, and their results are discarded. Completions and delay resumes
 arrive for deleted tasks are ignored. After deletion, polls throw
 `DurableTaskNotFoundException`, and scheduling the same task ID runs the request again.
 
+The grain applies retention when it activates, after each journal write, and before it
+answers a poll or a client's schedule, so neither observes a task whose retention has
+ended. An idle grain keeps the expired state in its journal until one of these occurs.
+
 Size `ResultRetentionPeriod` to cover the longest interval in which clients poll results
 or retry schedules, and account for the retained task state in each grain's journal:
 the number of retained client-scheduled tasks is their completion rate multiplied by the

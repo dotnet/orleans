@@ -980,6 +980,10 @@ internal sealed partial class DurableTaskGrainRuntime(
         IDurableTaskRequest request,
         CancellationToken cancellationToken)
     {
+        // Retention ends at a deadline, which can pass while the grain is otherwise idle, and this write commits the
+        // deletion with the request.
+        ThrowIfStopping();
+        DeleteExpiredTasks();
         var scheduled = StageSchedule(taskId, request, fromInbox: false);
 
         // Commit the request identity and caller subscription before execution begins.
@@ -2181,6 +2185,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
             _shared.Logger.LogTrace("{Id} received polling request for task {TaskId}", GrainId, taskId);
+        }
+
+        // Retention ends at a deadline, which can pass while the grain is otherwise idle.
+        if (DeleteExpiredTasks())
+        {
+            await WriteStateAsync(cancellationToken);
         }
 
         if (!_storage.TryGetTask(taskId, out _))
