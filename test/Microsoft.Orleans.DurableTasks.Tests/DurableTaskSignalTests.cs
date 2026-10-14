@@ -32,7 +32,7 @@ public sealed class DurableTaskSignalTests
     private static CancellationToken TestCancellation => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task SignalBeforeTheWaitIsRecordedAndReturnedByTheWait()
+    public Task SignalBeforeTheWaitIsRecordedAndReturnedByTheWait() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -54,10 +54,10 @@ public sealed class DurableTaskSignalTests
         Assert.Equal([WorkflowId, RecordId], harness.Storage.Ids);
         var diagnostics = await harness.GetDiagnosticsAsync();
         Assert.Equal(("Completed", "ada"), (diagnostics[RecordId].Status, diagnostics[RecordId].Response));
-    }
+    });
 
     [Fact]
-    public async Task WaitBeforeTheSignalCompletesWhenTheSignalCommits()
+    public Task WaitBeforeTheSignalCompletesWhenTheSignalCommits() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         await harness.ScheduleAsync(WorkflowId, async () => await Approved.WaitAsync());
@@ -83,10 +83,10 @@ public sealed class DurableTaskSignalTests
 
         Assert.Equal("ada", await harness.GetResultAsync<string>(WorkflowId));
         Assert.Equal(0, harness.SignalWaitCount);
-    }
+    });
 
     [Fact]
-    public async Task EqualValueIsADuplicateAndDifferentValueIsRejected()
+    public Task EqualValueIsADuplicateAndDifferentValueIsRejected() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -112,10 +112,10 @@ public sealed class DurableTaskSignalTests
         var terminal = await Assert.ThrowsAsync<InvalidOperationException>(
             () => harness.Tasks.SignalAsync(WorkflowId, Approved.For("2"), "ada", TestCancellation).AsTask());
         Assert.Contains("has completed", terminal.Message, StringComparison.Ordinal);
-    }
+    });
 
     [Fact]
-    public async Task SignalForATaskWhichIsNotARetainedInvokedTaskIsRejected()
+    public Task SignalForATaskWhichIsNotARetainedInvokedTaskIsRejected() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         var childStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -141,10 +141,10 @@ public sealed class DurableTaskSignalTests
         Assert.False(harness.Storage.Contains(RecordId));
         Assert.False(harness.Storage.Contains(WorkflowId.Child("step").Child("$signal:approved")));
         await harness.Runtime.StopAsync(TestCancellation);
-    }
+    });
 
     [Fact]
-    public async Task WaitsInANestedStepAndInAWhenAnySlotObserveTheInvokedTasksSignal()
+    public Task WaitsInANestedStepAndInAWhenAnySlotObserveTheInvokedTasksSignal() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         await harness.ScheduleAsync(WorkflowId, async () =>
@@ -163,10 +163,10 @@ public sealed class DurableTaskSignalTests
         Assert.True(harness.Storage.Contains(TaskId.Parse("workflow/$when-any-1/1")));
 
         static async DurableTask<string> WaitInStep() => await Approved.WaitAsync();
-    }
+    });
 
     [Fact]
-    public async Task WhenAnyRacesTheSignalWithADeadline()
+    public Task WhenAnyRacesTheSignalWithADeadline() => ActivationScheduler.RunAsync(async () =>
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
         var harness = new Harness(clock);
@@ -193,10 +193,10 @@ public sealed class DurableTaskSignalTests
             var index = await DurableTask.WhenAny([Approved.WaitAsync(), DurableTask.DelayUntil(deadline)]);
             return index == 0 ? await Approved.WaitAsync() : "timed out";
         }
-    }
+    });
 
     [Fact]
-    public async Task WaitAdvancesLogicalTimeToWhenTheSignalWasRecorded()
+    public Task WaitAdvancesLogicalTimeToWhenTheSignalWasRecorded() => ActivationScheduler.RunAsync(async () =>
     {
         var clock = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
         var harness = new Harness(clock);
@@ -211,10 +211,10 @@ public sealed class DurableTaskSignalTests
         await harness.Tasks.SignalAsync(WorkflowId, Approved, "ada", TestCancellation);
 
         Assert.Equal(DateTimeOffset.UnixEpoch.AddHours(3).ToString("O"), await harness.GetResultAsync<string>(WorkflowId));
-    }
+    });
 
     [Fact]
-    public async Task ReplayObservesTheRecordedValue()
+    public Task ReplayObservesTheRecordedValue() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         var observed = new ConcurrentQueue<string>();
@@ -242,10 +242,10 @@ public sealed class DurableTaskSignalTests
 
         Assert.Equal("ada", await replacement.GetResultAsync<string>(WorkflowId));
         Assert.Equal(["ada", "ada"], observed);
-    }
+    });
 
     [Fact]
-    public async Task SignalRecordIsDeletedWithTheExecutionTree()
+    public Task SignalRecordIsDeletedWithTheExecutionTree() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         var caller = GrainId.Create("caller", "one");
@@ -263,10 +263,10 @@ public sealed class DurableTaskSignalTests
         Assert.Empty(harness.Storage.Ids);
         await Assert.ThrowsAsync<DurableTaskNotFoundException>(
             () => harness.Tasks.SignalAsync(WorkflowId, Approved, "ada", TestCancellation).AsTask());
-    }
+    });
 
     [Fact]
-    public async Task DeletingTheTreeEndsAWaitWhichNeverReceivedItsSignal()
+    public Task DeletingTheTreeEndsAWaitWhichNeverReceivedItsSignal() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         var caller = GrainId.Create("caller", "one");
@@ -284,10 +284,10 @@ public sealed class DurableTaskSignalTests
 
         await harness.WaitForSignalWaitsAsync(0);
         Assert.Empty(harness.Storage.Ids);
-    }
+    });
 
     [Fact]
-    public async Task InboxAcceptsSignalsIntoTaskStateAndRejectsInvalidOnes()
+    public Task InboxAcceptsSignalsIntoTaskStateAndRejectsInvalidOnes() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         var sender = GrainId.Create("sender", "one");
@@ -313,10 +313,10 @@ public sealed class DurableTaskSignalTests
                 harness.Runtime.GrainId,
                 taskId,
                 new DurableTaskSignalMessage { TaskId = taskId, Name = Approved.Name, Value = DurableTaskResponse.FromResult(value), Sender = from });
-    }
+    });
 
     [Fact]
-    public async Task DurableExecutionRecordsEachSendSoReplayDoesNotSendAgain()
+    public Task DurableExecutionRecordsEachSendSoReplayDoesNotSendAgain() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         var target = GrainId.Create("target", "one");
@@ -335,10 +335,10 @@ public sealed class DurableTaskSignalTests
         var marker = harness.Storage.Get(markerId);
         Assert.StartsWith("$signal-send:", marker.RequestFingerprint, StringComparison.Ordinal);
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, marker.Result!.Status);
-    }
+    });
 
     [Fact]
-    public async Task TaskManagerInADurableExecutionSignalsAnotherTaskOfTheGrainOnce()
+    public Task TaskManagerInADurableExecutionSignalsAnotherTaskOfTheGrainOnce() => ActivationScheduler.RunAsync(async () =>
     {
         var harness = new Harness();
         var orderId = TaskId.CreateRoot("order");
@@ -355,7 +355,7 @@ public sealed class DurableTaskSignalTests
         Assert.StartsWith("$signal-send:", harness.Storage.Get(WorkflowId.Child("$child-1")).RequestFingerprint, StringComparison.Ordinal);
         Assert.Equal("ada", harness.Storage.Get(orderId.Child("$signal:approved")).Result!.GetResult<string>());
         Assert.Empty(harness.Transport.Signals);
-    }
+    });
 
     [Fact]
     public void TransportStagesSignalsWithAValueScopedIdentity()

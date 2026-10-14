@@ -302,8 +302,7 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
 
     public async DurableTask<DateTimeOffset> ObserveLogicalTimeAsync()
     {
-        var value = DurableExecutionContext.Current!.UtcNow;
-        probe.RecordLogicalTime(this.GetGrainId(), value);
+        var value = await ObserveCommittedLogicalTimeAsync();
         await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("wait");
         return value;
     }
@@ -317,9 +316,19 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
 
     public async DurableTask<int> DelayAcrossDeactivationAsync(int value)
     {
-        probe.RecordLogicalTime(this.GetGrainId(), DurableExecutionContext.Current!.UtcNow);
+        _ = await ObserveCommittedLogicalTimeAsync();
         await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("pause");
         return checked((value * 3) + 7);
+    }
+
+    // The execution's logical time commits with its first durable write. A step completes once its write commits, so the
+    // probe observes only a time which a replay reads back.
+    private async Task<DateTimeOffset> ObserveCommittedLogicalTimeAsync()
+    {
+        var value = DurableExecutionContext.Current!.UtcNow;
+        await DurableTask.Run(static _ => { }).WithId("commit");
+        probe.RecordLogicalTime(this.GetGrainId(), value);
+        return value;
     }
 
     public Task<Guid> GetActivationIdAsync() => Task.FromResult(_activationId);
