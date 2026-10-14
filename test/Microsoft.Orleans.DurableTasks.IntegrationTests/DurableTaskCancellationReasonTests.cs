@@ -51,7 +51,7 @@ public abstract class DurableTaskCancellationReasonTests(string journalFormatKey
         var workflow = _fixture.Client.GetGrain<IDurableTaskReasonWorkflowGrain>(Guid.NewGuid());
 
         var result = await workflow.TrySignalDurableTaskAsync(
-            TaskId.CreateRoot("missing"),
+            "missing",
             new DurableSignal<string>("shipped"),
             "parcel",
             cancellationToken);

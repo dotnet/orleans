@@ -43,7 +43,11 @@ namespace Orleans.DurableTasks
 
         public static System.Threading.Tasks.ValueTask SignalDurableTaskAsync<T>(this Orleans.Runtime.IAddressable target, TaskId taskId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
+        public static System.Threading.Tasks.ValueTask SignalDurableTaskAsync<T>(this Orleans.Runtime.IAddressable target, string rootId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public static System.Threading.Tasks.ValueTask<DurableSignalResult> TrySignalDurableTaskAsync<T>(this Orleans.Runtime.IAddressable target, TaskId taskId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Threading.Tasks.ValueTask<DurableSignalResult> TrySignalDurableTaskAsync<T>(this Orleans.Runtime.IAddressable target, string rootId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     [GenerateSerializer]
