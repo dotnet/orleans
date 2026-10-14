@@ -257,9 +257,7 @@ public abstract class ScheduledTask
         [EnumeratorCancellation] CancellationToken cancellationToken)
         where TTask : ScheduledTask
     {
-        using var linked = cancellationToken.CanBeCanceled
-            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.ExecutionAbortToken)
-            : null;
+        using var linked = CreateLinkedWaitCancellation(context, cancellationToken);
         var waitToken = linked?.Token ?? context.ExecutionAbortToken;
         var remaining = new List<TTask>(tasks);
         var candidates = new List<TaskId>(tasks.Length);
@@ -374,26 +372,90 @@ public abstract class ScheduledTask
     /// responses. Wait cancellation and transport failures are propagated, and losing waits are canceled
     /// without canceling the durable tasks. Candidates are captured when this method is called.
     /// </summary>
+    /// <remarks>
+    /// Called within a durable execution, the tasks are children of that execution, and the host selects the task which
+    /// completed first in its durable completion order, so every replay returns the same task, including a replay in which
+    /// more tasks have already completed. A host without a durable completion order records the selection, under the
+    /// decision identifier <c>$winner</c> beneath an operation identifier which this method generates in execution order
+    /// when called. Outside a durable execution, the method returns the task whose wait observes its response first. The
+    /// returned task has observed its terminal response.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="tasks"/> is empty.</exception>
     public static async Task<ScheduledTask> WhenAny(IReadOnlyList<ScheduledTask> tasks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
         var candidates = tasks.ToArray();
-        return candidates[await WaitForAnyIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
+        return candidates[await SelectAnyIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
     }
 
-    /// <summary>
-    /// Returns the first scheduled task whose response completes, including failed or canceled durable
-    /// responses. Wait cancellation and transport failures are propagated, and losing waits are canceled
-    /// without canceling the durable tasks. Candidates are captured when this method is called.
-    /// </summary>
+    /// <inheritdoc cref="WhenAny(IReadOnlyList{ScheduledTask}, CancellationToken)"/>
     public static async Task<ScheduledTask<TResult>> WhenAny<TResult>(
         IReadOnlyList<ScheduledTask<TResult>> tasks,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tasks);
         var candidates = tasks.ToArray();
-        return candidates[await WaitForAnyIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
+        return candidates[await SelectAnyIndexAsync(candidates, cancellationToken).ConfigureAwait(false)];
     }
+
+    /// <summary>
+    /// Selects the first completion of <paramref name="tasks"/> through the current execution's host, or by observing the
+    /// waits outside a durable execution.
+    /// </summary>
+    /// <remarks>
+    /// The operation identifier is generated before the first await, so calls which begin in deterministic order receive
+    /// the same identifiers on replay.
+    /// </remarks>
+    private static Task<int> SelectAnyIndexAsync<TTask>(TTask[] tasks, CancellationToken cancellationToken)
+        where TTask : ScheduledTask
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(tasks.Length, nameof(tasks));
+        return DurableExecutionContext.Current is { } context
+            ? SelectAnyIndexAsync(context, context.CreateOperationId(DurableTask.WhenAnyOperation), tasks, cancellationToken)
+            : WaitForAnyIndexAsync(tasks, cancellationToken);
+    }
+
+    private static async Task<int> SelectAnyIndexAsync<TTask>(
+        DurableExecutionContext context,
+        TaskId operationId,
+        TTask[] tasks,
+        CancellationToken cancellationToken)
+        where TTask : ScheduledTask
+    {
+        using var linked = CreateLinkedWaitCancellation(context, cancellationToken);
+        var waitToken = linked?.Token ?? context.ExecutionAbortToken;
+        var candidates = new TaskId[tasks.Length];
+        for (var index = 0; index < candidates.Length; index++)
+        {
+            candidates[index] = tasks[index].Id;
+        }
+
+        try
+        {
+            var selected = await context.SelectCompletionAsync(operationId.Child("$winner"), candidates, waitToken).ConfigureAwait(false);
+            var winnerIndex = Array.IndexOf(candidates, selected);
+            if (winnerIndex < 0)
+            {
+                throw new InvalidOperationException($"The host selected '{selected}', which is not a candidate of '{operationId}'.");
+            }
+
+            _ = await tasks[winnerIndex].ObserveAsync(waitToken).ConfigureAwait(false);
+            return winnerIndex;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw new OperationCanceledException(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Links the caller's wait cancellation with the execution's abort token, or returns <see langword="null"/> when the
+    /// caller's token can't be canceled, so the abort token alone applies.
+    /// </summary>
+    private static CancellationTokenSource? CreateLinkedWaitCancellation(DurableExecutionContext context, CancellationToken cancellationToken) =>
+        cancellationToken.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.ExecutionAbortToken)
+            : null;
 
     private static async Task<int> WaitForAnyIndexAsync<TTask>(
         IReadOnlyList<TTask> tasks,
