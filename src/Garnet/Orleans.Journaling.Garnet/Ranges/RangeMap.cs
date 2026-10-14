@@ -20,18 +20,30 @@ public readonly record struct RangeMapWriteResult(bool Written, RangeMapSnapshot
 /// <summary>
 /// Maps buckets to the partitions which own them, and records migrations in progress and where each partition is hosted.
 /// </summary>
+/// <param name="Id">
+/// The map's identity, fixed when the map is created: 1 to 64 characters from <c>[A-Za-z0-9._-]</c>, starting with a
+/// letter or digit. Partitions record it with their bucket states, so a partition of another map rejects operations
+/// routed to it through a stale endpoint.
+/// </param>
 /// <param name="BucketCount">The number of buckets, a power of two, fixed when the map is created.</param>
 /// <param name="Ranges">Contiguous, ordered ranges which together cover buckets <c>[0, BucketCount)</c>.</param>
 /// <param name="Migrations">Migrations in progress. Each migration's buckets are already assigned to its destination.</param>
 /// <param name="Partitions">Every partition, with its hosting assignment.</param>
 public sealed record RangeMap(
+    string Id,
     int BucketCount,
     ImmutableArray<RangeAssignment> Ranges,
     ImmutableArray<Migration> Migrations,
     ImmutableSortedDictionary<PartitionId, PartitionHosting> Partitions)
 {
     /// <summary>
-    /// Creates a map which divides the buckets into equal contiguous ranges, one per partition, in the given order.
+    /// Creates a new, unique map identity.
+    /// </summary>
+    /// <returns>A map identity.</returns>
+    public static string CreateId() => Guid.NewGuid().ToString("N");
+
+    /// <summary>
+    /// Creates a map with a new identity which divides the buckets into equal contiguous ranges, one per partition, in the given order.
     /// </summary>
     /// <param name="bucketCount">The number of buckets, a power of two.</param>
     /// <param name="partitions">The partitions and their hosting assignments.</param>
@@ -60,7 +72,7 @@ public sealed record RangeMap(
             first = last + 1;
         }
 
-        var map = new RangeMap(bucketCount, ranges.MoveToImmutable(), [], ImmutableSortedDictionary.CreateRange(list));
+        var map = new RangeMap(CreateId(), bucketCount, ranges.MoveToImmutable(), [], ImmutableSortedDictionary.CreateRange(list));
         try
         {
             map.Validate();
@@ -114,12 +126,17 @@ public sealed record RangeMap(
     /// </summary>
     /// <exception cref="InvalidOperationException">The map is invalid.</exception>
     /// <remarks>
-    /// A valid map has a power-of-two bucket count; ranges which are ordered, contiguous, and cover every bucket, and
+    /// A valid map has a valid id and a power-of-two bucket count; ranges which are ordered, contiguous, and cover every bucket, and
     /// whose owners are known partitions; disjoint migrations between distinct known partitions whose buckets are
     /// assigned to their destinations; and hosting assignments with a host, a non-negative epoch, and a storage location.
     /// </remarks>
     public void Validate()
     {
+        if (!PartitionId.IsValid(Id))
+        {
+            throw Invalid($"its id '{Id}' is not 1 to 64 characters from [A-Za-z0-9._-] starting with a letter or digit");
+        }
+
         if (BucketCount <= 0 || !BitOperations.IsPow2(BucketCount))
         {
             throw Invalid($"the bucket count {BucketCount} is not a positive power of two");
@@ -222,6 +239,7 @@ public sealed record RangeMap(
         }
 
         return other is not null
+            && string.Equals(Id, other.Id, StringComparison.Ordinal)
             && BucketCount == other.BucketCount
             && Ranges.AsSpan().SequenceEqual(other.Ranges.AsSpan())
             && Migrations.AsSpan().SequenceEqual(other.Migrations.AsSpan())
@@ -230,7 +248,7 @@ public sealed record RangeMap(
     }
 
     /// <inheritdoc/>
-    public override int GetHashCode() => HashCode.Combine(BucketCount, Ranges.IsDefault ? 0 : Ranges.Length, Partitions?.Count ?? 0);
+    public override int GetHashCode() => HashCode.Combine(Id, BucketCount, Ranges.IsDefault ? 0 : Ranges.Length, Partitions?.Count ?? 0);
 }
 
 /// <summary>

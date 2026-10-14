@@ -16,9 +16,9 @@ internal sealed class GarnetJournalStorageOptionsValidator(
             throw new OrleansConfigurationException($"{prefix}.{nameof(options.MetaStore)} is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(options.HostId))
+        if (options.HostId is not null && string.IsNullOrWhiteSpace(options.HostId))
         {
-            throw new OrleansConfigurationException($"{prefix}.{nameof(options.HostId)} is required.");
+            throw new OrleansConfigurationException($"{prefix}.{nameof(options.HostId)} must not be empty.");
         }
 
         if (options.BucketCount <= 0 || !BitOperations.IsPow2(options.BucketCount))

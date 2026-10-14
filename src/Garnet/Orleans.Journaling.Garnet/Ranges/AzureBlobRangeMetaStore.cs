@@ -10,8 +10,11 @@ namespace Orleans.Journaling.Ranges;
 /// </summary>
 /// <remarks>
 /// Each write reads the blob, checks its version, and uploads the new document conditionally on the ETag it read, so
-/// a write succeeds only if no other write intervened. The blob's container is created on the first write if it does
-/// not exist.
+/// a write succeeds only if no other write intervened. Each document carries a unique write id, so when the upload's
+/// condition fails, possibly because the client retried an upload whose first attempt was applied, the store reads the
+/// blob to determine whether this write was applied. If a later write has superseded the version this write targeted,
+/// the outcome cannot be determined and the write throws <see cref="IOException"/>. The blob's container is created
+/// on the first write if it does not exist.
 /// </remarks>
 public sealed class AzureBlobRangeMetaStore : IRangeMetaStore
 {
@@ -34,6 +37,7 @@ public sealed class AzureBlobRangeMetaStore : IRangeMetaStore
 
     /// <inheritdoc/>
     /// <exception cref="InvalidDataException">The blob does not hold a valid range map document.</exception>
+    /// <exception cref="IOException">The outcome of the write cannot be determined.</exception>
     public async ValueTask<RangeMapWriteResult> TryWriteAsync(RangeMap next, long expectedVersion, CancellationToken cancellationToken)
     {
         RangeMetaStoreArguments.Validate(next, expectedVersion);
@@ -44,7 +48,9 @@ public sealed class AzureBlobRangeMetaStore : IRangeMetaStore
         }
 
         var written = new RangeMapSnapshot(expectedVersion + 1, next);
-        var content = RangeMapJsonSerializer.Serialize(written);
+
+        // The write id makes this write's document unique, so a later read can tell whether this write was applied.
+        var content = RangeMapJsonSerializer.Serialize(written, writeId: Guid.NewGuid().ToString("N"));
         var conditions = current is null
             ? new BlobRequestConditions { IfNoneMatch = ETag.All }
             : new BlobRequestConditions { IfMatch = eTag };
@@ -55,10 +61,23 @@ public sealed class AzureBlobRangeMetaStore : IRangeMetaStore
         }
         catch (RequestFailedException exception) when (exception.Status is 409 or 412)
         {
-            // Another writer intervened, or the client retried an upload whose first attempt succeeded. In the latter
-            // case the blob holds exactly this write's document.
+            // Another writer intervened, or the client retried an upload whose first attempt was applied.
             var (after, _, bytes) = await ReadCoreAsync(cancellationToken).ConfigureAwait(false);
-            return new(bytes is not null && bytes.AsSpan().SequenceEqual(content), after);
+            if (after?.Version == expectedVersion + 1)
+            {
+                // Exactly one write produced this version: this one if the blob holds this write's document.
+                return new(bytes.AsSpan().SequenceEqual(content), after);
+            }
+
+            if (after is not null && after.Version > expectedVersion + 1)
+            {
+                // This write may have been applied and then superseded.
+                throw new IOException(
+                    $"The outcome of writing range map version {expectedVersion + 1} is unknown: the blob now holds version {after.Version}. Read the map to continue.",
+                    exception);
+            }
+
+            throw new IOException($"The range map blob changed unexpectedly while writing version {expectedVersion + 1}.", exception);
         }
     }
 

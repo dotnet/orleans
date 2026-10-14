@@ -47,8 +47,8 @@ A silo hosts the partitions the range map assigns to it, each an embedded Garnet
 | `oj:j:{b}:{id}` | list | Journal data: one element per append. `ReplaceAsync` replaces the list with one element. |
 | `oj:m:{b}:{id}` | hash | `$etag`, `$content-etag`, `$append-length`, `$format`, `$schema-version`, `$recent-etags`, and caller properties; or a tombstone: `$deleted`, `$etag`, and `$recent-etags`. |
 | `oj:i:{b}` | set | Encoded ids of the bucket's live journals, updated in the same transaction as every create and delete. |
-| `oj:b:{b}` | hash | Bucket state: `state` (`open` or `sealed`; absent key means absent), `version`, `source`, `done`. |
-| `oj:partition` | hash | `partition-id`, `bucket-count`, and `schema-version`, written once the partition has opened its initial buckets. |
+| `oj:b:{map}:{b}` | hash | Bucket state: `state` (`open` or `sealed`; absent key means absent), `version`, `source`, `done`. `{map}` is the range map's identity (D23). |
+| `oj:partition` | hash | `map-id`, `partition-id`, `bucket-count`, and `schema-version`, written once the partition has opened its initial buckets. |
 
 `{b}` is the bucket in decimal; `{id}` is the journal id encoded as generalized UTF-8 (WTF-8), which is injective over .NET strings including unpaired surrogates, so the catalog decodes ids from the index without metadata reads.
 
@@ -126,11 +126,13 @@ With Tsavorite's default Windows device (unbuffered, without write-through), one
 | D15 | The catalog reads each bucket index whole (`SMEMBERS`, in the `OJINDEX` procedure at the bucket's owner). | Decided | Garnet's `SSCAN` cursor is a position in the set's enumeration, so a delete between pages skips members. One snapshot per bucket includes every journal that exists for the whole listing. |
 | D16 | Every mutation is conditional on a state identity that never recurs: a content ETag, a metadata ETag, or an absence named by its tombstone's ETag. | Decided | Duplicate activations which both observe a missing journal cannot both create it, and a retry whose ETag has left the history cannot apply again: a creation cannot resurrect a deleted journal, and an unconditional metadata update cannot overwrite a later one. |
 | D17 | Requests do not carry the client's view version. A `WrongPartition` reply carries the version of the bucket's last transition; the client refreshes its view when that version is newer than its own and retries at once, and otherwise backs off and retries. | Decided | Refines the brief, which sends the client's version with each request. By D6 the partition's decision does not depend on the client's view, so the client's version would be unused; the reported version tells the client which view to wait for. A reported version no newer than the client's view means the owner has not opened the bucket yet (or the endpoint now belongs to another partition), which is transient. |
-| D18 | Hosts publish each partition's endpoint in the range map (`PartitionHosting.Endpoint`), by CAS, after the partition has opened its buckets. | Decided | Endpoints change when a host restarts with a free port or a partition fails over, and the MetaStore is already the authority for hosting. Clients route to a partition only once it serves its buckets. A stale endpoint is safe: whatever listens there rejects buckets it does not hold open. |
+| D18 | Hosts publish each partition's endpoint in the range map (`PartitionHosting.Endpoint`), by CAS, after the partition has opened its buckets. | Decided | Endpoints change when a host restarts with a free port or a partition fails over, and the MetaStore is already the authority for hosting. Clients route to a partition only once it serves its buckets. A stale endpoint is safe: whatever listens there rejects buckets it does not hold open, including partitions of other maps (D23). |
 | D19 | `PartitionId` is a string of 1–64 characters from `[A-Za-z0-9._-]`, starting with a letter or digit. `StorageLocation` is a path relative to the host's data directory. | Decided | Ids name files, keys, and the bucket `source` field (where `-` means none); relative locations keep the map independent of host file systems. Phase 4 interprets `StorageLocation` for shared storage. |
 | D20 | The Azure Blob MetaStore lives in the provider package. | Decided | `Microsoft.Garnet` already depends on `Azure.Storage.Blobs`, so a separate package would add no isolation. |
 | D21 | A Garnet MetaStore in a dedicated instance with commit-wait. | Undecided | Optional in the brief; the in-memory and Azure Blob stores cover phase 2. Worth adding if a deployment needs a MetaStore without Azure. |
-| D22 | `HostId` defaults to the silo name, and must be stable across restarts while hosting is static. | Decided for phase 2 | The static map assigns partitions to hosts by name. Phase 4 assigns hosts through the coordinator, keyed by live silos. |
+| D22 | `HostId`, if not configured, is generated on a silo's first start and stored in its `DataDirectory`; silos without a directory host nothing. | Decided for phase 2 | The static map assigns partitions to hosts by id, so the id must be stable across restarts. The silo name is not (Orleans generates a random one by default), while the directory persists exactly as long as the partitions it holds. Phase 4 assigns hosts through the coordinator, keyed by live silos. |
+| D23 | Each range map has an identity, fixed when it is created, which is part of every bucket key and of the partition descriptor. | Decided | A stale endpoint may reach a partition of another cluster on the same machine. That partition holds no bucket under this map's identity, so it rejects the operation as `WrongPartition(absent, 0)` and the router backs off and refreshes. Only the bucket key needs the identity, since every procedure checks the bucket before touching journal keys. |
+| D24 | A MetaStore write whose outcome cannot be determined throws, and the caller reads the map to continue. | Decided | The Azure SDK retries requests, so a conditional upload can fail its condition because its own first attempt was applied. Each document carries a unique write id: if the blob holds the next version, the store knows whether that version is this write's; if a later version has superseded it, the outcome is unknown. Reporting `Written = false` there could make a caller apply a change twice. |
 
 ## Range layer (phases 2–3)
 
@@ -148,6 +150,7 @@ public interface IRangeMetaStore
 public sealed record RangeMapSnapshot(long Version, RangeMap Map);
 public readonly record struct RangeMapWriteResult(bool Written, RangeMapSnapshot? Current);
 public sealed record RangeMap(
+    string Id,
     int BucketCount,
     ImmutableArray<RangeAssignment> Ranges,
     ImmutableArray<Migration> Migrations,
@@ -162,16 +165,17 @@ public readonly record struct PartitionId(string Value);
 Refinements of the brief's sketch, and why:
 
 - **No map is version 0.** `ReadAsync` returns `null` for an empty store, and the first map is written with `expectedVersion = 0` as version 1, so every silo can race to write the initial map and exactly one succeeds.
+- **`RangeMap.Id`** is the map's identity (D23), generated by `RangeMap.CreateUniform` or `RangeMap.CreateId`. Like the bucket count, it never changes.
 - **`RangeMapWriteResult`** names the CAS outcome. `Current` is the written map on success and the map that prevented the write on failure, so a writer retries from it without another read.
 - **`RangeAssignment.AssignedAtVersion`** is the version at which the owner opens the range's buckets: 0 for ranges assigned when the map was created, otherwise the version which committed the migration into the owner. A partition reports it in `WrongPartition`, which lets clients decide between refreshing and backing off (D17).
-- **`PartitionHosting.Host` is a string** (`HostId`, the silo name by default; D22), and **`Endpoint`** is the `host:port` the hosting silo publishes once the partition serves (D18).
+- **`PartitionHosting.Host` is a string** (`HostId`; D22), and **`Endpoint`** is the `host:port` the hosting silo publishes once the partition serves (D18).
 - **`ImmutableSortedDictionary`** gives the map a deterministic order, so equal maps serialize to equal documents. `RangeMap` compares its collections by value.
-- **`RangeMap.Validate`** checks the structural invariants: a power-of-two bucket count; ordered, contiguous ranges covering every bucket and owned by known partitions; disjoint migrations between distinct known partitions whose buckets the map already assigns to the destination (the commit step of the handover); and complete hosting records. Stores validate every write, and routers validate every view they read. Invariants across versions, such as the fixed bucket count, are enforced by the router, which rejects a view that changes them.
+- **`RangeMap.Validate`** checks the structural invariants: a power-of-two bucket count; ordered, contiguous ranges covering every bucket and owned by known partitions; disjoint migrations between distinct known partitions whose buckets the map already assigns to the destination (the commit step of the handover); and complete hosting records. Stores validate every write, and routers validate every view they read. Invariants across versions, the fixed identity and bucket count, are enforced by the router, which rejects a view that changes them.
 
 Implementations:
 
 - `InMemoryRangeMetaStore`, for tests and single-process development.
-- `AzureBlobRangeMetaStore`: one JSON document (format version, map version, map) in a blob. A write reads the document, compares versions, and uploads conditionally on the ETag it read (`If-None-Match: *` for the first map). If the upload fails its condition, the store reads the blob again and reports success only if it holds exactly the bytes this write uploaded, which covers an SDK retry of an upload whose first attempt succeeded.
+- `AzureBlobRangeMetaStore`: one JSON document (format version, map version, write id, map) in a blob. A write reads the document, compares versions, and uploads conditionally on the ETag it read (`If-None-Match: *` for the first map). If the upload fails its condition, the store reads the blob again: at the next version, the write succeeded exactly if the blob holds this write's document; at a later version, the outcome is unknown (D24).
 - A dedicated Garnet MetaStore is optional (D21).
 
 ### Routing
@@ -188,7 +192,7 @@ The catalog reads every bucket's index at its owner with `OJINDEX`, 32 buckets a
 
 ### Partition hosting (phase 2)
 
-On start, each silo reads the range map, writing `InitialRangeMap` (or a one-partition map hosted by itself, if it has a `DataDirectory`) if the store is empty, and waits if neither applies. It then starts an embedded Garnet server for each partition the map assigns to its `HostId`, in `DataDirectory/StorageLocation`, on consecutive ports from `ListenEndPoint` (free ports by default). Each new partition opens its initial buckets (D7) and records its descriptor; a restarted partition checks its descriptor against the map. Once its partitions serve, the silo publishes their endpoints by CAS (D18). Silos with no partitions route only.
+On start, each silo reads the range map, writing `InitialRangeMap` (or a one-partition map hosted by itself, if it has a `DataDirectory`) if the store is empty, and waits if neither applies. It then starts an embedded Garnet server for each partition the map assigns to its `HostId`, in `DataDirectory/StorageLocation`, on consecutive ports from `ListenEndPoint` (free ports by default). Each new partition opens its initial buckets (D7) and records its descriptor; a restarted partition checks its descriptor (map identity, partition id, bucket count) against the map. Once its partitions serve, the silo publishes their endpoints by CAS (D18). Silos with no partitions route only.
 
 In phase 2 the map's ranges and hosting assignments never change; only endpoints do. Phase 3 opens and seals buckets through migrations, and phase 4 moves partitions between hosts with a new epoch.
 ### Handover and migration

@@ -67,10 +67,14 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
         _telemetry = telemetry ?? JournalStorageTelemetry.CreateForDirectConstruction();
         _logger = logger;
         BucketCount = view.Map.BucketCount;
+        MapId = view.Map.Id;
     }
 
     /// <summary>Gets the number of buckets, which is the same in every view.</summary>
     public int BucketCount { get; }
+
+    /// <summary>Gets the identity of the range map, which is the same in every view.</summary>
+    public string MapId { get; }
 
     /// <summary>Gets the current view.</summary>
     public RangeMapSnapshot View => Volatile.Read(ref _view);
@@ -194,15 +198,15 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     /// Applies <paramref name="snapshot"/> if it is newer than the current view.
     /// </summary>
     /// <returns><see langword="true"/> if the view changed.</returns>
-    /// <exception cref="InvalidOperationException">The snapshot's map is invalid or changes the bucket count.</exception>
+    /// <exception cref="InvalidOperationException">The snapshot's map is invalid, or changes the map's identity or bucket count.</exception>
     public bool TryApplyView(RangeMapSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         snapshot.Map.Validate();
-        if (snapshot.Map.BucketCount != BucketCount)
+        if (snapshot.Map.BucketCount != BucketCount || !string.Equals(snapshot.Map.Id, MapId, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"Range map version {snapshot.Version} has {snapshot.Map.BucketCount} buckets, but the cluster has {BucketCount}. The bucket count never changes.");
+                $"Range map version {snapshot.Version} is map '{snapshot.Map.Id}' with {snapshot.Map.BucketCount} buckets, but the cluster uses map '{MapId}' with {BucketCount}. A map's identity and bucket count never change.");
         }
 
         lock (_lock)
