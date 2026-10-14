@@ -831,6 +831,67 @@ internal sealed class GarnetJournalUpdateMetadataProcedure : GarnetJournalProced
 }
 
 /// <summary>
+/// Lists the encoded ids of the journals in a bucket. Arguments: bucket key, index key.
+/// Returns <c>[1, members...]</c>, <c>WrongPartition</c> if the bucket is not open, or <c>NeedPull</c> if its migration is incomplete.
+/// </summary>
+/// <remarks>
+/// The bucket's index is updated in the same transaction as every create and delete, so the listing is one snapshot
+/// of the journals in the bucket. While the bucket's migration is incomplete, its source may hold more journals.
+/// </remarks>
+internal sealed class GarnetJournalIndexProcedure : CustomTransactionProcedure
+{
+    public override TimeSpan KeyLockTimeout => TimeSpan.FromSeconds(10);
+
+    public override bool Prepare<TGarnetReadApi>(TGarnetReadApi api, ref CustomProcedureInput procInput)
+    {
+        var offset = 0;
+        var bucketKey = GetNextArg(ref procInput, ref offset);
+        var indexKey = GetNextArg(ref procInput, ref offset);
+        if (!bucketKey.IsValid || !indexKey.IsValid)
+        {
+            return false;
+        }
+
+        AddKey(bucketKey, LockType.Shared, StoreType.Object);
+        AddKey(indexKey, LockType.Shared, StoreType.Object);
+        return true;
+    }
+
+    public override void Main<TGarnetApi>(TGarnetApi api, ref CustomProcedureInput procInput, ref MemoryResult<byte> output)
+    {
+        var offset = 0;
+        var bucketKey = GetNextArg(ref procInput, ref offset);
+        var indexKey = GetNextArg(ref procInput, ref offset);
+        var bucket = BucketRecord.Load(api, bucketKey);
+        var response = new GarnetRespArrayWriter();
+        if (!bucket.IsOpen)
+        {
+            response.WriteBulk(GarnetJournalProtocol.WrongPartitionStatus);
+            response.WriteBulk(bucket.Exists ? bucket.State : GarnetJournalProtocol.AbsentState);
+            response.WriteBulk(bucket.Exists ? bucket.Version : GarnetJournalProtocol.ZeroValue);
+        }
+        else if (!bucket.IsDone)
+        {
+            response.WriteBulk(GarnetJournalProtocol.NeedPullStatus);
+            response.WriteBulk(bucket.Source);
+        }
+        else
+        {
+            response.WriteBulk(GarnetJournalProtocol.SuccessStatus);
+            if (api.SetMembers(indexKey, out PinnedSpanByte[] members) == GarnetStatus.OK)
+            {
+                foreach (var member in members)
+                {
+                    response.WriteBulk(member.ReadOnlySpan);
+                }
+            }
+        }
+
+        response.CopyTo(ref output);
+    }
+}
+
+/// <summary>
 /// Transitions a bucket's state in this partition.
 /// Arguments: bucket key, operation (<c>open</c> or <c>seal</c>), version, source, done (0 or 1).
 /// Returns <c>[1]</c>, or <c>[-1, state, version]</c> if the transition does not apply to the current state.
@@ -955,6 +1016,7 @@ internal static class GarnetJournalProcedures
             static () => new GarnetJournalDeleteProcedure(),
             static () => new GarnetJournalUpdateMetadataProcedure(),
             static () => new GarnetJournalBucketProcedure(),
+            static () => new GarnetJournalIndexProcedure(),
         ];
 
         for (var i = 0; i < factories.Length; i++)
