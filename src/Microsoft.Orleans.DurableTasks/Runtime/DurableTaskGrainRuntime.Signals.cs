@@ -102,16 +102,23 @@ internal sealed partial class DurableTaskGrainRuntime
     /// Sends a signal from a durable execution, recording the send under <paramref name="markerId"/> in the execution's
     /// tree, and waits for the journal write which commits both.
     /// </summary>
+    /// <param name="throwOnRejection">
+    /// <see langword="true"/> to throw when this grain's task rejects the signal, without recording the send; otherwise the
+    /// marker records the rejection, which the operation returns, so a replay returns the same result.
+    /// </param>
     /// <remarks>
-    /// A signal for this grain is staged directly in task state; one for another grain is staged in the outbox. A replay
-    /// which reaches the marker sends nothing again, and the marker is deleted with the execution's tree.
+    /// A signal for this grain is staged directly in task state; one for another grain is staged in the outbox, whose
+    /// target's inbox records the value or dead-letters a rejected signal, so the send reports
+    /// <see cref="DurableSignalResult.Accepted"/>. A replay which reaches the marker sends nothing again, and the marker is
+    /// deleted with the execution's tree.
     /// </remarks>
-    public async ValueTask SendSignalAsync(
+    public async ValueTask<DurableSignalResult> SendSignalAsync(
         TaskId markerId,
         GrainId target,
         TaskId taskId,
         string name,
         DurableTaskResponse value,
+        bool throwOnRejection,
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
@@ -119,6 +126,7 @@ internal sealed partial class DurableTaskGrainRuntime
         ValidateSignal(taskId, name, value);
         var payloadFingerprint = GetSignalFingerprint(value);
         var markerFingerprint = GetSignalSendFingerprint(target, taskId, name, payloadFingerprint);
+        DurableSignalResult result;
         if (_storage.TryGetTask(markerId, out var recorded))
         {
             if (!string.Equals(recorded.RequestFingerprint, markerFingerprint, StringComparison.Ordinal))
@@ -131,12 +139,20 @@ internal sealed partial class DurableTaskGrainRuntime
 
             // The marker commits with the send, possibly in a write which an earlier attempt is still awaiting.
             await WriteStateAsync(cancellationToken);
-            return;
+            result = recorded.Result!.Result is DurableSignalResult recordedResult ? recordedResult : DurableSignalResult.Accepted;
+            if (throwOnRejection && CreateSignalRejection(taskId, name, result) is { } recordedRejection)
+            {
+                throw recordedRejection;
+            }
+
+            return result;
         }
 
+        result = DurableSignalResult.Accepted;
         if (target == GrainId)
         {
-            if (StageSignal(taskId, name, value, payloadFingerprint) is { } rejection)
+            result = StageSignal(taskId, name, value, payloadFingerprint);
+            if (throwOnRejection && CreateSignalRejection(taskId, name, result) is { } rejection)
             {
                 throw rejection;
             }
@@ -148,8 +164,12 @@ internal sealed partial class DurableTaskGrainRuntime
 
         var marker = _storage.GetOrCreateTask(markerId, request: null);
         _storage.SetRequestFingerprint(markerId, marker, markerFingerprint);
-        _storage.SetResponse(markerId, marker, DurableTaskResponse.Completed);
+        _storage.SetResponse(
+            markerId,
+            marker,
+            result == DurableSignalResult.Accepted ? DurableTaskResponse.Completed : DurableTaskResponse.FromResult(result));
         await WriteStateAsync(cancellationToken);
+        return result;
     }
 
     /// <summary>Stages a signal received through the inbox, completing its waits after the inbox batch commits.</summary>
@@ -158,20 +178,42 @@ internal sealed partial class DurableTaskGrainRuntime
     {
         ThrowIfStopping();
         ValidateSignal(taskId, name, value);
-        return StageSignal(taskId, name, value, GetSignalFingerprint(value));
+        return CreateSignalRejection(taskId, name, StageSignal(taskId, name, value, GetSignalFingerprint(value)));
     }
 
-    ValueTask IDurableTaskGrainExtension.SignalAsync(
+    async ValueTask IDurableTaskGrainExtension.SignalAsync(
         TaskId taskId,
         string name,
         DurableTaskResponse value,
         CancellationToken cancellationToken) =>
-        SignalOwnTaskAsync(taskId, name, value, cancellationToken);
+        await SignalOwnTaskAsync(taskId, name, value, throwOnRejection: true, cancellationToken);
 
-    ValueTask IDurableTaskManager.SignalAsync<T>(
+    ValueTask<DurableSignalResult> IDurableTaskGrainExtension.TrySignalAsync(
+        TaskId taskId,
+        string name,
+        DurableTaskResponse value,
+        CancellationToken cancellationToken) =>
+        SignalOwnTaskAsync(taskId, name, value, throwOnRejection: false, cancellationToken);
+
+    async ValueTask IDurableTaskManager.SignalAsync<T>(
         TaskId taskId,
         DurableSignal<T> signal,
         T value,
+        CancellationToken cancellationToken) =>
+        await SignalFromManagerAsync(taskId, signal, value, throwOnRejection: true, cancellationToken);
+
+    ValueTask<DurableSignalResult> IDurableTaskManager.TrySignalAsync<T>(
+        TaskId taskId,
+        DurableSignal<T> signal,
+        T value,
+        CancellationToken cancellationToken) =>
+        SignalFromManagerAsync(taskId, signal, value, throwOnRejection: false, cancellationToken);
+
+    private ValueTask<DurableSignalResult> SignalFromManagerAsync<T>(
+        TaskId taskId,
+        DurableSignal<T> signal,
+        T value,
+        bool throwOnRejection,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(signal);
@@ -179,54 +221,76 @@ internal sealed partial class DurableTaskGrainRuntime
 
         // A durable execution records the send, so its replay doesn't depend on the target's current state.
         return DurableExecutionContext.Current is GrainDurableExecutionContext context
-            ? context.SendSignalAsync(GrainId, taskId, signal.Name, response, cancellationToken)
-            : SignalOwnTaskAsync(taskId, signal.Name, response, cancellationToken);
+            ? context.SendSignalAsync(GrainId, taskId, signal.Name, response, throwOnRejection, cancellationToken)
+            : SignalOwnTaskAsync(taskId, signal.Name, response, throwOnRejection, cancellationToken);
     }
 
     /// <summary>Stages a signal for a task of this grain and waits for the journal write which commits it.</summary>
-    /// <remarks>A duplicate also waits for that write, so the value is durable when the operation completes.</remarks>
-    private async ValueTask SignalOwnTaskAsync(TaskId taskId, string name, DurableTaskResponse value, CancellationToken cancellationToken)
+    /// <remarks>
+    /// A duplicate also waits for that write, so the value is durable when the operation completes. A rejection stages
+    /// nothing, and either throws or is returned.
+    /// </remarks>
+    private async ValueTask<DurableSignalResult> SignalOwnTaskAsync(
+        TaskId taskId,
+        string name,
+        DurableTaskResponse value,
+        bool throwOnRejection,
+        CancellationToken cancellationToken)
     {
         ThrowIfStopping();
         ValidateSignal(taskId, name, value);
-        if (StageSignal(taskId, name, value, GetSignalFingerprint(value)) is { } rejection)
+        var result = StageSignal(taskId, name, value, GetSignalFingerprint(value));
+        if (result is DurableSignalResult.Accepted or DurableSignalResult.Duplicate)
         {
-            throw rejection;
+            await WriteStateAsync(cancellationToken);
+        }
+        else if (throwOnRejection)
+        {
+            throw CreateSignalRejection(taskId, name, result)!;
         }
 
-        await WriteStateAsync(cancellationToken);
+        return result;
     }
 
     /// <summary>Records the first value of a signal for an invoked task, without writing.</summary>
-    /// <returns><see langword="null"/> when the signal is recorded or is a duplicate, or the reason it is rejected.</returns>
-    private Exception? StageSignal(TaskId taskId, string name, DurableTaskResponse value, string payloadFingerprint)
+    /// <returns>Whether the signal is recorded, is a duplicate, or why it is rejected; a rejection stages nothing.</returns>
+    private DurableSignalResult StageSignal(TaskId taskId, string name, DurableTaskResponse value, string payloadFingerprint)
     {
         var recordId = GetSignalRecordId(taskId, name);
         if (_storage.TryGetTask(recordId, out var record))
         {
             return string.Equals(record.RequestFingerprint, payloadFingerprint, StringComparison.Ordinal)
-                ? null
-                : new InvalidOperationException(
-                    $"Durable task '{taskId}' already received a different value for signal '{name}'.");
+                ? DurableSignalResult.Duplicate
+                : DurableSignalResult.Conflict;
         }
 
         if (!_storage.TryGetTask(taskId, out var task) || !IsInvoked(task))
         {
-            return new DurableTaskNotFoundException(taskId);
+            return DurableSignalResult.TaskNotFound;
         }
 
         if (task.CompletedAt.HasValue)
         {
-            return new InvalidOperationException(
-                $"Durable task '{taskId}' has completed, so it no longer receives signal '{name}'.");
+            return DurableSignalResult.TaskCompleted;
         }
 
         record = _storage.GetOrCreateTask(recordId, request: null);
         _storage.SetRequestFingerprint(recordId, record, payloadFingerprint);
         _storage.SetResponse(recordId, record, value);
         _pendingHandleResponses[recordId] = value;
-        return null;
+        return DurableSignalResult.Accepted;
     }
+
+    /// <summary>Creates the exception which reports a rejected signal, or returns <see langword="null"/> for a recorded one.</summary>
+    private static Exception? CreateSignalRejection(TaskId taskId, string name, DurableSignalResult result) => result switch
+    {
+        DurableSignalResult.Conflict => new InvalidOperationException(
+            $"Durable task '{taskId}' already received a different value for signal '{name}'."),
+        DurableSignalResult.TaskNotFound => new DurableTaskNotFoundException(taskId),
+        DurableSignalResult.TaskCompleted => new InvalidOperationException(
+            $"Durable task '{taskId}' has completed, so it no longer receives signal '{name}'."),
+        _ => null,
+    };
 
     private static void ValidateSignal(TaskId taskId, string name, DurableTaskResponse value)
     {

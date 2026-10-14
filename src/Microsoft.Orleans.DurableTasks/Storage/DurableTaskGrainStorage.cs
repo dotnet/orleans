@@ -142,7 +142,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _results[taskId] = typedState.ResultPayload!;
     }
 
-    public void RequestCancellation(TaskId taskId, IDurableTaskState state)
+    public void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null)
     {
         var typedState = GetState(taskId, state);
         if (typedState.CancellationRequestedAt.HasValue || typedState.CompletedAt.HasValue)
@@ -151,6 +151,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         }
 
         typedState.CancellationRequestedAt = _timeProvider.GetUtcNow();
+        typedState.CancellationReason = reason;
         _items[taskId] = typedState;
     }
 

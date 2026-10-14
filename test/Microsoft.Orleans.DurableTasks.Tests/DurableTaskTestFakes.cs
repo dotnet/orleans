@@ -115,6 +115,9 @@ internal sealed class NotFoundDurableTaskServer(
     public ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 
+    public ValueTask CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
     public ValueTask AbortAsync(TaskId taskId, string reason, CancellationToken cancellationToken = default) =>
         throw new NotSupportedException();
 }

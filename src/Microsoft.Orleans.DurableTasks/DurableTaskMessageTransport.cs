@@ -60,13 +60,18 @@ internal sealed class DurableTaskMessageTransport(
             target,
             new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
 
-    public void SendCancellation(GrainId sender, GrainId target, TaskId taskId) =>
+    /// <remarks>
+    /// The message carries the cancellation's <paramref name="reason"/>, if any. Its identity covers only the sender,
+    /// target, task, and subject: the first cancellation request determines the reason, so every send for a task carries
+    /// the same one.
+    /// </remarks>
+    public void SendCancellation(GrainId sender, GrainId target, TaskId taskId, string? reason = null) =>
         Send(
             messageTypes.Cancellation,
             sender,
             target,
             taskId,
-            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender });
+            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender, CancellationReason = reason });
 
     /// <remarks>
     /// An abort is a cancellation message with its reason. Its identity differs from the task's cancellation, so an abort

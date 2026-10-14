@@ -62,7 +62,7 @@ internal sealed class DurableTaskMessageHandler(
                 }
                 else
                 {
-                    runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender));
+                    runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender), cancellation.CancellationReason);
                 }
 
                 return true;
