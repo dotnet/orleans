@@ -28,11 +28,12 @@ public abstract class DurableTaskSignalTests(string journalFormatKey) : IAsyncLi
         await waiter.SignalDurableTaskAsync(taskId, DurableTaskSignalWaiterGrain.Approved, "ada", cancellationToken);
 
         Assert.Equal("ada", await GetResultAsync(workflow, cancellationToken));
-        await waiter.SignalDurableTaskAsync(taskId, DurableTaskSignalWaiterGrain.Approved, "ada", cancellationToken);
+        // Root ID overloads address TaskId.CreateRoot(rootId).
+        await waiter.SignalDurableTaskAsync("approval", DurableTaskSignalWaiterGrain.Approved, "ada", cancellationToken);
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => waiter.SignalDurableTaskAsync(taskId, DurableTaskSignalWaiterGrain.Approved, "grace", cancellationToken).AsTask());
         await Assert.ThrowsAsync<DurableTaskNotFoundException>(
-            () => waiter.SignalDurableTaskAsync(TaskId.CreateRoot("missing"), DurableTaskSignalWaiterGrain.Approved, "ada", cancellationToken).AsTask());
+            () => waiter.SignalDurableTaskAsync("missing", DurableTaskSignalWaiterGrain.Approved, "ada", cancellationToken).AsTask());
 
         // The workflow's tree holds the signal's record with its value.
         var tasks = await GetTasksAsync(waiter, cancellationToken);
