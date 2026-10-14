@@ -64,6 +64,36 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task CancellationReachesTheInputsOfANamedCombinator() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var rootId = TaskId.Parse("root");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            try
+            {
+                await DurableTask.WhenAll([BlockedChild(started), DurableTask.Delay(TimeSpan.FromDays(1))]).WithId("work");
+                return "completed";
+            }
+            catch (OperationCanceledException) when (DurableExecutionContext.Current!.IsCancellationRequested)
+            {
+                return "canceled";
+            }
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await transport.ResumeSent.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).CancelAsync(rootId, TestContext.Current.CancellationToken);
+
+        // The inputs' IDs are root/work/0 and root/work/1, beneath the combinator's operation ID rather than the root.
+        Assert.Equal("canceled", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(TaskId.Parse("root/work/0")).Result!.Status);
+        Assert.Equal(DurableTaskStatus.Canceled, storage.Get(TaskId.Parse("root/work/1")).Result!.Status);
+    });
+
+    [Fact]
     public Task AttachedChildScheduledAfterCancellationIsCanceledWithoutRunning() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
