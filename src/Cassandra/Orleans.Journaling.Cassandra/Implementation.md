@@ -81,6 +81,13 @@ the header. A metadata-only revision change can be refreshed and retried when
 the content revision is unchanged. A content change is an optimistic
 concurrency failure and is reported as an inconsistent-state error.
 
+Before appending or replacing, a storage handle creates a missing header with
+an LWT. If it previously observed the journal as absent and that creation loses
+to another writer, it rejects the operation and keeps the observed-absence
+fence; the caller must recover before writing. A handle which has not observed
+the journal can adopt an existing header after its create-if-absent LWT loses,
+preserving cold-handle behavior.
+
 An append inserts the next entry with `IF NOT EXISTS` and conditionally updates
 the header in one **logged, same-partition conditional batch**. The LWT is on
 the header update; the entry insert and header update commit together. This
@@ -223,6 +230,9 @@ coverage includes:
 - round-trip recovery and Cassandra paging;
 - absent-journal reads, create-if-absent metadata, and empty
   append/replacement behavior;
+- append and replacement rejection after another handle creates a journal
+  which this handle observed as absent, plus cold-handle adoption of an
+  existing journal;
 - detection of missing active-generation rows before reporting a complete read;
 - generation replacement, restarted sequence numbers, and exact old-generation
   deletion;

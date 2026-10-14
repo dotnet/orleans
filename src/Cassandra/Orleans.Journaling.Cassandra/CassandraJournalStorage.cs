@@ -454,7 +454,18 @@ internal sealed class CassandraJournalStorage : IJournalStorage
             return state;
         }
 
-        await CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        var hadObservedAbsence = _hasObservedState;
+        var created = await CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (!created && hadObservedAbsence)
+        {
+            var current = _state;
+            SetState(null);
+            throw CreateInconsistentStateException(
+                "Cassandra journal was created after this storage handle observed it absent; recovery is required.",
+                null,
+                current?.Revision);
+        }
+
         state = _state ?? throw CreateInconsistentStateException("Cassandra journal header is missing after creation.", null, null);
         return state;
     }
