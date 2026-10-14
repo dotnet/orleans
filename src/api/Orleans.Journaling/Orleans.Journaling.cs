@@ -365,6 +365,7 @@ namespace Orleans.Journaling
         long PendingWriteByteCount { get; }
 
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken = default);
+        System.Collections.Generic.IReadOnlyList<string> GetRetiredStateNames();
         System.Collections.Generic.IReadOnlyList<System.Collections.Generic.KeyValuePair<string, IStateMachine>> GetStateMachines();
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken = default);
         void RegisterStateMachine(string name, IStateMachine stateMachine);
