@@ -217,7 +217,7 @@ namespace Tester.CodeGenTests
                 }
                 finally
                 {
-                    this.GrainFactory.DeleteObjectReference(observer);
+                    this.GrainFactory.DeleteObjectReference<IGrainObserverWithGenericMethods>(observer);
                 }
             }
             finally
