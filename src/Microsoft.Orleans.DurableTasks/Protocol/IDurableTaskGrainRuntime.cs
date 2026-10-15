@@ -215,6 +215,11 @@ internal interface IDurableTaskGrainRuntime
     /// <remarks>The caller owns the returned set.</remarks>
     HashSet<TaskId>? GetRecordedOperations(TaskId executionId) => null;
 
+    /// <summary>Notes that the attempt of <paramref name="executionId"/> which replayed its recorded operations runs live.</summary>
+    void OnReplayEnded(TaskId executionId)
+    {
+    }
+
     /// <summary>
     /// Stages the terminal response of the body which <paramref name="context"/> runs, from the work item which ran the
     /// body's final code on the activation, without writing.

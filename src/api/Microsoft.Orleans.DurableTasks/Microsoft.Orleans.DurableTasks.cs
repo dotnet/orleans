@@ -168,6 +168,68 @@ namespace Orleans.DurableTasks
     }
 }
 
+namespace Orleans.DurableTasks.Diagnostics
+{
+    public static partial class DurableTaskEvents
+    {
+        public const string ListenerName = "Orleans.DurableTasks";
+        public static System.IObservable<DurableTaskEvent> AllEvents { get { throw null; } }
+
+        public abstract partial class DurableTaskEvent
+        {
+            public readonly Orleans.Runtime.IGrainContext GrainContext;
+            public readonly TaskId TaskId;
+            protected DurableTaskEvent(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) { }
+        }
+
+        public sealed partial class ExecutionStarted : DurableTaskEvent
+        {
+            public ExecutionStarted(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
+        }
+
+        public sealed partial class ExecutionStopped : DurableTaskEvent
+        {
+            public ExecutionStopped(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
+        }
+
+        public sealed partial class ReplayEnded : DurableTaskEvent
+        {
+            public ReplayEnded(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
+        }
+
+        public sealed partial class SelectionWaitStarted : DurableTaskEvent
+        {
+            public SelectionWaitStarted(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
+        }
+
+        public sealed partial class SignalWaitEnded : DurableTaskEvent
+        {
+            public SignalWaitEnded(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
+        }
+
+        public sealed partial class SignalWaitStarted : DurableTaskEvent
+        {
+            public SignalWaitStarted(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
+        }
+
+        public sealed partial class TaskCompleted : DurableTaskEvent
+        {
+            public readonly DurableTaskResponse Response;
+            public TaskCompleted(Orleans.Runtime.IGrainContext grainContext, TaskId taskId, DurableTaskResponse response) : base(default!, default) { }
+        }
+
+        public sealed partial class TaskCreated : DurableTaskEvent
+        {
+            public TaskCreated(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
+        }
+
+        public sealed partial class TaskDeleted : DurableTaskEvent
+        {
+            public TaskDeleted(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
+        }
+    }
+}
+
 namespace Orleans.DurableTasks.Protocol
 {
     [GenerateSerializer]

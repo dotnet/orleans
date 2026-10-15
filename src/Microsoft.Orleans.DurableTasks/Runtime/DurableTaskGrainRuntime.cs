@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Orleans.DurableTasks;
+using Orleans.DurableTasks.Diagnostics;
 using Orleans.DurableTasks.Protocol;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -141,7 +142,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     // cancellation lowers it, and each scan recomputes it from the remaining tasks.
     private DateTimeOffset _nextExpiry = DateTimeOffset.MinValue;
 
-    internal GrainId GrainId => _shared.GrainContextAccessor.GrainContext.GrainId;
+    internal GrainId GrainId => GrainContext.GrainId;
+
+    internal IGrainContext GrainContext => _shared.GrainContextAccessor.GrainContext;
 
     public DateTimeOffset UtcNow => _shared.TimeProvider.GetUtcNow();
 
@@ -230,6 +233,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 return await SelectRecordedCompletionAsync(decisionId, decision: null, candidates, cancellationToken);
             }
 
+            DurableTaskEvents.EmitSelectionWaitStarted(GrainContext, decisionId);
             await WaitForAnyAsync(candidates, cancellationToken);
             ThrowIfStopping();
         }
@@ -314,7 +318,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
         else
         {
-            decision = _storage.GetOrCreateTask(decisionId, request: null);
+            decision = GetOrCreateTask(decisionId, request: null);
             _storage.SetRequestFingerprint(decisionId, decision, fingerprint);
         }
 
@@ -331,7 +335,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                     continue;
                 }
 
-                decision = _storage.GetOrCreateTask(decisionId, request: null);
+                decision = GetOrCreateTask(decisionId, request: null);
                 StoreResult(decisionId, decision, DurableTaskResponse.FromResult(candidate));
                 await WriteStateAsync(cancellationToken);
                 return candidate;
@@ -686,6 +690,35 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private ValueTask WriteStateAsync(CancellationToken cancellationToken) => _storage.WriteAsync(cancellationToken);
 
+    /// <summary>Returns a task's state, staging the state of a task which doesn't exist.</summary>
+    private IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request)
+    {
+        var reportCreation = DurableTaskEvents.IsTaskCreatedEnabled && !_storage.TryGetTask(taskId, out _);
+        var state = _storage.GetOrCreateTask(taskId, request);
+        if (reportCreation)
+        {
+            DurableTaskEvents.EmitTaskCreated(GrainContext, taskId);
+        }
+
+        return state;
+    }
+
+    /// <summary>Stages a task's terminal result.</summary>
+    private void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response)
+    {
+        _storage.SetResponse(taskId, state, response);
+        DurableTaskEvents.EmitTaskCompleted(GrainContext, taskId, response);
+    }
+
+    /// <summary>Stages a task's deletion.</summary>
+    private void RemoveTask(TaskId taskId)
+    {
+        if (_storage.RemoveTask(taskId))
+        {
+            DurableTaskEvents.EmitTaskDeleted(GrainContext, taskId);
+        }
+    }
+
     public async ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
         TaskId taskId,
         IDurableTaskRequest request,
@@ -739,7 +772,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
         }
 
-        state ??= _storage.GetOrCreateTask(taskId, request: null);
+        state ??= GetOrCreateTask(taskId, request: null);
         MarkShielded(taskId, state, shielded);
         if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
         {
@@ -793,16 +826,16 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         var response = effect(state);
-        record = _storage.GetOrCreateTask(effectId, request: null);
+        record = GetOrCreateTask(effectId, request: null);
         _storage.SetRequestFingerprint(effectId, record, EffectFingerprint);
         try
         {
-            _storage.SetResponse(effectId, record, response);
+            SetResponse(effectId, record, response);
         }
         catch (Exception exception) when (response.Exception is null)
         {
             response = DurableTaskResponse.FromException(exception);
-            _storage.SetResponse(effectId, record, response);
+            SetResponse(effectId, record, response);
         }
 
         return response;
@@ -932,7 +965,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
         }
 
-        state ??= _storage.GetOrCreateTask(taskId, request: null);
+        state ??= GetOrCreateTask(taskId, request: null);
         var generation = checked(state.ResumeGeneration + 1);
         _storage.SetDelay(taskId, state, dueTime, generation);
 
@@ -1209,7 +1242,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var fingerprint = IDurableTaskRequest.GetFingerprint(request, _shared.Serializer);
         if (!_storage.TryGetTask(taskId, out var state))
         {
-            state = _storage.GetOrCreateTask(taskId, request);
+            state = GetOrCreateTask(taskId, request);
             StageCaller(taskId, state, requestContext.CallerId);
             _storage.SetRequestFingerprint(taskId, state, fingerprint);
             var subscribedNew = requestContext.SupportsDurableCompletion
@@ -1698,7 +1731,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         // such as the first durable operation of its body or its result, so a synchronous step costs one write. A step's
         // identity and inputs follow from its parent's inputs and earlier results, so a replay which finds no record
         // runs the step again.
-        state ??= _storage.GetOrCreateTask(taskId, null);
+        state ??= GetOrCreateTask(taskId, null);
         MarkShielded(taskId, state, shielded);
 
         var executionContext = CreateExecutionContext(taskId);
@@ -1841,7 +1874,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         // The child state lets cancellation of the child or its ancestors reach the deferred handle.
-        state ??= _storage.GetOrCreateTask(taskId, null);
+        state ??= GetOrCreateTask(taskId, null);
         MarkShielded(taskId, state, shielded);
 
         DurableTaskResponse schedulingResponse;
@@ -1865,7 +1898,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 && !created.CancellationRequestedAt.HasValue
                 && created.Result is null)
             {
-                _storage.RemoveTask(taskId);
+                RemoveTask(taskId);
             }
 
             throw;
@@ -1980,6 +2013,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         // The attempt is runnable from its registration, before its body's first work item runs.
         Interlocked.Increment(ref _runningAttempts);
+        DurableTaskEvents.EmitExecutionStarted(GrainContext, taskId);
         start.SetResult();
     }
 
@@ -2043,6 +2077,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                     .Remove(new(context.Id, running));
                 ((ICollection<KeyValuePair<TaskId, GrainDurableTaskContext>>)_executionContexts)
                     .Remove(new(context.Id, context));
+                DurableTaskEvents.EmitExecutionStopped(GrainContext, context.Id);
             }
         }
     }
@@ -2177,7 +2212,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </param>
     private void StoreResult(TaskId taskId, IDurableTaskState state, DurableTaskResponse response, bool subscribed = false)
     {
-        _storage.SetResponse(taskId, state, response);
+        SetResponse(taskId, state, response);
         if (!subscribed && TryGetSubscription(state, out var target, out var subscribedTaskId))
         {
             Unsubscribe(target, subscribedTaskId, taskId);
@@ -2476,6 +2511,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             // Deactivation still drains the discarded attempt.
             TrackBackgroundTask(running.Task, "running a deleted durable task");
+            DurableTaskEvents.EmitExecutionStopped(GrainContext, taskId);
         }
 
         if (_taskHandles.TryRemove(taskId, out var handle))
@@ -2494,7 +2530,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         _pendingStarts.TryRemove(taskId, out _);
         _pendingHandleResponses.TryRemove(taskId, out _);
         _logicalTimes.Remove(taskId);
-        _storage.RemoveTask(taskId);
+        RemoveTask(taskId);
         SignalAcceptance(taskId);
     }
 
@@ -2670,7 +2706,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (!_storage.TryGetTask(taskId, out var taskState))
         {
             // The cancellation can precede its invocation, which this record cancels on arrival.
-            taskState = _storage.GetOrCreateTask(taskId, request: null);
+            taskState = GetOrCreateTask(taskId, request: null);
             StageCaller(taskId, taskState, callerId);
             _storage.RequestCancellation(taskId, taskState, reason);
             TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.OutboxRetryTimeout));
@@ -2867,6 +2903,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (_runningRequests.TryRemove(taskId, out var running))
         {
             TrackBackgroundTask(running.Task, "running an aborted durable task");
+            DurableTaskEvents.EmitExecutionStopped(GrainContext, taskId);
         }
 
         if (_taskHandles.TryGetValue(taskId, out var handle) && handle is not TaskHandle and not CompletedTaskHandle)
@@ -2940,6 +2977,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     public DateTimeOffset? GetCompletedAt(TaskId taskId) =>
         _storage.TryGetTask(taskId, out var state) ? state.CompletedAt : null;
+
+    public void OnReplayEnded(TaskId executionId) => DurableTaskEvents.EmitReplayEnded(GrainContext, executionId);
 
     /// <remarks>
     /// An execution's recorded operations are its nearest stored descendants: descendants which are themselves executions,
