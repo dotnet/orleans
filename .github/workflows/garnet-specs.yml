@@ -39,11 +39,12 @@ jobs:
           quint run "$SPEC" --main=garnetRangeMigrationSim --backend=rust
           --invariant=safety --max-steps=40 --max-samples=20000
       - name: Mutants must violate safety
-        # mutantUnfencedInstall needs a delivery delayed across three view changes, which random simulation
-        # rarely reaches; its directed scenario, unfencedInstallHidesWriteTest, catches it.
+        # mutantUnfencedInstall and mutantUnfencedOpen need long, specific sequences which random simulation
+        # rarely reaches; their directed scenarios, unfencedInstallHidesWriteTest and unfencedOpenTest, catch them.
         run: |
-          for step in mutantOpenBeforeSeal mutantUnconditionalInstall mutantDeleteWithoutTombstone mutantReclaimBeforeDone \
-                      mutantMarkDoneEarly mutantRetryWithoutIdempotence mutantRetryAnyAbsence mutantWriteAfterSeal; do
+          for step in mutantOpenBeforeSeal mutantUnconditionalInstall mutantDeleteWithoutTombstone \
+                      mutantReclaimBeforeDone mutantMarkDoneEarly mutantInventoryLiveOnly mutantCollectWithAttempt \
+                      mutantRetryWithoutIdempotence mutantRetryAnyAbsence mutantWriteAfterSeal; do
             if quint run "$SPEC" --main=garnetRangeMigrationSim --backend=rust --step="$step" \
                  --invariant=safety --max-steps=30 --max-samples=5000 --seed=7 > "$step.log" 2>&1; then
               echo "::error::$step was not caught by the safety invariant"
@@ -80,11 +81,11 @@ jobs:
       - name: Liveness under the coordinator's rule
         run: >-
           quint verify "$SPEC" --main=garnetRangeMigrationLive --backend=tlc
-          --step=coordinatedStep --temporal=migrationsComplete
+          --temporal=migrationsComplete
       - name: Liveness fails without the coordinator's rule
         run: |
           if quint verify "$SPEC" --main=garnetRangeMigrationLive --backend=tlc \
-               --step=step --temporal=migrationsComplete > uncoordinated.log 2>&1; then
+               --step=uncoordinatedStep --temporal=migrationsComplete > uncoordinated.log 2>&1; then
             echo "::error::migrationsComplete holds without the coordinator's rule, so it does not test the rule"
             exit 1
           fi
