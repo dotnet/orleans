@@ -384,8 +384,11 @@ synchronously on the activation which makes them, when the runtime stages them: 
   call to another grain, records that its ancestors' cancellation doesn't reach it: it is created and
   runs when its parent's cancellation was already requested, a later request skips it and its
   descendants, and recovery replays it with its own cancellation state. A shielded combinator shields
-  each input which it starts. Its own cancellation, an abort of its tree, and deletion of its tree
-  still reach it. A body detaches work which must outlive the task itself.
+  each input which it starts. A shielded signal wait which runs as part of the body waits with the
+  attempt's abort token, so the body's cancellation doesn't end it; a shielded subscription, including
+  the record of a detached task, isn't unsubscribed by it. Its own cancellation, an abort of its tree,
+  and deletion of its tree still reach every shielded operation. A body detaches work which must
+  outlive the task itself.
 - A cancellation request's reason commits with the request on each task it reaches, travels with the
   cancellation to each pending call to another grain, and is what a replay of a canceled body reads
   from `DurableTask.Current.CancellationReason`. Diagnostics report it as the `Response` of a
