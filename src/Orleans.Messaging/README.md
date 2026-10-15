@@ -139,8 +139,12 @@ construction or activation setup, before journal recovery.
     message fails its `Send` instead.
   - `DeadLettered`: the inbox dead-letters the message with the sink's reason and
     optional application-defined `Code`, such as `orders/duplicate-order`, and the
-    sender's source receives both in a `Rejected` retirement. A sink that throws or
-    reports another status is treated the same way, with no code.
+    sender's source receives both in a `Rejected` retirement.
+
+  A sink exception, or any other status, leaves the outcome unknown: the inbox stages
+  nothing and the delivery fails, so the sender's outbox retries it with backoff
+  until `OutboxRetryTimeout`, and a self-sent message fails its `Send`. Return
+  `DeadLettered` to reject a message permanently.
 
   Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
   sink honors their `DeliverAt`. Declined messages follow the handler path once
@@ -201,5 +205,5 @@ delivery duration; and `orleans-messaging-inbox-depth` and
 sends to itself counts as sent and as received by its inbox, and never contributes
 to outbox delivery or depth. Reference sends count as sent; a reference entry whose
 source fails to provide its message counts as delivered `source_error`. A message an
-inbox sink accepts counts as received `accepted` and processed `success`; one whose
-sink throws counts as processed `dead_lettered`.
+inbox sink accepts counts as received `accepted` and processed `success`; one which
+the sink dead-letters counts as processed `dead_lettered`.
