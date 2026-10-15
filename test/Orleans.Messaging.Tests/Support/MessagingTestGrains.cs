@@ -40,7 +40,8 @@ public sealed record TestMessage(
     [property: Id(8)] bool ThrowDuringPreparation = false,
     [property: Id(5)] bool CommitDuringHandling = false,
     [property: Id(6)] bool DeleteDuringHandling = false,
-    [property: Id(9)] bool ThrowOnceDuringPreparation = false);
+    [property: Id(9)] bool ThrowOnceDuringPreparation = false,
+    [property: Id(10)] int ThrowForAttempts = 0);
 
 [GenerateSerializer, Immutable]
 public sealed record MessageEffect(
@@ -98,6 +99,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
     private int _maxConcurrentHandlers;
     // Spans activations so a replayed message does not fail again after recovery.
     private static readonly ConcurrentDictionary<MessageId, byte> FailedOnce = new();
+    private static readonly ConcurrentDictionary<MessageId, int> FailedAttempts = new();
 
     public MessagingTestGrain(
         IGrainContext grainContext,
@@ -371,7 +373,9 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
             {
                 await WriteStateAsync(cancellationToken);
             }
-            if (message.ThrowDuringPreparation || (message.ThrowOnceDuringPreparation && FailedOnce.TryAdd(message.LogicalId, 0)))
+            if (message.ThrowDuringPreparation
+                || (message.ThrowOnceDuringPreparation && FailedOnce.TryAdd(message.LogicalId, 0))
+                || (message.ThrowForAttempts > 0 && FailedAttempts.AddOrUpdate(message.LogicalId, 1, static (_, count) => count + 1) <= message.ThrowForAttempts))
             {
                 throw new InvalidOperationException($"Injected handler preparation failure for {message.LogicalId}.");
             }

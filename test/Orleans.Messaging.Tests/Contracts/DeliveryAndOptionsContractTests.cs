@@ -105,6 +105,7 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal(TimeSpan.FromDays(7), options.DeduplicationWindow);
         Assert.Equal(TimeSpan.FromHours(6), options.OutboxRetryTimeout);
         Assert.Equal(TimeSpan.FromDays(30), options.DeadLetterRetentionPeriod);
+        Assert.Equal(TimeSpan.FromHours(6), options.InboxRetryTimeout);
         Assert.Equal(1000, options.MaxRetainedDeadLetters);
         Assert.Equal(32, options.InboxBatchSize);
         Assert.Equal(32, options.OutboxBatchSize);
@@ -120,6 +121,7 @@ public sealed class DeliveryAndOptionsContractTests
             (nameof(DurableMessagingOptions.DeduplicationWindow), options => options.DeduplicationWindow = TimeSpan.FromTicks(-1)),
             (nameof(DurableMessagingOptions.RetryInitialInterval), options => options.RetryInitialInterval = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.RetryInitialInterval), options => options.RetryInitialInterval = TimeSpan.MaxValue),
+            (nameof(DurableMessagingOptions.InboxRetryTimeout), options => options.InboxRetryTimeout = TimeSpan.FromTicks(-1)),
             (nameof(DurableMessagingOptions.OutboxRetryTimeout), options => options.OutboxRetryTimeout = TimeSpan.Zero),
             (nameof(DurableMessagingOptions.OutboxRetryTimeout), options => options.OutboxRetryTimeout = TimeSpan.FromTicks(-1)),
             (nameof(DurableMessagingOptions.DeadLetterRetentionPeriod), options => options.DeadLetterRetentionPeriod = TimeSpan.Zero),

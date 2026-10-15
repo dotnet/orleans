@@ -13,6 +13,9 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
 {
     private static readonly TimeSpan RetryDelay = TimeSpan.FromMinutes(1);
 
+    // Attempts run at 0, 1, 3, 7, 15, 31 and 63 retry delays; the eighth and last runs when the timeout elapses.
+    private static readonly TimeSpan RetryTimeout = RetryDelay * 100;
+
     [Fact]
     public async Task HandlerFailure_RetriesAfterBackoffAndEarlyWakeupsAreHarmless()
     {
@@ -51,7 +54,51 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
     }
 
     [Fact]
-    public async Task OrdinaryHandlerFailures_DeadLetterAtExactConfiguredAttemptLimit()
+    public async Task TransientHandlerFailures_RetryUntilTheHandlerSucceedsWithinTheRetryTimeout()
+    {
+        var receiver = NewGrain();
+        _ = await receiver.GetSnapshotAsync();
+        var inbox = Fixture.GetInbox(receiver);
+        var envelope = CreateEnvelope(receiver, NewMessage(196, "transient") with { ThrowForAttempts = 6 });
+        var messageId = envelope.Envelope.MessageId;
+        var start = Fixture.Clock.GetUtcNow();
+
+        Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
+        await Fixture.WaitUntilAsync(receiver, () => inbox.Count == 1 && InboxTestAccess.GetMessageState(inbox, messageId).AttemptCount == 1);
+        await RunFailedAttemptsAsync(receiver, inbox, messageId, start, failedAttempts: 6);
+
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
+        var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(1, Assert.Single(completed.Effects).Count);
+        Assert.Equal(0, completed.InboxCount);
+        Assert.Empty(completed.InboxDeadLetters);
+        Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
+    }
+
+    // Verifies each failed attempt's retry state, running the pump at each retry, and leaves the clock at the attempt
+    // which follows the last failed one.
+    private async Task RunFailedAttemptsAsync(IMessagingTestGrain receiver, Inbox inbox, MessageId messageId, DateTimeOffset start, int failedAttempts)
+    {
+        var expirationTime = start + RetryTimeout;
+        for (var attempt = 1; ; attempt++)
+        {
+            var state = await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetMessageState(inbox, messageId));
+            Assert.Equal(attempt, state.AttemptCount);
+            Assert.Equal(expirationTime, state.ExpirationTime);
+            var backoff = start + RetryDelay * ((1 << attempt) - 1);
+            Assert.Equal(backoff < expirationTime ? backoff : expirationTime, state.NextAttemptAt);
+            Fixture.Clock.Advance(state.NextAttemptAt!.Value - Fixture.Clock.GetUtcNow());
+            if (attempt == failedAttempts)
+            {
+                return;
+            }
+
+            _ = await Fixture.RunPumpAsync(receiver);
+            await Fixture.WaitUntilAsync(receiver, () => InboxTestAccess.GetMessageState(inbox, messageId).AttemptCount == attempt + 1);
+        }
+    }
+    [Fact]
+    public async Task OrdinaryHandlerFailures_RetryUntilTheRetryTimeoutThenDeadLetter()
     {
         var receiver = NewGrain();
         _ = await receiver.GetSnapshotAsync();
@@ -63,19 +110,14 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         Assert.Equal(DeliveryStatus.Accepted, (await DeliverAsync(receiver, envelope)).Status);
         await Fixture.WaitUntilAsync(receiver, () => inbox.Count == 1 && InboxTestAccess.GetMessageState(inbox, messageId).AttemptCount == 1);
 
-        // Backoff doubles per attempt.
-        Fixture.Clock.Advance(RetryDelay);
-        _ = await Fixture.RunPumpAsync(receiver);
-        await Fixture.WaitUntilAsync(receiver, () => InboxTestAccess.GetMessageState(inbox, messageId).AttemptCount == 2);
-        var second = await Fixture.OnGrainAsync(receiver, () => InboxTestAccess.GetMessageState(inbox, messageId));
-        Assert.Equal(start + RetryDelay + RetryDelay * 2, second.NextAttemptAt);
-
-        Fixture.Clock.Advance(RetryDelay * 2);
+        // Backoff doubles per attempt, and the last attempt runs when InboxRetryTimeout elapses after the first failure.
+        await RunFailedAttemptsAsync(receiver, inbox, messageId, start, failedAttempts: 7);
+        Assert.Equal(start + RetryTimeout, Fixture.Clock.GetUtcNow());
         Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
         var deadLettered = await Fixture.WaitForDeadLetterCountAsync(receiver, 1);
         var deadLetter = Assert.Single(deadLettered.InboxDeadLetters);
         Assert.Equal(messageId, deadLetter.MessageId);
-        Assert.Equal(3, deadLetter.AttemptCount);
+        Assert.Equal(8, deadLetter.AttemptCount);
         Assert.Equal(0, deadLettered.InboxCount);
         Assert.Empty(deadLettered.Effects);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
@@ -152,7 +194,7 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         protected override void ConfigureOptions(DurableMessagingOptions options)
         {
             base.ConfigureOptions(options);
-            options.MaxProcessingAttempts = 3;
+            options.InboxRetryTimeout = RetryTimeout;
             options.RetryInitialInterval = RetryDelay;
         }
     }

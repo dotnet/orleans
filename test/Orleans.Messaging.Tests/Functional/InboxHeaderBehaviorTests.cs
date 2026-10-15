@@ -253,7 +253,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         protected override void ConfigureOptions(DurableMessagingOptions options)
         {
             base.ConfigureOptions(options);
-            options.MaxProcessingAttempts = 2;
+            options.InboxRetryTimeout = TimeSpan.FromHours(1);
             options.RetryInitialInterval = TimeSpan.FromHours(1);
         }
     }

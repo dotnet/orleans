@@ -304,14 +304,20 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 return;
             }
 
+            // An exception leaves the outcome unknown, so the message retries until InboxRetryTimeout after its first
+            // failure. The last attempt runs when the timeout elapses; Fail(reason) dead-letters a message at once.
             var attempts = checked(entry.State.AttemptCount + 1);
-            if (attempts >= Options.MaxProcessingAttempts)
+            var now = TimeProvider.GetUtcNow();
+            var expirationTime = entry.State.ExpirationTime ?? MessagingTime.AddClamped(now, Options.InboxRetryTimeout);
+            if (expirationTime <= now)
             {
                 StageDeadLetter(entry.Message, error.Message, attempts);
                 status = "dead_lettered";
             }
             else
             {
+                var retryAt = MessagingTime.AddClamped(now,
+                    TimeSpan.FromTicks(Options.RetryInitialInterval.Ticks * (1L << Math.Min(attempts - 1, DurableMessagingOptions.MaximumBackoffExponent))));
                 Emit(new()
                 {
                     Kind = InboxCommandKind.Retry,
@@ -320,8 +326,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                     {
                         AttemptCount = attempts,
                         LastError = error.ToString(),
-                        NextAttemptAt = MessagingTime.AddClamped(TimeProvider.GetUtcNow(),
-                            TimeSpan.FromTicks(Options.RetryInitialInterval.Ticks * (1L << Math.Min(attempts - 1, DurableMessagingOptions.MaximumBackoffExponent))))
+                        NextAttemptAt = retryAt < expirationTime ? retryAt : expirationTime,
+                        ExpirationTime = expirationTime
                     }
                 });
                 status = "retry";
