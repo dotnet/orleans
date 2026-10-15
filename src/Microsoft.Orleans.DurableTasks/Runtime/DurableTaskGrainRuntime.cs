@@ -1038,9 +1038,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         return response;
     }
 
-    /// <summary>Stages a remote child's terminal response, which its callee sent under the child's own identifier.</summary>
+    /// <summary>
+    /// Stages a remote child's terminal response, which its callee sent for the task which it stores under this grain's
+    /// scope.
+    /// </summary>
     internal void AcceptResponseFromInbox(TaskId taskId, DurableTaskResponse response, GrainId sender) =>
-        AcceptResponseFromInbox(taskId, taskId, response, sender);
+        AcceptResponseFromInbox(taskId, CallerScope.GetTaskId(GrainId, taskId), response, sender);
 
     /// <summary>
     /// Stages the terminal response of a task of <paramref name="sender"/> which <paramref name="taskId"/> awaits: a remote
@@ -1217,6 +1220,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private ScheduledRequest StageSchedule(TaskId taskId, IDurableTaskRequest request, bool fromInbox)
     {
         ThrowIfStopping();
+        CallerScope.ThrowIfReserved(taskId);
         if (request.Context is not { } requestContext)
         {
             throw new InvalidOperationException($"No context for durable task request {request}");
@@ -1247,7 +1251,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             StageCaller(taskId, state, requestContext.CallerId);
             _storage.SetRequestFingerprint(taskId, state, fingerprint);
             var subscribedNew = requestContext.SupportsDurableCompletion
-                && TryRegisterCompletionDestination(taskId, state, new(requestContext.CallerId, taskId));
+                && TryRegisterCompletionDestination(taskId, state, GetInvoker(requestContext.CallerId, taskId));
             return new(subscribedNew ? DurableTaskResponse.Subscribed : DurableTaskResponse.Pending, Start: true, CompletedResponse: null);
         }
 
@@ -1317,7 +1321,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
             if (requestContext.SupportsDurableCompletion)
             {
-                TryRegisterCompletionDestination(taskId, state, new(requestContext.CallerId, taskId));
+                TryRegisterCompletionDestination(taskId, state, GetInvoker(requestContext.CallerId, taskId));
             }
 
             var canceled = StageResponse(taskId, DurableTaskResponse.FromException(new OperationCanceledException()));
@@ -1328,20 +1332,27 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             if (ShouldSendCompletion(taskId, state, requestContext))
             {
-                SendCompletion(taskId, new(requestContext.CallerId, taskId));
+                SendCompletion(taskId, GetInvoker(requestContext.CallerId, taskId));
             }
 
             return new(completed, Start: false, CompletedResponse: null);
         }
 
         var subscribed = requestContext.SupportsDurableCompletion
-            && TryRegisterCompletionDestination(taskId, state, new(requestContext.CallerId, taskId));
+            && TryRegisterCompletionDestination(taskId, state, GetInvoker(requestContext.CallerId, taskId));
 
         // A request staged by an attempt whose write did not complete has not started yet.
         return new(subscribed ? DurableTaskResponse.Subscribed : DurableTaskResponse.Pending, Start: true, CompletedResponse: null);
     }
 
     private readonly record struct ScheduledRequest(DurableTaskResponse Response, bool Start, DurableTaskResponse? CompletedResponse);
+
+    /// <summary>
+    /// Returns the destination of the completion of <paramref name="taskId"/> to the grain which invoked it, which names the
+    /// invoker's own child.
+    /// </summary>
+    private static DurableTaskSubscriber GetInvoker(GrainId callerId, TaskId taskId) =>
+        new(callerId, CallerScope.GetCallerTaskId(callerId, taskId));
 
     private bool ShouldSendCompletion(
         TaskId taskId,
@@ -1355,13 +1366,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             return false;
         }
 
-        if (state.CompletionDestinations.Contains(new(requestContext.CallerId, taskId)))
+        if (state.CompletionDestinations.Contains(GetInvoker(requestContext.CallerId, taskId)))
         {
             // The completion to this destination is still pending in the outbox.
             return false;
         }
 
-        return TryRegisterCompletionDestination(taskId, state, new(requestContext.CallerId, taskId));
+        return TryRegisterCompletionDestination(taskId, state, GetInvoker(requestContext.CallerId, taskId));
     }
 
     private void StartRequest(TaskId taskId)
