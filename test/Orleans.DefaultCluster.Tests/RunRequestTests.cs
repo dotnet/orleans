@@ -145,14 +145,6 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
         Assert.Contains("ICustomRequests.Apply", await grain.GetFilteredCalls());
     }
 
-    [Fact]
-    public async Task ReceiveLocalRequest_CustomInvokable_ObservesCallerGrainCancellationToken()
-    {
-        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
-
-        Assert.Equal("canceled", await grain.RunCancellableCustomRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken));
-    }
-
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

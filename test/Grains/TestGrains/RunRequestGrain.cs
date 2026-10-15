@@ -82,19 +82,6 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         return Task.CompletedTask;
     }
 
-    public async Task<string?> RunCancellableCustomRequest()
-    {
-        using var source = new GrainCancellationTokenSource();
-        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var completion = new ResponseCompletionSource<string?>();
-
-        // The request interleaves so that it runs while this call waits for it.
-        ((IGrainBase)this).GrainContext.ReceiveLocalRequest(new CancellableRequest(source.Token, started), completion, new LocalRequestOptions { Interleave = true });
-        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        await source.Cancel();
-        return await completion.AsValueTask().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
-    }
-
     public Task StartBlockingRequest()
     {
         var gate = _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -317,51 +304,6 @@ internal sealed class CustomRequest(string value, TaskCompletionSource<string?>?
     public override string GetInterfaceName() => InterfaceName;
 
     public override string GetActivityName() => $"{InterfaceName}/{MethodName}";
-
-    public override Type GetInterfaceType() => typeof(IRunRequestGrain);
-
-    public override MethodInfo GetMethod() => typeof(IRunRequestGrain).GetMethod(nameof(IRunRequestGrain.Ping))!;
-}
-
-/// <summary>
-/// A hand-written request which waits for its <see cref="GrainCancellationToken"/> argument to be canceled.
-/// </summary>
-internal sealed class CancellableRequest(GrainCancellationToken token, TaskCompletionSource started) : Request<string?>
-{
-    private GrainCancellationToken _token = token;
-    private RunRequestGrainBase? _grain;
-
-    public override object GetTarget() => _grain!;
-
-    public override void SetTarget(ITargetHolder holder) => _grain = (RunRequestGrainBase?)holder.GetTarget();
-
-    protected override async ValueTask<string?> InvokeInner()
-    {
-        started.TrySetResult();
-        try
-        {
-            await Task.Delay(Timeout.Infinite, _token.CancellationToken);
-            return "completed";
-        }
-        catch (OperationCanceledException)
-        {
-            return "canceled";
-        }
-    }
-
-    public override int GetArgumentCount() => 1;
-
-    public override object GetArgument(int index) => index == 0 ? _token : throw new ArgumentOutOfRangeException(nameof(index));
-
-    public override void SetArgument(int index, object value) => _token = index == 0 ? (GrainCancellationToken)value : throw new ArgumentOutOfRangeException(nameof(index));
-
-    public override void Dispose() { }
-
-    public override string GetMethodName() => "WaitForCancellation";
-
-    public override string GetInterfaceName() => CustomRequest.InterfaceName;
-
-    public override string GetActivityName() => $"{CustomRequest.InterfaceName}/WaitForCancellation";
 
     public override Type GetInterfaceType() => typeof(IRunRequestGrain);
 

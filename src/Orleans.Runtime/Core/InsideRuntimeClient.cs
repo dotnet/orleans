@@ -331,13 +331,7 @@ namespace Orleans.Runtime
                                 var invokable = LocalRequestCompletion.GetRequest(body);
                                 invokable.SetTarget(target);
 
-                                // A local request carries the caller's own tokens, which are already linked to their sources.
-                                // Tokens deserialized from the wire are replaced with tokens registered on the activation.
-                                if (!message.IsLocalOnly)
-                                {
-                                    CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
-                                }
-
+                                CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
                                 if (GrainCallFilters is { Count: > 0 } || target.GrainInstance is IIncomingGrainCallFilter)
                                 {
                                     var invoker = new GrainMethodInvoker(message, target, invokable, GrainCallFilters, this.interfaceToImplementationMapping, this.responseCopier);
