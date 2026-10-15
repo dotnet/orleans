@@ -7,27 +7,25 @@ using Orleans.Serialization.Invocation;
 namespace Orleans.Runtime;
 
 /// <summary>
-/// A request queued on an activation by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken, string?)"/>.
+/// A request queued on an activation by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>.
 /// </summary>
 /// <remarks>
 /// The request is its own completion source, so queuing a request allocates only this object and its message.
 /// Cancellation applies while the request is queued. Once the callback starts, the task reflects the callback's outcome.
 /// When a call filter completes the invocation without running the callback, the task reflects the filter's outcome.
-/// Call filters observe the request as <see cref="IGrainRequestInvoker.RunRequestAsync"/>, with the method name supplied by the caller, if any.
+/// Call filters observe the request as <see cref="IGrainRequestInvoker.RunRequestAsync"/>.
 /// </remarks>
 internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResult>, IInvokable, IGrainRequestInvoker, ILocalRequest, IResponseCompletionSource
 {
     private readonly Func<TState, CancellationToken, Task> _callback;
     private readonly TState _state;
-    private readonly string? _methodName;
     private readonly CancellationTokenRegistration _registration;
 
-    public GrainRequest(Func<TState, CancellationToken, Task> callback, TState state, string? methodName, CancellationToken cancellationToken)
+    public GrainRequest(Func<TState, CancellationToken, Task> callback, TState state, CancellationToken cancellationToken)
         : base(TaskCreationOptions.RunContinuationsAsynchronously)
     {
         _callback = callback;
         _state = state;
-        _methodName = methodName;
         _registration = cancellationToken.UnsafeRegister(
             static (state, cancellationToken) => ((GrainRequest<TState, TResult>)state!).TrySetCanceled(cancellationToken),
             this);
@@ -133,11 +131,11 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
 
     public void SetArgument(int index, object? value) => throw new ArgumentOutOfRangeException(nameof(index));
 
-    public string GetMethodName() => _methodName ?? nameof(IGrainRequestInvoker.RunRequestAsync);
+    public string GetMethodName() => nameof(IGrainRequestInvoker.RunRequestAsync);
 
     public string GetInterfaceName() => nameof(IGrainRequestInvoker);
 
-    public string GetActivityName() => $"{nameof(IGrainRequestInvoker)}/{GetMethodName()}";
+    public string GetActivityName() => $"{nameof(IGrainRequestInvoker)}/{nameof(IGrainRequestInvoker.RunRequestAsync)}";
 
     public MethodInfo GetMethod() => IGrainRequestInvoker.MethodInfo;
 
@@ -153,7 +151,7 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
 }
 
 /// <summary>
-/// The interface which call filters observe for requests queued by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken, string?)"/>.
+/// The interface which call filters observe for requests queued by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>.
 /// </summary>
 internal interface IGrainRequestInvoker
 {

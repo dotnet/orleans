@@ -8,9 +8,6 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task StartInterleavingRequestDuringCall();
 
-    Task StartNamedRequest(int orderId);
-
-    Task StartMethodGroupRequest();
 
     Task StartCustomInvokableRequest(string value);
 

@@ -9,7 +9,7 @@ using Xunit;
 namespace DefaultCluster.Tests.General;
 
 /// <summary>
-/// Tests for <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken, string?)"/>,
+/// Tests for <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>,
 /// which runs a delegate as a request on the grain's activation.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Scheduler")]
@@ -133,27 +133,6 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
         Assert.Contains("IGrainRequestInvoker.RunRequestAsync", await grain.GetFilteredCalls());
     }
 
-    [Fact]
-    public async Task NamedRequest_DescribesItselfToGrainCallFilter()
-    {
-        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
-
-        await grain.StartNamedRequest(42);
-
-        Assert.Equal("order-42", await grain.AwaitPendingRequest());
-        Assert.Contains("IGrainRequestInvoker.ProcessOrder", await grain.GetFilteredCalls());
-    }
-
-    [Fact]
-    public async Task MethodGroupRequest_IsNamedAfterMethod()
-    {
-        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
-
-        await grain.StartMethodGroupRequest();
-
-        Assert.Equal("processed", await grain.AwaitPendingRequest());
-        Assert.Contains("IGrainRequestInvoker.ProcessOrders", await grain.GetFilteredCalls());
-    }
 
     [Fact]
     public async Task ReceiveLocalRequest_CustomInvokable_CompletesSeparateCompletionSource()
@@ -257,7 +236,7 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
 }
 
 /// <summary>
-/// Tests how requests queued by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken, string?)"/>
+/// Tests how requests queued by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>
 /// interact with <see cref="SiloMessagingOptions.MaxEnqueuedRequestsHardLimit"/>.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Scheduler")]

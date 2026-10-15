@@ -5,7 +5,7 @@ using Xunit;
 namespace NonSilo.Tests.Runtime;
 
 /// <summary>
-/// Tests for the request which <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken, string?)"/> queues.
+/// Tests for the request which <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/> queues.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Scheduler")]
 public class GrainRequestTests
@@ -23,7 +23,6 @@ public class GrainRequestTests
                 callbackRan = true;
                 return Task.CompletedTask;
             },
-            null,
             null,
             cancellation.Token);
 
@@ -51,7 +50,7 @@ public class GrainRequestTests
     public async Task Complete_CallbackFailure_IsReportedByRequest()
     {
         var exception = new InvalidOperationException("Request failed.");
-        var request = new GrainRequest<object?, object?>((_, _) => Task.FromException(exception), null, null, default);
+        var request = new GrainRequest<object?, object?>((_, _) => Task.FromException(exception), null, default);
 
         var response = await request.Invoke();
 
@@ -62,7 +61,7 @@ public class GrainRequestTests
     [Fact]
     public async Task Complete_FilterFailureAfterCallback_IsNotReportedByRequest()
     {
-        var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("result"), null, null, default);
+        var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("result"), null, default);
 
         await request.Invoke();
 
@@ -81,7 +80,6 @@ public class GrainRequestTests
                 return Task.CompletedTask;
             },
             null,
-            null,
             default);
 
         Assert.True(((ILocalRequest)request).Complete(Response.FromException(new InvalidOperationException("Filter failed."))));
@@ -97,7 +95,7 @@ public class GrainRequestTests
         for (var i = 0; i < 2_000; i++)
         {
             using var cancellation = new CancellationTokenSource();
-            var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, null, cancellation.Token);
+            var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, cancellation.Token);
             using var start = new Barrier(2);
             var cancel = Task.Run(() =>
             {
@@ -126,7 +124,6 @@ public class GrainRequestTests
                 return Task.CompletedTask;
             },
             null,
-            null,
             cancellation.Token);
         var exception = new OrleansMessageRejectionException("Rejected.");
 
@@ -139,9 +136,9 @@ public class GrainRequestTests
     }
 
     [Fact]
-    public void Describe_WithoutMethodName_DescribesRequestAsGrainRequestInvoker()
+    public void Describe_DescribesRequestAsGrainRequestInvoker()
     {
-        var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, null, TestContext.Current.CancellationToken);
+        var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, TestContext.Current.CancellationToken);
 
         Assert.Equal("IGrainRequestInvoker", request.GetInterfaceName());
         Assert.Equal("RunRequestAsync", request.GetMethodName());
@@ -152,20 +149,9 @@ public class GrainRequestTests
     }
 
     [Fact]
-    public void Describe_WithMethodName_UsesMethodName()
-    {
-        var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, "Drain", TestContext.Current.CancellationToken);
-
-        Assert.Equal("IGrainRequestInvoker", request.GetInterfaceName());
-        Assert.Equal("Drain", request.GetMethodName());
-        Assert.Equal("IGrainRequestInvoker/Drain", request.GetActivityName());
-        Assert.Equal(0, request.GetArgumentCount());
-    }
-
-    [Fact]
     public async Task CompletionSource_Complete_CompletesTask()
     {
-        var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("unused"), null, null, TestContext.Current.CancellationToken);
+        var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("unused"), null, TestContext.Current.CancellationToken);
 
         ((IResponseCompletionSource)request).Complete(Response.FromResult("filtered"));
 

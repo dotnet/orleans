@@ -61,22 +61,6 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         _log.Add("call-end");
     }
 
-    public Task StartNamedRequest(int orderId)
-    {
-        _pending = this.RunRequestAsync(
-            static (orderId, _) => Task.FromResult<string?>($"order-{orderId}"),
-            orderId,
-            methodName: "ProcessOrder");
-        return Task.CompletedTask;
-    }
-
-    public Task StartMethodGroupRequest()
-    {
-        _pending = this.RunRequestAsync(ProcessOrders);
-        return Task.CompletedTask;
-    }
-
-    private Task<string?> ProcessOrders(CancellationToken cancellationToken) => Task.FromResult<string?>("processed");
 
     public Task<int> QueueUnlimitedRequests(int count)
     {

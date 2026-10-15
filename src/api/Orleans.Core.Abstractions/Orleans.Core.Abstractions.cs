@@ -1119,29 +1119,29 @@ namespace Orleans
 
         public static Runtime.IGrainTimer RegisterGrainTimer<TState>(this IGrainBase grain, System.Func<TState, System.Threading.Tasks.Task> callback, TState state, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Action<System.Threading.CancellationToken> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Action<System.Threading.CancellationToken> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Action<System.Threading.CancellationToken> callback, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Action<System.Threading.CancellationToken> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Action<TState, System.Threading.CancellationToken> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Action<TState, System.Threading.CancellationToken> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Action<TState, System.Threading.CancellationToken> callback, TState state, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Action<TState, System.Threading.CancellationToken> callback, TState state, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
-        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public delegate System.Threading.Tasks.Task GrainCallFilterDelegate(IGrainCallContext context);

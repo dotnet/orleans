@@ -308,56 +308,6 @@ private Task OnHeartbeat(DateTimeOffset timestamp, CancellationToken cancellatio
         // </run_request_options>
     }
 
-    [GenerateSerializer]
-    public sealed record Order([property: Id(0)] string Id, [property: Id(1)] decimal Total);
-
-    public interface IOrderBookGrain : IGrainWithStringKey
-    {
-        ValueTask<decimal> GetTotal();
-    }
-
-    public sealed class OrderBookGrain : Grain, IOrderBookGrain
-    {
-        private decimal _total;
-
-        public ValueTask<decimal> GetTotal() => ValueTask.FromResult(_total);
-
-        private int Apply(IReadOnlyList<Order> orders)
-        {
-            foreach (var order in orders)
-            {
-                _total += order.Total;
-            }
-
-            return orders.Count;
-        }
-
-        // <run_request_named>
-// Call filters and tracing observe this request as IGrainRequestInvoker.ApplyOrders.
-internal Task<int> ApplyOrders(IReadOnlyList<Order> orders, CancellationToken cancellationToken) =>
-    this.RunRequestAsync(
-        static (state, _) => Task.FromResult(state.Grain.Apply(state.Orders)),
-        (Grain: this, Orders: orders),
-        cancellationToken,
-        methodName: nameof(ApplyOrders));
-        // </run_request_named>
-    }
-
-    // <run_request_filter>
-public sealed class RequestLoggingFilter(ILogger<RequestLoggingFilter> logger) : IIncomingGrainCallFilter
-{
-    public async Task Invoke(IIncomingGrainCallContext context)
-    {
-        logger.LogInformation(
-            "Running {InterfaceName}.{MethodName}",
-            context.InterfaceName,
-            context.MethodName);
-
-        await context.Invoke();
-    }
-}
-    // </run_request_filter>
-
     public interface IIngestGrain : IGrainWithStringKey
     {
         ValueTask<int> GetCount();
