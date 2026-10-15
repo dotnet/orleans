@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0115: Log through a replay-safe logger"
-description: Understand ORLEANS0115, which reports durable task code which logs through a logger which replays.
-ms.date: 10/13/2026
+description: Understand ORLEANS0115, which reports log calls in durable task code which a replay runs again, and fix them with ReplaySafe().
+ms.date: 10/15/2026
 ms.topic: reference
 ---
 
@@ -15,18 +15,26 @@ ms.topic: reference
 
 ## Cause
 
-A durable task body logs, at a point from which it can still reach a durable operation, through a logger which no `ReplaySafe()` call created.
+A durable task body logs through an `ILogger`, with a `LoggerExtensions` method, `ILogger.Log`, or a `[LoggerMessage]` method, at a point from which it still reaches a durable operation, and the logger isn't one which `ReplaySafe()` returns:
+
+:::code source="snippets/durable-tasks/Orleans0115.cs" id="orleans0115_violation" language="csharp":::
 
 ## Rule description
 
-A replay re-runs this code and logs the event again. A logger which `ReplaySafe()` returns skips events while the task replays operations which it has already recorded, so each event is logged once.
+A replay runs the code before the body's last durable operation again, including its log calls. After the export in the example deactivates during its tenth partition, the replay logs `Exporting partition` for the nine completed partitions again, and logs repeat each time the task replays. Logs then overstate the work, and log-based metrics and alerts count it again.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+A logger which `ReplaySafe()` returns skips events while the task replays: from the start of a run which finds recorded operations, until the run reaches an operation which no earlier run recorded. Each event is then logged once.
+
+For replay-safe logging, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
 
 ## How to fix violations
 
-Log through `logger.ReplaySafe()`, or through a field, property, or local which a `ReplaySafe()` call initializes.
+Wrap the logger with `ReplaySafe()`, typically once in the grain's constructor. The logger reads the running task when it logs, so ordinary grain methods use it too:
+
+:::code source="snippets/durable-tasks/Orleans0115.cs" id="orleans0115_fix" language="csharp":::
+
+Logs in a `DurableTask.Once` effect, in a step, or in the body's synchronous tail don't repeat, because a replay returns their recorded results without running them.
 
 ## When to suppress
 
-Suppress the diagnostic for events which the application expects once per run, such as replay diagnostics.
+Suppress the diagnostic for logs which should record every run, such as debugging logs which show where replays happen.

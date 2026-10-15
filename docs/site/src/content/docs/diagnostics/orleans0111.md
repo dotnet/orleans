@@ -1,7 +1,7 @@
 ---
 title: "ORLEANS0111: Wait with durable delays"
-description: Understand ORLEANS0111, which reports durable task code which waits with a non-durable delay.
-ms.date: 10/13/2026
+description: Understand ORLEANS0111, which reports Task.Delay or Thread.Sleep in durable task code, and fix it with DurableTask.Delay, DurableTask.DelayUntil, or durable timeouts.
+ms.date: 10/15/2026
 ms.topic: reference
 ---
 
@@ -15,18 +15,32 @@ ms.topic: reference
 
 ## Cause
 
-A durable task body calls `Task.Delay` or `Thread.Sleep` at a point from which it can still reach a durable operation.
+A durable task body awaits `Task.Delay` or calls `Thread.Sleep` at a point from which it still reaches a durable operation:
+
+:::code source="snippets/durable-tasks/Orleans0111.cs" id="orleans0111_violation" language="csharp":::
 
 ## Rule description
 
-A durable delay records its due time in logical time, so a replay resumes the remaining wait, and an elapsed delay returns immediately. Other waits restart for their whole duration on each run.
+`Task.Delay` waits in the memory of the current run. When the activation deactivates, its silo restarts, or the run fails before the delay ends, the wait is lost, and the replay starts a new 14-day wait from the start of the run, so a trial whose run restarts every few days never expires. `Thread.Sleep` also blocks the activation's scheduler, so the grain processes nothing else while it sleeps.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+A durable delay records its due time in the execution's logical time. The grain can deactivate while it waits, the runtime reactivates it when the delay is due, and a replay resumes the recorded delay instead of starting another.
+
+For delays and timeouts, see [Combinators and handles](../grains/durable-tasks.md#combinators-and-handles).
 
 ## How to fix violations
 
-Use `DurableTask.Delay` or `DurableTask.DelayUntil`.
+**Wait for a duration with `DurableTask.Delay`:**
+
+:::code source="snippets/durable-tasks/Orleans0111.cs" id="orleans0111_fix_delay" language="csharp":::
+
+**Wait until a time with `DurableTask.DelayUntil`.** Compute the time from arguments, recorded results, or `DurableTask.Current.UtcNow`, so every replay computes the same due time:
+
+:::code source="snippets/durable-tasks/Orleans0111.cs" id="orleans0111_fix_delay_until" language="csharp":::
+
+**Bound work with `WaitAsync` or `WaitUntilAsync`** instead of racing it with `Task.Delay`. The timeout is a durable delay which counts from the first run. When it elapses first, the work receives a cancellation request, and a task which ends canceled throws `TimeoutException`:
+
+:::code source="snippets/durable-tasks/Orleans0111.cs" id="orleans0111_fix_timeout" language="csharp":::
 
 ## When to suppress
 
-None in durable task bodies.
+Suppress the diagnostic for a short pause which a replay may repeat, such as a pause before a durable operation which polls a resource that is still starting. A backoff between attempts of an external call inside a `DurableTask.Run` delegate reaches no durable operation, so the rule doesn't report it.
