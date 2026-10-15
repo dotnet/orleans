@@ -86,4 +86,29 @@ public class GrainRequestTests
         Assert.False(callbackRan);
         await Assert.ThrowsAsync<InvalidOperationException>(() => request.Task);
     }
+
+    [Fact]
+    public async Task OnInvoked_FilterFailureRacingCancellation_ReportsOnlyFailuresTheTaskCarries()
+    {
+        var filterException = new InvalidOperationException("Filter failed.");
+        var response = Response.FromException(filterException);
+        for (var i = 0; i < 2_000; i++)
+        {
+            using var cancellation = new CancellationTokenSource();
+            var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, cancellation.Token);
+            using var start = new Barrier(2);
+            var cancel = Task.Run(() =>
+            {
+                start.SignalAndWait();
+                cancellation.Cancel();
+            }, TestContext.Current.CancellationToken);
+
+            start.SignalAndWait(TestContext.Current.CancellationToken);
+            var reported = ((ILocalRequest)request).OnInvoked(response);
+            await cancel;
+
+            // The request reports the filter's failure exactly when its task carries that failure.
+            Assert.Equal(request.Task.IsFaulted && ReferenceEquals(request.Task.Exception!.InnerException, filterException), reported);
+        }
+    }
 }

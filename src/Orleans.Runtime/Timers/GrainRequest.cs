@@ -103,16 +103,14 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
         }
 
         // A call filter completed the invocation without running the callback.
+        // Cancellation can complete the task first, in which case the task does not report the filter's failure.
         _registration.Dispose();
         if (response.Exception is { } filterException)
         {
-            TrySetException(filterException);
-        }
-        else
-        {
-            TrySetResult(response.Result is TResult result ? result : default!);
+            return TrySetException(filterException);
         }
 
+        TrySetResult(response.Result is TResult result ? result : default!);
         return true;
     }
 
