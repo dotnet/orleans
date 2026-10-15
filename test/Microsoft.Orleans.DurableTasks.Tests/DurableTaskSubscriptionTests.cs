@@ -105,9 +105,9 @@ public sealed class DurableTaskSubscriptionTests
         await operation.GetResponseAsync(OperationId, TestCancellation);
         await subscriber.DeliverAsync(operation.CreateInboxMessage(Assert.Single(operation.Transport.Completions)), TestCancellation);
 
-        // The handle's identifier is the subscription's record, and its target identifier is the observed task.
+        // The handle's identifier is the subscription's record, and its target identifier and address name the observed task.
         Assert.Equal(
-            $"{SubscriptionChildId} {OperationId} done",
+            $"{SubscriptionChildId} {OperationId} {OperationGrain} {OperationId} done",
             (await subscriber.GetResponseAsync(RelayId, TestCancellation)).GetResult<string>());
     });
 
@@ -447,7 +447,8 @@ public sealed class DurableTaskSubscriptionTests
     private static async DurableTask<string> ObserveTaskThroughItsHandle(IAddressable target, string rootId)
     {
         var handle = await target.GetDurableTask<string>(rootId).ScheduleAsync();
-        return $"{handle.Id} {handle.TargetTaskId} {await handle}";
+        Assert.True(handle.TryGetAddress(out var address));
+        return $"{handle.Id} {handle.TargetTaskId} {address.Target} {address.Id} {await handle}";
     }
 
     private static async DurableTask<string> AwaitTask(IAddressable target, string rootId) =>

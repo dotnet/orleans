@@ -384,6 +384,42 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void DurableTaskAddressRoundTripsThroughOrleansAndJson()
+    {
+        var address = new DurableTaskAddress(GrainId.Create("order", "42"), TaskId.CreateRoot("place/order").Child("step"));
+        var typeInfo = DurableTaskJsonContext.Default.DurableTaskAddress;
+
+        // JSON carries the grain and the task as their canonical strings, with source-generated and reflection metadata.
+        var json = JsonSerializer.Serialize(address, typeInfo);
+        Assert.Equal("""{"Target":"order/42","Id":"place\\/order/step"}""", json);
+        Assert.Equal(json, JsonSerializer.Serialize(address));
+        Assert.Equal(address, JsonSerializer.Deserialize(json, typeInfo));
+        Assert.Equal(address, JsonSerializer.Deserialize<DurableTaskAddress>(json));
+        Assert.Equal(address, MessagingTestHelpers.Serializer.Deserialize<DurableTaskAddress>(MessagingTestHelpers.Serializer.SerializeToArray(address)));
+        Assert.Equal((address.Target, address.Id), (((IDurableTaskReference)address).Target, ((IDurableTaskReference)address).Id));
+    }
+
+    [Fact]
+    public void ReferencesAndRootHandlesReportTheirTasksAddresses()
+    {
+        var target = GrainId.Create("worker", "one");
+        var taskId = TaskId.CreateRoot("root");
+        var grainFactory = Substitute.For<IGrainFactory>();
+        var grain = Substitute.For<IGrainBase, IAddressable>();
+        grain.GrainContext.Returns(new TestGrainContext(target));
+        grainFactory.GetGrain(target).Returns((IAddressable)grain);
+
+        var reference = grainFactory.GetDurableTask<int>(new DurableTaskAddress(target, taskId));
+        var handle = new GrainScheduledTaskHandle(taskId, target, request: null, new NotFoundDurableTaskServer(taskId), lastResponse: null);
+
+        Assert.Equal((target, taskId), (reference.Target, reference.Id));
+        Assert.Equal(new DurableTaskAddress(target, taskId), reference.Address);
+        Assert.Equal(new DurableTaskAddress(target, taskId), handle.GetFeature<IDurableTaskReference>());
+        Assert.Throws<ArgumentException>(() => grainFactory.GetDurableTask<int>(new DurableTaskAddress(target, default)));
+        Assert.Throws<ArgumentException>(() => grainFactory.GetDurableTask<int>(new DurableTaskAddress(default, taskId)));
+    }
+
+    [Fact]
     public void DurableTaskReferenceIsAwaitableOnlyThroughItsExtension()
     {
         // ASP.NET Core Minimal APIs reject a handler whose return type has an instance GetAwaiter, so a handler returns a
@@ -505,6 +541,7 @@ public sealed class DurableRpcProtocolTests
             });
         var handle = new GrainScheduledTaskHandle(
             TaskId.Parse("root"),
+            GrainId.Create("test", "server"),
             request,
             grain,
             lastResponse: null);
@@ -635,6 +672,7 @@ public sealed class DurableRpcProtocolTests
         var grain = new NotFoundDurableTaskServer(taskId);
         var handle = new GrainScheduledTaskHandle(
             taskId,
+            GrainId.Create("test", "server"),
             new RuntimeTestDurableTaskRequest(),
             grain,
             lastResponse: null);
@@ -661,6 +699,7 @@ public sealed class DurableRpcProtocolTests
         var grain = new NotFoundDurableTaskServer(taskId);
         var handle = new GrainScheduledTaskHandle(
             taskId,
+            GrainId.Create("test", "server"),
             new RuntimeTestDurableTaskRequest(),
             grain,
             lastResponse: null);
@@ -683,7 +722,7 @@ public sealed class DurableRpcProtocolTests
     {
         var taskId = TaskId.Parse("root/attached-missing");
         var grain = new NotFoundDurableTaskServer(taskId);
-        ScheduledTask<int> task = new AttachedScheduledTask<int>(taskId, grain);
+        ScheduledTask<int> task = new AttachedScheduledTask<int>(taskId, GrainId.Create("test", "server"), grain);
 
         var failure = await Assert.ThrowsAsync<DurableTaskNotFoundException>(
             () => task.GetResponseAsync(
@@ -732,7 +771,7 @@ public sealed class DurableRpcProtocolTests
             rootId,
             failureTaskId,
             returnFailureResponse: true);
-        ScheduledTask<int> task = new AttachedScheduledTask<int>(rootId, grain);
+        ScheduledTask<int> task = new AttachedScheduledTask<int>(rootId, GrainId.Create("test", "server"), grain);
 
         var response = await task.GetResponseAsync(
             new PollingOptions { PollTimeout = TimeSpan.Zero },

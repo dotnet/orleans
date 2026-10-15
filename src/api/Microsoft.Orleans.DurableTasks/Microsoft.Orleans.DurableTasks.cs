@@ -38,6 +38,48 @@ namespace Orleans.DurableTasks
     }
 
     [GenerateSerializer]
+    [Immutable]
+    [Alias("Orleans.DurableTasks.DurableTaskAddress")]
+    public readonly partial struct DurableTaskAddress : IDurableTaskReference, System.IEquatable<DurableTaskAddress>
+    {
+        public DurableTaskAddress(Orleans.Runtime.GrainId Target, TaskId Id) { }
+
+        [Id(1)]
+        public TaskId Id { get { throw null; } init { } }
+
+        [Id(0)]
+        public Orleans.Runtime.GrainId Target { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out Orleans.Runtime.GrainId Target, out TaskId Id) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(DurableTaskAddress other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(DurableTaskAddress left, DurableTaskAddress right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(DurableTaskAddress left, DurableTaskAddress right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
+    }
+
+    public static partial class DurableTaskAddressExtensions
+    {
+        public static DurableTaskReference<TResult> GetDurableTask<TResult>(this IGrainFactory grainFactory, DurableTaskAddress address) { throw null; }
+
+        public static bool TryGetAddress(this ScheduledTask task, out DurableTaskAddress address) { throw null; }
+    }
+
+    [GenerateSerializer]
     [Alias("Orleans.DurableTasks.DurableTaskConflictException")]
     public sealed partial class DurableTaskConflictException : System.InvalidOperationException
     {
@@ -107,6 +149,8 @@ namespace Orleans.DurableTasks
     public sealed partial class DurableTaskReference<TResult> : DurableTask<TResult>, IDurableTaskReference
     {
         internal DurableTaskReference() { }
+
+        public DurableTaskAddress Address { get { throw null; } }
 
         public TaskId Id { get { throw null; } }
 
@@ -700,6 +744,24 @@ namespace OrleansCodeGen.Orleans.DurableTasks
         public global::Orleans.DurableTasks.DurableSignalResult ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.DurableSignalResult value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableTaskAddress : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.DurableTaskAddress>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.DurableTasks.DurableTaskAddress>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public Codec_DurableTaskAddress(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.DurableTasks.DurableTaskAddress instance) { }
+
+        public global::Orleans.DurableTasks.DurableTaskAddress ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.DurableTasks.DurableTaskAddress instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.DurableTaskAddress value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 

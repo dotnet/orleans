@@ -50,8 +50,11 @@ public sealed class DurableTaskReference<TResult> : DurableTask<TResult>, IDurab
     /// <summary>Gets the grain which owns the referenced task.</summary>
     public GrainId Target { get; }
 
+    /// <summary>Gets the address of the referenced task, which code stores or sends to reach the task later.</summary>
+    public DurableTaskAddress Address => new(Target, Id);
+
     private ScheduledTask<TResult> Handle =>
-        _handle ??= new AttachedScheduledTask<TResult>(Id, _target.AsReference<IDurableTaskGrainExtension>());
+        _handle ??= new AttachedScheduledTask<TResult>(Id, Target, _target.AsReference<IDurableTaskGrainExtension>());
 
     /// <inheritdoc cref="DurableTaskReferenceExtensions.GetAwaiter{TResult}"/>
     internal DurableTaskReferenceAwaiter<TResult> CreateAwaiter() =>
@@ -200,9 +203,14 @@ public static class DurableTaskReferenceExtensions
 }
 
 /// <summary>
-/// A reference to an existing durable task of a grain, such as a <see cref="DurableTaskReference{TResult}"/>, read without
-/// its result type.
+/// A reference to an existing durable task of a grain, such as a <see cref="DurableTaskReference{TResult}"/> read without
+/// its result type, or a <see cref="DurableTaskAddress"/>.
 /// </summary>
+/// <remarks>
+/// A <see cref="ScheduledTask"/> whose task other parties reach provides its reference as a feature, through
+/// <see cref="ScheduledTask.GetFeature{TFeature}"/>, which
+/// <see cref="DurableTaskAddressExtensions.TryGetAddress(ScheduledTask, out DurableTaskAddress)"/> reads.
+/// </remarks>
 public interface IDurableTaskReference
 {
     /// <summary>Gets the identifier of the referenced task.</summary>

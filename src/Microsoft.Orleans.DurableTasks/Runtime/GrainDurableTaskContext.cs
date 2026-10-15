@@ -665,17 +665,29 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     /// <summary>Wraps a handle of this execution's operation, which the activation's scheduler runs.</summary>
-    private ExecutionTaskHandle CreateExecutionHandle(IScheduledTaskHandle handle) =>
-        new(handle, this, _runtime.GetTargetTaskId(handle.TaskId));
+    private ExecutionTaskHandle CreateExecutionHandle(IScheduledTaskHandle handle)
+    {
+        var targetTaskId = _runtime.GetTargetTaskId(handle.TaskId, out var addressedHost);
+        return new(handle, this, targetTaskId, addressedHost);
+    }
 
     private sealed class ExecutionTaskHandle(
         IScheduledTaskHandle inner,
         GrainDurableTaskContext owner,
-        TaskId targetTaskId) : IScheduledTaskHandle
+        TaskId targetTaskId,
+        GrainId addressedHost) : IScheduledTaskHandle
     {
         public TaskId TaskId => inner.TaskId;
 
         public TaskId TargetTaskId { get; } = targetTaskId;
+
+        /// <summary>
+        /// Returns the <see cref="DurableTaskAddress"/> of a detached or subscribed task, as
+        /// <see cref="IDurableTaskReference"/>.
+        /// </summary>
+        public TFeature? GetFeature<TFeature>()
+            where TFeature : class =>
+            addressedHost.IsDefault ? null : new DurableTaskAddress(addressedHost, TargetTaskId) as TFeature;
 
         public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
 

@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Orleans.DurableTasks.Storage;
 using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Runtime;
@@ -22,5 +21,5 @@ namespace Orleans.DurableTasks.Runtime;
 internal sealed record PendingInvocation(
     [property: Id(0)] GrainId Target,
     [property: Id(1)] byte[] Payload,
-    [property: Id(2), JsonConverter(typeof(TaskIdJsonConverter)), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [property: Id(2), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     TaskId? RecordId);
