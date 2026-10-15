@@ -26,6 +26,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     private readonly MessagingPump _pump;
     private readonly InboxDispatcher _handlers = new([]);
     private readonly List<IInboxMessageSink> _sinks = [];
+    private readonly List<IInboxWorkSource> _workSources = [];
 
     public Inbox(MessagingPump pump)
     {
@@ -58,6 +59,13 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     {
         ArgumentNullException.ThrowIfNull(sink);
         _sinks.Add(sink);
+        return this;
+    }
+
+    public IInbox Register(IInboxWorkSource source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        _workSources.Add(source);
         return this;
     }
 
@@ -394,20 +402,35 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
         return true;
     }
 
+    /// <summary>Gets a value indicating whether the inbox or a registered work source holds pending work.</summary>
+    internal bool HasWork => _messages.Count > 0 || GetWorkSourceDelay() is not null;
+
     /// <summary>
-    /// Returns the delay until the next message is due, or <see langword="null"/> when the inbox is empty.
+    /// Returns the delay until the next message or work source is due, or <see langword="null"/> when neither the inbox
+    /// nor any work source holds work.
     /// </summary>
     /// <param name="jobNow">The current Durable Jobs time, which the caller uses to schedule the wake-up.</param>
     internal TimeSpan? GetNextWakeupDelay(DateTimeOffset jobNow)
     {
-        if (_messages.Count == 0) return null;
+        var next = GetWorkSourceDelay();
+        if (_messages.Count == 0 || next <= TimeSpan.Zero) return next;
         var now = TimeProvider.GetUtcNow();
-        var next = TimeSpan.MaxValue;
         foreach (var entry in _messages.Values)
         {
             var delay = GetDelay(entry, now, jobNow);
             if (delay == TimeSpan.Zero) return delay;
-            if (delay < next) next = delay;
+            if (next is null || delay < next) next = delay;
+        }
+
+        return next;
+    }
+
+    private TimeSpan? GetWorkSourceDelay()
+    {
+        TimeSpan? next = null;
+        foreach (var source in _workSources)
+        {
+            if (source.GetWakeupDelay() is { } delay && (next is null || delay < next)) next = delay;
         }
 
         return next;
