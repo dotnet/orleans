@@ -436,7 +436,9 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 if (status is DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.DeadLettered)
                 {
                     Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id });
-                    Retire(current, status == DeliveryStatus.DeadLettered ? OutboxMessageRetirement.DeadLettered : OutboxMessageRetirement.Delivered);
+                    Retire(current, status == DeliveryStatus.DeadLettered
+                        ? OutboxMessageRetirement.Rejected(outcome.Result!.Value.Message ?? "The receiver dead-lettered the message.")
+                        : OutboxMessageRetirement.Delivered());
                     delivered++;
                 }
                 else
@@ -444,7 +446,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                     if (status == DeliveryStatus.Backpressured) backpressured++;
                     var (retry, deadLetter) = PrepareRetry(outcome, ref deadLetters);
                     Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id, State = retry, DeadLetter = deadLetter });
-                    if (deadLetter is not null) Retire(current, OutboxMessageRetirement.DeadLettered);
+                    if (deadLetter is not null) Retire(current, OutboxMessageRetirement.DeadLettered(deadLetter.Reason));
                 }
                 RecordDeliveryMetrics(outcome);
                 applied++;
@@ -520,7 +522,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
             };
             AddDeadLetter(ref deadLetters, letter);
             Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id, DeadLetter = letter });
-            Retire(entry, OutboxMessageRetirement.DeadLettered);
+            Retire(entry, OutboxMessageRetirement.DeadLettered(letter.Reason));
             Shared.Instruments.OnOutboxMessageDelivered(Shared.GrainType, "source_error");
         }
 
