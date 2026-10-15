@@ -16,7 +16,8 @@ internal static class GarnetTestRouting
     {
         var map = RangeMap.CreateUniform(
             GarnetJournalStorageOptions.DEFAULT_BUCKET_COUNT,
-            [new(P0, new PartitionHosting("test", 0, "p0", GarnetJournalPartitionManager.FormatEndpoint(endPoint)))]) with { Id = "test-map" };
+            [new(P0, new PartitionHosting("test", 0, "p0", GarnetJournalPartitionManager.FormatEndpoint(endPoint)))]);
+        map = map with { Id = "test-map" };
         await GarnetJournalPartitionManager.InitializeAsync(endPoint, P0, map, cancellationToken);
         var store = new InMemoryRangeMetaStore();
         var snapshot = (await store.TryWriteAsync(map, 0, cancellationToken)).Current!;
