@@ -658,6 +658,7 @@ namespace Orleans.DurableTasks
         public override T GetResult<T>() { throw null; }
     }
 
+    [System.Text.Json.Serialization.JsonConverter(typeof(TaskIdJsonConverter))]
     public readonly partial struct TaskId : System.IEquatable<TaskId>, System.IParsable<TaskId>, System.ISpanParsable<TaskId>, System.ISpanFormattable, System.IFormattable
     {
         private readonly object _dummy;
@@ -715,5 +716,16 @@ namespace Orleans.DurableTasks
         public static bool TryParse(string? s, out TaskId result) { throw null; }
 
         static bool System.IParsable<TaskId>.TryParse(string? s, System.IFormatProvider? provider, out TaskId result) { throw null; }
+    }
+
+    public sealed partial class TaskIdJsonConverter : System.Text.Json.Serialization.JsonConverter<TaskId>
+    {
+        public override TaskId Read(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override TaskId ReadAsPropertyName(ref System.Text.Json.Utf8JsonReader reader, System.Type typeToConvert, System.Text.Json.JsonSerializerOptions options) { throw null; }
+
+        public override void Write(System.Text.Json.Utf8JsonWriter writer, TaskId value, System.Text.Json.JsonSerializerOptions options) { }
+
+        public override void WriteAsPropertyName(System.Text.Json.Utf8JsonWriter writer, TaskId value, System.Text.Json.JsonSerializerOptions options) { }
     }
 }
