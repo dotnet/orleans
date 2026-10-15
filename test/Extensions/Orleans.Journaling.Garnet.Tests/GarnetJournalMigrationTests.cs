@@ -69,6 +69,9 @@ public sealed class GarnetJournalMigrationTests : IAsyncLifetime
     public async Task Pulls_ServeOperationsBeforeConsolidation()
     {
         var router = _partitions.CreateRouter();
+
+        // Without key filters, every first access to a journal the destination holds no record of pulls.
+        router.Migrator.KeyFilters = false;
         var coordinator = new GarnetJournalMigrationCoordinator(router);
         var ids = _partitions.JournalsInBucket(0, "pull").Take(3).ToArray();
         await Storage(router, ids[0]).AppendAsync(Bytes(1), CancellationToken);
@@ -102,6 +105,54 @@ public sealed class GarnetJournalMigrationTests : IAsyncLifetime
         Assert.Equal(1, await router.Migrator.DropMarkersAsync(P2, 0, DateTimeOffset.UtcNow + options.TombstoneRetention, CancellationToken));
         Assert.Equal(0, (await router.Migrator.GetBucketAsync(P2, 0, CancellationToken)).MarkerCount);
         Assert.Null(await ReadAsync(stale, ids[1]));
+    }
+
+    [Fact]
+    public async Task KeyFilters_AnswerForJournalsTheChainNeverHeld()
+    {
+        var router = _partitions.CreateRouter();
+        var coordinator = new GarnetJournalMigrationCoordinator(router);
+        var ids = _partitions.JournalsInBucket(0, "filter").Take(4).ToArray();
+        await Storage(router, ids[0]).AppendAsync(Bytes(1), CancellationToken);
+        await Storage(router, ids[1]).AppendAsync(Bytes(1), CancellationToken);
+        await Storage(router, ids[1]).DeleteAsync(CancellationToken);
+
+        // The source's filter covers its live journal and its tombstone, and travels with the open.
+        await coordinator.TryMoveAsync([0], P2, CancellationToken);
+        await AdvanceToAsync(coordinator, 0, MigrationPhase.Opened);
+        var destination = _partitions.Database(P2);
+        var bucketKey = GarnetJournalKeys.GetBucketKey(_partitions.MapId, 0);
+        var chain = (byte[])(await destination.HashGetAsync(bucketKey, "chain"))!;
+        Assert.Equal(1, GarnetJournalKeyFilter.Count(chain));
+        Assert.False(GarnetJournalKeyFilter.ExcludesAll(chain, GarnetJournalKeys.EncodeJournalId(ids[0].Value)));
+        Assert.False(GarnetJournalKeyFilter.ExcludesAll(chain, GarnetJournalKeys.EncodeJournalId(ids[1].Value)));
+
+        // A journal no partition on the chain held is absent without a pull, so the destination records nothing.
+        Assert.Null(await ReadAsync(router, ids[2]));
+        Assert.False(await destination.KeyExistsAsync(Storage(router, ids[2]).MetadataKey));
+        await Storage(router, ids[3]).AppendAsync(Bytes(3), CancellationToken);
+        Assert.Equal([3], await ReadAsync(router, ids[3]));
+
+        // Journals the filter reports are pulled: the deleted one as its tombstone, which carries the deletion's ETag.
+        Assert.Null(await ReadAsync(router, ids[1]));
+        Assert.Contains(await destination.HashGetAllAsync(Storage(router, ids[1]).MetadataKey), entry => entry.Name == "$deleted");
+        Assert.Equal([1], await ReadAsync(router, ids[0]));
+        Assert.Equal(1, (await router.Migrator.GetBucketAsync(P2, 0, CancellationToken)).MarkerCount);
+
+        // A move before the migration is done chains: the next destination's filters cover both links.
+        Assert.Equal(MoveStatus.Committed, (await coordinator.TryMoveAsync([0], P1, CancellationToken)).Status);
+        await AdvanceToAsync(coordinator, 0, MigrationPhase.Opened);
+        var next = (byte[])(await _partitions.Database(P1).HashGetAsync(bucketKey, "chain"))!;
+        Assert.Equal(2, GarnetJournalKeyFilter.Count(next));
+        Assert.Null(await ReadAsync(router, ids[2]));
+        Assert.False(await _partitions.Database(P1).KeyExistsAsync(Storage(router, ids[2]).MetadataKey));
+        Assert.Equal([3], await ReadAsync(router, ids[3]));
+
+        // Once done, the destination drops the chain's filters.
+        await CompleteAllAsync(coordinator);
+        Assert.False(await _partitions.Database(P1).HashExistsAsync(bucketKey, "chain"));
+        Assert.Equal([1], await ReadAsync(router, ids[0]));
+        Assert.Null(await ReadAsync(router, ids[1]));
     }
 
     [Fact]

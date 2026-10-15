@@ -28,11 +28,15 @@ internal sealed class GarnetJournalPartitionHost : IDisposable
 {
     private readonly GarnetServer _server;
 
-    private GarnetJournalPartitionHost(GarnetServer server, IPEndPoint endPoint)
+    private GarnetJournalPartitionHost(GarnetServer server, IPEndPoint endPoint, GarnetJournalLoad load)
     {
         _server = server;
         EndPoint = endPoint;
+        Load = load;
     }
+
+    /// <summary>Gets the partition's per-bucket load counters.</summary>
+    public GarnetJournalLoad Load { get; }
 
     /// <summary>Gets the endpoint on which the partition accepts RESP connections.</summary>
     public IPEndPoint EndPoint { get; }
@@ -96,10 +100,14 @@ internal sealed class GarnetJournalPartitionHost : IDisposable
         };
 
         var server = new GarnetServer(options, loggerFactory);
+        var load = new GarnetJournalLoad();
         try
         {
-            GarnetJournalProcedures.Register(server);
+            GarnetJournalProcedures.Register(server, load);
             server.Start();
+
+            // Recovery replayed logged operations, which the balancer must not count as load.
+            load.Reset();
         }
         catch
         {
@@ -108,7 +116,7 @@ internal sealed class GarnetJournalPartitionHost : IDisposable
         }
 
         logger?.LogInformation("Started Garnet journal partition at {EndPoint} with {Location}.", endPoint, location);
-        return new(server, endPoint);
+        return new(server, endPoint, load);
     }
 
     /// <summary>Stops the partition. Its durable state remains in its data directory.</summary>

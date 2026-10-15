@@ -33,6 +33,9 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
     // Locks are held only while Main runs in memory; AOF commit waits happen after the locks are released.
     public override TimeSpan KeyLockTimeout => TimeSpan.FromSeconds(10);
 
+    /// <summary>Gets the partition's load counters, which record every operation on an open bucket.</summary>
+    public GarnetJournalLoad? Load { get; init; }
+
     protected abstract bool LocksData { get; }
 
     protected abstract bool IsWrite { get; }
@@ -101,7 +104,7 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
     /// Checks that the bucket is open in this partition and, for journals absent from it, that its migration is complete.
     /// </summary>
     /// <returns><see langword="true"/> if the operation may proceed; otherwise, the response has been written.</returns>
-    protected static bool CheckBucket<TGarnetApi>(TGarnetApi api, ref CustomProcedureInput procInput, in JournalRecord journal, ref MemoryResult<byte> output)
+    protected bool CheckBucket<TGarnetApi>(TGarnetApi api, ref CustomProcedureInput procInput, in JournalRecord journal, ref MemoryResult<byte> output)
         where TGarnetApi : IGarnetReadApi
     {
         var bucket = BucketRecord.Load(api, BucketKey(ref procInput));
@@ -111,9 +114,13 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
             return false;
         }
 
+        Load?.Record(BucketKey(ref procInput).ReadOnlySpan);
+
         // Journals the partition holds, including deletion tombstones and absent markers, are authoritative. Others
-        // may still be on the bucket's migration chain until migration completes.
-        if (!journal.Exists && !bucket.IsDone)
+        // may still be on the bucket's migration chain until migration completes, unless the chain's key filters
+        // report that no partition on it holds a record of the journal (D36): then the journal is in the empty
+        // absence at the bucket's collection generation, exactly as the absent marker a pull would install.
+        if (!journal.Exists && !bucket.IsDone && !GarnetJournalKeyFilter.ExcludesAll(bucket.Chain, Member(ref procInput).ReadOnlySpan))
         {
             WriteNeedPull(bucket, ref output);
             return false;
@@ -316,6 +323,12 @@ internal readonly ref struct BucketRecord
 
     /// <summary>Gets the bucket's collection generation (see <see cref="GarnetJournalProcedure.IsCollectedSince"/>).</summary>
     public long CollectionGeneration { get; init; }
+
+    /// <summary>Gets the key filters a sealed copy wrote for its destination, or empty if it wrote none.</summary>
+    public ReadOnlySpan<byte> Filter { get; init; }
+
+    /// <summary>Gets the key filters of the chain an open bucket's incomplete migration reads from, or empty if unknown.</summary>
+    public ReadOnlySpan<byte> Chain { get; init; }
     public bool IsOpen => Exists && State.SequenceEqual(GarnetJournalProtocol.OpenState);
     public bool IsSealed => Exists && State.SequenceEqual(GarnetJournalProtocol.SealedState);
 
@@ -327,7 +340,7 @@ internal readonly ref struct BucketRecord
             return default;
         }
 
-        ReadOnlySpan<byte> state = default, version = default, source = default, done = default, reclaimed = default, collected = default;
+        ReadOnlySpan<byte> state = default, version = default, source = default, done = default, reclaimed = default, collected = default, filter = default, chain = default;
         for (var i = 0; i + 1 < values.Length; i += 2)
         {
             var field = values[i].ReadOnlySpan;
@@ -338,6 +351,8 @@ internal readonly ref struct BucketRecord
             else if (field.SequenceEqual(GarnetJournalProtocol.BucketDoneField)) done = value;
             else if (field.SequenceEqual(GarnetJournalProtocol.BucketReclaimedField)) reclaimed = value;
             else if (field.SequenceEqual(GarnetJournalProtocol.BucketCollectedField)) collected = value;
+            else if (field.SequenceEqual(GarnetJournalProtocol.BucketFilterField)) filter = value;
+            else if (field.SequenceEqual(GarnetJournalProtocol.BucketChainField)) chain = value;
         }
 
         return new()
@@ -349,6 +364,8 @@ internal readonly ref struct BucketRecord
             IsDone = done.SequenceEqual(GarnetJournalProtocol.TrueValue),
             IsReclaimed = reclaimed.SequenceEqual(GarnetJournalProtocol.TrueValue),
             CollectionGeneration = GarnetJournalProtocol.TryParseNonNegativeCanonical(collected, out var generation) ? generation : 0,
+            Filter = filter,
+            Chain = chain,
         };
     }
 }
@@ -1018,7 +1035,9 @@ internal sealed class GarnetJournalIndexProcedure : CustomTransactionProcedure
 /// <summary>
 /// Transitions a bucket's state in this partition.
 /// Arguments: bucket key, index key, marker key, operation (<c>open</c>, <c>seal</c>, or <c>reclaim</c>), version, source,
-/// done (0 or 1), and the collection generation the bucket opens with (the source's; <c>-</c> or <c>0</c> for none).
+/// done (0 or 1), the collection generation the bucket opens with (the source's; <c>-</c> or <c>0</c> for none), and
+/// optionally, for <c>seal</c>, <c>1</c> to write key filters, or for <c>open</c>, the key filters of the chain the
+/// bucket opens from (D36).
 /// Returns <c>[1]</c>, or <c>[-1, state, version, reclaimed]</c> if the transition does not apply to the current state.
 /// </summary>
 /// <remarks>
@@ -1028,10 +1047,12 @@ internal sealed class GarnetJournalIndexProcedure : CustomTransactionProcedure
 /// </para>
 /// <para>
 /// <c>open</c> opens a bucket the partition holds no copy of: an absent bucket, or a reclaimed one, at a later version,
-/// whose journals have all been purged (the reopen rule, D11). <c>seal</c> seals an open bucket at a later version.
-/// <c>reclaim</c> marks the copy sealed at <c>version</c> as reclaimed (D42): from then on, every read of it fails, and
-/// its journals may be purged. Each transition reports success if it has already been applied, so retries and
-/// duplicate coordinators are harmless.
+/// whose journals have all been purged (the reopen rule, D11). <c>seal</c> seals an open bucket at a later version and,
+/// if requested, writes key filters over the journals it holds a record of (its index and marker set: the migration
+/// inventory, D42), followed by its own chain's filters while its migration is not done; it writes none if those are
+/// unknown. <c>reclaim</c> marks the copy sealed at <c>version</c> as reclaimed (D42): from then on, every read of it
+/// fails, and its journals may be purged. Each transition reports success if it has already been applied, so retries
+/// and duplicate coordinators are harmless.
 /// </para>
 /// </remarks>
 internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
@@ -1066,6 +1087,7 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
         var source = GetNextArg(ref procInput, ref offset);
         var done = GetNextArg(ref procInput, ref offset);
         var collected = GetNextArg(ref procInput, ref offset);
+        var extra = GetNextArg(ref procInput, ref offset);
         var bucket = BucketRecord.Load(api, bucketKey);
         var response = new GarnetRespArrayWriter();
         if (!GarnetJournalProtocol.TryParseNonNegativeCanonical(version.ReadOnlySpan, out var requestedVersion)
@@ -1113,6 +1135,13 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
                 {
                     api.HashSet(bucketKey, PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketCollectedField), collected, out _);
                 }
+
+                // A bucket opened with its migration incomplete keeps its chain's key filters, which the sealed source
+                // wrote and which never change (D36).
+                if (extra.IsValid && extra.Length > 0 && !done.ReadOnlySpan.SequenceEqual(GarnetJournalProtocol.TrueValue))
+                {
+                    api.HashSet(bucketKey, PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketChainField), extra, out _);
+                }
             }
         }
         else if (operation.ReadOnlySpan.SequenceEqual(GarnetJournalProtocol.SealOperation))
@@ -1121,11 +1150,20 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
             applies = bucket.IsOpen && currentVersion < requestedVersion;
             if (applies)
             {
+                // Filters are written in the seal's transaction, so they cover every record the sealed copy will ever hold.
+                var filter = extra.IsValid && extra.ReadOnlySpan.SequenceEqual(GarnetJournalProtocol.TrueValue)
+                    && (bucket.IsDone || !bucket.Chain.IsEmpty)
+                    ? CreateFilter(api, indexKey, markerKey, bucket.IsDone ? default : bucket.Chain)
+                    : null;
                 api.HashSet(bucketKey,
                 [
                     (PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketStateField), PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.SealedState)),
                     (PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketVersionField), version),
                 ], out _);
+                if (filter is not null)
+                {
+                    api.HashSet(bucketKey, PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketFilterField), CreateArgSlice(filter), out _);
+                }
             }
         }
         else if (operation.ReadOnlySpan.SequenceEqual(GarnetJournalProtocol.ReclaimOperation))
@@ -1139,6 +1177,10 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
                 [
                     (PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketReclaimedField), PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.TrueValue)),
                 ], out _);
+                if (!bucket.Filter.IsEmpty)
+                {
+                    api.HashDelete(bucketKey, PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketFilterField), out _);
+                }
             }
         }
         else
@@ -1163,6 +1205,32 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
         response.CopyTo(ref output);
     }
 
+    /// <summary>
+    /// Creates the key filters a sealed copy writes: one over every journal it holds a record of, followed by its own
+    /// chain's filters, <paramref name="chain"/>, if its migration is not done.
+    /// </summary>
+    private static byte[] CreateFilter<TGarnetApi>(TGarnetApi api, PinnedSpanByte indexKey, PinnedSpanByte markerKey, ReadOnlySpan<byte> chain)
+        where TGarnetApi : IGarnetReadApi
+    {
+        var live = api.SetMembers(indexKey, out PinnedSpanByte[] index) == GarnetStatus.OK ? index : [];
+        var markers = api.SetMembers(markerKey, out PinnedSpanByte[] marked) == GarnetStatus.OK ? marked : [];
+        var count = live.Length + markers.Length;
+        var filter = new byte[GarnetJournalKeyFilter.GetEncodedLength(count) + chain.Length];
+        var bits = GarnetJournalKeyFilter.Begin(filter, count);
+        foreach (var member in live)
+        {
+            GarnetJournalKeyFilter.Add(bits, member.ReadOnlySpan);
+        }
+
+        foreach (var member in markers)
+        {
+            GarnetJournalKeyFilter.Add(bits, member.ReadOnlySpan);
+        }
+
+        chain.CopyTo(filter.AsSpan(filter.Length - chain.Length));
+        return filter;
+    }
+
     private static bool IsEmpty<TGarnetApi>(TGarnetApi api, PinnedSpanByte key)
         where TGarnetApi : IGarnetReadApi
         => api.SetLength(key, out var count) != GarnetStatus.OK || count == 0;
@@ -1177,18 +1245,21 @@ internal static class GarnetJournalProcedures
     /// Registers every journal procedure, in the order that assigns their persisted ids.
     /// </summary>
     /// <remarks>Call before the server starts, since recovery replays logged procedure invocations by id.</remarks>
-    public static void Register(global::Garnet.GarnetServer server)
+    /// <param name="server">The server.</param>
+    /// <param name="load">The partition's load counters, which the journal procedures update and <see cref="GarnetJournalProtocol.Load"/> reports.</param>
+    public static void Register(global::Garnet.GarnetServer server, GarnetJournalLoad load)
     {
         ArgumentNullException.ThrowIfNull(server);
+        ArgumentNullException.ThrowIfNull(load);
         Func<CustomTransactionProcedure>[] factories =
         [
-            static () => new GarnetJournalReadProcedure(),
-            static () => new GarnetJournalGetMetadataProcedure(),
-            static () => new GarnetJournalCreateProcedure(),
-            static () => new GarnetJournalAppendProcedure(),
-            static () => new GarnetJournalReplaceProcedure(),
-            static () => new GarnetJournalDeleteProcedure(),
-            static () => new GarnetJournalUpdateMetadataProcedure(),
+            () => new GarnetJournalReadProcedure { Load = load },
+            () => new GarnetJournalGetMetadataProcedure { Load = load },
+            () => new GarnetJournalCreateProcedure { Load = load },
+            () => new GarnetJournalAppendProcedure { Load = load },
+            () => new GarnetJournalReplaceProcedure { Load = load },
+            () => new GarnetJournalDeleteProcedure { Load = load },
+            () => new GarnetJournalUpdateMetadataProcedure { Load = load },
             static () => new GarnetJournalBucketProcedure(),
             static () => new GarnetJournalIndexProcedure(),
             static () => new GarnetJournalPullReadProcedure(),
@@ -1214,5 +1285,8 @@ internal static class GarnetJournalProcedures
                     $"Garnet assigned id {id} to journal procedure '{GarnetJournalProtocol.Names[i]}'; expected {i}. Journal procedures must be registered first, in a fixed order.");
             }
         }
+
+        // The load report is not logged, so its id is not persisted.
+        server.Register.NewProcedure(GarnetJournalProtocol.Load, () => new GarnetJournalLoadProcedure(load));
     }
 }

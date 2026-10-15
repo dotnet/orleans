@@ -356,6 +356,12 @@ internal sealed class GarnetJournalDoneProcedure : CustomTransactionProcedure
             }
 
             api.HashSet(bucketKey, PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketDoneField), PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.TrueValue), out _);
+
+            // Reads no longer consult the chain, so its key filters are no longer needed.
+            if (!bucket.Chain.IsEmpty)
+            {
+                api.HashDelete(bucketKey, PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketChainField), out _);
+            }
         }
 
         response.WriteBulk(GarnetJournalProtocol.SuccessStatus);
@@ -480,9 +486,11 @@ internal sealed class GarnetJournalPurgeProcedure : GarnetJournalBucketSetProced
 }
 
 /// <summary>
-/// Reads a bucket's state in this partition. Arguments: bucket key, index key, marker key.
+/// Reads a bucket's state in this partition. Arguments: bucket key, index key, marker key, and optionally <c>1</c> to
+/// include the key filters a sealed copy wrote (D36).
 /// Returns <c>[1, state, version, source, done, reclaimed, indexCount, markerCount, collected]</c>, where <c>state</c> is
-/// <c>absent</c>, <c>open</c>, or <c>sealed</c>, and <c>collected</c> is the collection generation.
+/// <c>absent</c>, <c>open</c>, or <c>sealed</c>, and <c>collected</c> is the collection generation, followed, when
+/// requested, by the key filters (empty if none).
 /// </summary>
 internal sealed class GarnetJournalBucketInfoProcedure : GarnetJournalBucketSetProcedure
 {
@@ -495,6 +503,7 @@ internal sealed class GarnetJournalBucketInfoProcedure : GarnetJournalBucketSetP
         var bucketKey = GetNextArg(ref procInput, ref offset);
         var indexKey = GetNextArg(ref procInput, ref offset);
         var markerKey = GetNextArg(ref procInput, ref offset);
+        var withFilter = GetNextArg(ref procInput, ref offset);
         var bucket = BucketRecord.Load(api, bucketKey);
         api.SetLength(indexKey, out var indexCount);
         api.SetLength(markerKey, out var markerCount);
@@ -508,6 +517,11 @@ internal sealed class GarnetJournalBucketInfoProcedure : GarnetJournalBucketSetP
         response.WriteBulk(indexCount);
         response.WriteBulk(markerCount);
         response.WriteBulk(bucket.CollectionGeneration);
+        if (withFilter.IsValid && withFilter.ReadOnlySpan.SequenceEqual(GarnetJournalProtocol.TrueValue))
+        {
+            response.WriteBulk(bucket.IsSealed && !bucket.IsReclaimed ? bucket.Filter : default);
+        }
+
         response.CopyTo(ref output);
     }
 }

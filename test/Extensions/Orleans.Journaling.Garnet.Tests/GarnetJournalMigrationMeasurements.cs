@@ -14,12 +14,18 @@ public sealed class GarnetJournalMigrationMeasurements
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Theory]
-    [InlineData(16, 128)]
-    public async Task MeasureCutoverPause(int writers, int payloadSize)
+    [InlineData(16, 128, 0, true)]
+    [InlineData(16, 128, 5000, true)]
+    [InlineData(16, 128, 5000, false)]
+    public async Task MeasureCutoverPause(int writers, int payloadSize, int preloaded, bool keyFilters)
     {
         await using var partitions = await GarnetTestPartitions.StartAsync(2, 16, owners: 1, CancellationToken);
         var router = partitions.CreateRouter();
-        var coordinator = new GarnetJournalMigrationCoordinator(partitions.CreateRouter());
+        var coordinatorRouter = partitions.CreateRouter();
+        coordinatorRouter.Migrator.KeyFilters = keyFilters;
+        var coordinator = new GarnetJournalMigrationCoordinator(coordinatorRouter);
+        await Parallel.ForEachAsync(partitions.JournalsInBucket(3, "preload").Take(preloaded), new ParallelOptions { MaxDegreeOfParallelism = 64, CancellationToken = CancellationToken }, async (id, token) =>
+            await new GarnetJournalStorage(router, id, "json", compactionThresholdBytes: 0).AppendAsync(new ReadOnlySequence<byte>(new byte[payloadSize]), token));
         var journals = partitions.JournalsInBucket(3, "cutover").Take(writers).ToArray();
         var payload = new ReadOnlySequence<byte>(new byte[payloadSize]);
         var samples = new List<(long Start, long End)>();
@@ -60,7 +66,7 @@ public sealed class GarnetJournalMigrationMeasurements
         var before = samples.Where(sample => sample.End < commit).Select(Latency).Order().ToArray();
         var during = samples.Where(sample => sample.Start <= completedAt && sample.End >= commit).Select(Latency).Order().ToArray();
         Report(
-            $"cutover writers={writers} payload={payloadSize}B: commit->opened={opened:F1}ms commit->complete={complete:F1}ms; "
+            $"cutover writers={writers} payload={payloadSize}B preloaded={preloaded} keyFilters={keyFilters}: commit->opened={opened:F1}ms commit->complete={complete:F1}ms; "
             + $"before p50={Percentile(before, 0.5):F2}ms p99={Percentile(before, 0.99):F2}ms max={before[^1]:F2}ms; "
             + $"during p50={Percentile(during, 0.5):F2}ms p99={Percentile(during, 0.99):F2}ms max={during[^1]:F2}ms (n={during.Length})");
     }
@@ -119,6 +125,51 @@ public sealed class GarnetJournalMigrationMeasurements
             $"consolidation journals={journals} size={journalSize}B: installed={installed} in {consolidation.TotalMilliseconds:F0}ms "
             + $"({installed / consolidation.TotalSeconds:F0} journals/s, {installed * (double)journalSize / consolidation.TotalSeconds / (1 << 20):F1} MiB/s); "
             + $"completion and reclamation {reclamation.TotalMilliseconds:F0}ms");
+    }
+
+    [Theory]
+    [InlineData(500, 1024, true)]
+    [InlineData(500, 1024, false)]
+    public async Task MeasureFirstAccessWithKeyFilters(int journals, int journalSize, bool keyFilters)
+    {
+        await using var partitions = await GarnetTestPartitions.StartAsync(2, 16, owners: 1, CancellationToken);
+        var router = partitions.CreateRouter();
+        router.Migrator.KeyFilters = keyFilters;
+        var coordinator = new GarnetJournalMigrationCoordinator(router);
+        var held = partitions.JournalsInBucket(5, "held").Take(journals).ToArray();
+        var fresh = partitions.JournalsInBucket(5, "new").Take(journals).ToArray();
+        await Parallel.ForEachAsync(held, CancellationToken, async (id, token) =>
+            await new GarnetJournalStorage(router, id, "json", compactionThresholdBytes: 0).AppendAsync(new ReadOnlySequence<byte>(new byte[journalSize]), token));
+
+        var baseline = await AppendAllAsync(router, partitions.JournalsInBucket(5, "baseline").Take(100).ToArray(), journalSize);
+        await coordinator.TryMoveAsync([5], GarnetTestPartitions.Id(1), CancellationToken);
+        while (new RangeMapBuckets((await partitions.ReadViewAsync()).Map).GetLatestMigration(5)?.Phase < MigrationPhase.Opened)
+        {
+            await coordinator.AdvanceAsync(filter: null, CancellationToken);
+        }
+
+        // The first write to a journal no partition held: without filters, the destination answers NeedPull, and the
+        // client reads the chain and installs an absent marker first.
+        var created = await AppendAllAsync(router, fresh, journalSize);
+        var pulled = await ReadAllAsync(router, held);
+        Report(
+            $"first access journals={journals} size={journalSize}B keyFilters={keyFilters}: create before move p50={Percentile(baseline, 0.5):F3}ms p99={Percentile(baseline, 0.99):F3}ms; "
+            + $"create after move p50={Percentile(created, 0.5):F3}ms p99={Percentile(created, 0.99):F3}ms; "
+            + $"held journal first read p50={Percentile(pulled, 0.5):F3}ms p99={Percentile(pulled, 0.99):F3}ms");
+    }
+
+    private static async Task<double[]> AppendAllAsync(GarnetJournalRouter router, JournalId[] ids, int size)
+    {
+        var latencies = new double[ids.Length];
+        for (var i = 0; i < ids.Length; i++)
+        {
+            var start = Stopwatch.GetTimestamp();
+            await new GarnetJournalStorage(router, ids[i], "json", compactionThresholdBytes: 0).AppendAsync(new ReadOnlySequence<byte>(new byte[size]), CancellationToken);
+            latencies[i] = Stopwatch.GetElapsedTime(start).TotalMilliseconds;
+        }
+
+        Array.Sort(latencies);
+        return latencies;
     }
 
     private static async Task<double[]> ReadAllAsync(GarnetJournalRouter router, JournalId[] ids)

@@ -165,6 +165,48 @@ public sealed class GarnetJournalStorageOptions
     /// </summary>
     public TimeSpan MarkerCollectionInterval { get; set; } = TimeSpan.FromMinutes(1);
 
+    /// <summary>
+    /// Gets or sets a value indicating whether a partition writes key filters when it seals a bucket which moves away.
+    /// </summary>
+    /// <remarks>
+    /// A key filter is a bloom filter of the journals the sealed copy holds, about 1.2 bytes per journal. The bucket's new
+    /// owner answers for a journal which no filter on its migration chain reports, such as a journal created after the
+    /// move, without first pulling it from the previous owner.
+    /// </remarks>
+    public bool KeyFilters { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets how often the balancer samples load and, when partitions are imbalanced, moves buckets between them;
+    /// <see cref="Timeout.InfiniteTimeSpan"/> disables balancing.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Partitions count the operations they serve per bucket. The silo hosting the partition with the lowest id runs the
+    /// balancer: once the range map holds no migrations, and while the most loaded partition's load exceeds
+    /// <see cref="BalancingThreshold"/> times the mean, it merges cold ranges into their neighbors and moves the runs of
+    /// buckets which most reduce imbalance per journal moved, at most <see cref="BalancingMaxMoveFraction"/> of the
+    /// buckets per round. Each move is a migration, which pauses its buckets only for the cutover.
+    /// </para>
+    /// <para>
+    /// With <see cref="PartitionBlobContainer"/>, silos also move one partition at a time from the silo hosting the
+    /// most partitions to the one hosting the fewest, at most once per interval, while the counts differ by two or more.
+    /// Like failover, this considers only silos which host under their addresses, not silos with a <see cref="HostId"/>.
+    /// </para>
+    /// </remarks>
+    public TimeSpan BalancingInterval { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets or sets the imbalance, the most loaded partition's load over the mean partition load, above which the
+    /// balancer moves buckets. Must exceed 1.
+    /// </summary>
+    public double BalancingThreshold { get; set; } = 1.25;
+
+    /// <summary>Gets or sets the cluster's load, in journal operations per second, below which the balancer moves no buckets.</summary>
+    public double BalancingMinimumLoad { get; set; } = 100;
+
+    /// <summary>Gets or sets the largest fraction of the buckets one balancing round moves, between 0 and 1.</summary>
+    public double BalancingMaxMoveFraction { get; set; } = 0.09;
+
     /// <summary>Gets or sets the in-memory size of each hosted partition's hybrid log, for example <c>1g</c>.</summary>
     public string LogMemorySize { get; set; } = DEFAULT_LOG_MEMORY_SIZE;
 

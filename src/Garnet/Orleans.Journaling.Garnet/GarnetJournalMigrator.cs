@@ -37,6 +37,12 @@ internal sealed class GarnetJournalMigrator(GarnetJournalRouter router)
     private string MapId => router.MapId;
 
     /// <summary>
+    /// Gets or sets a value indicating whether seals write key filters, which let destinations answer for journals the
+    /// migration chain never held without a pull (D36).
+    /// </summary>
+    public bool KeyFilters { get; set; } = true;
+
+    /// <summary>
     /// Pulls a journal into <paramref name="destination"/>, which answered <c>NeedPull(source, version)</c> for it.
     /// </summary>
     /// <returns>
@@ -282,9 +288,11 @@ internal sealed class GarnetJournalMigrator(GarnetJournalRouter router)
     }
 
     /// <summary>Reads a bucket's state in a partition.</summary>
-    public async Task<BucketState> GetBucketAsync(PartitionId partition, int bucket, CancellationToken cancellationToken)
+    /// <param name="withFilter">Whether to include the key filters a sealed copy wrote.</param>
+    public async Task<BucketState> GetBucketAsync(PartitionId partition, int bucket, CancellationToken cancellationToken, bool withFilter = false)
     {
-        var result = await router.ExecuteAtAsync(partition, GarnetJournalProtocol.BucketInfo, GarnetJournalKeySet.GetBucketArgs(MapId, bucket), cancellationToken).ConfigureAwait(false);
+        var args = withFilter ? GarnetJournalKeySet.GetBucketArgs(MapId, bucket, "1") : GarnetJournalKeySet.GetBucketArgs(MapId, bucket);
+        var result = await router.ExecuteAtAsync(partition, GarnetJournalProtocol.BucketInfo, args, cancellationToken).ConfigureAwait(false);
         return ParseBucketState(result);
     }
 
@@ -298,7 +306,8 @@ internal sealed class GarnetJournalMigrator(GarnetJournalRouter router)
             result[5].ToString() == "1",
             (long)result[6],
             (long)result[7],
-            long.Parse(result[8].ToString(), NumberStyles.None, CultureInfo.InvariantCulture));
+            long.Parse(result[8].ToString(), NumberStyles.None, CultureInfo.InvariantCulture),
+            result.Length > 9 && (byte[]?)result[9] is { Length: > 0 } filter ? filter : null);
     }
 
     /// <summary>Reads a bucket's state in a partition with one attempt.</summary>
@@ -318,8 +327,9 @@ internal sealed class GarnetJournalMigrator(GarnetJournalRouter router)
 
     /// <summary>Applies a bucket transition (<c>open</c>, <c>seal</c>, or <c>reclaim</c>) in a partition.</summary>
     /// <param name="collectionGeneration">For <c>open</c>, the source's collection generation, which the bucket inherits (D25).</param>
+    /// <param name="extra">For <c>seal</c>, <c>"1"</c> to write key filters; for <c>open</c>, the key filters of the chain (D36).</param>
     /// <returns><see langword="true"/> if the transition applied or had already been applied.</returns>
-    public async Task<bool> TransitionAsync(PartitionId partition, int bucket, string operation, long version, PartitionId? source, CancellationToken cancellationToken, long collectionGeneration = 0)
+    public async Task<bool> TransitionAsync(PartitionId partition, int bucket, string operation, long version, PartitionId? source, CancellationToken cancellationToken, long collectionGeneration = 0, object? extra = null)
     {
         var args = GarnetJournalKeySet.GetBucketArgs(
             MapId,
@@ -328,9 +338,27 @@ internal sealed class GarnetJournalMigrator(GarnetJournalRouter router)
             version.ToString(CultureInfo.InvariantCulture),
             source?.Value ?? GarnetJournalProtocol.NoSource,
             source is null ? "1" : "0",
-            collectionGeneration.ToString(CultureInfo.InvariantCulture));
+            collectionGeneration.ToString(CultureInfo.InvariantCulture),
+            extra ?? RedisValue.EmptyString);
         var result = await router.ExecuteAtAsync(partition, GarnetJournalProtocol.Bucket, args, cancellationToken).ConfigureAwait(false);
         return GarnetJournalRouter.GetStatus(result) == GarnetJournalProtocol.SuccessStatus;
+    }
+
+    /// <summary>Seals <paramref name="bucket"/> in <paramref name="partition"/> at <paramref name="version"/>, writing key filters if <see cref="KeyFilters"/> is set.</summary>
+    public Task<bool> SealAsync(PartitionId partition, int bucket, long version, CancellationToken cancellationToken)
+        => TransitionAsync(partition, bucket, GarnetJournalProtocol.BucketSealOperation, version, source: null, cancellationToken, extra: KeyFilters ? "1" : "0");
+
+    /// <summary>
+    /// Opens <paramref name="bucket"/> in <paramref name="destination"/> at <paramref name="version"/> from
+    /// <paramref name="source"/>, which has sealed it at that version: the bucket inherits the sealed copy's collection
+    /// generation (D25) and its key filters (D36), both of which are final once the copy is sealed.
+    /// </summary>
+    /// <returns><see langword="true"/> if the open applied or had already been applied.</returns>
+    public async Task<bool> OpenAsync(PartitionId destination, int bucket, long version, PartitionId source, CancellationToken cancellationToken)
+    {
+        var sealedCopy = await GetBucketAsync(source, bucket, cancellationToken, withFilter: true).ConfigureAwait(false);
+        var filter = sealedCopy.State == GarnetJournalProtocol.SealedStateName && sealedCopy.Version == version ? sealedCopy.Filter : null;
+        return await TransitionAsync(destination, bucket, GarnetJournalProtocol.BucketOpenOperation, version, source, cancellationToken, sealedCopy.CollectionGeneration, filter).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -447,7 +475,8 @@ internal sealed record ChainRecord(string Kind, RedisValue[] Metadata, RedisValu
 
 /// <summary>A bucket's state in a partition.</summary>
 /// <param name="CollectionGeneration">The bucket's collection generation (D25).</param>
-internal readonly record struct BucketState(string State, long Version, string Source, bool Done, bool Reclaimed, long IndexCount, long MarkerCount, long CollectionGeneration = 0)
+/// <param name="Filter">The key filters a sealed copy wrote (D36), if they were requested and it wrote any.</param>
+internal readonly record struct BucketState(string State, long Version, string Source, bool Done, bool Reclaimed, long IndexCount, long MarkerCount, long CollectionGeneration = 0, byte[]? Filter = null)
 {
     /// <summary>Gets a value indicating whether the partition holds no copy of the bucket which a read can reach: it is absent or reclaimed (D11).</summary>
     public bool IsAbsentOrReclaimed => State == GarnetJournalProtocol.AbsentStateName || Reclaimed;

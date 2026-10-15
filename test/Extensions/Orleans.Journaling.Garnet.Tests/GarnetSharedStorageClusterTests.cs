@@ -13,7 +13,7 @@ namespace Orleans.Journaling.Garnet.Tests;
 /// A three-silo cluster whose three partitions are on shared blob storage. The initial map names no silo as a host, so
 /// the silos' failover agents place the partitions; membership detects dead silos quickly.
 /// </summary>
-internal sealed class GarnetSharedStorageClusterFixture : IntegrationTestFixture
+internal class GarnetSharedStorageClusterFixture : IntegrationTestFixture
 {
     internal const int BucketCount = 64;
 
@@ -22,11 +22,15 @@ internal sealed class GarnetSharedStorageClusterFixture : IntegrationTestFixture
 
     public InMemoryRangeMetaStore MetaStore { get; } = new();
 
+    /// <summary>Gets how often silos balance partitions across silos.</summary>
+    protected virtual TimeSpan BalancingInterval => Timeout.InfiniteTimeSpan;
+
     protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
     {
         builder.Options.InitialSilosCount = 3;
         var metaStore = MetaStore;
         var container = Container;
+        var balancingInterval = BalancingInterval;
         var map = RangeMap.CreateUniform(
             BucketCount,
             Enumerable.Range(0, 3).Select(index => KeyValuePair.Create(new PartitionId($"p{index}"), new PartitionHosting("unassigned", 0, $"p{index}"))));
@@ -49,15 +53,22 @@ internal sealed class GarnetSharedStorageClusterFixture : IntegrationTestFixture
                 storage.OperationTimeout = TimeSpan.FromSeconds(30);
                 storage.HostingInterval = TimeSpan.FromMilliseconds(200);
                 storage.MigrationInterval = TimeSpan.FromMilliseconds(50);
+                storage.BalancingInterval = balancingInterval;
             });
         });
     }
 
-    public override async ValueTask DisposeAsync()
+    public sealed override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
         await Container.DeleteIfExistsAsync();
     }
+}
+
+/// <summary>The shared-storage cluster, with silos which balance partitions across themselves every two seconds.</summary>
+internal sealed class GarnetBalancedSharedStorageClusterFixture : GarnetSharedStorageClusterFixture
+{
+    protected override TimeSpan BalancingInterval => TimeSpan.FromSeconds(2);
 }
 
 /// <summary>
@@ -125,5 +136,36 @@ public sealed class GarnetSharedStorageClusterTests
         }
 
         Assert.All(lost, partition => Assert.NotEqual(victimHost, failedOver.Map.Partitions[partition].Host));
+    }
+    [Fact]
+    public async Task Placement_SpreadsPartitionsAndActivatesGrainsWithTheirPartitions()
+    {
+        GarnetBlobTestStorage.SkipIfUnavailable();
+        await using var fixture = new GarnetBalancedSharedStorageClusterFixture();
+        await fixture.InitializeAsync();
+        var silos = fixture.Cluster.Silos.Select(silo => silo.SiloAddress.ToParsableString()).ToHashSet();
+
+        // The first silo to become active may receive every partition; the silos then move one at a time until each hosts one.
+        var view = await GarnetTestWaits.WaitForMapAsync(
+            fixture.MetaStore,
+            map => map.Partitions.Values.All(hosting => hosting.Endpoint is not null) && map.Partitions.Values.Select(hosting => hosting.Host).ToHashSet().SetEquals(silos),
+            "each silo serves one partition",
+            TimeSpan.FromSeconds(90));
+
+        // Grains with GarnetJournalPlacement activate on the silo hosting their journal's partition.
+        var grains = Enumerable.Range(0, 24).Select(_ => fixture.Client.GetGrain<IGarnetLocalityGrain>(Guid.NewGuid())).ToArray();
+        Task<string> Describe() => fixture.MetaStore.ReadAsync(CancellationToken.None).AsTask().ContinueWith(read => GarnetTestWaits.DescribeMap(read.Result), TaskScheduler.Default);
+        await GarnetTestWaits.BoundedAsync(Task.WhenAll(grains.Select((grain, index) => grain.SetValue(index))), "Writing grain state", Describe);
+        foreach (var grain in grains)
+        {
+            var journal = JournalId.FromGrainId(grain.GetGrainId());
+            var bucket = GarnetJournalKeys.GetBucket(GarnetJournalKeys.EncodeJournalId(journal.Value), GarnetSharedStorageClusterFixture.BucketCount);
+            Assert.Equal(view.Map.Partitions[view.Map.GetOwner(bucket)].Host, await GarnetTestWaits.BoundedAsync(grain.GetSilo(), "Reading a grain's silo", Describe));
+        }
+
+        for (var i = 0; i < grains.Length; i++)
+        {
+            Assert.Equal(i, await GarnetTestWaits.BoundedAsync(grains[i].GetValue(), "Reading grain state", Describe));
+        }
     }
 }

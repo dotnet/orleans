@@ -16,6 +16,7 @@ permissions:
 env:
   QUINT_VERSION: 0.33.0
   SPEC: garnetRangeMigration.qnt
+  SIM_SPEC: garnetRangeMigrationSim.qnt
   HOSTING_SPEC: partitionHosting.qnt
 
 jobs:
@@ -32,12 +33,12 @@ jobs:
         with:
           node-version: 22
       - run: npm install -g "@informalsystems/quint@$QUINT_VERSION"
-      - run: quint typecheck "$SPEC" && quint typecheck garnetRangeMigrationTraces.qnt
+      - run: quint typecheck "$SPEC" && quint typecheck "$SIM_SPEC" && quint typecheck garnetRangeMigrationTraces.qnt
       - name: Directed scenarios
-        run: quint test "$SPEC" --main=garnetRangeMigrationSim --match=Test
+        run: quint test "$SIM_SPEC" --main=garnetRangeMigrationSim --match=Test
       - name: Random simulation
         run: >-
-          quint run "$SPEC" --main=garnetRangeMigrationSim --backend=rust
+          quint run "$SIM_SPEC" --main=garnetRangeMigrationSim --backend=rust
           --invariant=safety --max-steps=40 --max-samples=20000
       - name: Mutants must violate safety
         # mutantUnfencedInstall, mutantUnfencedOpen, mutantUnfencedDone, and mutantUnfencedReclaim need long, specific
@@ -46,8 +47,9 @@ jobs:
         run: |
           for step in mutantOpenBeforeSeal mutantUnconditionalInstall mutantDeleteWithoutTombstone \
                       mutantReclaimBeforeDone mutantMarkDoneEarly mutantInventoryLiveOnly mutantDropWithoutHorizon \
-                      mutantClientClock mutantRetryWithoutIdempotence mutantRetryAnyAbsence mutantWriteAfterSeal; do
-            if quint run "$SPEC" --main=garnetRangeMigrationSim --backend=rust --step="$step" \
+                      mutantClientClock mutantRetryWithoutIdempotence mutantRetryAnyAbsence mutantWriteAfterSeal \
+                      mutantFilterOmitsTombstone mutantFilterOmitsJournal; do
+            if quint run "$SIM_SPEC" --main=garnetRangeMigrationSim --backend=rust --step="$step" \
                  --invariant=safety --max-steps=30 --max-samples=5000 --seed=7 > "$step.log" 2>&1; then
               echo "::error::$step was not caught by the safety invariant"
               exit 1

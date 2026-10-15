@@ -8,6 +8,19 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Journaling
 {
+    [GenerateSerializer]
+    [Immutable]
+    [SuppressReferenceTracking]
+    public sealed partial class GarnetJournalPlacement : Runtime.PlacementStrategy
+    {
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = false)]
+    public sealed partial class GarnetJournalPlacementAttribute : Placement.PlacementAttribute
+    {
+        public GarnetJournalPlacementAttribute() : base(default!) { }
+    }
+
     public static partial class GarnetJournalStorageHostingExtensions
     {
         public static Hosting.ISiloBuilder AddGarnetJournalStorage(this Hosting.ISiloBuilder builder, System.Action<GarnetJournalStorageOptions>? configure) { throw null; }
@@ -23,6 +36,14 @@ namespace Orleans.Journaling
         public const string DEFAULT_INDEX_MEMORY_SIZE = "64m";
         public const string DEFAULT_LOG_MEMORY_SIZE = "1g";
         public static readonly System.TimeSpan DEFAULT_TOMBSTONE_RETENTION;
+        public System.TimeSpan BalancingInterval { get { throw null; } set { } }
+
+        public double BalancingMaxMoveFraction { get { throw null; } set { } }
+
+        public double BalancingMinimumLoad { get { throw null; } set { } }
+
+        public double BalancingThreshold { get { throw null; } set { } }
+
         public int BucketCount { get { throw null; } set { } }
 
         public string CheckpointAofSize { get { throw null; } set { } }
@@ -40,6 +61,8 @@ namespace Orleans.Journaling
         public Ranges.RangeMap? InitialRangeMap { get { throw null; } set { } }
 
         public int InitStage { get { throw null; } set { } }
+
+        public bool KeyFilters { get { throw null; } set { } }
 
         public System.Net.IPEndPoint? ListenEndPoint { get { throw null; } set { } }
 
@@ -186,5 +209,24 @@ namespace Orleans.Journaling.Ranges
 
         [System.Runtime.CompilerServices.CompilerGenerated]
         public override readonly string ToString() { throw null; }
+    }
+}
+
+namespace OrleansCodeGen.Orleans.Journaling
+{
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_GarnetJournalPlacement : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Journaling.GarnetJournalPlacement>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Journaling.GarnetJournalPlacement instance) { }
+
+        public global::Orleans.Journaling.GarnetJournalPlacement ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Journaling.GarnetJournalPlacement instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Journaling.GarnetJournalPlacement value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 }

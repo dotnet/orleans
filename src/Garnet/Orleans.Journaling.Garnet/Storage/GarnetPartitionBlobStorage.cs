@@ -56,6 +56,8 @@ internal sealed class GarnetPartitionBlobStorage
     private Dictionary<string, BlobEntry> _blobs = new(StringComparer.Ordinal);
     private long _sequence;
     private Exception? _failure;
+    private long _pageWrites;
+    private long _bytesWritten;
 
     private GarnetPartitionBlobStorage(BlobContainerClient container, string prefix, long epoch, ILogger? logger)
     {
@@ -82,6 +84,19 @@ internal sealed class GarnetPartitionBlobStorage
 
     /// <summary>Gets the conditions which every write of this tenure carries.</summary>
     public PageBlobRequestConditions WriteConditions => new() { LeaseId = LeaseId };
+
+    /// <summary>Gets the number of page uploads this tenure's devices have completed.</summary>
+    public long PageWrites => Interlocked.Read(ref _pageWrites);
+
+    /// <summary>Gets the number of bytes this tenure's devices have uploaded.</summary>
+    public long BytesWritten => Interlocked.Read(ref _bytesWritten);
+
+    /// <summary>Records a completed page upload.</summary>
+    internal void OnPagesWritten(long bytes)
+    {
+        Interlocked.Increment(ref _pageWrites);
+        Interlocked.Add(ref _bytesWritten, bytes);
+    }
 
     /// <summary>
     /// Takes over the storage under <paramref name="storageLocation"/> in <paramref name="container"/> for a tenure at

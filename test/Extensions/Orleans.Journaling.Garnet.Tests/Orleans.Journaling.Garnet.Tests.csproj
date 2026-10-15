@@ -25,6 +25,9 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Garnet\Orleans.Journaling.Garnet\Orleans.Journaling.Garnet.csproj" />
+    <!-- Providers the comparison benchmark measures against. -->
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Journaling.AzureStorage\Orleans.Journaling.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.Journaling.Redis\Orleans.Journaling.Redis.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Journaling.Tests\Orleans.Journaling.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
     <ProjectReference Include="..\Orleans.Journaling.Garnet.CrashHost\Orleans.Journaling.Garnet.CrashHost.csproj" />
