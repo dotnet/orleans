@@ -24,7 +24,7 @@ siloBuilder.AddDurableTasks();
 ```
 
 The silo registration composes Messaging, which uses Durable Jobs to wake grains
-with pending messages. Configure Journaling with a durable journal storage
+with pending messages or runnable executions. Configure Journaling with a durable journal storage
 provider and a Durable Jobs provider for production. Task state can be stored
 in any journal format, including the
 default JSON format and the Orleans binary format. Requests and responses are
@@ -252,6 +252,13 @@ framework assets; its first published version establishes the compatibility base
 - An activation recovers task state after its journal, inbox, and outbox have
   recovered, and starts the recovered executions once the grain's
   `OnActivateAsync` has completed.
+- The runtime is an inbox work source: while the grain holds a runnable
+  execution, one which runs code rather than waiting for a child's result, a
+  signal, or a delay's resume, Messaging keeps the grain's Durable Jobs wake-up,
+  which a journal write ensures before it becomes durable. A grain which
+  deactivates or crashes while an execution is runnable is reactivated within
+  about a second, and recovery resumes the execution. A waiting execution
+  resumes when the message it waits for reactivates the grain.
 - Activation shutdown begins when deactivation starts, before the grain's
   `OnDeactivateAsync` runs. It stops new execution and signals the attempt-scoped
   execution-abort token observed by delegate and delay operations and

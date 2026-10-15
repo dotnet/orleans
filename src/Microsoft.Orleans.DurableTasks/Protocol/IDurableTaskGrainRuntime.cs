@@ -248,6 +248,20 @@ internal interface IDurableTaskGrainRuntime
     }
 
     /// <summary>
+    /// Notes that an attempt waits for an event which a message delivers, such as a child's result, a signal, or a delay's
+    /// resume, until the matching <see cref="OnAttemptUnparked"/>.
+    /// </summary>
+    /// <remarks>An attempt which isn't parked is runnable, so its grain needs a wake-up to resume it after a deactivation.</remarks>
+    void OnAttemptParked()
+    {
+    }
+
+    /// <summary>Notes that an attempt which <see cref="OnAttemptParked"/> reported runs again.</summary>
+    void OnAttemptUnparked()
+    {
+    }
+
+    /// <summary>
     /// Waits for the signal <paramref name="name"/> of the invoked task whose execution tree contains
     /// <paramref name="executionId"/>, and returns its committed value and the time it was recorded.
     /// </summary>
