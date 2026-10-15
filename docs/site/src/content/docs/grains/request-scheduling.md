@@ -71,13 +71,13 @@ Use <xref:System.Threading.Tasks.Task.Run*> only to isolate unavoidable synchron
 <xref:Orleans.GrainBaseExtensions.RunRequestAsync*> runs a callback as a request on the activation. Call it from any thread, such as a stream, messaging, or library callback, to apply results to grain state under the same scheduling as grain calls:
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_from_callback":::
-The request:
+With the default <xref:Orleans.Runtime.LocalRequestOptions>, the request:
 
 - Follows the grain's reentrancy rules and queues behind the current request on a non-reentrant grain.
 - Passes through incoming grain call filters, which see it as a method of `IGrainRequestInvoker` with no arguments.
 - Starts a new call chain. <xref:Orleans.Runtime.RequestContext> values from the calling thread don't flow into the callback.
 - Restarts the activation's idle collection period.
-- Is admitted regardless of <xref:Orleans.Configuration.SiloMessagingOptions.MaxEnqueuedRequestsHardLimit>, like a grain timer tick.
+- Bypasses <xref:Orleans.Configuration.SiloMessagingOptions.MaxEnqueuedRequestsHardLimit>.
 
 The returned task completes with the callback's result or exception. The callback receives the cancellation token passed to `RunRequestAsync`, and cancelling it while the request is queued cancels the request. If the activation deactivates before the request runs, the task faults with <xref:Orleans.Runtime.OrleansMessageRejectionException>.
 
