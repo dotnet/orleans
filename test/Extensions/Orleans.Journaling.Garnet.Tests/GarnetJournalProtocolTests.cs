@@ -1,4 +1,5 @@
 using System.Buffers;
+using NSubstitute;
 using Orleans.Storage;
 using StackExchange.Redis;
 
@@ -80,10 +81,10 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         Assert.Equal(["-1"], await ExecuteAsync(GarnetJournalProtocol.Delete, otherDelete));
         Assert.Null(await Provider.CreateStorage(id).GetMetadataAsync(CancellationToken));
 
-        object[] create = [.. Keys(storage), "create-etag", "json", "0"];
+        object[] create = [.. Keys(storage), "create-etag", "json", "delete-etag", "0"];
         Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Create, create))[0]);
         Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Create, create))[0]);
-        object[] otherCreate = [.. Keys(storage), "other-create-etag", "json", "0"];
+        object[] otherCreate = [.. Keys(storage), "other-create-etag", "json", "delete-etag", "0"];
         Assert.Equal("0", (await ExecuteAsync(GarnetJournalProtocol.Create, otherCreate))[0]);
     }
 
@@ -107,7 +108,7 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
 
         // Retries are recognized while fewer than RecentETagCount later mutations have committed.
         var previous = "recreated-0";
-        Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "0", "", previous, new byte[] { 0 }, "json"]))[0]);
+        Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "0", "deleted", previous, new byte[] { 0 }, "json"]))[0]);
         object[] tracked = [.. Keys(storage), "1", previous, "tracked", new byte[] { 9 }, "json"];
         Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, tracked))[0]);
         previous = "tracked";
@@ -126,6 +127,155 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         await Provider.CreateStorage(id).ReadAsync(consumer, CancellationToken);
         Assert.Equal(GarnetJournalProtocol.RecentETagCount + 2, consumer.Bytes.Count);
         Assert.Equal(1, consumer.Bytes.Count(value => value == 9));
+    }
+
+    [Theory]
+    [InlineData(GarnetJournalProtocol.Append)]
+    [InlineData(GarnetJournalProtocol.Replace)]
+    [InlineData(GarnetJournalProtocol.Create)]
+    public async Task CreationRetries_DoNotResurrectDeletedJournal_AfterHistoryEviction(string procedure)
+    {
+        var id = NewId($"resurrect-{procedure}");
+        var storage = (GarnetJournalStorage)Provider.CreateStorage(id);
+        object[] creation = procedure == GarnetJournalProtocol.Create
+            ? [.. Keys(storage), "created", "json", "", "1", "owner", "first"]
+            : [.. Keys(storage), "0", "", "created", new byte[] { 1 }, "json"];
+
+        // The creation commits but its reply is lost; enough later mutations to evict its ETag end in a deletion.
+        Assert.Equal("1", (await ExecuteAsync(procedure, creation))[0]);
+        var previous = "created";
+        for (var i = 1; i < GarnetJournalProtocol.RecentETagCount; i++)
+        {
+            var next = $"later-{i}";
+            Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", previous, next, new byte[] { 2 }, "json"]))[0]);
+            previous = next;
+        }
+
+        Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Delete, [.. Keys(storage), previous, "1", "deleted"]));
+
+        // The retry names the absence it observed (no record), not the deletion's, so it does not create the journal again.
+        Assert.Equal(["-1"], await ExecuteAsync(procedure, creation));
+        Assert.Null(await Provider.CreateStorage(id).GetMetadataAsync(CancellationToken));
+        Assert.Equal(["0", "deleted"], await ExecuteAsync(GarnetJournalProtocol.GetMetadata, [.. Keys(storage)]));
+    }
+
+    [Fact]
+    public async Task MetadataUpdateRetries_DoNotApplyAgain_AfterHistoryEviction()
+    {
+        var id = NewId("metadata-eviction");
+        var storage = (GarnetJournalStorage)Provider.CreateStorage(id);
+        await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken);
+        var initial = (await storage.GetMetadataAsync(CancellationToken))!.ETag!;
+
+        // An update setting owner=A commits but its reply is lost; later updates end with owner=B.
+        object[] setA = [.. Keys(storage), "1", initial, "set-a", "0", "1", "owner", "A"];
+        Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.UpdateMetadata, setA))[0]);
+        var previous = "set-a";
+        for (var i = 0; i < GarnetJournalProtocol.RecentETagCount; i++)
+        {
+            var next = $"update-{i}";
+            Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.UpdateMetadata, [.. Keys(storage), "1", previous, next, "0", "1", "owner", $"B{i}"]))[0]);
+            previous = next;
+        }
+
+        // The retry's condition names a metadata ETag which never recurs, so it fails instead of overwriting B.
+        Assert.Equal(["-1"], await ExecuteAsync(GarnetJournalProtocol.UpdateMetadata, setA));
+        var metadata = await Provider.CreateStorage(id).GetMetadataAsync(CancellationToken);
+        Assert.Equal($"B{GarnetJournalProtocol.RecentETagCount - 1}", metadata!.Properties["owner"]);
+    }
+
+    [Fact]
+    public async Task NoOpMetadataUpdate_IsRecognizedOnRetry()
+    {
+        var id = NewId("metadata-noop");
+        var storage = (GarnetJournalStorage)Provider.CreateStorage(id);
+        await storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "A" }, CancellationToken);
+        var initial = (await storage.GetMetadataAsync(CancellationToken))!.ETag!;
+
+        // An update setting owner=A changes nothing, keeps the metadata ETag, and loses its reply.
+        object[] setA = [.. Keys(storage), "1", initial, "noop", "0", "1", "owner", "A"];
+        var first = await ExecuteAsync(GarnetJournalProtocol.UpdateMetadata, setA);
+        Assert.Equal("1", first[0]);
+        Assert.Equal(initial, (await storage.GetMetadataAsync(CancellationToken))!.ETag);
+
+        // Another writer sets owner=B; the retry reports the no-op's success without undoing B.
+        Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.UpdateMetadata, [.. Keys(storage), "1", initial, "set-b", "0", "1", "owner", "B"]))[0]);
+        Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.UpdateMetadata, setA))[0]);
+        Assert.Equal("B", (await Provider.CreateStorage(id).GetMetadataAsync(CancellationToken))!.Properties["owner"]);
+    }
+
+    [Fact]
+    public async Task UnconditionalMetadataUpdate_AppliesOverConcurrentUpdates()
+    {
+        var id = NewId("metadata-unconditional");
+        var storage = Provider.CreateStorage(id);
+        var other = Provider.CreateStorage(id);
+        await storage.CreateIfNotExistsAsync(cancellationToken: CancellationToken);
+        await storage.GetMetadataAsync(CancellationToken);
+        await other.UpdateMetadataAsync(new Dictionary<string, string> { ["owner"] = "other" }, cancellationToken: CancellationToken);
+
+        // The update is conditioned on the ETag this instance reads, and reads again after the other writer's update.
+        var updated = await storage.UpdateMetadataAsync(new Dictionary<string, string> { ["owner"] = "mine" }, cancellationToken: CancellationToken);
+        Assert.Equal("mine", updated!.Properties["owner"]);
+        Assert.Equal("mine", (await other.GetMetadataAsync(CancellationToken))!.Properties["owner"]);
+    }
+
+    [Fact]
+    public async Task ConcurrentInitialization_WithConflictingBucketCounts_StartsOnlyOneCount()
+    {
+        var directory = GarnetPartitionFixture.CreateTemporaryDirectory();
+        try
+        {
+            using var host = GarnetJournalPartitionHost.Start(
+                new GarnetJournalPartitionSettings { DataDirectory = directory, LogMemorySize = "64m", IndexMemorySize = "1m" },
+                loggerFactory: null);
+            await using var connection = await ConnectionMultiplexer.ConnectAsync(new ConfigurationOptions
+            {
+                EndPoints = { host.EndPoint },
+                Protocol = RedisProtocol.Resp2,
+            });
+
+            var database = connection.GetDatabase();
+            var clients = new[] { 16, 32 }.Select(count => new GarnetJournalPartitionClient(database, count, TimeSpan.FromSeconds(10))).ToArray();
+            var failures = await Task.WhenAll(clients.Select(client => Capture(client.EnsureSinglePartitionInitializedAsync(CancellationToken))));
+
+            Assert.Single(failures, failure => failure is null);
+            Assert.All(failures.Where(failure => failure is not null), failure => Assert.IsType<InvalidOperationException>(failure));
+            var winner = clients[Array.IndexOf(failures, null)].BucketCount;
+            Assert.Equal(winner.ToString(), (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, "bucket-count"));
+            Assert.Equal("1", (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, "initialized"));
+        }
+        finally
+        {
+            GarnetPartitionFixture.TryDeleteDirectory(directory);
+        }
+
+        static async Task<Exception?> Capture(Task task)
+        {
+            try
+            {
+                await task;
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+        }
+    }
+
+    [Fact]
+    public async Task OperationTimeout_BoundsEachAttempt()
+    {
+        var database = Substitute.For<IDatabase>();
+        database.ExecuteAsync(Arg.Any<string>(), Arg.Any<object[]>()).Returns(new TaskCompletionSource<RedisResult>().Task);
+        var client = new GarnetJournalPartitionClient(database, GarnetJournalStorageOptions.DEFAULT_BUCKET_COUNT, TimeSpan.FromMilliseconds(200));
+        var ambiguous = new System.Runtime.CompilerServices.StrongBox<bool>();
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        await Assert.ThrowsAsync<TimeoutException>(() => client.ExecuteAsync(GarnetJournalProtocol.Read, [], CancellationToken, ambiguous).AsTask());
+        Assert.InRange(stopwatch.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+        Assert.True(ambiguous.Value);
     }
 
     [Fact]

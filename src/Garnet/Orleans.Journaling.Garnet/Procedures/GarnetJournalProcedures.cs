@@ -117,6 +117,15 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
         response.CopyTo(ref output);
     }
 
+    /// <summary>Writes the missing status followed by the journal's absence ETag.</summary>
+    protected static void WriteMissing(ref MemoryResult<byte> output, in JournalRecord journal)
+    {
+        var response = new GarnetRespArrayWriter();
+        response.WriteBulk(GarnetJournalProtocol.MissingStatus);
+        response.WriteBulk(journal.AbsenceETag);
+        response.CopyTo(ref output);
+    }
+
     protected static void WriteStatus(ref MemoryResult<byte> output, int status, long value)
     {
         var response = new GarnetRespArrayWriter();
@@ -266,6 +275,15 @@ internal readonly ref struct JournalRecord
     public ReadOnlySpan<byte> RecentETags { get; init; }
 
     /// <summary>
+    /// Gets the identity of the journal's absence: its tombstone's ETag, or empty if the partition holds no record.
+    /// </summary>
+    /// <remarks>
+    /// Each deletion writes a fresh ETag, so an absence never recurs while retries can arrive. A write conditioned on
+    /// the absence it observed therefore cannot apply again after a later creation and deletion.
+    /// </remarks>
+    public ReadOnlySpan<byte> AbsenceETag => IsTombstone ? ETag : default;
+
+    /// <summary>
     /// Gets a value indicating whether the mutation which writes <paramref name="eTag"/> has already committed.
     /// </summary>
     public bool HasCommitted(PinnedSpanByte eTag)
@@ -327,7 +345,7 @@ internal readonly ref struct JournalRecord
 
 /// <summary>
 /// Reads a journal's metadata and data. Arguments: keys.
-/// Returns <c>[1, metadataValueCount, metadata..., segments...]</c> or <c>[0]</c>.
+/// Returns <c>[1, metadataValueCount, metadata..., segments...]</c>, or <c>[0, absenceETag]</c> if the journal is absent.
 /// </summary>
 internal sealed class GarnetJournalReadProcedure : GarnetJournalProcedure
 {
@@ -345,7 +363,7 @@ internal sealed class GarnetJournalReadProcedure : GarnetJournalProcedure
 
         if (!journal.IsLive)
         {
-            WriteStatus(ref output, GarnetJournalProtocol.MissingStatus);
+            WriteMissing(ref output, journal);
             return;
         }
 
@@ -389,7 +407,7 @@ internal sealed class GarnetJournalReadProcedure : GarnetJournalProcedure
 }
 
 /// <summary>
-/// Reads a journal's metadata. Arguments: keys. Returns <c>[1, metadata...]</c> or <c>[0]</c>.
+/// Reads a journal's metadata. Arguments: keys. Returns <c>[1, metadata...]</c>, or <c>[0, absenceETag]</c> if the journal is absent.
 /// </summary>
 internal sealed class GarnetJournalGetMetadataProcedure : GarnetJournalProcedure
 {
@@ -407,7 +425,7 @@ internal sealed class GarnetJournalGetMetadataProcedure : GarnetJournalProcedure
 
         if (!journal.IsLive)
         {
-            WriteStatus(ref output, GarnetJournalProtocol.MissingStatus);
+            WriteMissing(ref output, journal);
             return;
         }
 
@@ -416,8 +434,9 @@ internal sealed class GarnetJournalGetMetadataProcedure : GarnetJournalProcedure
 }
 
 /// <summary>
-/// Creates a journal if it does not exist. Arguments: keys, new ETag, format, property count, properties.
-/// Returns <c>[1, metadata...]</c> if created, or <c>[0, metadata...]</c> if it already existed.
+/// Creates a journal if it does not exist. Arguments: keys, new ETag, format, observed absence ETag, property count, properties.
+/// Returns <c>[1, metadata...]</c> if created, <c>[0, metadata...]</c> if it already existed, or <c>[-1]</c> if the
+/// journal is absent but its absence is not the one the caller observed.
 /// </summary>
 internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
 {
@@ -435,7 +454,8 @@ internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
 
         var newETag = GetArg(ref procInput, FirstOperationArg);
         var format = GetArg(ref procInput, FirstOperationArg + 1);
-        var countArg = GetArg(ref procInput, FirstOperationArg + 2);
+        var absence = GetArg(ref procInput, FirstOperationArg + 2);
+        var countArg = GetArg(ref procInput, FirstOperationArg + 3);
         if (journal.Exists && journal.HasCommitted(newETag))
         {
             // A retry of a create which committed reports the creation.
@@ -464,6 +484,14 @@ internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
             return;
         }
 
+        // Every absence has an identity (its tombstone's ETag), so a retry whose ETag has left the journal's history
+        // cannot satisfy this condition after a later creation and deletion.
+        if (!journal.AbsenceETag.SequenceEqual(absence.ReadOnlySpan))
+        {
+            WriteStatus(ref output, GarnetJournalProtocol.ConflictStatus);
+            return;
+        }
+
         if (!Utf8Parser.TryParse(countArg.ReadOnlySpan, out int count, out _) || count < 0)
         {
             WriteStatus(ref output, GarnetJournalProtocol.InvalidMetadataStatus);
@@ -479,7 +507,7 @@ internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
         fields[5] = (Pinned(GarnetJournalProtocol.RecentETagsField), AppendRecentETag(journal.RecentETags, newETag));
         for (var i = 0; i < count; i++)
         {
-            fields[6 + i] = (GetArg(ref procInput, FirstOperationArg + 3 + 2 * i), GetArg(ref procInput, FirstOperationArg + 4 + 2 * i));
+            fields[6 + i] = (GetArg(ref procInput, FirstOperationArg + 4 + 2 * i), GetArg(ref procInput, FirstOperationArg + 5 + 2 * i));
         }
 
         ClearForCreate(api, ref procInput, journal);
@@ -491,7 +519,7 @@ internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
 
 /// <summary>
 /// Appends to or replaces a journal, creating it if it is expected to be absent.
-/// Arguments: keys, expectation (<c>1</c>: the content ETag matches; <c>0</c>: the journal is absent), expected content ETag, new ETag, payload, format.
+/// Arguments: keys, expectation (<c>1</c>: the content ETag matches; <c>0</c>: the journal is absent), expected content ETag or observed absence ETag, new ETag, payload, format.
 /// Returns <c>[1, appendLength]</c> or a failure status.
 /// </summary>
 internal abstract class GarnetJournalWriteProcedure : GarnetJournalProcedure
@@ -527,7 +555,8 @@ internal abstract class GarnetJournalWriteProcedure : GarnetJournalProcedure
 
         if (!journal.IsLive)
         {
-            if (expectsETag)
+            // A write which creates the journal names the absence it observed: its tombstone's ETag, or no record.
+            if (expectsETag || !journal.AbsenceETag.SequenceEqual(expected.ReadOnlySpan))
             {
                 WriteStatus(ref output, GarnetJournalProtocol.ConflictStatus);
                 return;
@@ -684,7 +713,7 @@ internal sealed class GarnetJournalDeleteProcedure : GarnetJournalProcedure
 /// <summary>
 /// Conditionally updates caller-owned metadata.
 /// Arguments: keys, has expected ETag (0 or 1), expected ETag, new ETag, remove count, removed names, set count, set pairs.
-/// Returns <c>[1, metadata...]</c>, or <c>[0]</c> if the journal is missing or the ETag does not match.
+/// Returns <c>[1, metadata...]</c>, <c>[0]</c> if the journal is missing, or <c>[-1]</c> if the ETag does not match.
 /// </summary>
 internal sealed class GarnetJournalUpdateMetadataProcedure : GarnetJournalProcedure
 {
@@ -735,7 +764,7 @@ internal sealed class GarnetJournalUpdateMetadataProcedure : GarnetJournalProced
 
         if (hasExpected && !journal.ETag.SequenceEqual(expected.ReadOnlySpan))
         {
-            WriteStatus(ref output, GarnetJournalProtocol.MissingStatus);
+            WriteStatus(ref output, GarnetJournalProtocol.ConflictStatus);
             return;
         }
 
@@ -789,6 +818,12 @@ internal sealed class GarnetJournalUpdateMetadataProcedure : GarnetJournalProced
             sets.Add((Pinned(GarnetJournalProtocol.ETagField), newETag));
             sets.Add((Pinned(GarnetJournalProtocol.RecentETagsField), recent));
             api.HashSet(metadataKey, sets.ToArray(), out _);
+        }
+        else
+        {
+            // A no-op keeps the metadata ETag but records the request, so a retry after another writer's update reports
+            // this update's success instead of applying it again.
+            api.HashSet(metadataKey, Pinned(GarnetJournalProtocol.RecentETagsField), recent, out _);
         }
 
         WriteMetadata(api, ref procInput, ref output, GarnetJournalProtocol.SuccessStatus);
