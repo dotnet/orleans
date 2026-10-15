@@ -7,10 +7,14 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace Orleans.DurableTasks.Analyzers;
 
-/// <summary>Reports durable task definitions which never run or which run more than once.</summary>
+/// <summary>
+/// Reports durable task definitions which never run, which run more than once, or which are posted from code without a
+/// durable outbox.
+/// </summary>
 /// <remarks>
-/// A method which returns <c>DurableTask</c> creates a definition, which runs when it is awaited, scheduled, or detached.
-/// An <c>async DurableTask</c> method's definition is single-use: it runs its state machine once.
+/// A method which returns <c>DurableTask</c> creates a definition, which runs when it is awaited, scheduled, or posted.
+/// An <c>async DurableTask</c> method's definition is single-use: it runs its state machine once. <c>Post</c> stages a
+/// start in the durable outbox of the grain which runs the calling code.
 /// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
@@ -18,7 +22,8 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = ImmutableArray.Create(
         DurableTaskDiagnostics.UnobservedDefinition,
-        DurableTaskDiagnostics.ReusedDefinition);
+        DurableTaskDiagnostics.ReusedDefinition,
+        DurableTaskDiagnostics.PostWithoutOutbox);
 
     /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
@@ -33,6 +38,7 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
             }
 
             start.RegisterOperationAction(operation => AnalyzeStatement(operation, symbols), OperationKind.ExpressionStatement);
+            start.RegisterOperationAction(operation => AnalyzePost(operation, symbols), OperationKind.Invocation);
             start.RegisterOperationBlockAction(block => AnalyzeLocals(block, symbols));
         });
     }
@@ -52,6 +58,65 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
                 context.Operation.Syntax.GetLocation(),
                 invocation.TargetMethod.Name));
         }
+    }
+
+    /// <summary>Reports a <c>Post</c> outside grains and durable task bodies, where no durable outbox can stage it.</summary>
+    private static void AnalyzePost(OperationAnalysisContext context, DurableTaskSymbols symbols)
+    {
+        var invocation = (IInvocationOperation)context.Operation;
+        if (!DurableTaskSymbols.IsPost(invocation)
+            || symbols.IsGrain(context.ContainingSymbol.ContainingType)
+            || RunsInDurableBody(invocation, context.ContainingSymbol, symbols))
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            DurableTaskDiagnostics.PostWithoutOutbox,
+            invocation.Syntax.GetLocation(),
+            GetDefinitionName(invocation)));
+    }
+
+    /// <summary>
+    /// Returns whether an operation runs in a durable task body: an <c>async DurableTask</c> method, or a delegate which a
+    /// durable task factory, such as <c>DurableTask.Run</c>, runs, including code which such a body contains.
+    /// </summary>
+    private static bool RunsInDurableBody(IOperation operation, ISymbol containingSymbol, DurableTaskSymbols symbols)
+    {
+        for (var current = operation.Parent; current is not null; current = current.Parent)
+        {
+            switch (current)
+            {
+                case IAnonymousFunctionOperation function
+                    when symbols.IsDurableBody(function.Symbol) || IsDurableTaskFactoryArgument(function):
+                    return true;
+                case ILocalFunctionOperation local when symbols.IsDurableBody(local.Symbol):
+                    return true;
+            }
+        }
+
+        return containingSymbol is IMethodSymbol method && symbols.IsDurableBody(method);
+    }
+
+    private static bool IsDurableTaskFactoryArgument(IAnonymousFunctionOperation function) =>
+        function.Parent is IDelegateCreationOperation { Parent: IArgumentOperation { Parent: IInvocationOperation factory } }
+        && DurableTaskSymbols.IsDurableTasksType(factory.TargetMethod.ContainingType);
+
+    /// <summary>Returns the name of the method which defines the posted task, through any configuration calls.</summary>
+    private static string GetDefinitionName(IInvocationOperation post)
+    {
+        var current = DurableTaskSymbols.GetExtensionReceiver(post);
+        while (current is not null && DurableTaskSymbols.Unwrap(current) is IInvocationOperation invocation)
+        {
+            if (!DurableTaskSymbols.IsConfiguration(invocation))
+            {
+                return invocation.TargetMethod.Name;
+            }
+
+            current = DurableTaskSymbols.GetExtensionReceiver(invocation);
+        }
+
+        return post.TargetMethod.Name;
     }
 
     /// <summary>
@@ -110,7 +175,7 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
 
     /// <summary>
     /// Returns whether a value is a single-use definition: a call to an async method in this compilation which returns
-    /// <c>DurableTask</c>, optionally configured with <c>WithId</c>.
+    /// <c>DurableTask</c>, optionally configured with <c>WithId</c>, <c>Detached</c>, or <c>Shielded</c>.
     /// </summary>
     private static bool IsSingleUseDefinition(IOperation value, DurableTaskSymbols symbols)
     {
@@ -122,7 +187,7 @@ public sealed class DurableTaskDefinitionAnalyzer : DiagnosticAnalyzer
                 return true;
             }
 
-            if (!DurableTaskSymbols.IsWithId(invocation) || DurableTaskSymbols.GetExtensionReceiver(invocation) is not { } receiver)
+            if (!DurableTaskSymbols.IsConfiguration(invocation) || DurableTaskSymbols.GetExtensionReceiver(invocation) is not { } receiver)
             {
                 return false;
             }
