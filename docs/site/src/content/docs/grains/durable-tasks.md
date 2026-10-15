@@ -440,8 +440,10 @@ when the caller continues:
   whose results the starter doesn't need. The starter can complete while it runs, and the
   task keeps running through the starter's cancellation, abort, and deletion. Its root ID
   is the <xref:Orleans.DurableTasks.DurableTaskExtensions.WithId*> name, verbatim, so
-  other parties address it by that name, or `{taskId}:{segment}`, where `{segment}` is the
-  generated ID of the execution's next unnamed operation. The start names the execution
+  other parties address it by that name, or `{grainId}/{taskId}:{segment}`, where
+  `{grainId}` is the starting grain and `{segment}` is the generated ID of the execution's
+  next unnamed operation, so workflows with the same task ID on different grains start
+  different tasks. Starters which share a task name it. The start names the execution
   as a subscriber, so awaiting the task, or its handle, receives its result; canceling
   that wait ends only the subscription.
 - <xref:Orleans.DurableTasks.ConfiguredDurableTask.ScheduleAsync*> returns once the
