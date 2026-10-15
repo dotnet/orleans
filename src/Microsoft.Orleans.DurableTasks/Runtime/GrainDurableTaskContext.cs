@@ -342,7 +342,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                 task switch
                 {
                     IDurableTaskRequest { Context.TargetId: var target } => $"a call to grain '{target}'",
-                    IDurableTaskSubscription subscription => $"a subscription to task '{subscription.TaskId}' on grain '{subscription.Target}'",
+                    IDurableTaskSubscription subscription => $"a subscription to task '{subscription.Id}' on grain '{subscription.Target}'",
                     _ => "a local child task",
                 });
         }

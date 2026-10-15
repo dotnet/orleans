@@ -45,8 +45,8 @@ internal sealed partial class DurableTaskGrainRuntime
     /// </remarks>
     private StagedChild StageSubscription(TaskId taskId, IDurableTaskSubscription subscription, bool shielded)
     {
-        var fingerprint = FormatIdentity(SubscriptionFingerprintPrefix, subscription.Target, subscription.TaskId);
-        if (TryGetRecordedSubscription(taskId, fingerprint, DescribeSubscription(subscription.Target, subscription.TaskId)) is { } recorded)
+        var fingerprint = FormatIdentity(SubscriptionFingerprintPrefix, subscription.Target, subscription.Id);
+        if (TryGetRecordedSubscription(taskId, fingerprint, DescribeSubscription(subscription.Target, subscription.Id)) is { } recorded)
         {
             return recorded;
         }
@@ -64,11 +64,11 @@ internal sealed partial class DurableTaskGrainRuntime
         {
             // The subscribed result is read before the child is staged, so a result which no longer decodes fails the
             // scheduling without recording the child.
-            response = SubscribeLocal(subscription.TaskId, taskId);
+            response = SubscribeLocal(subscription.Id, taskId);
         }
         else
         {
-            MessageTransport.SendSubscription(GrainId, subscription.Target, subscription.TaskId, taskId);
+            MessageTransport.SendSubscription(GrainId, subscription.Target, subscription.Id, taskId);
         }
 
         return new(StageSubscriptionRecord(taskId, fingerprint, shielded, response), RequiresWrite: true);

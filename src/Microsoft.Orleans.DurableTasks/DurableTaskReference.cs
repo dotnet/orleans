@@ -28,7 +28,8 @@ namespace Orleans.DurableTasks;
 /// <para>
 /// The reference is awaitable through <see cref="DurableTaskReferenceExtensions.GetAwaiter{TResult}"/>, an extension
 /// method, so frameworks which inspect a return type's instance members, such as ASP.NET Core Minimal APIs, treat the
-/// reference as a value.
+/// reference as a value. <see cref="IDurableTaskReference"/> reads its <see cref="Target"/> and <see cref="Id"/> without its
+/// result type.
 /// </para>
 /// </remarks>
 public sealed class DurableTaskReference<TResult> : DurableTask<TResult>, IDurableTaskSubscription
@@ -48,8 +49,6 @@ public sealed class DurableTaskReference<TResult> : DurableTask<TResult>, IDurab
 
     /// <summary>Gets the grain which owns the referenced task.</summary>
     public GrainId Target { get; }
-
-    TaskId IDurableTaskSubscription.TaskId => Id;
 
     private ScheduledTask<TResult> Handle =>
         _handle ??= new AttachedScheduledTask<TResult>(Id, _target.AsReference<IDurableTaskGrainExtension>());
@@ -200,12 +199,20 @@ public static class DurableTaskReferenceExtensions
     }
 }
 
-/// <summary>A reference to an existing task, which the durable task runtime schedules as a subscription child.</summary>
-internal interface IDurableTaskSubscription
+/// <summary>
+/// A reference to an existing durable task of a grain, such as a <see cref="DurableTaskReference{TResult}"/>, read without
+/// its result type.
+/// </summary>
+public interface IDurableTaskReference
 {
+    /// <summary>Gets the identifier of the referenced task.</summary>
+    TaskId Id { get; }
+
     /// <summary>Gets the grain which owns the referenced task.</summary>
     GrainId Target { get; }
+}
 
-    /// <summary>Gets the referenced task.</summary>
-    TaskId TaskId { get; }
+/// <summary>A reference to an existing task, which the durable task runtime schedules as a subscription child.</summary>
+internal interface IDurableTaskSubscription : IDurableTaskReference
+{
 }

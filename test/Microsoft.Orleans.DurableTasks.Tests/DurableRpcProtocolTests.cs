@@ -392,6 +392,7 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(
             typeof(DurableTaskReferenceAwaiter<int>),
             typeof(DurableTaskReferenceExtensions).GetMethod(nameof(DurableTaskReferenceExtensions.GetAwaiter))!.MakeGenericMethod(typeof(int)).ReturnType);
+        Assert.True(typeof(IDurableTaskReference).IsAssignableFrom(typeof(DurableTaskReference<int>)));
     }
 
     [Fact]
