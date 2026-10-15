@@ -32,15 +32,15 @@ validated at startup.
 Messaging settings in `DurableMessagingOptions` govern the transport; see
 [Capacity, retries, and retention](messaging-operations.md#capacity-retries-and-retention).
 
-- `OutboxRetryTimeout` bounds how long the outbox retries an invocation, acceptance,
-  completion, cancellation, or signal before dead-lettering it. A cancellation or signal which arrives
+- `OutboxRetryTimeout` bounds how long the outbox retries an invocation, completion,
+  cancellation, or signal before dead-lettering it. A cancellation or signal which arrives
   before its invocation is retained for this period, so the invocation terminates as
   canceled, or observes the signal, when it arrives. A signal whose invocation doesn't
   arrive in this period is deleted, and the grain logs a warning.
 - `DeduplicationWindow` deduplicates redelivered durable task messages, like other
   messages.
-- Invocations, acceptances, completions, cancellations, and signals are accepted directly
-  into task state, so they don't occupy inbox capacity. Delay resumes are scheduled messages which
+- Invocations, completions, cancellations, and signals are accepted directly into task
+  state, so they don't occupy inbox capacity. Delay resumes are scheduled messages which
   the grain sends itself, so they don't count toward `MaxCapacity`, like other scheduled
   messages; the grain holds one resume for each delay it scheduled, until that delay's
   due time.
@@ -186,18 +186,18 @@ with `DurableTaskAbortedException: <reason>`.
 ## Dead letters
 
 Durable task messages use subjects beginning with `durable-rpc/`: `invoke`,
-`accept`, `complete`, `cancel`, `resume`, and `signal`. Messaging's retry and dead-letter policy
+`complete`, `cancel`, `resume`, and `signal`. Messaging's retry and dead-letter policy
 applies to them; inspect and remove dead letters through `IMessagingDiagnostics`, as
 described in [Inspect and replay dead letters](messaging-operations.md#inspect-and-replay-dead-letters).
 
-- The receiving grain rejects an invocation which reuses a task ID with a different
-  request or caller to the task which started it, which fails with
-  `DurableTaskConflictException`. The receiving inbox dead-letters another message which
-  fails validation, such as a conflicting invocation which an ordinary grain method posted,
-  and a rejected signal,
-  such as one with a conflicting value or for a completed task, with the rejection as
-  its reason.
-- The outbox dead-letters a message whose delivery fails for `OutboxRetryTimeout`.
+- The receiving inbox dead-letters a message which fails validation, such as an
+  invocation which reuses a task ID with a different request or caller, and a rejected
+  signal, such as one with a conflicting value or for a completed task, with the
+  rejection as its reason. The sender's outbox retires a rejected invocation with that
+  reason, and the starting task's record fails with `DurableTaskConflictException`.
+- The outbox dead-letters a message whose delivery fails for `OutboxRetryTimeout`. A
+  dead-lettered invocation fails the starting task's record with
+  `DurableTaskDeliveryException`, so `ScheduleAsync`, and awaiting the task, throw it.
 - The outbox dead-letters a completion whose stored result no longer decodes, for
   example after a deployment removed the result type, with the decoding error as its
   reason. The runtime retires that completion and retains the task for
