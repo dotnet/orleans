@@ -248,6 +248,8 @@ namespace Orleans.DurableTasks
 
         public System.Threading.CancellationToken CancellationToken { get { throw null; } }
 
+        protected internal virtual string? HostId { get { throw null; } }
+
         public TaskId Id { get { throw null; } }
 
         public bool IsCancellationRequested { get { throw null; } }
