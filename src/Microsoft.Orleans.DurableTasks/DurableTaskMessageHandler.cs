@@ -13,9 +13,12 @@ namespace Orleans.DurableTasks.Runtime;
 /// As an <see cref="IInboxMessageSink"/>, it accepts invocations, subscriptions, completions, cancellations,
 /// unsubscriptions, and signals directly into task state, so the request, result, or signal payload is journaled once, in
 /// task state, and the inbox journals only the message's processed record in the same write. Each message is decoded and
-/// validated before any change is staged. A message which fails validation, such as an invocation whose identifier
-/// already identifies another request, throws, and a rejected signal reports a dead-lettered result, so the inbox
-/// dead-letters either one, and the sender's outbox retires it as rejected with the failure's message.
+/// validated before any change is staged. An invocation whose identifier already identifies another request or caller is
+/// final, so it is dead-lettered with the <see cref="DurableTaskRejectionCodes.Conflict"/> code and the conflict's
+/// message, which the sender's outbox reports when it retires the invocation as rejected. A rejected signal is
+/// dead-lettered with its rejection as the reason. Another failure, such as a message which doesn't decode, throws, so
+/// the sender's outbox retries the delivery until Messaging's <c>OutboxRetryTimeout</c>: during a rolling deployment, a
+/// retry can reach an activation which decodes it.
 /// </para>
 /// <para>
 /// As an <see cref="IInboxHandler"/>, it handles the delay resumes the grain schedules for itself, which the inbox holds
@@ -51,12 +54,21 @@ internal sealed class DurableTaskMessageHandler(
                     return true;
                 }
 
-                runtime.InvokeFromInbox(
-                    invocation.TaskId,
-                    request,
-                    sender,
-                    invocation.Detached,
-                    invocation.SubscriberId);
+                try
+                {
+                    runtime.InvokeFromInbox(
+                        invocation.TaskId,
+                        request,
+                        sender,
+                        invocation.Detached,
+                        invocation.SubscriberId);
+                }
+                catch (DurableTaskConflictException conflict)
+                {
+                    // A conflicting invocation stages nothing.
+                    result = DeliveryResult.DeadLettered(conflict.Message, DurableTaskRejectionCodes.Conflict);
+                }
+
                 return true;
             case DurableTaskMessageTypes.CompletionSubject:
                 var completion = messageTypes.Completion.Decode(message.Envelope);
