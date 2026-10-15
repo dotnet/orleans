@@ -93,7 +93,7 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
             new DurableValue<int>("value", manager,
                 new OrleansBinaryDurableValueCommandCodec<int>(ValueCodec<int>(), SessionPool)),
             new JournaledPersistentState<string>("state", manager,
-                new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool)),
+                new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool), CodecProvider.GetActivator<string>()),
             new DurableTaskCompletionSource<int>(
                 "tcs",
                 manager,

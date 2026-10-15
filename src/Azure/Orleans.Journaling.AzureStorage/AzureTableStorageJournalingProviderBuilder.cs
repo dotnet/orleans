@@ -1,3 +1,4 @@
+using System.Globalization;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,17 +17,40 @@ internal sealed class AzureTableStorageJournalingProviderBuilder : IProviderBuil
         var optionsBuilder = builder.Services.AddJournalStorageOptions<AzureTableJournalStorageOptions>(name);
         optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
-            var previousTableName = options.TableName;
-            configurationSection.Bind(options);
-
             var tableName = configurationSection[nameof(options.TableName)];
             if (!string.IsNullOrEmpty(tableName))
             {
                 options.TableName = tableName;
             }
-            else
+
+            if (bool.TryParse(configurationSection[nameof(options.DeleteOldGenerations)], out var deleteOldGenerations))
             {
-                options.TableName = previousTableName;
+                options.DeleteOldGenerations = deleteOldGenerations;
+            }
+
+            if (long.TryParse(configurationSection[nameof(options.CompactionRowCountThreshold)], NumberStyles.Integer, CultureInfo.InvariantCulture, out var compactionRowCountThreshold))
+            {
+                options.CompactionRowCountThreshold = compactionRowCountThreshold;
+            }
+
+            if (long.TryParse(configurationSection[nameof(options.CompactionSizeThreshold)], NumberStyles.Integer, CultureInfo.InvariantCulture, out var compactionSizeThreshold))
+            {
+                options.CompactionSizeThreshold = compactionSizeThreshold;
+            }
+
+            if (int.TryParse(configurationSection[nameof(options.MaxMetadataOnlyConflictRetries)], NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxMetadataOnlyConflictRetries))
+            {
+                options.MaxMetadataOnlyConflictRetries = maxMetadataOnlyConflictRetries;
+            }
+
+            if (TimeSpan.TryParse(configurationSection[nameof(options.MetadataOnlyConflictInitialBackoff)], CultureInfo.InvariantCulture, out var metadataOnlyConflictInitialBackoff))
+            {
+                options.MetadataOnlyConflictInitialBackoff = metadataOnlyConflictInitialBackoff;
+            }
+
+            if (TimeSpan.TryParse(configurationSection[nameof(options.MetadataOnlyConflictMaxBackoff)], CultureInfo.InvariantCulture, out var metadataOnlyConflictMaxBackoff))
+            {
+                options.MetadataOnlyConflictMaxBackoff = metadataOnlyConflictMaxBackoff;
             }
 
             var serviceKey = configurationSection["ServiceKey"];

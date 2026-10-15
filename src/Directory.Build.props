@@ -23,6 +23,12 @@
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0' and ('$(MSBuildProjectName)' == 'Orleans.Journaling' or '$(MSBuildProjectName)' == 'Orleans.Journaling.AzureStorage' or '$(MSBuildProjectName)' == 'Orleans.Journaling.Redis' or '$(MSBuildProjectName)' == 'Orleans.Journaling.S3' or '$(MSBuildProjectName)' == 'Orleans.DurableJobs' or '$(MSBuildProjectName)' == 'Orleans.DurableJobs.AzureStorage')">
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers"
                       PrivateAssets="all"

@@ -305,7 +305,7 @@ public static class JournalingHostingExtensions
                 ? Options.DefaultName
                 : name);
 
-    internal static IOptions<TOptions> GetJournalStorageOptions<TOptions>(this IServiceProvider services, string name)
+    internal static IOptions<TOptions> GetJournalStorageOptions<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] TOptions>(this IServiceProvider services, string name)
         where TOptions : class
         => string.Equals(name, ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, StringComparison.Ordinal)
             ? services.GetRequiredService<IOptions<TOptions>>()

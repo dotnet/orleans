@@ -241,6 +241,19 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void JsonValueCodec_NullOptions_UsesReflectionDefaultsWhenEnabled()
+    {
+        Assert.True(JsonSerializer.IsReflectionEnabledByDefault);
+        var codec = new JsonDurableValueCommandCodec<JsonCodecTestValue>();
+        var consumer = new ValueConsumer<JsonCodecTestValue>();
+        var value = new JsonCodecTestValue("alpha", 3);
+
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(value, writer))), consumer);
+
+        Assert.Equal(value, consumer.Value);
+    }
+
+    [Fact]
     public void JsonValueCodec_MissingMetadata_ThrowsHelpfulException()
     {
         var exception = Assert.Throws<InvalidOperationException>(

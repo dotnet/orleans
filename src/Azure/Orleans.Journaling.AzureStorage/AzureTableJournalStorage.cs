@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
@@ -1080,7 +1081,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
     private static string? NormalizeFormat(string? format) => format is { Length: > 0 } ? format : null;
 
     private static string SerializeCallerMetadata(IReadOnlyDictionary<string, string>? metadata)
-        => metadata is { Count: > 0 } ? JsonSerializer.Serialize(metadata) : "{}";
+        => metadata is { Count: > 0 } ? JsonSerializer.Serialize(metadata, CallerMetadataJsonContext.Default.IReadOnlyDictionaryStringString) : "{}";
 
     private static Dictionary<string, string> DeserializeCallerMetadata(string? json)
     {
@@ -1092,7 +1093,7 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
         Dictionary<string, string>? parsed;
         try
         {
-            parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            parsed = JsonSerializer.Deserialize(json, CallerMetadataJsonContext.Default.DictionaryStringString);
         }
         catch (JsonException exception)
         {
@@ -1110,6 +1111,10 @@ internal sealed partial class AzureTableJournalStorage : IJournalStorage
 
         return result;
     }
+
+    [JsonSerializable(typeof(IReadOnlyDictionary<string, string>))]
+    [JsonSerializable(typeof(Dictionary<string, string>))]
+    private sealed partial class CallerMetadataJsonContext : JsonSerializerContext;
 
     private static Dictionary<string, string> CopyAndValidateCallerMetadata(IReadOnlyDictionary<string, string>? metadata)
     {

@@ -522,6 +522,24 @@ public sealed class DurableStateManagerTests
         Assert.Equal(2, storage.AppendCount);
     }
 
+    [Fact]
+    public async Task PersistentState_WithoutRecord_CreatesStateWithSerializerActivator()
+    {
+        var builder = CreateBuilder();
+        builder.AddVolatileJournalStorage();
+        await using var services = builder.Services.BuildServiceProvider(validateScopes: true);
+        await using var scope = CreateActivationScope(services, GrainId.Create("registry-test", "persistent-default"));
+        var manager = scope.ServiceProvider.GetRequiredService<IDurableStateManager>();
+
+        var constructed = manager.GetOrAddPersistentState<ConstructedState>("constructed");
+        var positional = manager.GetOrAddPersistentState<TestDurableGrainState>("positional");
+
+        Assert.False(constructed.RecordExists);
+        Assert.Equal(ConstructedState.InitialValue, constructed.State.Value);
+        Assert.Same(constructed.State, constructed.State);
+        Assert.Equal(new TestDurableGrainState(null!, 0), positional.State);
+    }
+
     private static TestSiloBuilder CreateBuilder(bool withGrainContext = true)
     {
         var builder = new TestSiloBuilder();
@@ -826,5 +844,14 @@ public sealed class DurableStateManagerTests
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
             => _inner.DeleteAsync(cancellationToken);
+    }
+
+    [GenerateSerializer]
+    public sealed class ConstructedState
+    {
+        public const string InitialValue = "initial";
+
+        [Id(0)]
+        public string Value { get; set; } = InitialValue;
     }
 }
