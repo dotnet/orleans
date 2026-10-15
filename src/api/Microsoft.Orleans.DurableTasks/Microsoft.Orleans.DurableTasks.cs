@@ -202,7 +202,7 @@ namespace Orleans.DurableTasks.Protocol
         public DurableTask InitializeRequest(Orleans.Runtime.GrainReference targetGrainReference) { throw null; }
 
         protected abstract DurableTask InvokeInner();
-        System.Threading.Tasks.ValueTask ISchedulableTask.DetachAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken) { throw null; }
+        IScheduledTaskHandle ISchedulableTask.Post(TaskId taskId) { throw null; }
 
         System.Threading.Tasks.ValueTask<DurableTaskResponse> ISchedulableTask.ScheduleAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken) { throw null; }
 
@@ -277,7 +277,7 @@ namespace Orleans.DurableTasks.Protocol
         public DurableTask<TResult> InitializeRequest(Orleans.Runtime.GrainReference targetGrainReference) { throw null; }
 
         protected abstract DurableTask<TResult> InvokeInner();
-        System.Threading.Tasks.ValueTask ISchedulableTask.DetachAsync(TaskId taskId, System.Threading.CancellationToken cancellationToken) { throw null; }
+        IScheduledTaskHandle ISchedulableTask.Post(TaskId taskId) { throw null; }
 
         DurableTask IDurableTaskRequest.CreateTask() { throw null; }
 
@@ -354,13 +354,14 @@ namespace Orleans.DurableTasks.Protocol
         bool RemoveTask(TaskId taskId);
         void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null);
         void RetainResult(TaskId taskId, IDurableTaskState state);
+        void SetAccepted(TaskId taskId, IDurableTaskState state, bool accepted);
         void SetCallerId(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId callerId);
         void SetDelay(TaskId taskId, IDurableTaskState state, System.DateTimeOffset dueTime, long generation);
         void SetRemoteRequest(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId target, string fingerprint);
         void SetRequest(TaskId taskId, IDurableTaskState state, IDurableTaskRequest request);
         void SetRequestFingerprint(TaskId taskId, IDurableTaskState state, string fingerprint);
         void SetResponse(TaskId taskId, IDurableTaskState state, DurableTaskResponse response);
-        void SuppressCancellation(TaskId taskId, IDurableTaskState state);
+        void Shield(TaskId taskId, IDurableTaskState state);
         bool TryGetTask(TaskId taskId, out IDurableTaskState? state);
         System.Threading.Tasks.ValueTask WriteAsync(System.Threading.CancellationToken cancellationToken);
     }
@@ -398,13 +399,13 @@ namespace Orleans.DurableTasks.Protocol
 
     public partial interface IDurableTaskState
     {
+        bool? Accepted { get; }
+
         Orleans.Runtime.GrainId CallerId { get; }
 
         string? CancellationReason { get; }
 
         System.DateTimeOffset? CancellationRequestedAt { get; }
-
-        bool CancellationSuppressed { get; }
 
         System.DateTimeOffset? CompletedAt { get; }
 
@@ -429,6 +430,8 @@ namespace Orleans.DurableTasks.Protocol
         long ResumeGeneration { get; }
 
         System.DateTimeOffset? RetainedSince { get; }
+
+        bool Shielded { get; }
     }
 
     [GenerateSerializer]
@@ -449,6 +452,10 @@ namespace Orleans.DurableTasks.Runtime
     [Alias("Orleans.DurableTasks.Runtime.DurableTaskState")]
     public partial class DurableTaskState : Protocol.IDurableTaskState
     {
+        [Id(21)]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public bool? Accepted { get { throw null; } set { } }
+
         [Id(13)]
         [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
         public Orleans.Runtime.GrainId CallerId { get { throw null; } set { } }
@@ -459,10 +466,6 @@ namespace Orleans.DurableTasks.Runtime
 
         [Id(5)]
         public System.DateTimeOffset? CancellationRequestedAt { get { throw null; } set { } }
-
-        [Id(19)]
-        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
-        public bool CancellationSuppressed { get { throw null; } set { } }
 
         [Id(3)]
         public System.DateTimeOffset? CompletedAt { get { throw null; } set { } }
@@ -510,6 +513,10 @@ namespace Orleans.DurableTasks.Runtime
         [Id(17)]
         [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
         public System.DateTimeOffset? RetainedSince { get { throw null; } set { } }
+
+        [Id(19)]
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        public bool Shielded { get { throw null; } set { } }
     }
 
     public partial class VolatileDurableTaskGrainStorage : Protocol.IDurableTaskGrainStorage
@@ -538,6 +545,8 @@ namespace Orleans.DurableTasks.Runtime
 
         public void RetainResult(TaskId taskId, Protocol.IDurableTaskState state) { }
 
+        public void SetAccepted(TaskId taskId, Protocol.IDurableTaskState state, bool accepted) { }
+
         public void SetCallerId(TaskId taskId, Protocol.IDurableTaskState state, Orleans.Runtime.GrainId callerId) { }
 
         public void SetDelay(TaskId taskId, Protocol.IDurableTaskState state, System.DateTimeOffset dueTime, long generation) { }
@@ -550,7 +559,7 @@ namespace Orleans.DurableTasks.Runtime
 
         public void SetResponse(TaskId taskId, Protocol.IDurableTaskState state, DurableTaskResponse response) { }
 
-        public void SuppressCancellation(TaskId taskId, Protocol.IDurableTaskState state) { }
+        public void Shield(TaskId taskId, Protocol.IDurableTaskState state) { }
 
         public bool TryGetTask(TaskId taskId, out Protocol.IDurableTaskState? state) { throw null; }
 

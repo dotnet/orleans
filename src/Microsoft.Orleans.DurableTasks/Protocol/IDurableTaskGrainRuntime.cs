@@ -159,14 +159,47 @@ public struct DurableTaskDiagnosticState
 internal interface IDurableTaskGrainRuntime
 {
     DateTimeOffset UtcNow { get; }
-    ValueTask<IScheduledTaskHandle> ScheduleChildAsync(TaskId taskId, DurableTask taskDefinition, bool suppressCancellation, CancellationToken cancellationToken);
-    ValueTask<DurableTaskResponse> ScheduleRemoteAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Starts <paramref name="request"/> as a detached root task under <paramref name="rootId"/>, recording the start under
-    /// <paramref name="markerId"/> when it is not default, and waits for the journal write which commits both.
+    /// Starts or reattaches to the child <paramref name="taskId"/>, and waits for the journal write which commits it, and,
+    /// when <paramref name="waitForAcceptance"/> is set, for the acceptance of the child's host.
     /// </summary>
-    ValueTask DetachAsync(TaskId rootId, IDurableTaskRequest request, TaskId markerId, CancellationToken cancellationToken);
+    ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
+        TaskId taskId,
+        DurableTask taskDefinition,
+        bool shielded,
+        bool waitForAcceptance,
+        CancellationToken cancellationToken);
+
+    /// <summary>Stages the start of the child <paramref name="taskId"/> on the activation, without writing.</summary>
+    IScheduledTaskHandle PostChild(TaskId taskId, DurableTask taskDefinition, bool shielded);
+
+    /// <summary>
+    /// Starts <paramref name="request"/> as the detached root task <paramref name="rootId"/>, recorded and subscribed under
+    /// <paramref name="recordId"/>, and waits for the journal write which commits the start, and, when
+    /// <paramref name="waitForAcceptance"/> is set, for the acceptance of the task's grain.
+    /// </summary>
+    ValueTask<IScheduledTaskHandle> StartDetachedAsync(
+        TaskId recordId,
+        TaskId rootId,
+        IDurableTaskRequest request,
+        bool shielded,
+        bool waitForAcceptance,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Stages the start of the detached root task <paramref name="rootId"/>, recorded and subscribed under
+    /// <paramref name="recordId"/>, on the activation, without writing.
+    /// </summary>
+    IScheduledTaskHandle PostDetached(TaskId recordId, TaskId rootId, IDurableTaskRequest request, bool shielded);
+
+    /// <summary>
+    /// Stages the start of the root task <paramref name="rootId"/>, from code which runs outside a durable execution, on
+    /// the activation, without writing. The start commits with the grain's next journal write.
+    /// </summary>
+    void PostRoot(TaskId rootId, IDurableTaskRequest request);
+
+    ValueTask<DurableTaskResponse> ScheduleRemoteAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken);
     ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
     ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, string? reason, CancellationToken cancellationToken);
     ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken);

@@ -114,10 +114,15 @@ public class DurableTaskState : IDurableTaskState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? CancellationReason { get; set; }
 
-    /// <inheritdoc cref="IDurableTaskState.CancellationSuppressed"/>
+    /// <inheritdoc cref="IDurableTaskState.Shielded"/>
     [Id(19)]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-    public bool CancellationSuppressed { get; set; }
+    public bool Shielded { get; set; }
+
+    /// <inheritdoc cref="IDurableTaskState.Accepted"/>
+    [Id(21)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? Accepted { get; set; }
 
     [Id(7)]
     public DateTimeOffset? DueTime { get; set; }

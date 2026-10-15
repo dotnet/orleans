@@ -19,9 +19,8 @@ public interface IDurableTaskState
     /// The invoker subscribes under this task's own identifier, and a durable execution which awaits this task with
     /// <c>GetDurableTask</c> subscribes under its own child's identifier. Each subscriber of a terminal task on another
     /// grain has a completion pending in the outbox until the outbox retires it, and the task is retained until then;
-    /// a subscriber on this grain receives the result in the write which stores it. A subscription which arrives before
-    /// the task's invocation is held in a state without a request until the invocation arrives. Local nested tasks
-    /// have no subscribers.
+    /// a subscriber on this grain receives the result in the write which stores it. Local nested tasks have no
+    /// subscribers.
     /// </remarks>
     public IReadOnlySet<DurableTaskSubscriber> CompletionDestinations { get; }
 
@@ -48,11 +47,10 @@ public interface IDurableTaskState
     public string? CancellationReason { get; }
 
     /// <summary>
-    /// Gets whether the task's parent scheduled it in a cancellation suppression scope, so its ancestors' durable
-    /// cancellation doesn't reach it.
+    /// Gets whether the task's parent started it shielded, so its ancestors' durable cancellation doesn't reach it.
     /// </summary>
     /// <remarks>Its own cancellation, an abort of its tree, and deletion of its tree still reach it.</remarks>
-    public bool CancellationSuppressed { get; }
+    public bool Shielded { get; }
 
     /// <summary>
     /// The time at which the task was created.
@@ -69,15 +67,22 @@ public interface IDurableTaskState
     /// Gets when the terminal result's retention restarted because its completion was dead-lettered, or
     /// <see langword="null"/> when retention starts at <see cref="CompletedAt"/>.
     /// </summary>
-    /// <remarks>
-    /// A task state which holds subscriptions that arrived before the task's invocation records the latest subscription's
-    /// arrival here, which bounds when the invocation can still arrive; that time precedes <see cref="CompletedAt"/>.
-    /// </remarks>
     public DateTimeOffset? RetainedSince { get; }
 
     public GrainId RemoteTarget { get; }
 
     public string? RemoteRequestFingerprint { get; }
+
+    /// <summary>
+    /// Gets whether the host of the task which this record starts on another grain accepted the start,
+    /// <see langword="true"/>, or rejected it, <see langword="false"/>, or <see langword="null"/> until its reply arrives.
+    /// </summary>
+    /// <remarks>
+    /// A record of a durable call or of a detached task receives the reply which its target sends when it stores the
+    /// task, or when it rejects the start, such as a start whose identifier already identifies another request. A
+    /// rejection also stores the record's result, which fails with the rejection.
+    /// </remarks>
+    public bool? Accepted { get; }
 
     /// <summary>
     /// Gets the grain which created this task through durable messaging.

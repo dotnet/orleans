@@ -23,7 +23,7 @@ public abstract class DurableTaskWhenEachTests(string journalFormatKey) : IAsync
         var grain = _fixture.Client.GetGrain<IDurableTaskWhenEachGrain>(key);
         var taskId = TaskId.CreateRoot("each");
         var started = _fixture.MessagingProbe.WaitForStartedAsync(key, 1);
-        var workflow = await grain.CollectInCompletionOrderAsync(yieldKey).ScheduleAsync("each", cancellationToken);
+        var workflow = await grain.CollectInCompletionOrderAsync(yieldKey).WithId("each").ScheduleAsync(cancellationToken);
         await started.WaitAsync(Timeout, cancellationToken);
 
         // Input 2 completes first, then the activation is deactivated.

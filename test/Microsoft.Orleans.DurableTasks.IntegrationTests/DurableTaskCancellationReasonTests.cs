@@ -20,7 +20,7 @@ public abstract class DurableTaskCancellationReasonTests(string journalFormatKey
         var workflow = _fixture.Client.GetGrain<IDurableTaskReasonWorkflowGrain>(Guid.NewGuid());
         var holding = _fixture.MessagingProbe.WaitForStartedAsync(holderKey, 1);
 
-        var scheduled = await workflow.RunAsync(holderKey).ScheduleAsync("reason", cancellationToken);
+        var scheduled = await workflow.RunAsync(holderKey).WithId("reason").ScheduleAsync(cancellationToken);
         await holding.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         await scheduled.CancelAsync("Cancelled by the buyer", cancellationToken);
 
@@ -36,7 +36,7 @@ public abstract class DurableTaskCancellationReasonTests(string journalFormatKey
         var workflow = _fixture.Client.GetGrain<IDurableTaskReasonWorkflowGrain>(Guid.NewGuid());
         var blocking = _fixture.MessagingProbe.WaitForStartedAsync(holderKey, 1);
 
-        var scheduled = await workflow.CompensateInlineAsync(holderKey).ScheduleAsync("compensate", cancellationToken);
+        var scheduled = await workflow.CompensateInlineAsync(holderKey).WithId("compensate").ScheduleAsync(cancellationToken);
         await blocking.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         await scheduled.CancelAsync("Cancelled by the buyer", cancellationToken);
 
@@ -109,11 +109,8 @@ public sealed class DurableTaskReasonWorkflowGrain : DurableGrain, IDurableTaskR
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
         {
-            using (DurableTask.Current.SuppressCancellation())
-            {
-                var released = await holder.ReleaseAsync(2).WithId("release");
-                return $"released {released} after {DurableTask.Current.CancellationReason}";
-            }
+            var released = await holder.ReleaseAsync(2).WithId("release").Shielded();
+            return $"released {released} after {DurableTask.Current.CancellationReason}";
         }
     }
 }

@@ -265,6 +265,7 @@ public sealed class DurableRpcProtocolTests
     {
         Assert.Equal(
             [
+                DurableTaskMessageTypes.AcceptanceSubject,
                 DurableTaskMessageTypes.CancellationSubject,
                 DurableTaskMessageTypes.CompletionSubject,
                 DurableTaskMessageTypes.InvocationSubject,
@@ -296,8 +297,8 @@ public sealed class DurableRpcProtocolTests
             },
         };
 
-        transport.SendInvocation(sender, target, taskId, request);
-        transport.SendInvocation(sender, target, taskId, request);
+        transport.SendInvocation(sender, target, taskId, request, acknowledge: true);
+        transport.SendInvocation(sender, target, taskId, request, acknowledge: true);
         transport.SendCancellation(sender, target, taskId);
 
         var messages = outbox.Messages.ToArray();
@@ -310,10 +311,50 @@ public sealed class DurableRpcProtocolTests
         var body = MessagingTestHelpers.MessageTypes.Invocation.Decode(messages[0].Envelope);
         Assert.Equal(taskId, body.TaskId);
         Assert.Equal(sender, body.Sender);
+        Assert.True(body.Acknowledge);
         var decodedRequest = Assert.IsType<TestDurableTaskRequest>(body.Request);
         Assert.Equal(sender, decodedRequest.Context!.CallerId);
         Assert.Equal(target, decodedRequest.Context.TargetId);
         Assert.True(decodedRequest.Context.SupportsDurableCompletion);
+    }
+
+    [Fact]
+    public void DetachedInvocationAndAcceptanceIdentitiesCoverTheStartingRecord()
+    {
+        var outbox = new RecordingOutbox();
+        var transport = MessagingTestHelpers.CreateTransport(outbox);
+        var sender = GrainId.Create("caller", "one");
+        var target = GrainId.Create("target", "one");
+        var rootId = TaskId.CreateRoot("detached");
+        var record = TaskId.Parse("starter/$detach:a");
+        var otherRecord = TaskId.Parse("other/$detach:a");
+        var request = new TestDurableTaskRequest { Context = new DurableTaskRequestContext { TargetId = target } };
+
+        transport.SendDetachedInvocation(sender, target, rootId, request, record, acknowledge: true);
+        transport.SendDetachedInvocation(sender, target, rootId, request, record, acknowledge: true);
+        transport.SendDetachedInvocation(sender, target, rootId, request, otherRecord, acknowledge: false);
+        transport.SendAcceptance(target, new(sender, record), rootId, rejection: null);
+        transport.SendAcceptance(
+            target,
+            new(sender, otherRecord),
+            rootId,
+            DurableTaskResponse.FromException(new DurableTaskConflictException(rootId, "conflict")));
+
+        var messages = outbox.Messages.ToArray();
+        Assert.Equal(5, messages.Length);
+        Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
+        Assert.NotEqual(messages[0].Envelope.MessageId, messages[2].Envelope.MessageId);
+        var invocation = MessagingTestHelpers.MessageTypes.Invocation.Decode(messages[0].Envelope);
+        Assert.Equal((rootId, sender, true, (TaskId?)record, true), (invocation.TaskId, invocation.Sender, invocation.Detached, invocation.SubscriberId, invocation.Acknowledge));
+
+        Assert.Equal(DurableTaskMessageTypes.AcceptanceSubject, messages[3].Envelope.Subject);
+        Assert.Equal(sender, messages[3].ReceiverId);
+        Assert.NotEqual(messages[3].Envelope.MessageId, messages[4].Envelope.MessageId);
+        var accepted = MessagingTestHelpers.MessageTypes.Acceptance.Decode(messages[3].Envelope);
+        Assert.Equal((rootId, target, (TaskId?)record), (accepted.TaskId, accepted.Sender, accepted.SubscriberId));
+        Assert.Null(accepted.Rejection);
+        var rejected = MessagingTestHelpers.MessageTypes.Acceptance.Decode(messages[4].Envelope);
+        Assert.Equal(rootId, Assert.IsType<DurableTaskConflictException>(rejected.Rejection!.Exception).TaskId);
     }
 
     [Fact]
@@ -327,10 +368,15 @@ public sealed class DurableRpcProtocolTests
 
         transport.SendCancellation(sender, target, taskId);
         transport.SendCancellation(sender, target, taskId);
-        transport.SendInvocation(sender, target, taskId, new TestDurableTaskRequest
-        {
-            Context = new DurableTaskRequestContext { CallerId = sender, TargetId = target, SupportsDurableCompletion = true },
-        });
+        transport.SendInvocation(
+            sender,
+            target,
+            taskId,
+            new TestDurableTaskRequest
+            {
+                Context = new DurableTaskRequestContext { CallerId = sender, TargetId = target, SupportsDurableCompletion = true },
+            },
+            acknowledge: false);
 
         var messages = outbox.Messages.ToArray();
         Assert.Equal(3, messages.Length);

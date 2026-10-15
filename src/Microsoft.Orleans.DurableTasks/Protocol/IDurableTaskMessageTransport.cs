@@ -7,10 +7,28 @@ namespace Orleans.DurableTasks.Protocol;
 
 internal interface IDurableTaskMessageTransport
 {
-    void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request);
+    /// <summary>Stages an invocation of the attached child <paramref name="taskId"/> of <paramref name="sender"/>.</summary>
+    /// <param name="acknowledge">Whether <paramref name="target"/> replies with an acceptance once it stores the task.</param>
+    void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request, bool acknowledge);
 
-    /// <summary>Stages an invocation which starts a detached task on <paramref name="target"/>.</summary>
-    void SendDetachedInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request);
+    /// <summary>
+    /// Stages an invocation which starts the detached task <paramref name="taskId"/> on <paramref name="target"/>, and
+    /// subscribes <paramref name="sender"/>'s task <paramref name="subscriberId"/>, if any, to its result.
+    /// </summary>
+    /// <param name="acknowledge">Whether <paramref name="target"/> replies with an acceptance once it stores the task.</param>
+    void SendDetachedInvocation(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        IDurableTaskRequest request,
+        TaskId? subscriberId,
+        bool acknowledge);
+
+    /// <summary>
+    /// Stages the reply to an invocation of <paramref name="taskId"/>, which <paramref name="destination"/> started: an
+    /// acceptance, or the <paramref name="rejection"/> which fails the start.
+    /// </summary>
+    void SendAcceptance(GrainId sender, DurableTaskSubscriber destination, TaskId taskId, DurableTaskResponse? rejection);
 
     /// <summary>Stages a completion which the runtime provides from the task's stored result.</summary>
     /// <param name="messageId">The completion's message ID, from <see cref="GetCompletionMessageId"/>.</param>

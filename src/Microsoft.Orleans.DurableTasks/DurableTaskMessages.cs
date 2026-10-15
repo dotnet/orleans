@@ -23,22 +23,56 @@ internal sealed class DurableTaskInvocationMessage
     public GrainId Sender { get; init; }
 
     /// <summary>
-    /// Gets whether the invocation starts a detached task, which the receiver retains like a client-scheduled root and
-    /// whose result it sends to no caller.
+    /// Gets whether the invocation starts a detached task: an independent root task, which the receiver retains like a
+    /// client-scheduled root, and which has no caller.
     /// </summary>
     [Id(3)]
     public bool Detached { get; init; }
 
     /// <summary>
-    /// Gets the sender's task which subscribes to the result of the receiver's existing task <see cref="TaskId"/>, or
-    /// <see langword="null"/> for an invocation which carries a request.
+    /// Gets the sender's task which subscribes to the result of the receiver's task <see cref="TaskId"/>: the task which a
+    /// detached invocation starts, or an existing task, for a subscription which carries no request. A detached invocation
+    /// without a subscriber, which an ordinary grain method posts, has none.
     /// </summary>
     /// <remarks>
-    /// A subscription neither schedules nor claims the task: the receiver records no caller and validates none, and it
-    /// adds the subscriber to the task's completion destinations.
+    /// A subscriber neither claims the task nor validates its caller: the receiver adds it to the task's completion
+    /// destinations.
     /// </remarks>
     [Id(4)]
     public TaskId? SubscriberId { get; init; }
+
+    /// <summary>
+    /// Gets whether the sender awaits the receiver's acceptance: the receiver replies with an acceptance once it stores the
+    /// task, in the same write.
+    /// </summary>
+    [Id(5)]
+    public bool Acknowledge { get; init; }
+}
+
+/// <summary>
+/// Replies to an invocation: the receiver of the invocation stored the task, or it rejected the invocation, for example
+/// because the task identifier already identifies another request.
+/// </summary>
+[GenerateSerializer]
+internal sealed class DurableTaskAcceptanceMessage
+{
+    /// <summary>Gets the sender's task which the invocation started.</summary>
+    [Id(0)]
+    public TaskId TaskId { get; init; }
+
+    [Id(1)]
+    public GrainId Sender { get; init; }
+
+    /// <summary>
+    /// Gets the receiver's task which started the sender's task, when it differs from <see cref="TaskId"/>: the record of
+    /// a detached task.
+    /// </summary>
+    [Id(2)]
+    public TaskId? SubscriberId { get; init; }
+
+    /// <summary>Gets the failure which rejects the invocation, or <see langword="null"/> for an accepted invocation.</summary>
+    [Id(3)]
+    public DurableTaskResponse? Rejection { get; init; }
 }
 
 [GenerateSerializer]
@@ -142,6 +176,7 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public const string CancellationSubject = SubjectPrefix + "cancel";
     public const string ResumeSubject = SubjectPrefix + "resume";
     public const string SignalSubject = SubjectPrefix + "signal";
+    public const string AcceptanceSubject = SubjectPrefix + "accept";
 
     public MessageType<DurableTaskInvocationMessage> Invocation { get; } = new(InvocationSubject, serializer);
 
@@ -152,4 +187,6 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public MessageType<DurableTaskResumeMessage> Resume { get; } = new(ResumeSubject, serializer);
 
     public MessageType<DurableTaskSignalMessage> Signal { get; } = new(SignalSubject, serializer);
+
+    public MessageType<DurableTaskAcceptanceMessage> Acceptance { get; } = new(AcceptanceSubject, serializer);
 }

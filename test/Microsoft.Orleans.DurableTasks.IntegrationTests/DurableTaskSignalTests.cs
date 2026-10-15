@@ -22,7 +22,7 @@ public abstract class DurableTaskSignalTests(string journalFormatKey) : IAsyncLi
         var waiter = _fixture.Client.GetGrain<IDurableTaskSignalWaiterGrain>(waiterKey);
         var taskId = TaskId.CreateRoot("approval");
         var started = _fixture.MessagingProbe.WaitForStartedAsync(waiterKey, 1);
-        var workflow = await waiter.WaitForApprovalAsync().ScheduleAsync("approval", cancellationToken);
+        var workflow = await waiter.WaitForApprovalAsync().WithId("approval").ScheduleAsync(cancellationToken);
         await started.WaitAsync(Timeout, cancellationToken);
 
         await waiter.SignalDurableTaskAsync(taskId, DurableTaskSignalWaiterGrain.Approved, "ada", cancellationToken);
@@ -48,10 +48,10 @@ public abstract class DurableTaskSignalTests(string journalFormatKey) : IAsyncLi
         var waiter = _fixture.Client.GetGrain<IDurableTaskSignalWaiterGrain>(waiterKey);
         var sender = _fixture.Client.GetGrain<IDurableTaskSignalSenderGrain>(Guid.NewGuid());
         var started = _fixture.MessagingProbe.WaitForStartedAsync(waiterKey, 1);
-        var workflow = await waiter.WaitForApprovalAsync().ScheduleAsync("approval", cancellationToken);
+        var workflow = await waiter.WaitForApprovalAsync().WithId("approval").ScheduleAsync(cancellationToken);
         await started.WaitAsync(Timeout, cancellationToken);
 
-        var sending = await sender.SendApprovalAsync(waiterKey, "approval", "grace").ScheduleAsync("send", cancellationToken);
+        var sending = await sender.SendApprovalAsync(waiterKey, "approval", "grace").WithId("send").ScheduleAsync(cancellationToken);
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, (await sending.GetResponseAsync(cancellationToken).WaitAsync(Timeout, cancellationToken)).Status);
         Assert.Equal("grace", await GetResultAsync(workflow, cancellationToken));
@@ -70,7 +70,7 @@ public abstract class DurableTaskSignalTests(string journalFormatKey) : IAsyncLi
         var waiterKey = Guid.NewGuid();
         var waiter = _fixture.Client.GetGrain<IDurableTaskSignalWaiterGrain>(waiterKey);
         var started = _fixture.MessagingProbe.WaitForStartedAsync(waiterKey, 1);
-        var workflow = await waiter.WaitForTwoApprovalsAsync().ScheduleAsync("approvals", cancellationToken);
+        var workflow = await waiter.WaitForTwoApprovalsAsync().WithId("approvals").ScheduleAsync(cancellationToken);
         await started.WaitAsync(Timeout, cancellationToken);
 
         await waiter.ApproveAsync("approvals", "ada");

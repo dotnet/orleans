@@ -52,7 +52,7 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
             .Select(silo => _fixture.Cluster.GetSiloServiceProvider(silo.SiloAddress).GetRequiredService<OrleansInstruments>().Meter)
             .ToHashSet());
 
-        await caller.CallAsync(callee.GetPrimaryKey()).ScheduleAsync("fragile-root", cancellationToken);
+        await caller.CallAsync(callee.GetPrimaryKey()).WithId("fragile-root").ScheduleAsync(cancellationToken);
         await probe.ProduceStarted.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
         // The caller becomes unavailable, so the callee's first activation can't deliver the completion.
@@ -81,7 +81,7 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
         Assert.Equal(2, letter.AttemptCount);
 
         // The callee keeps its activation and processes later work.
-        var later = await callee.DoubleAsync(21).ScheduleAsync("later", cancellationToken);
+        var later = await callee.DoubleAsync(21).WithId("later").ScheduleAsync(cancellationToken);
         var response = await later.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         Assert.Equal(42, response.GetResult<int>());
         Assert.Equal(2, probe.CalleeActivations);

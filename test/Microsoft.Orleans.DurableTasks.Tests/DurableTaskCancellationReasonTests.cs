@@ -123,7 +123,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         runtime.ScheduleFromInbox(rootId, CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
         {
-            var remote = await new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)).WithId("remote").ScheduleAsync(cancellationToken);
+            var remote = new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)).WithId("remote").Post();
             await remote.CancelAsync("no longer needed", cancellationToken);
             canceled.TrySetResult();
             return 0;

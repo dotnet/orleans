@@ -26,7 +26,7 @@ public abstract class DurableTaskSubscriptionTests(string journalFormatKey) : IA
         var subscriber = _fixture.Client.GetGrain<IDurableTaskSubscriberGrain>(subscriberKey);
         var subscribing = _fixture.MessagingProbe.WaitForStartedAsync(subscriberKey, 1);
 
-        var relay = await subscriber.SubscribeAsync(operationKey, "op").ScheduleAsync("relay", cancellationToken);
+        var relay = await subscriber.SubscribeAsync(operationKey, "op").WithId("relay").ScheduleAsync(cancellationToken);
         await subscribing.WaitAsync(Timeout, cancellationToken);
         await operation.SignalDurableTaskAsync("op", DurableTaskSubscribedGrain.Release, "done", cancellationToken);
 
@@ -47,27 +47,36 @@ public abstract class DurableTaskSubscriptionTests(string journalFormatKey) : IA
     }
 
     [Fact]
-    public async Task SubscriptionToACompletedTaskCompletesAndToAnUnscheduledTaskAwaitsItsInvocation()
+    public async Task SubscriptionToACompletedTaskCompletesAndToAnUnknownTaskFailsPromptly()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var (operationKey, operation) = await StartOperationAsync("op", cancellationToken);
         await operation.SignalDurableTaskAsync("op", DurableTaskSubscribedGrain.Release, "done", cancellationToken);
         Assert.Equal("done", await GetResultAsync(operation.GetDurableTask<string>("op"), cancellationToken));
-        var subscriberKey = Guid.NewGuid();
-        var subscriber = _fixture.Client.GetGrain<IDurableTaskSubscriberGrain>(subscriberKey);
-        var subscribing = _fixture.MessagingProbe.WaitForStartedAsync(subscriberKey, 2);
+        var subscriber = _fixture.Client.GetGrain<IDurableTaskSubscriberGrain>(Guid.NewGuid());
 
-        var completed = await subscriber.SubscribeAsync(operationKey, "op").ScheduleAsync("completed", cancellationToken);
-        var early = await subscriber.SubscribeAsync(operationKey, "later").ScheduleAsync("early", cancellationToken);
+        var completed = await subscriber.SubscribeAsync(operationKey, "op").WithId("completed").ScheduleAsync(cancellationToken);
+        var unknown = await subscriber.SubscribeAsync(operationKey, "unknown").WithId("unknown").ScheduleAsync(cancellationToken);
+
         Assert.Equal("done", await GetResultAsync(completed, cancellationToken));
-        await subscribing.WaitAsync(Timeout, cancellationToken);
+        Assert.Equal("not found: unknown", await GetResultAsync(unknown, cancellationToken));
+    }
 
-        // The subscription can reach the operation's grain before the task's invocation, and waits for it.
-        var started = _fixture.MessagingProbe.WaitForStartedAsync(operationKey, 2);
-        await operation.RunAsync().ScheduleAsync("later", cancellationToken);
+    [Fact]
+    public async Task WorkflowSubscribesToTheDetachedTaskWhichItsScheduleReturned()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var operationKey = Guid.NewGuid();
+        var operation = _fixture.Client.GetGrain<IDurableTaskSubscribedGrain>(operationKey);
+        var subscriber = _fixture.Client.GetGrain<IDurableTaskSubscriberGrain>(Guid.NewGuid());
+        var started = _fixture.MessagingProbe.WaitForStartedAsync(operationKey, 1);
+
+        // The schedule returns once the operation's grain holds the task, so the subscription which follows finds it.
+        var relay = await subscriber.ScheduleAndSubscribeAsync(operationKey, "detached-op").WithId("relay").ScheduleAsync(cancellationToken);
         await started.WaitAsync(Timeout, cancellationToken);
-        await operation.SignalDurableTaskAsync("later", DurableTaskSubscribedGrain.Release, "later done", cancellationToken);
-        Assert.Equal("later done", await GetResultAsync(early, cancellationToken));
+        await operation.SignalDurableTaskAsync("detached-op", DurableTaskSubscribedGrain.Release, "done", cancellationToken);
+
+        Assert.Equal("done", await GetResultAsync(relay, cancellationToken));
     }
 
     [Fact]
@@ -78,7 +87,7 @@ public abstract class DurableTaskSubscriptionTests(string journalFormatKey) : IA
         var subscriberKey = Guid.NewGuid();
         var subscriber = _fixture.Client.GetGrain<IDurableTaskSubscriberGrain>(subscriberKey);
         var subscribing = _fixture.MessagingProbe.WaitForStartedAsync(subscriberKey, 1);
-        var relay = await subscriber.SubscribeWithDeadlineAsync(operationKey, "op").ScheduleAsync("relay", cancellationToken);
+        var relay = await subscriber.SubscribeWithDeadlineAsync(operationKey, "op").WithId("relay").ScheduleAsync(cancellationToken);
         await subscribing.WaitAsync(Timeout, cancellationToken);
 
         // The deadline's delay is due once the Durable Jobs clock passes it.
@@ -96,7 +105,7 @@ public abstract class DurableTaskSubscriptionTests(string journalFormatKey) : IA
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var (operationKey, operation) = await StartOperationAsync("op", cancellationToken);
-        var relay = await operation.SubscribeToOwnAsync("op").ScheduleAsync("relay", cancellationToken);
+        var relay = await operation.SubscribeToOwnAsync("op").WithId("relay").ScheduleAsync(cancellationToken);
         await _fixture.MessagingProbe.WaitForStartedAsync(operationKey, 2).WaitAsync(Timeout, cancellationToken);
 
         await operation.SignalDurableTaskAsync("op", DurableTaskSubscribedGrain.Release, "done", cancellationToken);
@@ -112,7 +121,7 @@ public abstract class DurableTaskSubscriptionTests(string journalFormatKey) : IA
         var subscriberKey = Guid.NewGuid();
         var subscriber = _fixture.Client.GetGrain<IDurableTaskSubscriberGrain>(subscriberKey);
         var subscribing = _fixture.MessagingProbe.WaitForStartedAsync(subscriberKey, 1);
-        var relay = await subscriber.SubscribeAsync(operationKey, "op").ScheduleAsync("relay", cancellationToken);
+        var relay = await subscriber.SubscribeAsync(operationKey, "op").WithId("relay").ScheduleAsync(cancellationToken);
         await subscribing.WaitAsync(Timeout, cancellationToken);
 
         await subscriber.DeactivateAsync();
@@ -128,7 +137,7 @@ public abstract class DurableTaskSubscriptionTests(string journalFormatKey) : IA
         var key = Guid.NewGuid();
         var grain = _fixture.Client.GetGrain<IDurableTaskSubscribedGrain>(key);
         var started = _fixture.MessagingProbe.WaitForStartedAsync(key, 1);
-        await grain.RunAsync().ScheduleAsync(rootId, cancellationToken);
+        await grain.RunAsync().WithId(rootId).ScheduleAsync(cancellationToken);
         await started.WaitAsync(Timeout, cancellationToken);
         return (key, grain);
     }
@@ -177,6 +186,8 @@ public interface IDurableTaskSubscriberGrain : IGrainWithGuidKey
     DurableTask<string> SubscribeAsync(Guid operationKey, string rootId);
 
     DurableTask<string> SubscribeWithDeadlineAsync(Guid operationKey, string rootId);
+
+    DurableTask<string> ScheduleAndSubscribeAsync(Guid operationKey, string rootId);
 
     Task DeactivateAsync();
 }
@@ -228,6 +239,13 @@ public sealed class DurableTaskSubscriberGrain(DurableTaskMessagingProbe probe) 
         {
             return "timed out";
         }
+    }
+
+    public async DurableTask<string> ScheduleAndSubscribeAsync(Guid operationKey, string rootId)
+    {
+        var operation = GrainFactory.GetGrain<IDurableTaskSubscribedGrain>(operationKey);
+        await operation.RunAsync().Detached().WithId(rootId).ScheduleAsync();
+        return await operation.GetDurableTask<string>(rootId);
     }
 
     public Task DeactivateAsync()
