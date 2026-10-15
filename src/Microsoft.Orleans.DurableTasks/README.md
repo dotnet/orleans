@@ -117,6 +117,12 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
 
 - In a durable task, awaiting a call, scheduling it, or posting it records an attached child under its
   task ID and stages a `durable-rpc/invoke` message, whose target claims the task for the caller.
+  Root IDs are scoped per grain, so the target stores the child under the caller's scope,
+  `$caller/{callerGrainId}/{taskId}`: two callers whose workflows share a root ID and a child name
+  run separate tasks on a shared target. The caller's invocation, cancellation, and abort address its
+  own child's ID, which the target maps to its scope, and the target's completion names the caller's
+  child as its subscriber. A root ID, which a detached start sends, addresses the target's root task
+  itself, and the root ID `$caller` is reserved.
   The target acknowledges the invocation once its journal write stores the task, and the starter's outbox
   retires the invocation as delivered, in the write which records the acceptance on the child.
   `ScheduleAsync` returns once that acceptance, or the task's result, is durable. `Post` stages the

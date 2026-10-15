@@ -93,6 +93,7 @@ internal sealed partial class DurableTaskGrainRuntime
     {
         ThrowIfStopping();
         Debug.Assert(rootId.Parent().IsDefault, "A posted task is a root task.");
+        CallerScope.ThrowIfReserved(rootId);
         var target = request.Context?.TargetId ?? throw new InvalidOperationException("The durable task request has no target.");
         if (target == GrainId)
         {
@@ -273,16 +274,16 @@ internal sealed partial class DurableTaskGrainRuntime
 
     /// <summary>
     /// Throws unless <paramref name="recordId"/> started <paramref name="sourceTaskId"/> of <paramref name="sender"/>: it
-    /// is that grain's remote child, or it subscribes to that task.
+    /// is the remote child which that grain stores under this grain's caller scope, or it subscribes to that task.
     /// </summary>
-    private static void ThrowIfNotStartedBy(TaskId recordId, TaskId sourceTaskId, IDurableTaskState state, GrainId sender)
+    private void ThrowIfNotStartedBy(TaskId recordId, TaskId sourceTaskId, IDurableTaskState state, GrainId sender)
     {
         var matches = TryGetSubscription(state, out var target, out var subscribedTaskId)
             ? target == sender && subscribedTaskId == sourceTaskId
             : !state.RemoteTarget.IsDefault
                 && state.RemoteRequestFingerprint is not null
                 && state.RemoteTarget == sender
-                && sourceTaskId == recordId;
+                && sourceTaskId == CallerScope.GetTaskId(GrainId, recordId);
         if (!matches)
         {
             throw new InvalidOperationException(
