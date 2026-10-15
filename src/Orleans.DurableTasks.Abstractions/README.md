@@ -255,9 +255,11 @@ continues:
   and the execution's cancellation, abort, and deletion don't reach it. The start names the execution
   as a subscriber, so awaiting the task, or its handle, observes its result without a separate
   subscription; canceling that wait ends only the subscription. Its root ID is the `WithId` name,
-  verbatim, so other parties can address it, or `{executionId}:{segment}`, where `{segment}` is the
-  generated ID of the execution's next unnamed operation. Starting it again under the same root ID,
-  including during a replay, reaches the same task.
+  verbatim, so other parties can address it, or `{hostId}/{executionId}:{segment}`, where `{segment}`
+  is the generated ID of the execution's next unnamed operation and `{hostId}` is the identity which the
+  host supplies through `DurableTaskContext.HostId`, such as its grain, so executions with the same ID
+  on different hosts derive different root IDs. Starting it again under the same root ID, including
+  during a replay, reaches the same task.
 - `ScheduleAsync()` returns once the task's host holds the task, so its ID can be handed to other
   parties, which address it with lookups such as `GetDurableTask`. A start which its host rejects, for
   example because the ID already identifies another definition, fails.
