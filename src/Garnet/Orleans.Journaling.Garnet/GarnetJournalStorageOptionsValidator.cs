@@ -53,10 +53,10 @@ internal sealed class GarnetJournalStorageOptionsValidator(
             throw new OrleansConfigurationException($"{prefix}.{nameof(options.TombstoneRetention)} must be positive.");
         }
 
-        if (options.MigrationInterval <= TimeSpan.Zero || options.MarkerCollectionInterval <= TimeSpan.Zero)
+        if (options.MigrationInterval <= TimeSpan.Zero || options.MarkerCollectionInterval <= TimeSpan.Zero || options.HostingInterval <= TimeSpan.Zero)
         {
             throw new OrleansConfigurationException(
-                $"{prefix}.{nameof(options.MigrationInterval)} and {nameof(options.MarkerCollectionInterval)} must be positive.");
+                $"{prefix}.{nameof(options.MigrationInterval)}, {nameof(options.MarkerCollectionInterval)}, and {nameof(options.HostingInterval)} must be positive.");
         }
 
         if (string.IsNullOrWhiteSpace(options.LogMemorySize) || string.IsNullOrWhiteSpace(options.IndexMemorySize) || string.IsNullOrWhiteSpace(options.CheckpointAofSize))

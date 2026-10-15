@@ -33,6 +33,8 @@ namespace Orleans.Journaling
 
         public string? HostId { get { throw null; } set { } }
 
+        public System.TimeSpan HostingInterval { get { throw null; } set { } }
+
         public string IndexMemorySize { get { throw null; } set { } }
 
         public Ranges.RangeMap? InitialRangeMap { get { throw null; } set { } }
@@ -50,6 +52,8 @@ namespace Orleans.Journaling
         public System.TimeSpan MigrationInterval { get { throw null; } set { } }
 
         public System.TimeSpan OperationTimeout { get { throw null; } set { } }
+
+        public Azure.Storage.Blobs.BlobContainerClient? PartitionBlobContainer { get { throw null; } set { } }
 
         public System.TimeSpan TombstoneRetention { get { throw null; } set { } }
     }

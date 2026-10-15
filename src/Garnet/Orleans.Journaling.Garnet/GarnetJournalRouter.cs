@@ -28,7 +28,9 @@ namespace Orleans.Journaling;
 /// </para>
 /// <para>
 /// Safety does not depend on the view: only a partition which holds a bucket open accepts operations on it, and at
-/// most one partition holds a bucket open. A stale view or endpoint costs retries, never correctness.
+/// most one partition holds a bucket open. A stale view or endpoint costs retries, never correctness. After a failover,
+/// the partition's previous host completes no journal operation once the new host has taken its storage over, so the
+/// router retries, refreshes its view, and reaches the new host.
 /// </para>
 /// </remarks>
 internal sealed class GarnetJournalRouter : IAsyncDisposable
@@ -37,6 +39,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     private const string TransactionFailedMessage = "ERR Transaction failed.";
     private static readonly TimeSpan InitialBackoff = TimeSpan.FromMilliseconds(10);
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan TransactionRefreshBackoff = TimeSpan.FromMilliseconds(80);
 
     private readonly IRangeMetaStore _metaStore;
     private readonly TimeSpan _operationTimeout;
@@ -344,7 +347,10 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
             _logger?.LogDebug(exception, "Retrying Garnet journal procedure {Procedure} on bucket {Bucket} after {Reason} failure at partition {Partition} in view {Version}.", procedure, bucket, reason, partition, view.Version);
             await Task.Delay(backoff, cancellationToken).ConfigureAwait(false);
             backoff = TimeSpan.FromTicks(Math.Min(backoff.Ticks * 2, MaxBackoff.Ticks));
-            if (reason is not "transaction")
+
+            // Transactions which did not run are usually lock timeouts; after a few, the partition may also have moved
+            // to another host, whose previous host fails every transaction.
+            if (reason is not "transaction" || backoff >= TransactionRefreshBackoff)
             {
                 try
                 {

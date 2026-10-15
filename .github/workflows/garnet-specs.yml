@@ -2,10 +2,10 @@ name: Garnet specs
 
 on:
   pull_request:
-    paths: [specs/garnet-range-migration/**, .github/workflows/garnet-specs.yml]
+    paths: [specs/garnet-range-migration/**, specs/garnet-partition-hosting/**, .github/workflows/garnet-specs.yml]
   push:
     branches: [main]
-    paths: [specs/garnet-range-migration/**, .github/workflows/garnet-specs.yml]
+    paths: [specs/garnet-range-migration/**, specs/garnet-partition-hosting/**, .github/workflows/garnet-specs.yml]
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
@@ -16,6 +16,7 @@ permissions:
 env:
   QUINT_VERSION: 0.33.0
   SPEC: garnetRangeMigration.qnt
+  HOSTING_SPEC: partitionHosting.qnt
 
 jobs:
   simulate:
@@ -59,6 +60,44 @@ jobs:
             echo "$step: violation found, as expected"
           done
 
+  simulate-hosting:
+    name: Hosting spec tests, simulation, and mutants
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: specs/garnet-partition-hosting
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - run: npm install -g "@informalsystems/quint@$QUINT_VERSION"
+      - run: quint typecheck "$HOSTING_SPEC"
+      - name: Directed scenarios
+        run: quint test "$HOSTING_SPEC" --main=partitionHostingSim --match=Test
+      - name: Random simulation
+        run: >-
+          quint run "$HOSTING_SPEC" --main=partitionHostingSim --backend=rust
+          --invariant=safety --max-steps=40 --max-samples=20000
+      # mutantUnconfirmedRecovery needs two takeovers to interleave; the directed scenario unconfirmedRecoveryTest exhibits it.
+      - name: Mutants must violate safety
+        run: |
+          for step in mutantUnfencedWrite mutantUnfencedRead mutantUnfencedManifest mutantUnregisteredWrite \
+                      mutantCreateBreaksLease mutantRecoverBeforeFence; do
+            if quint run "$HOSTING_SPEC" --main=partitionHostingSim --backend=rust --step="$step" \
+                 --invariant=safety --max-steps=30 --max-samples=10000 --seed=7 > "$step.log" 2>&1; then
+              echo "::error::$step was not caught by the safety invariant"
+              exit 1
+            fi
+            if ! grep -q '\[violation\]' "$step.log"; then
+              cat "$step.log"
+              echo "::error::$step failed without a safety violation"
+              exit 1
+            fi
+            echo "$step: violation found, as expected"
+          done
+
   model-check:
     name: Exhaustive model checking (TLC)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -79,6 +118,9 @@ jobs:
       - run: npm install -g "@informalsystems/quint@$QUINT_VERSION"
       - name: Safety
         run: quint verify "$SPEC" --main=garnetRangeMigrationTlc --backend=tlc --invariant=safety
+      - name: Hosting safety
+        working-directory: specs/garnet-partition-hosting
+        run: quint verify "$HOSTING_SPEC" --main=partitionHostingTlc --backend=tlc --invariant=safety
       - name: Liveness under the coordinator's rule
         run: >-
           quint verify "$SPEC" --main=garnetRangeMigrationLive --backend=tlc
