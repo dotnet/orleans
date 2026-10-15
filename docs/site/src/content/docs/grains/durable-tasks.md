@@ -113,9 +113,13 @@ place-order-{orderId}/$once:ship
 - A named combinator gives its inputs IDs beneath its own:
   `DurableTask.WhenAll(...).WithId("reserve")` identifies its inputs as `reserve/0`,
   `reserve/1`, and so on, in input order.
-- A call to another grain runs on that grain under the same task ID, so
-  `place-order-{orderId}/reserve/0` identifies both the order's record of the call and
-  the reservation task on the catalog grain.
+- A call to another grain runs on that grain under the caller's scope,
+  `$caller/{callerGrainId}/{taskId}`: the order's record of the call
+  `place-order-{orderId}/reserve/0` is the catalog grain's task
+  `$caller/order/{orderId}/place-order-{orderId}/reserve/0`. Each caller has its own
+  scope, so callers whose workflows share a root ID never share a callee's task. A
+  root task, such as a detached start, keeps its root ID on its grain, and the root ID
+  `$caller` is reserved.
 - Scheduling a task ID again with the same request reattaches to the existing task and
   its recorded result. Scheduling it with a different interface, method, or argument
   fails, so a task ID deduplicates schedules while the grain retains the task.
@@ -511,8 +515,11 @@ descriptor, which names the signal:
 The `GetDurableTask<TResult>(rootId)` grain-reference extension, or its `TaskId` overload,
 returns a <xref:Orleans.DurableTasks.DurableTaskReference`1> to an existing task, such as a
 client-scheduled operation or a detached task. A durable task awaits the reference to
-subscribe to the task's result. A webhook relay, for example, waits for an operation and
-then delivers its result:
+subscribe to the task's result, and other code awaits it to wait for the result. The
+reference is awaitable through an extension method, so an ASP.NET Core Minimal API
+handler returns it as a value, and <xref:Orleans.DurableTasks.IDurableTaskReference>
+reads its `Target` and `Id` without its result type. A webhook relay, for example, waits
+for an operation and then delivers its result:
 
 ```csharp
 public async DurableTask DeliverWebhookAsync(Guid operationKey, string operationId, Uri callback)
