@@ -16,39 +16,35 @@ internal interface IDurableTaskMessageTransport
     /// <param name="messageId">The completion's message ID, from <see cref="GetCompletionMessageId"/>.</param>
     void SendCompletion(MessageId messageId);
 
-    /// <summary>Gets the stable ID of the completion of a task sent from <paramref name="sender"/> to <paramref name="target"/>.</summary>
-    MessageId GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId);
+    /// <summary>Gets the stable ID of the completion of <paramref name="taskId"/> which <paramref name="sender"/> sends to <paramref name="destination"/>.</summary>
+    MessageId GetCompletionMessageId(GrainId sender, DurableTaskSubscriber destination, TaskId taskId);
 
-    /// <summary>Encodes a completion message addressed to <paramref name="target"/>.</summary>
-    /// <param name="observerId">
-    /// The observation in <paramref name="target"/>'s execution tree which the completion completes, or
-    /// <see langword="default"/> for a completion addressed to the task's caller.
-    /// </param>
+    /// <summary>Encodes the completion of <paramref name="taskId"/> which <paramref name="sender"/> sends to <paramref name="destination"/>.</summary>
     OutboxMessage CreateCompletionMessage(
         MessageId messageId,
         GrainId sender,
-        GrainId target,
+        DurableTaskSubscriber destination,
         TaskId taskId,
-        DurableTaskResponse response,
-        TaskId observerId = default);
+        DurableTaskResponse response);
 
     /// <summary>
-    /// Gets the stable ID of the completion of <paramref name="taskId"/> which <paramref name="sender"/> sends to the
-    /// observation <paramref name="observerId"/> of <paramref name="target"/>.
+    /// Stages a completion which carries <paramref name="response"/> for <paramref name="taskId"/> to
+    /// <paramref name="destination"/>, for a task which doesn't retain itself for the subscriber, such as a task which
+    /// <paramref name="sender"/> doesn't retain as an invoked task, which completes the subscriber as not found.
     /// </summary>
-    MessageId GetObservationCompletionMessageId(GrainId sender, GrainId target, TaskId taskId, TaskId observerId);
+    void SendResponse(GrainId sender, DurableTaskSubscriber destination, TaskId taskId, DurableTaskResponse response);
 
     /// <summary>
-    /// Stages a completion which reports to the observation <paramref name="observerId"/> of <paramref name="target"/> that
-    /// <paramref name="sender"/> retains no invoked task <paramref name="taskId"/>.
+    /// Stages a subscription of <paramref name="sender"/>'s task <paramref name="subscriberId"/> to the result of the
+    /// existing task <paramref name="taskId"/> of <paramref name="target"/>, as an invocation which carries no request.
     /// </summary>
-    void SendObservationNotFound(GrainId sender, GrainId target, TaskId taskId, TaskId observerId);
+    void SendSubscription(GrainId sender, GrainId target, TaskId taskId, TaskId subscriberId);
 
     /// <summary>
-    /// Stages a subscription of the observation <paramref name="observerId"/> of <paramref name="sender"/> to the terminal
-    /// result of the invoked task <paramref name="taskId"/> of <paramref name="target"/>, or the end of that subscription.
+    /// Stages the end of <paramref name="sender"/>'s task <paramref name="subscriberId"/>'s subscription to
+    /// <paramref name="taskId"/> of <paramref name="target"/>, as a cancellation message which names the subscriber.
     /// </summary>
-    void SendObservation(GrainId sender, GrainId target, TaskId taskId, TaskId observerId, bool unsubscribe);
+    void SendUnsubscription(GrainId sender, GrainId target, TaskId taskId, TaskId subscriberId);
 
     /// <summary>Stages a cooperative cancellation, carrying its <paramref name="reason"/>, of a task which <paramref name="target"/> executes.</summary>
     void SendCancellation(GrainId sender, GrainId target, TaskId taskId, string? reason = null);

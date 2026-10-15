@@ -29,7 +29,7 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTaskMessageTransport
 {
     private readonly TaskCompletionSource _resumeSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private readonly Dictionary<MessageId, (GrainId Sender, GrainId Target, TaskId TaskId)> _completionIds = [];
+    private readonly Dictionary<MessageId, (GrainId Sender, DurableTaskSubscriber Destination, TaskId TaskId)> _completionIds = [];
 
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<RecordedCompletion> Completions { get; } = [];
@@ -51,36 +51,29 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     public void SendDetachedInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
         DetachedInvocations.Add((sender, target, taskId, request));
 
-    public MessageId GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId)
+    public MessageId GetCompletionMessageId(GrainId sender, DurableTaskSubscriber destination, TaskId taskId)
     {
-        var messageId = DurableTaskMessageTransport.CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject);
-        _completionIds[messageId] = (sender, target, taskId);
+        var messageId = Encoder.GetCompletionMessageId(sender, destination, taskId);
+        _completionIds[messageId] = (sender, destination, taskId);
         return messageId;
     }
 
     public void SendCompletion(MessageId messageId)
     {
-        var (sender, target, taskId) = _completionIds[messageId];
-        Completions.Add(new(sender, target, taskId, messageId));
+        var (sender, destination, taskId) = _completionIds[messageId];
+        Completions.Add(new(sender, destination.GrainId, taskId, messageId, destination.TaskId));
     }
 
     public OutboxMessage CreateCompletionMessage(
         MessageId messageId,
         GrainId sender,
-        GrainId target,
+        DurableTaskSubscriber destination,
         TaskId taskId,
-        DurableTaskResponse response,
-        TaskId observerId = default) =>
-        MessagingTestHelpers.MessageTypes.Completion.Create(
-            messageId,
-            target,
-            new DurableTaskCompletionMessage
-            {
-                TaskId = taskId,
-                Response = response,
-                Sender = sender,
-                ObserverId = observerId.IsDefault ? null : observerId,
-            });
+        DurableTaskResponse response) =>
+        Encoder.CreateCompletionMessage(messageId, sender, destination, taskId, response);
+
+    /// <summary>Encodes messages as the adapter's transport does, without staging them.</summary>
+    private static readonly DurableTaskMessageTransport Encoder = MessagingTestHelpers.CreateTransport(new RecordingOutbox());
 
     public void SendCancellation(GrainId sender, GrainId target, TaskId taskId, string? reason = null)
     {
@@ -101,8 +94,8 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     }
 }
 
-/// <summary>A completion the runtime sent as a reference to its stored result.</summary>
-internal sealed record RecordedCompletion(GrainId Sender, GrainId Target, TaskId TaskId, MessageId MessageId)
+/// <summary>A completion the runtime sent as a reference to its stored result, to the task <see cref="SubscriberId"/> of <see cref="Target"/>.</summary>
+internal sealed record RecordedCompletion(GrainId Sender, GrainId Target, TaskId TaskId, MessageId MessageId, TaskId SubscriberId)
 {
     /// <summary>Materializes the completion from the runtime, as the outbox does for a delivery attempt.</summary>
     public DurableTaskCompletionMessage Materialize(DurableTaskGrainRuntime runtime)
