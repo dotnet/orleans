@@ -287,41 +287,13 @@ public class RunRequestQueueLimitTests : TestClusterPerTest
     }
 
     [Fact]
-    public async Task RunRequest_EnforcingQueueLimit_BeyondHardLimit_FaultsWithLimitExceeded()
+    public async Task RunRequest_IgnoresHardLimit()
     {
         var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
 
-        // The queuing call counts toward the limit, so the activation admits requests until its count exceeds the limit.
-        var outcomes = await grain.QueueRequests(HardLimit + 2);
-        await grain.AwaitPendingRequest().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-
-        Assert.Equal(["queued", "queued", "queued", nameof(LimitExceededException), nameof(LimitExceededException)], outcomes);
-        Assert.Equal(["request-0", "request-1", "request-2"], await grain.GetLog());
+        Assert.Equal(HardLimit * 4, await grain.QueueRequests(HardLimit * 4).WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
     }
 
-    [Fact]
-    public async Task RunRequest_ByDefault_IgnoresHardLimit()
-    {
-        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
-
-        var admitted = await grain.QueueUnlimitedRequests(HardLimit * 4);
-        await grain.AwaitPendingRequest().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-
-        Assert.Equal(HardLimit * 4, admitted);
-        Assert.Equal(HardLimit * 4, (await grain.GetLog()).Count);
-    }
-
-    [Fact]
-    public async Task RunRequest_ConcurrentProducers_StayWithinHardLimit()
-    {
-        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
-
-        var admitted = await grain.QueueRequestsConcurrently(64);
-        await grain.AwaitPendingRequest().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-
-        Assert.Equal(HardLimit, admitted);
-        Assert.Equal(HardLimit, (await grain.GetLog()).Count);
-    }
 
     private sealed class SiloConfigurator : ISiloConfigurator
     {

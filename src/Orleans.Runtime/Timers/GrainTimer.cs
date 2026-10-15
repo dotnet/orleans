@@ -303,8 +303,10 @@ internal abstract partial class GrainTimer : IGrainTimer
 
         public ValueTask<Response> Invoke() => timer.InvokeGrainTimerCallbackAsync();
 
-        // No caller observes a tick, so the runtime logs a failed tick.
-        public bool Complete(Response response) => false;
+        // The timer logs callback failures as the tick runs.
+        public void Complete(Response response)
+        {
+        }
 
         // This method is declared for the sake of IGrainTimerCore, but it is not intended to be called directly.
         // It exists for grain call interceptors which inspect the implementation method.

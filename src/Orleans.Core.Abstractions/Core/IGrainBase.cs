@@ -287,8 +287,6 @@ namespace Orleans
         /// <para>
         /// If the activation deactivates before the request starts, the returned task faults with
         /// <see cref="OrleansMessageRejectionException"/>.
-        /// If <see cref="LocalRequestOptions.EnforceQueueLimit"/> is set and the activation's queue exceeds the configured maximum number of enqueued requests,
-        /// the returned task faults with <see cref="LimitExceededException"/>.
         /// To present the request to call filters and tracing with a different interface name, method name, or arguments,
         /// queue a custom <see cref="ILocalRequest"/> using <see cref="IGrainContext.ReceiveLocalRequest"/>.
         /// </para>

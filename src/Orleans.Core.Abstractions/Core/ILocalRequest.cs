@@ -16,16 +16,11 @@ public interface ILocalRequest : IInvokable
     /// </summary>
     /// <param name="response">
     /// The response produced by the request and its call filters, or an exception if the grain context rejects the request.
-    /// The grain context rejects a request with an <see cref="OrleansMessageRejectionException"/> if it deactivates before the request starts,
-    /// and with a <see cref="LimitExceededException"/> if <see cref="LocalRequestOptions.EnforceQueueLimit"/> is set and its queue is full.
+    /// The grain context rejects a request with an <see cref="OrleansMessageRejectionException"/> if it deactivates before the request starts.
     /// </param>
-    /// <returns>
-    /// <see langword="true"/> if the request reports the response's exception to an observer; otherwise, <see langword="false"/>,
-    /// in which case the runtime logs a failure as a warning.
-    /// </returns>
     /// <remarks>
-    /// The grain context calls this method once for each time it receives the request.
-    /// It can be called from any thread, so implementations should complete quickly and without blocking.
+    /// The request owns its outcome, including reporting or logging failures, and accepts the first outcome it receives.
+    /// This method can be called from any thread, so implementations should complete quickly and without blocking.
     /// </remarks>
-    bool Complete(Response response);
+    void Complete(Response response);
 }

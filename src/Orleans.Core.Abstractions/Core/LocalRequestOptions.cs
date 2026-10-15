@@ -44,15 +44,4 @@ public readonly struct LocalRequestOptions
     /// the <see cref="AlwaysInterleaveAttribute"/> applied.
     /// </remarks>
     public bool Interleave { get; init; }
-
-    /// <summary>
-    /// Gets a value indicating whether the activation rejects the request when its queue is full.
-    /// Defaults to <see langword="false"/>.
-    /// </summary>
-    /// <remarks>
-    /// If this value is <see langword="true"/> and the activation's queue exceeds
-    /// the configured maximum number of enqueued requests (<c>SiloMessagingOptions.MaxEnqueuedRequestsHardLimit</c>), the request completes with a <see cref="LimitExceededException"/>.
-    /// If this value is <see langword="false"/>, the activation queues the request regardless of the number of enqueued requests.
-    /// </remarks>
-    public bool EnforceQueueLimit { get; init; }
 }

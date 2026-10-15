@@ -56,18 +56,18 @@ public class GrainRequestTests
 
         var response = await request.Invoke();
 
-        Assert.True(((ILocalRequest)request).Complete(response));
+        ((ILocalRequest)request).Complete(response);
         Assert.Same(exception, await Assert.ThrowsAsync<InvalidOperationException>(() => request.Task));
     }
 
     [Fact]
-    public async Task Complete_FilterFailureAfterCallback_IsNotReportedByRequest()
+    public async Task Complete_FilterFailureAfterCallback_KeepsCallbackResult()
     {
         var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("result"), null, default);
 
         await request.Invoke();
 
-        Assert.False(((ILocalRequest)request).Complete(Response.FromException(new InvalidOperationException("Filter failed."))));
+        ((ILocalRequest)request).Complete(Response.FromException(new InvalidOperationException("Filter failed.")));
         Assert.Equal("result", await request.Task);
     }
 
@@ -84,13 +84,13 @@ public class GrainRequestTests
             null,
             default);
 
-        Assert.True(((ILocalRequest)request).Complete(Response.FromException(new InvalidOperationException("Filter failed."))));
+        ((ILocalRequest)request).Complete(Response.FromException(new InvalidOperationException("Filter failed.")));
         Assert.False(callbackRan);
         await Assert.ThrowsAsync<InvalidOperationException>(() => request.Task);
     }
 
     [Fact]
-    public async Task Complete_FilterFailureRacingCancellation_ReportsOnlyFailuresTheTaskCarries()
+    public async Task Complete_FilterFailureRacingCancellation_KeepsFirstOutcome()
     {
         var filterException = new InvalidOperationException("Filter failed.");
         var response = Response.FromException(filterException);
@@ -106,11 +106,11 @@ public class GrainRequestTests
             }, TestContext.Current.CancellationToken);
 
             start.SignalAndWait(TestContext.Current.CancellationToken);
-            var reported = ((ILocalRequest)request).Complete(response);
+            ((ILocalRequest)request).Complete(response);
             await cancel;
 
-            // The request reports the filter's failure exactly when its task carries that failure.
-            Assert.Equal(request.Task.IsFaulted && ReferenceEquals(request.Task.Exception!.InnerException, filterException), reported);
+            // The task carries whichever outcome arrived first.
+            Assert.True(request.Task.IsCanceled || request.Task.IsFaulted && ReferenceEquals(request.Task.Exception!.InnerException, filterException));
         }
     }
 
@@ -193,18 +193,17 @@ public class GrainRequestTests
     {
         var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("unused"), null, TestContext.Current.CancellationToken);
 
-        Assert.True(((ILocalRequest)request).Complete(Response.FromResult("filtered")));
+        ((ILocalRequest)request).Complete(Response.FromResult("filtered"));
 
         Assert.Equal("filtered", await request.Task.WaitAsync(Timeout, TestContext.Current.CancellationToken));
     }
 
     [Fact]
-    public void LocalRequestOptions_Default_KeepsActivationAliveWithoutInterleavingOrQueueLimit()
+    public void LocalRequestOptions_Default_KeepsActivationAliveWithoutInterleaving()
     {
         Assert.True(default(LocalRequestOptions).KeepAlive);
         Assert.True(new LocalRequestOptions().KeepAlive);
         Assert.False(new LocalRequestOptions { KeepAlive = false }.KeepAlive);
         Assert.False(default(LocalRequestOptions).Interleave);
-        Assert.False(default(LocalRequestOptions).EnforceQueueLimit);
     }
 }

@@ -2716,7 +2716,7 @@ namespace Orleans.Runtime
 
     public partial interface ILocalRequest : Orleans.Serialization.Invocation.IInvokable, System.IDisposable
     {
-        bool Complete(Orleans.Serialization.Invocation.Response response);
+        void Complete(Orleans.Serialization.Invocation.Response response);
     }
 
     public partial interface IRehydrationContext
@@ -2823,8 +2823,6 @@ namespace Orleans.Runtime
     public readonly partial struct LocalRequestOptions
     {
         private readonly int _dummyPrimitive;
-        public bool EnforceQueueLimit { get { throw null; } init { } }
-
         public bool Interleave { get { throw null; } init { } }
 
         public bool KeepAlive { get { throw null; } init { } }

@@ -47,7 +47,6 @@ public sealed class GrainTimerTests
             Assert.Equal(1, fixture.Time.TimerCreations);
             Assert.Equal(interleave, request.Options.Interleave);
             Assert.Equal(keepAlive, request.Options.KeepAlive);
-            Assert.False(request.Options.EnforceQueueLimit);
             Assert.Same(parent, RequestContext.Get("parent"));
             await fixture.InvokeAsync(request);
             fixture.Time.Advance(TimeSpan.FromDays(1));

@@ -89,27 +89,23 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
 
     private static TResult GetResult(Task task) => task is Task<TResult> typed ? typed.Result : default!;
 
-    bool ILocalRequest.Complete(Response response)
+    void ILocalRequest.Complete(Response response)
     {
-        var task = Task;
-        if (task.IsCompleted)
+        // The task keeps its first outcome: the callback's, a cancellation, or a call filter's which completed the invocation without running the callback.
+        if (Task.IsCompleted)
         {
-            // The callback completed the task, so the task reports the callback's failure but not a later filter's failure.
-            return response.Exception is not { } exception
-                || task.IsCanceled && exception is OperationCanceledException
-                || task.IsFaulted && ReferenceEquals(task.Exception!.InnerException, exception);
+            return;
         }
 
-        // A call filter completed the invocation without running the callback.
-        // Cancellation can complete the task first, in which case the task does not report the filter's failure.
         _registration.Dispose();
-        if (response.Exception is { } filterException)
+        if (response.Exception is { } exception)
         {
-            return TrySetException(filterException);
+            TrySetException(exception);
         }
-
-        TrySetResult(response.Result is TResult result ? result : default!);
-        return true;
+        else
+        {
+            TrySetResult(response.Result is TResult result ? result : default!);
+        }
     }
 
 

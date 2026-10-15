@@ -319,17 +319,6 @@ private Task OnHeartbeat(DateTimeOffset timestamp, CancellationToken cancellatio
 
         public ValueTask<int> GetCount() => ValueTask.FromResult(_count);
 
-        // <run_request_queue_limit>
-// Applies backpressure to the producer: the request faults with LimitExceededException
-// when the activation's queue exceeds SiloMessagingOptions.MaxEnqueuedRequestsHardLimit.
-internal Task Ingest(int items, CancellationToken cancellationToken) =>
-    this.RunRequestAsync(
-        static (state, _) => state.Grain._count += state.Items,
-        (Grain: this, Items: items),
-        new LocalRequestOptions { EnforceQueueLimit = true },
-        cancellationToken);
-        // </run_request_queue_limit>
-
         internal void Increment() => _count++;
     }
 
@@ -343,8 +332,18 @@ internal sealed class IncrementRequest : Request, ILocalRequest
     public Task Completion => _completion.Task;
 
     // Receives the outcome once the request and its call filters complete, or when the activation rejects the request.
-    public bool Complete(Response response) =>
-        response.Exception is { } exception ? _completion.TrySetException(exception) : _completion.TrySetResult();
+    // The task keeps the first outcome.
+    public void Complete(Response response)
+    {
+        if (response.Exception is { } exception)
+        {
+            _completion.TrySetException(exception);
+        }
+        else
+        {
+            _completion.TrySetResult();
+        }
+    }
 
     public override object GetTarget() => _grain!;
 

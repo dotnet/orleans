@@ -88,11 +88,8 @@ Pass the grain and other values through the `state` argument and use a `static` 
 Pass <xref:Orleans.Runtime.LocalRequestOptions> to change how the request is scheduled. Set <xref:Orleans.Runtime.LocalRequestOptions.KeepAlive> to `false` for frequent background work that shouldn't keep an otherwise idle activation in memory. Set <xref:Orleans.Runtime.LocalRequestOptions.Interleave> to `true` to run the request between the turns of other requests, as with an `[AlwaysInterleave]` method:
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_options":::
-Set <xref:Orleans.Runtime.LocalRequestOptions.EnforceQueueLimit> to `true` to apply backpressure to a producer. The request then counts against <xref:Orleans.Configuration.SiloMessagingOptions.MaxEnqueuedRequestsHardLimit>, and the returned task faults with <xref:Orleans.Runtime.LimitExceededException> when the activation's queue is full:
-
-:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_queue_limit":::
 ### Deliver a custom request
 
-<xref:Orleans.Runtime.IGrainContext.ReceiveLocalRequest*> delivers an <xref:Orleans.Runtime.ILocalRequest> to the activation with the same scheduling as `RunRequestAsync`. Call filters, logs, and traces observe the request's own interface name, method name, and arguments, so a custom request can describe the work to them. The activation passes the request's response to <xref:Orleans.Runtime.ILocalRequest.Complete*>, or an exception if the activation rejects the request:
+<xref:Orleans.Runtime.IGrainContext.ReceiveLocalRequest*> delivers an <xref:Orleans.Runtime.ILocalRequest> to the activation with the same scheduling as `RunRequestAsync`. Call filters, logs, and traces observe the request's own interface name, method name, and arguments, so a custom request can describe the work to them. The activation passes the request's response to <xref:Orleans.Runtime.ILocalRequest.Complete*>, or an exception if the activation rejects the request. The request reports that outcome, including any failure, to its observers:
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="receive_local_request":::

@@ -480,6 +480,42 @@ internal sealed partial class ActivationData :
         }
     }
 
+    /// <summary>
+    /// Check whether this activation is overloaded.
+    /// Returns LimitExceededException if overloaded, otherwise <c>null</c>c>
+    /// </summary>
+    /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
+    public LimitExceededException? CheckOverloaded()
+    {
+        string limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit);
+        int maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit;
+        int maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit;
+        if (IsStatelessWorker)
+        {
+            limitName = nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker);
+            maxRequestsHardLimit = _shared.MessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker;
+            maxRequestsSoftLimit = _shared.MessagingOptions.MaxEnqueuedRequestsSoftLimit_StatelessWorker;
+        }
+
+        if (maxRequestsHardLimit <= 0 && maxRequestsSoftLimit <= 0) return null; // No limits are set
+
+        int count = GetRequestCount();
+
+        if (maxRequestsHardLimit > 0 && count > maxRequestsHardLimit) // Hard limit
+        {
+            LogRejectActivationTooManyRequests(_shared.Logger, count, this, maxRequestsHardLimit);
+            return new LimitExceededException(limitName, count, maxRequestsHardLimit, ToString());
+        }
+
+        if (maxRequestsSoftLimit > 0 && count > maxRequestsSoftLimit) // Soft limit
+        {
+            LogWarnActivationTooManyRequests(_shared.Logger, count, this, maxRequestsSoftLimit);
+            return null;
+        }
+
+        return null;
+    }
+
     internal int GetRequestCount()
     {
         lock (_lock)
@@ -1680,7 +1716,7 @@ internal sealed partial class ActivationData :
         }
         else // Request or OneWay
         {
-            ReceiveRequest(message, enforceQueueLimit: !message.IsLocalOnly);
+            ReceiveRequest(message);
         }
     }
 
@@ -1688,7 +1724,7 @@ internal sealed partial class ActivationData :
     {
         var message = _shared.InternalRuntime.RuntimeClient.CreateLocalRequest(this, request, options);
         _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveMessage(message);
-        ReceiveRequest(message, options.EnforceQueueLimit);
+        ReceiveRequest(message);
     }
 
     private void ReceiveResponse(Message message)
@@ -1707,48 +1743,19 @@ internal sealed partial class ActivationData :
         _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
     }
 
-    private void ReceiveRequest(Message message, bool enforceQueueLimit)
+    private void ReceiveRequest(Message message)
     {
-        var options = _shared.MessagingOptions;
-        var (hardLimit, softLimit) = IsStatelessWorker
-            ? (options.MaxEnqueuedRequestsHardLimit_StatelessWorker, options.MaxEnqueuedRequestsSoftLimit_StatelessWorker)
-            : (options.MaxEnqueuedRequestsHardLimit, options.MaxEnqueuedRequestsSoftLimit);
-
-        var enforceHardLimit = hardLimit > 0 && enforceQueueLimit;
-        int count;
-        bool admitted;
-        lock (_lock)
+        var overloadException = CheckOverloaded();
+        if (overloadException != null && !message.IsLocalOnly)
         {
-            // Counting and enqueuing under one lock keeps concurrent producers within the hard limit.
-            count = _runningRequests.Count + _waitingRequests.Count;
-            admitted = !enforceHardLimit || count <= hardLimit;
-            if (admitted)
-            {
-                _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
-            }
-        }
-
-        if (!admitted)
-        {
-            LogRejectActivationTooManyRequests(_shared.Logger, count, this, hardLimit);
-            var limitName = IsStatelessWorker ? nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit_StatelessWorker) : nameof(SiloMessagingOptions.MaxEnqueuedRequestsHardLimit);
-            var overloadException = new LimitExceededException(limitName, count, hardLimit, ToString());
-            if (message.IsLocalOnly)
-            {
-                ((ILocalRequest)message.BodyObject!).Complete(Response.FromException(overloadException));
-            }
-            else
-            {
-                _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
-                _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
-            }
-
+            _shared.MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
+            _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
             return;
         }
 
-        if (softLimit > 0 && count > softLimit)
+        lock (_lock)
         {
-            LogWarnActivationTooManyRequests(_shared.Logger, count, this, softLimit);
+            _waitingRequests.Add((message, CoarseStopwatch.StartNew()));
         }
 
         _workSignal.Signal();

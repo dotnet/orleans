@@ -61,17 +61,17 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         _log.Add("call-end");
     }
 
-
-    public Task<int> QueueUnlimitedRequests(int count)
+    public async Task<int> QueueRequests(int count)
     {
-        var admitted = new List<Task>(count);
+        var requests = new List<Task>(count);
         for (var i = 0; i < count; i++)
         {
-            admitted.Add(QueueLoggedRequest($"request-{i}", default));
+            requests.Add(this.RunRequestAsync(static (state, _) => state.Grain._log.Add(state.Entry), (Grain: this, Entry: $"request-{i}"), new LocalRequestOptions { Interleave = true }));
         }
 
-        _pending = Task.WhenAll(admitted);
-        return Task.FromResult(admitted.Count(request => !request.IsFaulted));
+        // The requests interleave with this call, which waits for them so that no other call arrives while they are queued.
+        await Task.WhenAll(requests);
+        return _log.Count;
     }
 
     public Task StartCustomInvokableRequest(string value)
@@ -112,57 +112,6 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         _pending = this.RunRequestAsync(static (value, _) => Task.FromResult<string?>((value * 2).ToString()), value);
         return Task.CompletedTask;
     }
-
-    public Task<List<string>> QueueRequests(int count)
-    {
-        var outcomes = new List<string>(count);
-        var admitted = new List<Task>(count);
-        for (var i = 0; i < count; i++)
-        {
-            var request = QueueLoggedRequest($"request-{i}", EnforceQueueLimit);
-            if (request.IsFaulted)
-            {
-                outcomes.Add(request.Exception!.InnerException!.GetType().Name);
-            }
-            else
-            {
-                outcomes.Add("queued");
-                admitted.Add(request);
-            }
-        }
-
-        _pending = Task.WhenAll(admitted);
-        return Task.FromResult(outcomes);
-    }
-
-    public async Task<int> QueueRequestsConcurrently(int count)
-    {
-        // Dedicated threads, released together, queue the requests while this call blocks the activation.
-        using var barrier = new Barrier(count);
-        var requests = await Task.WhenAll(Enumerable.Range(0, count).Select(i => Task.Factory.StartNew(
-            () =>
-            {
-                barrier.SignalAndWait();
-                return QueueLoggedRequest($"request-{i}", EnforceQueueLimit);
-            },
-            CancellationToken.None,
-            TaskCreationOptions.LongRunning,
-            TaskScheduler.Default)));
-
-        var admitted = requests.Where(request => !request.IsFaulted).ToList();
-        if (requests.FirstOrDefault(request => request.IsFaulted && request.Exception!.InnerException is not LimitExceededException) is { } unexpected)
-        {
-            await unexpected;
-        }
-
-        _pending = Task.WhenAll(admitted);
-        return admitted.Count;
-    }
-
-    private static readonly LocalRequestOptions EnforceQueueLimit = new() { EnforceQueueLimit = true };
-
-    private Task QueueLoggedRequest(string entry, LocalRequestOptions options) =>
-        this.RunRequestAsync(static (state, _) => state.Grain._log.Add(state.Entry), (Grain: this, Entry: entry), options);
 
     public Task StartRequestContextRequest(string value)
     {
@@ -272,12 +221,11 @@ internal sealed class CustomRequest(string value, Action<Response>? onComplete =
         return response.Exception is { } exception ? throw exception : (string?)response.Result;
     }
 
-    public bool Complete(Response response)
+    public void Complete(Response response)
     {
         Interlocked.Increment(ref _completions);
         onComplete?.Invoke(response);
         _outcome.TrySetResult(response);
-        return true;
     }
 
     public override object GetTarget() => _grain!;

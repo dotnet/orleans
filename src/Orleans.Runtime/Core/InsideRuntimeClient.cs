@@ -301,8 +301,6 @@ namespace Orleans.Runtime
 
         public async Task Invoke(IGrainContext target, Message message)
         {
-            // A local request is completed exactly once, even if completing it fails.
-            var localRequestCompleted = false;
             try
             {
                 // Don't process messages that have already timed out
@@ -352,18 +350,15 @@ namespace Orleans.Runtime
                     response = Response.FromException(exc1);
                 }
 
-                // A local request reports its outcome to its own observers.
-                var reportedByRequest = false;
+                // A local request owns its outcome, including reporting its failure.
                 if (message.IsLocalOnly)
                 {
-                    localRequestCompleted = true;
-                    reportedByRequest = ((ILocalRequest)message.BodyObject!).Complete(response);
+                    ((ILocalRequest)message.BodyObject!).Complete(response);
                 }
 
                 if (response.Exception is { } invocationException)
                 {
-                    // Callers observe two-way failures and failures which local requests report.
-                    var logLevel = message.Direction != Message.Directions.OneWay || reportedByRequest ? LogLevel.Debug : LogLevel.Warning;
+                    var logLevel = message.Direction != Message.Directions.OneWay || message.IsLocalOnly ? LogLevel.Debug : LogLevel.Warning;
                     LogGrainInvokeException(this.invokeExceptionLogger, logLevel, invocationException, message);
 
                     // If a grain allowed an inconsistent state exception to escape and the exception originated from
@@ -396,7 +391,7 @@ namespace Orleans.Runtime
             catch (Exception exc2)
             {
                 LogWarningInvokeException(this.logger, exc2, message);
-                if (message.IsLocalOnly && !localRequestCompleted)
+                if (message.IsLocalOnly)
                 {
                     ((ILocalRequest)message.BodyObject!).Complete(Response.FromException(exc2));
                 }

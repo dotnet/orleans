@@ -11,7 +11,7 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task StartCustomInvokableRequest(string value);
 
-    Task<int> QueueUnlimitedRequests(int count);
+    Task<int> QueueRequests(int count);
 
     Task StartBlockingRequest();
 
@@ -22,9 +22,6 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task StartValueRequest(int value);
 
-    Task<List<string>> QueueRequests(int count);
-
-    Task<int> QueueRequestsConcurrently(int count);
 
     Task SetRequestFilterMode(RequestFilterMode mode);
 
