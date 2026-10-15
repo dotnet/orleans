@@ -1459,6 +1459,46 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task StopFailsPendingPollsInsteadOfReportingTheTaskCanceled() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var attempts = 0;
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async executionToken =>
+            {
+                if (Interlocked.Increment(ref attempts) > 1)
+                {
+                    return 7;
+                }
+
+                started.TrySetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, executionToken);
+                return 0;
+            }));
+        var taskId = TaskId.Parse("root");
+        await ((IDurableTaskServer)runtime).ScheduleAsync(taskId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var polling = runtime.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromMinutes(1) }, TestContext.Current.CancellationToken).AsTask();
+        var waiting = runtime.GetScheduledTaskHandle(taskId).WaitAsync(TestContext.Current.CancellationToken).AsTask();
+
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // The stop fails each waiter, like a call which arrives while the runtime stops, and leaves the task pending.
+        var pollFailure = await Assert.ThrowsAsync<OperationCanceledException>(() => polling.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.Equal("The grain activation is stopping.", pollFailure.Message);
+        await Assert.ThrowsAsync<OperationCanceledException>(() => waiting.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        Assert.Null(storage.Get(taskId).Result);
+
+        var (replacement, _, _, _) = CreateRuntime(storage, manager);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
+        var response = await replacement.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) }, TestContext.Current.CancellationToken);
+        Assert.Equal(7, response.GetResult<int>());
+        await replacement.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    });
+
+    [Fact]
     public Task RecoveredPendingRequestStartsOnlyOnActivation() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
@@ -1975,11 +2015,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         cancellation.Cancel();
         await runtime.StopAsync(cancellation.Token).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        // Local waiters observe shutdown; the staged response still commits with the inbox batch for the next activation.
-        Assert.Equal(DurableTaskStatus.Canceled, (await handle.WaitAsync(TestContext.Current.CancellationToken)).Status);
+        // Local waiters fail with the shutdown; the staged response still commits with the inbox batch for the next activation.
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await handle.WaitAsync(TestContext.Current.CancellationToken));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         Assert.Equal(42, storage.Get(taskId).Result!.GetResult<int>());
-        Assert.Equal(DurableTaskStatus.Canceled, (await handle.WaitAsync(TestContext.Current.CancellationToken)).Status);
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await handle.WaitAsync(TestContext.Current.CancellationToken));
     });
 
     [Fact]
