@@ -44,25 +44,4 @@ public class MessagingInstrumentsTests
         Assert.Equal(5, Assert.Single(sentHeaderCollector.GetMeasurementSnapshot()).Value);
         Assert.Equal(7, Assert.Single(receivedHeaderCollector.GetMeasurementSnapshot()).Value);
     }
-
-    [TestSuite("BVT")]
-    [TestProvider("None")]
-    [Fact, TestCategory("BVT")]
-    public void MessagingInstruments_TotalsMessageBytesWithoutMetricListeners()
-    {
-        var services = new ServiceCollection();
-        services.AddMetrics();
-
-        using var serviceProvider = services.BuildServiceProvider();
-        var instruments = new MessagingInstruments(new OrleansInstruments(serviceProvider.GetRequiredService<IMeterFactory>()));
-        var message = new Message { Direction = Message.Directions.Request };
-
-        instruments.OnMessageSend(message, numTotalBytes: 12, headerBytes: 5, ConnectionDirection.SiloToSilo);
-        instruments.OnMessageSend(message, numTotalBytes: 8, headerBytes: 5, ConnectionDirection.GatewayToClient);
-        instruments.OnMessageReceive(message, numTotalBytes: 17, headerBytes: 7, ConnectionDirection.SiloToSilo);
-
-        Assert.False(instruments.MessageSentSizeHistogram.Enabled);
-        Assert.Equal(20, instruments.MessageBytesSent);
-        Assert.Equal(17, instruments.MessageBytesReceived);
-    }
 }

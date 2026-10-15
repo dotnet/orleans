@@ -278,6 +278,7 @@ function renderPage(jsx: JSX.Element, path: string) {
 
   let siloData: any[] = [];
   let siloStats: any[] = [];
+  let siloCounters: Counter[] = [];
   const loadData = function () {
     http.get(`HistoricalStats/${host}`, (err, data) => {
       siloData = data;
@@ -285,6 +286,10 @@ function renderPage(jsx: JSX.Element, path: string) {
     });
     http.get(`SiloStats/${host}`, (err, data) => {
       siloStats = data;
+      render();
+    });
+    http.get(`SiloCounters/${host}`, (_err, data) => {
+      siloCounters = data;
       render();
     });
   };
@@ -320,6 +325,7 @@ function renderPage(jsx: JSX.Element, path: string) {
           siloMetadata={siloMetadata}
           dashboardCounters={dashboardCounters}
           siloStats={siloStats}
+          counters={siloCounters}
         />
       </Page>,
       '#/silos'
@@ -347,11 +353,15 @@ function renderPage(jsx: JSX.Element, path: string) {
   renderLoading();
 
   let counters: Counter[] = [];
+  let loadDataIsPending = false;
   const loadData = function () {
+    if (loadDataIsPending) return;
+    loadDataIsPending = true;
     http.get(`SiloCounters/${host}`, (err, data) => {
+      if (routeIndex != thisRouteIndex) return;
       counters = data;
       render();
-    });
+    }).finally(() => loadDataIsPending = false);
   };
 
   render = function () {
