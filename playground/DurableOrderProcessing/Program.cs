@@ -79,7 +79,8 @@ api.MapGet("/orders/{orderId:guid}/workflow", async (Guid orderId, IGrainFactory
     }
     catch (DurableTaskNotFoundException)
     {
-        // The order retains the detached workflow's result for DurableTaskOptions.ResultRetentionPeriod.
+        // The order holds the workflow once the basket's invocation is delivered, and retains its result for
+        // DurableTaskOptions.ResultRetentionPeriod.
         return Results.NotFound();
     }
 });
