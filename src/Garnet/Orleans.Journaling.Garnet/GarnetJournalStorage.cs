@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Orleans.Storage;
 using StackExchange.Redis;
 
@@ -31,6 +32,9 @@ internal sealed class GarnetJournalStorage : IJournalStorage
 
     // Whether the journal existed when this instance last observed it, or null if it has not observed it.
     private bool? _exists;
+
+    // The absence ETag of the journal when this instance last observed it absent: its tombstone's ETag, or empty.
+    private string _absenceETag = string.Empty;
     private long _appendLength;
 
     public GarnetJournalStorage(
@@ -82,36 +86,54 @@ internal sealed class GarnetJournalStorage : IJournalStorage
     {
         cancellationToken.ThrowIfCancellationRequested();
         var properties = JournalMetadata.CopyProperties(metadata);
-        var args = new object[8 + properties.Count * 2];
-        WriteKeys(args);
-        args[5] = CreateETag();
-        args[6] = _journalFormatKey;
-        args[7] = properties.Count.ToString(CultureInfo.InvariantCulture);
-        var index = 8;
-        foreach (var (key, value) in properties)
+        while (true)
         {
-            args[index++] = key;
-            args[index++] = value;
-        }
+            if (_exists is null)
+            {
+                // The create is conditioned on the absence this instance observed.
+                await GetMetadataAsync(cancellationToken).ConfigureAwait(false);
+            }
 
-        var result = await ExecuteAsync(GarnetJournalProtocol.Create, args, cancellationToken).ConfigureAwait(false);
-        var status = GarnetJournalPartitionClient.GetStatus(result);
-        if (status is not GarnetJournalProtocol.SuccessStatus and not GarnetJournalProtocol.MissingStatus)
-        {
-            ThrowForStatus(status, nameof(CreateIfNotExistsAsync), expectedETag: null);
-        }
+            var args = new object[9 + properties.Count * 2];
+            WriteKeys(args);
+            args[5] = CreateETag();
+            args[6] = _journalFormatKey;
+            args[7] = _absenceETag;
+            args[8] = properties.Count.ToString(CultureInfo.InvariantCulture);
+            var index = 9;
+            foreach (var (key, value) in properties)
+            {
+                args[index++] = key;
+                args[index++] = value;
+            }
 
-        if (result.Length == 1)
-        {
-            // A retried create committed, and the journal has since been deleted.
-            ClearState();
-        }
-        else
-        {
-            SetState(CreateStorageState(result, startIndex: 1));
-        }
+            var ambiguous = new StrongBox<bool>();
+            var result = await ExecuteAsync(GarnetJournalProtocol.Create, args, cancellationToken, ambiguous).ConfigureAwait(false);
+            var status = GarnetJournalPartitionClient.GetStatus(result);
+            if (status == GarnetJournalProtocol.ConflictStatus && !ambiguous.Value)
+            {
+                // The journal was deleted after this instance observed its absence: observe it again and retry.
+                _exists = null;
+                continue;
+            }
 
-        return status == GarnetJournalProtocol.SuccessStatus;
+            if (status is not GarnetJournalProtocol.SuccessStatus and not GarnetJournalProtocol.MissingStatus)
+            {
+                ThrowForStatus(status, nameof(CreateIfNotExistsAsync), expectedETag: null, ambiguous.Value);
+            }
+
+            if (result.Length == 1)
+            {
+                // A retried create committed, and the journal has since been deleted; observe it again before the next write.
+                _exists = null;
+            }
+            else
+            {
+                SetState(CreateStorageState(result, startIndex: 1));
+            }
+
+            return status == GarnetJournalProtocol.SuccessStatus;
+        }
     }
 
     public async ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
@@ -123,7 +145,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         var status = GarnetJournalPartitionClient.GetStatus(result);
         if (status == GarnetJournalProtocol.MissingStatus)
         {
-            ClearState();
+            ClearState(GetAbsenceETag(result));
             return null;
         }
 
@@ -133,6 +155,12 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         return state.Metadata;
     }
 
+    /// <remarks>
+    /// Every update is conditioned on a metadata ETag, so a retry whose ETag has left the journal's history cannot apply
+    /// again. An unconditional update is conditioned on the ETag this instance reads, and reads again while other
+    /// writers' updates intervene. An update whose outcome is unknown and whose condition no longer holds throws
+    /// <see cref="GarnetJournalAmbiguousConflictException"/>.
+    /// </remarks>
     public async ValueTask<IJournalMetadata?> UpdateMetadataAsync(
         IReadOnlyDictionary<string, string>? set = null,
         IEnumerable<string>? remove = null,
@@ -142,38 +170,70 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         cancellationToken.ThrowIfCancellationRequested();
         var setValues = JournalMetadata.CopyProperties(set);
         var removeValues = CopyRemove(remove, setValues);
-        var args = new object[10 + removeValues.Count + setValues.Count * 2];
-        WriteKeys(args);
-        args[5] = expectedETag is null ? "0" : "1";
-        args[6] = expectedETag ?? string.Empty;
-        args[7] = CreateETag();
-        args[8] = removeValues.Count.ToString(CultureInfo.InvariantCulture);
-        var index = 9;
-        foreach (var key in removeValues)
+        var condition = expectedETag;
+        while (true)
         {
-            args[index++] = key;
-        }
+            if (condition is null)
+            {
+                if (await GetMetadataAsync(cancellationToken).ConfigureAwait(false) is not { } current)
+                {
+                    return null;
+                }
 
-        args[index++] = setValues.Count.ToString(CultureInfo.InvariantCulture);
-        foreach (var (key, value) in setValues)
-        {
-            args[index++] = key;
-            args[index++] = value;
-        }
+                condition = current.ETag ?? throw new InvalidOperationException($"Garnet journal '{_journalId}' has no metadata ETag.");
+            }
 
-        var result = await ExecuteAsync(GarnetJournalProtocol.UpdateMetadata, args, cancellationToken).ConfigureAwait(false);
-        var status = GarnetJournalPartitionClient.GetStatus(result);
-        if (status == GarnetJournalProtocol.MissingStatus)
-        {
-            return null;
-        }
+            var args = new object[10 + removeValues.Count + setValues.Count * 2];
+            WriteKeys(args);
+            args[5] = "1";
+            args[6] = condition;
+            args[7] = CreateETag();
+            args[8] = removeValues.Count.ToString(CultureInfo.InvariantCulture);
+            var index = 9;
+            foreach (var key in removeValues)
+            {
+                args[index++] = key;
+            }
 
-        ThrowForStatus(status, nameof(UpdateMetadataAsync), expectedETag);
-        var state = CreateStorageState(result, startIndex: 1);
-        SetState(state);
-        return state.Metadata;
+            args[index++] = setValues.Count.ToString(CultureInfo.InvariantCulture);
+            foreach (var (key, value) in setValues)
+            {
+                args[index++] = key;
+                args[index++] = value;
+            }
+
+            var ambiguous = new StrongBox<bool>();
+            var result = await ExecuteAsync(GarnetJournalProtocol.UpdateMetadata, args, cancellationToken, ambiguous).ConfigureAwait(false);
+            var status = GarnetJournalPartitionClient.GetStatus(result);
+            if (ambiguous.Value && status is GarnetJournalProtocol.MissingStatus or GarnetJournalProtocol.ConflictStatus)
+            {
+                // An earlier attempt may have committed before its ETag left the journal's history.
+                ThrowForStatus(GarnetJournalProtocol.ConflictStatus, nameof(UpdateMetadataAsync), condition, ambiguous: true);
+            }
+
+            if (status == GarnetJournalProtocol.MissingStatus)
+            {
+                return null;
+            }
+
+            if (status == GarnetJournalProtocol.ConflictStatus)
+            {
+                if (expectedETag is not null)
+                {
+                    return null;
+                }
+
+                // Another writer updated the metadata: read it again and retry this unconditional update.
+                condition = null;
+                continue;
+            }
+
+            ThrowForStatus(status, nameof(UpdateMetadataAsync), condition);
+            var state = CreateStorageState(result, startIndex: 1);
+            SetState(state);
+            return state.Metadata;
+        }
     }
-
     public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
@@ -184,7 +244,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         var status = GarnetJournalPartitionClient.GetStatus(result);
         if (status == GarnetJournalProtocol.MissingStatus)
         {
-            ClearState();
+            ClearState(GetAbsenceETag(result));
             consumer.Complete(metadata: null);
             return;
         }
@@ -218,19 +278,28 @@ internal sealed class GarnetJournalStorage : IJournalStorage
 
         var expectedExists = _exists == true;
         var expectedContentETag = expectedExists ? _contentETag! : string.Empty;
+        var newETag = CreateETag();
         var args = new object[8];
         WriteKeys(args);
         args[5] = expectedContentETag;
         args[6] = expectedExists ? "1" : "0";
-        args[7] = CreateETag();
-        var result = await ExecuteAsync(GarnetJournalProtocol.Delete, args, cancellationToken).ConfigureAwait(false);
+        args[7] = newETag;
+        var ambiguous = new StrongBox<bool>();
+        var result = await ExecuteAsync(GarnetJournalProtocol.Delete, args, cancellationToken, ambiguous).ConfigureAwait(false);
         var status = GarnetJournalPartitionClient.GetStatus(result);
-        if (status != GarnetJournalProtocol.AppearedStatus)
+        if (status == GarnetJournalProtocol.AppearedStatus)
         {
-            ThrowForStatus(status, nameof(DeleteAsync), expectedContentETag);
+            // The journal exists, though this instance last observed it absent: observe it again before the next write.
+            _exists = null;
+            return;
         }
 
-        ClearState();
+        ThrowForStatus(status, nameof(DeleteAsync), expectedContentETag, ambiguous.Value);
+        if (expectedExists)
+        {
+            // The deletion's tombstone carries its ETag, which identifies this absence.
+            ClearState(newETag);
+        }
     }
 
     /// <remarks>
@@ -255,13 +324,14 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         var args = new object[10];
         WriteKeys(args);
         args[5] = expectedContentETag is null ? "0" : "1";
-        args[6] = expectedContentETag ?? string.Empty;
+        args[6] = expectedContentETag ?? _absenceETag;
         args[7] = newETag;
         args[8] = payload;
         args[9] = _journalFormatKey;
-        var result = await ExecuteAsync(procedure, args, cancellationToken).ConfigureAwait(false);
+        var ambiguous = new StrongBox<bool>();
+        var result = await ExecuteAsync(procedure, args, cancellationToken, ambiguous).ConfigureAwait(false);
         var status = GarnetJournalPartitionClient.GetStatus(result);
-        ThrowForStatus(status, operation, expectedContentETag);
+        ThrowForStatus(status, operation, expectedContentETag, ambiguous.Value);
         if (result.Length < 2 || !long.TryParse(result[1].ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var appendLength))
         {
             throw new InvalidOperationException($"Garnet journal '{_journalId}' returned a malformed {operation} response.");
@@ -272,8 +342,8 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         _appendLength = appendLength;
     }
 
-    private ValueTask<RedisResult[]> ExecuteAsync(string procedure, object[] args, CancellationToken cancellationToken)
-        => _client.ExecuteAsync(procedure, args, cancellationToken);
+    private ValueTask<RedisResult[]> ExecuteAsync(string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous = null)
+        => _client.ExecuteAsync(procedure, args, cancellationToken, ambiguous);
 
     private void WriteKeys(object[] args)
     {
@@ -284,12 +354,15 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         args[4] = _member;
     }
 
-    private void ThrowForStatus(int status, string operation, string? expectedETag)
+    private void ThrowForStatus(int status, string operation, string? expectedETag, bool ambiguous = false)
     {
         switch (status)
         {
             case GarnetJournalProtocol.SuccessStatus:
                 return;
+            case GarnetJournalProtocol.ConflictStatus when ambiguous:
+                throw new GarnetJournalAmbiguousConflictException(
+                    $"Version conflict ({operation}) after an attempt whose outcome is unknown, which may have committed: JournalId={_journalId} ETag={expectedETag}.");
             case GarnetJournalProtocol.ConflictStatus:
                 throw new InconsistentStateException(
                     $"Version conflict ({operation}): JournalId={_journalId} ETag={expectedETag}.");
@@ -380,8 +453,11 @@ internal sealed class GarnetJournalStorage : IJournalStorage
         _appendLength = state.AppendLength;
     }
 
-    private void ClearState()
+    private static string GetAbsenceETag(RedisResult[] result) => result.Length > 1 ? result[1].ToString() : string.Empty;
+
+    private void ClearState(string absenceETag)
     {
+        _absenceETag = absenceETag;
         _exists = false;
         _contentETag = null;
         _appendLength = 0;
