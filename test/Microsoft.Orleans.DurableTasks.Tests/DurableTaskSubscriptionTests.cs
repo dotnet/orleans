@@ -374,6 +374,30 @@ public sealed class DurableTaskSubscriptionTests
     });
 
     [Fact]
+    public Task ShieldedSubscriptionReceivesTheResultAfterTheSubscribersCancellation() => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var subscriberHost = new SubscriptionHost(SubscriberGrain);
+        subscriberHost.Workflows["relay"] = static () => AwaitTaskShielded(new GrainAddress(OperationGrain), "op");
+        await using var subscriber = await subscriberHost.ActivateAsync(TestCancellation);
+        await subscriber.ScheduleAsync(RelayId, "relay", TestCancellation);
+        await subscriber.Transport.WaitForSubscriptionAsync(1);
+        await subscriber.WriteAsync(TestCancellation);
+
+        // The cancellation doesn't end the shielded subscription, so the operation's result completes the relay.
+        await subscriber.Tasks.CancelAsync(RelayId, "buyer", TestCancellation);
+        Assert.Single(subscriber.Transport.Subscriptions);
+        Assert.Null(subscriber.Get(SubscriptionChildId).Result);
+        await subscriber.DeliverAsync(
+            MessagingTestHelpers.MessageTypes.Completion.Create(
+                DurableTaskMessageTransport.CreateMessageId(OperationGrain, SubscriberGrain, OperationId, DurableTaskMessageTypes.CompletionSubject, SubscriptionChildId.ToString()),
+                SubscriberGrain,
+                new DurableTaskCompletionMessage { TaskId = OperationId, Response = DurableTaskResponse.FromResult("done"), Sender = OperationGrain, SubscriberId = SubscriptionChildId }).ToInboxMessage(),
+            TestCancellation);
+
+        Assert.Equal("done|True", (await subscriber.GetResponseAsync(RelayId, TestCancellation)).GetResult<string>());
+    });
+
+    [Fact]
     public void ReferenceAddressesTheTaskWithoutSchedulingIt()
     {
         var target = new GrainAddress(OperationGrain);
@@ -450,6 +474,9 @@ public sealed class DurableTaskSubscriptionTests
         Assert.True(handle.TryGetAddress(out var address));
         return $"{handle.Id} {handle.TargetTaskId} {address.Target} {address.Id} {await handle}";
     }
+
+    private static async DurableTask<string> AwaitTaskShielded(IAddressable target, string rootId) =>
+        $"{await target.GetDurableTask<string>(rootId).Shielded()}|{DurableTask.Current.IsCancellationRequested}";
 
     private static async DurableTask<string> AwaitTask(IAddressable target, string rootId) =>
         await target.GetDurableTask<string>(rootId);
