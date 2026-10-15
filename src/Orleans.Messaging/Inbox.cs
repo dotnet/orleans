@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Journaling;
 using Orleans.Messaging.Configuration;
+using Orleans.Messaging.Diagnostics;
 using Orleans.Runtime;
 
 namespace Orleans.Messaging;
@@ -97,6 +98,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                     ? DeliveryResult.DeadLettered(rejection.Reason, rejection.Code)
                     : DeliveryResult.Duplicate();
             }
+
+            MessagingEvents.EmitInboxMessageReceiving(GrainContext, message);
 
             // Sink-owned messages never occupy inbox capacity and need no handler. A sink's duplicate can still be staged,
             // so every outcome except backpressure is reported once the write is durable.

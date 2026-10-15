@@ -9,6 +9,7 @@ using Microsoft.Extensions.Time.Testing;
 using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
+using Orleans.Messaging.Diagnostics;
 using Orleans.Messaging.Tests.Support;
 using Orleans.Runtime;
 using Orleans.TestingHost;
@@ -212,6 +213,28 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Empty(inboxDeadLetters);
         Assert.Equal(0, inboxCount);
         Assert.Equal(letter.AttemptCount, Probe.For(receiver).SinkOffers);
+    }
+
+    [Fact]
+    public async Task DiagnosticEvents_InjectADeliveryFaultAndReportTheRetryAndTheRetirement()
+    {
+        var sender = NewGrain();
+        var receiver = NewGrain();
+        var messageId = NewMessageId("diagnostic-events");
+        using var events = new DeliveryEventObserver(sender.GetGrainId(), receiver.GetGrainId(), messageId, faults: 1);
+
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, NewPayload(), write: true);
+
+        // The observer's exception failed the first attempt before the inbox offered the message to its sink, so the
+        // outbox retried the delivery, and the retry delivered it.
+        var retired = await events.Retired.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        Assert.Equal(sender.GetGrainId(), retired.GrainContext.GrainId);
+        Assert.Equal(OutboxMessageRetirementStatus.Delivered, retired.Retirement.Status);
+        var retry = Assert.Single(events.Retries);
+        Assert.Equal((sender.GetGrainId(), receiver.GetGrainId(), 1), (retry.GrainContext.GrainId, retry.ReceiverId, retry.AttemptCount));
+        Assert.Contains(DeliveryEventObserver.Fault, retry.Error, StringComparison.Ordinal);
+        Assert.Equal(2, events.Receivings);
+        Assert.Equal((1, 1), (Probe.For(receiver).SinkOffers, Probe.For(receiver).SinkAcceptances));
     }
 
     [Fact]
@@ -775,6 +798,62 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
             await Task.Delay(10, Token);
         }
     }
+}
+
+/// <summary>
+/// Observes one message's messaging events, and fails its first deliveries by throwing from
+/// <see cref="MessagingEvents.InboxMessageReceiving"/>.
+/// </summary>
+internal sealed class DeliveryEventObserver : IObserver<MessagingEvents.MessagingEvent>, IDisposable
+{
+    public const string Fault = "The test injected a delivery fault.";
+
+    private readonly GrainId _sender;
+    private readonly GrainId _receiver;
+    private readonly MessageId _messageId;
+    private readonly IDisposable _subscription;
+    private readonly ConcurrentQueue<MessagingEvents.OutboxRetryScheduled> _retries = new();
+    private readonly TaskCompletionSource<MessagingEvents.OutboxMessageRetired> _retired = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _faults;
+    private int _receivings;
+
+    public DeliveryEventObserver(GrainId sender, GrainId receiver, MessageId messageId, int faults)
+    {
+        (_sender, _receiver, _messageId, _faults) = (sender, receiver, messageId, faults);
+        _subscription = MessagingEvents.AllEvents.Subscribe(this);
+    }
+
+    public Task<MessagingEvents.OutboxMessageRetired> Retired => _retired.Task;
+    public IReadOnlyCollection<MessagingEvents.OutboxRetryScheduled> Retries => _retries;
+    public int Receivings => Volatile.Read(ref _receivings);
+
+    public void OnNext(MessagingEvents.MessagingEvent value)
+    {
+        switch (value)
+        {
+            case MessagingEvents.InboxMessageReceiving receiving
+                when receiving.GrainContext.GrainId == _receiver && receiving.Message.Envelope.MessageId == _messageId:
+                Interlocked.Increment(ref _receivings);
+                if (Interlocked.Decrement(ref _faults) >= 0)
+                {
+                    throw new InvalidOperationException(Fault);
+                }
+
+                break;
+            case MessagingEvents.OutboxRetryScheduled retry when retry.GrainContext.GrainId == _sender && retry.MessageId == _messageId:
+                _retries.Enqueue(retry);
+                break;
+            case MessagingEvents.OutboxMessageRetired retired when retired.GrainContext.GrainId == _sender && retired.MessageId == _messageId:
+                _retired.TrySetResult(retired);
+                break;
+        }
+    }
+
+    public void OnCompleted() { }
+
+    public void OnError(Exception error) { }
+
+    public void Dispose() => _subscription.Dispose();
 }
 
 [TestSuite("BVT")]

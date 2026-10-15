@@ -404,6 +404,44 @@ namespace Orleans.Messaging.Configuration
     }
 }
 
+namespace Orleans.Messaging.Diagnostics
+{
+    public static partial class MessagingEvents
+    {
+        public const string ListenerName = "Orleans.Messaging";
+        public static System.IObservable<MessagingEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class InboxMessageReceiving : MessagingEvent
+        {
+            public readonly InboxMessage Message;
+            public InboxMessageReceiving(Runtime.IGrainContext grainContext, InboxMessage message) : base(default!) { }
+        }
+
+        public abstract partial class MessagingEvent
+        {
+            public readonly Runtime.IGrainContext GrainContext;
+            protected MessagingEvent(Runtime.IGrainContext grainContext) { }
+        }
+
+        public sealed partial class OutboxMessageRetired : MessagingEvent
+        {
+            public readonly MessageId MessageId;
+            public readonly OutboxMessageRetirement Retirement;
+            public OutboxMessageRetired(Runtime.IGrainContext grainContext, MessageId messageId, OutboxMessageRetirement retirement) : base(default!) { }
+        }
+
+        public sealed partial class OutboxRetryScheduled : MessagingEvent
+        {
+            public readonly int AttemptCount;
+            public readonly string Error;
+            public readonly MessageId MessageId;
+            public readonly System.DateTimeOffset NextAttemptAt;
+            public readonly Runtime.GrainId ReceiverId;
+            public OutboxRetryScheduled(Runtime.IGrainContext grainContext, MessageId messageId, Runtime.GrainId receiverId, int attemptCount, System.DateTimeOffset nextAttemptAt, string error) : base(default!) { }
+        }
+    }
+}
+
 namespace OrleansCodeGen.Orleans.Messaging
 {
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

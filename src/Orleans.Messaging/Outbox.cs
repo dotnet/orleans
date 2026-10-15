@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Messaging.Configuration;
+using Orleans.Messaging.Diagnostics;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using Polly;
@@ -185,9 +186,10 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     }
 
     /// <summary>Notifies the source of a retired reference entry, so its release commits with the entry's removal.</summary>
-    private static void Retire(OutboxEntry entry, OutboxMessageRetirement retirement)
+    private void Retire(OutboxEntry entry, OutboxMessageRetirement retirement)
     {
         if (entry.Reference is not null) entry.Source!.OnRetired(entry.MessageId, retirement);
+        MessagingEvents.EmitOutboxMessageRetired(_pump.GrainContext, entry.MessageId, retirement);
     }
 
     /// <summary>
@@ -447,6 +449,16 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                     var (retry, deadLetter) = PrepareRetry(outcome, ref deadLetters);
                     Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id, State = retry, DeadLetter = deadLetter });
                     if (deadLetter is not null) Retire(current, OutboxMessageRetirement.DeadLettered(deadLetter.Reason));
+                    else
+                    {
+                        MessagingEvents.EmitOutboxRetryScheduled(
+                            _pump.GrainContext,
+                            id,
+                            outcome.Message.ReceiverId,
+                            retry!.AttemptCount,
+                            retry.NextAttemptAt!.Value,
+                            retry.LastError!);
+                    }
                 }
                 RecordDeliveryMetrics(outcome);
                 applied++;

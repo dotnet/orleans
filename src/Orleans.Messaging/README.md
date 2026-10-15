@@ -222,3 +222,10 @@ to outbox delivery or depth. Reference sends count as sent; a reference entry wh
 source fails to provide its message counts as delivered `source_error`. A message an
 inbox sink accepts counts as received `accepted` and processed `success`; one which
 the sink dead-letters counts as received and processed `dead_lettered`.
+
+`MessagingEvents`, the `Orleans.Messaging` diagnostic listener, reports each transition
+synchronously on the activation which makes it: `InboxMessageReceiving` before the inbox
+stages a delivered message, `OutboxRetryScheduled` when a failed delivery is rescheduled,
+and `OutboxMessageRetired` when a message retires. Each event carries the activation's
+`IGrainContext`. Tests use the events as barriers, and inject a delivery fault by throwing
+from an `InboxMessageReceiving` observer, which fails the attempt like a sink exception.
