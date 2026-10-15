@@ -115,6 +115,29 @@ Diagnostics describe a subscription child's `Request` as
 `a subscription to task '{taskId}' on grain '{grain}'`, and `Waiters` lists a
 subscriber other than the invoker as its grain followed by its task ID.
 
+## Observe runtime transitions
+
+The `Orleans.DurableTasks` diagnostic listener, `DurableTaskEvents`, reports each
+transition synchronously on the activation whose runtime makes it, when the runtime
+stages it, with the activation's `IGrainContext` and the task's ID. The change commits
+with the grain's next journal write.
+
+| Event | Raised |
+| --- | --- |
+| `TaskCreated` | The runtime staged a task's state: an invoked task, or an operation of an execution. |
+| `TaskCompleted` | The runtime staged a task's terminal result, which the event carries. |
+| `TaskDeleted` | The runtime staged a task's deletion, with its execution tree or when its retention ended. |
+| `ExecutionStarted` | An attempt of a task's body started on the activation. |
+| `ExecutionStopped` | The attempt ended: its body completed, or an abort or deletion ended the task. |
+| `ReplayEnded` | A replaying attempt started an operation which no earlier attempt recorded, so `IsReplaying` reports `false`. |
+| `SignalWaitStarted`, `SignalWaitEnded` | An execution started or ended a wait for a signal, under the signal's record. |
+| `SelectionWaitStarted` | A selection, such as `DurableTask.WhenAny`'s, found no completed candidate and waits, under its decision. |
+
+Tests subscribe to `DurableTaskEvents.AllEvents`, or use `DiagnosticEventCollector`, to
+wait for a transition instead of polling. Messaging reports deliveries, retries, and
+retirements through `MessagingEvents`, whose `InboxMessageReceiving` observers inject
+delivery faults; see [Observe progress and size the system](messaging-operations.md#observe-progress-and-size-the-system).
+
 ## Diagnose replay divergence
 
 A replay must schedule the same operation, with the same arguments, under each recorded
