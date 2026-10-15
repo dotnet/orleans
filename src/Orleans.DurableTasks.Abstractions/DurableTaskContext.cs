@@ -12,7 +12,7 @@ public abstract class DurableTaskContext
 {
     private const char GeneratedSegmentPrefix = '$';
     private static readonly AsyncLocal<DurableTaskContext?> AmbientContext = new();
-    private static readonly AsyncLocal<DurableTaskContext?> CancellationSuppressedContext = new();
+    private static readonly AsyncLocal<DurableTaskContext?> ShieldedContext = new();
     private readonly object _lock = new();
     private readonly CancellationTokenSource _cancellationSource = new();
     private readonly CancellationTokenSource? _executionCancellationSource;
@@ -133,45 +133,33 @@ public abstract class DurableTaskContext
     }
 
     /// <summary>
-    /// Starts a scope in which this execution schedules children which its durable cancellation doesn't reach, such as
-    /// compensation which a canceled workflow runs inline.
+    /// Gets whether the calling code runs within a <see cref="DurableTaskExtensions.Shielded(DurableTask)"/> start of this
+    /// execution, so that a child which it schedules isn't reached by this execution's durable cancellation.
     /// </summary>
-    /// <returns>The scope, which ends when it is disposed.</returns>
     /// <remarks>
     /// <para>
-    /// Children scheduled in the scope, including local steps, delays, calls to other grains, and combinator inputs, run
-    /// to completion: a cancellation which the execution observed before scheduling them doesn't cancel them, and a later
-    /// one doesn't reach them. The host records this with each child, so it holds across replay. The execution's own
-    /// <see cref="CancellationToken"/>, <see cref="IsCancellationRequested"/>, and <see cref="CancellationReason"/>
-    /// still report its cancellation, and operations which run as part of the execution itself, such as a signal wait,
-    /// still observe it. An administrative abort still reaches the children, and so does deleting the execution's tree.
+    /// A shielded definition starts within the shield, and so do the inputs which a shielded combinator starts as part of
+    /// this execution. The shield follows the asynchronous flow of that start, and applies only to this execution: a
+    /// child's own children are reached by the child's cancellation as usual.
     /// </para>
     /// <para>
-    /// The scope follows the asynchronous flow which entered it, across awaits, and applies only to the execution which
-    /// entered it: a child's own children are reached by the child's cancellation as usual. Scopes nest, and disposing a
-    /// scope restores the state which preceded it. Work which must outlive the execution itself runs as a detached task.
+    /// Hosts read this when they schedule a child, before any asynchronous work, and record it with the child:
+    /// a host creates and runs such a child even after this execution's cancellation was requested, and doesn't propagate
+    /// this execution's cancellation to it. An administrative abort and deleting the execution's tree still reach it.
     /// </para>
     /// </remarks>
-    public CancellationSuppressionScope SuppressCancellation()
+    protected internal bool SchedulesShieldedChildren => ReferenceEquals(ShieldedContext.Value, this);
+
+    /// <summary>Starts shielding the children which the calling flow schedules, and returns the previous shield.</summary>
+    internal DurableTaskContext? EnterShield()
     {
-        var previous = CancellationSuppressedContext.Value;
-        CancellationSuppressedContext.Value = this;
-        return new(previous);
+        var previous = ShieldedContext.Value;
+        ShieldedContext.Value = this;
+        return previous;
     }
 
-    /// <summary>
-    /// Gets whether the calling code runs in a <see cref="SuppressCancellation"/> scope of this execution, so that a child
-    /// which it schedules isn't reached by this execution's durable cancellation.
-    /// </summary>
-    /// <remarks>
-    /// Hosts read this when they schedule a child, before any asynchronous work, and record it with the child: a host
-    /// creates and runs such a child even after this execution's cancellation was requested, and doesn't propagate this
-    /// execution's cancellation to it.
-    /// </remarks>
-    protected internal bool IsCancellationSuppressed => ReferenceEquals(CancellationSuppressedContext.Value, this);
-
-    internal static void RestoreCancellationSuppression(DurableTaskContext? previous) =>
-        CancellationSuppressedContext.Value = previous;
+    /// <summary>Restores the shield which <see cref="EnterShield"/> returned.</summary>
+    internal static void RestoreShield(DurableTaskContext? previous) => ShieldedContext.Value = previous;
 
     /// <summary>
     /// Gets the token which is canceled when durable cancellation is requested or the host aborts this execution attempt.
@@ -202,11 +190,64 @@ public abstract class DurableTaskContext
     /// <summary>Gets the host-owned token for aborting this execution attempt.</summary>
     internal CancellationToken ExecutionAbortToken => _executionAbortToken;
 
-    /// <summary>Schedules or reattaches to a child definition under an exact identifier.</summary>
-    protected internal abstract ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
+    /// <summary>
+    /// Starts, or reattaches to, <paramref name="taskDefinition"/> under <paramref name="taskId"/>, and records the start
+    /// in this execution.
+    /// </summary>
+    /// <param name="taskId">
+    /// A child of <see cref="Id"/> for an attached task, or the root identifier of a
+    /// <see cref="DurableTaskStartOptions.Detached"/> task.
+    /// </param>
+    /// <param name="taskDefinition">The definition to start.</param>
+    /// <param name="options">How the task relates to this execution, and when the start completes.</param>
+    /// <param name="cancellationToken">A token which abandons the start. It doesn't cancel the task.</param>
+    /// <returns>A handle through which this execution observes the task.</returns>
+    /// <remarks>
+    /// <para>
+    /// A host records the start in this execution's tree, together with the task's start, so a replay which reaches the
+    /// record observes the same task instead of starting another. An attached task is the child
+    /// <paramref name="taskId"/>, which this execution owns: its cancellation reaches the child unless the start is
+    /// shielded, as <see cref="SchedulesShieldedChildren"/> reports. A detached task is an independent root, which no
+    /// cancellation, abort, or deletion of this execution reaches. The host names this execution in the detached task's
+    /// start as a subscriber, so the returned handle receives the task's result; canceling the handle, or this
+    /// execution, ends only that subscription.
+    /// </para>
+    /// <para>
+    /// The returned operation completes once the start is durable. With
+    /// <see cref="DurableTaskStartOptions.WaitForAcceptance"/>, it completes once the task's host has also accepted and
+    /// durably stored the task, or the task's result is known, so the task's identifier can be handed to other parties
+    /// which address it.
+    /// </para>
+    /// </remarks>
+    protected internal abstract ValueTask<IScheduledTaskHandle> StartTaskAsync(
         TaskId taskId,
         DurableTask taskDefinition,
+        DurableTaskStartOptions options,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Stages the start of <paramref name="taskDefinition"/> under <paramref name="taskId"/> and records it in this
+    /// execution, synchronously.
+    /// </summary>
+    /// <param name="taskId">
+    /// A child of <see cref="Id"/> for an attached task, or the root identifier of a
+    /// <see cref="DurableTaskStartOptions.Detached"/> task.
+    /// </param>
+    /// <param name="taskDefinition">The definition to start.</param>
+    /// <param name="options"><see cref="DurableTaskStartOptions.None"/> or <see cref="DurableTaskStartOptions.Detached"/>.</param>
+    /// <returns>A handle through which this execution observes the task.</returns>
+    /// <remarks>
+    /// The host stages the start and its record in the calling code's turn, and both commit with the host's next durable
+    /// write, together with the state changes which that turn made. A replay which reaches the record returns the same
+    /// handle without starting the task again. Each option relates the task to this execution as
+    /// <see cref="StartTaskAsync"/> describes. Hosts which can't stage a start synchronously keep this default
+    /// implementation, which throws <see cref="NotSupportedException"/>.
+    /// </remarks>
+    protected internal virtual IScheduledTaskHandle PostTask(
+        TaskId taskId,
+        DurableTask taskDefinition,
+        DurableTaskStartOptions options)
+        => throw new NotSupportedException("The durable execution host does not support posting tasks.");
 
     /// <summary>Schedules a durable delay at <paramref name="dueTime"/>.</summary>
     protected internal abstract ValueTask<DurableTaskResponse> ScheduleDelayAsync(
@@ -238,25 +279,6 @@ public abstract class DurableTaskContext
     protected internal virtual void OnBodyCompleted(DurableTaskResponse response)
     {
     }
-
-    /// <summary>
-    /// Starts <paramref name="taskDefinition"/> as a detached root task under <paramref name="rootId"/> and records the
-    /// start in this execution.
-    /// </summary>
-    /// <remarks>
-    /// The detached task isn't part of this execution: durable cancellation of this execution doesn't cancel it, and this
-    /// execution doesn't observe its result. The host records the start under an identifier which it derives from the
-    /// detached task's identity, such as its target and <paramref name="rootId"/>, and commits the start together with
-    /// its record. Detaching the same task again, including during a replay, therefore reaches the same record and
-    /// leaves the detached task unchanged, independently of other operations which a deployment adds or removes; another
-    /// definition under the same identity fails. The returned operation completes once the start is durable. Hosts which
-    /// don't support detached tasks keep this default implementation, which throws <see cref="NotSupportedException"/>.
-    /// </remarks>
-    protected internal virtual ValueTask DetachTaskAsync(
-        TaskId rootId,
-        DurableTask taskDefinition,
-        CancellationToken cancellationToken)
-        => throw new NotSupportedException("The durable execution host does not support detached tasks.");
 
     /// <summary>
     /// Waits for the signal named <paramref name="name"/> of the invoked task whose execution contains this execution,
@@ -325,6 +347,17 @@ public abstract class DurableTaskContext
         return Id.Child(
             $"$child-{Interlocked.Increment(ref _nextChildId).ToString(CultureInfo.InvariantCulture)}");
     }
+
+    /// <summary>
+    /// Creates the root identifier of a detached task which this execution starts without a name:
+    /// <c>{Id}:{segment}</c>, where <c>{segment}</c> is the identifier which <see cref="CreateChildTaskId(string)"/>
+    /// generates for the next unnamed operation.
+    /// </summary>
+    /// <remarks>
+    /// The segment comes from the count which unnamed children share, so a replay which starts unnamed operations in the
+    /// same order derives the same root identifier, and other parties derive it from this execution's identifier.
+    /// </remarks>
+    internal TaskId CreateDetachedRootId() => TaskId.CreateRoot($"{Id}:{CreateChildTaskId(name: null).LastSegment}");
 
     internal TaskId CreateOperationId(string kind)
         => Id.Child($"${kind}-{Interlocked.Increment(ref _nextOperationId).ToString(CultureInfo.InvariantCulture)}");

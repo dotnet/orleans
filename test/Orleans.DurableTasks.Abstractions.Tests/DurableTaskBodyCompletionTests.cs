@@ -102,9 +102,10 @@ public sealed class DurableTaskBodyCompletionTests
                 ? $"completed:{response.Result}"
                 : $"completed:{response.Status}");
 
-        protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
+        protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(
             TaskId taskId,
             DurableTask taskDefinition,
+            DurableTaskStartOptions options,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
         protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(

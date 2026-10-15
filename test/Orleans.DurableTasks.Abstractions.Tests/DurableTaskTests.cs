@@ -2944,8 +2944,8 @@ public class SchedulingTests
             return DurableTaskResponse.FromResult(context.Id.ToString());
         });
 
-        var first = await definition.ScheduleAsync("stable-root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        var second = await definition.ScheduleAsync("stable-root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var first = await definition.WithId("stable-root").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var second = await definition.WithId("stable-root").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         Assert.Equal("stable-root", await first);
         Assert.Equal("stable-root", await second);
@@ -2961,9 +2961,9 @@ public class SchedulingTests
         ScheduledTask scheduled = generic
             ? await host.CreateRootDefinition<int>(
                 _ => ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.FromResult(42)))
-                .ScheduleAsync($"completed-cancellation-{generic}", cancellationToken: Xunit.TestContext.Current.CancellationToken) : await host.CreateRootDefinition<object?>(
+                .WithId($"completed-cancellation-{generic}").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken) : await host.CreateRootDefinition<object?>(
                 _ => ValueTask.FromResult(DurableTaskResponse.Completed))
-                .ScheduleAsync($"completed-cancellation-{generic}", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+                .WithId($"completed-cancellation-{generic}").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         await scheduled.CancelAsync(Xunit.TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
@@ -3025,26 +3025,6 @@ public class SchedulingTests
         }
     }
 
-    [Fact]
-    public async Task ExplicitRootSchedulingIgnoresAmbientDurableContext()
-    {
-        var host = new TestHost(DateTimeOffset.UnixEpoch);
-        var ambient = host.CreateContext(TaskId.CreateRoot("ambient"));
-        var definition = host.CreateRootDefinition<string>(
-            context => ValueTask.FromResult<DurableTaskResponse>(
-                DurableTaskResponse.FromResult(context.Id.ToString())));
-        ScheduledTask<string>? scheduled = null;
-
-        await host.RunWithAmbientAsync(
-            ambient,
-            async () => scheduled = await definition.ScheduleAsync("root"));
-
-        Assert.NotNull(scheduled);
-        Assert.Equal(TaskId.CreateRoot("root"), scheduled.Id);
-        Assert.Equal("root", await scheduled);
-        Assert.False(host.Contains(TaskId.Parse("ambient/root")));
-    }
-
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -3079,7 +3059,7 @@ public class SchedulingTests
                 return DurableTaskResponse.Completed;
             });
 
-            var scheduled = await root.ScheduleAsync("root");
+            var scheduled = await root.WithId("root").ScheduleAsync();
             await ((ScheduledTask)scheduled).WaitAsync();
             return host.EntryIds.Where(id => id != TaskId.CreateRoot("root")).ToArray();
         }
@@ -3146,7 +3126,7 @@ public class SchedulingTests
             return DurableTaskResponse.FromResult(winner);
         });
 
-        var scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await root.WithId("root").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var winnerIndex = await scheduled;
 
         Assert.Equal(1, winnerIndex);
@@ -3169,7 +3149,7 @@ public class SchedulingTests
                 DurableTask.Run(static _ => 3),
             ])));
 
-        var scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await root.WithId("root").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         first.SetResult(1);
 
         Assert.Equal([1, 2, 3], await scheduled);
@@ -3214,7 +3194,7 @@ public class SchedulingTests
         DurableTask<int>[] inputs = [DurableTask.Run(static _ => 1), DurableTask.Run(static _ => 2), DurableTask.Run(static _ => 3)];
         var root = host.CreateRootDefinition<int>(async _ => DurableTaskResponse.FromResult(
             whenAny ? (await DurableTask.WhenAny(inputs)).Result : (await DurableTask.WhenAll(inputs)).Sum()));
-        var scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await root.WithId("root").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         // Every input's scheduling begins before any of it completes, so a host can commit the batch together.
         var deadline = DateTime.UtcNow.AddSeconds(10);
@@ -3256,7 +3236,7 @@ public class SchedulingTests
             return DurableTaskResponse.FromResult(index);
         });
 
-        var scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await root.WithId("root").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () => await scheduled);
 
         Assert.Equal("winner failed", exception.Message);
@@ -3278,7 +3258,7 @@ public class SchedulingTests
             return DurableTaskResponse.FromResult((all, any));
         });
 
-        var scheduled = await root.ScheduleAsync("snapshot", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await root.WithId("snapshot").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var result = await scheduled;
 
         Assert.Equal(1, Assert.Single(result.All));
@@ -3306,7 +3286,7 @@ public class SchedulingTests
             return DurableTaskResponse.FromResult<IReadOnlyList<int>>([.. first, .. second]);
         });
 
-        var result = await await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var result = await await root.WithId("root").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         Assert.Equal([1, 2, 3, 4], result);
         Assert.Equal(
@@ -3340,7 +3320,7 @@ public class SchedulingTests
             return DurableTaskResponse.Completed;
         });
 
-        ScheduledTask scheduled = await root.ScheduleAsync("root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask scheduled = await root.WithId("root").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         await scheduled.WaitAsync(Xunit.TestContext.Current.CancellationToken);
 
         Assert.True(host.Contains(TaskId.Parse("root/$when-all-1/0")));
@@ -3373,7 +3353,7 @@ public class SchedulingTests
                 return DurableTaskResponse.FromResult(winner);
             });
 
-            var winner = await await root.ScheduleAsync("root");
+            var winner = await await root.WithId("root").ScheduleAsync();
             var ids = host.EntryIds;
             loser.SetResult();
             return (winner, ids);
@@ -3424,7 +3404,7 @@ public class SchedulingTests
             await completion.Task;
             return DurableTaskResponse.Completed;
         });
-        var scheduled = await definition.ScheduleAsync("wait", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await definition.WithId("wait").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         using var waitCancellation = new CancellationTokenSource();
         waitCancellation.Cancel();
 
@@ -3451,8 +3431,8 @@ public class SchedulingTests
             _ => ValueTask.FromResult(DurableTaskResponse.FromException(expected)));
         var genericDefinition = host.CreateRootDefinition<int>(
             _ => ValueTask.FromResult(DurableTaskResponse.FromException(expected)));
-        ScheduledTask nonGeneric = await nonGenericDefinition.ScheduleAsync($"all-non-generic-{canceled}", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        var generic = await genericDefinition.ScheduleAsync($"all-generic-{canceled}", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask nonGeneric = await nonGenericDefinition.WithId($"all-non-generic-{canceled}").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var generic = await genericDefinition.WithId($"all-generic-{canceled}").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         if (canceled)
         {
@@ -3510,8 +3490,8 @@ public class SchedulingTests
             await secondCompletion.Task;
             return DurableTaskResponse.Completed;
         });
-        ScheduledTask first = await firstDefinition.ScheduleAsync("first", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask second = await secondDefinition.ScheduleAsync("second", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask first = await firstDefinition.WithId("first").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask second = await secondDefinition.WithId("second").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
 
         var whenAny = ScheduledTask.WhenAny([first, second], cancellation.Token);
@@ -3545,8 +3525,8 @@ public class SchedulingTests
             await loserCompletion.Task;
             return DurableTaskResponse.Completed;
         });
-        ScheduledTask winner = await winnerDefinition.ScheduleAsync("drain-winner", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask loser = await loserDefinition.ScheduleAsync("drain-loser", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask winner = await winnerDefinition.WithId("drain-winner").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask loser = await loserDefinition.WithId("drain-loser").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var loserEntry = host.GetEntry(loser.Id);
         loserEntry.DelayWaitCancellationCompletion = true;
 
@@ -3579,8 +3559,8 @@ public class SchedulingTests
             await loserCompletion.Task;
             return DurableTaskResponse.Completed;
         });
-        ScheduledTask expectedWinner = await winnerDefinition.ScheduleAsync("winner", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask loser = await loserDefinition.ScheduleAsync("loser", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask expectedWinner = await winnerDefinition.WithId("winner").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask loser = await loserDefinition.WithId("loser").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         var winner = await ScheduledTask.WhenAny([expectedWinner, loser], Xunit.TestContext.Current.CancellationToken);
         var response = await winner.GetResponseAsync(Xunit.TestContext.Current.CancellationToken);
@@ -3611,8 +3591,8 @@ public class SchedulingTests
             await secondCompletion.Task;
             return DurableTaskResponse.Completed;
         });
-        ScheduledTask first = await firstDefinition.ScheduleAsync("transport-failure", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask second = await secondDefinition.ScheduleAsync("transport-loser", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask first = await firstDefinition.WithId("transport-failure").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask second = await secondDefinition.WithId("transport-loser").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var expected = new InvalidOperationException("host wait failed");
         host.GetEntry(first.Id).WaitException = expected;
 
@@ -3646,8 +3626,8 @@ public class SchedulingTests
             await secondCompletion.Task;
             return DurableTaskResponse.Completed;
         });
-        ScheduledTask first = await firstDefinition.ScheduleAsync("started-before-failure", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask second = await secondDefinition.ScheduleAsync("synchronous-wait-failure", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask first = await firstDefinition.WithId("started-before-failure").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask second = await secondDefinition.WithId("synchronous-wait-failure").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var expected = new InvalidOperationException("synchronous host wait failure");
         host.GetEntry(second.Id).WaitException = expected;
         host.GetEntry(second.Id).WaitExceptionIsSynchronous = true;
@@ -3673,7 +3653,7 @@ public class SchedulingTests
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var definition = host.CreateRootDefinition<int>(
             _ => ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.FromResult(7)));
-        var generic = await definition.ScheduleAsync("wait-result", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var generic = await definition.WithId("wait-result").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         ScheduledTask nonGeneric = generic;
 
         await nonGeneric.WaitAsync(Xunit.TestContext.Current.CancellationToken);
@@ -3696,7 +3676,7 @@ public class SchedulingTests
             : new InvalidOperationException("failed");
         var definition = host.CreateRootDefinition<int>(
             _ => ValueTask.FromResult(DurableTaskResponse.FromException(expected)));
-        var generic = await definition.ScheduleAsync($"terminal-{canceled}", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var generic = await definition.WithId($"terminal-{canceled}").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         ScheduledTask nonGeneric = generic;
 
         var nonGenericException = await Assert.ThrowsAnyAsync<Exception>(
@@ -3721,7 +3701,7 @@ public class SchedulingTests
             await completion.Task;
             return DurableTaskResponse.Completed;
         });
-        var scheduled = await definition.ScheduleAsync("poll", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await definition.WithId("poll").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         var status = await scheduled.GetStatusAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
@@ -3738,7 +3718,7 @@ public class SchedulingTests
             context => ValueTask.FromResult<DurableTaskResponse>(
                 DurableTaskResponse.FromResult(context.Id.ToString())));
 
-        var scheduled = await definition.ScheduleAsync("tenant/workflow", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await definition.WithId("tenant/workflow").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         Assert.Equal(@"tenant\/workflow", scheduled.Id.ToString());
         Assert.Equal(@"tenant\/workflow", await scheduled);
@@ -3759,8 +3739,8 @@ public class SchedulingTests
         });
         var winnerDefinition = host.CreateRootDefinition<int>(
             _ => ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.FromResult(42)));
-        var loser = await loserDefinition.ScheduleAsync($"second-winner-loser-{generic}", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        var expectedWinner = await winnerDefinition.ScheduleAsync($"second-winner-winner-{generic}", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var loser = await loserDefinition.WithId($"second-winner-loser-{generic}").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var expectedWinner = await winnerDefinition.WithId($"second-winner-winner-{generic}").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var loserEntry = host.GetEntry(loser.Id);
         loserEntry.DelayWaitCancellationCompletion = true;
         Assert.Equal(42, (await expectedWinner.GetResponseAsync(Xunit.TestContext.Current.CancellationToken)).GetResult<int>());
@@ -3796,10 +3776,10 @@ public class SchedulingTests
         var winnerCompletion = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var loser = await host.CreateRootDefinition<int>(
             async _ => DurableTaskResponse.FromResult(await loserCompletion.Task))
-            .ScheduleAsync("snapshot-loser", cancellationToken);
+            .WithId("snapshot-loser").ScheduleAsync(cancellationToken);
         var expectedWinner = await host.CreateRootDefinition<int>(
             async _ => DurableTaskResponse.FromResult(await winnerCompletion.Task))
-            .ScheduleAsync("snapshot-winner", cancellationToken);
+            .WithId("snapshot-winner").ScheduleAsync(cancellationToken);
         var candidates = new List<ScheduledTask<int>> { loser, expectedWinner };
         var whenAny = generic
             ? AwaitGenericWinnerAsync(candidates, cancellationToken)
@@ -3901,7 +3881,7 @@ public class SchedulingTests
             await completion.Task;
             return DurableTaskResponse.Completed;
         });
-        ScheduledTask scheduled = await definition.ScheduleAsync("completion-state", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask scheduled = await definition.WithId("completion-state").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var options = new PollingOptions { PollTimeout = TimeSpan.FromMilliseconds(137) };
 
         Assert.False(await scheduled.IsCompletedAsync(options, Xunit.TestContext.Current.CancellationToken));
@@ -3919,7 +3899,7 @@ public class SchedulingTests
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var definition = host.CreateRootDefinition<object?>(
             _ => ValueTask.FromResult(DurableTaskResponse.Pending));
-        ScheduledTask scheduled = await definition.ScheduleAsync("incomplete-wait", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask scheduled = await definition.WithId("incomplete-wait").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await scheduled.WaitAsync(Xunit.TestContext.Current.CancellationToken));
@@ -4012,7 +3992,7 @@ public class SchedulingTests
             return DurableTaskResponse.Completed;
         });
 
-        var scheduled = await definition.ScheduleAsync("phase2/root", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await definition.WithId("phase2/root").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
 
         var expectedId = TaskId.CreateRoot("phase2/root");
@@ -4037,8 +4017,8 @@ public class SchedulingTests
     {
         var firstState = new ControlledScheduledWaitState();
         var secondState = new ControlledScheduledWaitState();
-        ScheduledTask first = await new ControlledRootDefinition<object?>(firstState).ScheduleAsync("construction-cancel-first", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask second = await new ControlledRootDefinition<object?>(secondState).ScheduleAsync("construction-cancel-second", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask first = await new ControlledRootDefinition<object?>(firstState).WithId("construction-cancel-first").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask second = await new ControlledRootDefinition<object?>(secondState).WithId("construction-cancel-second").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         secondState.WaitConstruction = token =>
         {
@@ -4063,8 +4043,8 @@ public class SchedulingTests
     {
         var firstState = new ControlledScheduledWaitState();
         var secondState = new ControlledScheduledWaitState();
-        ScheduledTask first = await new ControlledRootDefinition<object?>(firstState).ScheduleAsync("construction-failure-first", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask second = await new ControlledRootDefinition<object?>(secondState).ScheduleAsync("construction-failure-second", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask first = await new ControlledRootDefinition<object?>(firstState).WithId("construction-failure-first").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask second = await new ControlledRootDefinition<object?>(secondState).WithId("construction-failure-second").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var expected = new InvalidOperationException("wait construction failed");
         secondState.WaitConstruction = _ => throw expected;
 
@@ -4088,8 +4068,8 @@ public class SchedulingTests
             CancellationDrainException = new ApplicationException("cleanup failed"),
         };
         var secondState = new ControlledScheduledWaitState();
-        ScheduledTask first = await new ControlledRootDefinition<object?>(firstState).ScheduleAsync("canceled-cleanup-first", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask second = await new ControlledRootDefinition<object?>(secondState).ScheduleAsync("canceled-cleanup-second", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask first = await new ControlledRootDefinition<object?>(firstState).WithId("canceled-cleanup-first").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask second = await new ControlledRootDefinition<object?>(secondState).WithId("canceled-cleanup-second").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         secondState.WaitConstruction = token =>
         {
@@ -4114,8 +4094,8 @@ public class SchedulingTests
             CancellationDrainException = new ApplicationException("cleanup failed"),
         };
         var secondState = new ControlledScheduledWaitState();
-        ScheduledTask first = await new ControlledRootDefinition<object?>(firstState).ScheduleAsync("failed-cleanup-first", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask second = await new ControlledRootDefinition<object?>(secondState).ScheduleAsync("failed-cleanup-second", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask first = await new ControlledRootDefinition<object?>(firstState).WithId("failed-cleanup-first").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask second = await new ControlledRootDefinition<object?>(secondState).WithId("failed-cleanup-second").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var expected = new InvalidOperationException("primary construction failure");
         secondState.WaitConstruction = _ => throw expected;
 
@@ -4136,8 +4116,8 @@ public class SchedulingTests
         {
             CancellationCallbackException = new ApplicationException("cancellation callback failed"),
         };
-        ScheduledTask primary = await new ControlledRootDefinition<object?>(primaryState).ScheduleAsync("callback-primary", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask loser = await new ControlledRootDefinition<object?>(losingState).ScheduleAsync("callback-loser", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask primary = await new ControlledRootDefinition<object?>(primaryState).WithId("callback-primary").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask loser = await new ControlledRootDefinition<object?>(losingState).WithId("callback-loser").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var expected = new InvalidOperationException("primary wait failed");
 
         var whenAny = ScheduledTask.WhenAny([primary, loser], Xunit.TestContext.Current.CancellationToken);
@@ -4165,8 +4145,8 @@ public class SchedulingTests
             UseFaultSource = true,
             IgnoreCancellationWhileWaitingForFault = true,
         };
-        ScheduledTask winner = await new ControlledRootDefinition<object?>(winningState).ScheduleAsync("winner", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask loser = await new ControlledRootDefinition<object?>(losingState).ScheduleAsync("loser", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask winner = await new ControlledRootDefinition<object?>(winningState).WithId("winner").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask loser = await new ControlledRootDefinition<object?>(losingState).WithId("loser").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var winningResponse = DurableTaskResponse.Completed;
         var losingException = new InvalidOperationException("losing wait fault");
 
@@ -4191,7 +4171,7 @@ public class SchedulingTests
     public async Task TypedConfiguredScheduledTaskAwaiterForwardsContinuationAndResult()
     {
         var state = new ControlledScheduledWaitState();
-        var scheduled = await new ControlledRootDefinition<int>(state).ScheduleAsync("typed-configured", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await new ControlledRootDefinition<int>(state).WithId("typed-configured").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         using var cancellation = new CancellationTokenSource();
         var safeContinuation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var unsafeContinuation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -4233,7 +4213,7 @@ public class SchedulingTests
     public async Task NonGenericConfiguredScheduledTaskAwaiterForwardsContinuation()
     {
         var state = new ControlledScheduledWaitState();
-        ScheduledTask scheduled = await new ControlledRootDefinition<object?>(state).ScheduleAsync("non-generic-configured", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask scheduled = await new ControlledRootDefinition<object?>(state).WithId("non-generic-configured").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var safeContinuation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var unsafeContinuation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var safeCalls = 0;
@@ -4281,7 +4261,7 @@ public class SchedulingTests
         using var waitCancellation = new CancellationTokenSource();
         using var cancelCancellation = new CancellationTokenSource();
 
-        var scheduled = await definition.ScheduleAsync(id.ToString(), scheduleCancellation.Token);
+        var scheduled = await definition.WithId(id.ToString()).ScheduleAsync(scheduleCancellation.Token);
         var options = new PollingOptions { PollTimeout = TimeSpan.FromMilliseconds(149) };
         var status = await scheduled.GetStatusAsync(options, pollCancellation.Token);
         var observation = scheduled.GetResponseAsync(waitCancellation.Token);
@@ -4314,7 +4294,7 @@ public class SchedulingTests
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         DurableTask definition = host.CreateRootDefinition<object?>(
             _ => ValueTask.FromResult(DurableTaskResponse.Completed));
-        ScheduledTask scheduled = await definition.ScheduleAsync("completed-await", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask scheduled = await definition.WithId("completed-await").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var continuation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var continuationCalls = 0;
         var awaiter = scheduled.GetAwaiter();
@@ -4342,7 +4322,7 @@ public class SchedulingTests
         var expectedResponse = DurableTaskResponse.FromResult(expected);
         var definition = host.CreateRootDefinition<CompletedScheduledResult>(
             _ => ValueTask.FromResult<DurableTaskResponse>(expectedResponse));
-        var scheduled = await definition.ScheduleAsync("generic-completed-await", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var scheduled = await definition.WithId("generic-completed-await").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var continuation = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var continuationCalls = 0;
         var awaiter = scheduled.GetAwaiter();
@@ -5005,7 +4985,7 @@ public class SchedulingTests
         using var pollCancellation = new CancellationTokenSource();
         using var cancelCancellation = new CancellationTokenSource();
 
-        var pending = await pendingDefinition.ScheduleAsync("non-generic-pending", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var pending = await pendingDefinition.WithId("non-generic-pending").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var options = new PollingOptions { PollTimeout = TimeSpan.FromMilliseconds(173) };
         var pendingResponse = await pending.GetResponseAsync(options, pollCancellation.Token);
         await pending.CancelAsync(cancelCancellation.Token);
@@ -5022,7 +5002,7 @@ public class SchedulingTests
             completedHandle,
             DurableTaskResponse.Completed);
 
-        var completed = await completedDefinition.ScheduleAsync("non-generic-completed", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var completed = await completedDefinition.WithId("non-generic-completed").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         await completed.CancelAsync(new CancellationToken(canceled: true));
         var completedResponse = await completed.GetResponseAsync(new PollingOptions { PollTimeout = TimeSpan.FromMilliseconds(181) }, Xunit.TestContext.Current.CancellationToken);
 
@@ -5040,8 +5020,8 @@ public class SchedulingTests
         winnerState.Complete(DurableTaskResponse.Completed);
         DurableTask winnerDefinition = new DirectRootDefinition(winnerState);
         DurableTask loserDefinition = new DirectRootDefinition(loserState);
-        ScheduledTask winner = await winnerDefinition.ScheduleAsync("direct-winner", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        ScheduledTask loser = await loserDefinition.ScheduleAsync("direct-loser", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask winner = await winnerDefinition.WithId("direct-winner").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask loser = await loserDefinition.WithId("direct-loser").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         var whenAny = ScheduledTask.WhenAny([winner, loser], Xunit.TestContext.Current.CancellationToken);
         await loserState.WaitStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), Xunit.TestContext.Current.CancellationToken);
@@ -5192,9 +5172,9 @@ public class SchedulingTests
         var firstState = new ControlledScheduledWaitState();
         var secondState = new ControlledScheduledWaitState();
         ScheduledTask first = await new ControlledRootDefinition<object?>(firstState)
-            .ScheduleAsync("first-construction-failure", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+            .WithId("first-construction-failure").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         ScheduledTask second = await new ControlledRootDefinition<object?>(secondState)
-            .ScheduleAsync("not-started-after-failure", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+            .WithId("not-started-after-failure").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
         var expected = new InvalidOperationException("first wait construction failed");
         firstState.WaitConstruction = _ => throw expected;
 
@@ -5228,7 +5208,7 @@ public class SchedulingTests
         };
         state.Complete(response);
         DurableTask definition = new DirectRootDefinition(state);
-        ScheduledTask candidate = await definition.ScheduleAsync($"single-{responseKind}", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        ScheduledTask candidate = await definition.WithId($"single-{responseKind}").ScheduleAsync(cancellationToken: Xunit.TestContext.Current.CancellationToken);
 
         var selected = await ScheduledTask.WhenAny([candidate], Xunit.TestContext.Current.CancellationToken);
         Assert.Equal(1, state.WaitCallCount);
@@ -5494,7 +5474,7 @@ internal sealed class TestContext(
 {
     public override DateTimeOffset UtcNow => utcNow;
 
-    protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+    protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options, CancellationToken cancellationToken)
         => host.ScheduleChildAsync(taskId, taskDefinition, cancellationToken);
 
     protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken)

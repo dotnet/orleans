@@ -51,9 +51,10 @@ public sealed class DurableTaskContextReplayTests
 
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
-        protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
+        protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(
             TaskId taskId,
             DurableTask taskDefinition,
+            DurableTaskStartOptions options,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
         protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(

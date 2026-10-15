@@ -1,28 +1,33 @@
 namespace Orleans.DurableTasks;
 
-/// <summary>Defines a durable task which a host can schedule independently.</summary>
+/// <summary>Defines a durable task which a host can start as a root task, outside a durable execution.</summary>
 public interface ISchedulableTask
 {
     /// <summary>
-    /// Schedules or reattaches to this definition under <paramref name="taskId"/>.
-    /// An existing identifier returns its recorded response and retains its original definition.
+    /// Schedules or reattaches to this definition under <paramref name="taskId"/>, and completes once the task's host has
+    /// accepted and durably stored the task.
     /// </summary>
+    /// <remarks>
+    /// An existing identifier returns its recorded response and retains its original definition, so a caller which
+    /// retries a start under the same identifier reaches the same task.
+    /// </remarks>
     ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken);
 
     /// <summary>Gets a handle for a scheduled identifier.</summary>
     IScheduledTaskHandle GetHandle(TaskId taskId);
 
     /// <summary>
-    /// Starts this definition as a detached root task under <paramref name="taskId"/>, which no caller observes.
+    /// Stages the start of this definition under <paramref name="taskId"/> in the calling code's durable outbox, and
+    /// returns a handle for the task.
     /// </summary>
     /// <remarks>
-    /// The returned operation completes once the host has durably accepted the schedule. The host sends the scheduler no
-    /// result, and it retains the task's result for polling as it does for other roots without an observing caller.
-    /// Detaching an existing identifier with the same definition leaves the task unchanged. Hosts which don't support
-    /// detached tasks keep this default implementation, which throws <see cref="NotSupportedException"/>.
+    /// The start commits with the caller's next durable write, together with the state changes which the calling code
+    /// staged, and its host then delivers it exactly once. Implementations which have no durable outbox to stage in, such
+    /// as clients, keep this default implementation, which throws <see cref="InvalidOperationException"/>.
     /// </remarks>
-    ValueTask DetachAsync(TaskId taskId, CancellationToken cancellationToken)
-        => throw new NotSupportedException("The durable task definition does not support detached scheduling.");
+    IScheduledTaskHandle Post(TaskId taskId)
+        => throw new InvalidOperationException(
+            "Post stages a start in the durable outbox of the calling grain, and this caller has none. Use ScheduleAsync, which completes once the task's host has accepted the task.");
 }
 
 /// <summary>Controls and observes one scheduled durable task.</summary>

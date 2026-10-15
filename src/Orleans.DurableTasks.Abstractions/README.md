@@ -16,7 +16,8 @@ on this abstractions assembly.
   state machine begins when a host runs the definition and releases captured state after terminal
   completion. Create a new instance for each execution. Definitions created with `DurableTask.Run`
   can be scheduled repeatedly.
-- Every root execution has an explicit `TaskId`. Child IDs append either a caller-provided
+- Every root execution has a `TaskId`: the name which `WithId` assigns, or a new random ID for a
+  task started outside a durable execution without a name. Child IDs append either a caller-provided
   segment or a generated segment to the parent ID. Generated segments are replay-stable when
   unnamed children are created in the same deterministic order. One `WhenAll` or `WhenAny`
   invocation assigns stable indexed slots to its concurrent batch, beneath an operation ID which
@@ -235,33 +236,45 @@ await foreach (var quote in ScheduledTask.WhenEach(quotes))
 `ScheduleAll(...).WithId(name)` names the inputs, as in this example. Outside a durable execution,
 `ScheduledTask.WhenEach` yields tasks in the order in which their waits observe their responses.
 
-## Detached tasks
+## Starting and observing tasks
 
-`DetachAsync(rootId)` starts a definition as a new root task, for fire-and-forget work, cleanup
-which outlives its starter, and durable calls from code which doesn't await their results:
+Configuration on the definition sets what a task is, and the call which starts it sets when the caller
+continues:
+
+| | `await definition` | `await definition.ScheduleAsync()` | `definition.Post()` |
+| --- | --- | --- | --- |
+| Attached (default) | Runs the child and returns its result once the result is durable. | Returns the child's handle once its host has accepted and durably stored it. | Stages the child with the execution's next durable write and returns its handle. |
+| `.Shielded()` | As attached; the caller's cancellation doesn't reach the child. | As attached; the caller's cancellation doesn't reach the child. | As attached; the caller's cancellation doesn't reach the child. |
+| `.Detached()` | Starts an independent root task and returns its result; canceling the wait ends only the caller's subscription. | Returns a handle to the root task once its host has accepted and durably stored it. | Stages the root task with the caller's next durable write and returns its handle. |
+
+- Within a durable execution, an attached child belongs to the execution's tree: the execution owns it,
+  its durable cancellation reaches it, and deleting the execution's tree deletes it.
+- `.Shielded()` keeps the execution's cancellation from reaching the child, while the execution still
+  owns it and waits for it; see [Compensating canceled work](#compensating-canceled-work).
+- `.Detached()` starts an independent root task. The starting execution can complete while it runs,
+  and the execution's cancellation, abort, and deletion don't reach it. The start names the execution
+  as a subscriber, so awaiting the task, or its handle, observes its result without a separate
+  subscription; canceling that wait ends only the subscription. Its root ID is the `WithId` name,
+  verbatim, so other parties can address it, or `{executionId}:{segment}`, where `{segment}` is the
+  generated ID of the execution's next unnamed operation. Starting it again under the same root ID,
+  including during a replay, reaches the same task.
+- `ScheduleAsync()` returns once the task's host holds the task, so its ID can be handed to other
+  parties, which address it with lookups such as `GetDurableTask`. A start which its host rejects, for
+  example because the ID already identifies another definition, fails.
+- `Post()` is synchronous: it stages the start, and the start commits with the caller's next durable
+  write, together with the state changes which the calling code made, and is then delivered once.
+  Within a durable execution, the start is recorded like a `DurableTask.Once` effect, so a replay
+  returns the same handle without starting the task again, and awaiting the handle later observes
+  the result. Code without a durable outbox, such as a client, can't post.
+- Outside a durable execution, every task is a root task, so `.Detached()` changes nothing. `WithId`
+  supplies the root ID, which makes a start safe to retry: a caller which retries after an ambiguous
+  failure, such as a timeout, reaches the same task. A start without `WithId` receives a new random
+  root ID, which the handle's `Id` reports, and behaves like an ordinary call.
+
+A workflow which starts follow-up work and completes without waiting for it posts a detached task:
 
 ```csharp
-await buyer.RecordOrderAsync(summary).DetachAsync($"order-{orderId:N}-v{summary.Version}");
-```
-
-- The detached task has the caller-chosen root ID, so it is independent of the starter: durable
-  cancellation of the starter doesn't cancel it, and the starter's lifecycle doesn't delete it.
-- `DetachAsync` completes once the host has durably accepted the schedule. The starter receives no
-  result; the host retains the result for polling by root ID as it does for other roots which no
-  caller observes.
-- Detaching the same definition under the same root ID again leaves the task unchanged. Another
-  definition under that ID fails like other ID reuse.
-- Within a durable execution, the host records each detach in the execution under an ID which it
-  derives from the detached task's identity, and commits the record with the start, so a replay
-  doesn't start the task again, including after a deployment adds or removes other operations.
-  Outside a durable execution, the definition starts through `ISchedulableTask.DetachAsync`.
-- Within a durable execution, `DetachedTaskId.For(segment)` derives a root ID from the execution's
-  task ID, `{taskId}:{segment}`, which is unique to that execution and segment and the same on every
-  replay. Segments contain no `:`. Observers derive the same ID with
-  `DetachedTaskId.For(starterTaskId, segment)` to poll or signal the detached task:
-
-```csharp
-await inventory.ReleaseAsync(order.Id).DetachAsync(DetachedTaskId.For("release"));
+order.PlaceOrderAsync(request).Detached().WithId($"place-order-{orderId}").Post();
 ```
 
 ## Signals
@@ -276,7 +289,7 @@ var approval = await Approved.WaitAsync();
 ```
 
 - A signal addresses one invoked task: a task which a caller, such as a client, another grain, or
-  `DetachAsync`, started. A wait
+  a durable execution which detached it, started. A wait
   anywhere in that task's execution observes the task's signals, including a wait in an
   `async DurableTask` step the task awaits and a wait in a `WhenAny` input. Each invoked task has
   its own signals.
@@ -304,8 +317,8 @@ var (received, approval) = await Approved.TryWaitAsync(deadline).WithId("approva
 ## Compensating canceled work
 
 A canceled workflow keeps running until its body completes, so it can undo the work it has done. It
-runs compensation inline in a `DurableTask.Current.SuppressCancellation()` scope: the children it
-schedules in the scope run to completion, and the workflow awaits their results as usual:
+starts compensation with `.Shielded()`: a shielded child runs to completion, and the workflow awaits
+its result as usual:
 
 ```csharp
 public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
@@ -317,32 +330,30 @@ public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
     }
     catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
     {
-        using (DurableTask.Current.SuppressCancellation())
-        {
-            await inventory.ReleaseAsync(order.Id).WithId("release");
-        }
-
+        await inventory.ReleaseAsync(order.Id).WithId("release").Shielded();
         return OrderResult.Canceled(DurableTask.Current.CancellationReason);
     }
 }
 ```
 
-- Children scheduled in the scope, including local steps, delays, calls to other grains, and combinator
-  inputs, run even though the workflow's cancellation was requested, and its cancellation doesn't reach
-  them later, including after a replay. The workflow's own token, `IsCancellationRequested`, and
-  `CancellationReason` still report its cancellation. An administrative abort still stops them, and
-  they are deleted with the workflow's execution tree.
-- The scope follows the asynchronous flow which entered it, across awaits, and covers only children of
-  the execution which entered it. Scopes nest, and disposing a scope restores the state which preceded
-  it.
+- A shielded child, such as a local step, a delay, or a call to another grain, runs even though the
+  workflow's cancellation was requested, and the workflow's cancellation doesn't reach it later,
+  including after a replay. The workflow's own token, `IsCancellationRequested`, and
+  `CancellationReason` still report its cancellation. An administrative abort still stops a shielded
+  child, and it is deleted with the workflow's execution tree. Canceling it through its own handle
+  cancels it and its children.
+- A shielded child's own children are reached only by the child's cancellation, so a shielded
+  `DurableTask.Run` step and the work it starts run to completion. A shielded combinator runs as part
+  of the workflow and shields each input which it starts.
 - Work which must outlive the workflow, such as cleanup which continues after the workflow's result is
   observed, runs as a detached task, which the workflow's cancellation doesn't reach either:
-  `inventory.ReleaseAsync(order.Id).DetachAsync(DetachedTaskId.For("release"))`.
+  `inventory.ReleaseAsync(order.Id).Detached().Post()`.
 - Hosts terminalize leaves of a canceled task as canceled promptly: delays, children whose bodies
-  haven't started, and attached children scheduled after the request outside a suppression scope,
+  haven't started, and attached children which aren't shielded and are scheduled after the request,
   which don't run. A child which already completed keeps its recorded result, and a running child
   observes the request itself.
 - A replay of a canceled task observes the request from the start, so the body takes the same path.
+
 ## Aborting tasks
 
 `ScheduledTask.AbortAsync(reason)` is for operators, for example when a body ignores cancellation or
@@ -365,7 +376,7 @@ including changes which later operations made. A durable body therefore has thre
 
 - **Recorded operations** run once per execution, and a replay returns their recorded outcomes:
   children such as durable grain calls, `async DurableTask` methods, `DurableTask.Run` delegates,
-  and delays, as well as signal waits, detaches, and `DurableTask.Once` effects.
+  and delays, as well as signal waits, detached and posted starts, and `DurableTask.Once` effects.
 - **Re-executed code** precedes the body's last recorded operation and runs again in every replay.
   It computes values from the method's arguments, recorded results, `DurableTask.Current.UtcNow`,
   the cancellation state, and configuration which stays the same while executions are pending.
@@ -383,8 +394,7 @@ Follow these rules in re-executed code:
   children, whose external effects need their own idempotency.
 - Give stable identifiers with `WithId` to children which are scheduled conditionally, in loops,
   or concurrently outside a combinator, and to combinators. Generated identifiers are stable only when unnamed
-  children, unnamed `DurableTask.Once` effects, and combinators are created in the same order. Hosts name detach records by the
-  detached task's identity, so they're stable without names.
+  children, unnamed `DurableTask.Once` effects, unnamed detached tasks, and combinators are created in the same order.
 - Scheduling an existing identifier with different arguments fails, so a replay which diverges
   from the recorded execution surfaces as an error.
   When a deployment changes a workflow while executions are pending, keep the existing steps
@@ -438,7 +448,7 @@ var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
 
 `DurableTask.Current.IsReplaying` reports whether a run of the body is re-running operations which an
 earlier run recorded. It is `true` from the start of a run which finds operations that earlier runs
-recorded in the task's tree, such as children, detach markers, and `Once` records,
+recorded in the task's tree, such as children, records of detached tasks, and `Once` records,
 until the run has reached each of them or starts an operation which no earlier run recorded. It then
 stays `false`. A first run reports `false` throughout. Signal values which callers sent to the task
 don't count as recorded operations.
@@ -466,7 +476,7 @@ ordinary grain methods. Logs inside a `DurableTask.Once` effect, or inside a ste
 don't repeat without it, because a replay returns their recorded results without running them.
 
 The package carries analyzers which report code that a replay would run differently, as
-diagnostics ORLEANS0100 to ORLEANS0115. Each diagnostic links to a page which describes the
+diagnostics ORLEANS0100 to ORLEANS0116. Each diagnostic links to a page which describes the
 hazard and its fix.
 
 ## Host responsibilities
@@ -478,11 +488,15 @@ ID is scheduled again, returns the same `SelectCompletionAsync` selection for a 
 the selection or by deriving it from a durable completion order, and supplies
 replay-consistent `UtcNow` values. It runs and replays the body of a canceled task with the durable
 request and its recorded reason applied, and terminalizes canceled leaves as canceled. Hosts which record
-cancellation reasons implement `IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`. Hosts which
-support cancellation suppression read `DurableTaskContext.IsCancellationSuppressed` when they schedule
-a child, record it with the child, and neither cancel such a child for its parent's earlier request nor
-propagate the parent's later request to it. Hosts which support detached tasks
-override `DurableTaskContext.DetachTaskAsync` and implement `ISchedulableTask.DetachAsync`.
+cancellation reasons implement `IScheduledTaskHandle.CancelAsync(reason, cancellationToken)`. Hosts start
+tasks in `DurableTaskContext.StartTaskAsync`, which receives `DurableTaskStartOptions`: `Detached` for an
+independent root task which names the execution as a subscriber, and `WaitForAcceptance` for a start which
+completes once the task's host has accepted the task. They read `DurableTaskContext.SchedulesShieldedChildren`
+when they start a child, record it with the child, and neither cancel such a child for its parent's earlier
+request nor propagate the parent's later request to it. Hosts which can stage a start synchronously override
+`DurableTaskContext.PostTask`, and definitions which can stage a root start in a durable outbox implement
+`ISchedulableTask.Post`. `ISchedulableTask.ScheduleAsync` completes once the host has accepted and durably
+stored the task.
 Hosts which support signals override `DurableTaskContext.WaitForSignalAsync`, record each
 task's first value for each signal name, and deliver signals from senders. Hosts which support abort
 implement `IScheduledTaskHandle.AbortAsync`. Hosts which support recorded effects override

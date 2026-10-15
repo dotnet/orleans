@@ -274,7 +274,7 @@ public class DurableTaskRaceTests
             }
         });
 
-        Assert.Equal($"{TimeoutReason} Canceled", await await root.ScheduleAsync("root", TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
+        Assert.Equal($"{TimeoutReason} Canceled", await await root.WithId("root").ScheduleAsync(TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
         Assert.Equal(DateTimeOffset.UnixEpoch + FiveMinutes, host.LastDelayDueTime);
         Assert.Equal(
             [RootId, TaskId.Parse("root/$timeout-1/1"), TaskId.Parse("root/pay")],
@@ -296,7 +296,7 @@ public class DurableTaskRaceTests
 
         Assert.Equal(
             DurableTaskStatus.CompletedSuccessfully,
-            await await root.ScheduleAsync("root", TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
+            await await root.WithId("root").ScheduleAsync(TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
         Assert.Equal(dueTime, host.LastDelayDueTime);
         Assert.Equal(DurableTaskStatus.Canceled, (await WaitForEntryAsync(host, "root/$timeout-1/1")).Status);
     }
@@ -318,7 +318,7 @@ public class DurableTaskRaceTests
             {
                 return DurableTaskResponse.FromResult(context.CancellationReason!);
             }
-        }).ScheduleAsync("root", TestCancellation);
+        }).WithId("root").ScheduleAsync(TestCancellation);
 
         const string reason = "The operation timed out after 00:00:00.";
         if (returnsReason)
@@ -343,12 +343,12 @@ public class DurableTaskRaceTests
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch) { PropagatesCancellation = true };
         var completed = await host.CreateRootDefinition<int>(static _ => new(DurableTaskResponse.FromResult(7)))
-            .ScheduleAsync("completed", TestCancellation);
+            .WithId("completed").ScheduleAsync(TestCancellation);
         var pending = await host.CreateRootDefinition<int>(static async context =>
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, context.CancellationToken);
             return DurableTaskResponse.FromResult(0);
-        }).ScheduleAsync("pending", TestCancellation);
+        }).WithId("pending").ScheduleAsync(TestCancellation);
         using var canceled = new CancellationTokenSource();
         await canceled.CancelAsync();
 
@@ -373,17 +373,17 @@ public class DurableTaskRaceTests
             return DurableTaskResponse.FromResult($"{winner.GetResult()} {quotes[1].GetResult()}");
         });
 
-        Assert.Equal($"ground {RaceLostReason}", await await root.ScheduleAsync("root", TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
+        Assert.Equal($"ground {RaceLostReason}", await await root.WithId("root").ScheduleAsync(TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
         Assert.Equal([TaskId.Parse("root/$race-1/$winner")], host.DecisionIds);
 
         // Outside an execution, the first observed response wins and no selection is recorded.
         var first = await host.CreateRootDefinition<string>(static _ => new(DurableTaskResponse.FromResult("first")))
-            .ScheduleAsync("first", TestCancellation);
+            .WithId("first").ScheduleAsync(TestCancellation);
         var second = await host.CreateRootDefinition<string>(static async context =>
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, context.CancellationToken);
             return DurableTaskResponse.FromResult("second");
-        }).ScheduleAsync("second", TestCancellation);
+        }).WithId("second").ScheduleAsync(TestCancellation);
 
         var observed = await ScheduledTask.Race([second, first], TestCancellation).WaitAsync(WaitTimeout, TestCancellation);
 
@@ -407,7 +407,7 @@ public class DurableTaskRaceTests
             return DurableTaskResponse.FromResult($"{index} {quote} {paid}");
         });
 
-        Assert.Equal("0 ground paid", await await root.ScheduleAsync("root", TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
+        Assert.Equal("0 ground paid", await await root.WithId("root").ScheduleAsync(TestCancellation).WaitAsync(WaitTimeout, TestCancellation));
 
         // The timeout which races as input 0 runs as a child with its own execution, which names its inputs.
         Assert.Equal(
@@ -445,7 +445,7 @@ public class DurableTaskRaceTests
 
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var scheduled = await host.CreateRootDefinition<int>(static _ => new(DurableTaskResponse.FromResult(1)))
-            .ScheduleAsync("root", TestCancellation);
+            .WithId("root").ScheduleAsync(TestCancellation);
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>("timeout", () => scheduled.WaitAsync(Timeout.InfiniteTimeSpan, TestCancellation));
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
             "timeout",

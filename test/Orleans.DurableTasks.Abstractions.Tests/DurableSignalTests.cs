@@ -241,9 +241,10 @@ public partial class DurableSignalTests
                 ? host.WaitForSignalAsync(Id, name, cancellationToken)
                 : base.WaitForSignalAsync(name, cancellationToken);
 
-        protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
+        protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(
             TaskId taskId,
             DurableTask taskDefinition,
+            DurableTaskStartOptions options,
             CancellationToken cancellationToken) => new(host.Schedule(taskId, taskDefinition));
 
         protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
