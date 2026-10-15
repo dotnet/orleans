@@ -244,9 +244,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         var request = CreateSerializableRequest(receiver);
         var otherInvocation = InvocationMessage(otherCaller, receiver, taskId, request);
-        var invocationException = Assert.Throws<DurableTaskConflictException>(
-            () => handler.TryAccept(otherInvocation, out _));
-        Assert.Contains("already associated with caller", invocationException.Message, StringComparison.Ordinal);
+        Assert.True(handler.TryAccept(otherInvocation, out var result));
+        Assert.Equal((DeliveryStatus.DeadLettered, DurableTaskRejectionCodes.Conflict), (result.Status, result.Code));
+        Assert.Contains("already associated with caller", result.Message, StringComparison.Ordinal);
     });
 
     [Fact]
@@ -3678,19 +3678,47 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var request = CreateSerializableRequest(runtime.GrainId);
 
         // The attached invocation's identifier already identifies another request, so the inbox dead-letters it with the
-        // conflict's message, which the sender's outbox reports as the rejection's reason.
-        var exception = Assert.Throws<DurableTaskConflictException>(() => CreateHandler(runtime).TryAccept(
+        // conflict's code and message, which the sender's outbox reports as the rejection.
+        Assert.True(CreateHandler(runtime).TryAccept(
             MessagingTestHelpers.CreateMessage(
                 MessagingTestHelpers.MessageTypes.Invocation,
                 sender,
                 runtime.GrainId,
                 taskId,
                 new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender }),
-            out _));
+            out var result));
 
-        Assert.Equal(taskId, exception.TaskId);
+        Assert.Equal((DeliveryStatus.DeadLettered, DurableTaskRejectionCodes.Conflict), (result.Status, result.Code));
+        Assert.Contains($"Durable task '{taskId}' is already associated with a different request.", result.Message);
         Assert.Equal(fingerprint, storage.Get(taskId).RequestFingerprint);
         Assert.Equal(destinations, storage.Get(taskId).CompletionDestinations);
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    });
+
+    [Fact]
+    public Task UndecodableInvocationThrowsSoItsDeliveryIsRetriedAndChangesNothing() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var sender = GrainId.Create("caller", "one");
+        var taskId = TaskId.Parse("starter/call");
+        var invocation = MessagingTestHelpers.CreateMessage(
+            MessagingTestHelpers.MessageTypes.Invocation,
+            sender,
+            runtime.GrainId,
+            taskId,
+            new DurableTaskInvocationMessage { TaskId = taskId, Request = CreateSerializableRequest(runtime.GrainId), Sender = sender });
+        var envelope = invocation.Envelope;
+        var truncated = new OutboxMessage
+        {
+            Envelope = envelope with { Payload = envelope.Payload[..(envelope.Payload.Length / 2)] },
+            ReceiverId = runtime.GrainId,
+        }.ToInboxMessage();
+
+        // The sink throws instead of rejecting the invocation, so the sender's outbox retries its delivery.
+        Assert.ThrowsAny<Exception>(() => CreateHandler(runtime).TryAccept(truncated, out _));
+
+        Assert.False(storage.Contains(taskId));
+        Assert.Equal(0, manager.WriteCount);
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     });
 
@@ -3735,12 +3763,14 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(starterId).Result!.Status);
     });
 
-    [Fact]
-    public Task RejectedScheduleWithinAnExecutionFailsOnEveryReplay() => ActivationScheduler.RunAsync(async () =>
+    [Theory]
+    [InlineData(DurableTaskRejectionCodes.Conflict, "DurableTaskConflictException place-order: rejected")]
+    [InlineData("custom/unknown", "DurableTaskRejectedException place-order custom/unknown: Grain '{0}' rejected the invocation of durable task 'place-order' (custom/unknown): rejected")]
+    [InlineData(null, "DurableTaskRejectedException place-order : Grain '{0}' rejected the invocation of durable task 'place-order': rejected")]
+    public Task RejectedScheduleWithinAnExecutionFailsWithItsCodesExceptionOnEveryReplay(string? code, string expected) => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var starterId = TaskId.Parse("starter");
-        var rootId = TaskId.CreateRoot("place-order");
         var remote = CreateRemoteRequest(1);
         var target = remote.Context!.TargetId;
         var recordId = starterId.Child($"$detach:{target}:place-order");
@@ -3759,7 +3789,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 }
                 catch (DurableTaskConflictException conflict)
                 {
-                    outcomes.Enqueue($"{conflict.TaskId}: {conflict.Message}");
+                    outcomes.Enqueue($"{nameof(DurableTaskConflictException)} {conflict.TaskId}: {conflict.Message}");
+                }
+                catch (DurableTaskRejectedException rejected)
+                {
+                    Assert.Equal(target, rejected.Target);
+                    outcomes.Enqueue($"{nameof(DurableTaskRejectedException)} {rejected.TaskId} {rejected.Code}: {rejected.Message}");
                 }
 
                 attempts[current].TrySetResult();
@@ -3768,13 +3803,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         runtime.ScheduleFromInbox(starterId, request);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await WaitUntilAsync(() => storage.Contains(recordId));
+        await WaitUntilAsync(() => storage.Contains(recordId) && transport.SentInvocations.Count == 1);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
-        // The target dead-lettered the invocation, and the outbox retires it as rejected with the target's reason.
+        // The target dead-lettered the invocation, and the outbox retires it as rejected with the target's code and reason.
         ((IOutboxMessageSource)runtime).OnRetired(
-            transport.GetInvocationMessageId(runtime.GrainId, target, rootId, recordId),
-            OutboxMessageRetirement.Rejected("rejected"));
+            Assert.Single(transport.SentInvocations),
+            OutboxMessageRetirement.Rejected("rejected", code));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await attempts[0].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
@@ -3788,8 +3823,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
         await attempts[1].Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        Assert.Equal(["place-order: rejected", "place-order: rejected"], outcomes);
-        Assert.Empty(replacementTransport.DetachedInvocations);
+        var outcome = string.Format(System.Globalization.CultureInfo.InvariantCulture, expected, target);
+        Assert.Equal([outcome, outcome], outcomes);
+        Assert.Empty(replacementTransport.SentInvocations);
         await replacement.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     });
 

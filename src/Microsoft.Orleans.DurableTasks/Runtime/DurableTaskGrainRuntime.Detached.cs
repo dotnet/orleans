@@ -26,10 +26,12 @@ namespace Orleans.DurableTasks.Runtime;
 /// retirement's journal write and records the outcome on the starting record: the record of a call to another grain, or
 /// of a detached task. The outbox retires an invocation as delivered once the task's grain has durably stored the task,
 /// which is the target's acceptance. A grain which can't store the task, because its identifier already identifies
-/// another request or caller, dead-letters the invocation, and the outbox retires it as rejected, with the grain's
-/// reason, which fails the record with a <see cref="DurableTaskConflictException"/>. An invocation which the outbox can't
-/// deliver before Messaging's <c>OutboxRetryTimeout</c> retires as dead-lettered, which fails the record with a
-/// <see cref="DurableTaskDeliveryException"/>. Awaiting the task, or a start which awaits its acceptance, throws the
+/// another request or caller, dead-letters the invocation with the <see cref="DurableTaskRejectionCodes.Conflict"/> code,
+/// and the outbox retires it as rejected, with the grain's reason, which fails the record with a
+/// <see cref="DurableTaskConflictException"/>. Another rejection, with another code or none, fails the record with a
+/// <see cref="DurableTaskRejectedException"/>, which reports the code. An invocation which the outbox can't deliver
+/// before Messaging's <c>OutboxRetryTimeout</c>, including one which the grain fails to accept, such as one which doesn't
+/// decode, retires as dead-lettered, which fails the record with a <see cref="DurableTaskDeliveryException"/>. Awaiting the task, or a start which awaits its acceptance, throws the
 /// failure, in every replay.
 /// </para>
 /// </remarks>
@@ -253,9 +255,14 @@ internal sealed partial class DurableTaskGrainRuntime
         if (!delivered && !HasStoredResult(state))
         {
             var invokedId = TryGetDetachedTask(state, out _, out var rootId) ? rootId : recordId;
-            Exception failure = retirement.Status == OutboxMessageRetirementStatus.Rejected
-                ? new DurableTaskConflictException(invokedId, retirement.Reason!)
-                : new DurableTaskDeliveryException(invokedId, invocation.Target, retirement.Reason!);
+            Exception failure = retirement.Status switch
+            {
+                OutboxMessageRetirementStatus.Rejected when retirement.Code == DurableTaskRejectionCodes.Conflict
+                    => new DurableTaskConflictException(invokedId, retirement.Reason!),
+                OutboxMessageRetirementStatus.Rejected
+                    => new DurableTaskRejectedException(invokedId, invocation.Target, retirement.Code, retirement.Reason!),
+                _ => new DurableTaskDeliveryException(invokedId, invocation.Target, retirement.Reason!),
+            };
             var response = DurableTaskResponse.FromException(failure);
             StoreResult(recordId, state, response, subscribed: true);
             _pendingHandleResponses[recordId] = response;

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.Journaling;
+using Orleans.Messaging;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
@@ -150,6 +151,9 @@ public interface IDurableTaskWorkerGrain : IGrainWithGuidKey
 {
     DurableTask<int> EchoAsync(int value);
     DurableTask<int> WaitForCancellationAsync(int value);
+
+    /// <summary>Gets the rejection codes of the worker's inbox dead letters.</summary>
+    Task<string?[]> GetInboxDeadLetterCodesAsync();
 }
 
 public sealed class DurableTaskMessagingProbe
@@ -254,8 +258,12 @@ public sealed class DurableTaskCoordinatorGrain : DurableGrain, IDurableTaskCoor
 }
 
 [GrainType("durable-task-worker-test")]
-public sealed class DurableTaskWorkerGrain(DurableTaskMessagingProbe probe) : DurableGrain, IDurableTaskWorkerGrain
+public sealed class DurableTaskWorkerGrain(DurableTaskMessagingProbe probe, IMessagingDiagnostics diagnostics)
+    : DurableGrain, IDurableTaskWorkerGrain
 {
+    public Task<string?[]> GetInboxDeadLetterCodesAsync() =>
+        Task.FromResult(diagnostics.InboxDeadLetters.Select(deadLetter => deadLetter.Code).ToArray());
+
     public DurableTask<int> EchoAsync(int value)
     {
         probe.RecordStarted(this.GetPrimaryKey());
