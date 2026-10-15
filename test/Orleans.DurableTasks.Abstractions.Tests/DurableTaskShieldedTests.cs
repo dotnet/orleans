@@ -119,6 +119,28 @@ public class DurableTaskShieldedTests
         Assert.True(log["release"]);
     }
 
+    [Fact]
+    public async Task ShieldedSignalWaitIsOutOfReachOfTheExecutionsCancellation()
+    {
+        var log = new ConcurrentDictionary<string, bool>();
+        var context = new RecordingContext(TaskId.CreateRoot("root"), log);
+        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "buyer", TestCancellation);
+
+        var response = await DurableTaskRuntimeHelper.RunAsync(
+            DurableTask.Run(async _ =>
+            {
+                var shielded = await new DurableSignal<string>("shielded").WaitAsync().Shielded();
+                var unshielded = await new DurableSignal<string>("unshielded").WaitAsync();
+                return $"{shielded}|{unshielded}";
+            }),
+            context);
+
+        // The shielded wait, which runs as part of the execution, waits with a token which the cancellation doesn't reach.
+        Assert.Equal("shielded|unshielded", response.GetResult<string>());
+        Assert.False(log["wait:shielded"]);
+        Assert.True(log["wait:unshielded"]);
+    }
+
     private static ConfiguredDurableTask Step(string name) => DurableTask.Run(static _ => { }).WithId(name);
 
     private static async Task<DurableTaskResponse> RunAsync(ConcurrentDictionary<string, bool> log, Func<Task> body)
@@ -159,6 +181,13 @@ public class DurableTaskShieldedTests
             TaskId decisionId,
             IReadOnlyList<TaskId> candidates,
             CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        /// <summary>Records whether the wait's token is canceled, and returns the signal's name as its value.</summary>
+        protected override ValueTask<DurableTaskResponse> WaitForSignalAsync(string name, CancellationToken cancellationToken)
+        {
+            log[$"wait:{name}"] = cancellationToken.IsCancellationRequested;
+            return new(DurableTaskResponse.FromResult(name));
+        }
     }
 
     private sealed class CompletedHandle(TaskId taskId, DurableTaskResponse response) : IScheduledTaskHandle

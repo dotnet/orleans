@@ -54,8 +54,8 @@ public static class DurableTaskExtensions
     public static ConfiguredDurableTask<TResult> Detached<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).Detached();
 
     /// <summary>
-    /// Returns a configuration which starts the task as an attached child which the starting execution's durable
-    /// cancellation doesn't reach.
+    /// Returns a configuration which starts the task as an attached child, or runs it as part of the execution, out of
+    /// reach of the starting execution's durable cancellation.
     /// </summary>
     /// <param name="task">The definition to start.</param>
     /// <remarks>
@@ -72,6 +72,13 @@ public static class DurableTaskExtensions
     /// <see cref="DurableTask.Run(Func{CancellationToken, Task})"/> step and the work it starts, runs to completion. A
     /// shielded combinator, such as <see cref="DurableTask.WhenAll(IReadOnlyList{DurableTask})"/>, runs as part of the
     /// execution and shields each input which it starts.
+    /// </para>
+    /// <para>
+    /// Every awaited durable operation honors the shield in the same way, whether it runs as a child or as part of the
+    /// execution: a signal wait, a delay, a subscription to an existing task, a call to another grain, and combinators
+    /// such as <c>Race</c>, <c>WhenAny</c>, <c>WaitAsync</c>, and <see cref="DurableSignal{T}.TryWaitAsync"/> complete
+    /// after the execution's cancellation, and an administrative abort ends them. A detached task is independent of the
+    /// execution, and a shield keeps the execution's cancellation from ending the execution's subscription to its result.
     /// </para>
     /// </remarks>
     public static ConfiguredDurableTask Shielded(this DurableTask task) => new ConfiguredDurableTask(task).Shielded();
