@@ -474,12 +474,13 @@ descriptor, which names the signal:
   write. The signal message can then arrive first; the receiving grain records its value,
   and the invocation observes it when it arrives.
 
-## Observe tasks which another caller started
+## Await tasks which another caller started
 
-A durable task awaits the result of an invoked task which it didn't start, such as a
-client-scheduled operation or a detached task, with the `ObserveDurableTask<TResult>`
-grain-reference extension. A webhook relay, for example, waits for an operation and then
-delivers its result:
+The `GetDurableTask<TResult>(rootId)` grain-reference extension, or its `TaskId` overload,
+returns a <xref:Orleans.DurableTasks.DurableTaskReference`1> to an existing task, such as a
+client-scheduled operation or a detached task. A durable task awaits the reference to
+subscribe to the task's result. A webhook relay, for example, waits for an operation and
+then delivers its result:
 
 ```csharp
 public async DurableTask DeliverWebhookAsync(Guid operationKey, string operationId, Uri callback)
@@ -487,7 +488,7 @@ public async DurableTask DeliverWebhookAsync(Guid operationKey, string operation
     var operation = GrainFactory.GetGrain<IOperationGrain>(operationKey);
     try
     {
-        var result = await operation.ObserveDurableTask<OperationResult>(operationId)
+        var result = await operation.GetDurableTask<OperationResult>(operationId)
             .WaitAsync(TimeSpan.FromDays(1));
         await DurableTask.Run(async ct =>
         {
@@ -502,29 +503,29 @@ public async DurableTask DeliverWebhookAsync(Guid operationKey, string operation
 }
 ```
 
-- The observation is a child of the awaiting execution, like a call to another grain:
-  awaiting it, scheduling it, or passing it to `WhenAny`, `Race`, `WaitAsync`, or
-  `WaitUntilAsync` records it under the child ID which that operation assigns. The record
-  and a subscription commit in one journal write, and a replay which reaches the record
+- In a durable task, awaiting the reference, scheduling it, or passing it to `WhenAny`,
+  `Race`, `WaitAsync`, or `WaitUntilAsync` subscribes a child of the execution, recorded
+  under the child ID which that operation assigns, like a call to another grain. The child
+  and its subscription commit in one journal write, and a replay which reaches the child
   doesn't subscribe again.
-- The subscription travels through the outbox to the observed task's grain, which sends
-  the task's terminal result through its outbox, as it does to the task's caller, and
-  retains the task until that completion retires. An observation of a terminal task
-  completes promptly. A subscription can arrive before the observed task's invocation, for
-  example when one journal write of another grain starts both the task and the observer,
-  so the observed grain holds a subscription for a task which it doesn't store until the
-  invocation arrives or Messaging's `OutboxRetryTimeout` passes. An observation of a task
-  which the grain doesn't retain as an invoked task then, because its retention ended or it
-  was never invoked, fails with `DurableTaskNotFoundException`, and replays observe the
-  same failure. Bound the wait with `WaitAsync` or `WaitUntilAsync`.
-- The observation completes with the observed task's outcome: its result, its failure, or
-  its cancellation.
-- Canceling the observation, for example when a `WaitAsync` deadline passes or a `Race`
-  input loses, ends it as canceled and ends its subscription. The observed task continues.
-- An observation of a task of the same grain subscribes and completes in task state, in
-  the journal write which stores the observed result.
-- Outside a durable task, clients and ordinary grain methods poll an existing task with
-  `GetDurableTask<TResult>(rootId)`.
+- The subscription travels through the outbox to the task's grain as an invocation without
+  a request, which neither runs nor claims the task. The grain adds the child to the task's
+  subscribers, beside the task's invoker, sends the task's result through its outbox, as it
+  does to the invoker, and retains the task until that completion retires. The child
+  completes with the task's outcome: its result, its failure, or its cancellation.
+- A subscription to a terminal task completes promptly. A subscription can arrive before
+  the task's invocation, for example when one journal write of another grain starts both
+  the task and the subscriber, so the task's grain holds it until the invocation arrives or
+  Messaging's `OutboxRetryTimeout` passes after the latest subscription arrived. A subscription to a task which the grain doesn't
+  retain as an invoked task then, because its retention ended or it was never invoked,
+  fails with `DurableTaskNotFoundException`, and replays observe the same failure. Bound the
+  wait with `WaitAsync` or `WaitUntilAsync`.
+- Canceling the child, for example when a `WaitAsync` deadline passes or a `Race` input
+  loses, ends it as canceled and ends its subscription. The task continues.
+- A subscription to a task of the same grain completes in the journal write which stores
+  the task's result.
+- Clients and ordinary grain methods await the same reference, or poll, cancel, or abort
+  the task through it, with calls to the task's grain.
 
 ## Commit model and guarantees
 
@@ -557,7 +558,7 @@ their own idempotency, for example a request key derived from the task ID.
 
 An *invoked task*, which a client or another grain scheduled, owns an execution tree:
 the task and its descendants which aren't invoked tasks themselves, such as local
-steps, delays, `DurableTask.Once` records, detach and signal-send markers, observations,
+steps, delays, `DurableTask.Once` records, detach and signal-send markers, subscriptions,
 and the records of calls to other grains. Once an invoked task is
 terminal, its grain deletes the tree:
 
@@ -567,7 +568,7 @@ terminal, its grain deletes the tree:
   detached task, `DurableTaskOptions.ResultRetentionPeriod` after completion. Polls
   during that period return the retained result, and later polls throw
   `DurableTaskNotFoundException`.
-- In either case, not before the completion to each observing durable task retires.
+- In either case, not before the completion to each subscribing durable task retires.
 
 Deleting a tree cancels its unfinished tasks. A task ID therefore deduplicates schedules
 until its task is deleted, and scheduling it after the deletion runs the request again.
