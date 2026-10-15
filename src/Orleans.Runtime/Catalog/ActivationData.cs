@@ -1944,7 +1944,11 @@ internal sealed partial class ActivationData :
                     if (_lifecycle is { } lifecycle)
                     {
                         _activationActivity?.AddEvent(new ActivityEvent("lifecycle-start"));
-                        await lifecycle.OnStart(cancellationToken).WaitAsync(cancellationToken);
+
+                        // The activation timeout cancels this token. The runtime awaits user code to completion, so the activation keeps
+                        // its registration and services while that code runs. Activation fails if the token was canceled.
+                        await lifecycle.OnStart(cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
                         _activationActivity?.AddEvent(new ActivityEvent("lifecycle-started"));
                     }
                 }
@@ -1971,7 +1975,8 @@ internal sealed partial class ActivationData :
 
                     try
                     {
-                        await grainBase.OnActivateAsync(cancellationToken).WaitAsync(cancellationToken);
+                        await grainBase.OnActivateAsync(cancellationToken);
+                        cancellationToken.ThrowIfCancellationRequested();
                     }
                     catch (Exception exception)
                     {
@@ -1979,9 +1984,8 @@ internal sealed partial class ActivationData :
                         {
                             _shared.CatalogInstruments.OnActivationFailedToActivate(_shared.GrainTypeMetricName);
 
-                            // This captures the case where user code in OnActivateAsync doesn't use the passed cancellation token
-                            // and makes a call that tries to resolve the scoped IServiceProvider or other type that has been disposed because of cancellation,
-                            // or a direct OperationCanceledException from cancellation.
+                            // User code observed activation cancellation, either by throwing OperationCanceledException
+                            // or by accessing an object which was disposed because of cancellation.
                             if (exception is ObjectDisposedException ode)
                             {
                                 LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
@@ -2127,7 +2131,9 @@ internal sealed partial class ActivationData :
                         {
                             LogBeforeOnDeactivateAsync(_shared.Logger, this);
 
-                            await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken).WaitAsync(cancellationToken);
+                            // The deactivation timeout cancels this token. The runtime awaits user code to completion before it
+                            // unregisters the activation or disposes its services.
+                            await grainBase.OnDeactivateAsync(DeactivationReason, cancellationToken);
 
                             LogAfterOnDeactivateAsync(_shared.Logger, this);
                         }
@@ -2148,7 +2154,7 @@ internal sealed partial class ActivationData :
                     {
                         // Stops the lifecycle stages which were previously started.
                         // Stages which were never started are ignored.
-                        await lifecycle.OnStop(cancellationToken).WaitAsync(cancellationToken);
+                        await lifecycle.OnStop(cancellationToken);
                     }
                 }
                 catch (Exception exception)

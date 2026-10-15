@@ -128,7 +128,9 @@ Set container or process memory limits before tuning percentage thresholds. Leav
 
 ## Activation and deactivation timeouts
 
-<xref:Orleans.Configuration.GrainCollectionOptions.ActivationTimeout> and <xref:Orleans.Configuration.GrainCollectionOptions.DeactivationTimeout> both default to 30 seconds. These are runtime safety bounds, not goals. Keep <xref:Orleans.Grain.OnActivateAsync*> and <xref:Orleans.Grain.OnDeactivateAsync*>, state access, and dependency calls cancellable and normally much faster.
+<xref:Orleans.Configuration.GrainCollectionOptions.ActivationTimeout> and <xref:Orleans.Configuration.GrainCollectionOptions.DeactivationTimeout> both default to 30 seconds. When a timeout elapses, Orleans cancels the <xref:System.Threading.CancellationToken> passed to <xref:Orleans.Grain.OnActivateAsync*>, <xref:Orleans.Grain.OnDeactivateAsync*>, and grain lifecycle participants, then waits for that code to complete. The activation keeps its grain directory registration and activation-scoped services until those callbacks return. If the activation timeout elapses, activation fails after the callbacks return. If the deactivation timeout elapses, deactivation continues after the callbacks return.
+
+Pass the token to state access and dependency calls so that callbacks complete promptly after cancellation. Keep these callbacks normally much faster than the timeouts.
 
 ## Tune from measurements
 
