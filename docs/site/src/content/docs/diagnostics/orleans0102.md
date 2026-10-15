@@ -29,7 +29,7 @@ A replay runs the code before the body's last durable operation again, including
 
 A step records its result, so a replay returns the result without awaiting the operation again.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the rules and the replay model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 
 ## How to fix violations
 
@@ -45,7 +45,7 @@ For the replay model, see [Replay and determinism](../grains/durable-tasks.md#re
 
 :::code source="snippets/durable-tasks/Orleans0102.cs" id="orleans0102_fix_tail" language="csharp":::
 
-A step which ends before its result commits runs again, and so does the tail of a run which ends before the task's result commits. An external operation in a step or the tail therefore runs at least once, so give it an idempotency key derived from the task, such as `$"{grainId}/{DurableTask.Current.Id}"`, when it changes another system.
+A step which ends before its result commits runs again, and so does the tail of a run which ends before the task's result commits. An external operation in a step or the tail therefore runs at least once, so give it an idempotency key derived from the task, such as `$"{grainId}/{DurableTask.Current.Id}"`, when it changes another system; see [Idempotency in durable tasks](../grains/durable-tasks-idempotency.md) and [Integrate durable tasks with other systems](../grains/durable-tasks-integrations.md).
 
 ## When to suppress
 

@@ -29,7 +29,7 @@ A replay runs the body from the start, so it produces another value:
 - **Another key.** A replay which reaches the `charge` step before it recorded a result runs the step with a new key, so the payment provider can't recognize the retry and charges again.
 - **Divergence.** A value which reaches a durable call's arguments, a `WithId` name, or a branch makes the replay schedule a different operation than the one which the first run recorded, and the operation fails with a divergence error.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the rules and the replay model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 
 ## How to fix violations
 
@@ -37,7 +37,7 @@ For the replay model, see [Replay and determinism](../grains/durable-tasks.md#re
 
 :::code source="snippets/durable-tasks/Orleans0101.cs" id="orleans0101_fix" language="csharp":::
 
-**Derive identifiers from the task's identity.** The grain and `DurableTask.Current.Id` name the execution in every replay, so a key built from them is stable without a record:
+**Derive identifiers from the task's identity.** The grain and `DurableTask.Current.Id` name the execution in every replay, so a key built from them is stable without a record; see [Derive idempotency keys from the task](../grains/durable-tasks-idempotency.md#derive-idempotency-keys-from-the-task):
 
 :::code source="snippets/durable-tasks/Orleans0101.cs" id="orleans0101_fix_task_id" language="csharp":::
 
