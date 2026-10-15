@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-using Orleans.DurableTasks.Storage;
 using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Protocol;
@@ -15,4 +13,4 @@ namespace Orleans.DurableTasks.Protocol;
 [Alias("Orleans.DurableTasks.Protocol.DurableTaskSubscriber")]
 public readonly record struct DurableTaskSubscriber(
     [property: Id(0)] GrainId GrainId,
-    [property: Id(1), JsonConverter(typeof(TaskIdJsonConverter))] TaskId TaskId);
+    [property: Id(1)] TaskId TaskId);

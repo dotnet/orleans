@@ -198,7 +198,12 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
 
     /// <summary>Gets a handle for the root task <paramref name="taskId"/> of the request's target.</summary>
     internal static IScheduledTaskHandle GetHandle(DurableTaskRequestShared shared, IDurableTaskRequest request, TaskId taskId) =>
-        new GrainScheduledTaskHandle(taskId, request, GetServer(shared, request.Context!.TargetId), lastResponse: null);
+        new GrainScheduledTaskHandle(
+            taskId,
+            request.Context!.TargetId,
+            request,
+            GetServer(shared, request.Context.TargetId),
+            lastResponse: null);
 
     /// <summary>
     /// Gets the server of <paramref name="target"/>'s tasks: the runtime of the grain which runs the calling code, when it's
@@ -449,9 +454,19 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     public IScheduledTaskHandle GetHandle(TaskId taskId) => DurableTaskRequest.GetHandle(_shared, this, taskId);
 }
 
-internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskRequest? request, IDurableTaskServer grain, DurableTaskResponse? lastResponse) : IScheduledTaskHandle
+/// <summary>The handle of a root task of <paramref name="target"/>, which code outside a durable execution observes.</summary>
+internal sealed class GrainScheduledTaskHandle(
+    TaskId taskId,
+    GrainId target,
+    IDurableTaskRequest? request,
+    IDurableTaskServer grain,
+    DurableTaskResponse? lastResponse) : IScheduledTaskHandle
 {
     public TaskId TaskId { get; } = taskId;
+
+    /// <summary>Returns the task's <see cref="DurableTaskAddress"/>, as <see cref="IDurableTaskReference"/>.</summary>
+    public TFeature? GetFeature<TFeature>()
+        where TFeature : class => new DurableTaskAddress(target, TaskId) as TFeature;
     public DurableTaskResponse? LastResponse { get; private set; } = lastResponse;
 
     public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
