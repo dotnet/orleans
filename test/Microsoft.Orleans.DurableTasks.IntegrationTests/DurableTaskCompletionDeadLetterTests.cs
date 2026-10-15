@@ -8,6 +8,7 @@ using Orleans.Messaging.Configuration;
 using Orleans.Messaging.Diagnostics;
 using Orleans.TestingHost.Diagnostics;
 using Xunit;
+using Orleans.DurableTasks.Runtime;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 
@@ -95,7 +96,7 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
         Assert.Single(await callee.GetOutboxDeadLettersAsync());
 
         // The dead-lettered completion retains its result for polling, and polling surfaces the decoding failure.
-        var childId = TaskId.CreateRoot("fragile-root").Child(FragileResultCallerGrain.CallId);
+        var childId = CallerScope.GetTaskId(caller.GetGrainId(), TaskId.CreateRoot("fragile-root").Child(FragileResultCallerGrain.CallId));
         var error = await Assert.ThrowsAnyAsync<Exception>(() => callee.AsReference<IDurableTaskGrainExtension>()
             .SubscribeOrPollAsync(childId, new SubscribeOrPollOptions { PollTimeout = TimeSpan.Zero }, cancellationToken).AsTask());
         Assert.Contains(FragileResultHooks.Error, error.ToString(), StringComparison.Ordinal);

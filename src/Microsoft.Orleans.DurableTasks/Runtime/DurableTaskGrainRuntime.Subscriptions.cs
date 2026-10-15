@@ -218,7 +218,7 @@ internal sealed partial class DurableTaskGrainRuntime
     {
         if (!_storage.TryGetTask(taskId, out var state)
             || HasStoredResult(state)
-            || subscriber == new DurableTaskSubscriber(state.CallerId, taskId)
+            || subscriber == GetInvoker(state.CallerId, taskId)
             || !state.CompletionDestinations.Contains(subscriber))
         {
             return;

@@ -384,6 +384,29 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void CallerScopeMapsEachCallersChildToItsOwnTaskAndBack()
+    {
+        // The caller's key contains the separator, which the scope escapes.
+        var caller = GrainId.Create("caller", "tenant/one");
+        var other = GrainId.Create("caller", "two");
+        var childId = TaskId.Parse("place-order/reserve");
+
+        var scoped = CallerScope.GetTaskId(caller, childId);
+
+        Assert.Equal(CallerScope.Root.Child(caller.ToString()), scoped.Parent().Parent());
+        Assert.NotEqual(scoped, CallerScope.GetTaskId(other, childId));
+        Assert.Equal(scoped, CallerScope.Resolve(caller, childId));
+        Assert.Equal(childId, CallerScope.GetCallerTaskId(caller, scoped));
+        Assert.Equal(scoped, CallerScope.GetCallerTaskId(other, scoped));
+        Assert.Equal(childId, CallerScope.GetCallerTaskId(default, childId));
+
+        // A root ID addresses the target's root task itself, and the scopes' root is reserved.
+        Assert.Equal(TaskId.CreateRoot("detached"), CallerScope.Resolve(caller, TaskId.CreateRoot("detached")));
+        Assert.Throws<ArgumentException>(() => CallerScope.ThrowIfReserved(CallerScope.Root));
+        CallerScope.ThrowIfReserved(TaskId.CreateRoot("place-order"));
+    }
+
+    [Fact]
     public void CancellationReplayUsesStableSubjectScopedMessageIdentity()
     {
         var outbox = new RecordingOutbox();

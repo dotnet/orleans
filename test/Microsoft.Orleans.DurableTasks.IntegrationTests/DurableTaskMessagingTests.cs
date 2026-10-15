@@ -5,6 +5,7 @@ using Orleans.DurableTasks.Protocol;
 using Orleans.Journaling;
 using Orleans.Messaging;
 using Xunit;
+using Orleans.DurableTasks.Runtime;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 
@@ -102,9 +103,9 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         var workerId = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey).GetGrainId();
         for (var index = 0; index < FanOut; index++)
         {
-            // The worker retains each canceled child's terminal state under the caller's child identity until the
-            // caller's inbox accepts its completion, then deletes it.
-            var childId = TaskId.CreateRoot("fan-out").Child($"wait-{index}");
+            // The worker retains each canceled child's terminal state under the caller's scope until the caller's inbox
+            // accepts its completion, then deletes it.
+            var childId = CallerScope.GetTaskId(coordinator.GetGrainId(), TaskId.CreateRoot("fan-out").Child($"wait-{index}"));
             Assert.Equal(DurableTaskStatus.Canceled, (await events.WaitForCompletedAsync(workerId, childId)).Status);
             await events.WaitForDeletedAsync(workerId, childId);
         }

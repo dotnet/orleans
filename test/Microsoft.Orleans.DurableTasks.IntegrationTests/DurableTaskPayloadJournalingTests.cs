@@ -5,6 +5,7 @@ using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.Journaling;
 using Xunit;
+using Orleans.DurableTasks.Runtime;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
 
@@ -41,7 +42,7 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
         Assert.True(response.GetResult<bool>());
 
         // The caller's inbox accepted the completion, so the callee's outbox retires it and deletes the task.
-        var childId = TaskId.CreateRoot("payload-call").Child(PayloadCallerGrain.CallId);
+        var childId = CallerScope.GetTaskId(caller.GetGrainId(), TaskId.CreateRoot("payload-call").Child(PayloadCallerGrain.CallId));
         await events.WaitForDeletedAsync(worker.GetGrainId(), childId);
 
         var callerJournal = await ReadJournalAsync(caller.GetGrainId());
