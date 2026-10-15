@@ -99,6 +99,11 @@ namespace Orleans.DurableTasks
         public readonly void UnsafeOnCompleted(System.Action continuation) { }
     }
 
+    public static partial class DurableTaskReferenceExtensions
+    {
+        public static DurableTaskReferenceAwaiter<TResult> GetAwaiter<TResult>(this DurableTaskReference<TResult> reference) { throw null; }
+    }
+
     public sealed partial class DurableTaskReference<TResult> : DurableTask<TResult>
     {
         internal DurableTaskReference() { }
@@ -112,8 +117,6 @@ namespace Orleans.DurableTasks
         public System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-        public DurableTaskReferenceAwaiter<TResult> GetAwaiter() { throw null; }
 
         public System.Threading.Tasks.Task<DurableTaskResponse> GetResponseAsync(PollingOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 

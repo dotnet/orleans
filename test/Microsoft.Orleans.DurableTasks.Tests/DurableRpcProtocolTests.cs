@@ -384,6 +384,17 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void DurableTaskReferenceIsAwaitableOnlyThroughItsExtension()
+    {
+        // ASP.NET Core Minimal APIs reject a handler whose return type has an instance GetAwaiter, so a handler returns a
+        // reference as a value.
+        Assert.Null(typeof(DurableTaskReference<int>).GetMethod(nameof(DurableTaskReferenceExtensions.GetAwaiter), BindingFlags.Public | BindingFlags.Instance));
+        Assert.Equal(
+            typeof(DurableTaskReferenceAwaiter<int>),
+            typeof(DurableTaskReferenceExtensions).GetMethod(nameof(DurableTaskReferenceExtensions.GetAwaiter))!.MakeGenericMethod(typeof(int)).ReturnType);
+    }
+
+    [Fact]
     public void CallerScopeMapsEachCallersChildToItsOwnTaskAndBack()
     {
         // The caller's key contains the separator, which the scope escapes.
