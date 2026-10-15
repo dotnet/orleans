@@ -14,7 +14,7 @@ namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
 /// <remarks>
 /// A workflow calls the partner's gated step, which waits for a gate the test opens. The partner's activation ends while the
 /// step runs: it deactivates, its silo shuts down or crashes, or its journal write fails. Only the client polls the
-/// workflow's grain, and the Durable Jobs clock follows real time, as the wake-ups do.
+/// workflow's grain.
 /// </remarks>
 public abstract class DurableTaskRunnableWakeupTests(string journalFormatKey) : IAsyncLifetime
 {
@@ -36,7 +36,7 @@ public abstract class DurableTaskRunnableWakeupTests(string journalFormatKey) : 
     [Fact]
     public async Task DeactivationWhileAStepRunsResumesTheStep()
     {
-        var (workflow, partnerKey, partner) = await StartGatedStepAsync(silo: null);
+        var (workflow, partnerKey, partner) = await StartGatedStepAsync();
         Assert.True(_harness.Fixture.Cluster.TryGetGrainContext(partner.GetGrainId(), out var activation));
 
         await partner.DeactivateAsync();
@@ -49,8 +49,8 @@ public abstract class DurableTaskRunnableWakeupTests(string journalFormatKey) : 
     [Fact]
     public async Task SiloShutdownWhileAStepRunsResumesTheStepOnAnotherSilo()
     {
-        var silo = _harness.Fixture.Cluster.Silos[^1];
-        var (workflow, partnerKey, partner) = await StartGatedStepAsync(silo);
+        var (workflow, partnerKey, partner) = await StartGatedStepAsync();
+        var silo = GetSilo(partner);
 
         await _harness.Fixture.Cluster.StopSiloAsync(silo, CancellationToken);
         _harness.Gates.Open(partnerKey);
@@ -61,8 +61,8 @@ public abstract class DurableTaskRunnableWakeupTests(string journalFormatKey) : 
     [Fact]
     public async Task SiloCrashWhileAStepRunsResumesTheStepOnAnotherSilo()
     {
-        var silo = _harness.Fixture.Cluster.Silos[^1];
-        var (workflow, partnerKey, partner) = await StartGatedStepAsync(silo);
+        var (workflow, partnerKey, partner) = await StartGatedStepAsync();
+        var silo = GetSilo(partner);
 
         await _harness.Fixture.Cluster.KillSiloAsync(silo, CancellationToken);
         await _harness.Fixture.Cluster.WaitForLivenessToStabilizeAsync(didKill: true);
@@ -77,9 +77,8 @@ public abstract class DurableTaskRunnableWakeupTests(string journalFormatKey) : 
     [InlineData(FaultPoint.JournalWriteAfterDurable)]
     public async Task FailedWriteWhileAStepRunsResumesTheStep(FaultPoint point)
     {
-        var (workflow, partnerKey, partner) = await StartGatedStepAsync(silo: null);
-        var writes = _harness.Injector.Count(FaultPoint.JournalWriteBeforeDurable, partner.GetGrainId());
-        await _harness.SettleAsync([writes], CancellationToken);
+        var (workflow, partnerKey, partner) = await StartGatedStepAsync();
+        // The step started once the write which recorded it completed, so the partner's next write records its result.
         var fault = _harness.Injector.Arm(point, partner.GetGrainId(), 0);
 
         _harness.Gates.Open(partnerKey);
@@ -88,15 +87,13 @@ public abstract class DurableTaskRunnableWakeupTests(string journalFormatKey) : 
         Assert.True(fault.HasFired, $"{fault} didn't fire.");
     }
 
-    /// <summary>
-    /// Starts the workflow's call to the partner's gated step, on <paramref name="silo"/> when provided, and waits until the
-    /// step runs.
-    /// </summary>
-    private async Task<(IFaultWorkflowGrain Workflow, Guid PartnerKey, IFaultPartnerGrain Partner)> StartGatedStepAsync(InProcessSiloHandle? silo)
+    /// <summary>Starts the workflow's call to the partner's gated step, and waits until the step runs.</summary>
+    private async Task<(IFaultWorkflowGrain Workflow, Guid PartnerKey, IFaultPartnerGrain Partner)> StartGatedStepAsync()
     {
         _harness.Injector.Reset();
         var workflow = _harness.Client.GetGrain<IFaultWorkflowGrain>(Guid.NewGuid());
-        var (partnerKey, partner) = silo is null ? NewPartner() : await ActivatePartnerOnAsync(silo);
+        var partnerKey = Guid.NewGuid();
+        var partner = _harness.Client.GetGrain<IFaultPartnerGrain>(partnerKey);
         _wakeups = _harness.Injector.Count(FaultPoint.JobWakeupFails, partner.GetGrainId());
         await _harness.CallAsync(token => workflow.CallGatedAsync(partnerKey, Value).WithId("gated").ScheduleAsync(token), CancellationToken);
         await _harness.Fixture.MessagingProbe.WaitForStartedAsync(partnerKey, 1).WaitAsync(DurableTaskFaultHarness.RunTimeout, CancellationToken);
@@ -104,36 +101,18 @@ public abstract class DurableTaskRunnableWakeupTests(string journalFormatKey) : 
     }
 
 
-    private (Guid Key, IFaultPartnerGrain Grain) NewPartner()
+    /// <summary>Gets the silo which hosts the partner's activation; the cluster's other silo remains.</summary>
+    private InProcessSiloHandle GetSilo(IFaultPartnerGrain partner)
     {
-        var key = Guid.NewGuid();
-        return (key, _harness.Client.GetGrain<IFaultPartnerGrain>(key));
+        Assert.True(_harness.Fixture.Cluster.TryGetGrainContext(partner.GetGrainId(), out var context));
+        return _harness.Fixture.Cluster.Silos.Single(silo => silo.SiloAddress.Equals(context.Address.SiloAddress));
     }
-
-    /// <summary>Activates fresh partners until placement puts one on <paramref name="silo"/>.</summary>
-    private async Task<(Guid Key, IFaultPartnerGrain Grain)> ActivatePartnerOnAsync(InProcessSiloHandle silo)
-    {
-        await _harness.Fixture.Cluster.WaitForLivenessToStabilizeAsync();
-        for (var attempt = 0; attempt < 100; attempt++)
-        {
-            var (key, partner) = NewPartner();
-            await partner.GetStateAsync();
-            if (_harness.Fixture.Cluster.TryGetGrainContext(partner.GetGrainId(), out var context)
-                && silo.SiloAddress.Equals(context.Address.SiloAddress))
-            {
-                return (key, partner);
-            }
-        }
-
-        throw new InvalidOperationException($"No partner was placed on {silo.SiloAddress} in 100 activations.");
-    }
-
     private async Task AssertCompletesAsync(IFaultWorkflowGrain workflow, IFaultPartnerGrain partner)
     {
         DurableTaskResponse response;
         try
         {
-            response = await _harness.RunAsync<int>(workflow, "gated", static _ => Task.CompletedTask, CancellationToken, advanceClock: false);
+            response = await _harness.RunAsync<int>(workflow, "gated", static _ => Task.CompletedTask, CancellationToken);
         }
         catch (TimeoutException exception)
         {
