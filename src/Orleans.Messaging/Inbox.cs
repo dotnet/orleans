@@ -94,7 +94,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
                 // A sender whose answer was lost delivers again, so it receives the rejection which a sink first answered.
                 return pending is null && _rejections.TryGetValue(key, out var rejection)
-                    ? DeliveryResult.DeadLettered(rejection.Reason)
+                    ? DeliveryResult.DeadLettered(rejection.Reason, rejection.Code)
                     : DeliveryResult.Duplicate();
             }
 
@@ -236,7 +236,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 else
                 {
                     LogSinkDeadLettered(Logger, error, key, GrainContext.GrainId, reason);
-                    StageDeadLetter(message, reason, attemptCount: 1, new() { Reason = reason });
+                    StageDeadLetter(message, reason, attemptCount: 1, result.Code, new() { Reason = reason, Code = result.Code });
                 }
             }
             catch (Exception exception)
@@ -249,7 +249,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, accepted ? "accepted" : "dead_lettered");
             Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, accepted ? "success" : "dead_lettered");
-            if (!accepted) return DeliveryResult.DeadLettered(reason);
+            if (!accepted) return DeliveryResult.DeadLettered(reason, result.Code);
             LogMessageAccepted(Logger, key, GrainContext.GrainId);
             return DeliveryResult.Accepted();
         }
@@ -426,7 +426,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             Rejection = rejection
         });
 
-    private void StageDeadLetter(InboxMessage message, string reason, int attemptCount, InboxRejection? rejection = null)
+    private void StageDeadLetter(InboxMessage message, string reason, int attemptCount, string? code = null, InboxRejection? rejection = null)
     {
         var now = TimeProvider.GetUtcNow();
         var key = message.Envelope.MessageId;
@@ -436,7 +436,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             Message = message,
             DeadLetteredAt = now,
             Reason = reason,
-            AttemptCount = attemptCount
+            AttemptCount = attemptCount,
+            Code = code
         }, rejection);
     }
 

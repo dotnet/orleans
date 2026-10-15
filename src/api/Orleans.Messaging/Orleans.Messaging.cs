@@ -30,6 +30,9 @@ namespace Orleans.Messaging
         [Id(3)]
         public int AttemptCount { get { throw null; } init { } }
 
+        [Id(4)]
+        public string? Code { get { throw null; } init { } }
+
         [Id(1)]
         public System.DateTimeOffset DeadLetteredAt { get { throw null; } init { } }
 
@@ -46,6 +49,9 @@ namespace Orleans.Messaging
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
+        [Id(2)]
+        public string? Code { get { throw null; } init { } }
+
         [Id(1)]
         public string? Message { get { throw null; } init { } }
 
@@ -56,7 +62,7 @@ namespace Orleans.Messaging
 
         public static DeliveryResult Backpressured() { throw null; }
 
-        public static DeliveryResult DeadLettered(string reason) { throw null; }
+        public static DeliveryResult DeadLettered(string reason, string? code = null) { throw null; }
 
         public static DeliveryResult Duplicate() { throw null; }
 
@@ -349,6 +355,8 @@ namespace Orleans.Messaging
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
+        public string? Code { get { throw null; } init { } }
+
         public string? Reason { get { throw null; } init { } }
 
         public OutboxMessageRetirementStatus Status { get { throw null; } init { } }
@@ -357,7 +365,7 @@ namespace Orleans.Messaging
 
         public static OutboxMessageRetirement Delivered() { throw null; }
 
-        public static OutboxMessageRetirement Rejected(string reason) { throw null; }
+        public static OutboxMessageRetirement Rejected(string reason, string? code = null) { throw null; }
     }
 
     public enum OutboxMessageRetirementStatus

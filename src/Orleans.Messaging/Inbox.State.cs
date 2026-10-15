@@ -252,6 +252,7 @@ internal sealed class InboxProcessedEntry
 internal sealed class InboxRejection
 {
     [Id(0)] public required string Reason { get; init; }
+    [Id(1)] public string? Code { get; init; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxEntry")]

@@ -84,6 +84,13 @@ public readonly struct OutboxMessageRetirement
     /// </summary>
     public string? Reason { get; init; }
 
+    /// <summary>
+    /// Gets the application-defined code which the receiver's inbox message sink reported with a rejection, as
+    /// <see cref="DeliveryResult.Code"/>; <see langword="null"/> when the receiver reported none or the message didn't
+    /// retire as <see cref="OutboxMessageRetirementStatus.Rejected"/>.
+    /// </summary>
+    public string? Code { get; init; }
+
     /// <summary>Creates a retirement of a message which the receiver durably accepted or reported as a duplicate.</summary>
     public static OutboxMessageRetirement Delivered() => new() { Status = OutboxMessageRetirementStatus.Delivered };
 
@@ -95,10 +102,13 @@ public readonly struct OutboxMessageRetirement
     };
 
     /// <summary>Creates a retirement of a message which the receiver dead-lettered for <paramref name="reason"/>.</summary>
-    public static OutboxMessageRetirement Rejected(string reason) => new()
+    /// <param name="reason">The reason which the receiver reported.</param>
+    /// <param name="code">The application-defined code which the receiver reported, if any.</param>
+    public static OutboxMessageRetirement Rejected(string reason, string? code = null) => new()
     {
         Status = OutboxMessageRetirementStatus.Rejected,
-        Reason = reason
+        Reason = reason,
+        Code = code
     };
 }
 

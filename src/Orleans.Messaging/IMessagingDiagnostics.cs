@@ -80,6 +80,13 @@ public sealed class DeadLetter<TMessage>
     /// </summary>
     [Id(3)]
     public int AttemptCount { get; init; }
+
+    /// <summary>
+    /// Gets the application-defined code which an inbox message sink reported when it dead-lettered the message, or
+    /// <see langword="null"/>.
+    /// </summary>
+    [Id(4)]
+    public string? Code { get; init; }
 }
 
 internal sealed class MessagingDiagnostics(Inbox inbox, Outbox outbox) : IMessagingDiagnostics
@@ -90,7 +97,8 @@ internal sealed class MessagingDiagnostics(Inbox inbox, Outbox outbox) : IMessag
             Message = entry.Message,
             DeadLetteredAt = entry.DeadLetteredAt,
             Reason = entry.Reason,
-            AttemptCount = entry.AttemptCount
+            AttemptCount = entry.AttemptCount,
+            Code = entry.Code
         }).ToList();
 
     public IReadOnlyList<DeadLetter<OutboxMessage>> OutboxDeadLetters =>

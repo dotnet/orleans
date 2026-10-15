@@ -118,8 +118,9 @@ construction or activation setup, before journal recovery.
   `OnRetired`, and an attempt already in flight still completes. When the message
   retires, the outbox calls `OnRetired` with an `OutboxMessageRetirement` whose
   `Status` is `Delivered` (`Accepted` or `Duplicate`), `Rejected` (the receiver
-  dead-lettered it) or `DeadLettered` (the outbox dead-lettered it), and whose
-  `Reason` carries the dead letter's reason, while it stages the removal, so the
+  dead-lettered it) or `DeadLettered` (the outbox dead-lettered it), whose
+  `Reason` carries the dead letter's reason, and whose `Code` carries the code of a
+  `Rejected` message's receiver, while it stages the removal, so the
   source's changes commit in the same journal write. An outbox dead letter stores the
   materialized message. After the send, a source that throws or returns an invalid
   message, such as one with a different ID, dead-letters that entry alone in the
@@ -141,10 +142,12 @@ construction or activation setup, before journal recovery.
   - `Duplicate`: the sink already holds the message.
   - `Backpressured`: the sink is at capacity, so the sender retries. A self-sent
     message fails its `Send` instead.
-  - `DeadLettered`: the inbox dead-letters the message with the sink's reason. A
-    sink that throws or reports another status is treated the same way. The processed
-    record keeps the reason, so a duplicate within `DeduplicationWindow`, such as a
-    retry whose first answer was lost, receives the same rejection.
+  - `DeadLettered`: the inbox dead-letters the message with the sink's reason and
+    optional application-defined `Code`, such as `orders/duplicate-order`, and the
+    sender's source receives both in a `Rejected` retirement. A sink that throws or
+    reports another status is treated the same way, with no code. The processed
+    record keeps the reason and code, so a duplicate within `DeduplicationWindow`,
+    such as a retry whose first answer was lost, receives the same rejection.
 
   Sink-owned messages never occupy capacity and have no inbox retry lifecycle; the
   sink honors their `DeliverAt`. Declined messages follow the handler path once

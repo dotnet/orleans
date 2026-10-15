@@ -126,12 +126,14 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         await WaitUntilAsync(sender, _ => Storage.CountPayloadOccurrences(Journal(sender), payload) == 2);
     }
 
-    [Fact]
-    public async Task SourceMessage_DeadLetteredByTheReceiver_RetiresAsRejectedWithTheReceiversReason()
+    [Theory]
+    [InlineData(SinkMode.Throw, null)]
+    [InlineData(SinkMode.DeadLetter, SourceSinkGrain.RejectionCode)]
+    public async Task SourceMessage_DeadLetteredByTheReceiver_RetiresAsRejectedWithTheReceiversReasonAndCode(SinkMode mode, string? code)
     {
         var sender = NewGrain();
         var receiver = NewGrain();
-        Probe.For(receiver).Mode = SinkMode.Throw;
+        Probe.For(receiver).Mode = mode;
         var messageId = NewMessageId("receiver-dead-letter");
         var payload = NewPayload();
 
@@ -143,12 +145,14 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
             context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
         Assert.Equal(nameof(OutboxMessageRetirementStatus.Rejected), state.Retired[messageId.ToString()]);
         Assert.Equal(SourceSinkGrain.Rejection, (await OnGrainAsync(sender, context => Grain(context).GetRetirementReasons()))[messageId.ToString()]);
+        Assert.Equal(code, (await OnGrainAsync(sender, context => Grain(context).GetRetirementCodes())).GetValueOrDefault(messageId.ToString()));
         Assert.Empty(state.Outgoing);
         Assert.Empty(outboxDeadLetters);
         var inboxLetter = Assert.Single(await OnGrainAsync(receiver, context =>
             context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().InboxDeadLetters));
         Assert.Equal(payload, inboxLetter.Message.Envelope.Payload);
         Assert.Equal(SourceSinkGrain.Rejection, inboxLetter.Reason);
+        Assert.Equal(code, inboxLetter.Code);
     }
 
     [Fact]
@@ -465,10 +469,10 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     }
 
     [Theory]
-    [InlineData(SinkMode.Throw, SourceSinkGrain.Rejection)]
-    [InlineData(SinkMode.DeadLetter, SourceSinkGrain.Rejection)]
-    [InlineData(SinkMode.UnsupportedStatus, "The inbox message sink reported the unsupported delivery status 'HandlerNotFound'.")]
-    public async Task SinkRejection_DeadLettersTheMessageAndAnswersItsDuplicatesWithTheSameRejection(SinkMode mode, string reason)
+    [InlineData(SinkMode.Throw, SourceSinkGrain.Rejection, null)]
+    [InlineData(SinkMode.DeadLetter, SourceSinkGrain.Rejection, SourceSinkGrain.RejectionCode)]
+    [InlineData(SinkMode.UnsupportedStatus, "The inbox message sink reported the unsupported delivery status 'HandlerNotFound'.", null)]
+    public async Task SinkRejection_DeadLettersTheMessageAndAnswersItsDuplicatesWithTheSameRejection(SinkMode mode, string reason, string? code)
     {
         var receiver = NewGrain();
         Probe.For(receiver).Mode = mode;
@@ -482,6 +486,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
         Assert.Equal(DeliveryStatus.DeadLettered, result.Status);
         Assert.Equal(reason, result.Message);
+        Assert.Equal(code, result.Code);
         var grainType = receiver.GetGrainId().Type.ToString();
         Assert.Single(metrics.Read("inbox-messages-received")).AssertCounter(grainType, "dead_lettered");
         Assert.Single(metrics.Read("inbox-messages-processed")).AssertCounter(grainType, "dead_lettered");
@@ -494,6 +499,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var letter = Assert.Single(letters);
         Assert.Equal(payload, letter.Message.Envelope.Payload);
         Assert.Equal(reason, letter.Reason);
+        Assert.Equal(code, letter.Code);
         Assert.Equal(1, letter.AttemptCount);
         Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(receiver), payload));
 
@@ -518,6 +524,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         {
             Assert.Equal(DeliveryStatus.DeadLettered, duplicate.Status);
             Assert.Equal(reason, duplicate.Message);
+            Assert.Equal(code, duplicate.Code);
         }
     }
 
@@ -812,6 +819,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
 {
     internal const string Subject = "source-sink/payload";
     internal const string Rejection = "The sink rejected the message.";
+    internal const string RejectionCode = "source-sink/rejected";
     internal const string SourceFailure = "The source can't decode the stored message.";
     private readonly IJournaledStateManager _manager;
     private readonly IOutbox _outbox;
@@ -820,6 +828,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
     private readonly IDurableDictionary<string, byte[]> _received;
     private readonly IDurableDictionary<string, string> _retired;
     private readonly IDurableDictionary<string, string> _reasons;
+    private readonly IDurableDictionary<string, string> _codes;
     private readonly SourceSinkProbe.Counters _probe;
 
     public SourceSinkGrain(
@@ -832,6 +841,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         [FromKeyedServices("received")] IDurableDictionary<string, byte[]> received,
         [FromKeyedServices("retired")] IDurableDictionary<string, string> retired,
         [FromKeyedServices("reasons")] IDurableDictionary<string, string> reasons,
+        [FromKeyedServices("codes")] IDurableDictionary<string, string> codes,
         SourceSinkProbe probe)
     {
         _manager = manager;
@@ -841,6 +851,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         _received = received;
         _retired = retired;
         _reasons = reasons;
+        _codes = codes;
         _probe = probe.For(context.GrainId);
         _probe.OnActivated();
         outbox.Register(this);
@@ -852,6 +863,9 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
 
     /// <summary>Gets the reasons of this source's dead-lettered messages, by message ID.</summary>
     internal Dictionary<string, string> GetRetirementReasons() => new(_reasons);
+
+    /// <summary>Gets the receivers' rejection codes for this source's rejected messages, by message ID.</summary>
+    internal Dictionary<string, string> GetRetirementCodes() => new(_codes);
 
     /// <summary>Stores an outgoing message in the source's state without sending it.</summary>
     internal void StoreOutgoing(GrainId receiver, MessageId messageId, byte[] payload)
@@ -942,6 +956,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         Assert.True(_receivers.Remove(key));
         _retired[key] = retirement.Status.ToString();
         if (retirement.Reason is { } reason) _reasons[key] = reason;
+        if (retirement.Code is { } code) _codes[key] = code;
     }
 
     bool IInboxMessageSink.TryAccept(InboxMessage message, out DeliveryResult result)
@@ -957,7 +972,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
             case SinkMode.Throw:
                 throw new InvalidOperationException(Rejection);
             case SinkMode.DeadLetter:
-                result = DeliveryResult.DeadLettered(Rejection);
+                result = DeliveryResult.DeadLettered(Rejection, RejectionCode);
                 return true;
             case SinkMode.Backpressure:
                 result = DeliveryResult.Backpressured();
