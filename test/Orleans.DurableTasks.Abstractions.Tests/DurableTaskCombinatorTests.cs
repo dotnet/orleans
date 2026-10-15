@@ -109,7 +109,7 @@ public class DurableTaskCombinatorTests
             }
         });
 
-        Assert.Equal("failed", await await root.ScheduleAsync("root", TestCancellation));
+        Assert.Equal("failed", await await root.WithId("root").ScheduleAsync(TestCancellation));
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public class DurableTaskCombinatorTests
             return DurableTaskResponse.FromResult((await whenAll, await whenAny));
         });
 
-        var result = await await root.ScheduleAsync("root", TestCancellation);
+        var result = await await root.WithId("root").ScheduleAsync(TestCancellation);
 
         Assert.Equal([1, 2, 3], result.All);
         Assert.Equal((0, 1), result.Any);
@@ -170,7 +170,7 @@ public class DurableTaskCombinatorTests
             return DurableTaskResponse.FromResult((all, any));
         });
 
-        var result = await await root.ScheduleAsync("root", TestCancellation);
+        var result = await await root.WithId("root").ScheduleAsync(TestCancellation);
 
         Assert.Equal([1, 2], result.All);
         Assert.Equal(0, result.Any);
@@ -212,7 +212,7 @@ public class DurableTaskCombinatorTests
                 return DurableTaskResponse.FromResult(await DurableTask.WhenAny([DurableTask.Run(static _ => { })]).WithId("race"));
             });
 
-            await await root.ScheduleAsync("root", Xunit.TestContext.Current.CancellationToken);
+            await await root.WithId("root").ScheduleAsync(Xunit.TestContext.Current.CancellationToken);
             return (host.EntryIds.Where(static id => id != RootId).ToArray(), host.DecisionIds);
         }
     }
@@ -242,7 +242,7 @@ public class DurableTaskCombinatorTests
             return DurableTaskResponse.FromResult(await scheduled);
         });
 
-        var result = await await root.ScheduleAsync("root", TestCancellation);
+        var result = await await root.WithId("root").ScheduleAsync(TestCancellation);
 
         Assert.Equal([1, 2], result);
         Assert.Equal(
