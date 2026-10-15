@@ -178,10 +178,17 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
-    public void SuppressCancellation(TaskId taskId, IDurableTaskState state)
+    public void Shield(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(taskId, state);
-        typedState.CancellationSuppressed = true;
+        typedState.Shielded = true;
+        _items[taskId] = typedState;
+    }
+
+    public void SetAccepted(TaskId taskId, IDurableTaskState state, bool accepted)
+    {
+        var typedState = GetState(taskId, state);
+        typedState.Accepted = accepted;
         _items[taskId] = typedState;
     }
 

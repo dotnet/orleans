@@ -25,7 +25,7 @@ public abstract class DurableTaskRaceTests(string journalFormatKey) : IAsyncLife
         var workflow = _fixture.Client.GetGrain<IDurableTaskRaceWorkflowGrain>(Guid.NewGuid());
         var holding = _fixture.MessagingProbe.WaitForStartedAsync(workerKey, 1);
 
-        var scheduled = await workflow.HoldAsync(workerKey).ScheduleAsync("hold", cancellationToken);
+        var scheduled = await workflow.HoldAsync(workerKey).WithId("hold").ScheduleAsync(cancellationToken);
         await holding.WaitAsync(Timeout, cancellationToken);
         _fixture.JobClock.Advance(TimeSpan.FromHours(2));
 
@@ -41,7 +41,7 @@ public abstract class DurableTaskRaceTests(string journalFormatKey) : IAsyncLife
         var workflow = _fixture.Client.GetGrain<IDurableTaskRaceWorkflowGrain>(Guid.NewGuid());
         var blocking = _fixture.MessagingProbe.WaitForStartedAsync(workerKey, 1);
 
-        var scheduled = await workflow.BlockAsync(workerKey).ScheduleAsync("block", cancellationToken);
+        var scheduled = await workflow.BlockAsync(workerKey).WithId("block").ScheduleAsync(cancellationToken);
         await blocking.WaitAsync(Timeout, cancellationToken);
         Assert.True(_fixture.Cluster.TryGetGrainContext(workflow.GetGrainId(), out var activation));
         await workflow.DeactivateAsync();
@@ -63,7 +63,7 @@ public abstract class DurableTaskRaceTests(string journalFormatKey) : IAsyncLife
         var quoteKey = Guid.NewGuid();
         var workflow = _fixture.Client.GetGrain<IDurableTaskRaceWorkflowGrain>(Guid.NewGuid());
 
-        var scheduled = await workflow.RaceAsync(holdKey, quoteKey).ScheduleAsync("race", cancellationToken);
+        var scheduled = await workflow.RaceAsync(holdKey, quoteKey).WithId("race").ScheduleAsync(cancellationToken);
 
         // Each race's losing call returns the reason which it observed, and the handle race observes that result.
         Assert.Equal(

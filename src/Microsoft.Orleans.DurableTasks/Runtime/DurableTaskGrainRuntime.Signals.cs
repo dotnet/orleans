@@ -259,8 +259,8 @@ internal sealed partial class DurableTaskGrainRuntime
     /// <returns>Whether the signal is recorded, is a duplicate, or why it is rejected; a rejection stages nothing.</returns>
     /// <remarks>
     /// A sender can commit an invocation and a signal for it in one write, and the outbox delivers them independently.
-    /// A delivered signal for a task which isn't stored, or which records only a cancellation or subscriptions that
-    /// preceded its invocation, is therefore recorded ahead of the invocation, which finds the record in its tree. The record is
+    /// A delivered signal for a task which isn't stored, or which records only a cancellation that preceded its
+    /// invocation, is therefore recorded ahead of the invocation, which finds the record in its tree. The record is
     /// deleted once Messaging's <c>OutboxRetryTimeout</c> has elapsed without the invocation, after which the invocation
     /// can no longer arrive.
     /// </remarks>
@@ -280,7 +280,7 @@ internal sealed partial class DurableTaskGrainRuntime
         }
 
         var found = _storage.TryGetTask(taskId, out var task);
-        var precedesInvocation = fromInbox && (!found || IsCancellationRecord(task!) || IsSubscriptionRecord(task!));
+        var precedesInvocation = fromInbox && (!found || IsCancellationRecord(task!));
         if (!precedesInvocation)
         {
             if (!found || !IsInvoked(task!))

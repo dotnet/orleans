@@ -35,17 +35,19 @@ public interface IDurableTaskGrainStorage
     /// <remarks>The first request determines the reason: a task whose cancellation is recorded, or which is terminal, is unchanged.</remarks>
     void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null);
 
-    /// <summary>Records that the task's ancestors' durable cancellation doesn't reach it.</summary>
-    void SuppressCancellation(TaskId taskId, IDurableTaskState state);
+    /// <summary>Records that the task is shielded: its ancestors' durable cancellation doesn't reach it.</summary>
+    void Shield(TaskId taskId, IDurableTaskState state);
+
+    /// <summary>
+    /// Records whether the host of the task which this record starts accepted the start, or rejected it.
+    /// </summary>
+    void SetAccepted(TaskId taskId, IDurableTaskState state, bool accepted);
     void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation);
 
     void AddCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination);
     void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination);
 
-    /// <summary>
-    /// Restarts the retention period of a terminal result, now, or records now as the arrival of the latest subscription
-    /// which awaits the task's invocation.
-    /// </summary>
+    /// <summary>Restarts the retention period of a terminal result, now.</summary>
     void RetainResult(TaskId taskId, IDurableTaskState state);
 
     bool TryGetTask(TaskId taskId, [NotNullWhen(true)] out IDurableTaskState? state);

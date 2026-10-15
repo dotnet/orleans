@@ -29,7 +29,7 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         var coordinator = _fixture.Client.GetGrain<IDurableTaskCoordinatorGrain>(Guid.NewGuid());
         var workerKey = Guid.NewGuid();
 
-        var scheduled = await coordinator.SumEchoesAsync(workerKey, FanOut).ScheduleAsync("sum-echoes", cancellationToken);
+        var scheduled = await coordinator.SumEchoesAsync(workerKey, FanOut).WithId("sum-echoes").ScheduleAsync(cancellationToken);
         var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
@@ -46,8 +46,8 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         var grainFactory = _fixture.Cluster.GetSiloServiceProvider().GetRequiredService<IGrainFactory>();
         var worker = grainFactory.GetGrain<IDurableTaskWorkerGrain>(Guid.NewGuid());
 
-        var echo = await worker.EchoAsync(21).ScheduleAsync("silo-hosted-echo", cancellationToken);
-        var wait = await worker.WaitForCancellationAsync(1).ScheduleAsync("silo-hosted-wait", cancellationToken);
+        var echo = await worker.EchoAsync(21).WithId("silo-hosted-echo").ScheduleAsync(cancellationToken);
+        var wait = await worker.WaitForCancellationAsync(1).WithId("silo-hosted-wait").ScheduleAsync(cancellationToken);
         await wait.CancelAsync(cancellationToken);
         var canceled = await wait.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
@@ -62,7 +62,7 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         var workerKey = Guid.NewGuid();
         var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey);
         var started = _fixture.MessagingProbe.WaitForStartedAsync(workerKey, 1);
-        var waiting = await worker.WaitForCancellationAsync(1).ScheduleAsync("long-poll", cancellationToken);
+        var waiting = await worker.WaitForCancellationAsync(1).WithId("long-poll").ScheduleAsync(cancellationToken);
         await started.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
         // The poll outlasts the test, so a request sent after it completes only if the grain interleaves them. A waiting
@@ -71,7 +71,7 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
             waiting.Id,
             new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromMinutes(5) },
             cancellationToken).AsTask();
-        var echo = await worker.EchoAsync(21).ScheduleAsync("echo", cancellationToken)
+        var echo = await worker.EchoAsync(21).WithId("echo").ScheduleAsync(cancellationToken)
             .WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         Assert.Equal(42, await echo.WaitAsync(cancellationToken));
         Assert.False(poll.IsCompleted);
@@ -89,7 +89,7 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         var allStarted = _fixture.MessagingProbe.WaitForStartedAsync(workerKey, FanOut);
         var allCanceled = _fixture.MessagingProbe.WaitForCanceledAsync(workerKey, FanOut);
 
-        var scheduled = await coordinator.WaitForCancellationAsync(workerKey, FanOut).ScheduleAsync("fan-out", cancellationToken);
+        var scheduled = await coordinator.WaitForCancellationAsync(workerKey, FanOut).WithId("fan-out").ScheduleAsync(cancellationToken);
         await allStarted.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
         await scheduled.CancelAsync(cancellationToken);

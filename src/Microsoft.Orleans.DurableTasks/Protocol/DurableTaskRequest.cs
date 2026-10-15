@@ -152,47 +152,64 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         return this;
     }
 
-    async ValueTask<DurableTaskResponse> ISchedulableTask.ScheduleAsync(TaskId taskId, CancellationToken cancellationToken)
-    {
-        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
-        Debug.Assert(Context is not null);
+    ValueTask<DurableTaskResponse> ISchedulableTask.ScheduleAsync(TaskId taskId, CancellationToken cancellationToken) =>
+        ScheduleRootAsync(_shared, this, taskId, cancellationToken);
 
-        if (TryGetRuntime(_shared, out var runtime))
-        {
-            return await runtime.ScheduleRemoteAsync(taskId, this, cancellationToken);
-        }
+    IScheduledTaskHandle ISchedulableTask.Post(TaskId taskId) => PostRoot(_shared, this, taskId);
 
-        PrepareClientContext(Context);
-        var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
-    }
-
-    ValueTask ISchedulableTask.DetachAsync(TaskId taskId, CancellationToken cancellationToken) =>
-        DetachCoreAsync(_shared, this, taskId, cancellationToken);
-
-    /// <summary>Starts a request as a detached root task.</summary>
+    /// <summary>
+    /// Schedules a root task from code which runs outside a durable execution, and completes once the target grain has
+    /// accepted and durably stored the task.
+    /// </summary>
     /// <remarks>
-    /// A durable grain stages the start with its pending changes and waits for the journal write which commits them.
-    /// Other callers schedule the root like a client, which neither subscribes to nor polls the task.
+    /// The call goes directly to the target, like a client's. Code which runs on the target grain schedules through the
+    /// grain's own runtime, so a non-reentrant grain doesn't call itself.
     /// </remarks>
-    internal static async ValueTask DetachCoreAsync(
+    internal static ValueTask<DurableTaskResponse> ScheduleRootAsync(
         DurableTaskRequestShared shared,
         IDurableTaskRequest request,
         TaskId taskId,
         CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
-        Debug.Assert(request.Context is not null);
-        if (TryGetRuntime(shared, out var runtime))
+        var context = request.Context!;
+        PrepareClientContext(context);
+        return GetServer(shared, context.TargetId).ScheduleAsync(taskId, request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Stages the start of a root task in the durable outbox of the grain which runs the calling code, and returns the
+    /// task's handle.
+    /// </summary>
+    /// <remarks>The start commits with the grain's next journal write.</remarks>
+    /// <exception cref="InvalidOperationException">The calling code doesn't run in a grain with durable tasks.</exception>
+    internal static IScheduledTaskHandle PostRoot(DurableTaskRequestShared shared, IDurableTaskRequest request, TaskId taskId)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        if (!TryGetRuntime(shared, out var runtime))
         {
-            await runtime.DetachAsync(taskId, request, markerId: default, cancellationToken);
-            return;
+            throw new InvalidOperationException(
+                "Post stages a start in the durable outbox of the calling grain, and this caller has none. Use ScheduleAsync, which completes once the task's host has accepted the task.");
         }
 
-        PrepareClientContext(request.Context);
-        var targetGrain = shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(request.Context.TargetId);
-        _ = await targetGrain.ScheduleAsync(taskId, request, cancellationToken);
+        runtime.PostRoot(taskId, request);
+        return GetHandle(shared, request, taskId);
     }
+
+    /// <summary>Gets a handle for the root task <paramref name="taskId"/> of the request's target.</summary>
+    internal static IScheduledTaskHandle GetHandle(DurableTaskRequestShared shared, IDurableTaskRequest request, TaskId taskId) =>
+        new GrainScheduledTaskHandle(taskId, request, GetServer(shared, request.Context!.TargetId), lastResponse: null);
+
+    /// <summary>
+    /// Gets the server of <paramref name="target"/>'s tasks: the runtime of the grain which runs the calling code, when it's
+    /// the target, or the target's grain extension.
+    /// </summary>
+    private static IDurableTaskServer GetServer(DurableTaskRequestShared shared, GrainId target) =>
+        TryGetRuntime(shared, out var runtime)
+        && runtime is IDurableTaskServer local
+        && shared.GrainContextAccessor.GrainContext.GrainId == target
+            ? local
+            : shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(target);
 
     /// <inheritdoc/>
     protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
@@ -279,11 +296,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
     /// <inheritdoc/>
     public virtual TimeSpan? GetDefaultResponseTimeout() => null;
 
-    public IScheduledTaskHandle GetHandle(TaskId taskId)
-    {
-        Debug.Assert(Context is not null);
-        return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
-    }
+    public IScheduledTaskHandle GetHandle(TaskId taskId) => DurableTaskRequest.GetHandle(_shared, this, taskId);
 }
 
 /// <summary>
@@ -368,22 +381,10 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     }
 
     /// <inheritdoc/>
-    public async ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default)
-    {
-        Debug.Assert(Context is not null);
+    public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, CancellationToken cancellationToken = default) =>
+        DurableTaskRequest.ScheduleRootAsync(_shared, this, taskId, cancellationToken);
 
-        if (DurableTaskRequest.TryGetRuntime(_shared, out var runtime))
-        {
-            return await runtime.ScheduleRemoteAsync(taskId, this, cancellationToken);
-        }
-
-        DurableTaskRequest.PrepareClientContext(Context);
-        var targetGrain = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        return await targetGrain.ScheduleAsync(taskId, this, cancellationToken);
-    }
-
-    ValueTask ISchedulableTask.DetachAsync(TaskId taskId, CancellationToken cancellationToken) =>
-        DurableTaskRequest.DetachCoreAsync(_shared, this, taskId, cancellationToken);
+    IScheduledTaskHandle ISchedulableTask.Post(TaskId taskId) => DurableTaskRequest.PostRoot(_shared, this, taskId);
 
     /// <inheritdoc/>
     protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
@@ -445,11 +446,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     /// <inheritdoc/>
     public virtual TimeSpan? GetDefaultResponseTimeout() => null;
 
-    public IScheduledTaskHandle GetHandle(TaskId taskId)
-    {
-        Debug.Assert(Context is not null);
-        return new GrainScheduledTaskHandle(taskId, this, _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId), lastResponse: null);
-    }
+    public IScheduledTaskHandle GetHandle(TaskId taskId) => DurableTaskRequest.GetHandle(_shared, this, taskId);
 }
 
 internal sealed class GrainScheduledTaskHandle(TaskId taskId, IDurableTaskRequest? request, IDurableTaskServer grain, DurableTaskResponse? lastResponse) : IScheduledTaskHandle

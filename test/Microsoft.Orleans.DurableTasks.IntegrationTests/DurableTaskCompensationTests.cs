@@ -25,7 +25,7 @@ public abstract class DurableTaskCompensationTests(string journalFormatKey) : IA
         var holding = _fixture.MessagingProbe.WaitForStartedAsync(inventoryKey, 1);
         var holdCanceled = _fixture.MessagingProbe.WaitForCanceledAsync(inventoryKey, 1);
 
-        var scheduled = await workflow.ReserveAsync(inventoryKey, 3).ScheduleAsync("reserve", cancellationToken);
+        var scheduled = await workflow.ReserveAsync(inventoryKey, 3).WithId("reserve").ScheduleAsync(cancellationToken);
         await holding.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         await scheduled.CancelAsync(cancellationToken);
 
@@ -49,7 +49,7 @@ public abstract class DurableTaskCompensationTests(string journalFormatKey) : IA
         var workflow = _fixture.Client.GetGrain<IDurableTaskCompensatingWorkflowGrain>(workflowKey);
         var holding = _fixture.MessagingProbe.WaitForStartedAsync(inventoryKey, 1);
         var holdStopped = _fixture.MessagingProbe.WaitForCanceledAsync(inventoryKey, 1);
-        var scheduled = await workflow.ReserveAsync(inventoryKey, 2).ScheduleAsync("abort-me", cancellationToken);
+        var scheduled = await workflow.ReserveAsync(inventoryKey, 2).WithId("abort-me").ScheduleAsync(cancellationToken);
         await holding.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
         await workflow.AsReference<IDurableTaskGrainExtension>().AbortAsync(TaskId.CreateRoot("abort-me"), "operator", cancellationToken);
@@ -137,7 +137,7 @@ public sealed class DurableTaskCompensatingWorkflowGrain : DurableGrain, IDurabl
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
         {
-            await inventory.ReleaseAsync(reserved).DetachAsync(GetCompensationRootId(this.GetPrimaryKey()));
+            _ = inventory.ReleaseAsync(reserved).Detached().WithId(GetCompensationRootId(this.GetPrimaryKey())).Post();
             return "compensated";
         }
     }

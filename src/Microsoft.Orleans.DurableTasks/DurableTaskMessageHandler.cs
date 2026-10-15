@@ -10,12 +10,13 @@ namespace Orleans.DurableTasks.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// As an <see cref="IInboxMessageSink"/>, it accepts invocations, subscriptions, completions, cancellations,
-/// unsubscriptions, and signals directly into task state, so the request, result, or signal payload is journaled once,
-/// in task state,
-/// and the inbox journals only the message's processed record in the same write. Each message is decoded and validated
-/// before any change is staged; a message which fails validation throws, and a rejected signal reports a dead-lettered
-/// result, so the inbox dead-letters either one.
+/// As an <see cref="IInboxMessageSink"/>, it accepts invocations, subscriptions, acceptances, completions,
+/// cancellations, unsubscriptions, and signals directly into task state, so the request, result, or signal payload is
+/// journaled once, in task state, and the inbox journals only the message's processed record in the same write. Each
+/// message is decoded and validated before any change is staged. An invocation from a task which awaits its result, and which its receiver rejects, such as one
+/// whose identifier already identifies another request, is answered with a rejection, which fails the start for its
+/// sender. Another message which fails validation throws, and a rejected signal reports a dead-lettered result, so the
+/// inbox dead-letters either one.
 /// </para>
 /// <para>
 /// As an <see cref="IInboxHandler"/>, it handles the delay resumes the grain schedules for itself, which the inbox holds
@@ -38,29 +39,26 @@ internal sealed class DurableTaskMessageHandler(
             case DurableTaskMessageTypes.InvocationSubject:
                 var invocation = messageTypes.Invocation.Decode(message.Envelope);
                 var sender = GetSender(invocation.Sender);
-                if (invocation.SubscriberId is { } subscriberId)
+                if (invocation.Request is not { } request)
                 {
                     // A subscription carries no request and claims no caller: it adds the sender's task to the existing
                     // task's completion destinations.
-                    if (invocation.Request is not null || invocation.Detached)
+                    if (invocation.SubscriberId is not { } subscriberId || invocation.Detached || invocation.Acknowledge)
                     {
-                        throw new InvalidOperationException("A durable task subscription carries no request.");
+                        throw new InvalidOperationException("A durable task subscription carries a subscriber and nothing else.");
                     }
 
                     runtime.SubscribeFromInbox(invocation.TaskId, new(sender, subscriberId));
                     return true;
                 }
 
-                var request = invocation.Request
-                    ?? throw new InvalidOperationException("The durable task invocation request is missing.");
-                var requestContext = request.Context
-                    ?? throw new InvalidOperationException("The durable task invocation request has no context.");
-
-                // A detached task has no caller: like a client-scheduled root, it's retained for polling and its
-                // result is sent to no grain.
-                requestContext.CallerId = invocation.Detached ? default : sender;
-                requestContext.SupportsDurableCompletion = !invocation.Detached;
-                runtime.ScheduleFromInbox(invocation.TaskId, request);
+                runtime.InvokeFromInbox(
+                    invocation.TaskId,
+                    request,
+                    sender,
+                    invocation.Detached,
+                    invocation.SubscriberId,
+                    invocation.Acknowledge);
                 return true;
             case DurableTaskMessageTypes.CompletionSubject:
                 var completion = messageTypes.Completion.Decode(message.Envelope);
@@ -87,6 +85,14 @@ internal sealed class DurableTaskMessageHandler(
                     runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender), cancellation.CancellationReason);
                 }
 
+                return true;
+            case DurableTaskMessageTypes.AcceptanceSubject:
+                var acceptance = messageTypes.Acceptance.Decode(message.Envelope);
+                runtime.AcceptAcceptanceFromInbox(
+                    acceptance.SubscriberId ?? acceptance.TaskId,
+                    acceptance.TaskId,
+                    acceptance.Rejection,
+                    GetSender(acceptance.Sender));
                 return true;
             case DurableTaskMessageTypes.SignalSubject:
                 var signal = messageTypes.Signal.Decode(message.Envelope);
