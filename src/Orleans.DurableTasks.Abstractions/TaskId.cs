@@ -33,6 +33,9 @@ public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanPars
     /// <summary>Gets the parent identifier, or <see cref="None"/> for a root.</summary>
     public TaskId Parent() => _key?.Parent is { } parent ? new(parent) : None;
 
+    /// <summary>Gets the unescaped last segment of this identifier.</summary>
+    internal string LastSegment => _key?.LastSegment ?? throw new InvalidOperationException("An empty task identifier has no segments.");
+
     /// <summary>
     /// Returns whether this non-empty identifier is an ancestor of or equal to
     /// <paramref name="other"/>. <see cref="None"/> is outside the hierarchy and returns
@@ -172,6 +175,8 @@ internal sealed class HierarchicalKey : IEquatable<HierarchicalKey>
     private HierarchicalKey(string[] segments) => _segments = segments;
 
     public HierarchicalKey? Parent => _segments.Length > 1 ? new(_segments[..^1]) : null;
+
+    public string LastSegment => _segments[^1];
 
     public static HierarchicalKey FromSegment(string segment)
     {

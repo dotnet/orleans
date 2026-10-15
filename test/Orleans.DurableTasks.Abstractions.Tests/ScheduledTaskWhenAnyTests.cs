@@ -67,7 +67,7 @@ public class ScheduledTaskWhenAnyTests
             return DurableTaskResponse.FromResult(exception.CancellationToken == cancellation.Token);
         });
 
-        Assert.True(await await root.ScheduleAsync("root", TestCancellation));
+        Assert.True(await await root.WithId("root").ScheduleAsync(TestCancellation));
         Assert.Equal([TaskId.Parse("root/$when-any-2/$winner")], host.DecisionIds);
     }
 
@@ -77,9 +77,9 @@ public class ScheduledTaskWhenAnyTests
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var release = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var pending = await host.CreateRootDefinition<int>(async _ => DurableTaskResponse.FromResult(await release.Task))
-            .ScheduleAsync("pending", TestCancellation);
+            .WithId("pending").ScheduleAsync(TestCancellation);
         var completed = await host.CreateRootDefinition<int>(static _ => ValueTask.FromResult<DurableTaskResponse>(DurableTaskResponse.FromResult(2)))
-            .ScheduleAsync("completed", TestCancellation);
+            .WithId("completed").ScheduleAsync(TestCancellation);
 
         var winner = await ScheduledTask.WhenAny([pending, completed], TestCancellation);
 
@@ -94,7 +94,7 @@ public class ScheduledTaskWhenAnyTests
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
         var incomplete = await host.CreateRootDefinition<int>(static _ => ValueTask.FromResult(DurableTaskResponse.Pending))
-            .ScheduleAsync("incomplete", TestCancellation);
+            .WithId("incomplete").ScheduleAsync(TestCancellation);
 
         var whenAny = await Assert.ThrowsAsync<InvalidOperationException>(() => ScheduledTask.WhenAny([incomplete], TestCancellation));
         var whenEach = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -122,7 +122,7 @@ public class ScheduledTaskWhenAnyTests
         });
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await await root.ScheduleAsync("root", TestCancellation));
+            async () => await await root.WithId("root").ScheduleAsync(TestCancellation));
 
         Assert.Equal("The durable task has not completed.", exception.Message);
         Assert.Equal([TaskId.Parse("root/$when-any-2/$winner")], host.DecisionIds);
