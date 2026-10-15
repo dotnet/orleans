@@ -22,8 +22,9 @@ namespace Orleans.DurableTasks;
 /// Outside a durable execution, awaiting the reference waits for the task's result, and its polling members, such as
 /// <see cref="GetResponseAsync(CancellationToken)"/>, <see cref="WaitAsync(CancellationToken)"/>, and
 /// <see cref="GetStatusAsync"/>, and its control members,
-/// <see cref="CancelAsync(string, CancellationToken)"/> and <see cref="AbortAsync"/>, call the task's grain. A durable
-/// execution doesn't record those calls.
+/// <see cref="CancelAsync(string, CancellationToken)"/> and <see cref="AbortAsync"/>, call the task's grain. Waits and
+/// polls retry the failures which leave the task unaffected, such as a lost connection, a crashed silo, or a deactivating
+/// activation, until the grain answers or the caller's token ends them. A durable execution doesn't record those calls.
 /// </para>
 /// <para>
 /// The reference is awaitable through <see cref="DurableTaskReferenceExtensions.GetAwaiter{TResult}"/>, an extension

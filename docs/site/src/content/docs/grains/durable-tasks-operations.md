@@ -247,6 +247,16 @@ A caller, such as an HTTP endpoint, tells a conflict, which it resolves by choos
 another task ID, from a start which wasn't accepted, by the exception's type. `DurableTaskRejectedException.Code` reports the target's code, and
 `Target` the rejecting grain.
 
+### Client waits across outages
+
+A client, or an ordinary grain method, waits for a task by polling its grain. A poll
+which can't reach the grain, because a connection drops, the grain's silo stops or
+crashes, the call times out, or the grain deactivates, leaves the task running, so the
+wait retries it with exponential backoff, from 50 ms to 5 s, and the next poll reaches
+the grain's next activation. The wait ends with the task's outcome, with
+`DurableTaskNotFoundException` for a task which the grain doesn't retain, or when the
+caller's token or the wait's timeout ends it.
+
 ## Capacity and throughput
 
 - A recorded effect, `DurableTask.Once`, adds no journal write: its record and the state

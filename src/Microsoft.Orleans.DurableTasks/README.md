@@ -73,8 +73,11 @@ start or which `IDurableTaskManager.GetTask` returns, and, in a durable executio
 tasks and of `GetDurableTask` subscriptions have addresses. An attached child belongs to its caller's
 tree and has none.
 
-An absent root or a root whose result retention has expired throws
-`DurableTaskNotFoundException`. A returned failed response remains an execution
+Waits and polls from clients and ordinary grain methods retry the failures which leave the task
+unaffected: a lost connection, a stopped or crashed silo, a call timeout, or a deactivating
+activation. They back off exponentially, from 50 ms to 5 s, until the task's grain answers or the
+caller's token or the wait's timeout ends the wait. An absent root or a root whose result retention
+has expired throws `DurableTaskNotFoundException` at once. A returned failed response remains an execution
 failure, including when the stored user exception has that same type.
 
 A durable task awaits the same reference to subscribe to the result of an invoked task which it
