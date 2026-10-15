@@ -444,9 +444,10 @@ when the caller continues:
   other parties, which address it with `GetDurableTask`. The target acknowledges the
   invocation, and the caller's outbox retires it, once the target's journal write stores
   the task. A start which the target rejects, because the task ID already identifies
-  another request, throws `DurableTaskConflictException`, and one which isn't delivered
-  before Messaging's `OutboxRetryTimeout` throws `DurableTaskDeliveryException`; awaiting
-  the task throws the same failure.
+  another request, throws `DurableTaskConflictException`. Other failures to accept the
+  start, such as a request which the target can't decode, are retried, and a start which
+  isn't accepted before Messaging's `OutboxRetryTimeout` throws
+  `DurableTaskDeliveryException`. Awaiting the task throws the same failure. See [Dead letters](durable-tasks-operations.md#dead-letters).
 - <xref:Orleans.DurableTasks.ConfiguredDurableTask.Post*> is synchronous. It stages the
   invocation in the caller's outbox, which commits with the grain's next journal write,
   together with the state changes which the calling code made, and delivers it once. The
