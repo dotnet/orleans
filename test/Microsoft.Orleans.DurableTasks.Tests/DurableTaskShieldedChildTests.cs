@@ -11,11 +11,11 @@ using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
 
-/// <summary>Children which a durable execution schedules in a cancellation suppression scope.</summary>
+/// <summary>Children which a durable execution starts shielded.</summary>
 public sealed partial class DurableTaskRuntimeInvariantTests
 {
     [Fact]
-    public Task SuppressedChildrenScheduledAfterTheCancellationRun() => ActivationScheduler.RunAsync(async () =>
+    public Task ShieldedChildrenStartedAfterTheCancellationRun() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var rootId = TaskId.CreateRoot("order");
@@ -29,14 +29,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             }
             catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
             {
-                using (DurableTask.Current.SuppressCancellation())
-                {
-                    var release = await DurableTask.Run(async _ => 1 + await DurableTask.Run(_ => 1).WithId("inner")).WithId("release");
-                    await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("pause");
-                    var batch = await DurableTask.WhenAll<int>([DurableTask.Run(_ => 3), DurableTask.Run(_ => 4)]);
-                    var outcome = $"{release}{batch[0]}{batch[1]}|{cancellationToken.IsCancellationRequested}";
-                    return $"{outcome}|{DurableTask.Current.IsCancellationRequested}";
-                }
+                var release = await DurableTask.Run(async _ => 1 + await DurableTask.Run(_ => 1).WithId("inner")).WithId("release").Shielded();
+                await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("pause").Shielded();
+                var batch = await DurableTask.WhenAll<int>([DurableTask.Run(_ => 3), DurableTask.Run(_ => 4)]).Shielded();
+                var outcome = $"{release}{batch[0]}{batch[1]}|{cancellationToken.IsCancellationRequested}";
+                return $"{outcome}|{DurableTask.Current.IsCancellationRequested}";
             }
         })));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -53,17 +50,17 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         foreach (var child in new[] { "release", "pause" })
         {
             var state = storage.Get(rootId.Child(child));
-            Assert.True(state.CancellationSuppressed);
+            Assert.True(state.Shielded);
             Assert.Null(state.CancellationRequestedAt);
             Assert.Equal(DurableTaskStatus.CompletedSuccessfully, state.Result!.Status);
         }
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(rootId.Child("release").Child("inner")).Result!.Status);
-        Assert.False(storage.Get(rootId.Child("release").Child("inner")).CancellationSuppressed);
+        Assert.False(storage.Get(rootId.Child("release").Child("inner")).Shielded);
     });
 
     [Fact]
-    public Task CancellationDoesNotReachSuppressedRemoteChildren() => ActivationScheduler.RunAsync(async () =>
+    public Task CancellationDoesNotReachShieldedRemoteChildren() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var rootId = TaskId.CreateRoot("order");
@@ -79,22 +76,14 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         };
         runtime.ScheduleFromInbox(rootId, CreateRequest(1, () => DurableTask.Run(async _ =>
         {
-            ScheduledTask before;
-            using (DurableTask.Current.SuppressCancellation())
-            {
-                before = await new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)).WithId("before").ScheduleAsync(CancellationToken.None);
-            }
-
+            var before = new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)).WithId("before").Shielded().Post();
+            await DurableTask.Run(static _ => { }).WithId("commit");
             ready.TrySetResult();
             await resume.Task;
 
-            // Outside the scope, a child scheduled after the cancellation is canceled without running.
-            var outside = await new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(3)).WithId("outside").ScheduleAsync(CancellationToken.None);
-            ScheduledTask after;
-            using (DurableTask.Current.SuppressCancellation())
-            {
-                after = await new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(4)).WithId("after").ScheduleAsync(CancellationToken.None);
-            }
+            // A child which isn't shielded and starts after the cancellation is canceled without running.
+            var outside = new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(3)).WithId("outside").Post();
+            var after = new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(4)).WithId("after").Shielded().Post();
 
             await before;
             await after;
@@ -118,11 +107,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             [rootId.Child("before"), rootId.Child("after")],
             transport.Invocations.Select(static invocation => invocation.TaskId));
         Assert.Empty(transport.Cancellations);
-        Assert.True(storage.Get(rootId.Child("after")).CancellationSuppressed);
+        Assert.True(storage.Get(rootId.Child("after")).Shielded);
     });
 
     [Fact]
-    public Task RecoveryKeepsSuppressedChildrenUnreachedByTheCancellation() => ActivationScheduler.RunAsync(async () =>
+    public Task RecoveryKeepsShieldedChildrenUnreachedByTheCancellation() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -132,20 +121,17 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var request = CreateRequest(1, () => DurableTask.Run(async _ =>
         {
             var parent = DurableTask.Current;
-            using (DurableTask.Current.SuppressCancellation())
+            return await DurableTask.Run(async cancellationToken =>
             {
-                return await DurableTask.Run(async cancellationToken =>
+                var child = DurableTask.Current;
+                if (Interlocked.Increment(ref childAttempts) == 1)
                 {
-                    var child = DurableTask.Current;
-                    if (Interlocked.Increment(ref childAttempts) == 1)
-                    {
-                        firstChildAttempt.TrySetResult();
-                        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                    }
+                    firstChildAttempt.TrySetResult();
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
 
-                    return $"{child.IsCancellationRequested}|{cancellationToken.IsCancellationRequested}|{parent.IsCancellationRequested}";
-                }).WithId("cleanup");
-            }
+                return $"{child.IsCancellationRequested}|{cancellationToken.IsCancellationRequested}|{parent.IsCancellationRequested}";
+            }).WithId("cleanup").Shielded();
         }));
         await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
         await firstChildAttempt.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
@@ -160,12 +146,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal("False|False|True", (await WaitForResponseAsync(replacement, rootId)).GetResult<string>());
         Assert.Equal(2, Volatile.Read(ref childAttempts));
         Assert.Equal("buyer", storage.Get(rootId).CancellationReason);
-        Assert.True(storage.Get(childId).CancellationSuppressed);
+        Assert.True(storage.Get(childId).Shielded);
         Assert.Null(storage.Get(childId).CancellationRequestedAt);
     });
 
     [Fact]
-    public Task AbortReachesSuppressedChildren() => ActivationScheduler.RunAsync(async () =>
+    public Task AbortReachesShieldedChildren() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -174,23 +160,20 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var childEnded = new TaskCompletionSource<(bool TokenCanceled, bool CancellationRequested)>(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(1, () => DurableTask.Run(async _ =>
         {
-            using (DurableTask.Current.SuppressCancellation())
+            return await DurableTask.Run(async cancellationToken =>
             {
-                return await DurableTask.Run(async cancellationToken =>
+                started.TrySetResult();
+                try
                 {
-                    started.TrySetResult();
-                    try
-                    {
-                        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        childEnded.TrySetResult((cancellationToken.IsCancellationRequested, DurableTask.Current.IsCancellationRequested));
-                    }
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    childEnded.TrySetResult((cancellationToken.IsCancellationRequested, DurableTask.Current.IsCancellationRequested));
+                }
 
-                    return 1;
-                }).WithId("cleanup");
-            }
+                return 1;
+            }).WithId("cleanup").Shielded();
         }));
         await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
@@ -204,7 +187,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
-    public Task SuppressedChildIsCanceledThroughItsOwnHandle() => ActivationScheduler.RunAsync(async () =>
+    public Task ShieldedChildIsCanceledThroughItsOwnHandle() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var rootId = TaskId.Parse("root");
@@ -212,11 +195,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(1, () => DurableTask.Run(async _ =>
         {
-            ScheduledTask<int> child;
-            using (DurableTask.Current.SuppressCancellation())
-            {
-                child = await BlockedChild(started).WithId("cleanup").ScheduleAsync(CancellationToken.None);
-            }
+            var child = await BlockedChild(started).WithId("cleanup").Shielded().ScheduleAsync(CancellationToken.None);
 
             await child.CancelAsync("no longer needed", CancellationToken.None);
             return (await child.GetResponseAsync(CancellationToken.None)).Status;
@@ -226,11 +205,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(DurableTaskStatus.Canceled, (await WaitForResponseAsync(runtime, rootId)).GetResult<DurableTaskStatus>());
         Assert.Equal("no longer needed", storage.Get(childId).CancellationReason);
-        Assert.True(storage.Get(childId).CancellationSuppressed);
+        Assert.True(storage.Get(childId).Shielded);
     });
 
     [Fact]
-    public async Task VolatileStorageRecoversTheFirstCancellationReasonAndTheSuppression()
+    public async Task VolatileStorageRecoversTheFirstCancellationReasonAndTheShield()
     {
         using var services = new ServiceCollection()
             .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskMessageTransport).Assembly))
@@ -243,7 +222,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var taskId = TaskId.Parse("root/cleanup");
         var state = storage.GetOrCreateTask(taskId, request: null);
 
-        storage.SuppressCancellation(taskId, state);
+        storage.Shield(taskId, state);
         storage.RequestCancellation(taskId, state, "buyer");
         Assert.True(storage.TryGetTask(taskId, out var canceled));
         storage.RequestCancellation(taskId, canceled, "later");
@@ -252,18 +231,18 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await storage.ReadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(storage.TryGetTask(taskId, out var recovered));
-        Assert.Equal(("buyer", true), (recovered.CancellationReason, recovered.CancellationSuppressed));
+        Assert.Equal(("buyer", true), (recovered.CancellationReason, recovered.Shielded));
         Assert.NotNull(recovered.CancellationRequestedAt);
     }
 
     [Fact]
-    public void JsonTaskStateStoresCancellationSuppressionOnlyWhenSet()
+    public void JsonTaskStateStoresTheShieldOnlyWhenSet()
     {
         var typeInfo = DurableTaskJsonContext.Default.DurableTaskState;
 
-        var json = JsonSerializer.Serialize(new DurableTaskState { CancellationSuppressed = true }, typeInfo);
+        var json = JsonSerializer.Serialize(new DurableTaskState { Shielded = true }, typeInfo);
 
-        Assert.True(JsonSerializer.Deserialize(json, typeInfo)!.CancellationSuppressed);
-        Assert.DoesNotContain(nameof(DurableTaskState.CancellationSuppressed), JsonSerializer.Serialize(new DurableTaskState(), typeInfo), StringComparison.Ordinal);
+        Assert.True(JsonSerializer.Deserialize(json, typeInfo)!.Shielded);
+        Assert.DoesNotContain(nameof(DurableTaskState.Shielded), JsonSerializer.Serialize(new DurableTaskState(), typeInfo), StringComparison.Ordinal);
     }
 }

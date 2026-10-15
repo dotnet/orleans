@@ -34,7 +34,7 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
         var input = PayloadMarkers.Input(seed);
         var output = PayloadMarkers.Transform(input);
 
-        var scheduled = await caller.CallAsync(worker.GetPrimaryKey(), seed).ScheduleAsync("payload-call", cancellationToken);
+        var scheduled = await caller.CallAsync(worker.GetPrimaryKey(), seed).WithId("payload-call").ScheduleAsync(cancellationToken);
         var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
         Assert.True(response.GetResult<bool>());
@@ -61,12 +61,12 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
         var input = PayloadMarkers.Input(Random.Shared.Next());
         var output = PayloadMarkers.Transform(input);
 
-        var scheduled = await worker.TransformAsync(input).ScheduleAsync("client-call", cancellationToken);
+        var scheduled = await worker.TransformAsync(input).WithId("client-call").ScheduleAsync(cancellationToken);
         var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         Assert.Equal(output, response.GetResult<byte[]>());
 
         // A client has no inbox, so the result stays retained for polling after further writes.
-        var other = await worker.TransformAsync(PayloadMarkers.Input(Random.Shared.Next())).ScheduleAsync("other-call", cancellationToken);
+        var other = await worker.TransformAsync(PayloadMarkers.Input(Random.Shared.Next())).WithId("other-call").ScheduleAsync(cancellationToken);
         await other.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         var polled = await worker.GetDurableTask<byte[]>("client-call").GetResponseAsync(cancellationToken);
         Assert.Equal(output, polled.GetResult<byte[]>());

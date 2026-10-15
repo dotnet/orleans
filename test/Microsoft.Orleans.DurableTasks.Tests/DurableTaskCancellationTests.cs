@@ -293,7 +293,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var request = CreateRequest(1, () => DurableTask.Run(async cancellationToken =>
         {
             _ = await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("delay").ScheduleAsync(cancellationToken);
-            _ = await new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)).WithId("remote").ScheduleAsync(cancellationToken);
+            _ = new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)).WithId("remote").Post();
             try
             {
                 return await DurableTask.Run(async cancellationToken =>

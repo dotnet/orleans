@@ -51,7 +51,7 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         var grainId = grain.GetGrainId();
         var activationBefore = await grain.GetActivationIdAsync();
 
-        var scheduled = await grain.ComputeAsync(argument).ScheduleAsync(rootId, cancellationToken);
+        var scheduled = await grain.ComputeAsync(argument).WithId(rootId).ScheduleAsync(cancellationToken);
         Assert.Equal(expectedResult, await scheduled.WaitAsync(cancellationToken));
         Assert.Equal(
             new DurableTaskInvocationSnapshot(1, activationBefore, argument),
@@ -80,7 +80,7 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         var cancellationToken = TestContext.Current.CancellationToken;
         var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
         var grainId = grain.GetGrainId();
-        var scheduled = await grain.ObserveLogicalTimeAsync().ScheduleAsync(rootId, cancellationToken);
+        var scheduled = await grain.ObserveLogicalTimeAsync().WithId(rootId).ScheduleAsync(cancellationToken);
         await _fixture.Probe.WaitForLogicalTimeCountAsync(grainId, 1, cancellationToken);
 
         await grain.RequestDeactivationAsync();
@@ -106,7 +106,7 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
         var grainId = grain.GetGrainId();
 
-        var scheduled = await grain.DelayThenComputeAsync(argument).ScheduleAsync(rootId, cancellationToken);
+        var scheduled = await grain.DelayThenComputeAsync(argument).WithId(rootId).ScheduleAsync(cancellationToken);
         var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
@@ -123,7 +123,7 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         var cancellationToken = TestContext.Current.CancellationToken;
         var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
         var grainId = grain.GetGrainId();
-        var scheduled = await grain.DelayAcrossDeactivationAsync(argument).ScheduleAsync(rootId, cancellationToken);
+        var scheduled = await grain.DelayAcrossDeactivationAsync(argument).WithId(rootId).ScheduleAsync(cancellationToken);
         await _fixture.Probe.WaitForLogicalTimeCountAsync(grainId, 1, cancellationToken);
 
         // The delay is an hour long, so it stays pending across the deactivation and the replay which follows it.
@@ -159,7 +159,7 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         var cancellationToken = TestContext.Current.CancellationToken;
         var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
         var grainId = grain.GetGrainId();
-        _ = await grain.ObserveActivationAsync().ScheduleAsync(rootId, cancellationToken);
+        _ = await grain.ObserveActivationAsync().WithId(rootId).ScheduleAsync(cancellationToken);
         await _fixture.Probe.WaitForActivationObservationCountAsync(grainId, 1, cancellationToken);
 
         // The next activation's OnActivateAsync yields to the work which the activation queued before it, so a recovered
@@ -178,7 +178,7 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         var cancellationToken = TestContext.Current.CancellationToken;
         var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
         var grainId = grain.GetGrainId();
-        _ = await grain.ObserveDeactivationAsync().ScheduleAsync(rootId, cancellationToken);
+        _ = await grain.ObserveDeactivationAsync().WithId(rootId).ScheduleAsync(cancellationToken);
         await _fixture.Probe.WaitForActivationObservationCountAsync(grainId, 1, cancellationToken);
 
         // The grain's OnDeactivateAsync waits for the running execution's abort, which the runtime would otherwise

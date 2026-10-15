@@ -69,16 +69,11 @@ var result = await operation.GetDurableTask<OperationResult>("operation-42")
   which subscribes as `(caller, task ID)`, and the task's result reaches every destination the same
   way: through the outbox, with the task retained until the completion retires. The child completes
   with that outcome: the result, failure, or cancellation.
-- A subscription to a terminal task sends its completion at once, and one to a stored task which
-  isn't an invoked task completes the child with `DurableTaskNotFoundException` at once. The outbox
-  delivers messages independently, so a subscription can arrive before the task's invocation, for
-  example when one write of another grain starts both the task and the subscriber. A subscription
-  for a task which the target doesn't store is held in a task state without a request, like an
-  early cancellation, which the invocation completes. When no invocation arrives within Messaging's
-  `OutboxRetryTimeout` after the latest subscription arrived, a resume message scheduled for that
-  deadline wakes the target, which deletes the state and completes each subscriber with
-  `DurableTaskNotFoundException`. A subscription to a cancellation which preceded the invocation, and
-  which recovery terminalized, receives that cancellation.
+- A subscription to a terminal task sends its completion at once, and one to a task which the
+  target doesn't retain as an invoked task completes the child with `DurableTaskNotFoundException` at
+  once. A task ID which reaches the subscriber refers to a task which its target already holds:
+  `ScheduleAsync` returns once the target has accepted the task, and a durable execution which starts
+  a detached task subscribes through the start itself.
 - Canceling the child ends it as canceled and sends an unsubscription, a `durable-rpc/cancel`
   message which names the child, which removes the destination while the task is running; the task
   continues. An abort or deletion of the child's tree ends it the same way, and a completion which
@@ -109,31 +104,48 @@ A cancellation request can carry a reason, which the canceled workflow reads fro
 request determines the reason; `ScheduledTask.CancelAsync(reason)` and
 `IDurableTaskGrainExtension.CancelAsync(taskId, reason)` carry one from clients and tooling.
 
-`DetachAsync` starts a durable grain call as a detached root task on its target, for
-fire-and-forget work, cleanup which outlives a canceled workflow, and durable calls from
-ordinary grain methods:
+Configuration on a durable grain call sets what the task is, and the call which starts it sets when
+the caller continues:
 
 ```csharp
-await buyer.RecordOrderAsync(summary).DetachAsync($"order-{orderId:N}-v{summary.Version}");
+// In a workflow: start the order as an independent root task, in the same write as the basket's change.
+_ = order.PlaceOrderAsync(request).Detached().WithId(PlaceOrderTaskId(orderId)).Post();
+
+// Anywhere: return once the target holds the task, so its ID can be handed to other parties.
+var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(orderId)).ScheduleAsync();
 ```
 
-- In a durable task, the call and a marker in the execution's tree,
-  `{taskId}/$detach:{target}:{rootId}`, commit in one journal write. A replay which reaches
-  the marker doesn't send the call again, and the marker is deleted with the tree. The marker
-  derives from the detached task's identity, so adding operations to a workflow doesn't move
-  it, and detaching the same task again reaches the same marker.
-  `DetachedTaskId.For(segment)` derives the root ID from the durable task's ID, so the target
-  retains the detached task under `{taskId}:{segment}`.
-- In an ordinary method of a durable grain, the call is staged with the grain's pending
-  state changes, and `DetachAsync` completes once the journal write which commits them
-  completes.
-- From a client, or code outside a durable grain, `DetachAsync` completes once the target
-  has scheduled the root.
-
-A call to the grain itself starts as a local root after the commit; a call to another
-grain is an invocation in the outbox. The starter stores no state for the detached task.
-Its target retains it like a client-scheduled root, which `GetDurableTask<T>(rootId)`
-polls, and sends its result to no grain.
+- In a durable task, awaiting a call, scheduling it, or posting it records an attached child under its
+  task ID and stages a `durable-rpc/invoke` message, whose target claims the task for the caller.
+  `ScheduleAsync` asks the target to acknowledge the invocation: the target replies with a
+  `durable-rpc/accept` message in the journal write which stores the task, and `ScheduleAsync` returns
+  once that acceptance is durable. `Post` stages the child and its invocation in the calling code's
+  turn, so they commit with the grain's next journal write; a replay which reaches the child doesn't
+  send it again.
+- A detached call is an independent root task on its target. The execution records it under
+  `{taskId}/$detach:{target}:{rootId}`, whose fingerprint covers the root ID and the request, so a
+  replay which reaches the record doesn't start the task again and one which starts another request
+  under the same record fails as a divergence. The invocation is a full outbox message which carries
+  the request and names the record as a subscriber, so the start survives deletion of the starter's
+  tree, and the target adds the record to the task's completion destinations when it stores the task.
+  The record observes the task like a `GetDurableTask` subscription: the task's result completes it,
+  and its cancellation, an abort or deletion of its tree, or the starter's cancellation ends only the
+  subscription. Its root ID is the `WithId` name, or `{taskId}:{segment}`, where `{segment}` is the
+  generated ID of the execution's next unnamed operation.
+- A target which can't store an invoked task, because its ID already identifies another request or
+  another caller, replies with a rejection instead of an acceptance. The starter's record stores the
+  rejection's `DurableTaskConflictException` as its result, so `ScheduleAsync` throws it, and awaiting
+  the task or its handle throws it, in every replay.
+- In an ordinary method of a durable grain, `ScheduleAsync` calls the target directly, like a client,
+  and returns once the target has stored the task; a call to the grain itself goes through the grain's
+  own runtime. `Post` stages the invocation in the grain's outbox, so it commits with the grain's next
+  journal write, together with the state changes which the method made, and is delivered once. The
+  started task is a root task, which the grain doesn't store, and its target sends its result to no
+  grain.
+- A client's `ScheduleAsync` returns once the target has stored the task. A client has no outbox,
+  so `Post` throws `InvalidOperationException`.
+- A call to the grain itself starts as a local root after the journal write which commits it. Its
+  target retains a root task like a client-scheduled root, which `GetDurableTask<T>(rootId)` polls.
 
 A `DurableSignal<T>` carries an external event, such as a shipment notice or a human
 approval, into an invoked task. The task's execution waits with `WaitAsync()`, and senders
@@ -168,7 +180,7 @@ await tasks.SignalAsync(workflowId, Shipped, shipment);
   arrives. When no invocation arrives within Messaging's `OutboxRetryTimeout`, after which it no
   longer can, the grain deletes the value and logs a warning.
 - In a durable task, the send and a marker in the execution's tree commit in one journal write,
-  like `DetachAsync`, so a replay which reaches the marker doesn't send it again. The marker is
+  like a posted start, so a replay which reaches the marker doesn't send it again. The marker is
   `{taskId}/$send:{target}:{task}:{name}`, and repeated sends of one signal in an execution,
   such as retries after `TaskNotFound`, are numbered `$send:...$2`, and so on, so each sends
   again and the target reports an equal value as `Duplicate`. A signal to
@@ -214,7 +226,7 @@ framework assets; its first published version establishes the compatibility base
   commit; a failed journal write deactivates the grain, and the next activation
   recovers from committed state.
 - Inbox messages are staged synchronously, so the inbox commits each message
-  with the changes it caused. Invocations, completions, cancellations, and signals
+  with the changes it caused. Invocations, acceptances, completions, cancellations, and signals
   are accepted when they are delivered; scheduled delay resumes are processed when
   due. Execution starts, local completions, and cancellation propagation follow
   the commit.
@@ -240,8 +252,9 @@ framework assets; its first published version establishes the compatibility base
   re-invocation still observes the result.
 - Terminal responses and completion notifications commit together. The callee
   retains the result until the completion retires from its outbox.
-- A task's completion destinations are its subscribers: its invoker, and each durable
-  execution's child which subscribed with `GetDurableTask`. Each receives the result in a
+- A task's completion destinations are its subscribers: its invoker, each durable
+  execution's child which subscribed with `GetDurableTask`, and the record of each execution which
+  started the task as a detached task. Each receives the result in a
   completion which commits with the result, and the task is retained until every
   completion retires: a task with a grain caller is deleted when the last one retires,
   and a task without one keeps its result for `ResultRetentionPeriod` after completion,
@@ -252,7 +265,7 @@ framework assets; its first published version establishes the compatibility base
 - An invoked task, which a client or another grain scheduled as a request, owns
   an execution tree: the task and its descendants which aren't invoked tasks
   themselves, such as local children, delays, combinator decisions, subscriptions,
-  and calls to other grains. Callers choose task identifiers, so an invoked task nested under
+  records of detached tasks, and calls to other grains. Callers choose task identifiers, so an invoked task nested under
   another task's identifier keeps its own lifecycle. Once an invoked task is
   terminal, the grain deletes its execution tree: in the journal write which
   retires its completion when the calling grain has durably accepted it, or
@@ -287,16 +300,16 @@ framework assets; its first published version establishes the compatibility base
   cancellation to each pending call to another grain, whose callee applies the same rules to its own
   task, and terminalizes delays and tasks whose bodies haven't started as canceled. A started body
   decides its task's outcome: the task is canceled when the cancellation escapes it, and otherwise
-  completes with the body's result or failure. Attached children which the body schedules after the
-  request outside a cancellation suppression scope are canceled without running. Recovery replays a canceled body with its cancellation
+  completes with the body's result or failure. Attached children which aren't shielded and which the
+  body starts after the request are canceled without running. Recovery replays a canceled body with its cancellation
   requested, so completed children return their recorded results. The first durable terminal result
   wins a race.
-- A body runs compensation inline in a `DurableTask.Current.SuppressCancellation()` scope. Each
-  child which it schedules in the scope, such as a local step, a delay, or a call to another grain,
-  records that its ancestors' cancellation doesn't reach it: it is created and runs when its parent's
-  cancellation was already requested, a later request skips it and its descendants, and recovery
-  replays it with its own cancellation state. Its own cancellation, an abort of its tree, and deletion
-  of its tree still reach it. A body detaches work which must outlive the task itself.
+- A body starts compensation with `.Shielded()`. A shielded child, such as a local step, a delay, or a
+  call to another grain, records that its ancestors' cancellation doesn't reach it: it is created and
+  runs when its parent's cancellation was already requested, a later request skips it and its
+  descendants, and recovery replays it with its own cancellation state. A shielded combinator shields
+  each input which it starts. Its own cancellation, an abort of its tree, and deletion of its tree
+  still reach it. A body detaches work which must outlive the task itself.
 - A cancellation request's reason commits with the request on each task it reaches, travels with the
   cancellation to each pending call to another grain, and is what a replay of a canceled body reads
   from `DurableTask.Current.CancellationReason`. Diagnostics report it as the `Response` of a
@@ -312,12 +325,12 @@ framework assets; its first published version establishes the compatibility base
   `DurableTaskAbortedException: <reason>`. A child which a custom scheduler runs receives the abort through its
   handle, or a cancellation request when its scheduler doesn't support abort. Aborting a terminal task changes
   nothing, and an abort which arrives before its invocation is recorded as a cancellation.
-- A detached task is a root on its target with no caller. Durable cancellation of its
-  starter doesn't reach it, and deleting the starter's execution tree deletes only the
-  marker which recorded the start. Detaching the same request under the same root ID
-  again leaves the task unchanged. Another request under that ID fails like other task
-  ID reuse; when the call to another grain is delivered through the outbox, the target's
-  inbox dead-letters it.
+- A detached task is a root on its target with no caller. Durable cancellation and abort of its
+  starter don't reach it, and deleting the starter's execution tree deletes only the record which
+  observed it. Starting the same request under the same root ID again leaves the task unchanged.
+  Another request under that ID fails like other task ID reuse: the target rejects the invocation to
+  its starter. A detached task which an ordinary grain method posts names no starter, so its target's
+  inbox dead-letters such an invocation.
 - Delays persist their logical due time and generation. Each delay sends a
   `durable-rpc/resume` message to its own grain, with `Envelope.DeliverAt` set to
   the due time. The grain's own inbox accepts the message in the delay's journal
@@ -327,8 +340,7 @@ framework assets; its first published version establishes the compatibility base
   terminalizes it as canceled, and duplicate and stale resumes are harmless.
   Like every scheduled message, a resume doesn't count toward Messaging's
   `MaxCapacity`: its sender bounds it, and the grain holds one resume for each
-  delay it scheduled, until that delay's due time, and one for each task state which
-  holds subscriptions that arrived before the task's invocation, until its deadline.
+  delay it scheduled, until that delay's due time.
   A delay's due time is a commitment: a replay which requests another due time,
   for example after a configured duration changed, keeps the recorded one and
   logs a warning. A delay canceled while its write is in flight terminalizes as

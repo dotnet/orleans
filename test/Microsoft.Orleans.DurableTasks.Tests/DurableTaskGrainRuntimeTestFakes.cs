@@ -31,7 +31,7 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     private readonly TaskCompletionSource _resumeSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Dictionary<MessageId, (GrainId Sender, DurableTaskSubscriber Destination, TaskId TaskId)> _completionIds = [];
 
-    public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
+    public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request, bool Acknowledge)> Invocations { get; } = [];
     public List<RecordedCompletion> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
     public List<string?> CancellationReasons { get; } = [];
@@ -40,16 +40,27 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     public Action<GrainId, GrainId, TaskId, IDurableTaskRequest>? BeforeSendInvocation { get; set; }
     public Action<GrainId, GrainId, TaskId>? BeforeSendCancellation { get; set; }
 
-    public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request)
+    public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request, bool acknowledge)
     {
         BeforeSendInvocation?.Invoke(sender, target, taskId, request);
-        Invocations.Add((sender, target, taskId, request));
+        Invocations.Add((sender, target, taskId, request, acknowledge));
     }
 
-    public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> DetachedInvocations { get; } = [];
+    public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request, TaskId? SubscriberId, bool Acknowledge)> DetachedInvocations { get; } = [];
 
-    public void SendDetachedInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
-        DetachedInvocations.Add((sender, target, taskId, request));
+    public void SendDetachedInvocation(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        IDurableTaskRequest request,
+        TaskId? subscriberId,
+        bool acknowledge) =>
+        DetachedInvocations.Add((sender, target, taskId, request, subscriberId, acknowledge));
+
+    public List<(GrainId Sender, DurableTaskSubscriber Destination, TaskId TaskId, DurableTaskResponse? Rejection)> Acceptances { get; } = [];
+
+    public void SendAcceptance(GrainId sender, DurableTaskSubscriber destination, TaskId taskId, DurableTaskResponse? rejection) =>
+        Acceptances.Add((sender, destination, taskId, rejection));
 
     public MessageId GetCompletionMessageId(GrainId sender, DurableTaskSubscriber destination, TaskId taskId)
     {

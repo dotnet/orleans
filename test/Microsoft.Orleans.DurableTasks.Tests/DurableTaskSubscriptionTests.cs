@@ -155,83 +155,26 @@ public sealed class DurableTaskSubscriptionTests
     });
 
     [Fact]
-    public Task SubscriptionWhichPrecedesTheInvocationAwaitsItUntilTheSendersRetryTimeout() => ActivationScheduler.RunAsync(async () =>
-    {
-        var time = new FakeTimeProvider(DateTimeOffset.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture));
-        var retryTimeout = new DurableMessagingOptions().OutboxRetryTimeout;
-        await using var operationHost = new SubscriptionHost(OperationGrain, time);
-        operationHost.Workflows["op"] = static () => DurableTask.FromResult("done");
-        await using var operation = await operationHost.ActivateAsync(TestCancellation);
-        var early = new RecordedSubscription(SubscriberGrain, OperationGrain, OperationId, SubscriptionChildId, Unsubscribe: false);
-        var missingId = TaskId.CreateRoot("missing");
-        var missing = new RecordedSubscription(SubscriberGrain, OperationGrain, missingId, RelayId.Child("$child-2"), Unsubscribe: false);
-
-        // Each subscription is held for its invocation, with a resume which wakes the grain at its deadline.
-        await operation.DeliverAsync(early.ToInboxMessage(), TestCancellation);
-        await operation.DeliverAsync(missing.ToInboxMessage(), TestCancellation);
-        Assert.Single(operation.Subscribers(OperationId));
-        Assert.Single(operation.Subscribers(missingId));
-        Assert.Empty(operation.Transport.NotFound);
-        Assert.Contains(operation.Transport.Resumes, resume => resume.TaskId == missingId.Child("$subscriptions") && resume.DueTime == time.GetUtcNow() + retryTimeout);
-
-        // An unsubscription removes a subscriber which awaits the invocation, and the state which held only it.
-        var ended = new RecordedSubscription(SubscriberGrain, OperationGrain, TaskId.CreateRoot("ended"), RelayId.Child("$child-3"), Unsubscribe: false);
-        await operation.DeliverAsync(ended.ToInboxMessage(), TestCancellation);
-        Assert.True(operation.Contains(ended.TaskId));
-        await operation.DeliverAsync((ended with { Unsubscribe = true }).ToInboxMessage(), TestCancellation);
-        Assert.False(operation.Contains(ended.TaskId));
-
-        // The invocation which arrives finds the subscriber among its completion destinations.
-        await operation.ScheduleAsync(OperationId, "op", TestCancellation);
-        await operation.GetResponseAsync(OperationId, TestCancellation);
-        var completion = Assert.Single(operation.Transport.Completions);
-        Assert.Equal(SubscriptionChildId, completion.Materialize(operation.Runtime).SubscriberId);
-
-        // A local abort finds no task to abort.
-        await operation.Tasks.AbortAsync(missingId, "stopped", TestCancellation);
-        Assert.Null(operation.Get(missingId).CompletedAt);
-
-        // A later subscription extends the deadline to its own sender's retry timeout.
-        time.Advance(TimeSpan.FromHours(1));
-        var later = missing with { SubscriberId = RelayId.Child("$child-4") };
-        await operation.DeliverAsync(later.ToInboxMessage(), TestCancellation);
-        Assert.Contains(operation.Transport.Resumes, resume => resume.TaskId == missingId.Child("$subscriptions") && resume.DueTime == time.GetUtcNow() + retryTimeout);
-
-        // The other subscriptions' task never arrives, so the latest deadline completes its subscribers as not found.
-        time.Advance(retryTimeout - TimeSpan.FromTicks(1));
-        await operation.WriteAsync(TestCancellation);
-        Assert.Equal(2, operation.Subscribers(missingId).Count);
-        time.Advance(TimeSpan.FromTicks(1));
-        await Assert.ThrowsAsync<DurableTaskNotFoundException>(
-            () => operation.Runtime.SubscribeOrPollAsync(missingId, new SubscribeOrPollOptions(), TestCancellation).AsTask());
-        Assert.Equal(
-            [missing with { Sender = OperationGrain, Target = SubscriberGrain }, later with { Sender = OperationGrain, Target = SubscriberGrain }],
-            operation.Transport.NotFound.OrderBy(static subscriber => subscriber.SubscriberId.ToString(), StringComparer.Ordinal));
-        Assert.False(operation.Contains(missingId));
-    });
-
-    [Fact]
-    public Task SubscriptionToACancellationWhichRecoveryTerminalizedReceivesItsOutcome() => ActivationScheduler.RunAsync(async () =>
+    public Task SubscriptionToATaskWhichTheGrainDoesNotHoldCompletesAsNotFoundAtOnce() => ActivationScheduler.RunAsync(async () =>
     {
         var caller = GrainId.Create("caller", "one");
         await using var operationHost = new SubscriptionHost(OperationGrain);
         operationHost.Workflows["op"] = static () => DurableTask.FromResult("done");
-        await using (var first = await operationHost.ActivateAsync(TestCancellation))
-        {
-            // The caller's cancellation arrives before its invocation.
-            first.Runtime.SignalCancellationFromInbox(OperationId, caller, reason: null);
-            await first.WriteAsync(TestCancellation);
-        }
-
         await using var operation = await operationHost.ActivateAsync(TestCancellation);
-        Assert.Equal(DurableTaskStatus.Canceled, operation.Get(OperationId).Result!.Status);
-        var subscription = new RecordedSubscription(SubscriberGrain, OperationGrain, OperationId, SubscriptionChildId, Unsubscribe: false);
+        var missing = new RecordedSubscription(SubscriberGrain, OperationGrain, TaskId.CreateRoot("missing"), SubscriptionChildId, Unsubscribe: false);
 
-        await operation.DeliverAsync(subscription.ToInboxMessage(), TestCancellation);
+        // The grain holds no state for a subscription to a task which it doesn't hold.
+        await operation.DeliverAsync(missing.ToInboxMessage(), TestCancellation);
+        Assert.Equal(missing with { Sender = OperationGrain, Target = SubscriberGrain }, Assert.Single(operation.Transport.NotFound));
+        Assert.Empty(operation.Ids);
+        Assert.Empty(operation.Transport.Resumes);
 
-        var (subscriber, response) = Assert.Single(operation.Transport.Responses);
-        Assert.Equal(subscription with { Sender = OperationGrain, Target = SubscriberGrain }, subscriber);
-        Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+        // A cancellation which preceded its invocation holds no task to subscribe to either.
+        operation.Runtime.SignalCancellationFromInbox(OperationId, caller, reason: null);
+        await operation.WriteAsync(TestCancellation);
+        var early = missing with { TaskId = OperationId, SubscriberId = RelayId.Child("$child-2") };
+        await operation.DeliverAsync(early.ToInboxMessage(), TestCancellation);
+        Assert.Equal(early with { Sender = OperationGrain, Target = SubscriberGrain }, operation.Transport.NotFound[1]);
         Assert.Empty(operation.Get(OperationId).CompletionDestinations);
 
         // The invocation still finds the cancellation, which its caller receives.

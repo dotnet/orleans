@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.Globalization;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.DurableTasks.Protocol;
@@ -11,22 +10,24 @@ namespace Orleans.DurableTasks.Runtime;
 
 /// <remarks>
 /// <para>
-/// A subscription lets a durable execution await the terminal result of an existing invoked task which it didn't invoke.
+/// A subscription lets a durable execution await the terminal result of a task which it didn't start as an attached
+/// child: an existing invoked task, which <c>GetDurableTask</c> addresses, or a detached task which the execution starts.
 /// The subscribing grain records a child of the execution, whose fingerprint names the task's grain and identifier, and
-/// stages the subscription in the same journal write: an invocation message which carries the child's identifier
-/// instead of a request, so it neither schedules nor claims the task. Like a delay, the child is a cancellation leaf: its
-/// own cancellation, its ancestors' cancellation, an abort of its tree, or deletion of its tree terminalizes it without
-/// reaching the task, and stages an unsubscription, a cancellation message which names the child.
+/// stages the subscription in the same journal write: an invocation message which carries the child's identifier, so it
+/// neither claims the task nor validates its caller, and which carries the request of a detached task. Like a delay, the
+/// child is a cancellation leaf: its own cancellation, its ancestors' cancellation, an abort of its tree, or deletion of
+/// its tree terminalizes it without reaching the task, and stages an unsubscription, a cancellation message which names
+/// the child.
 /// </para>
 /// <para>
 /// The task's grain adds the child to the task's completion destinations, beside the task's invoker, so the task's
 /// result reaches it as it reaches the invoker: through the outbox, with the task retained until the completion retires.
-/// A subscription to a terminal task sends its completion at once, and one to a stored task which isn't invoked
-/// receives a completion with <see cref="DurableTaskNotFoundException"/>. The outbox delivers messages independently,
-/// so a subscription can arrive before the task's invocation; it is then held, in a task state without a request, until
-/// the invocation arrives or Messaging's <c>OutboxRetryTimeout</c> has elapsed, after which the invocation can no longer
-/// arrive and the subscription completes as not found. A subscription to a task of the same grain is staged directly in
-/// task state, and completes in the write which stores the task's result.
+/// A subscription to a terminal task sends its completion at once, and one to a task which the grain doesn't retain as
+/// an invoked task receives a completion with <see cref="DurableTaskNotFoundException"/> at once. A task identifier
+/// which a durable execution can hold refers to a task which its grain already accepted: a schedule which a client, a
+/// grain, or a durable execution awaited, or a detached task which the execution started itself, whose invocation names
+/// the child. A subscription to a task of the same grain is staged directly in task state, and completes in the write
+/// which stores the task's result.
 /// </para>
 /// </remarks>
 internal sealed partial class DurableTaskGrainRuntime
@@ -34,79 +35,101 @@ internal sealed partial class DurableTaskGrainRuntime
     // Execution-tree records begin with '$', so a subscription never collides with a request fingerprint.
     private const string SubscriptionFingerprintPrefix = "$subscribe:";
 
-    // The segment of the resume message which wakes the grain when a subscription's awaited invocation can no longer
-    // arrive. No task uses the segment, so the resume changes no state.
-    private const string AwaitedInvocationResumeSegment = "$subscriptions";
-
-    /// <summary>Schedules, or reaches the record of, a subscription child under <paramref name="taskId"/>.</summary>
+    /// <summary>
+    /// Stages a subscription child under <paramref name="taskId"/>, or reaches its record, without writing, and returns
+    /// its handle and whether it staged changes.
+    /// </summary>
     /// <remarks>
     /// The record and its subscription commit in one journal write, so a replay which finds the record doesn't subscribe
     /// again; it awaits that write, which an earlier attempt can still be awaiting, and the recorded outcome.
     /// </remarks>
-    private async ValueTask<IScheduledTaskHandle> ScheduleSubscriptionAsync(
-        TaskId taskId,
-        IDurableTaskSubscription subscription,
-        bool suppressCancellation,
-        CancellationToken cancellationToken)
+    private StagedChild StageSubscription(TaskId taskId, IDurableTaskSubscription subscription, bool shielded)
     {
         var fingerprint = FormatIdentity(SubscriptionFingerprintPrefix, subscription.Target, subscription.TaskId);
-        if (_storage.TryGetTask(taskId, out var state))
+        if (TryGetRecordedSubscription(taskId, fingerprint, DescribeSubscription(subscription.Target, subscription.TaskId)) is { } recorded)
         {
-            if (!string.Equals(state.RequestFingerprint, fingerprint, StringComparison.Ordinal))
-            {
-                throw CreateDivergenceException(
-                    $"Durable child task '{taskId}' is already associated with a different operation.",
-                    state,
-                    DescribeSubscription(subscription.Target, subscription.TaskId));
-            }
-
-            if (state.Result is { IsCompleted: true } recorded)
-            {
-                return new CompletedTaskHandle(taskId, recorded);
-            }
-
-            if (state.CancellationRequestedAt.HasValue)
-            {
-                return new CompletedTaskHandle(
-                    taskId,
-                    await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, cancellationToken));
-            }
-
-            var existing = GetScheduledTaskHandle(taskId);
-            await WriteStateAsync(cancellationToken);
-            return existing;
+            return recorded;
         }
 
-        // A subscription of a canceled ancestor is not created, unless the parent scheduled it in a cancellation
-        // suppression scope.
-        if (IsAncestorCancellationRequested(taskId, state: null, suppressCancellation))
+        // A subscription of a canceled ancestor is not created, unless the parent started it shielded.
+        if (IsAncestorCancellationRequested(taskId, state: null, shielded))
         {
-            return new CompletedTaskHandle(taskId, DurableTaskResponse.Canceled);
+            return new(new CompletedTaskHandle(taskId, DurableTaskResponse.Canceled), RequiresWrite: false);
         }
 
         // Retention ends at a deadline, so a subscription to a task of this grain doesn't find a task whose retention ended.
         DeleteExpiredTasks();
-        var transport = MessageTransport;
         DurableTaskResponse? response = null;
         if (subscription.Target == GrainId)
         {
             // The subscribed result is read before the child is staged, so a result which no longer decodes fails the
             // scheduling without recording the child.
-            response = Subscribe(subscription.TaskId, new(GrainId, taskId), fromInbox: false) switch
-            {
-                SubscriptionOutcome.NotFound => CreateNotFound(subscription.TaskId),
-                SubscriptionOutcome.Terminal => _storage.TryGetTask(subscription.TaskId, out var subscribed) ? subscribed.Result! : null,
-                _ => null,
-            };
+            response = SubscribeLocal(subscription.TaskId, taskId);
         }
         else
         {
-            transport.SendSubscription(GrainId, subscription.Target, subscription.TaskId, taskId);
+            MessageTransport.SendSubscription(GrainId, subscription.Target, subscription.TaskId, taskId);
         }
 
-        state = _storage.GetOrCreateTask(taskId, request: null);
+        return new(StageSubscriptionRecord(taskId, fingerprint, shielded, response), RequiresWrite: true);
+    }
+
+    /// <summary>
+    /// Returns the handle of the subscription child recorded under <paramref name="taskId"/>, or <see langword="null"/>
+    /// when there's no record.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The record holds another operation.</exception>
+    private StagedChild? TryGetRecordedSubscription(TaskId taskId, string fingerprint, string requested)
+    {
+        if (!_storage.TryGetTask(taskId, out var state))
+        {
+            return null;
+        }
+
+        if (!string.Equals(state.RequestFingerprint, fingerprint, StringComparison.Ordinal))
+        {
+            throw CreateDivergenceException(
+                $"Durable child task '{taskId}' is already associated with a different operation.",
+                state,
+                requested);
+        }
+
+        if (state.Result is { IsCompleted: true } recorded)
+        {
+            return new(new CompletedTaskHandle(taskId, recorded), RequiresWrite: false);
+        }
+
+        if (state.CancellationRequestedAt.HasValue)
+        {
+            var canceled = StageResponse(taskId, DurableTaskResponse.Canceled);
+            _pendingHandleResponses[taskId] = canceled;
+            return new(new CompletedTaskHandle(taskId, canceled), RequiresWrite: true);
+        }
+
+        return new(GetScheduledTaskHandle(taskId), RequiresWrite: true);
+    }
+
+    /// <summary>
+    /// Subscribes this grain's child <paramref name="subscriberId"/> to this grain's task <paramref name="taskId"/>, and
+    /// returns the task's terminal result, the not-found failure, or <see langword="null"/> while the task is pending.
+    /// </summary>
+    private DurableTaskResponse? SubscribeLocal(TaskId taskId, TaskId subscriberId) =>
+        Subscribe(taskId, new(GrainId, subscriberId)) switch
+        {
+            SubscriptionOutcome.NotFound => CreateNotFound(taskId),
+            SubscriptionOutcome.Terminal => _storage.TryGetTask(taskId, out var subscribed) ? subscribed.Result! : null,
+            _ => null,
+        };
+
+    /// <summary>
+    /// Stages the record of a subscription child, completing it with <paramref name="response"/> when the subscribed task
+    /// is of this grain and has a result, and returns its handle.
+    /// </summary>
+    private IScheduledTaskHandle StageSubscriptionRecord(TaskId taskId, string fingerprint, bool shielded, DurableTaskResponse? response)
+    {
+        var state = _storage.GetOrCreateTask(taskId, request: null);
         _storage.SetRequestFingerprint(taskId, state, fingerprint);
-        MarkCancellationSuppressed(taskId, state, suppressCancellation);
+        MarkShielded(taskId, state, shielded);
         var handle = GetOrCreateRunningTaskHandle(taskId);
         if (response is not null)
         {
@@ -114,7 +137,6 @@ internal sealed partial class DurableTaskGrainRuntime
             _pendingHandleResponses[taskId] = response;
         }
 
-        await WriteStateAsync(cancellationToken);
         return handle;
     }
 
@@ -134,7 +156,7 @@ internal sealed partial class DurableTaskGrainRuntime
 
         // Retention ends at a deadline, so a subscription doesn't find a task whose retention ended.
         DeleteExpiredTasks();
-        if (Subscribe(taskId, subscriber, fromInbox: true) == SubscriptionOutcome.NotFound)
+        if (Subscribe(taskId, subscriber) == SubscriptionOutcome.NotFound)
         {
             MessageTransport.SendResponse(GrainId, subscriber, taskId, CreateNotFound(taskId));
         }
@@ -155,10 +177,6 @@ internal sealed partial class DurableTaskGrainRuntime
     }
 
     /// <summary>Adds <paramref name="subscriber"/> to <paramref name="taskId"/>'s completion destinations, without writing.</summary>
-    /// <param name="fromInbox">
-    /// <see langword="true"/> when the subscription was delivered through the inbox, so it can precede the task's
-    /// invocation.
-    /// </param>
     /// <returns>
     /// <see cref="SubscriptionOutcome.Pending"/> when the subscriber awaits the task's result,
     /// <see cref="SubscriptionOutcome.Terminal"/> when the task has stored its result, or
@@ -166,36 +184,16 @@ internal sealed partial class DurableTaskGrainRuntime
     /// on another grain of a terminal task receives a completion through the outbox; a subscriber on this grain reads the
     /// result directly.
     /// </returns>
-    /// <remarks>
-    /// A delivered subscription for a task which isn't stored, or which records only a cancellation or subscriptions that
-    /// preceded its invocation, is held for that invocation, which finds it among its completion destinations. Each such
-    /// subscription records when it arrived, and schedules a resume message for <c>OutboxRetryTimeout</c> later, which
-    /// wakes the grain, so the subscriptions complete as not found while the grain is otherwise idle.
-    /// </remarks>
-    private SubscriptionOutcome Subscribe(TaskId taskId, DurableTaskSubscriber subscriber, bool fromInbox)
+    private SubscriptionOutcome Subscribe(TaskId taskId, DurableTaskSubscriber subscriber)
     {
-        var found = _storage.TryGetTask(taskId, out var state);
-        var awaitsInvocation = fromInbox
-            && (!found || IsSubscriptionRecord(state!) || (IsCancellationRecord(state!) && !HasStarted(taskId)));
-        if (!awaitsInvocation && (!found || !IsInvoked(state!)))
+        if (!_storage.TryGetTask(taskId, out var state) || !IsInvoked(state))
         {
             return SubscriptionOutcome.NotFound;
         }
 
-        if (found && HasStoredResult(state!))
+        if (HasStoredResult(state))
         {
-            if (subscriber.GrainId == GrainId)
-            {
-                return SubscriptionOutcome.Terminal;
-            }
-
-            if (!IsInvoked(state!))
-            {
-                // A cancellation which preceded the invocation, and which recovery terminalized, is the outcome which the
-                // invocation completes with when it arrives. The record doesn't retain itself for subscribers.
-                MessageTransport.SendResponse(GrainId, subscriber, taskId, state!.Result!);
-            }
-            else if (TryRegisterCompletionDestination(taskId, state!, subscriber))
+            if (subscriber.GrainId != GrainId && TryRegisterCompletionDestination(taskId, state, subscriber))
             {
                 SendCompletion(taskId, subscriber);
             }
@@ -203,18 +201,7 @@ internal sealed partial class DurableTaskGrainRuntime
             return SubscriptionOutcome.Terminal;
         }
 
-        state ??= _storage.GetOrCreateTask(taskId, request: null);
         _storage.AddCompletionDestination(taskId, state, subscriber);
-        if (awaitsInvocation)
-        {
-            // The invocation arrives within the retry timeout of the latest subscription's sender, or never, so each
-            // subscription extends the deadline and schedules a resume which wakes the grain then.
-            _storage.RetainResult(taskId, state);
-            var expiry = GetAwaitedInvocationExpiry(state);
-            TrackExpiry(expiry);
-            MessageTransport.SendResume(GrainId, taskId.Child(AwaitedInvocationResumeSegment), generation: 1, expiry);
-        }
-
         return SubscriptionOutcome.Pending;
     }
 
@@ -237,12 +224,7 @@ internal sealed partial class DurableTaskGrainRuntime
             return;
         }
 
-        var awaitsInvocation = IsSubscriptionRecord(state);
         _storage.RemoveCompletionDestination(taskId, state, subscriber);
-        if (awaitsInvocation && state.CompletionDestinations.Count == 0 && !state.CancellationRequestedAt.HasValue)
-        {
-            _storage.RemoveTask(taskId);
-        }
     }
 
     /// <summary>
@@ -285,52 +267,16 @@ internal sealed partial class DurableTaskGrainRuntime
         _pendingHandleResponses[subscriberId] = response;
     }
 
-    /// <summary>
-    /// Completes the subscribers of a task whose invocation didn't arrive as not found, and removes them, without writing.
-    /// </summary>
-    private void CompleteSubscribersAsNotFound(TaskId taskId, IDurableTaskState state)
-    {
-        foreach (var subscriber in state.CompletionDestinations.ToArray())
-        {
-            if (subscriber.GrainId == GrainId)
-            {
-                CompleteSubscription(subscriber.TaskId, taskId, CreateNotFound(taskId));
-            }
-            else
-            {
-                MessageTransport.SendResponse(GrainId, subscriber, taskId, CreateNotFound(taskId));
-            }
-
-            _storage.RemoveCompletionDestination(taskId, state, subscriber);
-        }
-    }
-
     private static DurableTaskResponse CreateNotFound(TaskId taskId) =>
         DurableTaskResponse.FromException(new DurableTaskNotFoundException(taskId));
 
     /// <summary>
-    /// Returns when a task state which awaits its invocation is deleted unless the invocation arrives: the retry timeout
-    /// after the state was created, or after its latest subscription arrived.
+    /// Returns whether a task is a subscription child, including the record of a detached task, and the task to which it
+    /// subscribes.
     /// </summary>
-    private DateTimeOffset GetAwaitedInvocationExpiry(IDurableTaskState state)
-    {
-        var since = state.RetainedSince is { } subscribed && subscribed > state.CreatedAt ? subscribed : state.CreatedAt;
-        return AddSaturating(since, _shared.OutboxRetryTimeout);
-    }
-
-    /// <summary>Returns whether a task state holds only subscriptions which arrived before the task's invocation.</summary>
-    /// <remarks>Such a state can also record a cancellation which arrived before the invocation.</remarks>
-    private static bool IsSubscriptionRecord(IDurableTaskState state) =>
-        state.CompletionDestinations.Count > 0
-        && !state.CompletedAt.HasValue
-        && state.RequestFingerprint is null
-        && state.RemoteRequestFingerprint is null
-        && state.DueTime is null
-        && state.Request is null;
-
-    /// <summary>Returns whether a task is a subscription child, and the task to which it subscribes.</summary>
     private static bool TryGetSubscription(IDurableTaskState state, out GrainId target, out TaskId taskId) =>
-        TryParseIdentity(SubscriptionFingerprintPrefix, state.RequestFingerprint, out target, out taskId);
+        TryParseIdentity(SubscriptionFingerprintPrefix, state.RequestFingerprint, out target, out taskId)
+        || TryGetDetachedTask(state, out target, out taskId);
 
     /// <summary>Formats a grain and a task as <c>{prefix}{grain length}:{grain}{task}</c>, which parses unambiguously.</summary>
     private static string FormatIdentity(string prefix, GrainId grain, TaskId taskId)

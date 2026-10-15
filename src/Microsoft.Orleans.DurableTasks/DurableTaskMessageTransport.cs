@@ -22,7 +22,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// with <see cref="Envelope.DeliverAt"/> set to the delay's due time, which the grain's own inbox accepts in the delay's
 /// journal write; its identity also covers the delay generation and due time. A signal's identity also covers its name
 /// and value. A subscription's, an unsubscription's, and a subscriber's completion's identities also cover the subscribing
-/// task, so each subscription of a task has its own messages. The runtime derives readiness from journaled state, so
+/// task, so each subscription of a task has its own messages, and an acceptance's identity covers the task which started
+/// the accepted task. The runtime derives readiness from journaled state, so
 /// duplicate and stale resumes are harmless.
 /// </remarks>
 internal sealed class DurableTaskMessageTransport(
@@ -31,21 +32,58 @@ internal sealed class DurableTaskMessageTransport(
 {
     internal const string MessageIdRoot = "durable-rpc";
 
-    public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
+    public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request, bool acknowledge) =>
         Send(
             messageTypes.Invocation,
             sender,
             target,
             taskId,
-            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender });
+            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender, Acknowledge = acknowledge });
 
-    public void SendDetachedInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request) =>
+    /// <remarks>
+    /// The identity of an invocation with a subscriber also covers the subscriber, so each record which starts the same
+    /// detached task subscribes to it.
+    /// </remarks>
+    public void SendDetachedInvocation(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        IDurableTaskRequest request,
+        TaskId? subscriberId,
+        bool acknowledge) =>
         Send(
             messageTypes.Invocation,
             sender,
             target,
             taskId,
-            new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender, Detached = true });
+            new DurableTaskInvocationMessage
+            {
+                TaskId = taskId,
+                Request = request,
+                Sender = sender,
+                Detached = true,
+                SubscriberId = subscriberId,
+                Acknowledge = acknowledge,
+            },
+            CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.InvocationSubject, subscriberId?.ToString()),
+            deliverAt: null);
+
+    /// <remarks>The identity covers the destination's task, so each start of a task receives its own reply.</remarks>
+    public void SendAcceptance(GrainId sender, DurableTaskSubscriber destination, TaskId taskId, DurableTaskResponse? rejection) =>
+        Send(
+            messageTypes.Acceptance,
+            sender,
+            destination.GrainId,
+            taskId,
+            new DurableTaskAcceptanceMessage
+            {
+                TaskId = taskId,
+                Sender = sender,
+                SubscriberId = destination.TaskId == taskId ? null : destination.TaskId,
+                Rejection = rejection,
+            },
+            CreateMessageId(sender, destination.GrainId, taskId, DurableTaskMessageTypes.AcceptanceSubject, destination.TaskId.ToString()),
+            deliverAt: null);
 
     public void SendCompletion(MessageId messageId) => outbox.Value.Send(messageId);
 

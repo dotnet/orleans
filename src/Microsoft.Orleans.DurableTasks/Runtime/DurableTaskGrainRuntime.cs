@@ -52,8 +52,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// </para>
 /// <para>
 /// An invoked task, which was scheduled as a request, owns an execution tree: the task and its descendants which are
-/// not invoked tasks themselves, such as local children, delays, completion decisions, detach markers, effect records,
-/// subscriptions to other tasks, and remote-child stubs. Task identifiers are chosen by callers, so an
+/// not invoked tasks themselves, such as local children, delays, completion decisions, records of detached tasks,
+/// effect records, subscriptions to other tasks, and remote-child stubs. Task identifiers are chosen by callers, so an
 /// invoked descendant keeps its own lifecycle.
 /// Once an invoked task is terminal and no completion is pending, the runtime deletes its execution tree: in the write
 /// which retires its last completion as delivered, because that destination durably holds the result, or otherwise once
@@ -63,8 +63,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// cancellation to each pending remote child and signals each running execution, whose result is then discarded.
 /// Completions and resumes which arrive for a deleted task are ignored. A cancellation which arrives before its
 /// invocation is recorded until <see cref="Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxRetryTimeout"/>
-/// has elapsed, after which the invocation can no longer arrive, and so are a signal and a subscription which arrive
-/// before their invocation; the subscription then completes as not found.
+/// has elapsed, after which the invocation can no longer arrive, and so is a signal which arrives before its invocation.
+/// A subscription to a task which the grain doesn't retain as an invoked task completes as not found at once.
 /// </para>
 /// <para>
 /// Cancellation is cooperative: a request is recorded in task state, cancels the durable token of running attempts,
@@ -377,14 +377,13 @@ internal sealed partial class DurableTaskGrainRuntime(
         { RemoteTarget.IsDefault: false } => $"a call to grain '{state.RemoteTarget}' ({AbbreviateFingerprint(state.RemoteRequestFingerprint)})",
         { DueTime: { } dueTime } => $"a delay due at {dueTime:O}",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(CompletionDecisionFingerprintPrefix, StringComparison.Ordinal) => "a selection of the first task to complete",
-        { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(DetachMarkerFingerprintPrefix, StringComparison.Ordinal) => "a detached task's start",
+        _ when TryGetDetachedTask(state, out var target, out var rootId) => DescribeDetachedStart(target, rootId),
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalSendFingerprintPrefix, StringComparison.Ordinal) => "a signal's send",
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal) => "a signal's value",
         { RequestFingerprint: { } fingerprint } when TryParseIdentity(SubscriptionFingerprintPrefix, fingerprint, out var target, out var subscribed) => DescribeSubscription(target, subscribed),
         { RequestFingerprint: EffectFingerprint } => "a DurableTask.Once effect",
         { RequestFingerprint: { } fingerprint } => $"a request ({AbbreviateFingerprint(fingerprint)})",
         { CancellationRequestedAt: not null, CompletedAt: null } => "a cancellation which arrived before its request",
-        { CompletionDestinations.Count: > 0, CompletedAt: null } => "a subscription which arrived before its request",
         _ => "a local child task",
     };
 
@@ -497,7 +496,8 @@ internal sealed partial class DurableTaskGrainRuntime(
             : state.Request?.Context?.CallerId ?? default;
         if (!existingCaller.IsDefault && existingCaller != callerId)
         {
-            throw new InvalidOperationException(
+            throw new DurableTaskConflictException(
+                taskId,
                 $"Durable task '{taskId}' is already associated with caller '{existingCaller}', not '{callerId}'.");
         }
     }
@@ -615,7 +615,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </summary>
     /// <remarks>
     /// A delivered destination durably holds the result, so the task needs no retention for it. A task without a grain
-    /// caller, such as a task which a client scheduled or detached, keeps its result for the retention period after
+    /// caller, such as a task which a client scheduled or a durable execution detached, keeps its result for the retention period after
     /// completion, so polls observe it. A dead-lettered completion restarts the result's retention period, so a poller,
     /// or a caller which invokes the task again, can still observe it; the task is then deleted when that period ends.
     /// </remarks>
@@ -635,9 +635,8 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        // A retention which restarted after completion, because a completion was dead-lettered, outlasts delivery. A task
-        // which awaited its invocation recorded its subscriptions' arrival before completion.
-        if (state.RetainedSince >= state.CompletedAt || state.CallerId.IsDefault)
+        // A retention which restarted, because a completion was dead-lettered, outlasts delivery.
+        if (state.RetainedSince.HasValue || state.CallerId.IsDefault)
         {
             TrackExpiry(GetRetentionExpiry(state));
         }
@@ -655,20 +654,29 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     private ValueTask WriteStateAsync(CancellationToken cancellationToken) => _storage.WriteAsync(cancellationToken);
 
-    public ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
+    public async ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
         TaskId taskId,
         IDurableTaskRequest request,
-        CancellationToken cancellationToken) =>
-        ScheduleRemoteAsync(taskId, request, suppressCancellation: false, cancellationToken);
-
-    private async ValueTask<DurableTaskResponse> ScheduleRemoteAsync(
-        TaskId taskId,
-        IDurableTaskRequest request,
-        bool suppressCancellation,
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
         cancellationToken.ThrowIfCancellationRequested();
+        var response = StageRemote(taskId, request, shielded: false, acknowledge: false);
+        if (!response.IsCompleted)
+        {
+            await WriteStateAsync(cancellationToken);
+        }
+
+        return response;
+    }
+
+    /// <summary>
+    /// Stages the invocation of <paramref name="request"/> on another grain as the remote child <paramref name="taskId"/>,
+    /// without writing, and returns the child's recorded terminal response, or <see cref="DurableTaskResponse.Pending"/>.
+    /// </summary>
+    /// <param name="acknowledge">Whether the target replies with an acceptance once it stores the task.</param>
+    private DurableTaskResponse StageRemote(TaskId taskId, IDurableTaskRequest request, bool shielded, bool acknowledge)
+    {
         var transport = MessageTransport;
         var context = request.Context ?? throw new InvalidOperationException("The durable task request has no context.");
         if (context.TargetId == GrainId)
@@ -701,7 +709,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         state ??= _storage.GetOrCreateTask(taskId, request: null);
-        MarkCancellationSuppressed(taskId, state, suppressCancellation);
+        MarkShielded(taskId, state, shielded);
         if (state.RemoteTarget.IsDefault || state.RemoteRequestFingerprint is null)
         {
             _storage.SetRemoteRequest(taskId, state, context.TargetId, fingerprint);
@@ -709,72 +717,8 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         context.CallerId = GrainId;
         context.SupportsDurableCompletion = true;
-        transport.SendInvocation(GrainId, context.TargetId, taskId, request);
-        await WriteStateAsync(cancellationToken);
+        transport.SendInvocation(GrainId, context.TargetId, taskId, request, acknowledge);
         return DurableTaskResponse.Pending;
-    }
-
-    /// <summary>
-    /// Starts a request as a detached root task and waits for the journal write which commits it, together with this
-    /// grain's other pending changes.
-    /// </summary>
-    /// <remarks>
-    /// A detached task has no caller: its target retains it like a client-scheduled root and sends its result to no grain,
-    /// so this grain stores no state for it. A task for this grain is staged locally and starts after the commit; a task
-    /// for another grain is an invocation staged in the outbox. Within a durable execution, a terminal marker in the
-    /// execution's tree records the start in the same write, so a replay which reaches the marker doesn't start the task
-    /// again, and the marker is deleted with that tree. The marker is terminal, so canceling or deleting its tree doesn't
-    /// reach the detached task.
-    /// </remarks>
-    public async ValueTask DetachAsync(
-        TaskId rootId,
-        IDurableTaskRequest request,
-        TaskId markerId,
-        CancellationToken cancellationToken)
-    {
-        ThrowIfStopping();
-        cancellationToken.ThrowIfCancellationRequested();
-        Debug.Assert(!rootId.IsDefault && rootId.Parent().IsDefault, "A detached task is a root task.");
-        var context = request.Context ?? throw new InvalidOperationException("The durable task request has no context.");
-        string? markerFingerprint = null;
-        if (!markerId.IsDefault)
-        {
-            markerFingerprint = GetDetachMarkerFingerprint(rootId, context.TargetId, request);
-            if (_storage.TryGetTask(markerId, out var recorded))
-            {
-                if (!string.Equals(recorded.RequestFingerprint, markerFingerprint, StringComparison.Ordinal))
-                {
-                    throw CreateDivergenceException(
-                        $"Durable task '{markerId}' is already associated with another operation.",
-                        recorded,
-                        $"detaching root task '{rootId}'");
-                }
-
-                // The marker commits with the start, possibly in a write which an earlier attempt is still awaiting.
-                await WriteStateAsync(cancellationToken);
-                return;
-            }
-        }
-
-        if (context.TargetId == GrainId)
-        {
-            StageScheduleWithCommitEffects(rootId, request, fromInbox: false);
-        }
-        else
-        {
-            context.CallerId = default;
-            context.SupportsDurableCompletion = false;
-            MessageTransport.SendDetachedInvocation(GrainId, context.TargetId, rootId, request);
-        }
-
-        if (markerFingerprint is not null)
-        {
-            var marker = _storage.GetOrCreateTask(markerId, request: null);
-            _storage.SetRequestFingerprint(markerId, marker, markerFingerprint);
-            _storage.SetResponse(markerId, marker, DurableTaskResponse.Completed);
-        }
-
-        await WriteStateAsync(cancellationToken);
     }
 
     // Fingerprints of operations in an execution tree begin with '$', so they never equal a hexadecimal request fingerprint.
@@ -851,23 +795,6 @@ internal sealed partial class DurableTaskGrainRuntime(
             $"Durable task '{operationId}' uses the same name and occurrence as '{otherKindId}', which an earlier run recorded.",
             recorded,
             requested);
-    }
-
-    private const string DetachMarkerFingerprintPrefix = "$detach:";
-
-    private string GetDetachMarkerFingerprint(TaskId rootId, GrainId target, IDurableTaskRequest request)
-    {
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        Span<byte> length = stackalloc byte[sizeof(int)];
-        foreach (var value in (ReadOnlySpan<string>)[rootId.ToString(), target.ToString(), IDurableTaskRequest.GetFingerprint(request, _shared.Serializer)])
-        {
-            var bytes = Encoding.UTF8.GetBytes(value);
-            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(length, bytes.Length);
-            hash.AppendData(length);
-            hash.AppendData(bytes);
-        }
-
-        return $"{DetachMarkerFingerprintPrefix}{Convert.ToHexString(hash.GetHashAndReset())}";
     }
 
     public async ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, string? reason, CancellationToken cancellationToken)
@@ -1064,25 +991,11 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        if (TryGetSubscription(state, out var target, out var subscribedTaskId))
+        ThrowIfNotStartedBy(taskId, sourceTaskId, state, sender);
+        if (TryGetSubscription(state, out _, out _))
         {
-            if (target != sender || subscribedTaskId != sourceTaskId)
-            {
-                throw new InvalidOperationException(
-                    $"Durable task '{taskId}' does not subscribe to task '{sourceTaskId}' of grain '{sender}'.");
-            }
-
             CompleteSubscription(taskId, sourceTaskId, response);
             return;
-        }
-
-        if (state.RemoteTarget.IsDefault
-            || state.RemoteRequestFingerprint is null
-            || state.RemoteTarget != sender
-            || sourceTaskId != taskId)
-        {
-            throw new InvalidOperationException(
-                $"Durable task '{taskId}' does not accept completions from grain '{sender}'.");
         }
 
         _pendingHandleResponses[taskId] = StageAcceptedResponse(taskId, state, response);
@@ -1121,8 +1034,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         foreach (var (taskId, state) in tasks)
         {
-            // A task which awaits its invocation has nothing to run; its record expires or the invocation completes it.
-            if (HasStoredResult(state) || IsSubscriptionRecord(state))
+            if (HasStoredResult(state))
             {
                 continue;
             }
@@ -1272,8 +1184,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         ValidateCaller(taskId, state, requestContext.CallerId);
         if (state.Request is null
             && state.RequestFingerprint is null
-            && state.CancellationRequestedAt is null
-            && !IsSubscriptionRecord(state))
+            && state.CancellationRequestedAt is null)
         {
             throw CreateScheduleConflictException(
                 taskId,
@@ -1307,16 +1218,9 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         StageCaller(taskId, state, requestContext.CallerId);
-        var awaitedInvocation = state.RequestFingerprint is null && state.Request is null;
         if (state.RequestFingerprint is null)
         {
             _storage.SetRequestFingerprint(taskId, state, fingerprint);
-        }
-
-        // A cancellation or a subscription which preceded the invocation recorded no request.
-        if (awaitedInvocation)
-        {
-            _storage.SetRequest(taskId, state, request);
         }
 
         // An invocation whose cancellation preceded its start terminalizes as canceled. A started body, which a duplicate
@@ -1325,6 +1229,12 @@ internal sealed partial class DurableTaskGrainRuntime(
             && state.Result is not { IsCompleted: true }
             && IsCancellationLeaf(taskId, state))
         {
+            // A cancellation which preceded the invocation recorded no request.
+            if (state.Request is null)
+            {
+                _storage.SetRequest(taskId, state, request);
+            }
+
             if (requestContext.SupportsDurableCompletion)
             {
                 TryRegisterCompletionDestination(taskId, state, new(requestContext.CallerId, taskId));
@@ -1483,28 +1393,42 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
     }
 
-    /// <summary>Schedules a child which its ancestors' durable cancellation reaches.</summary>
+    /// <summary>Starts a child which its ancestors' durable cancellation reaches.</summary>
     public ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
         TaskId taskId,
         DurableTask durableTask,
         CancellationToken cancellationToken) =>
-        ScheduleChildAsync(taskId, durableTask, suppressCancellation: false, cancellationToken);
+        ScheduleChildAsync(taskId, durableTask, shielded: false, waitForAcceptance: false, cancellationToken);
 
-    /// <summary>Schedules or reattaches to a child.</summary>
-    /// <param name="suppressCancellation">
-    /// Whether the parent scheduled the child in a cancellation suppression scope. Such a child is created and runs even
-    /// when an ancestor's cancellation was requested, and records that its ancestors' cancellation doesn't reach it.
+    /// <summary>Starts or reattaches to a child, and waits for the write which commits it.</summary>
+    /// <param name="taskId">The child's identifier.</param>
+    /// <param name="durableTask">The child's definition.</param>
+    /// <param name="shielded">
+    /// Whether the parent starts the child shielded. Such a child is created and runs even when an ancestor's cancellation
+    /// was requested, and records that its ancestors' cancellation doesn't reach it.
     /// </param>
+    /// <param name="waitForAcceptance">
+    /// Whether the start completes once the child's host has accepted and durably stored it: a call to another grain
+    /// awaits its target's acceptance, and a rejected call fails the start.
+    /// </param>
+    /// <param name="cancellationToken">A token which abandons the start.</param>
     public async ValueTask<IScheduledTaskHandle> ScheduleChildAsync(
         TaskId taskId,
         DurableTask durableTask,
-        bool suppressCancellation,
+        bool shielded,
+        bool waitForAcceptance,
         CancellationToken cancellationToken)
     {
         ThrowIfStopping();
         if (durableTask is IDurableTaskSubscription subscription)
         {
-            return await ScheduleSubscriptionAsync(taskId, subscription, suppressCancellation, cancellationToken);
+            var (subscriptionHandle, requiresWrite) = StageSubscription(taskId, subscription, shielded);
+            if (requiresWrite)
+            {
+                await WriteStateAsync(cancellationToken);
+            }
+
+            return subscriptionHandle;
         }
 
         if (durableTask is ISchedulableTask schedulableTask and not IDurableTaskRequest)
@@ -1512,10 +1436,47 @@ internal sealed partial class DurableTaskGrainRuntime(
             return await ScheduleCustomChildAsync(
                 taskId,
                 schedulableTask,
-                suppressCancellation,
+                shielded,
                 cancellationToken);
         }
 
+        var staged = StageChild(taskId, durableTask, shielded, acknowledge: waitForAcceptance);
+        if (staged.RequiresWrite)
+        {
+            await WriteStateAsync(cancellationToken);
+        }
+
+        if (waitForAcceptance)
+        {
+            await WaitForAcceptanceAsync(taskId, cancellationToken);
+        }
+
+        return staged.Handle;
+    }
+
+    /// <summary>Stages the start of a child on the activation, without writing, and returns its handle.</summary>
+    /// <remarks>
+    /// The start commits with the next journal write, together with the state changes which the calling work item made. A
+    /// definition which a custom host schedules starts asynchronously, so it can't be posted.
+    /// </remarks>
+    /// <exception cref="NotSupportedException">A custom host schedules the definition.</exception>
+    public IScheduledTaskHandle PostChild(TaskId taskId, DurableTask durableTask, bool shielded)
+    {
+        ThrowIfStopping();
+        return durableTask switch
+        {
+            IDurableTaskSubscription subscription => StageSubscription(taskId, subscription, shielded).Handle,
+            ISchedulableTask and not IDurableTaskRequest => throw new NotSupportedException(
+                "A durable task which a custom host schedules starts asynchronously, so it can't be posted. Await it, or schedule it with ScheduleAsync."),
+            _ => StageChild(taskId, durableTask, shielded, acknowledge: false).Handle,
+        };
+    }
+
+    /// <summary>Stages the start of a local child or of a call to another grain, without writing.</summary>
+    /// <param name="acknowledge">Whether a call to another grain asks its target for an acceptance.</param>
+    /// <returns>The child's handle, and whether its start staged changes which a write commits.</returns>
+    private StagedChild StageChild(TaskId taskId, DurableTask durableTask, bool shielded, bool acknowledge)
+    {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
             _shared.Logger.LogTrace("{Id} evaluating task {TaskId}", GrainId, taskId);
@@ -1583,38 +1544,38 @@ internal sealed partial class DurableTaskGrainRuntime(
         if (state is { CancellationRequestedAt: not null, Result: not { IsCompleted: true } }
             && IsCancellationLeaf(taskId, state))
         {
-            return new CompletedTaskHandle(
-                taskId,
-                await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, cancellationToken));
+            var canceled = StageResponse(taskId, DurableTaskResponse.Canceled);
+            _pendingHandleResponses[taskId] = canceled;
+            return new(new CompletedTaskHandle(taskId, canceled), RequiresWrite: true);
         }
 
         if (handle is CompletedTaskHandle)
         {
-            return handle;
+            return new(handle, RequiresWrite: false);
         }
 
         if (handle is TaskHandle cachedHandle
             && cachedHandle.ResponseTask.IsCompletedSuccessfully
             && cachedHandle.ResponseTask.Result.IsCompleted)
         {
-            return handle;
+            return new(handle, RequiresWrite: false);
         }
 
-        // A child of a canceled ancestor is not created, unless the parent scheduled it in a cancellation suppression
-        // scope. A child which existed when the cancellation was requested records the request itself.
-        if (state is not { CancellationRequestedAt: not null } && IsAncestorCancellationRequested(taskId, state, suppressCancellation))
+        // A child of a canceled ancestor is not created, unless the parent started it shielded. A child which existed when
+        // the cancellation was requested records the request itself.
+        if (state is not { CancellationRequestedAt: not null } && IsAncestorCancellationRequested(taskId, state, shielded))
         {
-            return new CompletedTaskHandle(taskId, DurableTaskResponse.Canceled);
+            return new(new CompletedTaskHandle(taskId, DurableTaskResponse.Canceled), RequiresWrite: false);
         }
 
         if (handle is not null)
         {
-            return handle;
+            return new(handle, RequiresWrite: false);
         }
 
         if (remoteRequest is not null)
         {
-            return await ScheduleRemoteChildAsync(taskId, remoteRequest, suppressCancellation, cancellationToken);
+            return StageRemoteChild(taskId, remoteRequest, shielded, acknowledge);
         }
 
         // Otherwise, the task must be a local method invocation. Its state is staged and commits with the next write,
@@ -1622,57 +1583,45 @@ internal sealed partial class DurableTaskGrainRuntime(
         // identity and inputs follow from its parent's inputs and earlier results, so a replay which finds no record
         // runs the step again.
         state ??= _storage.GetOrCreateTask(taskId, null);
-        MarkCancellationSuppressed(taskId, state, suppressCancellation);
+        MarkShielded(taskId, state, shielded);
 
         var executionContext = CreateExecutionContext(taskId);
         handle = GetOrCreateRunningTaskHandle(taskId);
         StartInvocation(taskId, static task => task, durableTask, executionContext);
-        return handle;
+        return new(handle, RequiresWrite: false);
     }
 
-    private async ValueTask<IScheduledTaskHandle> ScheduleRemoteChildAsync(
-        TaskId taskId,
-        IDurableTaskRequest request,
-        bool suppressCancellation,
-        CancellationToken cancellationToken)
+    /// <summary>A staged start's handle, and whether the start staged changes which a write commits.</summary>
+    private readonly record struct StagedChild(IScheduledTaskHandle Handle, bool RequiresWrite);
+
+    private StagedChild StageRemoteChild(TaskId taskId, IDurableTaskRequest request, bool shielded, bool acknowledge)
     {
-        _ = MessageTransport;
-        var transientHandle = new TaskHandle(taskId, this, request.Context!.TargetId) { IsRunning = true };
-        var handle = _taskHandles.GetOrAdd(taskId, transientHandle);
+        var response = StageRemote(taskId, request, shielded, acknowledge);
+        if (response.IsCompleted)
+        {
+            return new(new CompletedTaskHandle(taskId, response), RequiresWrite: false);
+        }
+
+        var handle = _taskHandles.GetOrAdd(taskId, static (id, state) => new TaskHandle(id, state.Runtime, state.Target), (Runtime: this, Target: request.Context!.TargetId));
         if (handle is TaskHandle taskHandle)
         {
             taskHandle.IsRunning = true;
         }
 
-        try
-        {
-            var response = await ScheduleRemoteAsync(taskId, request, suppressCancellation, cancellationToken);
-            if (response.IsCompleted)
-            {
-                return new CompletedTaskHandle(taskId, response);
-            }
-
-            return handle;
-        }
-        catch
-        {
-            ((ICollection<KeyValuePair<TaskId, IScheduledTaskHandle>>)_taskHandles)
-                .Remove(new(taskId, transientHandle));
-            throw;
-        }
+        return new(handle, RequiresWrite: true);
     }
 
     /// <summary>Returns whether the durable cancellation of one of a task's ancestors reaches the task.</summary>
     /// <param name="taskId">The task.</param>
     /// <param name="state">The task's state, if it exists.</param>
-    /// <param name="suppressCancellation">Whether the task's parent schedules it in a cancellation suppression scope.</param>
+    /// <param name="shielded">Whether the task's parent starts it shielded.</param>
     /// <remarks>
-    /// Cancellation reaches a task through its ancestors up to the nearest one which is suppressed: the cancellation of
+    /// Cancellation reaches a task through its ancestors up to the nearest one which is shielded: the cancellation of
     /// that task's own ancestors doesn't reach it, so it doesn't reach its descendants either.
     /// </remarks>
-    private bool IsAncestorCancellationRequested(TaskId taskId, IDurableTaskState? state, bool suppressCancellation)
+    private bool IsAncestorCancellationRequested(TaskId taskId, IDurableTaskState? state, bool shielded)
     {
-        if (suppressCancellation || state is { CancellationSuppressed: true })
+        if (shielded || state is { Shielded: true })
         {
             return false;
         }
@@ -1686,7 +1635,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                     return true;
                 }
 
-                if (ancestorState.CancellationSuppressed)
+                if (ancestorState.Shielded)
                 {
                     return false;
                 }
@@ -1696,19 +1645,19 @@ internal sealed partial class DurableTaskGrainRuntime(
         return false;
     }
 
-    /// <summary>Records that a child which its parent scheduled in a cancellation suppression scope is unreachable by its ancestors' cancellation.</summary>
-    private void MarkCancellationSuppressed(TaskId taskId, IDurableTaskState state, bool suppressCancellation)
+    /// <summary>Records that a child which its parent started shielded is unreachable by its ancestors' cancellation.</summary>
+    private void MarkShielded(TaskId taskId, IDurableTaskState state, bool shielded)
     {
-        if (suppressCancellation && !state.CancellationSuppressed)
+        if (shielded && !state.Shielded)
         {
-            _storage.SuppressCancellation(taskId, state);
+            _storage.Shield(taskId, state);
         }
     }
 
     private async ValueTask<IScheduledTaskHandle> ScheduleCustomChildAsync(
         TaskId taskId,
         ISchedulableTask schedulableTask,
-        bool suppressCancellation,
+        bool shielded,
         CancellationToken cancellationToken)
     {
         var stateExisted = _storage.TryGetTask(taskId, out var state);
@@ -1743,7 +1692,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, CancellationToken.None));
         }
 
-        if (IsAncestorCancellationRequested(taskId, state, suppressCancellation))
+        if (IsAncestorCancellationRequested(taskId, state, shielded))
         {
             if (state is null)
             {
@@ -1777,7 +1726,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         // The child state lets cancellation of the child or its ancestors reach the deferred handle.
         state ??= _storage.GetOrCreateTask(taskId, null);
-        MarkCancellationSuppressed(taskId, state, suppressCancellation);
+        MarkShielded(taskId, state, shielded);
 
         DurableTaskResponse schedulingResponse;
         IScheduledTaskHandle? scheduledHandle = null;
@@ -2229,27 +2178,24 @@ internal sealed partial class DurableTaskGrainRuntime(
         List<(TaskId Id, IDurableTaskState State)>? expired = null;
         foreach (var (taskId, state) in _storage.Tasks)
         {
-            // A subscription which arrived before its task's invocation has subscribers but no result.
-            var awaitsInvocation = IsSubscriptionRecord(state);
-            if (state.CompletionDestinations.Count > 0 && !awaitsInvocation)
+            if (state.CompletionDestinations.Count > 0)
             {
                 continue;
             }
 
             var isCancellationRecord = IsCancellationRecord(state);
-            if ((!state.CompletedAt.HasValue && !isCancellationRecord && !awaitsInvocation)
-                || (!IsInvoked(state) && !awaitsInvocation && HasStoredAncestor(taskId)))
+            if ((!state.CompletedAt.HasValue && !isCancellationRecord)
+                || (!IsInvoked(state) && HasStoredAncestor(taskId)))
             {
                 // A pending task has no expiry, and a task in another task's execution tree is deleted with it.
                 continue;
             }
 
             var expiry = state.CompletedAt.HasValue ? GetRetentionExpiry(state) : DateTimeOffset.MinValue;
-            if (isCancellationRecord || awaitsInvocation)
+            if (isCancellationRecord)
             {
-                // The invocation which the cancellation or subscription precedes is delivered within the sender's retry
-                // timeout, or never.
-                var recordExpiry = GetAwaitedInvocationExpiry(state);
+                // The invocation which the cancellation precedes is delivered within the sender's retry timeout, or never.
+                var recordExpiry = AddSaturating(state.CreatedAt, _shared.OutboxRetryTimeout);
                 expiry = recordExpiry > expiry ? recordExpiry : expiry;
             }
             else if (IsSignalRecord(state))
@@ -2268,13 +2214,6 @@ internal sealed partial class DurableTaskGrainRuntime(
                         GrainId,
                         taskId.Parent());
                 }
-                else if (awaitsInvocation)
-                {
-                    _shared.Logger.LogWarning(
-                        "{Id} completing the subscriptions to durable task '{TaskId}' as not found, because its invocation didn't arrive within the sender's retry timeout.",
-                        GrainId,
-                        taskId);
-                }
 
                 (expired ??= []).Add((taskId, state));
             }
@@ -2290,8 +2229,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return false;
         }
 
-        // Execution trees are disjoint: each one ends at the invoked tasks below it. A subscription which awaits an
-        // invocation can lie in another expired tree, whose deletion removed it already.
+        // An expired record can lie in another expired tree, whose deletion removed it already.
         foreach (var (taskId, state) in expired)
         {
             if (_storage.TryGetTask(taskId, out _))
@@ -2325,8 +2263,9 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>Returns whether a task was scheduled as a request, so it owns its execution tree.</summary>
     /// <remarks>
-    /// Completion decisions, detach markers, signal records, signal send markers, and effect records have fingerprints
-    /// which begin with <c>$</c>, but they are part of their parent's tree; request fingerprints are hexadecimal.
+    /// Completion decisions, records of detached tasks, signal records, signal send markers, and effect records have
+    /// fingerprints which begin with <c>$</c>, but they are part of their parent's tree; request fingerprints are
+    /// hexadecimal.
     /// </remarks>
     private static bool IsInvoked(IDurableTaskState state) =>
         state.RequestFingerprint is { } fingerprint
@@ -2364,9 +2303,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </remarks>
     private void DeleteTree(TaskId taskId, IDurableTaskState state)
     {
-        Debug.Assert(
-            !state.CompletedAt.HasValue || state.CompletionDestinations.Count == 0,
-            "A pending completion retains its task's result.");
+        Debug.Assert(state.CompletionDestinations.Count == 0, "A pending completion retains its task's result.");
         List<GrainDurableTaskContext>? contexts = null;
         List<IScheduledTaskHandle>? handles = null;
         DeleteTreeCore(taskId, state, ref contexts, ref handles);
@@ -2407,12 +2344,6 @@ internal sealed partial class DurableTaskGrainRuntime(
             Unsubscribe(target, subscribedTaskId, taskId);
         }
 
-        if (!terminal && state.CompletionDestinations.Count > 0)
-        {
-            // The subscriptions preceded an invocation which didn't arrive.
-            CompleteSubscribersAsNotFound(taskId, state);
-        }
-
         if (_executionContexts.TryRemove(taskId, out var context))
         {
             context.MarkDeleted();
@@ -2445,6 +2376,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         _pendingHandleResponses.TryRemove(taskId, out _);
         _logicalTimes.Remove(taskId);
         _storage.RemoveTask(taskId);
+        SignalAcceptance(taskId);
     }
 
     /// <inheritdoc/>
@@ -2462,8 +2394,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             await WriteStateAsync(cancellationToken);
         }
 
-        // A subscription which awaits its task's invocation holds no task to poll.
-        if (!_storage.TryGetTask(taskId, out var state) || IsSubscriptionRecord(state))
+        if (!_storage.TryGetTask(taskId, out var state))
         {
             throw new DurableTaskNotFoundException(taskId);
         }
@@ -2617,10 +2548,10 @@ internal sealed partial class DurableTaskGrainRuntime(
             throw new ArgumentException("Invalid TaskId.", nameof(taskId));
         }
 
-        if (!_storage.TryGetTask(taskId, out var taskState) || IsSubscriptionRecord(taskState))
+        if (!_storage.TryGetTask(taskId, out var taskState))
         {
             // The cancellation can precede its invocation, which this record cancels on arrival.
-            taskState ??= _storage.GetOrCreateTask(taskId, request: null);
+            taskState = _storage.GetOrCreateTask(taskId, request: null);
             StageCaller(taskId, taskState, callerId);
             _storage.RequestCancellation(taskId, taskState, reason);
             TrackExpiry(AddSaturating(taskState.CreatedAt, _shared.OutboxRetryTimeout));
@@ -2655,9 +2586,9 @@ internal sealed partial class DurableTaskGrainRuntime(
                 // A named combinator's inputs are this task's nearest stored descendants beneath the combinator's ID.
                 Debug.Assert(currentTaskId.IsAncestorOf(childTaskId));
 
-                // A child scheduled in a cancellation suppression scope isn't reached by its ancestors' cancellation;
+                // A shielded child isn't reached by its ancestors' cancellation;
                 // its own cancellation, an abort of the tree, and deletion of the tree still reach it.
-                if (!childTaskState.CancellationSuppressed)
+                if (!childTaskState.Shielded)
                 {
                     _ = RequestCancellationCore(childTaskId, childTaskState, contexts, handles);
                 }
@@ -2743,7 +2674,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </remarks>
     internal void AbortFromInbox(TaskId taskId, string reason, GrainId callerId)
     {
-        if (!_storage.TryGetTask(taskId, out var state) || IsSubscriptionRecord(state))
+        if (!_storage.TryGetTask(taskId, out _))
         {
             SignalCancellationFromInbox(taskId, callerId, reason: null);
             return;
@@ -2756,9 +2687,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private bool StageAbort(TaskId taskId, string reason, GrainId callerId)
     {
         ThrowIfStopping();
-
-        // Subscriptions which await an invocation hold no task to abort.
-        if (!_storage.TryGetTask(taskId, out var state) || IsSubscriptionRecord(state))
+        if (!_storage.TryGetTask(taskId, out var state))
         {
             return false;
         }
@@ -2896,15 +2825,15 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>
     /// An execution's recorded operations are its nearest stored descendants: descendants which are themselves executions,
     /// such as local steps, hold their own operations. Signal values belong to the invoked task, which senders deliver
-    /// independently of its attempts; invoked descendants keep their own lifecycle; and a cancellation or a subscription
-    /// which arrived before its request records no operation of this execution.
+    /// independently of its attempts; invoked descendants keep their own lifecycle; and a cancellation which arrived
+    /// before its request records no operation of this execution.
     /// </remarks>
     public HashSet<TaskId>? GetRecordedOperations(TaskId executionId)
     {
         HashSet<TaskId>? operations = null;
         foreach (var (id, state) in _storage.GetChildren(executionId))
         {
-            if (!IsInvoked(state) && !IsSignalRecord(state) && !IsSubscriptionRecord(state) && !IsCancellationRecord(state))
+            if (!IsInvoked(state) && !IsSignalRecord(state) && !IsCancellationRecord(state))
             {
                 (operations ??= []).Add(id);
             }
