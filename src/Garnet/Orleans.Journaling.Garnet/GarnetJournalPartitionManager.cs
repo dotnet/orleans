@@ -106,11 +106,12 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
     /// existing one.
     /// </summary>
     /// <remarks>
-    /// The partition first records its identity (map, partition id, bucket count) in its descriptor, then opens the
-    /// buckets the map assigns to it, then marks the descriptor initialized. Storage which records another identity is
-    /// rejected before any bucket is opened, so a data directory serves only the partition it was created for. Opening
-    /// a bucket is idempotent, so an initialization interrupted by a crash resumes on the next start. Buckets which a
-    /// migration moves into the partition are opened by the migration.
+    /// The partition first claims its identity (map, partition id, bucket count) in its descriptor, as one field set
+    /// only if absent, then opens the buckets the map assigns to it, then marks the descriptor initialized. Storage
+    /// which records another identity is rejected before any bucket is opened, so a data directory serves only the
+    /// partition it was created for, and of concurrent initializations with different identities exactly one succeeds.
+    /// Opening a bucket is idempotent, so an initialization interrupted by a crash resumes on the next start. Buckets
+    /// which a migration moves into the partition are opened by the migration.
     /// </remarks>
     /// <exception cref="InvalidOperationException">The storage belongs to another partition or map.</exception>
     public static async Task InitializeAsync(EndPoint endPoint, PartitionId partitionId, RangeMap map, CancellationToken cancellationToken)
@@ -121,36 +122,40 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
             Protocol = RedisProtocol.Resp2,
         }).WaitAsync(cancellationToken).ConfigureAwait(false);
         var database = connection.GetDatabase();
-        var descriptor = await ReadDescriptorAsync(database, cancellationToken).ConfigureAwait(false);
-        if (descriptor.Count == 0)
-        {
-            // One HSET records the whole identity atomically, before any bucket is opened.
-            await database.HashSetAsync(
-                GarnetJournalKeys.PartitionKey,
-                [
-                    new(GarnetJournalKeys.MapIdField, map.Id),
-                    new(GarnetJournalKeys.PartitionIdField, partitionId.Value),
-                    new(GarnetJournalKeys.BucketCountField, map.BucketCount),
-                    new(GarnetJournalKeys.SchemaVersionField, GarnetJournalProtocol.CurrentSchemaVersion),
-                ]).WaitAsync(cancellationToken).ConfigureAwait(false);
-            descriptor = await ReadDescriptorAsync(database, cancellationToken).ConfigureAwait(false);
-        }
+        var bucketCount = map.BucketCount.ToString(CultureInfo.InvariantCulture);
 
+        // Claim the whole identity as one field, set only if absent, before any bucket is opened. Claiming its parts
+        // separately could leave a mixed identity which no initialization matches.
+        var identity = FormatIdentity(map.Id, partitionId.Value, bucketCount);
+        await database.HashSetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.IdentityField, identity, When.NotExists)
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
+        var descriptor = await ReadDescriptorAsync(database, cancellationToken).ConfigureAwait(false);
         var mapId = descriptor.GetValueOrDefault(GarnetJournalKeys.MapIdField);
-        var bucketCount = descriptor.GetValueOrDefault(GarnetJournalKeys.BucketCountField);
         var id = descriptor.GetValueOrDefault(GarnetJournalKeys.PartitionIdField);
-        if (!string.Equals(mapId, map.Id, StringComparison.Ordinal)
-            || !string.Equals(id, partitionId.Value, StringComparison.Ordinal)
-            || !string.Equals(bucketCount, map.BucketCount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
+        var claimedBucketCount = descriptor.GetValueOrDefault(GarnetJournalKeys.BucketCountField);
+        if (!string.Equals(descriptor.GetValueOrDefault(GarnetJournalKeys.IdentityField), identity, StringComparison.Ordinal)
+            || mapId is not null && !string.Equals(mapId, map.Id, StringComparison.Ordinal)
+            || id is not null && !string.Equals(id, partitionId.Value, StringComparison.Ordinal)
+            || claimedBucketCount is not null && !string.Equals(claimedBucketCount, bucketCount, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"The storage of Garnet journal partition '{partitionId}' holds partition '{id}' of map '{mapId}' with {bucketCount} buckets, but the range map expects partition '{partitionId}' of map '{map.Id}' with {map.BucketCount} buckets.");
+                $"The storage of Garnet journal partition '{partitionId}' holds '{descriptor.GetValueOrDefault(GarnetJournalKeys.IdentityField)}' (partition '{id}' of map '{mapId}' with {claimedBucketCount} buckets), but the range map expects partition '{partitionId}' of map '{map.Id}' with {map.BucketCount} buckets.");
         }
 
         if (descriptor.ContainsKey(GarnetJournalKeys.InitializedField))
         {
             return;
         }
+
+        // Record the claimed identity's parts for inspection; they never differ from the claim.
+        await database.HashSetAsync(
+            GarnetJournalKeys.PartitionKey,
+            [
+                new(GarnetJournalKeys.MapIdField, map.Id),
+                new(GarnetJournalKeys.PartitionIdField, partitionId.Value),
+                new(GarnetJournalKeys.BucketCountField, bucketCount),
+                new(GarnetJournalKeys.SchemaVersionField, GarnetJournalProtocol.CurrentSchemaVersion),
+            ]).WaitAsync(cancellationToken).ConfigureAwait(false);
 
         const int BatchSize = 256;
         var buckets = GetInitialBuckets(map, partitionId).ToList();
@@ -248,6 +253,9 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
             : endPoint.Address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{endPoint.Address}]" : endPoint.Address.ToString();
         return $"{host}:{endPoint.Port.ToString(CultureInfo.InvariantCulture)}";
     }
+
+    /// <summary>Formats a partition identity as recorded in the descriptor's identity field.</summary>
+    internal static string FormatIdentity(string mapId, string partitionId, string bucketCount) => $"{mapId}/{partitionId}/{bucketCount}";
 
     private static async Task<Dictionary<string, string>> ReadDescriptorAsync(IDatabase database, CancellationToken cancellationToken)
         => (await database.HashGetAllAsync(GarnetJournalKeys.PartitionKey).WaitAsync(cancellationToken).ConfigureAwait(false))

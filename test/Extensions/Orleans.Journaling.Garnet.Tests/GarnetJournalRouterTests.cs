@@ -1,6 +1,8 @@
 using System.Buffers;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using Orleans.Journaling.Ranges;
 using StackExchange.Redis;
 
@@ -200,6 +202,45 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
         var storage = Enumerable.Range(0, 100).Select(index => CreateStorage(router, $"unreachable-{index}")).First(storage => view.Map.GetOwner(storage.Bucket) == P1);
 
         await Assert.ThrowsAsync<TimeoutException>(() => storage.AppendAsync(new ReadOnlySequence<byte>([5]), CancellationToken).AsTask());
+    }
+
+    [Fact]
+    public async Task OperationTimeout_BoundsEachAttemptAndMarksTheOutcomeAmbiguous()
+    {
+        // A command whose reply never arrives, a blocking pop on an empty list, occupies the attempt until the deadline.
+        var view = (await CreateRouterAsync()).View;
+        var router = new GarnetJournalRouter(_store, view, TimeSpan.FromMilliseconds(300));
+        _routers.Add(router);
+        var ambiguous = new StrongBox<bool>();
+        var stopwatch = Stopwatch.StartNew();
+
+        await Assert.ThrowsAsync<TimeoutException>(() => router.ExecuteAsync(0, "BLPOP", [(RedisKey)$"stalled-{Guid.NewGuid():N}", "0"], CancellationToken, ambiguous).AsTask());
+        Assert.InRange(stopwatch.Elapsed, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+
+        // The command may have run, so the outcome is unknown.
+        Assert.True(ambiguous.Value);
+    }
+
+    [Fact]
+    public async Task RejectedAttempts_LeaveTheOutcomeUnambiguous()
+    {
+        var router = await CreateRouterAsync();
+        var storage = CreateStorage(router, "rejected");
+        var bucket = storage.Bucket;
+        var current = (await _store.ReadAsync(CancellationToken))!;
+        var source = current.Map.GetOwner(bucket);
+
+        // The bucket moves to p2, which has not opened it: every attempt is rejected with WrongPartition until it opens.
+        var assigned = (await _store.TryWriteAsync(GarnetTestRouting.AssignBucket(current.Map, bucket, P2, current.Version + 1), current.Version, CancellationToken)).Current!;
+        Assert.Equal("1", await TransitionAsync(source, bucket, "seal", assigned.Version));
+        var ambiguous = new StrongBox<bool>();
+        var read = router.ExecuteAsync(bucket, GarnetJournalProtocol.Read, storage.GetProcedureKeys(), CancellationToken, ambiguous).AsTask();
+        await Task.Delay(300, CancellationToken);
+        Assert.False(read.IsCompleted);
+        Assert.Equal("1", await TransitionAsync(P2, bucket, "open", assigned.Version));
+
+        Assert.Equal(GarnetJournalProtocol.MissingStatus, GarnetJournalRouter.GetStatus(await read));
+        Assert.False(ambiguous.Value);
     }
 
     [Fact]
