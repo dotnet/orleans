@@ -225,14 +225,12 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     // <durable_tasks_compensation>
     private async Task<OrderResult> CancelOrderAsync(OrderLine[] lines, string? reason)
     {
-        // The workflow's cancellation doesn't reach children scheduled in this scope.
-        using (DurableTask.Current.SuppressCancellation())
-        {
-            await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
-                .WithId("release");
-            DurableTask.Once("cancel", () => SetStatus(OrderStatus.Cancelled));
-            return new OrderResult(OrderStatus.Cancelled, reason);
-        }
+        // The release is shielded, so it runs to completion after the cancellation which ended the workflow.
+        await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
+            .WithId("release")
+            .Shielded();
+        DurableTask.Once("cancel", () => SetStatus(OrderStatus.Cancelled));
+        return new OrderResult(OrderStatus.Cancelled, reason);
     }
     // </durable_tasks_compensation>
 
@@ -262,14 +260,9 @@ public interface IBasketGrain : IGrainWithStringKey
 
 public sealed class BasketGrain : DurableGrain, IBasketGrain
 {
-    private readonly IDurableTaskManager _tasks;
     private readonly IDurableDictionary<int, OrderLine> _lines;
 
-    public BasketGrain(IDurableTaskManager tasks)
-    {
-        _tasks = tasks;
-        _lines = StateManager.GetOrAddDictionary<int, OrderLine>("lines");
-    }
+    public BasketGrain() => _lines = StateManager.GetOrAddDictionary<int, OrderLine>("lines");
 
     public async Task AddAsync(OrderLine line)
     {
@@ -287,19 +280,22 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
         var order = new SubmitOrder(this.GetPrimaryKeyString(), [.. _lines.Values], cardLast4);
         _lines.Clear();
 
-        // Stages the invocation in the outbox and writes the journal, so the cleared basket commits with it.
-        await GrainFactory.GetGrain<IOrderGrain>(orderId)
+        // Posts the invocation to the outbox, and the journal write commits it with the cleared basket.
+        _ = GrainFactory.GetGrain<IOrderGrain>(orderId)
             .PlaceOrderAsync(order)
-            .ScheduleAsync(OrderGrain.PlaceOrderTaskId(orderId));
+            .WithId(OrderGrain.PlaceOrderTaskId(orderId))
+            .Post();
+        await WriteStateAsync();
         return orderId;
     }
 
-    // Reads this grain's record of the call, which receives the workflow's result through the inbox.
+    // Polls the workflow on the order grain, which retains its result.
     public async Task<OrderResult?> GetOrderResultAsync(Guid orderId)
     {
         try
         {
-            var response = await _tasks.GetTask<OrderResult>(OrderGrain.PlaceOrderTaskId(orderId))
+            var response = await GrainFactory.GetGrain<IOrderGrain>(orderId)
+                .GetDurableTask<OrderResult>(OrderGrain.PlaceOrderTaskId(orderId))
                 .GetResponseAsync(new PollingOptions { PollTimeout = TimeSpan.Zero });
             return response.Status is DurableTaskStatus.CompletedSuccessfully ? response.GetResult<OrderResult>() : null;
         }
@@ -317,10 +313,11 @@ internal static class OrderClient
     // <durable_tasks_schedule_from_client>
     public static async Task<OrderResult> PlaceOrderAsync(IClusterClient client, Guid orderId, SubmitOrder order)
     {
-        // Scheduling the same request under the same root ID again returns the same task.
+        // Scheduling the same request under the same root ID again returns the same task, so a retry is safe.
         ScheduledTask<OrderResult> workflow = await client.GetGrain<IOrderGrain>(orderId)
             .PlaceOrderAsync(order)
-            .ScheduleAsync(OrderGrain.PlaceOrderTaskId(orderId));
+            .WithId(OrderGrain.PlaceOrderTaskId(orderId))
+            .ScheduleAsync();
         return await workflow;
     }
 
@@ -454,11 +451,9 @@ public sealed class AllocationGrain : DurableGrain, IAllocationGrain
 
         // Releases exactly the lines whose reservation succeeded, including after a cancellation request.
         var held = lines.Where((_, i) => reservations[i].TryGetResult(out var reserved) && reserved);
-        using (DurableTask.Current.SuppressCancellation())
-        {
-            await DurableTask.WhenAll(held.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
-                .WithId("release");
-        }
+        await DurableTask.WhenAll(held.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
+            .WithId("release")
+            .Shielded();
 
         DurableTask.Current.CancellationToken.ThrowIfCancellationRequested();
         return false;
@@ -583,16 +578,18 @@ public sealed class InvoiceGrain : DurableGrain, IInvoiceGrain
 
     public InvoiceGrain() => _issued = StateManager.GetOrAddValue<decimal>("issued");
 
-    public static string IssueTaskId(Guid invoiceId) => $"issue-{invoiceId:N}";
+    public static string ReceiptTaskId(Guid invoiceId) => $"receipt-{invoiceId:N}";
 
     public async DurableTask<decimal> IssueAsync(InvoiceRequest request)
     {
         var amount = await Record(request.Amount).WithId("record");
 
-        // Starts the root task "issue-{invoiceId}:receipt" on the notification grain without waiting for it.
-        await GrainFactory.GetGrain<INotificationGrain>(request.CustomerId)
+        // Starts the root task "receipt-{invoiceId}" on the notification grain, which commits with the invoice's result.
+        _ = GrainFactory.GetGrain<INotificationGrain>(request.CustomerId)
             .SendReceiptAsync(this.GetPrimaryKey(), amount)
-            .DetachAsync(DetachedTaskId.For("receipt"));
+            .Detached()
+            .WithId(ReceiptTaskId(this.GetPrimaryKey()))
+            .Post();
         return amount;
     }
 
@@ -749,8 +746,7 @@ internal static class InvoiceClient
     // <durable_tasks_detach_observe>
     public static async Task<DurableTaskStatus> GetReceiptStatusAsync(IClusterClient client, Guid invoiceId, string customerId)
     {
-        var rootId = DetachedTaskId.For(TaskId.CreateRoot(InvoiceGrain.IssueTaskId(invoiceId)), "receipt");
-        var receipt = client.GetGrain<INotificationGrain>(customerId).GetDurableTask<bool>(rootId);
+        var receipt = client.GetGrain<INotificationGrain>(customerId).GetDurableTask<bool>(InvoiceGrain.ReceiptTaskId(invoiceId));
         return await receipt.GetStatusAsync(new PollingOptions { PollTimeout = TimeSpan.Zero });
     }
     // </durable_tasks_detach_observe>

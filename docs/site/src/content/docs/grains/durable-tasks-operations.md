@@ -32,15 +32,15 @@ validated at startup.
 Messaging settings in `DurableMessagingOptions` govern the transport; see
 [Capacity, retries, and retention](messaging-operations.md#capacity-retries-and-retention).
 
-- `OutboxRetryTimeout` bounds how long the outbox retries an invocation, completion,
-  cancellation, or signal before dead-lettering it. A cancellation or signal which arrives
+- `OutboxRetryTimeout` bounds how long the outbox retries an invocation, acceptance,
+  completion, cancellation, or signal before dead-lettering it. A cancellation or signal which arrives
   before its invocation is retained for this period, so the invocation terminates as
   canceled, or observes the signal, when it arrives. A signal whose invocation doesn't
   arrive in this period is deleted, and the grain logs a warning.
 - `DeduplicationWindow` deduplicates redelivered durable task messages, like other
   messages.
-- Invocations, completions, cancellations, and signals are accepted directly into task
-  state, so they don't occupy inbox capacity. Delay resumes are scheduled messages which
+- Invocations, acceptances, completions, cancellations, and signals are accepted directly
+  into task state, so they don't occupy inbox capacity. Delay resumes are scheduled messages which
   the grain sends itself, so they don't count toward `MaxCapacity`, like other scheduled
   messages; the grain holds one resume for each delay it scheduled, until that delay's
   due time.
@@ -52,17 +52,18 @@ multi-silo deployments; see [Journaling configuration](journaling/configuration.
 
 Each invoked task owns an execution tree: the task, its local steps, delays,
 combinator records, `DurableTask.Once` records, signal records, subscriptions to other tasks,
-detach and signal-send markers, and its records of calls to other grains. The grain
+records of detached tasks, signal-send markers, and its records of calls to other grains. The grain
 deletes the tree in one journal write:
 
 | Invoked by | Deleted |
 | --- | --- |
 | A durable task or an ordinary method of another durable grain | When the outbox retires the completion after the calling grain has durably accepted the result. |
-| A client, or `DetachAsync` | `ResultRetentionPeriod` after completion. |
+| A client, an ordinary grain method, or a durable task which detached it | `ResultRetentionPeriod` after completion. |
 | Any caller, after its completion was dead-lettered | `ResultRetentionPeriod` after the dead letter. |
 
-A task to which durable tasks subscribe through `GetDurableTask` is also retained until
-the outbox retires the completion to each subscriber. A dead-lettered subscriber
+A task to which durable tasks subscribe, through `GetDurableTask` or by starting it as a
+detached task, is also retained until the outbox retires the completion to each
+subscriber. A dead-lettered subscriber
 completion restarts the retention period, like a caller's.
 
 A grain's record of a call which an ordinary method scheduled is a root of its own,
@@ -148,15 +149,17 @@ caller observe the failure.
 When a deployment changes a workflow while executions are pending, those executions
 replay under the new code:
 
-- Keep existing steps, `Once` effects, and detaches, with their IDs and arguments. A
+- Keep existing steps, `Once` effects, and detached starts, with their IDs and arguments. A
   changed `Once` delegate doesn't affect executions which recorded it: they return the
   recorded result. Turning a recorded step into an effect under the same name, or the
   reverse, fails as a divergence.
 - Give new steps new IDs, and place steps which depend on new behavior after the
   existing ones.
 - Name every child and combinator which a later change might move, so generated IDs
-  don't shift. Detaches and signal sends derive their IDs from the detached task or the
-  signal, so they don't shift.
+  don't shift. Detached tasks and signal sends derive their record IDs from the detached
+  task or the signal, so they don't shift. An unnamed detached task derives its root ID
+  from the execution's unnamed operations, so name it with `WithId` when a later change
+  might move it.
 - Keep argument, result, and signal types decodable by the Orleans serializer, adding
   members with new `[Id(n)]` values.
 - A changed delay duration applies to new delays. A replayed delay keeps its recorded
@@ -183,12 +186,15 @@ with `DurableTaskAbortedException: <reason>`.
 ## Dead letters
 
 Durable task messages use subjects beginning with `durable-rpc/`: `invoke`,
-`complete`, `cancel`, `resume`, and `signal`. Messaging's retry and dead-letter policy
+`accept`, `complete`, `cancel`, `resume`, and `signal`. Messaging's retry and dead-letter policy
 applies to them; inspect and remove dead letters through `IMessagingDiagnostics`, as
 described in [Inspect and replay dead letters](messaging-operations.md#inspect-and-replay-dead-letters).
 
-- The receiving inbox dead-letters a message which fails validation, such as an
-  invocation which reuses a task ID with a different request, and a rejected signal,
+- The receiving grain rejects an invocation which reuses a task ID with a different
+  request or caller to the task which started it, which fails with
+  `DurableTaskConflictException`. The receiving inbox dead-letters another message which
+  fails validation, such as a conflicting invocation which an ordinary grain method posted,
+  and a rejected signal,
   such as one with a conflicting value or for a completed task, with the rejection as
   its reason.
 - The outbox dead-letters a message whose delivery fails for `OutboxRetryTimeout`.
@@ -238,8 +244,8 @@ which include durable task messages; see
 - A durable task sends signals to other grains with `SignalDurableTaskAsync`, which
   records the send for replay; `TrySignalDurableTaskAsync` is for clients and ordinary
   grain methods.
-- Signals address invoked tasks: tasks which a client, another grain, or `DetachAsync`
-  started.
+- Signals address invoked tasks: tasks which a client, another grain, or a durable task
+  which detached them started.
 - `ScheduleAll`, `WhenAllCompleted`, and `WhenEach` run only when awaited inside a
   durable execution; scheduling one as a task of its own throws
   `NotSupportedException`.

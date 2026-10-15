@@ -77,12 +77,15 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
 
         _checkouts[orderId] = now;
 
-        // The detached workflow is staged in the outbox with the cleared basket, and both commit in one journal write.
-        // The order ID derives the workflow's root task ID, so the order runs one workflow, which it retains with its
-        // result; the basket keeps no state for it.
-        await GrainFactory.GetGrain<IOrderGrain>(orderId)
+        // The workflow is posted to the outbox with the cleared basket, and both commit in one journal write. The order ID
+        // derives the workflow's root task ID, so the order runs one workflow, which it retains with its result; the
+        // basket keeps no state for it.
+        _ = GrainFactory.GetGrain<IOrderGrain>(orderId)
             .PlaceOrderAsync(new SubmitOrder(this.GetPrimaryKeyString(), lines, request.Address, request.CardNumber[^4..]))
-            .DetachAsync(OrderGrain.PlaceOrderTaskId(orderId));
+            .Detached()
+            .WithId(OrderGrain.PlaceOrderTaskId(orderId))
+            .Post();
+        await WriteStateAsync();
         return orderId;
     }
 }
