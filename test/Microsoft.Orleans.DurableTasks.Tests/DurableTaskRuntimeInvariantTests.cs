@@ -448,7 +448,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var state = storage.GetOrCreate(taskId);
         storage.SetRequest(taskId, state, request);
         storage.SetRequestFingerprint(taskId, state, IDurableTaskRequest.GetFingerprint(request, CreateSerializer()));
-        storage.AddCompletionDestination(taskId, state, request.Context!.CallerId);
+        storage.AddCompletionDestination(taskId, state, new(request.Context!.CallerId, taskId));
         storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
 
         // A listed destination has a completion pending in the outbox, which retires it.
@@ -476,7 +476,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var completion = Assert.Single(transport.Completions);
         Assert.Equal(caller, completion.Target);
         Assert.Equal(taskId, completion.TaskId);
-        Assert.Contains(caller, storage.Get(taskId).CompletionDestinations);
+        Assert.Contains(new DurableTaskSubscriber(caller, taskId), storage.Get(taskId).CompletionDestinations);
         Assert.Equal(42, completion.Materialize(runtime).Response.GetResult<int>());
     }
 
@@ -2044,8 +2044,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var state = storage.GetOrCreate(taskId);
         storage.SetRemoteRequest(taskId, state, target, "fingerprint");
         state.RequestFingerprint = "invocation";
-        state.CompletionDestinations.Add(waiter);
-        state.CompletionDestinations.Add(other);
+        state.CompletionDestinations.Add(new(waiter, taskId));
+        state.CompletionDestinations.Add(new(other, taskId));
         var handle = runtime.GetScheduledTaskHandle(taskId);
 
         runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(7), target);
@@ -2057,8 +2057,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.Equal(7, storage.Get(taskId).Result!.GetResult<int>());
         Assert.Equal(7, (await handle.WaitAsync(TestContext.Current.CancellationToken)).GetResult<int>());
-        Assert.DoesNotContain(waiter, storage.Get(taskId).CompletionDestinations);
-        Assert.Contains(other, storage.Get(taskId).CompletionDestinations);
+        Assert.DoesNotContain(new DurableTaskSubscriber(waiter, taskId), storage.Get(taskId).CompletionDestinations);
+        Assert.Contains(new DurableTaskSubscriber(other, taskId), storage.Get(taskId).CompletionDestinations);
         Assert.False(((IOutboxMessageSource)runtime).TryGetMessage(waiterCompletion, out _));
         Assert.Empty(transport.Completions);
     });
@@ -4107,10 +4107,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             ((TestTaskState)state).ResumeGeneration = generation;
         }
 
-        public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination) =>
+        public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination) =>
             ((TestTaskState)state).CompletionDestinations.Add(destination);
 
-        public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination) =>
+        public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination) =>
             ((TestTaskState)state).CompletionDestinations.Remove(destination);
 
         public void RetainResult(TaskId taskId, IDurableTaskState state) =>
@@ -4150,7 +4150,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     private sealed class TestTaskState : IDurableTaskState
     {
         public DurableTaskResponse? Result { get; set; }
-        public HashSet<GrainId> CompletionDestinations { get; set; } = [];
+        public HashSet<DurableTaskSubscriber> CompletionDestinations { get; set; } = [];
         public IDurableTaskRequest? Request { get; set; }
         public DateTimeOffset? CompletedAt { get; set; }
         public DateTimeOffset? CancellationRequestedAt { get; set; }
@@ -4165,7 +4165,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public string? RemoteRequestFingerprint { get; set; }
         public GrainId CallerId { get; set; }
         public long CompletionSequence { get; set; }
-        IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
+        IReadOnlySet<DurableTaskSubscriber> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     }
 
     private sealed class TestDurableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IDurableDictionary<TKey, TValue>

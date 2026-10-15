@@ -49,11 +49,9 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskGrainExtensions
     {
-        public static ScheduledTask<TResult> GetDurableTask<TResult>(this Orleans.Runtime.IAddressable target, string rootId) { throw null; }
+        public static DurableTaskReference<TResult> GetDurableTask<TResult>(this Orleans.Runtime.IAddressable target, TaskId taskId) { throw null; }
 
-        public static DurableTask<TResult> ObserveDurableTask<TResult>(this Orleans.Runtime.IAddressable target, TaskId taskId) { throw null; }
-
-        public static DurableTask<TResult> ObserveDurableTask<TResult>(this Orleans.Runtime.IAddressable target, string rootId) { throw null; }
+        public static DurableTaskReference<TResult> GetDurableTask<TResult>(this Orleans.Runtime.IAddressable target, string rootId) { throw null; }
 
         public static System.Threading.Tasks.ValueTask SignalDurableTaskAsync<T>(this Orleans.Runtime.IAddressable target, TaskId taskId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
@@ -72,6 +70,49 @@ namespace Orleans.DurableTasks
 
         [Id(0)]
         public TaskId TaskId { get { throw null; } }
+    }
+
+    public readonly partial struct DurableTaskReferenceAwaiter<TResult> : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
+    {
+        private readonly DurableTaskAwaiter<TResult> _subscription;
+        private readonly ScheduledTaskAwaiter<TResult> _wait;
+        private readonly int _dummyPrimitive;
+        public bool IsCompleted { get { throw null; } }
+
+        public readonly TResult GetResult() { throw null; }
+
+        public readonly void OnCompleted(System.Action continuation) { }
+
+        public readonly void UnsafeOnCompleted(System.Action continuation) { }
+    }
+
+    public sealed partial class DurableTaskReference<TResult> : DurableTask<TResult>
+    {
+        internal DurableTaskReference() { }
+
+        public TaskId Id { get { throw null; } }
+
+        public Orleans.Runtime.GrainId Target { get { throw null; } }
+
+        public System.Threading.Tasks.ValueTask AbortAsync(string reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public DurableTaskReferenceAwaiter<TResult> GetAwaiter() { throw null; }
+
+        public System.Threading.Tasks.Task<DurableTaskResponse> GetResponseAsync(PollingOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<DurableTaskResponse> GetResponseAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<DurableTaskStatus> GetStatusAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<bool> IsCompletedAsync(PollingOptions options = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        protected override System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context) { throw null; }
+
+        public ConfiguredScheduledTaskAwaitable<TResult> WaitAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
     public partial interface IDurableTaskManager
@@ -252,6 +293,41 @@ namespace Orleans.DurableTasks.Protocol
         public override string ToString() { throw null; }
     }
 
+    [GenerateSerializer]
+    [Immutable]
+    [Alias("Orleans.DurableTasks.Protocol.DurableTaskSubscriber")]
+    public readonly partial struct DurableTaskSubscriber : System.IEquatable<DurableTaskSubscriber>
+    {
+        public DurableTaskSubscriber(Orleans.Runtime.GrainId GrainId, TaskId TaskId) { }
+
+        [Id(0)]
+        public Orleans.Runtime.GrainId GrainId { get { throw null; } init { } }
+
+        [Id(1)]
+        public TaskId TaskId { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out Orleans.Runtime.GrainId GrainId, out TaskId TaskId) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(DurableTaskSubscriber other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(DurableTaskSubscriber left, DurableTaskSubscriber right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(DurableTaskSubscriber left, DurableTaskSubscriber right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
+    }
+
     [Alias("IDurableTaskGrainExtension")]
     public partial interface IDurableTaskGrainExtension : Orleans.Runtime.IGrainExtension, Orleans.Runtime.IAddressable, IDurableTaskServer
     {
@@ -269,12 +345,12 @@ namespace Orleans.DurableTasks.Protocol
     {
         System.Collections.Generic.IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks { get; }
 
-        void AddCompletionDestination(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId destination);
+        void AddCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination);
         void Clear();
         System.Collections.Generic.IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task);
         IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request);
         System.Threading.Tasks.ValueTask ReadAsync(System.Threading.CancellationToken cancellationToken);
-        void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, Orleans.Runtime.GrainId destination);
+        void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination);
         bool RemoveTask(TaskId taskId);
         void RequestCancellation(TaskId taskId, IDurableTaskState state, string? reason = null);
         void RetainResult(TaskId taskId, IDurableTaskState state);
@@ -332,7 +408,7 @@ namespace Orleans.DurableTasks.Protocol
 
         System.DateTimeOffset? CompletedAt { get; }
 
-        System.Collections.Generic.IReadOnlySet<Orleans.Runtime.GrainId> CompletionDestinations { get; }
+        System.Collections.Generic.IReadOnlySet<DurableTaskSubscriber> CompletionDestinations { get; }
 
         long CompletionSequence { get; }
 
@@ -392,7 +468,7 @@ namespace Orleans.DurableTasks.Runtime
         public System.DateTimeOffset? CompletedAt { get { throw null; } set { } }
 
         [Id(6)]
-        public System.Collections.Generic.HashSet<Orleans.Runtime.GrainId> CompletionDestinations { get { throw null; } set { } }
+        public System.Collections.Generic.HashSet<Protocol.DurableTaskSubscriber> CompletionDestinations { get { throw null; } set { } }
 
         [Id(20)]
         [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
@@ -404,7 +480,7 @@ namespace Orleans.DurableTasks.Runtime
         [Id(7)]
         public System.DateTimeOffset? DueTime { get { throw null; } set { } }
 
-        System.Collections.Generic.IReadOnlySet<Orleans.Runtime.GrainId> Protocol.IDurableTaskState.CompletionDestinations { get { throw null; } }
+        System.Collections.Generic.IReadOnlySet<Protocol.DurableTaskSubscriber> Protocol.IDurableTaskState.CompletionDestinations { get { throw null; } }
 
         [Id(12)]
         public string? RemoteRequestFingerprint { get { throw null; } set { } }
@@ -442,7 +518,7 @@ namespace Orleans.DurableTasks.Runtime
 
         public System.Collections.Generic.IEnumerable<(TaskId Id, Protocol.IDurableTaskState State)> Tasks { get { throw null; } }
 
-        public void AddCompletionDestination(TaskId taskId, Protocol.IDurableTaskState state, Orleans.Runtime.GrainId destination) { }
+        public void AddCompletionDestination(TaskId taskId, Protocol.IDurableTaskState state, Protocol.DurableTaskSubscriber destination) { }
 
         public void AddOrUpdateTask(TaskId taskId, DurableTaskState state) { }
 
@@ -454,7 +530,7 @@ namespace Orleans.DurableTasks.Runtime
 
         public System.Threading.Tasks.ValueTask ReadAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        public void RemoveCompletionDestination(TaskId taskId, Protocol.IDurableTaskState state, Orleans.Runtime.GrainId destination) { }
+        public void RemoveCompletionDestination(TaskId taskId, Protocol.IDurableTaskState state, Protocol.DurableTaskSubscriber destination) { }
 
         public bool RemoveTask(TaskId taskId) { throw null; }
 
@@ -629,6 +705,24 @@ namespace OrleansCodeGen.Orleans.DurableTasks.Protocol
         public override void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableTasks.Protocol.DurableTaskRequest<TResult> instance) { }
 
         public override void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableTasks.Protocol.DurableTaskRequest<TResult> instance) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableTaskSubscriber : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.Protocol.DurableTaskSubscriber>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.DurableTasks.Protocol.DurableTaskSubscriber>, global::Orleans.Serialization.Serializers.IValueSerializer
+    {
+        public Codec_DurableTaskSubscriber(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref global::Orleans.DurableTasks.Protocol.DurableTaskSubscriber instance) { }
+
+        public global::Orleans.DurableTasks.Protocol.DurableTaskSubscriber ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::Orleans.DurableTasks.Protocol.DurableTaskSubscriber instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.Protocol.DurableTaskSubscriber value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

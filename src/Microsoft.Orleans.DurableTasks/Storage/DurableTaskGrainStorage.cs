@@ -193,7 +193,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _items[taskId] = typedState;
     }
 
-    public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination)
+    public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination)
     {
         var typedState = GetState(taskId, state);
         if (typedState.CompletionDestinations.Add(destination))
@@ -202,7 +202,7 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         }
     }
 
-    public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination)
+    public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination)
     {
         var typedState = GetState(taskId, state);
         if (typedState.CompletionDestinations.Remove(destination))

@@ -73,7 +73,7 @@ api.MapGet("/orders/{orderId:guid}/workflow", async (Guid orderId, IGrainFactory
         {
             taskId = workflow.Id.ToString(),
             status = response.Status.ToString(),
-            result = workflow.TryGetResult(out var result) ? result : null,
+            result = response.ResponseKind is DurableTaskResponseKind.CompletedSuccessfully ? response.GetResult<OrderResult>() : null,
             error = response.Exception?.Message,
         });
     }

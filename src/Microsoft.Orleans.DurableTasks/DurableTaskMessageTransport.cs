@@ -21,9 +21,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// A delay resume is a message the grain sends to itself
 /// with <see cref="Envelope.DeliverAt"/> set to the delay's due time, which the grain's own inbox accepts in the delay's
 /// journal write; its identity also covers the delay generation and due time. A signal's identity also covers its name
-/// and value. An observation's subscription and completion identities also cover the observation, so each observation of
-/// a task has its own messages. The runtime derives readiness from journaled state, so duplicate and stale resumes are
-/// harmless.
+/// and value. A subscription's, an unsubscription's, and a subscriber's completion's identities also cover the subscribing
+/// task, so each subscription of a task has its own messages. The runtime derives readiness from journaled state, so
+/// duplicate and stale resumes are harmless.
 /// </remarks>
 internal sealed class DurableTaskMessageTransport(
     Lazy<IOutbox> outbox,
@@ -49,76 +49,93 @@ internal sealed class DurableTaskMessageTransport(
 
     public void SendCompletion(MessageId messageId) => outbox.Value.Send(messageId);
 
-    public MessageId GetCompletionMessageId(GrainId sender, GrainId target, TaskId taskId) =>
-        CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject);
+    /// <remarks>
+    /// The identity of a completion to a subscriber whose task differs from <paramref name="taskId"/> also covers that
+    /// task, so each subscription of a task, including one which follows a delivered completion of that task to the same
+    /// grain, receives its own completion.
+    /// </remarks>
+    public MessageId GetCompletionMessageId(GrainId sender, DurableTaskSubscriber destination, TaskId taskId) =>
+        CreateMessageId(
+            sender,
+            destination.GrainId,
+            taskId,
+            DurableTaskMessageTypes.CompletionSubject,
+            destination.TaskId == taskId ? null : destination.TaskId.ToString());
 
     public OutboxMessage CreateCompletionMessage(
         MessageId messageId,
         GrainId sender,
-        GrainId target,
+        DurableTaskSubscriber destination,
         TaskId taskId,
-        DurableTaskResponse response,
-        TaskId observerId = default) =>
+        DurableTaskResponse response) =>
         messageTypes.Completion.Create(
             messageId,
-            target,
-            new DurableTaskCompletionMessage
-            {
-                TaskId = taskId,
-                Response = response,
-                Sender = sender,
-                ObserverId = observerId.IsDefault ? null : observerId,
-            });
+            destination.GrainId,
+            CreateCompletion(sender, destination, taskId, response));
 
     /// <remarks>
-    /// The identity covers the observation, so each observation of a task, including one which follows a delivered
-    /// completion of that task to the same grain, receives its own completion.
+    /// The message carries <paramref name="response"/> in its body. Its identity differs from the reference completion of
+    /// the same subscriber, and each subscription receives at most one such response.
     /// </remarks>
-    public MessageId GetObservationCompletionMessageId(GrainId sender, GrainId target, TaskId taskId, TaskId observerId) =>
-        CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject, observerId.ToString());
-
-    public void SendObservationNotFound(GrainId sender, GrainId target, TaskId taskId, TaskId observerId) =>
+    public void SendResponse(GrainId sender, DurableTaskSubscriber destination, TaskId taskId, DurableTaskResponse response) =>
         Send(
             messageTypes.Completion,
             sender,
-            target,
+            destination.GrainId,
             taskId,
-            new DurableTaskCompletionMessage
-            {
-                TaskId = taskId,
-                Response = DurableTaskResponse.FromException(new DurableTaskNotFoundException(taskId)),
-                Sender = sender,
-                ObserverId = observerId,
-            },
-            CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject, observerId.ToString(), NotFoundQualifier),
+            CreateCompletion(sender, destination, taskId, response),
+            CreateMessageId(
+                sender,
+                destination.GrainId,
+                taskId,
+                DurableTaskMessageTypes.CompletionSubject,
+                destination.TaskId.ToString(),
+                ResponseQualifier),
             deliverAt: null);
 
-    private const string NotFoundQualifier = "not-found";
+    private const string ResponseQualifier = "response";
 
-    public void SendObservation(GrainId sender, GrainId target, TaskId taskId, TaskId observerId, bool unsubscribe)
-    {
-        if (observerId.IsDefault)
+    private static DurableTaskCompletionMessage CreateCompletion(
+        GrainId sender,
+        DurableTaskSubscriber destination,
+        TaskId taskId,
+        DurableTaskResponse response) =>
+        new()
         {
-            throw new ArgumentException("The observer id must not be empty.", nameof(observerId));
-        }
+            TaskId = taskId,
+            Response = response,
+            Sender = sender,
+            SubscriberId = destination.TaskId == taskId ? null : destination.TaskId,
+        };
 
+    /// <remarks>
+    /// The identity covers the subscriber, so it differs from an invocation of the task and from other subscriptions.
+    /// </remarks>
+    public void SendSubscription(GrainId sender, GrainId target, TaskId taskId, TaskId subscriberId) =>
         Send(
-            messageTypes.Observation,
+            messageTypes.Invocation,
             sender,
             target,
             taskId,
-            new DurableTaskObservationMessage { TaskId = taskId, ObserverId = observerId, Sender = sender, Unsubscribe = unsubscribe },
-            CreateMessageId(
-                sender,
-                target,
-                taskId,
-                DurableTaskMessageTypes.ObservationSubject,
-                observerId.ToString(),
-                unsubscribe ? UnsubscribeQualifier : null),
+            new DurableTaskInvocationMessage { TaskId = taskId, Sender = sender, SubscriberId = ValidateSubscriber(subscriberId) },
+            CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.InvocationSubject, subscriberId.ToString()),
             deliverAt: null);
-    }
 
-    private const string UnsubscribeQualifier = "unsubscribe";
+    /// <remarks>
+    /// The identity covers the subscriber, so it differs from a cancellation of the task and from other subscriptions.
+    /// </remarks>
+    public void SendUnsubscription(GrainId sender, GrainId target, TaskId taskId, TaskId subscriberId) =>
+        Send(
+            messageTypes.Cancellation,
+            sender,
+            target,
+            taskId,
+            new DurableTaskCancellationMessage { TaskId = taskId, Sender = sender, SubscriberId = ValidateSubscriber(subscriberId) },
+            CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CancellationSubject, subscriberId.ToString()),
+            deliverAt: null);
+
+    private static TaskId ValidateSubscriber(TaskId subscriberId) =>
+        subscriberId.IsDefault ? throw new ArgumentException("The subscriber id must not be empty.", nameof(subscriberId)) : subscriberId;
 
     /// <remarks>
     /// The message carries the cancellation's <paramref name="reason"/>, if any. Its identity covers only the sender,
