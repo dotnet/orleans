@@ -257,7 +257,9 @@ framework assets; its first published version establishes the compatibility base
   execution-abort token observed by delegate and delay operations and
   adapter-controlled waits. The runtime then drains active execution, before
   messaging and the journal stop, discards its results, and leaves committed
-  work available for replay in the next activation.
+  work available for replay in the next activation. A poll or wait on the
+  activation fails with `OperationCanceledException`, as a call which arrives
+  while the runtime stops does, and the task continues in the next activation.
 - Each request and result payload is journaled once per grain. The callee's inbox
   accepts invocations, and the caller's inbox accepts completions, directly into
   task state, journaling only the message's processed record alongside it. The
