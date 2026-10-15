@@ -207,6 +207,32 @@ public class DurableTaskStartTests
     }
 
     [Fact]
+    public async Task HandlesExposeTheFeaturesWhichTheirHostsProvide()
+    {
+        var definition = new RootDefinition();
+        var context = new StartRecordingContext(TaskId.CreateRoot("starter"), targetTaskId: TaskId.CreateRoot("stored"));
+        var plain = new StartRecordingContext(TaskId.CreateRoot("starter"));
+        (HostLocation? Scheduled, HostLocation? Posted, string? Unprovided, HostLocation? Plain) features = default;
+
+        await RunAsync(context, async () =>
+        {
+            var scheduled = await definition.Detached().WithId("scheduled").ScheduleAsync();
+            var posted = definition.Detached().WithId("posted").Post();
+            features = (scheduled.GetFeature<HostLocation>(), posted.GetFeature<HostLocation>(), scheduled.GetFeature<string>(), null);
+        });
+        await RunAsync(plain, async () =>
+        {
+            var scheduled = await definition.Detached().WithId("scheduled").ScheduleAsync();
+            features.Plain = scheduled.GetFeature<HostLocation>();
+        });
+
+        Assert.Equal(new HostLocation("host-1"), features.Scheduled);
+        Assert.Equal(new HostLocation("host-1"), features.Posted);
+        Assert.Null(features.Unprovided);
+        Assert.Null(features.Plain);
+    }
+
+    [Fact]
     public async Task DetachedConfigurationsWithinAnExecutionHaveNoHandleOperations()
     {
         var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
@@ -301,12 +327,17 @@ public class DurableTaskStartTests
 
         public TaskId TargetTaskId => targetTaskId;
 
+        public TFeature? GetFeature<TFeature>()
+            where TFeature : class => new HostLocation("host-1") as TFeature;
+
         public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
 
         public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
 
         public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
     }
+
+    private sealed record HostLocation(string Host);
 
     /// <summary>A root definition whose host accepts the start without a durable outbox.</summary>
     private class ScheduleOnlyDefinition : DurableTask, ISchedulableTask
