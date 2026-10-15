@@ -22,6 +22,10 @@ namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
 /// activation failure fails, with the same task ID. Only the client calls the workflow's grain: every other grain resumes
 /// through its messages and wake-ups, so a run which stalls is a violation.
 /// </para>
+/// <para>
+/// The default suite sweeps the ambiguous writes of the pipeline, and <see cref="DurableTaskCrashSweepTests"/> sweeps both
+/// failure modes of both workflows.
+/// </para>
 /// </remarks>
 public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) : IAsyncLifetime
 {
@@ -40,14 +44,14 @@ public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) 
         Assert.Empty(run.Violations);
     }
 
-    [Theory]
-    [InlineData(FaultWorkflow.Pipeline, FaultPoint.JournalWriteBeforeDurable)]
-    [InlineData(FaultWorkflow.Pipeline, FaultPoint.JournalWriteAfterDurable)]
-    [InlineData(FaultWorkflow.RaceAndCompensate, FaultPoint.JournalWriteBeforeDurable)]
-    [InlineData(FaultWorkflow.RaceAndCompensate, FaultPoint.JournalWriteAfterDurable)]
-    public async Task EveryJournalWriteFailureOnlyDelaysCompletion(FaultWorkflow workflow, FaultPoint point)
+    [Fact]
+    public Task EveryAmbiguousJournalWriteOfThePipelineOnlyDelaysCompletion() =>
+        SweepJournalWritesAsync(_harness, FaultWorkflow.Pipeline, FaultPoint.JournalWriteAfterDurable);
+
+    /// <summary>Fails each journal write of each grain of <paramref name="workflow"/> in turn, and checks every run.</summary>
+    internal static async Task SweepJournalWritesAsync(DurableTaskFaultHarness harness, FaultWorkflow workflow, FaultPoint point)
     {
-        var baseline = await FaultScenario.RunAsync(_harness, workflow);
+        var baseline = await FaultScenario.RunAsync(harness, workflow);
         Assert.Empty(baseline.Violations);
         var violations = new List<string>();
         var injected = new Dictionary<FaultRole, int>();
@@ -59,7 +63,7 @@ public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) 
             injected[role] = 0;
             for (var occurrence = 0; occurrence < longest; occurrence++)
             {
-                var run = await FaultScenario.RunAsync(_harness, workflow, new FaultSpec(point, role, occurrence));
+                var run = await FaultScenario.RunAsync(harness, workflow, new FaultSpec(point, role, occurrence));
                 longest = Math.Max(longest, run.Writes[role]);
                 if (!run.Fired)
                 {
@@ -79,6 +83,23 @@ public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) 
     }
 }
 
+/// <summary>Sweeps every journal write of both workflows, failing each before it is durable and as an ambiguous commit.</summary>
+public abstract class DurableTaskCrashSweepTests(string journalFormatKey) : IAsyncLifetime
+{
+    private readonly DurableTaskFaultHarness _harness = new(journalFormatKey);
+
+    public ValueTask InitializeAsync() => _harness.InitializeAsync();
+    public ValueTask DisposeAsync() => _harness.DisposeAsync();
+
+    [Theory]
+    [InlineData(FaultWorkflow.Pipeline, FaultPoint.JournalWriteBeforeDurable)]
+    [InlineData(FaultWorkflow.Pipeline, FaultPoint.JournalWriteAfterDurable)]
+    [InlineData(FaultWorkflow.RaceAndCompensate, FaultPoint.JournalWriteBeforeDurable)]
+    [InlineData(FaultWorkflow.RaceAndCompensate, FaultPoint.JournalWriteAfterDurable)]
+    public Task EveryJournalWriteFailureOnlyDelaysCompletion(FaultWorkflow workflow, FaultPoint point) =>
+        DurableTaskCrashExplorationTests.SweepJournalWritesAsync(_harness, workflow, point);
+}
+
 /// <summary>Runs crash exploration with task state stored in the default JSON journal format.</summary>
 [Collection(DurableTaskRecoveryCollection.Name)]
 [TestSuite("BVT")]
@@ -92,3 +113,17 @@ public sealed class JsonDurableTaskCrashExplorationTests() : DurableTaskCrashExp
 [TestProvider("None")]
 [TestArea("DurableTasks")]
 public sealed class OrleansBinaryDurableTaskCrashExplorationTests() : DurableTaskCrashExplorationTests(DurableTaskRecoveryFixture.OrleansBinary);
+
+/// <summary>Runs the full crash sweep with task state stored in the default JSON journal format.</summary>
+[Collection(DurableTaskRecoveryCollection.Name)]
+[TestSuite("SlowBVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
+public sealed class JsonDurableTaskCrashSweepTests() : DurableTaskCrashSweepTests(DurableTaskRecoveryFixture.Json);
+
+/// <summary>Runs the full crash sweep with task state stored in the Orleans binary journal format.</summary>
+[Collection(DurableTaskRecoveryCollection.Name)]
+[TestSuite("SlowBVT")]
+[TestProvider("None")]
+[TestArea("DurableTasks")]
+public sealed class OrleansBinaryDurableTaskCrashSweepTests() : DurableTaskCrashSweepTests(DurableTaskRecoveryFixture.OrleansBinary);
