@@ -87,6 +87,31 @@ public sealed class DurableTaskSubscriptionTests
     });
 
     [Fact]
+    public Task SubscriptionHandleNamesTheObservedTask() => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var subscriberHost = new SubscriptionHost(SubscriberGrain);
+        await using var operationHost = new SubscriptionHost(OperationGrain);
+        operationHost.Workflows["op"] = static () => WaitForRelease();
+        subscriberHost.Workflows["relay"] = () => ObserveTaskThroughItsHandle(operationHost.Address, "op");
+        await using var operation = await operationHost.ActivateAsync(TestCancellation);
+        await using var subscriber = await subscriberHost.ActivateAsync(TestCancellation);
+        await operation.ScheduleAsync(OperationId, "op", TestCancellation);
+        await subscriber.ScheduleAsync(RelayId, "relay", TestCancellation);
+        var subscription = await subscriber.Transport.WaitForSubscriptionAsync(1);
+        await subscriber.WriteAsync(TestCancellation);
+
+        await operation.DeliverAsync(subscription.ToInboxMessage(), TestCancellation);
+        await operation.Tasks.SignalAsync(OperationId, Release, "done", TestCancellation);
+        await operation.GetResponseAsync(OperationId, TestCancellation);
+        await subscriber.DeliverAsync(operation.CreateInboxMessage(Assert.Single(operation.Transport.Completions)), TestCancellation);
+
+        // The handle's identifier is the subscription's record, and its target identifier is the observed task.
+        Assert.Equal(
+            $"{SubscriptionChildId} {OperationId} done",
+            (await subscriber.GetResponseAsync(RelayId, TestCancellation)).GetResult<string>());
+    });
+
+    [Fact]
     public Task ReplayReachesTheRecordedSubscriptionWithoutSubscribingAgain() => ActivationScheduler.RunAsync(async () =>
     {
         await using var subscriberHost = new SubscriptionHost(SubscriberGrain);
@@ -418,6 +443,12 @@ public sealed class DurableTaskSubscriptionTests
     });
 
     private static async DurableTask<string> WaitForRelease() => await Release.WaitAsync();
+
+    private static async DurableTask<string> ObserveTaskThroughItsHandle(IAddressable target, string rootId)
+    {
+        var handle = await target.GetDurableTask<string>(rootId).ScheduleAsync();
+        return $"{handle.Id} {handle.TargetTaskId} {await handle}";
+    }
 
     private static async DurableTask<string> AwaitTask(IAddressable target, string rootId) =>
         await target.GetDurableTask<string>(rootId);
