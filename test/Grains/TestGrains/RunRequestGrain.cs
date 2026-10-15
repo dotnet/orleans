@@ -90,13 +90,7 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         var admitted = new List<Task>(count);
         for (var i = 0; i < count; i++)
         {
-            var entry = $"request-{i}";
-            var request = this.RunRequestAsync(static (state, _) =>
-            {
-                state.Grain._log.Add(state.Entry);
-                return Task.CompletedTask;
-            }, (Grain: this, Entry: entry));
-
+            var request = QueueLoggedRequest($"request-{i}");
             if (request.IsFaulted)
             {
                 outcomes.Add(request.Exception!.InnerException!.GetType().Name);
@@ -111,6 +105,37 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         _pending = Task.WhenAll(admitted);
         return Task.FromResult(outcomes);
     }
+
+    public async Task<int> QueueRequestsConcurrently(int count)
+    {
+        // Dedicated threads, released together, queue the requests while this call blocks the activation.
+        using var barrier = new Barrier(count);
+        var requests = await Task.WhenAll(Enumerable.Range(0, count).Select(i => Task.Factory.StartNew(
+            () =>
+            {
+                barrier.SignalAndWait();
+                return QueueLoggedRequest($"request-{i}");
+            },
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default)));
+
+        var admitted = requests.Where(request => !request.IsFaulted).ToList();
+        if (requests.FirstOrDefault(request => request.IsFaulted && request.Exception!.InnerException is not LimitExceededException) is { } unexpected)
+        {
+            await unexpected;
+        }
+
+        _pending = Task.WhenAll(admitted);
+        return admitted.Count;
+    }
+
+    private Task QueueLoggedRequest(string entry) =>
+        this.RunRequestAsync(static (state, _) =>
+        {
+            state.Grain._log.Add(state.Entry);
+            return Task.CompletedTask;
+        }, (Grain: this, Entry: entry));
 
     public Task StartRequestContextRequest(string value)
     {

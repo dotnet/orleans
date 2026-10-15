@@ -17,6 +17,8 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task<List<string>> QueueRequests(int count);
 
+    Task<int> QueueRequestsConcurrently(int count);
+
     Task SetRequestFilterMode(RequestFilterMode mode);
 
     Task StartRequestContextRequest(string value);

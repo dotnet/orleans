@@ -241,6 +241,18 @@ public class RunRequestQueueLimitTests : TestClusterPerTest
         Assert.Equal(["request-0", "request-1", "request-2"], await grain.GetLog());
     }
 
+    [Fact]
+    public async Task RunRequest_ConcurrentProducers_StayWithinHardLimit()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        var admitted = await grain.QueueRequestsConcurrently(64);
+        await grain.AwaitPendingRequest().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HardLimit, admitted);
+        Assert.Equal(HardLimit, (await grain.GetLog()).Count);
+    }
+
     private sealed class SiloConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder hostBuilder) =>
