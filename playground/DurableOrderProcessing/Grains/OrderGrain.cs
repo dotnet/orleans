@@ -84,7 +84,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
         var lines = request.Lines;
         var order = OrderDetails.Submit(OrderId, request, DurableTask.Current.UtcNow);
         DurableTask.Once(() => _history.Append(order));
-        await RecordAsync(order.Order);
+        Record(order.Order);
 
         // While the order awaits validation, CancelAsync can cancel this task. The next durable operation, up to the
         // payment authorization, observes the cancellation and throws OperationCanceledException, and the workflow
@@ -97,7 +97,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             order = order.BeginValidation();
             reservable = lines;
             DurableTask.Once(() => _history.Append(order));
-            await RecordAsync(order.Order);
+            Record(order.Order);
 
             // Reserves every line concurrently, as the children reserve/0, reserve/1, and so on. WhenAll waits for every
             // reservation, including after a cancellation, so each line's reservation is settled when it returns or throws.
@@ -110,7 +110,7 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             }
 
             DurableTask.Once(() => _history.Append(order));
-            await RecordAsync(order.Order);
+            Record(order.Order);
 
             // The authorization runs as authorize-payment/0 and its timeout as authorize-payment/1. When the timeout
             // elapses first, the payment grain observes a cancellation request, and an authorization which then ends
@@ -136,14 +136,14 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
         order = order.MarkPaid();
         DurableTask.Once(() => _history.Append(order));
-        await RecordAsync(order.Order);
+        Record(order.Order);
         await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).CommitAsync(OrderId))).WithId("commit");
 
         // The order ships when ShipAsync signals it; the wait returns at once for a shipment which arrived earlier.
         await Shipped.WaitAsync();
         order = order.MarkShipped();
         DurableTask.Once(() => _history.Append(order));
-        await RecordAsync(order.Order);
+        Record(order.Order);
         return Result(order);
     }
 
@@ -175,27 +175,24 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
 
     // Releases the lines' reservations concurrently, then records the cancellation. Releasing is idempotent and returns
     // whether the line held a reservation, so the workflow releases each line without tracking which reservations ran.
-    // The suppression scope keeps the workflow's cancellation from reaching this compensation, so it runs to completion.
+    // The release is shielded, so the cancellation which ended the workflow lets this compensation run to completion.
     private async Task<OrderResult> CancelOrderAsync(OrderDetails order, OrderLine[] lines, string? reason)
     {
-        using (DurableTask.Current.SuppressCancellation())
-        {
-            var released = await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
-                .WithId("release");
-            order = order.Cancel([.. lines.Where((_, i) => released[i]).Select(line => line.ProductId)], reason);
-            DurableTask.Once(() => _history.Append(order));
-            await RecordAsync(order.Order);
-            return Result(order);
-        }
+        var released = await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
+            .WithId("release")
+            .Shielded();
+        order = order.Cancel([.. lines.Where((_, i) => released[i]).Select(line => line.ProductId)], reason);
+        DurableTask.Once(() => _history.Append(order));
+        Record(order.Order);
+        return Result(order);
     }
 
-    // Detaches the buyer's projection update under a root ID derived from the workflow's ID and the version, such as
-    // "place-order-{orderId}:buyer-v2", so the workflow doesn't wait for the buyer and its cancellation doesn't reach the
-    // update. The workflow records each snapshot in the order's history first. Updates arrive in any order; the buyer
-    // keeps the summary with the highest version.
-    private ValueTask RecordAsync(OrderState order) =>
-        GrainFactory.GetGrain<IBuyerGrain>(order.BuyerId).RecordOrderAsync(order.ToSummary())
-            .DetachAsync(DetachedTaskId.For($"buyer-v{order.Version}"));
+    // Posts the buyer's projection update as a detached task, whose root ID derives from the workflow's ID, so the
+    // workflow continues without waiting for the buyer and the update runs independently of the workflow. The update
+    // commits with the workflow's next journal write, after the snapshot which the workflow records in the order's
+    // history. Updates arrive in any order; the buyer keeps the summary with the highest version.
+    private void Record(OrderState order) =>
+        _ = GrainFactory.GetGrain<IBuyerGrain>(order.BuyerId).RecordOrderAsync(order.ToSummary()).Detached().Post();
 
     private ICatalogItemGrain Catalog(int productId) => GrainFactory.GetGrain<ICatalogItemGrain>(productId);
 
