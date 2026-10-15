@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.Metrics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +19,7 @@ internal sealed partial class DashboardHost(
     OrleansInstruments instruments,
     IGrainFactory grainFactory,
     DashboardTelemetryExporter dashboardTelemetryExporter,
-    ISiloGrainClient siloGrainClient) : IHostedService, IAsyncDisposable, IDisposable
+    ISiloGrainClient siloGrainClient) : IHostedService, ILifecycleParticipant<ISiloLifecycle>, IAsyncDisposable, IDisposable
 {
     private MeterProvider? _meterProvider;
 
@@ -26,8 +27,13 @@ internal sealed partial class DashboardHost(
     {
         await Task.WhenAll(
             ActivateDashboardGrainAsync(cancellationToken),
-            ActivateSiloGrainAsync(cancellationToken),
-            StartOpenTelemetryConsumerAsync()).ConfigureAwait(false);
+            ActivateSiloGrainAsync(cancellationToken)).ConfigureAwait(false);
+    }
+
+    public void Participate(ISiloLifecycle lifecycle)
+    {
+        // Observe client connections from the moment the gateway opens at the Active stage.
+        lifecycle.Subscribe<DashboardHost>(ServiceLifecycleStage.BecomeActive, _ => StartOpenTelemetryConsumerAsync());
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -62,8 +68,18 @@ internal sealed partial class DashboardHost(
     {
         _meterProvider = Sdk.CreateMeterProviderBuilder()
             .AddMeter(instruments.Meter.Name)
-            // Multiple silos and clients can publish identically named meters in one process.
-            .AddView(instrument => ReferenceEquals(instrument.Meter, instruments.Meter) ? null : MetricStreamConfiguration.Drop)
+            .AddView(instrument =>
+            {
+                if (!ReferenceEquals(instrument.Meter, instruments.Meter))
+                {
+                    return MetricStreamConfiguration.Drop;
+                }
+
+                // The dashboard displays silo-wide totals, so collect a single stream with histogram sums only.
+                return instrument.GetType().IsGenericType && instrument.GetType().GetGenericTypeDefinition() == typeof(Histogram<>)
+                    ? new ExplicitBucketHistogramConfiguration { TagKeys = [], Boundaries = [], RecordMinMax = false }
+                    : null;
+            })
             .AddReader(new PeriodicExportingMetricReader(dashboardTelemetryExporter, 1000, 1000))
             .Build();
         return Task.CompletedTask;

@@ -11,11 +11,6 @@ namespace Orleans.Runtime;
 /// <summary>
 /// Listens for Orleans runtime metrics used to produce silo runtime statistics.
 /// </summary>
-/// <remarks>
-/// The runtime does not start this listener. Silo runtime statistics are available from
-/// <see cref="IManagementGrain.GetRuntimeStatistics(SiloAddress[])"/>.
-/// </remarks>
-[Obsolete($"This type will be removed. Use {nameof(IManagementGrain)}.{nameof(IManagementGrain.GetRuntimeStatistics)} to read silo client and message statistics.", error: false)]
 public static class SiloRuntimeMetricsListener
 {
     private static readonly MeterListener MeterListener = new();

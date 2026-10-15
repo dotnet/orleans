@@ -1,20 +1,37 @@
-// Below its lg breakpoint, AdminLTE's CSS hides the sidebar unless the body has sidebar-open.
-// The dashboard does not load AdminLTE's JavaScript, so it toggles that class itself.
 export default function initializeSidebar() {
-  const body = document.body;
   const toggle = document.getElementById('sidebar-toggle')!;
+  const sidebar = document.getElementById('dashboard-sidebar')!;
+  const overlay = document.getElementById('sidebar-overlay')!;
+  const narrowScreen = window.matchMedia('(max-width: 991.98px)');
 
   const setOpen = (open: boolean) => {
-    body.classList.toggle('sidebar-open', open);
+    document.body.classList.toggle('sidebar-open', open);
     toggle.setAttribute('aria-expanded', String(open));
+    overlay.hidden = !open;
+    sidebar.inert = narrowScreen.matches && !open;
   };
 
-  toggle.addEventListener('click', () => setOpen(!body.classList.contains('sidebar-open')));
-  document.getElementById('sidebar-overlay')!.addEventListener('click', () => setOpen(false));
-  document.getElementById('dashboard-sidebar')!.addEventListener('click', event => {
-    if ((event.target as Element).closest('a')) setOpen(false);
+  const close = () => {
+    setOpen(false);
+    toggle.focus();
+  };
+
+  toggle.addEventListener('click', () => {
+    const open = !document.body.classList.contains('sidebar-open');
+    setOpen(open);
+    if (open) sidebar.querySelector<HTMLAnchorElement>('a[href]')?.focus();
+  });
+  overlay.addEventListener('click', close);
+  sidebar.addEventListener('click', event => {
+    if (narrowScreen.matches && event.target instanceof Element && event.target.closest('a[href]')) {
+      close();
+    }
   });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') setOpen(false);
+    if (event.key === 'Escape' && document.body.classList.contains('sidebar-open')) {
+      close();
+    }
   });
+  narrowScreen.addEventListener('change', () => setOpen(false));
+  setOpen(false);
 }

@@ -8,9 +8,9 @@ using Orleans.Dashboard;
 using Orleans.Dashboard.Core;
 using Orleans.Dashboard.Implementation;
 using Orleans.Hosting;
+using Orleans.Runtime;
 using Orleans.Services;
 using Orleans.TestingHost;
-using TestGrains;
 using Xunit;
 
 namespace UnitTests;
@@ -25,7 +25,7 @@ public class SiloRuntimeStatisticsTests
         .GetMethod("CollectStatistics", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
     [Fact]
-    public async Task CollectStatistics_ReportsConnectedClientsAndMessageBytes()
+    public async Task CollectStatistics_ReportsConnectedClients()
     {
         var builder = new InProcessTestClusterBuilder(1);
         builder.Options.ConfigureFileLogging = false;
@@ -42,12 +42,9 @@ public class SiloRuntimeStatisticsTests
         var before = (await client.HistoricalStats(address, TestContext.Current.CancellationToken)).Value.Last()!;
         Assert.Equal(1, before.ClientCount);
 
-        await cluster.Client.GetGrain<ITestStateInMemoryGrain>(0).GetState();
-        await CollectStatistics(service, TestContext.Current.CancellationToken);
-        var after = (await client.HistoricalStats(address, TestContext.Current.CancellationToken)).Value.Last()!;
-        Assert.Equal(1, after.ClientCount);
-        Assert.True(after.ReceivedMessages > before.ReceivedMessages);
-        Assert.True(after.SentMessages > before.SentMessages);
+        var management = cluster.Client.GetGrain<IManagementGrain>(0);
+        var statistics = Assert.Single(await management.GetRuntimeStatistics([silo.SiloAddress], TestContext.Current.CancellationToken));
+        Assert.Equal(before.ClientCount, statistics.ClientCount);
     }
 
     private static Task CollectStatistics(SiloGrainService service, CancellationToken cancellationToken) =>

@@ -7,7 +7,6 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Core.Diagnostics;
 using Orleans.Internal;
-using Orleans.Messaging;
 using Orleans.Runtime;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
@@ -24,21 +23,15 @@ namespace NonSilo.Tests.Runtime;
 public class DeploymentLoadPublisherTests
 {
     [Fact]
-    public async Task PublishStatistics_ReportsClientsAndMessageBytes()
+    public async Task PublishStatistics_ReportsConnectedClients()
     {
         using var rig = CreateTestRig(TimeSpan.Zero);
         rig.ServiceProvider.GetRequiredService<IConnectedClientCollection>().Count.Returns(2);
-        var messagingInstruments = rig.ServiceProvider.GetRequiredService<MessagingInstruments>();
-        var message = new Message { Direction = Message.Directions.Request };
-        messagingInstruments.OnMessageReceive(message, numTotalBytes: 120, headerBytes: 10, ConnectionDirection.ClientToGateway);
-        messagingInstruments.OnMessageSend(message, numTotalBytes: 80, headerBytes: 10, ConnectionDirection.GatewayToClient);
 
         await rig.Publisher.PublishStatistics(TestContext.Current.CancellationToken);
 
         var statistics = rig.Publisher.LocalRuntimeStatistics;
         Assert.Equal(2, statistics.ClientCount);
-        Assert.Equal(120, statistics.ReceivedMessages);
-        Assert.Equal(80, statistics.SentMessages);
         await rig.DirectTarget.Received(1).UpdateRuntimeStatistics(rig.LocalSilo, statistics, TestContext.Current.CancellationToken);
     }
 
@@ -274,7 +267,7 @@ public class DeploymentLoadPublisherTests
         var environmentStatistics = Substitute.For<IEnvironmentStatisticsProvider>();
         var loadSheddingOptions = Options.Create(new LoadSheddingOptions());
         var initialStatistics = new SiloRuntimeStatistics(
-            0, 0, environmentStatistics, loadSheddingOptions, 0, 0, 0, DateTime.UnixEpoch);
+            0, 0, environmentStatistics, loadSheddingOptions, 0, DateTime.UnixEpoch);
         var control = Substitute.For<ISiloControl>();
         control.GetRuntimeStatistics(Arg.Any<CancellationToken>()).Returns(Task.FromResult(initialStatistics));
         grainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, Arg.Any<SiloAddress>()).Returns(control);

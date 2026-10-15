@@ -5,6 +5,10 @@
   overflow-y: auto;
 }
 
+.sidebar-expand-lg.sidebar-open .sidebar-overlay {
+  position: fixed;
+}
+
 /* Brand logo styling */
 .brand-logo {
   height: 45px;

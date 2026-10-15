@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:ui": "playwright test"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.1.0",
@@ -23,6 +24,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.0",
     "@eslint/js": "^9.39.5",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@types/humanize-duration": "^3.27.4",
