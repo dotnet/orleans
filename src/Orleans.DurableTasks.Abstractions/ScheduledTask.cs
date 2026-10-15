@@ -17,7 +17,22 @@ public abstract partial class ScheduledTask
     internal ScheduledTask() { }
 
     /// <summary>Gets the stable durable task identifier.</summary>
+    /// <remarks>
+    /// In a durable execution, the identifier names the execution's operation which started or observes the task, such as
+    /// the record of a detached task, so combinators and replays address the operation by it.
+    /// </remarks>
     public abstract TaskId Id { get; }
+
+    /// <summary>
+    /// Gets the identifier under which the task's host stores the task which this handle observes, which other parties use
+    /// to address the task.
+    /// </summary>
+    /// <remarks>
+    /// The identifier equals <see cref="Id"/> unless the host stores the task under another one: in a durable execution,
+    /// the handle of a detached task observes the task's root identifier on its target, and a host can scope the
+    /// identifier of a call to another host by the caller.
+    /// </remarks>
+    public virtual TaskId TargetTaskId => Id;
 
     /// <summary>Gets whether this handle has observed the task's terminal response.</summary>
     /// <remarks>
@@ -640,6 +655,8 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
 {
     public override TaskId Id => handle.TaskId;
 
+    public override TaskId TargetTaskId => handle.TargetTaskId;
+
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
 
     protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => handle.CancelAsync(reason, cancellationToken);
@@ -655,6 +672,8 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
 internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) : ScheduledTask<TResult>
 {
     public override TaskId Id => handle.TaskId;
+
+    public override TaskId TargetTaskId => handle.TargetTaskId;
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
 
