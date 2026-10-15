@@ -583,16 +583,13 @@ registration. A <xref:Orleans.DurableTasks.TaskId> serializes as its escaped pat
   `GetDurableTask` observes. An attached child belongs to its caller's tree, so its
   handle has no address.
 
-A workflow records the detached task which it hands off, and a later activation awaits it:
+A grain records the detached task which it hands off, and later awaits, polls, or cancels it,
+after any number of reactivations:
 
-```csharp
-var handle = await shipping.ShipAsync(order).Detached().WithId($"ship-{orderId}").ScheduleAsync();
-handle.TryGetAddress(out var shipment);
-_shipment.Value = shipment;
+:::code source="../snippets/compiled/Grains/DurableTaskIdentitySnippets.cs" id="durable_tasks_identity_store" language="csharp":::
 
-// After any number of reactivations:
-var tracking = await GrainFactory.GetDurableTask<TrackingNumber>(_shipment.Value);
-```
+[Task identity and references](durable-tasks-identity.md#address-a-task-from-elsewhere)
+describes which tasks have addresses and how long they resolve.
 
 ## Commit model and guarantees
 
