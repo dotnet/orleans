@@ -119,8 +119,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     private int _runningAttempts;
     private int _parkedAttempts;
 
-    // Set when a write's committed effects resume attempts, whose waits unpark in later work items; see GetWakeupDelay.
-    private int _resumed;
+    // The parked waits of attempts, by the task or signal record whose completion resumes them.
+    private readonly Dictionary<TaskId, List<ParkedWait>> _parkedWaits = [];
     private TaskId[] _committingStarts = [];
     private KeyValuePair<TaskId, DurableTaskResponse>[] _committingHandleResponses = [];
     private long[] _committingCancellationPropagations = [];
@@ -1412,6 +1412,51 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     void IDurableTaskGrainRuntime.OnAttemptUnparked() => Interlocked.Decrement(ref _parkedAttempts);
 
+    void IDurableTaskGrainRuntime.RegisterParkedWait(TaskId awaited, ParkedWait wait)
+    {
+        lock (_parkedWaits)
+        {
+            if (!_parkedWaits.TryGetValue(awaited, out var waits))
+            {
+                _parkedWaits[awaited] = waits = [];
+            }
+
+            waits.Add(wait);
+        }
+    }
+
+    void IDurableTaskGrainRuntime.UnregisterParkedWait(TaskId awaited, ParkedWait wait)
+    {
+        lock (_parkedWaits)
+        {
+            if (_parkedWaits.TryGetValue(awaited, out var waits) && waits.Remove(wait) && waits.Count == 0)
+            {
+                _parkedWaits.Remove(awaited);
+            }
+        }
+    }
+
+    TaskId? IDurableTaskGrainRuntime.GetSignalRecordId(TaskId executionId, string name) =>
+        GetSignalRecordId(GetSignalOwner(executionId), name);
+
+    /// <summary>Resumes the parked waits for <paramref name="awaited"/>, whose result or value the runtime completed.</summary>
+    private void ResumeParkedWaits(TaskId awaited)
+    {
+        List<ParkedWait>? waits;
+        lock (_parkedWaits)
+        {
+            if (_parkedWaits.Count == 0 || !_parkedWaits.Remove(awaited, out waits))
+            {
+                return;
+            }
+        }
+
+        foreach (var wait in waits)
+        {
+            wait.Resume();
+        }
+    }
+
     /// <summary>
     /// Reports work while the grain holds a runnable execution, so the inbox's durable wake-up reactivates the grain, and
     /// recovery resumes the execution, after a deactivation or a crash.
@@ -1426,9 +1471,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// become durable.
     /// </para>
     /// <para>
-    /// A parked attempt which a committed result resumes unparks in a later work item. A consult after a write whose
-    /// effects resumed attempts therefore reports work once and clears that mark, so the wake-up recurs and consults again
-    /// after the resumed attempts have run.
+    /// A parked attempt counts as runnable from the moment the runtime completes what it awaits, before its code continues
+    /// in a later work item; see <see cref="GrainDurableTaskContext"/>. Committed cancellations propagate in background
+    /// work, which counts as work until it ends.
     /// </para>
     /// <para>
     /// The delay is short, because a deactivated grain's runnable work makes no progress until the grain wakes, and while
@@ -1437,11 +1482,11 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// </para>
     /// </remarks>
     TimeSpan? IInboxWorkSource.GetWakeupDelay() =>
-        Interlocked.Exchange(ref _resumed, 0) != 0
-        || Volatile.Read(ref _runningAttempts) > Volatile.Read(ref _parkedAttempts)
+        Volatile.Read(ref _runningAttempts) > Volatile.Read(ref _parkedAttempts)
         || !_pendingStarts.IsEmpty
         || !_pendingHandleResponses.IsEmpty
         || !_pendingCancellationPropagations.IsEmpty
+        || !_backgroundTasks.IsEmpty
         || Volatile.Read(ref _recoveredStarts) is not null
             ? RunnableWakeupDelay
             : null;
@@ -1487,10 +1532,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         _committingStarts = [];
         _committingHandleResponses = [];
         _committingCancellationPropagations = [];
-        if (starts.Length > 0 || handleResponses.Length > 0 || propagations.Length > 0)
-        {
-            Volatile.Write(ref _resumed, 1);
-        }
 
         foreach (var taskId in starts)
         {
