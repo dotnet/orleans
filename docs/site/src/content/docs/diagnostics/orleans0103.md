@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-Code which runs once, such as a local step or the body's synchronous tail, changes grain state and then awaits an external operation before it returns. The following step counts a notice, then sends it:
+Code which runs once, such as a local step or the body's synchronous tail, changes grain state and then awaits an external operation before it returns. A change is an assignment, an increment, or a decrement of a grain state member, such as `IDurableValue<T>.Value` or a dictionary or list element, or a call which changes a collection, such as `Add`, `AddRange`, `Remove`, `Clear`, `Insert`, `RemoveAt`, `Enqueue`, `Dequeue`, `TryDequeue`, `TryAdd`, `UnionWith`, `IntersectWith`, `ExceptWith`, `SymmetricExceptWith`, `IDurableLog<T>.Append` and `TrimBefore`, the `TrySet` methods of `IDurableTaskCompletionSource<T>`, and `IPersistentState<TState>.WriteStateAsync` and `ClearStateAsync`. The following step counts a notice, then sends it:
 
 :::code source="snippets/durable-tasks/Orleans0103.cs" id="orleans0103_violation" language="csharp":::
 
