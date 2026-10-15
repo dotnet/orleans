@@ -480,6 +480,8 @@ namespace Orleans.DurableTasks
 
     public partial interface IScheduledTaskHandle
     {
+        TaskId TargetTaskId { get; }
+
         TaskId TaskId { get; }
 
         System.Threading.Tasks.ValueTask AbortAsync(string reason, System.Threading.CancellationToken cancellationToken);
@@ -533,6 +535,8 @@ namespace Orleans.DurableTasks
         public bool IsCompleted { get { throw null; } }
 
         public DurableTaskStatus Status { get { throw null; } }
+
+        public virtual TaskId TargetTaskId { get { throw null; } }
 
         public System.Threading.Tasks.ValueTask AbortAsync(string reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
