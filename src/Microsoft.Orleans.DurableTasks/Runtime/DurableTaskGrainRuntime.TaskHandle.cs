@@ -83,5 +83,15 @@ internal sealed partial class DurableTaskGrainRuntime
 
         public bool TrySetResponse(DurableTaskResponse response) => _responseTcs.TrySetResult(response);
         public bool TrySetException(Exception exception) => _responseTcs.TrySetException(exception);
+
+        /// <summary>Fails the handle's waiters because the activation stops, while the task continues in the next activation.</summary>
+        /// <remarks>The handle may have no waiter, so the failure is marked observed.</remarks>
+        public void SetStopping(OperationCanceledException exception)
+        {
+            if (_responseTcs.TrySetException(exception))
+            {
+                _ = _responseTcs.Task.Exception;
+            }
+        }
     }
 }
