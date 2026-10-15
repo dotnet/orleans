@@ -10,13 +10,12 @@ namespace Orleans.DurableTasks.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// As an <see cref="IInboxMessageSink"/>, it accepts invocations, subscriptions, acceptances, completions,
-/// cancellations, unsubscriptions, and signals directly into task state, so the request, result, or signal payload is
-/// journaled once, in task state, and the inbox journals only the message's processed record in the same write. Each
-/// message is decoded and validated before any change is staged. An invocation from a task which awaits its result, and which its receiver rejects, such as one
-/// whose identifier already identifies another request, is answered with a rejection, which fails the start for its
-/// sender. Another message which fails validation throws, and a rejected signal reports a dead-lettered result, so the
-/// inbox dead-letters either one.
+/// As an <see cref="IInboxMessageSink"/>, it accepts invocations, subscriptions, completions, cancellations,
+/// unsubscriptions, and signals directly into task state, so the request, result, or signal payload is journaled once, in
+/// task state, and the inbox journals only the message's processed record in the same write. Each message is decoded and
+/// validated before any change is staged. A message which fails validation, such as an invocation whose identifier
+/// already identifies another request, throws, and a rejected signal reports a dead-lettered result, so the inbox
+/// dead-letters either one, and the sender's outbox retires it as rejected with the failure's message.
 /// </para>
 /// <para>
 /// As an <see cref="IInboxHandler"/>, it handles the delay resumes the grain schedules for itself, which the inbox holds
@@ -43,7 +42,7 @@ internal sealed class DurableTaskMessageHandler(
                 {
                     // A subscription carries no request and claims no caller: it adds the sender's task to the existing
                     // task's completion destinations.
-                    if (invocation.SubscriberId is not { } subscriberId || invocation.Detached || invocation.Acknowledge)
+                    if (invocation.SubscriberId is not { } subscriberId || invocation.Detached)
                     {
                         throw new InvalidOperationException("A durable task subscription carries a subscriber and nothing else.");
                     }
@@ -57,8 +56,7 @@ internal sealed class DurableTaskMessageHandler(
                     request,
                     sender,
                     invocation.Detached,
-                    invocation.SubscriberId,
-                    invocation.Acknowledge);
+                    invocation.SubscriberId);
                 return true;
             case DurableTaskMessageTypes.CompletionSubject:
                 var completion = messageTypes.Completion.Decode(message.Envelope);
@@ -85,14 +83,6 @@ internal sealed class DurableTaskMessageHandler(
                     runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender), cancellation.CancellationReason);
                 }
 
-                return true;
-            case DurableTaskMessageTypes.AcceptanceSubject:
-                var acceptance = messageTypes.Acceptance.Decode(message.Envelope);
-                runtime.AcceptAcceptanceFromInbox(
-                    acceptance.SubscriberId ?? acceptance.TaskId,
-                    acceptance.TaskId,
-                    acceptance.Rejection,
-                    GetSender(acceptance.Sender));
                 return true;
             case DurableTaskMessageTypes.SignalSubject:
                 var signal = messageTypes.Signal.Decode(message.Envelope);

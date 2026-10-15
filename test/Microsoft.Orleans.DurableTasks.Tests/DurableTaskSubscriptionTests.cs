@@ -491,6 +491,7 @@ public sealed class DurableTaskSubscriptionTests
                 var services = scope.ServiceProvider;
                 var storage = services.GetRequiredService<DurableTaskGrainStorage>();
                 var logicalTimes = services.GetRequiredKeyedService<IDurableDictionary<TaskId, DateTimeOffset>>("$task-logical-times");
+                var invocations = services.GetRequiredKeyedService<IDurableDictionary<MessageId, PendingInvocation>>("$task-invocations");
                 var manager = services.GetRequiredService<IJournaledStateManager>();
                 var grainContext = Substitute.For<IGrainContext>();
                 grainContext.GrainId.Returns(grainId);
@@ -503,7 +504,7 @@ public sealed class DurableTaskSubscriptionTests
                     Options.Create(new DurableMessagingOptions()),
                     _journal.Serializer);
                 var transport = new RecordingDurableTaskMessageTransport();
-                var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, shared, [transport]);
+                var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [transport]);
                 manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
                 runtime.InitializeForActivation();
                 await storage.ReadAsync(cancellationToken);

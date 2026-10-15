@@ -7,32 +7,25 @@ namespace Orleans.DurableTasks.Protocol;
 
 internal interface IDurableTaskMessageTransport
 {
-    /// <summary>Stages an invocation of the attached child <paramref name="taskId"/> of <paramref name="sender"/>.</summary>
-    /// <param name="acknowledge">Whether <paramref name="target"/> replies with an acceptance once it stores the task.</param>
-    void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request, bool acknowledge);
+    /// <summary>Encodes an invocation of the attached child <paramref name="taskId"/> of <paramref name="sender"/>.</summary>
+    OutboxMessage CreateInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request);
 
     /// <summary>
-    /// Stages an invocation which starts the detached task <paramref name="taskId"/> on <paramref name="target"/>, and
+    /// Encodes an invocation which starts the detached task <paramref name="taskId"/> on <paramref name="target"/>, and
     /// subscribes <paramref name="sender"/>'s task <paramref name="subscriberId"/>, if any, to its result.
     /// </summary>
-    /// <param name="acknowledge">Whether <paramref name="target"/> replies with an acceptance once it stores the task.</param>
-    void SendDetachedInvocation(
+    OutboxMessage CreateDetachedInvocation(
         GrainId sender,
         GrainId target,
         TaskId taskId,
         IDurableTaskRequest request,
-        TaskId? subscriberId,
-        bool acknowledge);
+        TaskId? subscriberId);
 
-    /// <summary>
-    /// Stages the reply to an invocation of <paramref name="taskId"/>, which <paramref name="destination"/> started: an
-    /// acceptance, or the <paramref name="rejection"/> which fails the start.
-    /// </summary>
-    void SendAcceptance(GrainId sender, DurableTaskSubscriber destination, TaskId taskId, DurableTaskResponse? rejection);
+    /// <summary>Rebuilds the invocation <paramref name="messageId"/> to <paramref name="target"/> from its encoded payload.</summary>
+    OutboxMessage CreateInvocation(MessageId messageId, GrainId target, byte[] payload);
 
-    /// <summary>Stages a completion which the runtime provides from the task's stored result.</summary>
-    /// <param name="messageId">The completion's message ID, from <see cref="GetCompletionMessageId"/>.</param>
-    void SendCompletion(MessageId messageId);
+    /// <summary>Stages a message which the runtime provides: a completion or an invocation.</summary>
+    void Send(MessageId messageId);
 
     /// <summary>Gets the stable ID of the completion of <paramref name="taskId"/> which <paramref name="sender"/> sends to <paramref name="destination"/>.</summary>
     MessageId GetCompletionMessageId(GrainId sender, DurableTaskSubscriber destination, TaskId taskId);

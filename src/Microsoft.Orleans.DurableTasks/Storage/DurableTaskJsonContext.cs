@@ -2,13 +2,16 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using Orleans.DurableTasks.Runtime;
+using Orleans.Messaging;
 
 namespace Orleans.DurableTasks.Storage;
 
 /// <summary>
-/// Source-generated JSON metadata for the task state which the adapter stores in JSON journals.
+/// Source-generated JSON metadata for the task state and pending invocations which the adapter stores in JSON journals.
 /// </summary>
 [JsonSerializable(typeof(DurableTaskState))]
+[JsonSerializable(typeof(PendingInvocation))]
+[JsonSerializable(typeof(MessageId))]
 [JsonSerializable(typeof(DateTimeOffset))]
 [JsonSerializable(typeof(byte[]))]
 internal sealed partial class DurableTaskJsonContext : JsonSerializerContext;

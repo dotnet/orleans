@@ -74,13 +74,14 @@ public interface IDurableTaskState
     public string? RemoteRequestFingerprint { get; }
 
     /// <summary>
-    /// Gets whether the host of the task which this record starts on another grain accepted the start,
-    /// <see langword="true"/>, or rejected it, <see langword="false"/>, or <see langword="null"/> until its reply arrives.
+    /// Gets whether the grain of the task which this record starts on another grain durably accepted the task,
+    /// <see langword="true"/>, or the start failed, <see langword="false"/>, or <see langword="null"/> until either is known.
     /// </summary>
     /// <remarks>
-    /// A record of a durable call or of a detached task receives the reply which its target sends when it stores the
-    /// task, or when it rejects the start, such as a start whose identifier already identifies another request. A
-    /// rejection also stores the record's result, which fails with the rejection.
+    /// A record of a durable call or of a detached task records the acceptance when its invocation retires as delivered, or
+    /// when the task's result reaches it first. An invocation which its target rejected, such as a start whose identifier
+    /// already identifies another request, or which the outbox dead-lettered, fails the start, and stores the failure as
+    /// the record's result unless the record already holds its own outcome, such as its cancellation.
     /// </remarks>
     public bool? Accepted { get; }
 

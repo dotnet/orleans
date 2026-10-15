@@ -6,6 +6,7 @@ using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using System.Reflection;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
@@ -31,7 +32,7 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     private readonly TaskCompletionSource _resumeSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Dictionary<MessageId, (GrainId Sender, DurableTaskSubscriber Destination, TaskId TaskId)> _completionIds = [];
 
-    public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request, bool Acknowledge)> Invocations { get; } = [];
+    public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request)> Invocations { get; } = [];
     public List<RecordedCompletion> Completions { get; } = [];
     public List<(GrainId Sender, GrainId Target, TaskId TaskId)> Cancellations { get; } = [];
     public List<string?> CancellationReasons { get; } = [];
@@ -40,27 +41,56 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     public Action<GrainId, GrainId, TaskId, IDurableTaskRequest>? BeforeSendInvocation { get; set; }
     public Action<GrainId, GrainId, TaskId>? BeforeSendCancellation { get; set; }
 
-    public void SendInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request, bool acknowledge)
+    public OutboxMessage CreateInvocation(GrainId sender, GrainId target, TaskId taskId, IDurableTaskRequest request)
     {
         BeforeSendInvocation?.Invoke(sender, target, taskId, request);
-        Invocations.Add((sender, target, taskId, request, acknowledge));
+        Invocations.Add((sender, target, taskId, request));
+        return CreateInvocationMessage(sender, target, taskId, request, detached: false, subscriberId: null);
     }
 
-    public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request, TaskId? SubscriberId, bool Acknowledge)> DetachedInvocations { get; } = [];
+    public List<(GrainId Sender, GrainId Target, TaskId TaskId, IDurableTaskRequest Request, TaskId? SubscriberId)> DetachedInvocations { get; } = [];
 
-    public void SendDetachedInvocation(
+    public OutboxMessage CreateDetachedInvocation(
         GrainId sender,
         GrainId target,
         TaskId taskId,
         IDurableTaskRequest request,
-        TaskId? subscriberId,
-        bool acknowledge) =>
-        DetachedInvocations.Add((sender, target, taskId, request, subscriberId, acknowledge));
+        TaskId? subscriberId)
+    {
+        DetachedInvocations.Add((sender, target, taskId, request, subscriberId));
+        return CreateInvocationMessage(sender, target, taskId, request, detached: true, subscriberId);
+    }
 
-    public List<(GrainId Sender, DurableTaskSubscriber Destination, TaskId TaskId, DurableTaskResponse? Rejection)> Acceptances { get; } = [];
+    /// <summary>
+    /// Creates an invocation with the transport's identity and a payload which identifies its request by fingerprint, so a
+    /// test request without a codec can be sent.
+    /// </summary>
+    private OutboxMessage CreateInvocationMessage(
+        GrainId sender,
+        GrainId target,
+        TaskId taskId,
+        IDurableTaskRequest request,
+        bool detached,
+        TaskId? subscriberId) =>
+        Encoder.CreateInvocation(
+            GetInvocationMessageId(sender, target, taskId, subscriberId),
+            target,
+            Encoding.UTF8.GetBytes($"{detached}:{IDurableTaskRequest.GetFingerprint(request, MessagingTestHelpers.Serializer)}"));
 
-    public void SendAcceptance(GrainId sender, DurableTaskSubscriber destination, TaskId taskId, DurableTaskResponse? rejection) =>
-        Acceptances.Add((sender, destination, taskId, rejection));
+    public OutboxMessage CreateInvocation(MessageId messageId, GrainId target, byte[] payload) =>
+        Encoder.CreateInvocation(messageId, target, payload);
+
+    /// <summary>Gets the IDs of the invocations which the runtime staged by reference, in order.</summary>
+    public List<MessageId> SentInvocations { get; } = [];
+
+    /// <summary>Gets the ID of the invocation of <paramref name="taskId"/> which <paramref name="sender"/> sends to <paramref name="target"/>.</summary>
+    public MessageId GetInvocationMessageId(GrainId sender, GrainId target, TaskId taskId, TaskId? subscriberId) =>
+        DurableTaskMessageTransport.CreateMessageId(
+            sender,
+            target,
+            taskId,
+            DurableTaskMessageTypes.InvocationSubject,
+            subscriberId?.ToString());
 
     public MessageId GetCompletionMessageId(GrainId sender, DurableTaskSubscriber destination, TaskId taskId)
     {
@@ -69,10 +99,16 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
         return messageId;
     }
 
-    public void SendCompletion(MessageId messageId)
+    public void Send(MessageId messageId)
     {
-        var (sender, destination, taskId) = _completionIds[messageId];
-        Completions.Add(new(sender, destination.GrainId, taskId, messageId, destination.TaskId));
+        if (_completionIds.TryGetValue(messageId, out var completion))
+        {
+            Completions.Add(new(completion.Sender, completion.Destination.GrainId, completion.TaskId, messageId, completion.Destination.TaskId));
+        }
+        else
+        {
+            SentInvocations.Add(messageId);
+        }
     }
 
     public OutboxMessage CreateCompletionMessage(

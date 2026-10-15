@@ -12,6 +12,7 @@ using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Orleans.DurableTasks.Storage;
 using Orleans.Journaling;
+using Orleans.Messaging;
 using Orleans.Messaging.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
@@ -51,6 +52,7 @@ internal sealed class DurableTaskReplayHarness(Func<ReplayGrain, DurableTask> wo
             var services = scope.ServiceProvider;
             var storage = services.GetRequiredService<DurableTaskGrainStorage>();
             var logicalTimes = services.GetRequiredKeyedService<IDurableDictionary<TaskId, DateTimeOffset>>("$task-logical-times");
+            var invocations = services.GetRequiredKeyedService<IDurableDictionary<MessageId, PendingInvocation>>("$task-invocations");
             var counter = services.GetRequiredKeyedService<IDurableValue<int>>("counter");
             var log = services.GetRequiredKeyedService<IDurableLog<int>>("log");
             var manager = services.GetRequiredService<IJournaledStateManager>();
@@ -65,7 +67,7 @@ internal sealed class DurableTaskReplayHarness(Func<ReplayGrain, DurableTask> wo
                 Options.Create(new DurableTaskOptions { ResultRetentionPeriod = TimeSpan.FromHours(1) }),
                 Options.Create(new DurableMessagingOptions()),
                 _journal.Serializer);
-            var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, shared, [new RecordingDurableTaskMessageTransport()]);
+            var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [new RecordingDurableTaskMessageTransport()]);
             var probe = new WriteProbe(() => (counter.Value, log.Count, CompletedTasks(storage)));
             manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, runtime);
             manager.RegisterStateMachine("write-probe", probe);

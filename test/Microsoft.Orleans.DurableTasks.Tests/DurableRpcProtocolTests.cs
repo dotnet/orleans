@@ -265,7 +265,6 @@ public sealed class DurableRpcProtocolTests
     {
         Assert.Equal(
             [
-                DurableTaskMessageTypes.AcceptanceSubject,
                 DurableTaskMessageTypes.CancellationSubject,
                 DurableTaskMessageTypes.CompletionSubject,
                 DurableTaskMessageTypes.InvocationSubject,
@@ -297,21 +296,28 @@ public sealed class DurableRpcProtocolTests
             },
         };
 
-        transport.SendInvocation(sender, target, taskId, request, acknowledge: true);
-        transport.SendInvocation(sender, target, taskId, request, acknowledge: true);
+        OutboxMessage[] messages =
+        [
+            transport.CreateInvocation(sender, target, taskId, request),
+            transport.CreateInvocation(sender, target, taskId, request),
+        ];
         transport.SendCancellation(sender, target, taskId);
 
-        var messages = outbox.Messages.ToArray();
-        Assert.Equal(3, messages.Length);
+        // The runtime stages invocations by reference, so the transport only encodes them.
+        var cancellation = Assert.Single(outbox.Messages);
         Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
         Assert.Equal(messages[0].Envelope.Payload, messages[1].Envelope.Payload);
-        Assert.NotEqual(messages[0].Envelope.MessageId, messages[2].Envelope.MessageId);
+        Assert.NotEqual(messages[0].Envelope.MessageId, cancellation.Envelope.MessageId);
         Assert.Equal(DurableTaskMessageTypes.InvocationSubject, messages[0].Envelope.Subject);
         Assert.Equal(target, messages[0].ReceiverId);
-        var body = MessagingTestHelpers.MessageTypes.Invocation.Decode(messages[0].Envelope);
+
+        // The runtime rebuilds a pending invocation from its target and payload.
+        var rebuilt = transport.CreateInvocation(messages[0].Envelope.MessageId, target, messages[0].Envelope.Payload);
+        Assert.Equal((target, messages[0].Envelope.MessageId), (rebuilt.ReceiverId, rebuilt.Envelope.MessageId));
+        Assert.Equal((messages[0].Envelope.Subject, messages[0].Envelope.Payload), (rebuilt.Envelope.Subject, rebuilt.Envelope.Payload));
+        var body = MessagingTestHelpers.MessageTypes.Invocation.Decode(rebuilt.Envelope);
         Assert.Equal(taskId, body.TaskId);
         Assert.Equal(sender, body.Sender);
-        Assert.True(body.Acknowledge);
         var decodedRequest = Assert.IsType<TestDurableTaskRequest>(body.Request);
         Assert.Equal(sender, decodedRequest.Context!.CallerId);
         Assert.Equal(target, decodedRequest.Context.TargetId);
@@ -319,7 +325,7 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
-    public void DetachedInvocationAndAcceptanceIdentitiesCoverTheStartingRecord()
+    public void DetachedInvocationIdentityCoversItsSubscriber()
     {
         var outbox = new RecordingOutbox();
         var transport = MessagingTestHelpers.CreateTransport(outbox);
@@ -330,31 +336,51 @@ public sealed class DurableRpcProtocolTests
         var otherRecord = TaskId.Parse("other/$detach:a");
         var request = new TestDurableTaskRequest { Context = new DurableTaskRequestContext { TargetId = target } };
 
-        transport.SendDetachedInvocation(sender, target, rootId, request, record, acknowledge: true);
-        transport.SendDetachedInvocation(sender, target, rootId, request, record, acknowledge: true);
-        transport.SendDetachedInvocation(sender, target, rootId, request, otherRecord, acknowledge: false);
-        transport.SendAcceptance(target, new(sender, record), rootId, rejection: null);
-        transport.SendAcceptance(
-            target,
-            new(sender, otherRecord),
-            rootId,
-            DurableTaskResponse.FromException(new DurableTaskConflictException(rootId, "conflict")));
+        OutboxMessage[] messages =
+        [
+            transport.CreateDetachedInvocation(sender, target, rootId, request, record),
+            transport.CreateDetachedInvocation(sender, target, rootId, request, record),
+            transport.CreateDetachedInvocation(sender, target, rootId, request, otherRecord),
+            transport.CreateDetachedInvocation(sender, target, rootId, request, subscriberId: null),
+        ];
 
-        var messages = outbox.Messages.ToArray();
-        Assert.Equal(5, messages.Length);
+        // Each subscriber, and a posted start which has none, has its own invocation.
+        Assert.Empty(outbox.Messages);
         Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
-        Assert.NotEqual(messages[0].Envelope.MessageId, messages[2].Envelope.MessageId);
+        Assert.Equal(3, messages.Select(message => message.Envelope.MessageId).Distinct().Count());
         var invocation = MessagingTestHelpers.MessageTypes.Invocation.Decode(messages[0].Envelope);
-        Assert.Equal((rootId, sender, true, (TaskId?)record, true), (invocation.TaskId, invocation.Sender, invocation.Detached, invocation.SubscriberId, invocation.Acknowledge));
+        Assert.Equal((rootId, sender, true, (TaskId?)record), (invocation.TaskId, invocation.Sender, invocation.Detached, invocation.SubscriberId));
+    }
 
-        Assert.Equal(DurableTaskMessageTypes.AcceptanceSubject, messages[3].Envelope.Subject);
-        Assert.Equal(sender, messages[3].ReceiverId);
-        Assert.NotEqual(messages[3].Envelope.MessageId, messages[4].Envelope.MessageId);
-        var accepted = MessagingTestHelpers.MessageTypes.Acceptance.Decode(messages[3].Envelope);
-        Assert.Equal((rootId, target, (TaskId?)record), (accepted.TaskId, accepted.Sender, accepted.SubscriberId));
-        Assert.Null(accepted.Rejection);
-        var rejected = MessagingTestHelpers.MessageTypes.Acceptance.Decode(messages[4].Envelope);
-        Assert.Equal(rootId, Assert.IsType<DurableTaskConflictException>(rejected.Rejection!.Exception).TaskId);
+    [Fact]
+    public void PendingInvocationRoundTripsThroughBothJournalFormats()
+    {
+        var target = GrainId.Create("target", "one");
+        var messageId = DurableTaskMessageTransport.CreateMessageId(
+            GrainId.Create("sender", "one"),
+            target,
+            TaskId.CreateRoot("detached"),
+            DurableTaskMessageTypes.InvocationSubject);
+        var recorded = new PendingInvocation(target, [1, 2, 3], TaskId.Parse("starter/$detach:a"));
+        var posted = recorded with { RecordId = null };
+        var typeInfo = DurableTaskJsonContext.Default.PendingInvocation;
+
+        foreach (var invocation in new[] { recorded, posted })
+        {
+            var json = JsonSerializer.Deserialize(JsonSerializer.Serialize(invocation, typeInfo), typeInfo)!;
+            var binary = MessagingTestHelpers.Serializer.Deserialize<PendingInvocation>(MessagingTestHelpers.Serializer.SerializeToArray(invocation));
+            PendingInvocation[] copies = [json, binary!];
+            Assert.All(copies, copy =>
+            {
+                Assert.Equal((invocation.Target, invocation.RecordId), (copy.Target, copy.RecordId));
+                Assert.Equal(invocation.Payload, copy.Payload);
+            });
+        }
+
+        // A posted root's entry has no record, which the JSON journal omits.
+        Assert.DoesNotContain(nameof(PendingInvocation.RecordId), JsonSerializer.Serialize(posted, typeInfo), StringComparison.Ordinal);
+        var messageIdTypeInfo = DurableTaskJsonContext.Default.MessageId;
+        Assert.Equal(messageId, JsonSerializer.Deserialize(JsonSerializer.Serialize(messageId, messageIdTypeInfo), messageIdTypeInfo));
     }
 
     [Fact]
@@ -368,20 +394,15 @@ public sealed class DurableRpcProtocolTests
 
         transport.SendCancellation(sender, target, taskId);
         transport.SendCancellation(sender, target, taskId);
-        transport.SendInvocation(
-            sender,
-            target,
-            taskId,
-            new TestDurableTaskRequest
-            {
-                Context = new DurableTaskRequestContext { CallerId = sender, TargetId = target, SupportsDurableCompletion = true },
-            },
-            acknowledge: false);
+        var invocation = transport.CreateInvocation(sender, target, taskId, new TestDurableTaskRequest
+        {
+            Context = new DurableTaskRequestContext { CallerId = sender, TargetId = target, SupportsDurableCompletion = true },
+        });
 
         var messages = outbox.Messages.ToArray();
-        Assert.Equal(3, messages.Length);
+        Assert.Equal(2, messages.Length);
         Assert.Equal(messages[0].Envelope.MessageId, messages[1].Envelope.MessageId);
-        Assert.NotEqual(messages[0].Envelope.MessageId, messages[2].Envelope.MessageId);
+        Assert.NotEqual(messages[0].Envelope.MessageId, invocation.Envelope.MessageId);
         Assert.Equal(DurableTaskMessageTypes.CancellationSubject, messages[0].Envelope.Subject);
         var body = MessagingTestHelpers.MessageTypes.Cancellation.Decode(messages[0].Envelope);
         Assert.Equal(taskId, body.TaskId);
@@ -399,8 +420,8 @@ public sealed class DurableRpcProtocolTests
         var response = DurableTaskResponse.FromResult(42);
 
         var messageId = transport.GetCompletionMessageId(sender, new(target, taskId), taskId);
-        transport.SendCompletion(messageId);
-        transport.SendCompletion(transport.GetCompletionMessageId(sender, new(target, taskId), taskId));
+        transport.Send(messageId);
+        transport.Send(transport.GetCompletionMessageId(sender, new(target, taskId), taskId));
 
         // The outbox journals only the reference; the runtime provides the message from the stored result.
         Assert.Empty(outbox.Messages);
