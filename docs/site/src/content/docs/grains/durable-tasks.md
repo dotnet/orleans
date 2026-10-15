@@ -14,7 +14,8 @@ grains, local state transitions, delays, and external signals. Each step's resul
 recorded in the grain's journal, so the workflow survives activation loss and resumes
 where it stopped. Durable tasks run over [Messaging](messaging.md), which carries
 invocations, results, cancellations, and signals between grains through each grain's
-durable inbox and outbox, and over Durable Jobs, which wakes grains when delays are due.
+durable inbox and outbox, and over Durable Jobs, which wakes grains when delays are due
+and resumes executions after their grain deactivates.
 
 > [!NOTE]
 > The `Microsoft.Orleans.DurableTasks` adapter and the
@@ -566,6 +567,10 @@ public async DurableTask DeliverWebhookAsync(Guid operationKey, string operation
 - Task state and outgoing messages share the grain's journal commit boundary with the
   grain's own journaled state. A failed journal write deactivates the grain, and the
   next activation recovers from committed state.
+- While an execution runs code, rather than waiting for a call's result, a signal, or a
+  delay, the grain keeps a Durable Jobs wake-up, so a grain which deactivates or crashes
+  is reactivated within about a second and resumes the execution. A waiting execution
+  resumes when the message it waits for reactivates its grain.
 - Posting a durable call from a durable grain, including from an ordinary method, stages
   the invocation in the outbox, so it commits atomically with the grain's state changes.
   Inside a durable task, awaiting and scheduling a call stage it the same way.

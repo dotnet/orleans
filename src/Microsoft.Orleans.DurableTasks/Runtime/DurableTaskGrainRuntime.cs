@@ -37,7 +37,8 @@ namespace Orleans.DurableTasks.Runtime;
 /// A delay stages a resume message to its own grain together with its delay state, scheduled with
 /// <see cref="Orleans.Messaging.Envelope.DeliverAt"/> for the delay's due time. The grain's own inbox accepts the message
 /// in the same journal write as the delay, so the resume is durable whenever the delay is, and the inbox processes it
-/// once it is due. The adapter schedules no Durable Jobs of its own.
+/// once it is due. The adapter schedules no Durable Jobs of its own: as the inbox's work source, it reports its runnable
+/// executions, for which Messaging's wake-up reactivates the grain.
 /// </para>
 /// <para>
 /// The runtime is the <see cref="IOutboxMessageSource"/> of its completion messages: the outbox journals a reference to
@@ -83,7 +84,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     IDurableTaskGrainExtension,
     IDurableTaskManager,
     IStateMachine,
-    IOutboxMessageSource
+    IOutboxMessageSource,
+    IInboxWorkSource
 {
     /// <summary>The journal state machine name of the runtime's commit hook.</summary>
     internal const string StateMachineName = "orleans.durable-tasks.runtime";
@@ -108,6 +110,16 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly IDurableDictionary<MessageId, PendingInvocation> _invocations = invocations;
     private readonly IDurableTaskMessageTransport? _messageTransport = messageTransports.SingleOrDefault();
     private readonly CancellationTokenSource _deactivationCts = new();
+    // How soon a deactivated grain wakes to resume its runnable attempts, and how often the inbox's wake-up job recurs
+    // while they run; see GetWakeupDelay.
+    private static readonly TimeSpan RunnableWakeupDelay = TimeSpan.FromSeconds(1);
+
+    // The attempts which run, and those of them which are parked on a message-driven wait.
+    private int _runningAttempts;
+    private int _parkedAttempts;
+
+    // Set when a write's committed effects resume attempts, whose waits unpark in later work items; see GetWakeupDelay.
+    private int _resumed;
     private TaskId[] _committingStarts = [];
     private KeyValuePair<TaskId, DurableTaskResponse>[] _committingHandleResponses = [];
     private long[] _committingCancellationPropagations = [];
@@ -1352,6 +1364,44 @@ internal sealed partial class DurableTaskGrainRuntime(
         StartInvocation(taskId, static value => value.CreateTask(), committedRequest, executionContext);
     }
 
+    void IDurableTaskGrainRuntime.OnAttemptParked() => Interlocked.Increment(ref _parkedAttempts);
+
+    void IDurableTaskGrainRuntime.OnAttemptUnparked() => Interlocked.Decrement(ref _parkedAttempts);
+
+    /// <summary>
+    /// Reports work while the grain holds a runnable execution, so the inbox's durable wake-up reactivates the grain, and
+    /// recovery resumes the execution, after a deactivation or a crash.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An attempt is runnable unless it is parked on an event which a message delivers: a child's result, a signal, a
+    /// delay's resume, or the first of several completions. That message reactivates the grain. A journal write also
+    /// makes attempts runnable once it commits: it starts the requests it accepts, completes the handles of the results
+    /// and signals it stores, and propagates the cancellations it records. The inbox consults this source while it
+    /// prepares each write, before the runtime captures those effects, and ensures the wake-up before the write can
+    /// become durable.
+    /// </para>
+    /// <para>
+    /// A parked attempt which a committed result resumes unparks in a later work item. A consult after a write whose
+    /// effects resumed attempts therefore reports work once and clears that mark, so the wake-up recurs and consults again
+    /// after the resumed attempts have run.
+    /// </para>
+    /// <para>
+    /// The delay is short, because a deactivated grain's runnable work makes no progress until the grain wakes, and while
+    /// the grain is active a wake-up only reschedules itself. Most attempts run only briefly between parked waits, so their
+    /// wake-up job finds no work on its first run and ends.
+    /// </para>
+    /// </remarks>
+    TimeSpan? IInboxWorkSource.GetWakeupDelay() =>
+        Interlocked.Exchange(ref _resumed, 0) != 0
+        || Volatile.Read(ref _runningAttempts) > Volatile.Read(ref _parkedAttempts)
+        || !_pendingStarts.IsEmpty
+        || !_pendingHandleResponses.IsEmpty
+        || !_pendingCancellationPropagations.IsEmpty
+        || Volatile.Read(ref _recoveredStarts) is not null
+            ? RunnableWakeupDelay
+            : null;
+
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         throw new InvalidOperationException($"Journal state '{StateMachineName}' does not write journal entries.");
 
@@ -1393,6 +1443,10 @@ internal sealed partial class DurableTaskGrainRuntime(
         _committingStarts = [];
         _committingHandleResponses = [];
         _committingCancellationPropagations = [];
+        if (starts.Length > 0 || handleResponses.Length > 0 || propagations.Length > 0)
+        {
+            Volatile.Write(ref _resumed, 1);
+        }
 
         foreach (var taskId in starts)
         {
@@ -1896,6 +1950,8 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
+        // The attempt is runnable from its registration, before its body's first work item runs.
+        Interlocked.Increment(ref _runningAttempts);
         start.SetResult();
     }
 
@@ -1950,6 +2006,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
         finally
         {
+            Interlocked.Decrement(ref _runningAttempts);
             context.OnAttemptCompleted();
             if (_runningRequests.TryGetValue(context.Id, out var running)
                 && ReferenceEquals(running.Context, context))

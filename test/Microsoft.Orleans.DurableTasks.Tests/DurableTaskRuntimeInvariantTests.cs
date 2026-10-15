@@ -1499,6 +1499,52 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task WorkSourceReportsRunnableAttemptsAndNotParkedOnes() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, _, _, transport) = CreateRuntime();
+        var workSource = (IInboxWorkSource)runtime;
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var stepId = TaskId.Parse("step");
+        var delayId = TaskId.Parse("delay");
+        Assert.Null(workSource.GetWakeupDelay());
+
+        // A body which runs code is runnable, so a deactivated grain must wake to resume it.
+        await ((IDurableTaskServer)runtime).ScheduleAsync(stepId, CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            started.TrySetResult();
+            await release.Task;
+            return 1;
+        })), TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(TimeSpan.FromSeconds(1), workSource.GetWakeupDelay());
+        release.SetResult();
+        await runtime.GetScheduledTaskHandle(stepId).WaitAsync(TestContext.Current.CancellationToken).AsTask()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // The write which committed the result resumed its waiters, which run in later work items, so the next consult
+        // reports work once; consults after the attempt ended report none.
+        Assert.Equal(TimeSpan.FromSeconds(1), workSource.GetWakeupDelay());
+        await WaitForNoWorkAsync();
+
+        // A body parked on a delay waits for its resume message, which reactivates the grain.
+        await ((IDurableTaskServer)runtime).ScheduleAsync(delayId, CreateRequest(2, () => DurableTask.Delay(TimeSpan.FromDays(1))), TestContext.Current.CancellationToken);
+        await transport.ResumeSent.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        await WaitForNoWorkAsync();
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Work items queued on the activation scheduler run in order, so yielding lets the attempts park or end.
+        async Task WaitForNoWorkAsync()
+        {
+            for (var yields = 0; workSource.GetWakeupDelay() is not null; yields++)
+            {
+                Assert.True(yields < 100, "The work source kept reporting work.");
+                await Task.Yield();
+            }
+        }
+    });
+
+    [Fact]
     public Task RecoveredPendingRequestStartsOnlyOnActivation() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, _) = CreateRuntime();

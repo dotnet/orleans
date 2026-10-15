@@ -36,6 +36,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private bool _deleted;
     private bool _aborted;
 
+    // The attempt's waits for events which messages deliver. Accessed on the activation scheduler.
+    private int _parkedWaits;
+
     // The number of sends of each signal which this attempt has begun, by marker segment. Guarded by _lock.
     private Dictionary<string, int>? _signalSends;
 
@@ -181,6 +184,35 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <summary>Releases the attempt's link to activation shutdown once the attempt has ended.</summary>
     internal void OnAttemptCompleted() => _shutdownRegistration.Dispose();
+
+    /// <summary>
+    /// Runs a wait for an event which a message delivers, such as a child's result, a signal, a delay's resume, or the
+    /// first of several completions, and reports the attempt parked while any such wait is pending.
+    /// </summary>
+    /// <remarks>
+    /// The message which ends the wait reactivates the grain, so a parked attempt needs no wake-up of its own. The
+    /// journal write which commits the awaited result also stages the completion of the result's handle, which the
+    /// runtime reports as work, so a deactivation after that write still resumes the attempt.
+    /// </remarks>
+    private async ValueTask<T> ParkAsync<T>(ValueTask<T> wait)
+    {
+        if (_parkedWaits++ == 0)
+        {
+            _runtime.OnAttemptParked();
+        }
+
+        try
+        {
+            return await wait;
+        }
+        finally
+        {
+            if (--_parkedWaits == 0)
+            {
+                _runtime.OnAttemptUnparked();
+            }
+        }
+    }
 
     private void ThrowIfDeleted()
     {
@@ -342,7 +374,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfDeleted();
 
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        return await _runtime.ScheduleDelayAsync(taskId, dueTime, executionCts.Token);
+        return await ParkAsync(_runtime.ScheduleDelayAsync(taskId, dueTime, executionCts.Token));
     }
 
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
@@ -476,7 +508,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         ThrowIfDeleted();
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        var (value, recordedAt) = await _runtime.WaitForSignalAsync(Id, name, executionCts.Token);
+        var (value, recordedAt) = await ParkAsync(_runtime.WaitForSignalAsync(Id, name, executionCts.Token));
         ObserveTime(recordedAt);
         return value;
     }
@@ -557,7 +589,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfDeleted();
 
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        return await _runtime.SelectCompletionAsync(decisionId, candidates, executionCts.Token);
+        return await ParkAsync(_runtime.SelectCompletionAsync(decisionId, candidates, executionCts.Token));
     }
 
     private void ThrowIfNotChildTaskId(TaskId taskId)
@@ -685,7 +717,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
                 owner._abortSource.Token);
-            return Observe(await inner.WaitAsync(executionCts.Token));
+            return Observe(await owner.ParkAsync(inner.WaitAsync(executionCts.Token)));
         }
 
         private DurableTaskResponse Observe(DurableTaskResponse response)
