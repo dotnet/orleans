@@ -203,7 +203,7 @@ namespace UnitTests.Grains
 
         public Task QueueRequest(TimeSpan duration, bool keepAlive)
         {
-            _ = this.RunRequestAsync(static (duration, cancellationToken) => Task.Delay(duration, cancellationToken), duration, new GrainRequestOptions { KeepAlive = keepAlive });
+            _ = this.RunRequestAsync(static (duration, cancellationToken) => Task.Delay(duration, cancellationToken), duration, new LocalRequestOptions { KeepAlive = keepAlive });
             return Task.CompletedTask;
         }
     }

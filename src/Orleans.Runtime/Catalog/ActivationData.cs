@@ -30,7 +30,6 @@ internal sealed partial class ActivationData :
     IGrainContext,
     ICollectibleGrainContext,
     IActivationKeepAlive,
-    IGrainRequestRunner,
     IGrainExtensionBinder,
     IActivationWorkingSetMember,
     IGrainTimerRegistry,
@@ -572,19 +571,6 @@ internal sealed partial class ActivationData :
                 MarkActive();
             }
         }
-    }
-
-    Task<TResult> IGrainRequestRunner.RunRequestAsync<TState, TResult>(Func<TState, CancellationToken, Task> callback, TState state, in GrainRequestOptions options, CancellationToken cancellationToken)
-    {
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return Task.FromCanceled<TResult>(cancellationToken);
-        }
-
-        var request = GrainRequest<TState, TResult>.Create(callback, state, options, cancellationToken);
-        var message = _shared.InternalRuntime.MessageFactory.CreateLocalRequest(this, request, IGrainRequestInvoker.InterfaceType, options.KeepAlive, options.Interleave);
-        ReceiveMessage(message);
-        return request.Task;
     }
 
     public void ResetKeepAliveRequest()
@@ -1674,8 +1660,15 @@ internal sealed partial class ActivationData :
         }
         else // Request or OneWay
         {
-            ReceiveRequest(message);
+            ReceiveRequest(message, enforceQueueLimit: !message.IsLocalOnly);
         }
+    }
+
+    public void ReceiveLocalRequest(IInvokable request, IResponseCompletionSource? completion, LocalRequestOptions options)
+    {
+        var message = _shared.InternalRuntime.RuntimeClient.CreateLocalRequest(this, request, completion, options);
+        _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveMessage(message);
+        ReceiveRequest(message, options.EnforceQueueLimit);
     }
 
     private void ReceiveResponse(Message message)
@@ -1694,15 +1687,14 @@ internal sealed partial class ActivationData :
         _shared.InternalRuntime.RuntimeClient.ReceiveResponse(message);
     }
 
-    private void ReceiveRequest(Message message)
+    private void ReceiveRequest(Message message, bool enforceQueueLimit)
     {
         var options = _shared.MessagingOptions;
         var (hardLimit, softLimit) = IsStatelessWorker
             ? (options.MaxEnqueuedRequestsHardLimit_StatelessWorker, options.MaxEnqueuedRequestsSoftLimit_StatelessWorker)
             : (options.MaxEnqueuedRequestsHardLimit, options.MaxEnqueuedRequestsSoftLimit);
 
-        // Requests queued by RunRequestAsync honor the hard limit. Grain timer ticks are exempt.
-        var enforceHardLimit = hardLimit > 0 && (!message.IsLocalOnly || message.BodyObject is ILocalRequest);
+        var enforceHardLimit = hardLimit > 0 && enforceQueueLimit;
         int count;
         bool admitted;
         lock (_lock)
@@ -1723,7 +1715,7 @@ internal sealed partial class ActivationData :
             var overloadException = new LimitExceededException(limitName, count, hardLimit, ToString());
             if (message.IsLocalOnly)
             {
-                ((ILocalRequest)message.BodyObject!).Reject(overloadException);
+                (message.BodyObject as ILocalRequest)?.Reject(overloadException);
             }
             else
             {

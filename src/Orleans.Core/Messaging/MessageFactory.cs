@@ -58,7 +58,7 @@ namespace Orleans.Runtime
         /// <remarks>
         /// The request starts a new call chain, never expires, and completes on <paramref name="target"/> or is rejected with it.
         /// </remarks>
-        public Message CreateLocalRequest(IGrainContext target, object body, GrainInterfaceType interfaceType, bool keepAlive, bool interleave)
+        public Message CreateLocalRequest(IGrainContext target, object body, GrainInterfaceType interfaceType, LocalRequestOptions options)
         {
             var siloAddress = target.Address.SiloAddress;
             var message = CreateMessage(body, InvokeMethodOptions.OneWay, requestContextData: null);
@@ -68,8 +68,8 @@ namespace Orleans.Runtime
             message.SendingSilo = siloAddress;
             message.TargetSilo = siloAddress;
             message.InterfaceType = interfaceType;
-            message.IsKeepAlive = keepAlive;
-            message.IsAlwaysInterleave = interleave;
+            message.IsKeepAlive = options.KeepAlive;
+            message.IsAlwaysInterleave = options.Interleave;
             message.IsLocalOnly = true;
             return message;
         }

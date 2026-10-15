@@ -74,9 +74,10 @@ Use <xref:System.Threading.Tasks.Task.Run*> only to isolate unavoidable synchron
 The request:
 
 - Follows the grain's reentrancy rules and queues behind the current request on a non-reentrant grain.
-- Passes through incoming grain call filters. By default, filters see it as `IGrainRequestInvoker.RunRequestAsync` with no arguments.
+- Passes through incoming grain call filters, which see it as a method of `IGrainRequestInvoker` with no arguments.
 - Starts a new call chain. <xref:Orleans.Runtime.RequestContext> values from the calling thread don't flow into the callback.
 - Restarts the activation's idle collection period.
+- Is admitted regardless of <xref:Orleans.Configuration.SiloMessagingOptions.MaxEnqueuedRequestsHardLimit>, like a grain timer tick.
 
 The returned task completes with the callback's result or exception. The callback receives the cancellation token passed to `RunRequestAsync`, and cancelling it while the request is queued cancels the request. If the activation deactivates before the request runs, the task faults with <xref:Orleans.Runtime.OrleansMessageRejectionException>.
 
@@ -84,15 +85,22 @@ Pass the grain and other values through the `state` argument and use a `static` 
 
 ### Configure the request
 
-Pass <xref:Orleans.Runtime.GrainRequestOptions> to change how the request is scheduled. Set <xref:Orleans.Runtime.GrainRequestOptions.KeepAlive> to `false` for frequent background work that shouldn't keep an otherwise idle activation in memory. Set <xref:Orleans.Runtime.GrainRequestOptions.Interleave> to `true` to run the request between the turns of other requests, as with an `[AlwaysInterleave]` method:
+Pass <xref:Orleans.Runtime.LocalRequestOptions> to change how the request is scheduled. Set <xref:Orleans.Runtime.LocalRequestOptions.KeepAlive> to `false` for frequent background work that shouldn't keep an otherwise idle activation in memory. Set <xref:Orleans.Runtime.LocalRequestOptions.Interleave> to `true` to run the request between the turns of other requests, as with an `[AlwaysInterleave]` method:
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_options":::
-### Describe the request to call filters
+Set <xref:Orleans.Runtime.LocalRequestOptions.EnforceQueueLimit> to `true` to apply backpressure to a producer. The request then counts against <xref:Orleans.Configuration.SiloMessagingOptions.MaxEnqueuedRequestsHardLimit>, and the returned task faults with <xref:Orleans.Runtime.LimitExceededException> when the activation's queue is full:
 
-Set <xref:Orleans.Runtime.GrainRequestOptions.InterfaceName>, <xref:Orleans.Runtime.GrainRequestOptions.MethodName>, and <xref:Orleans.Runtime.GrainRequestOptions.Arguments> to identify the work in call filters, logs, and traces. Tracing names the request's activity `InterfaceName/MethodName`. The callback returns a result through the returned task:
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_queue_limit":::
+### Name the request
+
+Call filters, logs, and traces observe the request as `IGrainRequestInvoker.{methodName}`, and tracing names its activity `IGrainRequestInvoker/{methodName}`. When the callback is a method group, such as `this.RunRequestAsync(RefreshAsync)`, the method's name is used. Otherwise, the request is named `RunRequestAsync`. Pass `methodName` to choose the name:
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_named":::
-Call filters read the description through the call context:
+Call filters read the name through the call context:
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_filter":::
-The arguments describe the request to filters; the callback receives its `state`. A filter that calls `SetArgument` writes into the array assigned to `Arguments`.
+### Deliver a custom request
+
+<xref:Orleans.Runtime.IGrainContext.ReceiveLocalRequest*> delivers any <xref:Orleans.Serialization.Invocation.IInvokable> to the activation with the same scheduling as `RunRequestAsync`. Call filters observe the request's own interface and method names. The activation completes the supplied <xref:Orleans.Serialization.Invocation.IResponseCompletionSource> with the request's response, or with an exception if the activation rejects the request:
+
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="receive_local_request":::

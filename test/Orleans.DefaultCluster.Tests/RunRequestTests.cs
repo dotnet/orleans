@@ -9,7 +9,7 @@ using Xunit;
 namespace DefaultCluster.Tests.General;
 
 /// <summary>
-/// Tests for <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>,
+/// Tests for <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken, string?)"/>,
 /// which runs a delegate as a request on the grain's activation.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Scheduler")]
@@ -139,8 +139,29 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
         await grain.StartNamedRequest(42);
 
         Assert.Equal("order-42", await grain.AwaitPendingRequest());
-        Assert.Contains($"{RunRequestGrainBase.NamedRequestInterfaceName}.ProcessOrder", await grain.GetFilteredCalls());
-        Assert.Equal(["argument:42"], await grain.GetLog());
+        Assert.Contains("IGrainRequestInvoker.ProcessOrder", await grain.GetFilteredCalls());
+    }
+
+    [Fact]
+    public async Task MethodGroupRequest_IsNamedAfterMethod()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartMethodGroupRequest();
+
+        Assert.Equal("processed", await grain.AwaitPendingRequest());
+        Assert.Contains("IGrainRequestInvoker.ProcessOrders", await grain.GetFilteredCalls());
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_CustomInvokable_CompletesSeparateCompletionSource()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartCustomInvokableRequest("custom");
+
+        Assert.Equal("custom:True", await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+        Assert.Contains("ICustomRequests.Apply", await grain.GetFilteredCalls());
     }
 
     [Fact]
@@ -234,8 +255,8 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
 }
 
 /// <summary>
-/// Tests that requests queued by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>
-/// honor <see cref="SiloMessagingOptions.MaxEnqueuedRequestsHardLimit"/>.
+/// Tests how requests queued by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken, string?)"/>
+/// interact with <see cref="SiloMessagingOptions.MaxEnqueuedRequestsHardLimit"/>.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Scheduler")]
 [TestSuite("BVT")]
@@ -252,7 +273,7 @@ public class RunRequestQueueLimitTests : TestClusterPerTest
     }
 
     [Fact]
-    public async Task RunRequest_BeyondHardLimit_FaultsWithLimitExceeded()
+    public async Task RunRequest_EnforcingQueueLimit_BeyondHardLimit_FaultsWithLimitExceeded()
     {
         var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
 
@@ -262,6 +283,18 @@ public class RunRequestQueueLimitTests : TestClusterPerTest
 
         Assert.Equal(["queued", "queued", "queued", nameof(LimitExceededException), nameof(LimitExceededException)], outcomes);
         Assert.Equal(["request-0", "request-1", "request-2"], await grain.GetLog());
+    }
+
+    [Fact]
+    public async Task RunRequest_ByDefault_IgnoresHardLimit()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        var admitted = await grain.QueueUnlimitedRequests(HardLimit * 4);
+        await grain.AwaitPendingRequest().WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+
+        Assert.Equal(HardLimit * 4, admitted);
+        Assert.Equal(HardLimit * 4, (await grain.GetLog()).Count);
     }
 
     [Fact]

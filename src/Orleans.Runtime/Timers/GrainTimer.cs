@@ -11,15 +11,13 @@ namespace Orleans.Runtime;
 
 internal abstract partial class GrainTimer : IGrainTimer
 {
-    protected static readonly GrainInterfaceType InvokableInterfaceType = GrainInterfaceType.Create("Orleans.Runtime.IGrainTimerInvoker");
     protected static readonly TimerCallback TimerCallback = (state) => ((GrainTimer)state!).ScheduleTickOnActivation();
     protected static readonly MethodInfo InvokableMethodInfo = typeof(IGrainTimerInvoker).GetMethod(nameof(IGrainTimerInvoker.InvokeCallbackAsync), BindingFlags.Instance | BindingFlags.Public)!;
     private readonly CancellationTokenSource _cts = new();
     private readonly ITimer _timer;
     private readonly IGrainContext _grainContext;
     private readonly TimerRegistry _shared;
-    private readonly bool _interleave;
-    private readonly bool _keepAlive;
+    private readonly LocalRequestOptions _options;
     private readonly TimerTickInvoker _invoker;
     private TimerState _state;
     // The current arm while idle; the next delay once a tick is queued. Change replaces it.
@@ -38,8 +36,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         ArgumentNullException.ThrowIfNull(shared);
         ArgumentNullException.ThrowIfNull(grainContext);
 
-        _interleave = interleave;
-        _keepAlive = keepAlive;
+        _options = new() { Interleave = interleave, KeepAlive = keepAlive };
         _shared = shared;
         _grainContext = grainContext;
         _dueTime = Timeout.InfiniteTimeSpan;
@@ -106,8 +103,7 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         try
         {
-            var msg = _shared.MessageFactory.CreateLocalRequest(_grainContext, _invoker, InvokableInterfaceType, _keepAlive, _interleave);
-            _grainContext.ReceiveMessage(msg);
+            _grainContext.ReceiveLocalRequest(_invoker, completion: null, _options);
         }
         catch (Exception exception)
         {

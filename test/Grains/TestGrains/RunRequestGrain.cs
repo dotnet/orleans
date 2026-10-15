@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using Orleans.Concurrency;
+using Orleans.Serialization.Invocation;
 using UnitTests.GrainInterfaces;
 
 namespace UnitTests.Grains;
@@ -13,7 +15,6 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
     private Task _pending = Task.CompletedTask;
     private RequestFilterMode _requestFilterMode;
 
-    public const string NamedRequestInterfaceName = "IOrderProcessor";
 
     public async Task Invoke(IIncomingGrainCallContext context)
     {
@@ -31,11 +32,6 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
                     context.Result = "filtered";
                     return;
             }
-        }
-
-        else if (context.InterfaceName == NamedRequestInterfaceName)
-        {
-            _log.Add($"argument:{context.Request.GetArgument(0)}");
         }
 
         await context.Invoke();
@@ -67,7 +63,7 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         {
             _log.Add("request");
             return Task.CompletedTask;
-        }, new GrainRequestOptions { Interleave = true });
+        }, new LocalRequestOptions { Interleave = true });
 
         await Task.Delay(200);
         _log.Add("call-end");
@@ -78,7 +74,35 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         _pending = this.RunRequestAsync(
             static (orderId, _) => Task.FromResult<string?>($"order-{orderId}"),
             orderId,
-            new GrainRequestOptions { InterfaceName = NamedRequestInterfaceName, MethodName = "ProcessOrder", Arguments = [orderId] });
+            methodName: "ProcessOrder");
+        return Task.CompletedTask;
+    }
+
+    public Task StartMethodGroupRequest()
+    {
+        _pending = this.RunRequestAsync(ProcessOrders);
+        return Task.CompletedTask;
+    }
+
+    private Task<string?> ProcessOrders(CancellationToken cancellationToken) => Task.FromResult<string?>("processed");
+
+    public Task<int> QueueUnlimitedRequests(int count)
+    {
+        var admitted = new List<Task>(count);
+        for (var i = 0; i < count; i++)
+        {
+            admitted.Add(QueueLoggedRequest($"request-{i}", default));
+        }
+
+        _pending = Task.WhenAll(admitted);
+        return Task.FromResult(admitted.Count(request => !request.IsFaulted));
+    }
+
+    public Task StartCustomInvokableRequest(string value)
+    {
+        var completion = new ResponseCompletionSource<string?>();
+        ((IGrainBase)this).GrainContext.ReceiveLocalRequest(new CustomRequest(value), completion, default);
+        _pending = completion.AsValueTask().AsTask();
         return Task.CompletedTask;
     }
 
@@ -119,7 +143,7 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         var admitted = new List<Task>(count);
         for (var i = 0; i < count; i++)
         {
-            var request = QueueLoggedRequest($"request-{i}");
+            var request = QueueLoggedRequest($"request-{i}", EnforceQueueLimit);
             if (request.IsFaulted)
             {
                 outcomes.Add(request.Exception!.InnerException!.GetType().Name);
@@ -143,7 +167,7 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
             () =>
             {
                 barrier.SignalAndWait();
-                return QueueLoggedRequest($"request-{i}");
+                return QueueLoggedRequest($"request-{i}", EnforceQueueLimit);
             },
             CancellationToken.None,
             TaskCreationOptions.LongRunning,
@@ -159,12 +183,14 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         return admitted.Count;
     }
 
-    private Task QueueLoggedRequest(string entry) =>
+    private static readonly LocalRequestOptions EnforceQueueLimit = new() { EnforceQueueLimit = true };
+
+    private Task QueueLoggedRequest(string entry, LocalRequestOptions options) =>
         this.RunRequestAsync(static (state, _) =>
         {
             state.Grain._log.Add(state.Entry);
             return Task.CompletedTask;
-        }, (Grain: this, Entry: entry));
+        }, (Grain: this, Entry: entry), options);
 
     public Task StartRequestContextRequest(string value)
     {
@@ -236,6 +262,34 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
                 return Task.FromResult<string?>("ran");
             },
             RetainedInstances[key]);
+}
+
+/// <summary>
+/// A hand-written request delivered through <see cref="IGrainContext.ReceiveLocalRequest"/>.
+/// </summary>
+internal sealed class CustomRequest(string value) : Request<string?>
+{
+    public const string InterfaceName = "ICustomRequests";
+    public const string MethodName = "Apply";
+    private RunRequestGrainBase? _grain;
+
+    public override object GetTarget() => _grain!;
+
+    public override void SetTarget(ITargetHolder holder) => _grain = (RunRequestGrainBase?)holder.GetTarget();
+
+    protected override ValueTask<string?> InvokeInner() => new($"{value}:{_grain is not null}");
+
+    public override void Dispose() { }
+
+    public override string GetMethodName() => MethodName;
+
+    public override string GetInterfaceName() => InterfaceName;
+
+    public override string GetActivityName() => $"{InterfaceName}/{MethodName}";
+
+    public override Type GetInterfaceType() => typeof(IRunRequestGrain);
+
+    public override MethodInfo GetMethod() => typeof(IRunRequestGrain).GetMethod(nameof(IRunRequestGrain.Ping))!;
 }
 
 public sealed class NonReentrantRunRequestGrain : RunRequestGrainBase, INonReentrantRunRequestGrain

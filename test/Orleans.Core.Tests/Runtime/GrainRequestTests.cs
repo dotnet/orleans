@@ -5,7 +5,7 @@ using Xunit;
 namespace NonSilo.Tests.Runtime;
 
 /// <summary>
-/// Tests for the request which <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/> queues.
+/// Tests for the request which <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken, string?)"/> queues.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Scheduler")]
 public class GrainRequestTests
@@ -23,6 +23,7 @@ public class GrainRequestTests
                 callbackRan = true;
                 return Task.CompletedTask;
             },
+            null,
             null,
             cancellation.Token);
 
@@ -50,7 +51,7 @@ public class GrainRequestTests
     public async Task Complete_CallbackFailure_IsReportedByRequest()
     {
         var exception = new InvalidOperationException("Request failed.");
-        var request = new GrainRequest<object?, object?>((_, _) => Task.FromException(exception), null, default);
+        var request = new GrainRequest<object?, object?>((_, _) => Task.FromException(exception), null, null, default);
 
         var response = await request.Invoke();
 
@@ -61,7 +62,7 @@ public class GrainRequestTests
     [Fact]
     public async Task Complete_FilterFailureAfterCallback_IsNotReportedByRequest()
     {
-        var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("result"), null, default);
+        var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("result"), null, null, default);
 
         await request.Invoke();
 
@@ -80,6 +81,7 @@ public class GrainRequestTests
                 return Task.CompletedTask;
             },
             null,
+            null,
             default);
 
         Assert.True(((ILocalRequest)request).Complete(Response.FromException(new InvalidOperationException("Filter failed."))));
@@ -95,7 +97,7 @@ public class GrainRequestTests
         for (var i = 0; i < 2_000; i++)
         {
             using var cancellation = new CancellationTokenSource();
-            var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, cancellation.Token);
+            var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, null, cancellation.Token);
             using var start = new Barrier(2);
             var cancel = Task.Run(() =>
             {
@@ -124,6 +126,7 @@ public class GrainRequestTests
                 return Task.CompletedTask;
             },
             null,
+            null,
             cancellation.Token);
         var exception = new OrleansMessageRejectionException("Rejected.");
 
@@ -136,43 +139,22 @@ public class GrainRequestTests
     }
 
     [Fact]
-    public void Create_WithoutNames_DescribesRequestAsGrainRequestInvoker()
+    public void Describe_WithoutMethodName_DescribesRequestAsGrainRequestInvoker()
     {
-        var request = GrainRequest<object?, object?>.Create((_, _) => Task.CompletedTask, null, new GrainRequestOptions { KeepAlive = false, Interleave = true }, TestContext.Current.CancellationToken);
+        var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, null, TestContext.Current.CancellationToken);
 
-        Assert.IsNotType<NamedGrainRequest<object?, object?>>(request);
         Assert.Equal("IGrainRequestInvoker", request.GetInterfaceName());
         Assert.Equal("RunRequestAsync", request.GetMethodName());
         Assert.Equal("IGrainRequestInvoker/RunRequestAsync", request.GetActivityName());
+        Assert.Equal(typeof(IGrainRequestInvoker), request.GetInterfaceType());
         Assert.Equal(0, request.GetArgumentCount());
         Assert.Throws<ArgumentOutOfRangeException>(() => request.GetArgument(0));
     }
 
     [Fact]
-    public void Create_WithNamesAndArguments_DescribesRequestWithThem()
+    public void Describe_WithMethodName_UsesMethodName()
     {
-        var arguments = new object?[] { 1, "two" };
-        var request = GrainRequest<object?, object?>.Create(
-            (_, _) => Task.CompletedTask,
-            null,
-            new GrainRequestOptions { InterfaceName = "IOrderProcessor", MethodName = "ProcessOrder", Arguments = arguments },
-            TestContext.Current.CancellationToken);
-
-        Assert.Equal("IOrderProcessor", request.GetInterfaceName());
-        Assert.Equal("ProcessOrder", request.GetMethodName());
-        Assert.Equal("IOrderProcessor/ProcessOrder", request.GetActivityName());
-        Assert.Equal(2, request.GetArgumentCount());
-        Assert.Equal(1, request.GetArgument(0));
-        Assert.Equal("two", request.GetArgument(1));
-
-        request.SetArgument(1, "three");
-        Assert.Equal("three", arguments[1]);
-    }
-
-    [Fact]
-    public void Create_WithMethodNameOnly_FallsBackToDefaultInterfaceName()
-    {
-        var request = GrainRequest<object?, object?>.Create((_, _) => Task.CompletedTask, null, new GrainRequestOptions { MethodName = "Drain" }, TestContext.Current.CancellationToken);
+        var request = new GrainRequest<object?, object?>((_, _) => Task.CompletedTask, null, "Drain", TestContext.Current.CancellationToken);
 
         Assert.Equal("IGrainRequestInvoker", request.GetInterfaceName());
         Assert.Equal("Drain", request.GetMethodName());
@@ -181,11 +163,22 @@ public class GrainRequestTests
     }
 
     [Fact]
-    public void GrainRequestOptions_Default_KeepsActivationAlive()
+    public async Task CompletionSource_Complete_CompletesTask()
     {
-        Assert.True(default(GrainRequestOptions).KeepAlive);
-        Assert.True(new GrainRequestOptions().KeepAlive);
-        Assert.False(new GrainRequestOptions { KeepAlive = false }.KeepAlive);
-        Assert.False(default(GrainRequestOptions).Interleave);
+        var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("unused"), null, null, TestContext.Current.CancellationToken);
+
+        ((IResponseCompletionSource)request).Complete(Response.FromResult("filtered"));
+
+        Assert.Equal("filtered", await request.Task.WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public void LocalRequestOptions_Default_KeepsActivationAliveWithoutInterleavingOrQueueLimit()
+    {
+        Assert.True(default(LocalRequestOptions).KeepAlive);
+        Assert.True(new LocalRequestOptions().KeepAlive);
+        Assert.False(new LocalRequestOptions { KeepAlive = false }.KeepAlive);
+        Assert.False(default(LocalRequestOptions).Interleave);
+        Assert.False(default(LocalRequestOptions).EnforceQueueLimit);
     }
 }

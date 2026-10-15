@@ -10,6 +10,12 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task StartNamedRequest(int orderId);
 
+    Task StartMethodGroupRequest();
+
+    Task StartCustomInvokableRequest(string value);
+
+    Task<int> QueueUnlimitedRequests(int count);
+
     Task StartBlockingRequest();
 
     [AlwaysInterleave]

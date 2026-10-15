@@ -70,9 +70,6 @@ interface [GrainInterfaceType("Orleans.Runtime.ICatalog")] Orleans.Runtime.ICata
 interface [GrainInterfaceType("Orleans.Runtime.IGrainCallCancellationManagerSystemTarget")] Orleans.Runtime.IGrainCallCancellationManagerSystemTarget [Version(0)]
   AF79F3FA: CancelCallsAsync(System.Collections.Generic.List<Orleans.Runtime.GrainCallCancellationRequest>, System.Threading.CancellationToken) -> ValueTask
 
-interface [GrainInterfaceType("Orleans.Runtime.IGrainRequestInvoker")] Orleans.Runtime.IGrainRequestInvoker [Version(0)]
-  6D1E58B4: RunRequestAsync(System.Threading.CancellationToken) -> Task
-
 interface [GrainInterfaceType("Orleans.Runtime.IGrainTimerInvoker")] Orleans.Runtime.IGrainTimerInvoker [Version(0)]
   3F6C2672: InvokeCallbackAsync(System.Threading.CancellationToken) -> Task
 

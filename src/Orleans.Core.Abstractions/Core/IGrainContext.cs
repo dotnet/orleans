@@ -70,6 +70,33 @@ namespace Orleans.Runtime
         void ReceiveMessage(object message);
 
         /// <summary>
+        /// Queues <paramref name="request"/> as a one-way request on this instance.
+        /// </summary>
+        /// <param name="request">
+        /// The request to invoke. Its <see cref="IInvokable.GetInterfaceType"/> method must return an interface type.
+        /// </param>
+        /// <param name="completion">
+        /// The completion source which receives the request's response, or <see langword="null"/> if no caller observes the response.
+        /// </param>
+        /// <param name="options">The options for the request.</param>
+        /// <remarks>
+        /// <para>
+        /// The request is scheduled with the instance's other requests and passes through grain call filters, which observe
+        /// <paramref name="request"/>. It starts a new call chain and never leaves this instance.
+        /// </para>
+        /// <para>
+        /// <paramref name="completion"/> receives the response after the request and its call filters complete.
+        /// If this instance deactivates before the request starts, <paramref name="completion"/> receives an
+        /// <see cref="OrleansMessageRejectionException"/>. If <see cref="LocalRequestOptions.EnforceQueueLimit"/> is set and the
+        /// instance's queue exceeds the configured maximum number of enqueued requests, <paramref name="completion"/> receives a
+        /// <see cref="LimitExceededException"/>.
+        /// </para>
+        /// </remarks>
+        /// <exception cref="NotSupportedException">This instance does not support local requests.</exception>
+        void ReceiveLocalRequest(IInvokable request, IResponseCompletionSource? completion, LocalRequestOptions options)
+            => throw new NotSupportedException($"{GetType()} does not support local requests.");
+
+        /// <summary>
         /// Start activating this instance.
         /// </summary>
         /// <param name="requestContext">The request context of the request which is causing this instance to be activated, if any.</param>

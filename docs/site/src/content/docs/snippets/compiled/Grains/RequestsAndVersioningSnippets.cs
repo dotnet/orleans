@@ -311,7 +311,7 @@ private Task OnHeartbeat(DateTimeOffset timestamp, CancellationToken cancellatio
             return Task.CompletedTask;
         },
         (Grain: this, Timestamp: timestamp),
-        new GrainRequestOptions { KeepAlive = false, Interleave = true },
+        new LocalRequestOptions { KeepAlive = false, Interleave = true },
         cancellationToken);
         // </run_request_options>
     }
@@ -341,18 +341,13 @@ private Task OnHeartbeat(DateTimeOffset timestamp, CancellationToken cancellatio
         }
 
         // <run_request_named>
-// Call filters and tracing observe this request as IOrderFeed.ApplyOrders with one argument.
+// Call filters and tracing observe this request as IGrainRequestInvoker.ApplyOrders.
 internal Task<int> ApplyOrders(IReadOnlyList<Order> orders, CancellationToken cancellationToken) =>
     this.RunRequestAsync(
         static (state, _) => Task.FromResult(state.Grain.Apply(state.Orders)),
         (Grain: this, Orders: orders),
-        new GrainRequestOptions
-        {
-            InterfaceName = "IOrderFeed",
-            MethodName = "ApplyOrders",
-            Arguments = [orders.Count],
-        },
-        cancellationToken);
+        cancellationToken,
+        methodName: nameof(ApplyOrders));
         // </run_request_named>
     }
 
@@ -362,13 +357,82 @@ public sealed class RequestLoggingFilter(ILogger<RequestLoggingFilter> logger) :
     public async Task Invoke(IIncomingGrainCallContext context)
     {
         logger.LogInformation(
-            "Running {InterfaceName}.{MethodName} with {ArgumentCount} arguments",
+            "Running {InterfaceName}.{MethodName}",
             context.InterfaceName,
-            context.MethodName,
-            context.Request.GetArgumentCount());
+            context.MethodName);
 
         await context.Invoke();
     }
 }
     // </run_request_filter>
+
+    public interface IIngestGrain : IGrainWithStringKey
+    {
+        ValueTask<int> GetCount();
+    }
+
+    public sealed class IngestGrain : Grain, IIngestGrain
+    {
+        private int _count;
+
+        public ValueTask<int> GetCount() => ValueTask.FromResult(_count);
+
+        // <run_request_queue_limit>
+// Applies backpressure to the producer: the request faults with LimitExceededException
+// when the activation's queue exceeds SiloMessagingOptions.MaxEnqueuedRequestsHardLimit.
+internal Task Ingest(int items, CancellationToken cancellationToken) =>
+    this.RunRequestAsync(
+        static (state, _) =>
+        {
+            state.Grain._count += state.Items;
+            return Task.CompletedTask;
+        },
+        (Grain: this, Items: items),
+        new LocalRequestOptions { EnforceQueueLimit = true },
+        cancellationToken);
+        // </run_request_queue_limit>
+
+        internal void Increment() => _count++;
+    }
+
+    // <receive_local_request>
+// A request which increments IngestGrain's counter. Call filters observe it as IIngestRequests.Increment.
+internal sealed class IncrementRequest : Request
+{
+    private IngestGrain? _grain;
+
+    public override object GetTarget() => _grain!;
+
+    public override void SetTarget(ITargetHolder holder) => _grain = (IngestGrain?)holder.GetTarget();
+
+    protected override ValueTask InvokeInner()
+    {
+        _grain!.Increment();
+        return default;
+    }
+
+    public override string GetInterfaceName() => "IIngestRequests";
+
+    public override string GetMethodName() => "Increment";
+
+    public override string GetActivityName() => "IIngestRequests/Increment";
+
+    public override Type GetInterfaceType() => typeof(IIngestGrain);
+
+    public override System.Reflection.MethodInfo GetMethod() => typeof(IIngestGrain).GetMethod(nameof(IIngestGrain.GetCount))!;
+
+    public override void Dispose() { }
+}
+
+public static class IngestRequests
+{
+    // Delivers the request to the activation and completes the returned task with its response.
+    public static ValueTask Increment(IGrainContext activation)
+    {
+        var completion = new ResponseCompletionSource<object?>();
+        activation.ReceiveLocalRequest(new IncrementRequest(), completion, default);
+        return completion.AsVoidValueTask();
+    }
+}
+    // </receive_local_request>
 }

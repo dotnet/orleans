@@ -1119,21 +1119,21 @@ namespace Orleans
 
         public static Runtime.IGrainTimer RegisterGrainTimer<TState>(this IGrainBase grain, System.Func<TState, System.Threading.Tasks.Task> callback, TState state, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, Runtime.GrainRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, Runtime.GrainRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
 
-        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task RunRequestAsync<TState>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task> callback, TState state, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
 
-        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, Runtime.GrainRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
 
-        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
 
-        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, Runtime.GrainRequestOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, Runtime.LocalRequestOptions options, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
 
-        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static System.Threading.Tasks.Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<TResult>> callback, TState state, System.Threading.CancellationToken cancellationToken = default, string? methodName = null) { throw null; }
     }
 
     public delegate System.Threading.Tasks.Task GrainCallFilterDelegate(IGrainCallContext context);
@@ -2361,21 +2361,6 @@ namespace Orleans.Runtime
         public System.IServiceProvider ServiceProvider { get { throw null; } }
     }
 
-    public readonly partial struct GrainRequestOptions
-    {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public object?[]? Arguments { get { throw null; } init { } }
-
-        public string? InterfaceName { get { throw null; } init { } }
-
-        public bool Interleave { get { throw null; } init { } }
-
-        public bool KeepAlive { get { throw null; } init { } }
-
-        public string? MethodName { get { throw null; } init { } }
-    }
-
     public readonly partial struct GrainTimerCreationOptions : System.IEquatable<GrainTimerCreationOptions>
     {
         private readonly int _dummyPrimitive;
@@ -2642,6 +2627,7 @@ namespace Orleans.Runtime
         void Activate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken = default);
         void Deactivate(DeactivationReason deactivationReason, System.Threading.CancellationToken cancellationToken = default);
         void Migrate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken = default);
+        void ReceiveLocalRequest(Orleans.Serialization.Invocation.IInvokable request, Orleans.Serialization.Invocation.IResponseCompletionSource? completion, LocalRequestOptions options);
         void ReceiveMessage(object message);
         void Rehydrate(IRehydrationContext context);
         void SetComponent<TComponent>(TComponent? value)
@@ -2819,6 +2805,16 @@ namespace Orleans.Runtime
         public LimitExceededException(string limitName, int current, int threshold, object extraInfo) { }
 
         public LimitExceededException(string message) { }
+    }
+
+    public readonly partial struct LocalRequestOptions
+    {
+        private readonly int _dummyPrimitive;
+        public bool EnforceQueueLimit { get { throw null; } init { } }
+
+        public bool Interleave { get { throw null; } init { } }
+
+        public bool KeepAlive { get { throw null; } init { } }
     }
 
     public static partial class LogFormatter
