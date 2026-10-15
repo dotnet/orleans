@@ -26,6 +26,10 @@ on this abstractions assembly.
   segments or otherwise begin in deterministic order. A segment which `WithId` repeats in one run
   identifies its later occurrences by their order, `line`, `line$2`, and so on, so children named in
   a loop keep their IDs on replay. Generated segments contain `$`, which explicit names don't.
+- A `TaskId` formats and parses as its escaped hierarchical path, such as `order-42/charge`, where `\`
+  escapes `/` and `\` within a segment. System.Text.Json serializes it as that string, as a value or a
+  dictionary key, through `TaskIdJsonConverter`, so JSON payloads and source-generated contexts carry
+  task IDs without registration.
 - Scheduling the same definition under an existing ID reattaches to the response recorded
   for that ID. Hosts preserve the first definition associated with an ID.
 - A host can supply an execution-abort token when constructing `DurableTaskContext`.
