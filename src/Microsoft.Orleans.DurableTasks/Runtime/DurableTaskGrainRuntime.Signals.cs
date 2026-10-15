@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.DurableTasks.Diagnostics;
 using Orleans.DurableTasks.Protocol;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -63,6 +64,7 @@ internal sealed partial class DurableTaskGrainRuntime
                 waiters.Add(waiter);
             }
 
+            DurableTaskEvents.EmitSignalWaitStarted(GrainContext, recordId);
             try
             {
                 await waiter.Task.WaitAsync(cancellationToken);
@@ -76,6 +78,8 @@ internal sealed partial class DurableTaskGrainRuntime
                         _signalWaits.Remove(recordId);
                     }
                 }
+
+                DurableTaskEvents.EmitSignalWaitEnded(GrainContext, recordId);
             }
         }
     }
@@ -162,9 +166,9 @@ internal sealed partial class DurableTaskGrainRuntime
             MessageTransport.SendSignal(GrainId, target, taskId, name, value, payloadFingerprint);
         }
 
-        var marker = _storage.GetOrCreateTask(markerId, request: null);
+        var marker = GetOrCreateTask(markerId, request: null);
         _storage.SetRequestFingerprint(markerId, marker, markerFingerprint);
-        _storage.SetResponse(
+        SetResponse(
             markerId,
             marker,
             result == DurableSignalResult.Accepted ? DurableTaskResponse.Completed : DurableTaskResponse.FromResult(result));
@@ -294,9 +298,9 @@ internal sealed partial class DurableTaskGrainRuntime
             }
         }
 
-        record = _storage.GetOrCreateTask(recordId, request: null);
+        record = GetOrCreateTask(recordId, request: null);
         _storage.SetRequestFingerprint(recordId, record, payloadFingerprint);
-        _storage.SetResponse(recordId, record, value);
+        SetResponse(recordId, record, value);
         _pendingHandleResponses[recordId] = value;
         if (precedesInvocation)
         {

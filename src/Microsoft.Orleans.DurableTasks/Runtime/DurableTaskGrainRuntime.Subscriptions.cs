@@ -127,7 +127,7 @@ internal sealed partial class DurableTaskGrainRuntime
     /// </summary>
     private IScheduledTaskHandle StageSubscriptionRecord(TaskId taskId, string fingerprint, bool shielded, DurableTaskResponse? response)
     {
-        var state = _storage.GetOrCreateTask(taskId, request: null);
+        var state = GetOrCreateTask(taskId, request: null);
         _storage.SetRequestFingerprint(taskId, state, fingerprint);
         MarkShielded(taskId, state, shielded);
         var handle = GetOrCreateRunningTaskHandle(taskId);
