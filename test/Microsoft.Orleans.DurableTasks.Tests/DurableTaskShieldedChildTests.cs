@@ -59,6 +59,85 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.False(storage.Get(rootId.Child("release").Child("inner")).Shielded);
     });
 
+    [Theory]
+    [InlineData("signal")]
+    [InlineData("named-signal")]
+    [InlineData("try-wait")]
+    [InlineData("race")]
+    [InlineData("when-any")]
+    [InlineData("wait-async")]
+    public Task ShieldedWaitReceivesTheSignalAfterTheExecutionsCancellation(string wait) => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var tasks = (IDurableTaskManager)runtime;
+        var rootId = TaskId.CreateRoot("order");
+        var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        runtime.ScheduleFromInbox(rootId, CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            var deadline = DurableTask.Current.UtcNow.AddDays(1);
+            waiting.TrySetResult();
+            var value = wait switch
+            {
+                "signal" => await ShippedSignal.WaitAsync().Shielded(),
+                "named-signal" => await ShippedSignal.WaitAsync().WithId("wait").Shielded(),
+                "try-wait" => (await ShippedSignal.TryWaitAsync(deadline).Shielded()).Value,
+                "race" => (await DurableTask.Race<string>([ShippedSignal.WaitAsync(), Never()]).Shielded()).Result,
+                "when-any" => (await DurableTask.WhenAny<string>([ShippedSignal.WaitAsync(), Never()]).Shielded()).Result,
+                "wait-async" => await ShippedSignal.WaitAsync().WaitAsync(TimeSpan.FromDays(1)).Shielded(),
+                _ => throw new ArgumentOutOfRangeException(nameof(wait)),
+            };
+            return $"{value}|{DurableTask.Current.IsCancellationRequested}";
+        })));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await waiting.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+        // The cancellation commits while the execution waits, and the signal which arrives later completes the wait.
+        await tasks.CancelAsync(rootId, "buyer", TestContext.Current.CancellationToken);
+        await tasks.SignalAsync(rootId, ShippedSignal, "parcel", TestContext.Current.CancellationToken);
+
+        Assert.Equal("parcel|True", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+        Assert.Equal("buyer", storage.Get(rootId).CancellationReason);
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+        static async DurableTask<string> Never()
+        {
+            await DurableTask.Delay(TimeSpan.FromDays(2));
+            return "never";
+        }
+    });
+
+    [Fact]
+    public Task ShieldedDelayAndDetachedSubscriptionCompleteAfterTheExecutionsCancellation() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, transport) = CreateRuntime();
+        var rootId = TaskId.CreateRoot("order");
+        var detachedRequest = CreateRemoteRequest(1);
+        var target = detachedRequest.Context!.TargetId;
+        var recordId = rootId.Child($"$detach:{target}:shipment");
+        var delaying = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        runtime.ScheduleFromInbox(rootId, CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            var shipment = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("shipment").Shielded().Post();
+            delaying.TrySetResult();
+            await DurableTask.Delay(TimeSpan.FromMinutes(1)).Shielded();
+            return $"{(await shipment.GetResponseAsync(CancellationToken.None)).Status}|{DurableTask.Current.IsCancellationRequested}";
+        })));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await delaying.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await transport.ResumeSent.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+
+        // The cancellation reaches neither the delay nor the detached task's record, which completes with its result.
+        await ((IDurableTaskManager)runtime).CancelAsync(rootId, "buyer", TestContext.Current.CancellationToken);
+        Assert.Null(storage.Get(recordId).Result);
+        Assert.Empty(transport.Cancellations);
+        runtime.AcceptResponseFromInbox(recordId, TaskId.CreateRoot("shipment"), DurableTaskResponse.FromResult(1), target);
+        var resume = Assert.Single(transport.Resumes);
+        await HandleAsync(CreateHandler(runtime), ResumeContext(runtime, resume.TaskId, resume.Generation, resume.DueTime));
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal($"{DurableTaskStatus.CompletedSuccessfully}|True", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+    });
+
     [Fact]
     public Task CancellationDoesNotReachShieldedRemoteChildren() => ActivationScheduler.RunAsync(async () =>
     {
