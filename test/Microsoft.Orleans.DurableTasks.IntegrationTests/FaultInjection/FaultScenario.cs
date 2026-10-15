@@ -92,7 +92,13 @@ internal static class FaultScenario
         }
         catch (TimeoutException exception)
         {
-            violations.Add($"stalled: {exception.Message}");
+            var tasks = new List<string>();
+            foreach (var (role, grain) in grains)
+            {
+                tasks.Add($"{role} tasks: {await DescribeTasksAsync(harness, grain)}");
+            }
+
+            violations.Add($"stalled: {exception.Message} {string.Join("; ", tasks)}");
         }
 
         return new(
