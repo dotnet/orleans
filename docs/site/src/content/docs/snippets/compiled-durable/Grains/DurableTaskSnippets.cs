@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -278,6 +279,8 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
         }
 
         var order = new SubmitOrder(this.GetPrimaryKeyString(), [.. _lines.Values], cardLast4);
+
+        // <durable_tasks_checkout_post>
         _lines.Clear();
 
         // Posts the invocation to the outbox, and the journal write commits it with the cleared basket.
@@ -286,6 +289,7 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
             .WithId(OrderGrain.PlaceOrderTaskId(orderId))
             .Post();
         await WriteStateAsync();
+        // </durable_tasks_checkout_post>
         return orderId;
     }
 
@@ -766,3 +770,40 @@ internal static class DurableTaskDiagnostics
     }
     // </durable_tasks_diagnostics>
 }
+
+// <durable_tasks_reference_relay>
+[GenerateSerializer, Immutable]
+public sealed record OperationResult(string Summary);
+
+public interface IOperationGrain : IGrainWithGuidKey
+{
+    DurableTask<OperationResult> RunAsync(string input);
+}
+
+public interface IWebhookRelayGrain : IGrainWithGuidKey
+{
+    DurableTask DeliverWebhookAsync(Guid operationKey, string operationId, Uri callback);
+}
+
+public sealed class WebhookRelayGrain(HttpClient http) : DurableGrain, IWebhookRelayGrain
+{
+    public async DurableTask DeliverWebhookAsync(Guid operationKey, string operationId, Uri callback)
+    {
+        var operation = GrainFactory.GetGrain<IOperationGrain>(operationKey);
+        try
+        {
+            // Subscribes to the operation's result; the subscription and its deadline are recorded for replay.
+            var result = await operation.GetDurableTask<OperationResult>(operationId).WaitAsync(TimeSpan.FromDays(1));
+            await DurableTask.Run(async ct =>
+            {
+                using var response = await http.PostAsJsonAsync(callback, result, ct);
+                response.EnsureSuccessStatusCode();
+            }).WithId("deliver");
+        }
+        catch (TimeoutException)
+        {
+            // The operation is still running after a day; it continues without this relay.
+        }
+    }
+}
+// </durable_tasks_reference_relay>
