@@ -36,8 +36,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private bool _deleted;
     private bool _aborted;
 
-    // The attempt's waits for events which messages deliver. Accessed on the activation scheduler.
-    private int _parkedWaits;
+    // The attempt's waits for events which messages deliver: those which are pending, and those which resumed but whose
+    // waiting code hasn't continued yet. The attempt is parked while a wait is pending and none has resumed. Guarded by
+    // _lock.
+    private int _pendingWaits;
+    private int _resumedWaits;
+    private bool _parked;
+    private bool _ended;
 
     // The number of sends of each signal which this attempt has begun, by marker segment. Guarded by _lock.
     private Dictionary<string, int>? _signalSends;
@@ -190,35 +195,116 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _abortSource.Cancel();
     }
 
-    /// <summary>Releases the attempt's link to activation shutdown once the attempt has ended.</summary>
-    internal void OnAttemptCompleted() => _shutdownRegistration.Dispose();
+    /// <summary>
+    /// Releases the attempt's link to activation shutdown once the attempt has ended, and its parked state, which a wait
+    /// that the attempt left pending would otherwise keep.
+    /// </summary>
+    internal void OnAttemptCompleted()
+    {
+        _shutdownRegistration.Dispose();
+        lock (_lock)
+        {
+            _ended = true;
+            if (_parked)
+            {
+                _parked = false;
+                _runtime.OnAttemptUnparked();
+            }
+        }
+    }
 
     /// <summary>
-    /// Runs a wait for an event which a message delivers, such as a child's result, a signal, a delay's resume, or the
-    /// first of several completions, and reports the attempt parked while any such wait is pending.
+    /// Runs a wait for an event which a message delivers, such as a child's result, a signal, or the first of several
+    /// completions, and reports the attempt parked while the wait is pending.
     /// </summary>
+    /// <param name="wait">The wait.</param>
+    /// <param name="cancellationToken">The wait's token, whose cancellation resumes it.</param>
+    /// <param name="awaited">The tasks or signal records whose completion resumes the wait.</param>
     /// <remarks>
-    /// The message which ends the wait reactivates the grain, so a parked attempt needs no wake-up of its own. The
-    /// journal write which commits the awaited result also stages the completion of the result's handle, which the
-    /// runtime reports as work, so a deactivation after that write still resumes the attempt.
+    /// The message which ends the wait reactivates the grain, so a parked attempt needs no wake-up of its own. The wait
+    /// resumes synchronously when the runtime completes what it awaits, or when its token is canceled, before the waiting
+    /// code continues in a later work item, so the attempt counts as runnable from that moment.
     /// </remarks>
-    private async ValueTask<T> ParkAsync<T>(ValueTask<T> wait)
+    private async ValueTask<T> ParkAsync<T>(ValueTask<T> wait, CancellationToken cancellationToken, IReadOnlyList<TaskId> awaited)
     {
-        if (_parkedWaits++ == 0)
+        if (wait.IsCompleted)
         {
-            _runtime.OnAttemptParked();
+            return await wait;
+        }
+
+        var parked = new ParkedWait(this);
+        lock (_lock)
+        {
+            _pendingWaits++;
+            UpdateParked();
+        }
+
+        foreach (var id in awaited)
+        {
+            _runtime.RegisterParkedWait(id, parked);
         }
 
         try
         {
+            using var registration = cancellationToken.UnsafeRegister(static state => ((ParkedWait)state!).Resume(), parked);
             return await wait;
         }
         finally
         {
-            if (--_parkedWaits == 0)
+            foreach (var id in awaited)
             {
-                _runtime.OnAttemptUnparked();
+                _runtime.UnregisterParkedWait(id, parked);
             }
+
+            parked.End();
+        }
+    }
+
+    /// <summary>Notes that a pending wait resumed, so the attempt runs again once its code continues.</summary>
+    internal void OnWaitResumed()
+    {
+        lock (_lock)
+        {
+            _pendingWaits--;
+            _resumedWaits++;
+            UpdateParked();
+        }
+    }
+
+    /// <summary>Notes that a wait ended, after it resumed or without resuming.</summary>
+    internal void OnWaitEnded(bool resumed)
+    {
+        lock (_lock)
+        {
+            if (resumed)
+            {
+                _resumedWaits--;
+            }
+            else
+            {
+                _pendingWaits--;
+            }
+
+            UpdateParked();
+        }
+    }
+
+    private void UpdateParked()
+    {
+        var parked = !_ended && _pendingWaits > 0 && _resumedWaits == 0;
+        if (parked == _parked)
+        {
+            return;
+        }
+
+        _parked = parked;
+        if (parked)
+        {
+            _runtime.OnAttemptParked();
+        }
+        else
+        {
+            _runtime.OnAttemptUnparked();
         }
     }
 
@@ -382,7 +468,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfDeleted();
 
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        return await ParkAsync(_runtime.ScheduleDelayAsync(taskId, dueTime, executionCts.Token));
+        return await _runtime.ScheduleDelayAsync(taskId, dueTime, executionCts.Token);
     }
 
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
@@ -516,7 +602,11 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         ThrowIfDeleted();
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        var (value, recordedAt) = await ParkAsync(_runtime.WaitForSignalAsync(Id, name, executionCts.Token));
+        var recordId = _runtime.GetSignalRecordId(Id, name);
+        var (value, recordedAt) = await ParkAsync(
+            _runtime.WaitForSignalAsync(Id, name, executionCts.Token),
+            executionCts.Token,
+            recordId is { } id ? [id] : []);
         ObserveTime(recordedAt);
         return value;
     }
@@ -597,7 +687,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfDeleted();
 
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        return await ParkAsync(_runtime.SelectCompletionAsync(decisionId, candidates, executionCts.Token));
+        return await ParkAsync(_runtime.SelectCompletionAsync(decisionId, candidates, executionCts.Token), executionCts.Token, candidates);
     }
 
     private void ThrowIfNotChildTaskId(TaskId taskId)
@@ -744,7 +834,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
                 cancellationToken,
                 owner._abortSource.Token);
-            return Observe(await owner.ParkAsync(inner.WaitAsync(executionCts.Token)));
+            return Observe(await owner.ParkAsync(inner.WaitAsync(executionCts.Token), executionCts.Token, [inner.TaskId]));
         }
 
         private DurableTaskResponse Observe(DurableTaskResponse response)
