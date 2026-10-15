@@ -1,7 +1,11 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Diagnostics;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
+using Orleans.Messaging.Configuration;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
@@ -11,17 +15,24 @@ namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
 /// through a <see cref="DurableTaskFaultInjector"/>, and drives workflows to completion through injected faults.
 /// </summary>
 /// <remarks>
-/// The harness owns the Durable Jobs clock: while it waits for a task, it advances the clock in steps, so delays, scheduled
-/// resumes, and outbox retries fall due without real-time waits. Each step is far shorter than Messaging's
-/// <c>OutboxRetryTimeout</c>, so retries of an injected delivery failure never expire while a run makes progress.
+/// <para>
+/// The Durable Jobs clock leads the grains' clock by <see cref="JobClockLead"/>, so the workflows' delays, which are
+/// shorter, and Durable Jobs retries, which follow the grains' clock, are due as soon as they are scheduled. Outbox
+/// retries follow <see cref="RetryInterval"/>. The harness doesn't advance the clock while it waits.
+/// </para>
+/// <para>
+/// The harness synchronizes on events only: a task's completion through the client's wait for its response, and
+/// quiescence through the Durable Jobs activities of the grains' messaging wake-ups; see <see cref="SettleAsync"/>.
+/// <see cref="RunTimeout"/> bounds each wait to detect a stall.
+/// </para>
 /// </remarks>
 internal sealed class DurableTaskFaultHarness : IAsyncLifetime
 {
-    public static readonly TimeSpan ClockStep = TimeSpan.FromMinutes(1);
     public static readonly TimeSpan RunTimeout = TimeSpan.FromSeconds(30);
-    public static readonly TimeSpan StallTimeout = TimeSpan.FromSeconds(10);
-    public static readonly TimeSpan QuietPeriod = TimeSpan.FromMilliseconds(250);
-    private static readonly PollingOptions Poll = new() { PollTimeout = TimeSpan.FromMilliseconds(50) };
+    public static readonly TimeSpan JobClockLead = TimeSpan.FromHours(1);
+    public static readonly TimeSpan RetryInterval = TimeSpan.FromMilliseconds(100);
+    private const int MaxClientAttempts = 20;
+    private readonly MessagingWakeupTracker _wakeups = new();
 
     public DurableTaskFaultHarness(string journalFormatKey, Action<ISiloBuilder>? configureSilo = null)
     {
@@ -31,6 +42,7 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
         {
             Injector.Configure(silo);
             silo.Services.AddSingleton(Gates);
+            silo.Services.Configure<DurableMessagingOptions>(options => options.RetryInitialInterval = RetryInterval);
             configureSilo?.Invoke(silo);
         });
     }
@@ -40,138 +52,174 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     public DurableTaskRecoveryFixture Fixture { get; }
     public IClusterClient Client => Fixture.Client;
 
-    public ValueTask InitializeAsync() => Fixture.InitializeAsync();
+    public async ValueTask InitializeAsync()
+    {
+        Fixture.JobClock.Advance(JobClockLead);
+        await Fixture.InitializeAsync();
+    }
 
     public async ValueTask DisposeAsync()
     {
         Injector.Reset();
         await Fixture.DisposeAsync();
+        _wakeups.Dispose();
     }
 
-    /// <summary>
-    /// Schedules a root task and waits for its terminal response, retrying the client's calls which fail with an
-    /// infrastructure failure and advancing the Durable Jobs clock while the task runs.
-    /// </summary>
+    /// <summary>Schedules a root task and waits for its terminal response.</summary>
     /// <remarks>
-    /// <para>
-    /// A client call which fails, for example because the grain's activation fails to read its journal or its write fails,
-    /// is retried with the same task ID; the task ID deduplicates the schedule. Only the task's response is the outcome.
-    /// </para>
-    /// <para>
-    /// When <paramref name="nudge"/> is provided and the task doesn't complete within <see cref="StallTimeout"/>, the harness
-    /// reports the stall through <paramref name="onStalled"/>, calls <paramref name="nudge"/>, which activates the run's other
-    /// grains, and keeps waiting, so a run whose only defect is a lost wake-up still has its outcome checked.
-    /// </para>
-    /// <para>
-    /// A run which involves no delays or retries passes <paramref name="advanceClock"/> as <see langword="false"/>, so its
-    /// Durable Jobs wake-ups follow real time.
-    /// </para>
+    /// The client's calls are retried at once when an infrastructure failure fails them, for example when the grain's
+    /// activation fails to read its journal, its write fails, or it deactivates while the client waits. The task ID
+    /// deduplicates the schedule, and only the task's response is the outcome.
     /// </remarks>
     public async Task<DurableTaskResponse> RunAsync<T>(
         IAddressable grain,
         string rootId,
         Func<CancellationToken, Task> schedule,
-        CancellationToken cancellationToken,
-        Func<CancellationToken, Task>? nudge = null,
-        Action? onStalled = null,
-        bool advanceClock = true)
+        CancellationToken cancellationToken)
     {
-        var deadline = Stopwatch.StartNew();
-        var clientFailures = new List<string>();
-        await RetryAsync(schedule, clientFailures, deadline, cancellationToken);
-        var reference = grain.GetDurableTask<T>(rootId);
-        while (true)
+        var failures = new List<string>();
+        try
         {
-            if (nudge is not null && deadline.Elapsed > StallTimeout)
-            {
-                onStalled?.Invoke();
-                await RetryAsync(nudge, clientFailures, deadline, cancellationToken);
-                nudge = null;
-            }
-
-            try
-            {
-                var response = await reference.GetResponseAsync(Poll, cancellationToken);
-                if (response.IsCompleted)
-                {
-                    return response;
-                }
-            }
-            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
-            {
-                clientFailures.Add(exception.GetType().Name + ": " + exception.Message);
-            }
-
-            ThrowIfExpired(deadline, $"task '{rootId}' on {grain.GetGrainId()} to complete", clientFailures);
-            if (advanceClock)
-            {
-                Fixture.JobClock.Advance(ClockStep);
-            }
+            await RetryAsync(schedule, failures, cancellationToken).WaitAsync(RunTimeout, cancellationToken);
+            var reference = grain.GetDurableTask<T>(rootId);
+            DurableTaskResponse response = null!;
+            await RetryAsync(async token => response = await reference.GetResponseAsync(token), failures, cancellationToken)
+                .WaitAsync(RunTimeout, cancellationToken);
+            return response;
+        }
+        catch (TimeoutException exception)
+        {
+            throw new TimeoutException(
+                $"Timed out after {RunTimeout} waiting for task '{rootId}' on {grain.GetGrainId()}. Client call failures "
+                + $"({failures.Count}): {string.Join(" | ", failures.Distinct().Take(5))}",
+                exception);
         }
     }
 
-    /// <summary>
-    /// Waits until the counted operations, such as a run's journal writes, stop: none occurs within <see cref="QuietPeriod"/>
-    /// after the harness advances the Durable Jobs clock, so retries which are due run first.
-    /// </summary>
-    public async Task SettleAsync(IReadOnlyList<InjectedFault> counters, CancellationToken cancellationToken)
-    {
-        var deadline = Stopwatch.StartNew();
-        while (true)
-        {
-            var next = counters.Select(static counter => counter.WaitForMatchesAsync(counter.Matches + 1)).ToList();
-            Fixture.JobClock.Advance(ClockStep);
-            var quiet = Task.Delay(QuietPeriod, cancellationToken);
-            if (await Task.WhenAny([quiet, .. next]) == quiet)
-            {
-                return;
-            }
+    /// <summary>Waits until each of <paramref name="grains"/> holds no messaging work.</summary>
+    /// <remarks>
+    /// A grain holds messaging work while its inbox, its outbox, or the durable task runtime's work source, which reports
+    /// runnable executions, does. The inbox schedules the grain's messaging wake-up before the journal write which makes
+    /// work pending can become durable, and the wake-up job completes only once none remains. A grain therefore holds no
+    /// work once each wake-up job which was scheduled for it has completed. Call this after an outcome which follows the
+    /// grains' last work, such as a result which their messages produced.
+    /// </remarks>
+    public Task SettleAsync(IEnumerable<GrainId> grains, CancellationToken cancellationToken) =>
+        _wakeups.WaitForIdleAsync(grains).WaitAsync(RunTimeout, cancellationToken);
 
-            ThrowIfExpired(deadline, "the run's journal writes to stop", []);
-        }
-    }
-
-    /// <summary>Calls a grain until the call succeeds, retrying infrastructure failures.</summary>
+    /// <summary>Calls a grain until the call succeeds, retrying infrastructure failures at once.</summary>
     public async Task<TResult> CallAsync<TResult>(Func<CancellationToken, Task<TResult>> call, CancellationToken cancellationToken)
     {
-        var deadline = Stopwatch.StartNew();
         var failures = new List<string>();
         TResult result = default!;
-        await RetryAsync(async token => result = await call(token), failures, deadline, cancellationToken);
+        await RetryAsync(async token => result = await call(token), failures, cancellationToken);
         return result;
     }
 
-    private async Task RetryAsync(
-        Func<CancellationToken, Task> call,
-        List<string> failures,
-        Stopwatch deadline,
-        CancellationToken cancellationToken)
+    private static async Task RetryAsync(Func<CancellationToken, Task> call, List<string> failures, CancellationToken cancellationToken)
     {
-        while (true)
+        for (var attempt = 1; ; attempt++)
         {
             try
             {
                 await call(cancellationToken);
                 return;
             }
-            catch (Exception exception) when (!cancellationToken.IsCancellationRequested && exception is not DurableTaskConflictException)
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested
+                && exception is not (DurableTaskConflictException or TimeoutException)
+                && attempt < MaxClientAttempts)
             {
                 failures.Add(exception.GetType().Name + ": " + exception.Message);
             }
-
-            ThrowIfExpired(deadline, "a client call to succeed", failures);
-            Fixture.JobClock.Advance(ClockStep);
-            await Task.Delay(10, cancellationToken);
         }
     }
 
-    private static void ThrowIfExpired(Stopwatch deadline, string waitingFor, List<string> failures)
+    /// <summary>
+    /// Tracks the messaging wake-up jobs which Durable Jobs holds for each grain, through the Durable Jobs activities.
+    /// </summary>
+    /// <remarks>
+    /// A job is outstanding from the end of the activity which scheduled it until an execution of it ends with the job
+    /// removed: completed, failed without a retry, or canceled. Rescheduled and retried runs keep it outstanding.
+    /// </remarks>
+    private sealed class MessagingWakeupTracker : IDisposable
     {
-        if (deadline.Elapsed > RunTimeout)
+        // The names of the Durable Jobs activities and tags which the tracker reads.
+        private const string ScheduleActivity = "schedule durable job";
+        private const string ExecuteActivity = "execute durable job";
+        private const string JobIdTag = "orleans.durable_job.id";
+        private const string JobNameTag = "orleans.durable_job.name";
+        private const string TargetTag = "orleans.durable_job.target_grain_id";
+        private const string StatusTag = "orleans.durable_job.status";
+        private const string MessagingPumpJobName = "orleans.messaging.pump";
+
+        private readonly ActivityListener _listener;
+        private readonly Dictionary<string, HashSet<string>> _outstanding = new(StringComparer.Ordinal);
+        private readonly List<(HashSet<string> Grains, TaskCompletionSource Idle)> _waiters = [];
+
+        public MessagingWakeupTracker()
         {
-            throw new TimeoutException(
-                $"Timed out after {RunTimeout} waiting for {waitingFor}. Client call failures ({failures.Count}): "
-                + string.Join(" | ", failures.Distinct().Take(5)));
+            _listener = new()
+            {
+                ShouldListenTo = static source => source.Name == ActivitySources.DurableJobsActivitySourceName,
+                Sample = static (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+                ActivityStopped = OnActivityStopped,
+            };
+            ActivitySource.AddActivityListener(_listener);
         }
+
+        public Task WaitForIdleAsync(IEnumerable<GrainId> grains)
+        {
+            var keys = grains.Select(static grain => grain.ToString()).ToHashSet(StringComparer.Ordinal);
+            lock (_outstanding)
+            {
+                if (IsIdle(keys))
+                {
+                    return Task.CompletedTask;
+                }
+
+                var idle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _waiters.Add((keys, idle));
+                return idle.Task;
+            }
+        }
+
+        private void OnActivityStopped(Activity activity)
+        {
+            if (activity.GetTagItem(JobNameTag) as string != MessagingPumpJobName
+                || activity.GetTagItem(TargetTag) is not string target
+                || activity.GetTagItem(JobIdTag) is not string jobId)
+            {
+                return;
+            }
+
+            lock (_outstanding)
+            {
+                if (activity.OperationName == ScheduleActivity)
+                {
+                    if (!_outstanding.TryGetValue(target, out var jobs))
+                    {
+                        _outstanding[target] = jobs = new(StringComparer.Ordinal);
+                    }
+
+                    jobs.Add(jobId);
+                }
+                else if (activity.OperationName == ExecuteActivity
+                    && activity.GetTagItem(StatusTag) is "completed" or "failed" or "cancellation_requested"
+                    && _outstanding.TryGetValue(target, out var jobs)
+                    && jobs.Remove(jobId))
+                {
+                    foreach (var waiter in _waiters.Where(waiter => IsIdle(waiter.Grains)).ToList())
+                    {
+                        _waiters.Remove(waiter);
+                        waiter.Idle.TrySetResult();
+                    }
+                }
+            }
+        }
+
+        private bool IsIdle(HashSet<string> grains) =>
+            grains.All(grain => !_outstanding.TryGetValue(grain, out var jobs) || jobs.Count == 0);
+
+        public void Dispose() => _listener.Dispose();
     }
 }
