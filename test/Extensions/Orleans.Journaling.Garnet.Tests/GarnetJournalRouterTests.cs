@@ -260,7 +260,8 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
         foreach (var storage in storages)
         {
             var append = storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken).AsTask();
-            await Assert.ThrowsAsync<TimeoutException>(() => append.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken));
+            // Only the append's own timeout satisfies the assertion; the watchdog fails the test if the append hangs.
+            await Assert.ThrowsAsync<TimeoutException>(() => WithinWatchdogAsync(append));
         }
 
         // Both operations waited for one shared read, which their deadlines did not cancel.
@@ -285,7 +286,7 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
         Assert.True(router.ConnectionCount > 0);
 
         await router.DisposeAsync();
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => append.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => WithinWatchdogAsync(append));
         await Assert.ThrowsAsync<ObjectDisposedException>(() => CreateStorage(router, "after-disposal").AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken).AsTask());
         Assert.Equal(0, router.ConnectionCount);
     }
@@ -306,6 +307,21 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
         {
             Assert.False(await connection.GetDatabase().KeyExistsAsync(storage.DataKey));
         }
+    }
+
+    /// <summary>
+    /// Awaits <paramref name="operation"/>, failing the test if it does not complete within a generous watchdog bound,
+    /// so a hung operation cannot satisfy an assertion about the operation's own exception.
+    /// </summary>
+    private static async Task WithinWatchdogAsync(Task operation)
+    {
+        var watchdog = Task.Delay(TimeSpan.FromSeconds(10), CancellationToken);
+        if (await Task.WhenAny(operation, watchdog) != operation)
+        {
+            Assert.Fail("The operation did not complete within the watchdog bound.");
+        }
+
+        await operation;
     }
 
     private static KeyValuePair<PartitionId, PartitionHosting> Hosting(PartitionId id) => new(id, new PartitionHosting("test", 0, id.Value));
