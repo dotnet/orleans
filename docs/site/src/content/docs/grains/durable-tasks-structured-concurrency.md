@@ -127,6 +127,20 @@ task still stops it. Compensation is the typical shielded work: in the trip book
 `release` combinator shields both of its inputs, so the holds are released after the trip
 was canceled. A shielded combinator shields each input which it starts.
 
+Shielding means the same for every awaited durable operation, whether it runs as a child or
+as part of the owner: a shielded signal wait, `TryWaitAsync`, delay, `GetDurableTask`
+subscription, `Race`, `WhenAny`, or `WaitAsync` completes after the owner's cancellation,
+and only an abort or the tree's deletion ends it. A workflow which waits for a payment
+shields the wait, so a payment which arrives after a cancellation still reaches it:
+
+```csharp
+var payment = await PaymentReceived.WaitAsync().Shielded();
+if (DurableTask.Current.IsCancellationRequested)
+{
+    await payments.RefundAsync(payment).WithId("refund").Shielded();
+}
+```
+
 ## Detach the work which outlives its starter
 
 `.Detached()` starts a grain call as a new root on its target. The starter records that it

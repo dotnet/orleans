@@ -429,8 +429,11 @@ A body compensates inline by starting its compensation with
 <xref:Orleans.DurableTasks.DurableTaskExtensions.Shielded*>. A shielded child, such as a
 local step, a delay, or a call to another grain, runs to completion although the task's
 cancellation was requested, and a later request skips it, while the body still owns it
-and awaits its result. A shielded combinator shields each input which it starts. An abort
-and the deletion of the task's execution tree still reach shielded children.
+and awaits its result. A shielded combinator shields each input which it starts. Every
+awaited operation honors the shield the same way, so a shielded signal wait, delay,
+`GetDurableTask` subscription, `Race`, `WhenAny`, or `WaitAsync` completes after the
+task's cancellation. An abort and the deletion of the task's execution tree still reach
+shielded operations.
 
 An administrative abort, through `IDurableTaskManager.AbortAsync(rootId, reason)` or
 <xref:Orleans.DurableTasks.ScheduledTask.AbortAsync*?displayProperty=nameWithType>,

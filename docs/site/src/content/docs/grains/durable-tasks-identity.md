@@ -105,7 +105,9 @@ detached start sends a root ID instead, which the callee stores verbatim.
 
 A signal addresses an *invoked task*: a root task, or a task which another grain called.
 Its value is recorded beneath that task as `$signal:{name}`, where waits anywhere in the
-task's tree find it.
+task's tree find it. An unnamed wait runs as part of the waiting execution and records no
+operation; a wait which `WithId` names runs as a child under that name. Shielding a wait
+leaves its identity unchanged.
 
 Awaiting a `DurableTaskReference<TResult>` inside a durable task, scheduling it, or
 passing it to a combinator records a subscription child under the ID which that operation
