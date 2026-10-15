@@ -42,6 +42,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     private readonly CancellationTokenSource _shutdown = new();
     private RangeMapSnapshot _view;
     private Task<RangeMapSnapshot>? _refresh;
+    private bool _stopped;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GarnetJournalRouter"/> class.
@@ -86,15 +87,21 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     /// <exception cref="TimeoutException">The operation did not complete within the operation timeout.</exception>
     public async ValueTask<RedisResult[]> ExecuteAsync(int bucket, string procedure, object[] args, CancellationToken cancellationToken)
     {
+        // Every wait is bounded by the operation's deadline: a stalled connection, command, or MetaStore refresh ends
+        // the operation with a TimeoutException, while caller cancellation still surfaces as cancellation.
         var start = Stopwatch.GetTimestamp();
         var backoff = InitialBackoff;
+        RangeMapSnapshot view;
+        PartitionId partition;
+        string reason;
+        Exception? exception;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var view = View;
-            var partition = view.Map.GetOwner(bucket);
-            string reason;
-            Exception? exception = null;
+            ObjectDisposedException.ThrowIf(IsStopped, this);
+            view = View;
+            partition = view.Map.GetOwner(bucket);
+            exception = null;
             if (GetConnection(view, partition) is not { } connection)
             {
                 // The partition's host has not published its endpoint in this view.
@@ -104,8 +111,8 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
             {
                 try
                 {
-                    var database = await connection.GetDatabaseAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
-                    var result = await database.ExecuteAsync(procedure, args).WaitAsync(cancellationToken).ConfigureAwait(false);
+                    var database = await connection.GetDatabaseAsync().WaitAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false);
+                    var result = await database.ExecuteAsync(procedure, args).WaitAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false);
                     var values = (RedisResult[]?)result is { Length: > 0 } array
                         ? array
                         : throw new InvalidOperationException($"Garnet journal procedure {procedure} returned an invalid response.");
@@ -117,7 +124,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
                     reason = "wrong_partition";
                     var reportedVersion = GetReportedVersion(values);
                     if (reportedVersion > view.Version
-                        && (await TryRefreshAsync(cancellationToken).ConfigureAwait(false)).Version >= reportedVersion)
+                        && (await TryRefreshAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false)).Version >= reportedVersion)
                     {
                         // The bucket moved in a view newer than the one used, and the router now has that view.
                         _telemetry.OnRetry(ProviderName, reason);
@@ -134,7 +141,14 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
                     reason = "timeout";
                     exception = ex;
                 }
-                catch (ObjectDisposedException ex)
+                catch (TimeoutException ex)
+                {
+                    // The operation's deadline passed while waiting.
+                    reason = "deadline";
+                    exception = ex;
+                    break;
+                }
+                catch (ObjectDisposedException ex) when (!IsStopped)
                 {
                     // The view changed the partition's endpoint and the old connection was closed.
                     reason = "connection";
@@ -150,9 +164,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
 
             if (Stopwatch.GetElapsedTime(start) + backoff >= _operationTimeout)
             {
-                throw new TimeoutException(
-                    $"Garnet journal procedure {procedure} on bucket {bucket} did not complete within {_operationTimeout}: the last attempt, on partition '{partition}' in view {view.Version}, failed with reason '{reason}'.",
-                    exception);
+                break;
             }
 
             _telemetry.OnRetry(ProviderName, reason);
@@ -161,17 +173,33 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
             backoff = TimeSpan.FromTicks(Math.Min(backoff.Ticks * 2, MaxBackoff.Ticks));
             if (reason is not "transaction")
             {
-                await TryRefreshAsync(cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await TryRefreshAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false);
+                }
+                catch (TimeoutException ex)
+                {
+                    exception = ex;
+                    break;
+                }
             }
         }
-    }
 
+        throw new TimeoutException(
+            $"Garnet journal procedure {procedure} on bucket {bucket} did not complete within {_operationTimeout}: the last attempt, on partition '{partition}' in view {view.Version}, failed with reason '{reason}'.",
+            exception);
+    }
     /// <summary>
     /// Reads the MetaStore and applies its map if it is newer than the current view.
     /// </summary>
-    /// <remarks>Concurrent callers share one read.</remarks>
+    /// <remarks>
+    /// Concurrent callers share one read. A caller which stops waiting, through cancellation or a timeout, does not
+    /// cancel the shared read.
+    /// </remarks>
     /// <returns>The current view after the refresh.</returns>
-    public Task<RangeMapSnapshot> RefreshAsync(CancellationToken cancellationToken)
+    public Task<RangeMapSnapshot> RefreshAsync(CancellationToken cancellationToken) => StartRefresh().WaitAsync(cancellationToken);
+
+    private Task<RangeMapSnapshot> StartRefresh()
     {
         TaskCompletionSource<RangeMapSnapshot>? owner = null;
         Task<RangeMapSnapshot> refresh;
@@ -191,7 +219,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
             _ = RunRefreshAsync(owner);
         }
 
-        return refresh.WaitAsync(cancellationToken);
+        return refresh;
     }
 
     /// <summary>
@@ -211,7 +239,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
 
         lock (_lock)
         {
-            if (snapshot.Version <= _view.Version)
+            if (_stopped || snapshot.Version <= _view.Version)
             {
                 return false;
             }
@@ -233,12 +261,22 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
         return true;
     }
 
+    /// <summary>
+    /// Closes every connection. Operations in progress fail with <see cref="ObjectDisposedException"/> at their next
+    /// attempt, and no connection is opened after disposal begins.
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
         List<PartitionConnection> connections;
         List<Task> retiring;
         lock (_lock)
         {
+            if (_stopped)
+            {
+                return;
+            }
+
+            Volatile.Write(ref _stopped, true);
             connections = [.. _connections.Values];
             _connections.Clear();
             retiring = [.. _retiring];
@@ -251,8 +289,21 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
         }
 
         await Task.WhenAll(retiring).ConfigureAwait(false);
-        _shutdown.Dispose();
     }
+
+    /// <summary>Gets the number of open partition connections, excluding connections being retired.</summary>
+    internal int ConnectionCount
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _connections.Count;
+            }
+        }
+    }
+
+    private bool IsStopped => Volatile.Read(ref _stopped);
 
     public static int GetStatus(RedisResult[] result)
         => int.TryParse(result[0].ToString(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var status)
@@ -273,6 +324,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
 
         lock (_lock)
         {
+            ObjectDisposedException.ThrowIf(_stopped, this);
             if (!_connections.TryGetValue(endpoint, out var connection))
             {
                 // Connect only to endpoints in the current view, so connections from stale views are not retained.
@@ -289,17 +341,31 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
         }
     }
 
-    private async Task<RangeMapSnapshot> TryRefreshAsync(CancellationToken cancellationToken)
+    /// <summary>
+    /// Refreshes the view, waiting at most <paramref name="timeout"/>.
+    /// </summary>
+    /// <returns>The current view, which is unchanged if the refresh failed.</returns>
+    /// <exception cref="TimeoutException">The refresh did not complete within <paramref name="timeout"/>.</exception>
+    private async Task<RangeMapSnapshot> TryRefreshAsync(TimeSpan timeout, CancellationToken cancellationToken)
     {
+        var refresh = StartRefresh();
         try
         {
-            return await RefreshAsync(cancellationToken).ConfigureAwait(false);
+            return await refresh.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (refresh.IsFaulted)
         {
+            // Disposal cancels the shared refresh.
+            ObjectDisposedException.ThrowIf(IsStopped, this);
             _logger?.LogWarning(exception, "Failed to refresh the Garnet journal range map.");
             return View;
         }
+    }
+
+    private TimeSpan GetRemaining(long start)
+    {
+        var remaining = _operationTimeout - Stopwatch.GetElapsedTime(start);
+        return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
     }
 
     private async Task RunRefreshAsync(TaskCompletionSource<RangeMapSnapshot> completion)

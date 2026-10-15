@@ -82,7 +82,7 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
                     },
                     loggerFactory);
                 hosts.Add(id, host);
-                await InitializeAsync(host.EndPoint, id, view.Map, cancellationToken).ConfigureAwait(false);
+                await InitializeAsync(GetLocalEndPoint(host.EndPoint), id, view.Map, cancellationToken).ConfigureAwait(false);
                 endpoints.Add(id, FormatEndpoint(host.EndPoint));
             }
 
@@ -102,14 +102,17 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
     }
 
     /// <summary>
-    /// Opens the buckets <paramref name="map"/> assigns to a new partition and records the partition's descriptor (its map,
-    /// id, and bucket count), or
-    /// verifies the descriptor of an initialized partition.
+    /// Initializes a new partition for <paramref name="map"/>, or verifies and completes the initialization of an
+    /// existing one.
     /// </summary>
     /// <remarks>
-    /// Opening a bucket is idempotent and the descriptor is written last, so a crash during initialization is repaired
-    /// by the next initialization. Buckets which a migration moves into the partition are opened by the migration.
+    /// The partition first records its identity (map, partition id, bucket count) in its descriptor, then opens the
+    /// buckets the map assigns to it, then marks the descriptor initialized. Storage which records another identity is
+    /// rejected before any bucket is opened, so a data directory serves only the partition it was created for. Opening
+    /// a bucket is idempotent, so an initialization interrupted by a crash resumes on the next start. Buckets which a
+    /// migration moves into the partition are opened by the migration.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">The storage belongs to another partition or map.</exception>
     public static async Task InitializeAsync(EndPoint endPoint, PartitionId partitionId, RangeMap map, CancellationToken cancellationToken)
     {
         await using var connection = await ConnectionMultiplexer.ConnectAsync(new ConfigurationOptions
@@ -118,21 +121,34 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
             Protocol = RedisProtocol.Resp2,
         }).WaitAsync(cancellationToken).ConfigureAwait(false);
         var database = connection.GetDatabase();
-        var descriptor = (await database.HashGetAllAsync(GarnetJournalKeys.PartitionKey).WaitAsync(cancellationToken).ConfigureAwait(false))
-            .ToDictionary(entry => entry.Name.ToString(), entry => entry.Value.ToString(), StringComparer.Ordinal);
-        if (descriptor.Count > 0)
+        var descriptor = await ReadDescriptorAsync(database, cancellationToken).ConfigureAwait(false);
+        if (descriptor.Count == 0)
         {
-            var mapId = descriptor.GetValueOrDefault(GarnetJournalKeys.MapIdField);
-            var bucketCount = descriptor.GetValueOrDefault(GarnetJournalKeys.BucketCountField);
-            var id = descriptor.GetValueOrDefault(GarnetJournalKeys.PartitionIdField);
-            if (!string.Equals(mapId, map.Id, StringComparison.Ordinal)
-                || !string.Equals(id, partitionId.Value, StringComparison.Ordinal)
-                || !string.Equals(bucketCount, map.BucketCount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    $"The storage of Garnet journal partition '{partitionId}' holds partition '{id}' of map '{mapId}' with {bucketCount} buckets, but the range map expects partition '{partitionId}' of map '{map.Id}' with {map.BucketCount} buckets.");
-            }
+            // One HSET records the whole identity atomically, before any bucket is opened.
+            await database.HashSetAsync(
+                GarnetJournalKeys.PartitionKey,
+                [
+                    new(GarnetJournalKeys.MapIdField, map.Id),
+                    new(GarnetJournalKeys.PartitionIdField, partitionId.Value),
+                    new(GarnetJournalKeys.BucketCountField, map.BucketCount),
+                    new(GarnetJournalKeys.SchemaVersionField, GarnetJournalProtocol.CurrentSchemaVersion),
+                ]).WaitAsync(cancellationToken).ConfigureAwait(false);
+            descriptor = await ReadDescriptorAsync(database, cancellationToken).ConfigureAwait(false);
+        }
 
+        var mapId = descriptor.GetValueOrDefault(GarnetJournalKeys.MapIdField);
+        var bucketCount = descriptor.GetValueOrDefault(GarnetJournalKeys.BucketCountField);
+        var id = descriptor.GetValueOrDefault(GarnetJournalKeys.PartitionIdField);
+        if (!string.Equals(mapId, map.Id, StringComparison.Ordinal)
+            || !string.Equals(id, partitionId.Value, StringComparison.Ordinal)
+            || !string.Equals(bucketCount, map.BucketCount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"The storage of Garnet journal partition '{partitionId}' holds partition '{id}' of map '{mapId}' with {bucketCount} buckets, but the range map expects partition '{partitionId}' of map '{map.Id}' with {map.BucketCount} buckets.");
+        }
+
+        if (descriptor.ContainsKey(GarnetJournalKeys.InitializedField))
+        {
             return;
         }
 
@@ -161,16 +177,8 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
             }
         }
 
-        await database.HashSetAsync(
-            GarnetJournalKeys.PartitionKey,
-            [
-                new(GarnetJournalKeys.MapIdField, map.Id),
-                new(GarnetJournalKeys.PartitionIdField, partitionId.Value),
-                new(GarnetJournalKeys.BucketCountField, map.BucketCount),
-                new(GarnetJournalKeys.SchemaVersionField, GarnetJournalProtocol.CurrentSchemaVersion),
-            ]).WaitAsync(cancellationToken).ConfigureAwait(false);
+        await database.HashSetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.InitializedField, "1").WaitAsync(cancellationToken).ConfigureAwait(false);
     }
-
     /// <summary>Stops every hosted partition. Their durable state remains in their storage locations.</summary>
     public void Dispose()
     {
@@ -219,6 +227,20 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
         return path;
     }
 
+    /// <summary>
+    /// Gets the address at which this process connects to a partition it hosts: the loopback address of the same
+    /// family for a wildcard listen address, which is not a valid connection destination on every platform.
+    /// </summary>
+    internal static IPEndPoint GetLocalEndPoint(IPEndPoint endPoint)
+    {
+        if (endPoint.Address.Equals(IPAddress.Any))
+        {
+            return new IPEndPoint(IPAddress.Loopback, endPoint.Port);
+        }
+
+        return endPoint.Address.Equals(IPAddress.IPv6Any) ? new IPEndPoint(IPAddress.IPv6Loopback, endPoint.Port) : endPoint;
+    }
+
     internal static string FormatEndpoint(IPEndPoint endPoint)
     {
         var host = endPoint.Address.Equals(IPAddress.Any) || endPoint.Address.Equals(IPAddress.IPv6Any)
@@ -226,6 +248,10 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
             : endPoint.Address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{endPoint.Address}]" : endPoint.Address.ToString();
         return $"{host}:{endPoint.Port.ToString(CultureInfo.InvariantCulture)}";
     }
+
+    private static async Task<Dictionary<string, string>> ReadDescriptorAsync(IDatabase database, CancellationToken cancellationToken)
+        => (await database.HashGetAllAsync(GarnetJournalKeys.PartitionKey).WaitAsync(cancellationToken).ConfigureAwait(false))
+            .ToDictionary(entry => entry.Name.ToString(), entry => entry.Value.ToString(), StringComparer.Ordinal);
 
     private static async Task<RangeMapSnapshot> PublishEndpointsAsync(
         IRangeMetaStore metaStore,

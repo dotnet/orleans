@@ -35,6 +35,9 @@ internal static class GarnetJournalKeys
     /// <summary>The partition descriptor field holding the storage schema version.</summary>
     public const string SchemaVersionField = "schema-version";
 
+    /// <summary>The partition descriptor field which marks that the partition has opened its initial buckets.</summary>
+    public const string InitializedField = "initialized";
+
     public static int GetBucket(ReadOnlySpan<byte> encodedJournalId, int bucketCount)
     {
         // Bucket counts are powers of two, so masking is equivalent to the modulus.
