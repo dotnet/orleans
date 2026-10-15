@@ -18,6 +18,7 @@ using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
 using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
 using Orleans.Serialization.TypeSystem;
@@ -417,6 +418,53 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(new DurableTaskAddress(target, taskId), handle.GetFeature<IDurableTaskReference>());
         Assert.Throws<ArgumentException>(() => grainFactory.GetDurableTask<int>(new DurableTaskAddress(target, default)));
         Assert.Throws<ArgumentException>(() => grainFactory.GetDurableTask<int>(new DurableTaskAddress(default, taskId)));
+    }
+
+    [Fact]
+    public async Task ClientWaitsAndPollsRetryFailuresToReachTheTasksGrain()
+    {
+        var taskId = TaskId.CreateRoot("root");
+        var target = GrainId.Create("worker", "one");
+        var waitServer = new ScriptedDurableTaskServer(
+            new SiloUnavailableException(),
+            new OperationCanceledException("The durable task runtime is stopping."),
+            new ConnectionFailedException("lost"),
+            DurableTaskResponse.Pending,
+            DurableTaskResponse.FromResult(7));
+        var pollServer = new ScriptedDurableTaskServer(new TimeoutException(), new GatewayTooBusyException(), DurableTaskResponse.Pending);
+
+        var waited = await new GrainScheduledTaskHandle(taskId, target, request: null, waitServer, lastResponse: null)
+            .WaitAsync(TestContext.Current.CancellationToken);
+        var polled = await new GrainScheduledTaskHandle(taskId, target, request: null, pollServer, lastResponse: null)
+            .PollAsync(default, TestContext.Current.CancellationToken);
+
+        // Each failure to reach the grain is retried, and the task's response is the outcome.
+        Assert.Equal((7, 5), (waited.GetResult<int>(), waitServer.Polls));
+        Assert.Equal((DurableTaskStatus.Pending, 3), (polled.Status, pollServer.Polls));
+    }
+
+    [Fact]
+    public async Task ClientWaitsSurfaceUnknownTasksApplicationFailuresAndTheCallersCancellationAtOnce()
+    {
+        var taskId = TaskId.CreateRoot("root");
+        var target = GrainId.Create("worker", "one");
+        using var cancellation = new CancellationTokenSource();
+        var notFound = new ScriptedDurableTaskServer(new DurableTaskNotFoundException(taskId));
+        var failure = new ScriptedDurableTaskServer(new InvalidOperationException("bug"));
+        var failed = new ScriptedDurableTaskServer(DurableTaskResponse.FromException(new InvalidOperationException("failed")));
+        var canceled = new ScriptedDurableTaskServer(new TimeoutException()) { OnPoll = cancellation.Cancel };
+
+        await Assert.ThrowsAsync<DurableTaskNotFoundException>(
+            async () => await new GrainScheduledTaskHandle(taskId, target, null, notFound, null).WaitAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await new GrainScheduledTaskHandle(taskId, target, null, failure, null).WaitAsync(TestContext.Current.CancellationToken));
+        var response = await new GrainScheduledTaskHandle(taskId, target, null, failed, null).WaitAsync(TestContext.Current.CancellationToken);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await new GrainScheduledTaskHandle(taskId, target, null, canceled, null).WaitAsync(cancellation.Token));
+
+        Assert.Equal("failed", response.Exception!.Message);
+        Assert.Equal([1, 1, 1, 1], new[] { notFound.Polls, failure.Polls, failed.Polls, canceled.Polls });
+        Assert.False(DurableTaskPolling.IsTransient(new OperationCanceledException(cancellation.Token), cancellation.Token));
     }
 
     [Fact]
