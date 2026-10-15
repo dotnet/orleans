@@ -11,6 +11,8 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task StartCustomInvokableRequest(string value);
 
+    Task<string?> RunCancellableCustomRequest();
+
     Task<int> QueueUnlimitedRequests(int count);
 
     Task StartBlockingRequest();
