@@ -70,6 +70,38 @@ internal sealed class TestDurableTaskRequest : IDurableTaskRequest
     public DurableTask CreateTask() => DurableTask.Run(static _ => { });
 }
 
+/// <summary>A server whose polls return or throw each scripted outcome in turn, repeating the last.</summary>
+internal sealed class ScriptedDurableTaskServer(params object[] outcomes) : IDurableTaskServer
+{
+    private int _polls;
+
+    public int Polls => Volatile.Read(ref _polls);
+
+    /// <summary>Gets or sets an action which runs at each poll.</summary>
+    public Action? OnPoll { get; init; }
+
+    public ValueTask<DurableTaskResponse> ScheduleAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public ValueTask<DurableTaskResponse> SubscribeOrPollAsync(TaskId taskId, SubscribeOrPollOptions options, CancellationToken cancellationToken = default)
+    {
+        var poll = Interlocked.Increment(ref _polls);
+        OnPoll?.Invoke();
+        return outcomes[Math.Min(poll, outcomes.Length) - 1] switch
+        {
+            DurableTaskResponse response => new(response),
+            Exception exception => ValueTask.FromException<DurableTaskResponse>(exception),
+            var outcome => throw new InvalidOperationException($"Unexpected outcome '{outcome}'."),
+        };
+    }
+
+    public ValueTask CancelAsync(TaskId taskId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public ValueTask CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+    public ValueTask AbortAsync(TaskId taskId, string reason, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+}
+
 internal sealed class NotFoundDurableTaskServer(
     TaskId expectedTaskId,
     TaskId? responseTaskId = null,

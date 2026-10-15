@@ -264,7 +264,7 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
         while (!response.IsCompleted && !cts.IsCancellationRequested)
         {
-            response = await remote.SubscribeOrPollAsync(executionContext.Id, options, cts.Token);
+            response = await DurableTaskPolling.PollAsync(remote, executionContext.Id, options, cts.Token);
         }
 
         return response;
@@ -439,7 +439,7 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
         while (!response.IsCompleted && !cts.IsCancellationRequested)
         {
-            response = await remote.SubscribeOrPollAsync(executionContext.Id, options, cts.Token);
+            response = await DurableTaskPolling.PollAsync(remote, executionContext.Id, options, cts.Token);
         }
 
         return response;
@@ -501,9 +501,8 @@ internal sealed class GrainScheduledTaskHandle(
             return response;
         }
 
-        // TODO: Add resilience via Polly
         var pollOptions = new SubscribeOrPollOptions { PollTimeout = options.PollTimeout };
-        return DecodeResponse(await grain.SubscribeOrPollAsync(TaskId, pollOptions, cancellationToken));
+        return DecodeResponse(await DurableTaskPolling.PollAsync(grain, TaskId, pollOptions, cancellationToken));
     }
 
     public async ValueTask<DurableTaskResponse> ScheduleAsync(CancellationToken cancellationToken)
@@ -524,16 +523,12 @@ internal sealed class GrainScheduledTaskHandle(
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // TODO: Add resilience via Polly
-
             var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
-            response = DecodeResponse(await grain.SubscribeOrPollAsync(TaskId, options, cancellationToken));
+            response = DecodeResponse(await DurableTaskPolling.PollAsync(grain, TaskId, options, cancellationToken));
             if (response.IsCompleted)
             {
                 return response;
             }
-
-            // TODO: Add exponential backoff via Polly/etc?
         }
     }
 
