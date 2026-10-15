@@ -564,6 +564,36 @@ for an operation and then delivers its result:
 - Clients and ordinary grain methods await the same reference, or poll, cancel, or abort
   the task through it, with calls to the task's grain.
 
+### Store and send task addresses
+
+A <xref:Orleans.DurableTasks.DurableTaskAddress> pairs a task's grain with its ID, so code
+stores a task in journaled state, sends it in grain calls, or returns it in HTTP
+payloads, and reaches the task later. Orleans serializes it, and System.Text.Json writes
+it as `{"Target":"order/42","Id":"place-order"}` in JSON journals and HTTP payloads, with no
+registration. A <xref:Orleans.DurableTasks.TaskId> serializes as its escaped path, such as
+`place-order/reserve`.
+
+- `GrainFactory.GetDurableTask<TResult>(address)`, or the same method on an
+  `IClusterClient`, returns the task's reference, which awaits, subscribes, polls,
+  cancels, or aborts it, as above.
+- `DurableTaskReference<TResult>.Address` reads a reference's address.
+- `handle.TryGetAddress(out var address)` reads the address of a
+  <xref:Orleans.DurableTasks.ScheduledTask> handle's task: a root task which a client or an
+  ordinary grain method started, or, inside a durable task, a detached task or a task which
+  `GetDurableTask` observes. An attached child belongs to its caller's tree, so its
+  handle has no address.
+
+A workflow records the detached task which it hands off, and a later activation awaits it:
+
+```csharp
+var handle = await shipping.ShipAsync(order).Detached().WithId($"ship-{orderId}").ScheduleAsync();
+handle.TryGetAddress(out var shipment);
+_shipment.Value = shipment;
+
+// After any number of reactivations:
+var tracking = await GrainFactory.GetDurableTask<TrackingNumber>(_shipment.Value);
+```
+
 ## Commit model and guarantees
 
 - `(grain, TaskId)` identifies one execution. A stable request fingerprint detects reuse
