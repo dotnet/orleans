@@ -43,7 +43,7 @@ jobs:
         # rarely reaches; its directed scenario, unfencedInstallHidesWriteTest, catches it.
         run: |
           for step in mutantOpenBeforeSeal mutantUnconditionalInstall mutantDeleteWithoutTombstone mutantReclaimBeforeDone \
-                      mutantMarkDoneEarly mutantRetryWithoutIdempotence mutantEvictPendingId mutantWriteAfterSeal; do
+                      mutantMarkDoneEarly mutantRetryWithoutIdempotence mutantRetryAnyAbsence mutantWriteAfterSeal; do
             if quint run "$SPEC" --main=garnetRangeMigrationSim --backend=rust --step="$step" \
                  --invariant=safety --max-steps=30 --max-samples=5000 --seed=7 > "$step.log" 2>&1; then
               echo "::error::$step was not caught by the safety invariant"
