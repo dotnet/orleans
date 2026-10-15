@@ -14,8 +14,9 @@ namespace Orleans.DurableTasks.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every persisted member is a primitive, timestamp, string, <see cref="GrainId"/>, or set of grain identities, so every
-/// journal format can store the state. The request and the result are polymorphic Orleans-serializable values, held as
+/// Every persisted member is a primitive, timestamp, string, <see cref="GrainId"/>, or set of subscribers, each a grain
+/// identity and a task identifier, so every journal format can store the state. The request and the result are
+/// polymorphic Orleans-serializable values, held as
 /// opaque Orleans-serialized payloads in <see cref="RequestPayload"/> and <see cref="ResultPayload"/>. The payloads are
 /// not serialized with the state: the state is rewritten on every update, so the owning storage persists each payload
 /// separately, once, and attaches it to the state it exposes.
@@ -86,7 +87,7 @@ public class DurableTaskState : IDurableTaskState
 
     /// <inheritdoc cref="IDurableTaskState.CompletionDestinations"/>
     [Id(6)]
-    public HashSet<GrainId> CompletionDestinations { get; set; } = [];
+    public HashSet<DurableTaskSubscriber> CompletionDestinations { get; set; } = [];
 
     /// <inheritdoc cref="IDurableTaskState.Request"/>
     /// <remarks>The value is decoded from <see cref="RequestPayload"/> on first access.</remarks>
@@ -149,7 +150,7 @@ public class DurableTaskState : IDurableTaskState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public long CompletionSequence { get; set; }
 
-    IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
+    IReadOnlySet<DurableTaskSubscriber> IDurableTaskState.CompletionDestinations => CompletionDestinations;
 
     /// <summary>
     /// Binds this state to the serializer which encodes and decodes its payloads.

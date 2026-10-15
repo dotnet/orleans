@@ -170,14 +170,14 @@ public class VolatileDurableTaskGrainStorage(
         return last;
     }
 
-    public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination)
+    public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination)
     {
         var typedState = GetState(taskId, state);
         typedState.CompletionDestinations.Add(destination);
         AddOrUpdateTask(taskId, typedState);
     }
 
-    public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination)
+    public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination)
     {
         var typedState = GetState(taskId, state);
         typedState.CompletionDestinations.Remove(destination);

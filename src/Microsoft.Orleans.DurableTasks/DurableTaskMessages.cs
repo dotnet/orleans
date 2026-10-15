@@ -12,8 +12,12 @@ internal sealed class DurableTaskInvocationMessage
     [Id(0)]
     public TaskId TaskId { get; init; }
 
+    /// <summary>
+    /// Gets the request which the receiver schedules, or <see langword="null"/> for a subscription, which carries
+    /// <see cref="SubscriberId"/> instead.
+    /// </summary>
     [Id(1)]
-    public required IDurableTaskRequest Request { get; init; }
+    public IDurableTaskRequest? Request { get; init; }
 
     [Id(2)]
     public GrainId Sender { get; init; }
@@ -24,11 +28,23 @@ internal sealed class DurableTaskInvocationMessage
     /// </summary>
     [Id(3)]
     public bool Detached { get; init; }
+
+    /// <summary>
+    /// Gets the sender's task which subscribes to the result of the receiver's existing task <see cref="TaskId"/>, or
+    /// <see langword="null"/> for an invocation which carries a request.
+    /// </summary>
+    /// <remarks>
+    /// A subscription neither schedules nor claims the task: the receiver records no caller and validates none, and it
+    /// adds the subscriber to the task's completion destinations.
+    /// </remarks>
+    [Id(4)]
+    public TaskId? SubscriberId { get; init; }
 }
 
 [GenerateSerializer]
 internal sealed class DurableTaskCompletionMessage
 {
+    /// <summary>Gets the sender's task whose terminal result the message carries.</summary>
     [Id(0)]
     public TaskId TaskId { get; init; }
 
@@ -39,34 +55,11 @@ internal sealed class DurableTaskCompletionMessage
     public GrainId Sender { get; init; }
 
     /// <summary>
-    /// Gets the observation, in the receiver's execution tree, which the completion completes, or
-    /// <see langword="null"/> for a completion addressed to the task's caller.
+    /// Gets the receiver's task which the result completes, when it differs from <see cref="TaskId"/>: a task which
+    /// subscribed to the sender's task without invoking it.
     /// </summary>
     [Id(3)]
-    public TaskId? ObserverId { get; init; }
-}
-
-/// <summary>
-/// Subscribes an observation in the sender's execution tree to the terminal result of an invoked task of the receiver,
-/// or ends that subscription.
-/// </summary>
-[GenerateSerializer]
-internal sealed class DurableTaskObservationMessage
-{
-    /// <summary>Gets the observed task.</summary>
-    [Id(0)]
-    public TaskId TaskId { get; init; }
-
-    /// <summary>Gets the observation in the sender's execution tree.</summary>
-    [Id(1)]
-    public TaskId ObserverId { get; init; }
-
-    [Id(2)]
-    public GrainId Sender { get; init; }
-
-    /// <summary>Gets whether the message ends the observation's subscription.</summary>
-    [Id(3)]
-    public bool Unsubscribe { get; init; }
+    public TaskId? SubscriberId { get; init; }
 }
 
 [GenerateSerializer]
@@ -90,6 +83,13 @@ internal sealed class DurableTaskCancellationMessage
     /// </summary>
     [Id(3)]
     public string? CancellationReason { get; init; }
+
+    /// <summary>
+    /// Gets the sender's task whose subscription to <see cref="TaskId"/> the message ends, or <see langword="null"/> for a
+    /// cancellation or abort of the task. Ending a subscription doesn't cancel the task.
+    /// </summary>
+    [Id(4)]
+    public TaskId? SubscriberId { get; init; }
 }
 
 /// <summary>
@@ -142,7 +142,6 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public const string CancellationSubject = SubjectPrefix + "cancel";
     public const string ResumeSubject = SubjectPrefix + "resume";
     public const string SignalSubject = SubjectPrefix + "signal";
-    public const string ObservationSubject = SubjectPrefix + "observe";
 
     public MessageType<DurableTaskInvocationMessage> Invocation { get; } = new(InvocationSubject, serializer);
 
@@ -153,6 +152,4 @@ internal sealed class DurableTaskMessageTypes(Serializer serializer)
     public MessageType<DurableTaskResumeMessage> Resume { get; } = new(ResumeSubject, serializer);
 
     public MessageType<DurableTaskSignalMessage> Signal { get; } = new(SignalSubject, serializer);
-
-    public MessageType<DurableTaskObservationMessage> Observation { get; } = new(ObservationSubject, serializer);
 }

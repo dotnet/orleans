@@ -138,7 +138,7 @@ public sealed class DurableRpcProtocolTests
     [Fact]
     public void CompletionWaiterRemainsUntilRetired()
     {
-        var destination = GrainId.Create("caller", "one");
+        var destination = new DurableTaskSubscriber(GrainId.Create("caller", "one"), TaskId.CreateRoot("root"));
         var serializer = new ServiceCollection()
             .AddSerializer(builder => builder.AddAssembly(typeof(DurableTaskState).Assembly))
             .BuildServiceProvider()
@@ -242,7 +242,6 @@ public sealed class DurableRpcProtocolTests
     [InlineData(DurableTaskMessageTypes.CancellationSubject, "cancel")]
     [InlineData(DurableTaskMessageTypes.ResumeSubject, "resume")]
     [InlineData(DurableTaskMessageTypes.SignalSubject, "signal")]
-    [InlineData(DurableTaskMessageTypes.ObservationSubject, "observe")]
     public void MessageIdIsBoundedHierarchicalKeyScopedBySubject(string subject, string leaf)
     {
         var longTaskId = TaskId.Parse(string.Join('/', Enumerable.Repeat(new string('x', 200), 20)));
@@ -269,7 +268,6 @@ public sealed class DurableRpcProtocolTests
                 DurableTaskMessageTypes.CancellationSubject,
                 DurableTaskMessageTypes.CompletionSubject,
                 DurableTaskMessageTypes.InvocationSubject,
-                DurableTaskMessageTypes.ObservationSubject,
                 DurableTaskMessageTypes.ResumeSubject,
                 DurableTaskMessageTypes.SignalSubject,
             ],
@@ -354,9 +352,9 @@ public sealed class DurableRpcProtocolTests
         var taskId = TaskId.Parse("root");
         var response = DurableTaskResponse.FromResult(42);
 
-        var messageId = transport.GetCompletionMessageId(sender, target, taskId);
+        var messageId = transport.GetCompletionMessageId(sender, new(target, taskId), taskId);
         transport.SendCompletion(messageId);
-        transport.SendCompletion(transport.GetCompletionMessageId(sender, target, taskId));
+        transport.SendCompletion(transport.GetCompletionMessageId(sender, new(target, taskId), taskId));
 
         // The outbox journals only the reference; the runtime provides the message from the stored result.
         Assert.Empty(outbox.Messages);
@@ -364,7 +362,7 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal(
             DurableTaskMessageTransport.CreateMessageId(sender, target, taskId, DurableTaskMessageTypes.CompletionSubject),
             messageId);
-        var message = transport.CreateCompletionMessage(messageId, sender, target, taskId, response);
+        var message = transport.CreateCompletionMessage(messageId, sender, new(target, taskId), taskId, response);
         Assert.Equal(target, message.ReceiverId);
         var envelope = message.Envelope;
         Assert.Equal(messageId, envelope.MessageId);
