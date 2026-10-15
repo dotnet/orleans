@@ -33,6 +33,9 @@ internal static class GarnetJournalProtocol
     public const string DropMarker = "OJDROPMARK";
     public const string BucketInfo = "OJBUCKETINFO";
 
+    /// <summary>The load report, a non-transactional procedure registered after <see cref="Names"/>.</summary>
+    public const string Load = "OJLOAD";
+
     /// <summary>Procedure names in registration order.</summary>
     public static readonly string[] Names = [Read, GetMetadata, Create, Append, Replace, Delete, UpdateMetadata, Bucket, Index, PullRead, Install, Done, Link, Purge, DropMarker, BucketInfo];
 
@@ -102,6 +105,12 @@ internal static class GarnetJournalProtocol
     /// which the bucket's history dropped, or 0 (the field is absent) if it dropped none.
     /// </summary>
     public static ReadOnlySpan<byte> BucketCollectedField => "collected"u8;
+
+    /// <summary>The key filters a sealed copy wrote for its destination (see <see cref="GarnetJournalKeyFilter"/>).</summary>
+    public static ReadOnlySpan<byte> BucketFilterField => "filter"u8;
+
+    /// <summary>The key filters of the chain an open bucket's migration reads from, copied from its source when it opened.</summary>
+    public static ReadOnlySpan<byte> BucketChainField => "chain"u8;
     public static ReadOnlySpan<byte> OpenState => "open"u8;
     public static ReadOnlySpan<byte> SealedState => "sealed"u8;
     public static ReadOnlySpan<byte> AbsentState => "absent"u8;

@@ -71,5 +71,17 @@ internal sealed class GarnetJournalStorageOptionsValidator(
             throw new OrleansConfigurationException(
                 $"{prefix}.{nameof(options.LogMemorySize)}, {nameof(options.IndexMemorySize)}, and {nameof(options.CheckpointAofSize)} are required.");
         }
+
+        if (options.BalancingInterval <= TimeSpan.Zero && options.BalancingInterval != Timeout.InfiniteTimeSpan)
+        {
+            throw new OrleansConfigurationException($"{prefix}.{nameof(options.BalancingInterval)} must be positive, or infinite to disable balancing.");
+        }
+
+        if (!(options.BalancingThreshold > 1) || !(options.BalancingMinimumLoad >= 0)
+            || !(options.BalancingMaxMoveFraction > 0 && options.BalancingMaxMoveFraction <= 1))
+        {
+            throw new OrleansConfigurationException(
+                $"{prefix}.{nameof(options.BalancingThreshold)} must exceed 1, {nameof(options.BalancingMinimumLoad)} must be non-negative, and {nameof(options.BalancingMaxMoveFraction)} must be in (0, 1].");
+        }
     }
 }

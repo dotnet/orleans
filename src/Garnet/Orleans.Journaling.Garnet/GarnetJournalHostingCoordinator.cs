@@ -94,6 +94,53 @@ internal sealed class GarnetJournalHostingCoordinator(IRangeMetaStore metaStore,
 
     private static ulong Rank(PartitionId partition, string host) => XxHash64.HashToUInt64(Encoding.UTF8.GetBytes($"{partition.Value}\n{host}"));
 
+    /// <summary>
+    /// Moves one partition from the host with the most partitions to the one with the fewest, if their counts differ by
+    /// two or more and every partition is served by one of <paramref name="hosts"/>.
+    /// </summary>
+    /// <remarks>
+    /// A move is a planned failover: the new host takes the partition's storage over, which fences the previous host, so
+    /// the partition is unavailable from the assignment until the new host publishes its endpoint. Requiring every
+    /// partition to be served first moves one partition at a time: the move commits by compare-and-swap against the view
+    /// in which every partition served, so any intervening write, including another coordinator's move, rejects it.
+    /// </remarks>
+    /// <returns>The partition moved, or <see langword="null"/>.</returns>
+    public async Task<PartitionId?> TryBalanceAsync(IReadOnlyCollection<string> hosts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(hosts);
+        if (hosts.Count < 2)
+        {
+            return null;
+        }
+
+        var view = await ReadAsync(cancellationToken).ConfigureAwait(false);
+        var partitions = view.Map.Partitions;
+        var set = hosts.ToHashSet(StringComparer.Ordinal);
+        if (partitions.Values.Any(hosting => hosting.Endpoint is null || !set.Contains(hosting.Host)))
+        {
+            return null;
+        }
+
+        var counts = set.ToDictionary(host => host, host => partitions.Values.Count(hosting => hosting.Host == host), StringComparer.Ordinal);
+        var busiest = counts.OrderByDescending(entry => entry.Value).ThenBy(entry => entry.Key, StringComparer.Ordinal).First();
+        var idlest = counts.OrderBy(entry => entry.Value).ThenBy(entry => entry.Key, StringComparer.Ordinal).First();
+        if (busiest.Value - idlest.Value < 2)
+        {
+            return null;
+        }
+
+        // Commit against the view whose readiness and counts were checked, so any intervening write, such as another
+        // agent's move of a different partition, rejects this plan rather than overlapping two outages.
+        var (partition, _) = partitions.Where(entry => entry.Value.Host == busiest.Key).MinBy(entry => Rank(entry.Key, idlest.Key));
+        if (await TryWriteAsync(view, [(partition, idlest.Key)], cancellationToken).ConfigureAwait(false) is null)
+        {
+            return null;
+        }
+
+        logger?.LogInformation("Moved Garnet journal partition {Partition} from host {From} to host {To} to balance placement.", partition, busiest.Key, idlest.Key);
+        return partition;
+    }
+
     private async Task<RangeMapSnapshot> ReadAsync(CancellationToken cancellationToken)
     {
         var view = await metaStore.ReadAsync(cancellationToken).ConfigureAwait(false)

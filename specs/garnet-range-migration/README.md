@@ -10,6 +10,7 @@
 - **Clients** issue conditional writes, conditioned on the identity of a state they observed: the live journal, or its absence (D16). A client may hold any earlier observation (`seen`), which models duplicate activations and old observations. Any reply can be lost, and the client retries the same op at whichever partition it routes to. A retry that finds its id in the history reports success; one that fails its condition reports the outcome as unknown (`ambiguous`). An attempt whose reply was lost may also execute again later, after the client has its outcome (`deliverAttempt`), until it expires (`expire`). An observation of the empty absence includes the bucket's collection generation, which a write conditioned on it carries. Requests carry no view version (D17), so clients may send any operation to any partition.
 - **Views and opens.** A view change moves one or more buckets to one partition: a move, a split (some of a partition's buckets), or a merge (buckets of several partitions into one). In `step`, views change by the coordinator rule (`mayMove`), so migrations chain through partitions off the chain and buckets return to earlier owners once their copies are reclaimed. An open is two actions: `authorize` observes the current opener's seal and records an open request for the latest view's migration, at the version which assigned the bucket to its owner, and `openTicket` applies it later at the destination, fenced by the destination's own bucket version (D45). The open carries the sealed source's collection generation, which the destination inherits. Requests may be duplicated (up to `MAX_OPENS` in flight). `uncoordinatedStep` changes views freely.
 - **Migration.** A pull (on `NeedPull`) and a consolidation step are two actions, separate requests in the implementation. `fetch` reads a journal from the destination's migration chain, newest first, and records the destination's opening version as the pull's fence; `deliver` installs it later, in one transaction, only if the destination still holds the bucket open at that version with migration incomplete, and holds no record for the journal (D43). `dropPull` discards a pull the destination would reject. Up to `MAX_PULLS` pulls are in flight. Completion is two actions: `prepareDone` enumerates the migration inventory, every journal whose newest record on the chain is live, a tombstone, or an absent marker, as the consolidator lists each link's index and marker set (D42), with the destination's opening version, and `completeDone` sets `done` later, only if the destination is still open at that version and holds a record of every journal in the inventory (D46). Reclamation is also two actions: `authorizeReclaim` authorizes a sealed copy no migration chain reaches (`reachable`, computed from bucket states and stopping at a `done` bucket), bound to the version at which the source sealed the bucket; `reclaimBatch` deletes one batch of journals, fenced on that version (D47). The first batch marks the bucket reclaimed, so reads there fail; the bucket stays sealed. Completions and reclamations may be delayed and duplicated (`MAX_DONES`, `MAX_RECLAIMS` in flight). `dropMarker` removes absent markers and tombstones after `done`, whatever attempts are outstanding. A deletion stamps its tombstone with the bucket copy's collection generation, dropping a tombstone raises the generation past its stamp, and a write conditioned on the empty absence (no record, or an absent marker) fails if the generation has since passed the one it observed (D25).
+- **Key filters (D36).** A seal may write a key filter (`of`): every journal the sealed copy holds a record of (live journals, tombstones, and absent markers, as the migration inventory counts them), plus false positives the step chooses, plus the copy's own chain filter while its migration is not done. No filter, or an unknown one, is the filter which reports every key (`KEYS`), so a copy whose chain filter is unknown writes no useful filter either. The authorization of an open carries the sealed source's filter, which the open installs as the bucket's chain filter (`cf`). A partition holding no record of a journal answers for it without a pull (`filteredAbsent`) when its chain filter omits the journal: the journal reads as the empty absence at the bucket's collection generation, which is what a pull would install as an absent marker. `completeDone` clears the chain filter. With `FILTER_CHOICES` off (the TLC configurations), every seal writes an exact filter.
 - **Oracle:** `truth` records each journal's content after every committed write, `applied` and `log` the commits of each op and journal, and `collected` each journal's latest deletion whose tombstone a partition dropped.
 
 ## Properties
@@ -17,7 +18,7 @@
 | Property | Meaning |
 | --- | --- |
 | `singleOpen` | At most one partition accepts writes for a bucket. |
-| `durability` | Reads through the bucket's current opener return every committed write. Deleted and never-written journals read as absent. No read path reaches reclaimed data. |
+| `durability` | Reads through the bucket's current opener, which answers from its chain filter as a partition does, return every committed write. Deleted and never-written journals read as absent. No read path reaches reclaimed data. |
 | `exactlyOnce` | Each op applies at most once. An acknowledged op committed, and an op reported as a conflict did not; an ambiguous one may have committed or not. |
 | `retryOutcome` | A retry reports the committed outcome while fewer than `RECENT` later mutations of its journal have committed and no tombstone of a deletion at or after it has been dropped. |
 | `migrationsComplete` (temporal) | Under weak fairness of `seal`, `authorize`, `openTicket`, `dropTicket`, `fetch`, `deliver`, `dropPull`, `prepareDone`, `completeDone`, `dropDone`, `authorizeReclaim`, `reclaimBatch`, and `dropReclaim`, every bucket's latest move completes: its owner holds it open and `done`, and every other partition has reclaimed its copy. |
@@ -45,8 +46,10 @@ Each mutant breaks one rule of the design and must violate `safety`. Random simu
 | `mutantRetryWithoutIdempotence` | Retry without recognizing the op's own committed mutation. |
 | `mutantRetryAnyAbsence` | A retry conditioned on absence matches any absence instead of the one it observed, so a creation whose id left the history recreates a deleted journal. |
 | `mutantWriteAfterSeal` | Acknowledge a write in a sealed bucket (the Delos erratum). |
+| `mutantFilterOmitsTombstone` | Build the key filter from live journals and absent markers only. The destination answers for a deleted journal as the empty absence, without the deletion's identity and history, so a retried creation applies a second time (`exactlyOnce`). |
+| `mutantFilterOmitsJournal` | Build the key filter without the live journals, so the destination reads a journal the source holds as absent (`durability`). |
 
-Directed scenarios ending in `Test` exercise the protocol's main paths (handover, deletes and retries across a migration, chained migrations, merges and splits, returns to an earlier owner, a pull delayed across a reopening, delayed and duplicate opens, and delayed completions and reclamations), the coordinator and reclamation rules, the migration inventory, tombstone collection around queued attempts, the collection generation and client clock skew, old observations, retries within and beyond the history, and one counterexample per mutant.
+Directed scenarios ending in `Test` exercise the protocol's main paths (handover, deletes and retries across a migration, chained migrations, merges and splits, returns to an earlier owner, a pull delayed across a reopening, delayed and duplicate opens, and delayed completions and reclamations), the coordinator and reclamation rules, the migration inventory, tombstone collection around queued attempts, the collection generation and client clock skew, old observations, retries within and beyond the history, key filters with false positives, chains, unknown chains, and collection generations, and one counterexample per mutant.
 
 ## Rules the model makes precise
 
@@ -59,32 +62,35 @@ Directed scenarios ending in `Test` exercise the protocol's main paths (handover
 - **Completion fencing (D46).** A completion applies only at the opening its inventory was enumerated for (`delayedDoneFencedTest`).
 - **Reclamation fencing (D47).** Every deletion batch checks the version at which the source sealed the bucket, so a delayed duplicate cannot delete a later tenure's records (`delayedReclaimFencedTest`). A partition reopens a bucket only once its deletion has finished.
 - **Install fencing (D43).** A pull is delivered only at the opening it was fetched for. A destination that reopens a bucket starts empty, so an install conditional only on absence would accept a pull delayed from an earlier opening and hide later writes (`unfencedInstallHidesWriteTest`).
+- **Key filters (D36).** A filter must cover the migration inventory: every record its copy holds, tombstones included. A tombstone carries the deletion's identity and history, on which retried creations rely (D16, D44); answering "absent" without it lets a retry apply twice (`filterOmitsTombstoneAppliesTwiceTest`, `mutantFilterOmitsTombstone`). A filtered answer is the empty absence at the bucket's collection generation, inherited from the source with the filter, so a retry observed before a collected deletion is still rejected (`filterKeepsCollectionGenerationTest`). False positives cost pulls (`filterFalsePositivePullsTest`). A copy whose migration is not done includes its chain's filter, since journals it never pulled may be behind it (`chainedFilterTest`), and writes none if that filter is unknown (`unknownChainWritesNoFilterTest`).
 - **Retry history (D44).** The history is bounded by count. A retry whose id has left it fails its condition, which names a state that never recurs, and reports an unknown outcome instead of applying again (`retryAfterEvictionTest`, `retryCreateAfterDeleteTest`).
 
 ## Configurations
 
-| Module | Partitions, keys, views, ops, slots for pulls, opens, completions, and reclamations, `RECENT` | Use |
+| Module | Partitions, keys, views, ops, slots for pulls, opens, completions, and reclamations, `RECENT`, `FILTER_CHOICES` | Use |
 | --- | --- | --- |
-| `garnetRangeMigrationSim` | 3, 3 (two buckets), 5, 5, 2 each, 2 | Directed scenarios, simulation, mutants. |
+| `garnetRangeMigrationSim` ([own file](garnetRangeMigrationSim.qnt)) | 3, 3 (two buckets), 5, 5, 2 each, 2, on | Directed scenarios, simulation, mutants. |
 | `garnetRangeMigrationTraces` ([own file](garnetRangeMigrationTraces.qnt)) | as above, `RECENT = 8` (the implementation's) | Traces for the .NET conformance harness. |
-| `garnetRangeMigrationTlc` | 3, 2, 3, 2, 1 each, 1 | TLC safety. |
-| `garnetRangeMigrationLive` | 3, 2, 3, 1, 1 each, 1 | TLC liveness. |
+| `garnetRangeMigrationTlc` | 3, 2, 3, 2, 1 each, 1, off | TLC safety. |
+| `garnetRangeMigrationLive` | 3, 2, 3, 1, 1 each, 1, off | TLC liveness. |
 
-TLC's translation sends Apalache the IR of every module in the file, and Apalache's server rejects IR over 20 MiB. `quint compile garnetRangeMigration.qnt --main=garnetRangeMigrationTlc --target=json` measures 18,800,559 bytes (17.93 MiB), so later additions have about 2 MiB of headroom; the scenario module accounts for about 7 MiB of it. The trace configuration lives in [`garnetRangeMigrationTraces.qnt`](garnetRangeMigrationTraces.qnt), which imports the model, for that reason: in this file it would add 3.7 MiB.
+With `FILTER_CHOICES`, each seal chooses whether to write a key filter and which false positives it reports; without, every seal writes an exact filter. Sealed copies never change, so exact filters add little state and keep the TLC configurations tractable. Seals without filters reduce to the protocol checked before key filters were added, and simulation and the directed scenarios cover mixed and inexact filters.
+
+TLC's translation sends Apalache the IR of every module in the file as one JSON string, which Apalache's server limits to 20,000,000 characters ("String value length exceeds the maximum allowed"; Quint reports only `error`). The simulation configuration and its scenarios, and the trace configuration, therefore live in their own files, [`garnetRangeMigrationSim.qnt`](garnetRangeMigrationSim.qnt) and [`garnetRangeMigrationTraces.qnt`](garnetRangeMigrationTraces.qnt), which import the model. `quint compile garnetRangeMigration.qnt --main=garnetRangeMigrationTlc --target=json` measures 12,113,928 bytes; with the scenarios in this file it measured 20,179,124.
 
 ## Running
 
 ```sh
 quint typecheck garnetRangeMigration.qnt
-quint test garnetRangeMigration.qnt --main=garnetRangeMigrationSim --match=Test
-quint run garnetRangeMigration.qnt --main=garnetRangeMigrationSim --backend=rust --invariant=safety --max-steps=40 --max-samples=20000
-quint run garnetRangeMigration.qnt --main=garnetRangeMigrationSim --backend=rust --step=mutantOpenBeforeSeal --invariant=safety --max-steps=30 --max-samples=5000 --seed=7
+quint test garnetRangeMigrationSim.qnt --main=garnetRangeMigrationSim --match=Test
+quint run garnetRangeMigrationSim.qnt --main=garnetRangeMigrationSim --backend=rust --invariant=safety --max-steps=40 --max-samples=20000
+quint run garnetRangeMigrationSim.qnt --main=garnetRangeMigrationSim --backend=rust --step=mutantOpenBeforeSeal --invariant=safety --max-steps=30 --max-samples=5000 --seed=7
 quint verify garnetRangeMigration.qnt --main=garnetRangeMigrationTlc --backend=tlc --invariant=safety
 quint verify garnetRangeMigration.qnt --main=garnetRangeMigrationLive --backend=tlc --temporal=migrationsComplete
 ./generate-traces.sh
 ```
 
-[`generate-traces.sh`](generate-traces.sh) exports traces with `quint run --mbt --out-itf` from `garnetRangeMigrationTraces` under `step`, and keeps 12 in `test/Extensions/Orleans.Journaling.Garnet.Tests/Conformance/traces`: half raise a collection generation, and the rest exercise completion, reclamation, and rejected pulls, opens, or completions, delayed attempts, or marker collection. With `--mbt`, each state records the action taken (`mbt::actionTaken`) and its nondeterministic arguments (`mbt::nondetPicks`; every action's choices have distinct names), which `GarnetJournalConformanceTests` replays against the real procedures.
+[`generate-traces.sh`](generate-traces.sh) exports traces with `quint run --mbt --out-itf` from `garnetRangeMigrationTraces` under `step`, and keeps 12 in `test/Extensions/Orleans.Journaling.Garnet.Tests/Conformance/traces`: half raise a collection generation, and the rest exercise completion, reclamation, and rejected pulls, opens, or completions, delayed attempts, or marker collection. With `--mbt`, each state records the action taken (`mbt::actionTaken`) and its nondeterministic arguments (`mbt::nondetPicks`; every action's choices have distinct names), which `GarnetJournalConformanceTests` replays against the real procedures. The harness passes each seal's filter choice (`sf`) to the implementation and compares filters after every step; the implementation's filters report no false positives in buckets this small, and the specification's false positives (`sfp`) only add pulls, which the trace takes as steps of its own.
 
 On Windows, Quint cannot launch Apalache, which it uses to translate the specification for TLC. Start it first with `apalache-mc.bat server --port=8822` from `%USERPROFILE%\.quint\apalache-dist-<version>\apalache\bin`.
 
@@ -94,19 +100,19 @@ The [workflow](../../.github/workflows/garnet-specs.yml) runs the directed scena
 
 Quint 0.33.0, TLC through Apalache 0.62.1, on a shared Azure VM (Intel Xeon Platinum 8370C) that other jobs kept under load, so the durations are upper bounds:
 
-- Directed scenarios: all 56 pass.
-- Random simulation (`garnetRangeMigrationSim`: two slots each for pulls, opens, completions, and reclamations, `RECENT = 2`): no violation in 20,000 traces of up to 40 steps (59 seconds).
-- Mutants, with 5,000 traces of 30 steps (seed 7): eleven violate `safety` in under a second to 18 seconds (`mutantRetryAnyAbsence` is the slowest). The four fence mutants survive all 5,000; their directed scenarios catch them.
-- TLC safety (`garnetRangeMigrationTlc`: one slot of each kind, `RECENT = 1`): exhaustive, no violation; 12,379,961 distinct states (5.57 billion generated), depth 46, 2 hours 34 minutes.
-- TLC liveness (`garnetRangeMigrationLive`, `step`): `migrationsComplete` holds over all 465,327 distinct states, depth 42, 5 minutes.
-- TLC liveness under `uncoordinatedStep`: `migrationsComplete` is violated within 5,104 distinct states: a bucket returns to a partition whose sealed copy is still on the chain of an opener that the return seals, so the partition can never reopen.
+- Directed scenarios: all 68 pass.
+- Random simulation (`garnetRangeMigrationSim`: two slots each for pulls, opens, completions, and reclamations, `RECENT = 2`, filter choices): no violation in 20,000 traces of up to 40 steps (93 seconds).
+- Mutants, with 5,000 traces of 30 steps (seed 7): thirteen violate `safety`, including both key-filter mutants. The four fence mutants survive all 5,000; their directed scenarios catch them.
+- TLC safety (`garnetRangeMigrationTlc`: one slot of each kind, `RECENT = 1`, exact key filters): exhaustive, no violation; 14,670,903 distinct states (7.09 billion generated), depth 48, 3 hours 37 minutes. Before key filters: 12,379,961 distinct states, depth 46, 2 hours 34 minutes.
+- TLC liveness (`garnetRangeMigrationLive`, `step`, exact key filters): `migrationsComplete` holds over all 535,113 distinct states (94.4 million generated), depth 44, 8 minutes. Before key filters: 465,327 distinct states, depth 42.
+- TLC liveness under `uncoordinatedStep`: `migrationsComplete` is violated within 4,587 distinct states: a bucket returns to a partition whose sealed copy is still on the chain of an opener that the return seals, so the partition can never reopen.
 - Conformance: the 12 exported traces replay against the implementation (`GarnetJournalConformanceTests`).
 
 The TLC configurations allow at most three views, so they do not reach the fence mutants' counterexamples, which need four.
 
 ## Not yet modeled
 
-- Key filters.
+- The balancer, which only chooses views; the model changes views by the coordinator rule, as the balancer does.
 - The MetaStore's migration records and phases; the model derives them from views and bucket states, and the implementation records them from observed bucket states (D27).
 
 Partition failover and fencing are specified separately, in [`garnet-partition-hosting`](../garnet-partition-hosting/README.md), which checks that failover preserves this specification's abstraction of a partition: a durable, linearizable store which takes no steps while it is unavailable.

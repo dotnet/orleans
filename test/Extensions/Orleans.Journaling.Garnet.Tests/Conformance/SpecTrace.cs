@@ -34,7 +34,11 @@ internal static class Itf
 }
 
 /// <summary>A bucket's state in a partition, in the specification.</summary>
-internal sealed record SpecBucket(string State, long Version, long SealVersion, long Source, bool Done, bool Reclaimed, long Generation);
+/// <remarks>
+/// <see cref="Filter"/> is the key filter a sealed copy wrote (<see langword="null"/> if none) and <see cref="Chain"/>
+/// the filter of the chain an open bucket reads from (<see langword="null"/> if unknown) (D36).
+/// </remarks>
+internal sealed record SpecBucket(string State, long Version, long SealVersion, long Source, bool Done, bool Reclaimed, long Generation, IReadOnlySet<string>? Filter = null, IReadOnlySet<string>? Chain = null);
 
 /// <summary>
 /// A journal record in a partition, in the specification. <paramref name="Identity"/> is one more than the id of the
@@ -74,7 +78,9 @@ internal sealed class SpecState
                     Itf.Int(value.GetProperty("src")),
                     value.GetProperty("done").GetBoolean(),
                     value.GetProperty("reclaimed").GetBoolean(),
-                    Itf.Int(value.GetProperty("gen")));
+                    Itf.Int(value.GetProperty("gen")),
+                    ReadFilter(value, "of"),
+                    ReadFilter(value, "cf"));
             }
         }
 
@@ -149,6 +155,14 @@ internal sealed class SpecState
     public HashSet<long> Reclaims { get; } = [];
 
     public long NextOp { get; }
+
+    // The specification's "no filter" is the filter which reports every key, including keys of the other bucket, which
+    // no filter written by a seal holds.
+    private static HashSet<string>? ReadFilter(JsonElement bucket, string keys)
+    {
+        var set = Itf.Set(bucket.GetProperty(keys)).Select(key => key.GetString()!).ToHashSet(StringComparer.Ordinal);
+        return set.SetEquals(["a", "b", "c"]) ? null : set;
+    }
 
     public static List<SpecState> Load(string path)
     {

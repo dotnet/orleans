@@ -57,6 +57,9 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
     internal GarnetJournalRouter Router => _router ?? throw new InvalidOperationException(
         $"{nameof(GarnetJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
 
+    /// <summary>Gets the router, or <see langword="null"/> before the provider has started.</summary>
+    internal GarnetJournalRouter? TryGetRouter() => _router;
+
     /// <summary>Gets the coordinator which commits and drives migrations.</summary>
     internal GarnetJournalMigrationCoordinator Coordinator => _coordinator ?? throw new InvalidOperationException(
         $"{nameof(GarnetJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
@@ -196,6 +199,7 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
 
         _partitions = await GarnetJournalPartitionManager.StartAsync(_options, hostId, metaStore, view, _loggerFactory, cancellationToken).ConfigureAwait(false);
         var router = _router = new GarnetJournalRouter(metaStore, _partitions.View, _options.OperationTimeout, _telemetry, _logger, _timeProvider);
+        router.Migrator.KeyFilters = _options.KeyFilters;
         _partitions.ViewObserved = view => router.TryApplyView(view);
         _partitions.StartMonitoring();
         _coordinator = new GarnetJournalMigrationCoordinator(_router, _loggerFactory?.CreateLogger<GarnetJournalMigrationCoordinator>());
@@ -218,7 +222,8 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
                 _membership,
                 registry,
                 _options.HostingInterval,
-                _loggerFactory?.CreateLogger<GarnetJournalFailoverAgent>());
+                _loggerFactory?.CreateLogger<GarnetJournalFailoverAgent>(),
+                _options.BalancingInterval);
             _failoverAgent.Start();
         }
     }

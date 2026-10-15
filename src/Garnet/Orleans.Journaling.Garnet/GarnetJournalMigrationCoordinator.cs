@@ -42,37 +42,63 @@ internal sealed class GarnetJournalMigrationCoordinator(GarnetJournalRouter rout
     public async Task<MoveResult> TryMoveAsync(IEnumerable<int> buckets, PartitionId destination, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(buckets);
-        var requested = buckets.Distinct().Order().ToArray();
+        return await TryMoveAsync([.. buckets.Distinct().Select(bucket => (bucket, destination))], requireIdle: false, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Commits one view which moves each bucket in <paramref name="moves"/> to its destination, following the coordinator
+    /// rule (D11) for every bucket.
+    /// </summary>
+    /// <param name="moves">The buckets and their destinations; a bucket appears at most once.</param>
+    /// <param name="requireIdle">
+    /// If <see langword="true"/>, commit only if the range map holds no migrations, so that a balancer moves a bucket only
+    /// after its previous migration has completed and duplicated balancers commit at most one round between them.
+    /// </param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    public async Task<MoveResult> TryMoveAsync(IReadOnlyCollection<(int Bucket, PartitionId Destination)> moves, bool requireIdle, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(moves);
+        var requested = moves.OrderBy(move => move.Bucket).ToArray();
+        if (requested.Select(move => move.Bucket).Distinct().Count() != requested.Length)
+        {
+            throw new ArgumentException("Each bucket may be moved to one destination.", nameof(moves));
+        }
+
         while (true)
         {
             var view = await ReadAsync(cancellationToken).ConfigureAwait(false);
-            if (!view.Map.Partitions.ContainsKey(destination))
+            if (requested.FirstOrDefault(move => !view.Map.Partitions.ContainsKey(move.Destination)) is { Destination.IsDefault: false } unknown)
             {
-                throw new ArgumentException($"Partition '{destination}' is not in the range map.", nameof(destination));
+                throw new ArgumentException($"Partition '{unknown.Destination}' is not in the range map.", nameof(moves));
+            }
+
+            if (requireIdle && view.Map.Migrations.Length > 0)
+            {
+                return new(MoveStatus.MigrationInProgress, view);
             }
 
             var editor = new RangeMapBuckets(view.Map);
-            var moving = requested.Where(bucket => editor.GetOwner(bucket) != destination).ToList();
+            var moving = requested.Where(move => editor.GetOwner(move.Bucket) != move.Destination).ToList();
             if (moving.Count == 0)
             {
                 return new(MoveStatus.AlreadyOwned, view);
             }
 
-            if (moving.Any(bucket => editor.GetLatestMigration(bucket) is { Phase: < MigrationPhase.Opened }))
+            if (moving.Any(move => editor.GetLatestMigration(move.Bucket) is { Phase: < MigrationPhase.Opened }))
             {
                 return new(MoveStatus.PreviousMoveNotOpened, view);
             }
 
             // Each migration still in the map adds a source to the chain which reads of the bucket follow; completed
             // migrations are removed once their sources are reclaimed. The chain must stay within the traversal bound.
-            if (moving.Any(bucket => editor.GetMigrations(bucket).Count >= Migrator.MaxChainLength))
+            if (moving.Any(move => editor.GetMigrations(move.Bucket).Count >= Migrator.MaxChainLength))
             {
                 return new(MoveStatus.ChainTooLong, view);
             }
 
             // The owner must hold the bucket open: a partition opens its initial buckets when it first starts, and a
             // bucket moved before then would never be sealed. Once open, a bucket stays open until a move seals it.
-            var owners = await Task.WhenAll(moving.Select(bucket => Migrator.GetBucketAsync(editor.GetOwner(bucket), bucket, cancellationToken))).ConfigureAwait(false);
+            var owners = await Task.WhenAll(moving.Select(move => Migrator.GetBucketAsync(editor.GetOwner(move.Bucket), move.Bucket, cancellationToken))).ConfigureAwait(false);
             if (owners.Any(state => state.State != GarnetJournalProtocol.OpenStateName))
             {
                 return new(MoveStatus.PreviousMoveNotOpened, view);
@@ -81,20 +107,24 @@ internal sealed class GarnetJournalMigrationCoordinator(GarnetJournalRouter rout
             // The destination must not hold a copy of a bucket which a read path can reach; a copy is reachable until it
             // is reclaimed. A copy cannot appear between this check and the commit: only a commit which moves the
             // bucket to the destination makes it open the bucket, and such a commit fails this commit's compare-and-swap.
-            var states = await Task.WhenAll(moving.Select(bucket => Migrator.GetBucketAsync(destination, bucket, cancellationToken))).ConfigureAwait(false);
+            var states = await Task.WhenAll(moving.Select(move => Migrator.GetBucketAsync(move.Destination, move.Bucket, cancellationToken))).ConfigureAwait(false);
             if (states.Any(state => !state.IsAbsentOrReclaimed))
             {
                 return new(MoveStatus.DestinationHoldsCopy, view);
             }
 
-            foreach (var bucket in moving)
+            foreach (var move in moving)
             {
-                editor.Move(bucket, destination, view.Version + 1);
+                editor.Move(move.Bucket, move.Destination, view.Version + 1);
             }
 
             if (await TryWriteAsync(editor.ToMap(), view, cancellationToken).ConfigureAwait(false) is { } written)
             {
-                logger?.LogInformation("Committed range map version {Version}, moving {Count} Garnet journal buckets to partition {Destination}.", written.Version, moving.Count, destination);
+                logger?.LogInformation(
+                    "Committed range map version {Version}, moving {Count} Garnet journal buckets to partitions {Destinations}.",
+                    written.Version,
+                    moving.Count,
+                    string.Join(", ", moving.Select(move => move.Destination).Distinct()));
                 return new(MoveStatus.Committed, written);
             }
         }
@@ -343,17 +373,14 @@ internal sealed class GarnetJournalMigrationCoordinator(GarnetJournalRouter rout
             switch (latest.Phase)
             {
                 case MigrationPhase.Committed when handover:
-                    await Migrator.TransitionAsync(latest.Source, bucket, GarnetJournalProtocol.BucketSealOperation, latest.StartedAtVersion, source: null, cancellationToken).ConfigureAwait(false);
+                    await Migrator.SealAsync(latest.Source, bucket, latest.StartedAtVersion, cancellationToken).ConfigureAwait(false);
                     break;
                 case MigrationPhase.Sealed when handover:
-                    {
-                        // The seal is recorded, so the destination opens after it (the open must follow the seal). A sealed
-                        // copy collects no more markers, so its collection generation is final, and the destination inherits it.
-                        var source = await Migrator.GetBucketAsync(latest.Source, bucket, cancellationToken).ConfigureAwait(false);
-                        await Migrator.TransitionAsync(latest.Destination, bucket, GarnetJournalProtocol.BucketOpenOperation, latest.StartedAtVersion, latest.Source, cancellationToken, source.CollectionGeneration).ConfigureAwait(false);
-                        break;
-                    }
-
+                    // The seal is recorded, so the destination opens after it (the open must follow the seal). A sealed
+                    // copy collects no more markers and records no more journals, so its collection generation and its
+                    // key filters are final, and the destination inherits both.
+                    await Migrator.OpenAsync(latest.Destination, bucket, latest.StartedAtVersion, latest.Source, cancellationToken).ConfigureAwait(false);
+                    break;
                 case MigrationPhase.Opened when completion:
                     await Migrator.ConsolidateAsync(bucket, latest.Destination, cancellationToken).ConfigureAwait(false);
                     break;
@@ -420,7 +447,7 @@ internal enum MigrationWork
     Completion,
 }
 
-/// <summary>The outcome of <see cref="GarnetJournalMigrationCoordinator.TryMoveAsync"/>.</summary>
+/// <summary>The outcome of a move by <see cref="GarnetJournalMigrationCoordinator"/>.</summary>
 /// <param name="Status">Whether the move was committed, and if not, why.</param>
 /// <param name="View">The range map after the attempt.</param>
 internal readonly record struct MoveResult(MoveStatus Status, RangeMapSnapshot View);
@@ -445,4 +472,7 @@ internal enum MoveStatus
     /// migrations complete.
     /// </summary>
     ChainTooLong,
+
+    /// <summary>The move required an idle range map, and the map holds migrations.</summary>
+    MigrationInProgress,
 }

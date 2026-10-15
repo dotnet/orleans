@@ -6,7 +6,8 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Runs in every silo of a cluster whose partitions are on shared storage: assigns each partition whose host Orleans
 /// membership has declared dead, or no longer knows, or which no registered host serves, to an active silo registered
-/// for automatic hosting.
+/// for automatic hosting; and, every <c>balancingInterval</c>, moves one partition from the active registered silo
+/// hosting the most partitions to the one hosting the fewest while their counts differ by two or more.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,12 +29,14 @@ internal sealed class GarnetJournalFailoverAgent(
     IClusterMembershipService membership,
     IGarnetJournalHostRegistry registry,
     TimeSpan interval,
-    ILogger? logger) : IAsyncDisposable
+    ILogger? logger,
+    TimeSpan? balancingInterval = null) : IAsyncDisposable
 {
     private readonly CancellationTokenSource _stop = new();
     private readonly Dictionary<string, UnknownHost> _unknown = new(StringComparer.Ordinal);
     private long _refreshes;
     private Task? _run;
+    private long _nextBalance = Environment.TickCount64 + (long)(balancingInterval ?? TimeSpan.Zero).TotalMilliseconds;
 
     public void Start() => _run = Task.Run(() => RunAsync(_stop.Token));
 
@@ -87,6 +90,12 @@ internal sealed class GarnetJournalFailoverAgent(
             {
                 await registry.UnregisterAsync(host, cancellationToken).ConfigureAwait(false);
             }
+        }
+
+        if (assigned == 0 && balancingInterval is { } balance && balance != Timeout.InfiniteTimeSpan && Environment.TickCount64 >= _nextBalance)
+        {
+            _nextBalance = Environment.TickCount64 + (long)balance.TotalMilliseconds;
+            await coordinator.TryBalanceAsync(active, cancellationToken).ConfigureAwait(false);
         }
 
         return assigned;

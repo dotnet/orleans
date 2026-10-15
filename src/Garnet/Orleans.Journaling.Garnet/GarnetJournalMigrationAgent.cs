@@ -4,8 +4,8 @@ using Orleans.Journaling.Ranges;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Runs in each silo which hosts partitions: drives the migrations into those partitions, and drops their expired
-/// tombstones and absent markers.
+/// Runs in each silo which hosts partitions: drives the migrations into those partitions, drops their expired
+/// tombstones and absent markers, and, in the silo hosting the partition with the lowest id, runs the balancer.
 /// </summary>
 /// <remarks>
 /// The destination's host drives a migration, sealing its source and reclaiming it remotely, so every migration has
@@ -20,6 +20,7 @@ internal sealed class GarnetJournalMigrationAgent : IAsyncDisposable
     private readonly Func<PartitionId, bool> _isHosted;
     private readonly GarnetJournalStorageOptions _options;
     private readonly ILogger? _logger;
+    private readonly GarnetJournalBalancer? _balancer;
     private readonly CancellationTokenSource _stop = new();
     private Task[] _loops = [];
 
@@ -35,20 +36,59 @@ internal sealed class GarnetJournalMigrationAgent : IAsyncDisposable
         _isHosted = isHosted;
         _options = options;
         _logger = logger;
+        if (options.BalancingInterval != Timeout.InfiniteTimeSpan)
+        {
+            _balancer = new GarnetJournalBalancer(router, coordinator, GarnetJournalBalancerSettings.From(options), logger);
+        }
     }
 
+    /// <summary>Gets the balancer this agent runs while its silo hosts the partition with the lowest id, if balancing is enabled.</summary>
+    internal GarnetJournalBalancer? Balancer => _balancer;
+
     /// <summary>
-    /// Starts the agent's loops: one drives handovers, one consolidates and reclaims, and one collects markers, so
-    /// neither a long consolidation nor a long collection delays a handover, during which its bucket is unavailable.
+    /// Starts the agent's loops: one drives handovers, one consolidates and reclaims, one collects markers, and one
+    /// balances, so neither a long consolidation, a long collection, nor a balancing round delays a handover, during
+    /// which its bucket is unavailable.
     /// </summary>
     public void Start()
     {
-        _loops =
+        List<Task> loops =
         [
             Task.Run(() => RunAsync(MigrationWork.Handover, _stop.Token)),
             Task.Run(() => RunAsync(MigrationWork.Completion, _stop.Token)),
             Task.Run(() => CollectAsync(_stop.Token)),
         ];
+        if (_balancer is { } balancer)
+        {
+            loops.Add(Task.Run(() => BalanceAsync(balancer, _stop.Token)));
+        }
+
+        _loops = [.. loops];
+    }
+
+    /// <summary>Runs a balancing round every <see cref="GarnetJournalStorageOptions.BalancingInterval"/> while this silo hosts the partition with the lowest id (D37).</summary>
+    private async Task BalanceAsync(GarnetJournalBalancer balancer, CancellationToken cancellationToken)
+    {
+        var time = _router.TimeProvider;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_options.BalancingInterval, time, cancellationToken).ConfigureAwait(false);
+                if (GarnetJournalBalancer.IsBalancer(_router.View.Map, _isHosted))
+                {
+                    await balancer.RunOnceAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                _logger?.LogWarning(exception, "Garnet journal balancing round failed; retrying.");
+            }
+        }
     }
 
     public async ValueTask DisposeAsync()

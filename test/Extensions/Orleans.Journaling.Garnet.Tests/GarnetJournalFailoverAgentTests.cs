@@ -126,6 +126,31 @@ public sealed class GarnetJournalFailoverAgentTests
     }
 
     [Fact]
+    public async Task Agent_BalancesOnlyOntoSilosRegisteredUnderTheirAddresses()
+    {
+        // An active silo which serves an explicit HostId is not registered under its address, so a partition placed on
+        // that address would have no host; balancing leaves the partitions where they are until it registers.
+        var store = new InMemoryRangeMetaStore();
+        var other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11115), 1);
+        var hostings = Enumerable.Range(0, 4)
+            .Select(index => KeyValuePair.Create(new PartitionId($"p{index}"), new PartitionHosting(Active.ToParsableString(), 1, $"p{index}", $"endpoint:{index}")))
+            .ToArray();
+        await store.TryWriteAsync(RangeMap.CreateUniform(16, hostings), 0, CancellationToken);
+        var membership = new FakeMembership(new(
+            Snapshot(1).Members.Add(other, new ClusterMember(other, SiloStatus.Active, "other")),
+            new MembershipVersion(1)));
+        var registry = new FakeRegistry(Active);
+        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, registry, TimeSpan.FromSeconds(1), logger: null, balancingInterval: TimeSpan.Zero);
+
+        Assert.Equal(0, await agent.AssignAsync(CancellationToken));
+        Assert.All((await store.ReadAsync(CancellationToken))!.Map.Partitions.Values, hosting => Assert.Equal(Active.ToParsableString(), hosting.Host));
+
+        registry.Hosts.Add(other.ToParsableString());
+        Assert.Equal(0, await agent.AssignAsync(CancellationToken));
+        Assert.Single((await store.ReadAsync(CancellationToken))!.Map.Partitions.Values, hosting => hosting.Host == other.ToParsableString());
+    }
+
+    [Fact]
     public async Task Agent_AssignsNothingWithoutActiveSilos()
     {
         var store = new InMemoryRangeMetaStore();

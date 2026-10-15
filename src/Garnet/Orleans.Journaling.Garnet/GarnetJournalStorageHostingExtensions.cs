@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
 using Orleans.Providers;
 
 namespace Orleans.Journaling;
@@ -46,6 +47,13 @@ public static class GarnetJournalStorageHostingExtensions
             options.Configure(configure);
         }
 
+        // Grains marked [GarnetJournalPlacement] activate on the silo hosting their journal's partition.
+        if (!services.Any(service => service.IsKeyedService
+            && service.ServiceType == typeof(Orleans.Runtime.Placement.IPlacementDirector)
+            && Equals(service.ServiceKey, typeof(GarnetJournalPlacement))))
+        {
+            services.AddPlacementDirector<GarnetJournalPlacement, GarnetJournalPlacementDirector>();
+        }
 
         if (!services.Any(service => service.IsKeyedService
             && service.ServiceType == typeof(GarnetJournalStorageOptionsValidator)

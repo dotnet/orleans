@@ -81,6 +81,16 @@ silo.AddGarnetJournalStorage(options =>
 });
 ```
 
+Grains can run next to their journals:
+
+```csharp
+[GarnetJournalPlacement]
+public sealed class ShoppingCartGrain([FromKeyedServices("cart")] IDurableDictionary<string, int> items) : DurableGrain, IShoppingCartGrain
+{
+    // ...
+}
+```
+
 ## Behavior
 
 - **Durability.** Garnet runs with `--aof --aof-commit-freq 0 --aof-commit-wait`. Replies, including replies to reads, are sent only after the AOF commit covering the operation is written to the device: on local disk, with write-through, unbuffered I/O; on shared storage, as page blob writes which Azure Storage has committed.
@@ -88,6 +98,9 @@ silo.AddGarnetJournalStorage(options =>
 - **Consistency.** Each operation runs as one transaction procedure, and only the partition which holds a bucket open accepts operations on it. Writes are conditional on the state the storage instance last observed: the journal's content ETag, or the ETag of the deletion which left it absent. A stale writer fails with `InconsistentStateException`. Operations whose replies are lost are retried with the same ETags: a retry of an operation that already committed reports success without applying it again, and a retry which can no longer tell whether its earlier attempt committed, because other writers have changed the journal since, fails with `InconsistentStateException`. No operation applies twice.
 - **Routing.** Each silo caches the range map. When a partition reports that a bucket moved in a newer map, the silo refreshes its map and retries; when a partition is unreachable or not yet serving, it retries with backoff. Operations which cannot complete within `OperationTimeout` fail with `TimeoutException`.
 - **Migration.** A migration recorded in the range map moves a range from its source partition to its destination: the source seals the range's buckets, the destination opens them once the seals are recorded, and from then on the destination serves every operation. A journal's first access at the destination pulls it from the source; the destination's host consolidates the remaining journals in the background, records the migration done, and the source then deletes its copy. Silos which host partitions drive the migrations into them, and each step is recorded in the range map by compare-and-swap, so a silo restart or a duplicated driver resumes or repeats steps safely.
+- **Key filters.** When a source seals a bucket, it writes a bloom filter of the journals it holds, including deleted ones, which travels to the destination. The destination serves a journal which no filter reports, such as one created after the move, without pulling it first.
+- **Balancing.** Partitions count the operations they serve per bucket, and the silo hosting the partition with the lowest id runs a balancer every `BalancingInterval`. Once no migration is in progress, and while the busiest partition's load exceeds `BalancingThreshold` times the mean, it moves runs of buckets from the busiest partition to the least busy, preferring runs which reduce imbalance most per journal moved, and merges cold ranges into their neighbors, moving at most `BalancingMaxMoveFraction` of the buckets per round. With `PartitionBlobContainer`, silos also move one partition at a time from the silo hosting the most partitions to the one hosting the fewest, among the silos which host under their addresses.
+- **Locality.** Grain classes marked `[GarnetJournalPlacement]` activate on the silo hosting the partition which stores their journal, so their journal operations stay on that silo. Hosts are recognized when they are silo addresses, as with `PartitionBlobContainer`, or when the placing silo hosts the partition itself; other grains are placed randomly.
 - **Deletion.** Deleting a journal leaves a tombstone, which keeps a migration from resurrecting the journal from its source and lets retried writes recognize the deletion. Hosting silos drop tombstones older than `TombstoneRetention` once their bucket's migration is done, and advance the bucket's collection generation; a retried write which observed the journal's absence before the dropped deletion fails with `InconsistentStateException` rather than applying again, whatever the silos' clocks.
 - **Data model.** A journal's data is a list with one element per append, so appends do not copy earlier data. `ReplaceAsync` replaces the list with one element. `IsCompactionRequested` becomes `true` once the journal's appends since its last replacement reach `CompactionThresholdBytes` (8 MiB by default).
 - **Catalog.** The provider implements `IJournalStorageCatalog` by listing each bucket's journal index at the partition which owns it, consolidating a bucket first while its migration is in progress.
@@ -109,6 +122,11 @@ silo.AddGarnetJournalStorage(options =>
 | `TombstoneRetention` | 5 min | How long a hosting silo keeps a deleted journal's tombstone once its bucket's migration is done. Retries which arrive within it report their committed outcome; later ones fail with `InconsistentStateException`. Use more than the cluster's longest `OperationTimeout`, plus an allowance for clock skew between silos. |
 | `MigrationInterval` | 1 s | How often a hosting silo checks for migrations into its partitions while it has none in progress. |
 | `MarkerCollectionInterval` | 1 min | How often a hosting silo drops expired tombstones and absent markers. |
+| `KeyFilters` | `true` | Whether sealing a bucket for a migration writes a key filter, about 1.2 bytes per journal, so its destination serves journals the source never held without a pull. |
+| `BalancingInterval` | 30 s | How often the balancer samples load and may move buckets, and silos on shared storage may move a partition; `Timeout.InfiniteTimeSpan` disables both. |
+| `BalancingThreshold` | 1.25 | The busiest partition's load over the mean partition load above which the balancer moves buckets. |
+| `BalancingMinimumLoad` | 100 | Cluster load, in journal operations per second, below which the balancer moves nothing. |
+| `BalancingMaxMoveFraction` | 0.09 | Largest fraction of the buckets one balancing round moves. |
 | `LogMemorySize` | `1g` | In-memory size of each hosted partition's hybrid log; older records spill to its directory. |
 | `IndexMemorySize` | `64m` | Size of each hosted partition's hash index. |
 | `CheckpointAofSize` | `256m` | AOF size at which a partition takes a checkpoint, compacting its log and truncating the AOF. |

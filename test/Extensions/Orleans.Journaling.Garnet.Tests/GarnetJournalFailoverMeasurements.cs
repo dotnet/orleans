@@ -149,6 +149,7 @@ public sealed class GarnetJournalFailoverMeasurements : IAsyncDisposable
     {
         TestContext.Current.TestOutputHelper?.WriteLine(message);
         TestContext.Current.SendDiagnosticMessage(message);
+        File.AppendAllText(Path.Combine(Path.GetTempPath(), "garnet-failover-measurements.txt"), message + Environment.NewLine);
     }
 
     private static double Percentile(double[] sorted, double percentile)

@@ -167,6 +167,7 @@ internal sealed class GarnetPartitionBlobDevice : StorageDeviceBase
                 var count = Math.Min(MaxUploadSize, length - offset);
                 using var stream = CreateStream(source + (nint)offset, count, FileAccess.Read);
                 await blob.UploadPagesAsync(stream, destination + offset, options).ConfigureAwait(false);
+                _storage.OnPagesWritten(count);
             }
         }
         catch (Exception exception)

@@ -75,7 +75,7 @@ public sealed class GarnetJournalConformanceTests
         private readonly Dictionary<long, (string Procedure, object[] Args, SpecOp Op)> _ops = [];
         private readonly List<long> _viewVersions = [0];
         private readonly Dictionary<long, (long Partition, string Key, string Version, ChainRecord Record)> _pulls = [];
-        private readonly Dictionary<long, (long Partition, int Bucket, long View, long Source, long Generation)> _opens = [];
+        private readonly Dictionary<long, (long Partition, int Bucket, long View, long Source, long Generation, byte[]? Filter)> _opens = [];
         private readonly Dictionary<long, (long Partition, int Bucket, long Version, List<GarnetJournalKeySet> Journals)> _dones = [];
         private readonly Dictionary<long, (long Partition, int Bucket, long Version)> _reclaims = [];
 
@@ -141,17 +141,22 @@ public sealed class GarnetJournalConformanceTests
                     {
                         var (partition, bucket) = (Itf.IntPick(state, "sp"), Itf.IntPick(state, "sb"));
                         var version = _viewVersions[(int)post.Buckets[(partition, bucket)].SealVersion];
-                        Expect(await Migrator.TransitionAsync(P(partition), (int)bucket, GarnetJournalProtocol.BucketSealOperation, version, null, CancellationToken), "seal was refused");
+
+                        // The specification chose whether the seal writes key filters (D36), and any false positives they
+                        // report; the implementation's filters report none in buckets this small.
+                        var filters = Itf.Pick(state, "sf")?.GetBoolean() ?? false;
+                        Expect(await Migrator.TransitionAsync(P(partition), (int)bucket, GarnetJournalProtocol.BucketSealOperation, version, null, CancellationToken, extra: filters ? "1" : "0"), "seal was refused");
                         break;
                     }
 
                 case "authorizeAny":
                     {
-                        // The coordinator observes the sealed source and reads its collection generation, which is final.
+                        // The coordinator observes the sealed source and reads its collection generation and key filters,
+                        // which are final.
                         var slot = Itf.IntPick(state, "ai");
                         var ticket = post.Opens[slot];
-                        var generation = (await Migrator.GetBucketAsync(P(ticket.Source), ticket.Bucket, CancellationToken)).CollectionGeneration;
-                        _opens[slot] = (ticket.Partition, ticket.Bucket, ticket.View, ticket.Source, generation);
+                        var source = await Migrator.GetBucketAsync(P(ticket.Source), ticket.Bucket, CancellationToken, withFilter: true);
+                        _opens[slot] = (ticket.Partition, ticket.Bucket, ticket.View, ticket.Source, source.CollectionGeneration, source.State == "sealed" ? source.Filter : null);
                         break;
                     }
 
@@ -161,7 +166,7 @@ public sealed class GarnetJournalConformanceTests
                         var ticket = _opens[slot];
                         _opens.Remove(slot);
                         Expect(
-                            await Migrator.TransitionAsync(P(ticket.Partition), ticket.Bucket, GarnetJournalProtocol.BucketOpenOperation, _viewVersions[(int)ticket.View], P(ticket.Source), CancellationToken, ticket.Generation),
+                            await Migrator.TransitionAsync(P(ticket.Partition), ticket.Bucket, GarnetJournalProtocol.BucketOpenOperation, _viewVersions[(int)ticket.View], P(ticket.Source), CancellationToken, ticket.Generation, ticket.Filter),
                             "open was refused");
                         break;
                     }
@@ -173,7 +178,7 @@ public sealed class GarnetJournalConformanceTests
                         var slot = Itf.IntPick(state, "ti");
                         var ticket = _opens[slot];
                         _opens.Remove(slot);
-                        var applied = await Migrator.TransitionAsync(P(ticket.Partition), ticket.Bucket, GarnetJournalProtocol.BucketOpenOperation, _viewVersions[(int)ticket.View], P(ticket.Source), CancellationToken, ticket.Generation);
+                        var applied = await Migrator.TransitionAsync(P(ticket.Partition), ticket.Bucket, GarnetJournalProtocol.BucketOpenOperation, _viewVersions[(int)ticket.View], P(ticket.Source), CancellationToken, ticket.Generation, ticket.Filter);
                         var before = pre.Buckets[(ticket.Partition, ticket.Bucket)];
                         Expect(!applied || before.State == "open" && before.Version == ticket.View, "an open the specification rejects was applied");
                         break;
@@ -394,6 +399,16 @@ public sealed class GarnetJournalConformanceTests
                     Expect(actual.Done == spec.Done, $"{where}: done {actual.Done}, expected {spec.Done}");
                     Expect(actual.Reclaimed == spec.Reclaimed, $"{where}: reclaimed {actual.Reclaimed}, expected {spec.Reclaimed}");
                     Expect(actual.CollectionGeneration == spec.Generation, $"{where}: collection generation {actual.CollectionGeneration}, expected {spec.Generation}");
+
+                    // Key filters (D36): present where the specification has them, and reporting no journal the
+                    // specification's filter (its records plus any false positives it chose) omits.
+                    var fields = (await _partitions.Database(P(partition)).HashGetAllAsync(GarnetJournalKeys.GetBucketKey(_partitions.MapId, (int)bucket)))
+                        .ToDictionary(entry => entry.Name.ToString(), entry => (byte[])entry.Value!);
+                    CompareFilter(where, "chain", fields.GetValueOrDefault("chain"), spec.Chain, (int)bucket);
+                    if (spec.State == "sealed" && !spec.Reclaimed)
+                    {
+                        CompareFilter(where, "filter", fields.GetValueOrDefault("filter"), spec.Filter, (int)bucket);
+                    }
                 }
 
                 var database = _partitions.Database(P(partition));
@@ -425,6 +440,20 @@ public sealed class GarnetJournalConformanceTests
                         Expect(values.SequenceEqual(spec.Values), $"{where}: content [{string.Join(", ", values)}], expected [{string.Join(", ", spec.Values)}]");
                         Expect(metadata["$content-etag"] == $"op-{spec.Values[^1]}", $"{where}: content ETag {metadata["$content-etag"]}");
                     }
+                }
+            }
+        }
+
+        private void CompareFilter(string where, string name, byte[]? actual, IReadOnlySet<string>? expected, int bucket)
+        {
+            var present = actual is { Length: > 0 };
+            Expect(present == (expected is not null), $"{where}: {name} key filter {(present ? "present" : "absent")}, expected {(expected is null ? "none" : "one")}");
+            if (actual is { Length: > 0 } && expected is not null)
+            {
+                foreach (var key in Keys.Where(key => _keys[key].Bucket == bucket))
+                {
+                    var reports = !GarnetJournalKeyFilter.ExcludesAll(actual, _keys[key].EncodedId);
+                    Expect(!reports || expected.Contains(key), $"{where}: the {name} key filter reports '{key}', which the specification's omits");
                 }
             }
         }

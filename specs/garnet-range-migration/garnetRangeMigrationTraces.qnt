@@ -13,6 +13,7 @@ module garnetRangeMigrationTraces {
     MAX_OPENS = 2,
     MAX_DONES = 2,
     MAX_RECLAIMS = 2,
-    RECENT = 8
+    RECENT = 8,
+    FILTER_CHOICES = true
   ).* from "./garnetRangeMigration"
 }
