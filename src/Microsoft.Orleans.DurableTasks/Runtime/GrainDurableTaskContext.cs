@@ -92,6 +92,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// </remarks>
     public override bool IsReplaying => Volatile.Read(ref _unreached) is not null;
 
+    /// <summary>
+    /// Gets the grain which runs this execution, which qualifies the root identifiers of the detached tasks which the
+    /// execution starts without a name, so executions with the same identifier on different grains derive different ones.
+    /// </summary>
+    protected override string HostId => _runtime.GrainId.ToString();
+
     /// <summary>Notes that this attempt reached <paramref name="operationId"/>, which can end its replay.</summary>
     /// <param name="operationId">The operation's identifier.</param>
     /// <param name="recordsOperation">

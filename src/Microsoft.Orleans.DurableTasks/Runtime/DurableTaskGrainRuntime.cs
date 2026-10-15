@@ -143,7 +143,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     // cancellation lowers it, and each scan recomputes it from the remaining tasks.
     private DateTimeOffset _nextExpiry = DateTimeOffset.MinValue;
 
-    internal GrainId GrainId => GrainContext.GrainId;
+    public GrainId GrainId => GrainContext.GrainId;
 
     internal IGrainContext GrainContext => _shared.GrainContextAccessor.GrainContext;
 

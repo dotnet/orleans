@@ -143,8 +143,9 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
   the task.
   The record observes the task like a `GetDurableTask` subscription: the task's result completes it,
   and its cancellation, an abort or deletion of its tree, or the starter's cancellation ends only the
-  subscription. Its root ID is the `WithId` name, or `{taskId}:{segment}`, where `{segment}` is the
-  generated ID of the execution's next unnamed operation.
+  subscription. Its root ID is the `WithId` name, verbatim, or `{grainId}/{taskId}:{segment}`, where
+  `{grainId}` is the starting grain and `{segment}` is the generated ID of the execution's next unnamed
+  operation, so workflows with the same task ID on different grains derive different root IDs.
 - The outbox holds every invocation of a task on another grain by reference, and the starter provides
   it from a journaled table of pending invocations, keyed by message ID, until the outbox retires it.
   The table is separate from the execution trees, so a start survives deletion of the tree which made

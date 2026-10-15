@@ -3525,6 +3525,23 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task UnnamedDetachedTaskDerivesItsRootIdFromItsStartersGrainAndExecution() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, _, manager, transport) = CreateRuntime();
+        var starterId = TaskId.Parse("starter");
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(cancellationToken => { _ = new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(1)).Detached().Post(); }));
+
+        runtime.ScheduleFromInbox(starterId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => transport.DetachedInvocations.Count == 1);
+
+        // Another grain's execution with the same identifier derives a different root identifier.
+        Assert.Equal(TaskId.CreateRoot($"{runtime.GrainId}/starter:$child-1"), Assert.Single(transport.DetachedInvocations).TaskId);
+    });
+
+    [Fact]
     public Task CanceledStarterStillStartsTheDetachedTaskAndEndsOnlyItsSubscription() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
@@ -4356,6 +4373,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         private readonly TaskCompletionSource<CancellationToken> _schedulingStarted =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public GrainId GrainId { get; } = GrainId.Create("test", "probe");
+
         public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
         public Task<CancellationToken> SchedulingStarted => _schedulingStarted.Task;
 
@@ -4429,6 +4448,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     private sealed class SchedulerProbeRuntime(TaskScheduler scheduler) : IDurableTaskGrainRuntime
     {
         private int _schedulerInvocationCount;
+
+        public GrainId GrainId { get; } = GrainId.Create("test", "probe");
 
         public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
         public int SchedulerInvocationCount => Volatile.Read(ref _schedulerInvocationCount);
