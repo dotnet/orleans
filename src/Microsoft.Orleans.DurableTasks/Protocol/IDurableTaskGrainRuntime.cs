@@ -210,9 +210,14 @@ internal interface IDurableTaskGrainRuntime
 
     /// <summary>
     /// Returns the identifier under which its host stores the task which the operation <paramref name="taskId"/> of an
-    /// execution started or observes.
+    /// execution started or observes, and the grain which stores it when other parties address the task.
     /// </summary>
-    TaskId GetTargetTaskId(TaskId taskId);
+    /// <param name="taskId">The operation's identifier.</param>
+    /// <param name="addressedHost">
+    /// The grain which stores a detached or subscribed task, or <see langword="default"/> for a task which the
+    /// execution's tree owns.
+    /// </param>
+    TaskId GetTargetTaskId(TaskId taskId, out GrainId addressedHost);
 
     /// <summary>Returns when a task's terminal result was recorded, or <see langword="null"/> when it has none.</summary>
     DateTimeOffset? GetCompletedAt(TaskId taskId);

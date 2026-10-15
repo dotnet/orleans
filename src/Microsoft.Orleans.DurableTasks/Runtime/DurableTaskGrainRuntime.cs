@@ -2906,7 +2906,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     ScheduledTask<TResult> IDurableTaskManager.GetTask<TResult>(TaskId taskId)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
-        return new AttachedScheduledTask<TResult>(taskId, this);
+        return new AttachedScheduledTask<TResult>(taskId, GrainId, this);
     }
 
     ValueTask IDurableTaskManager.CancelAsync(TaskId taskId, string? reason, CancellationToken cancellationToken) =>
@@ -2959,19 +2959,22 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <remarks>
-    /// The record of a subscription or a detached start names the task which it observes, and a call to a grain reaches
-    /// the task which the target stores under this grain's scope. The identifier of any other operation, or of one which
-    /// recorded nothing, such as a start which an earlier cancellation prevented, is its own.
+    /// The record of a subscription or a detached start names the task which it observes and that task's grain, which
+    /// other parties address. A call to a grain reaches the task which the target stores under this grain's scope, and
+    /// retains until this grain accepts its completion. The identifier of any other operation, or of one which recorded
+    /// nothing, such as a start which an earlier cancellation prevented, is its own.
     /// </remarks>
-    public TaskId GetTargetTaskId(TaskId taskId)
+    public TaskId GetTargetTaskId(TaskId taskId, out GrainId addressedHost)
     {
+        addressedHost = default;
         if (!_storage.TryGetTask(taskId, out var state))
         {
             return taskId;
         }
 
-        if (TryGetSubscription(state, out _, out var observedId))
+        if (TryGetSubscription(state, out var target, out var observedId))
         {
+            addressedHost = target;
             return observedId;
         }
 

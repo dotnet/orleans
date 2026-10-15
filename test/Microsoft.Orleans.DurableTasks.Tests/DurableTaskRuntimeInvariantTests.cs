@@ -3548,7 +3548,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var starterId = TaskId.Parse("starter");
         var detachedRequest = CreateRemoteRequest(1);
         var callRequest = CreateRemoteRequest(2);
-        var attempts = new ConcurrentQueue<(TaskId Id, TaskId TargetTaskId)[]>();
+        var attempts = new ConcurrentQueue<(TaskId Id, TaskId TargetTaskId, DurableTaskAddress? Address)[]>();
         var request = CreateRequest(
             1,
             () => DurableTask.Run(async executionToken =>
@@ -3559,7 +3559,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                     new TestStateManager.TestRemoteDurableTask(callRequest).WithId("call").Post(),
                     DurableTask.Run(static _ => { }).WithId("local").Post(),
                 ];
-                attempts.Enqueue([.. handles.Select(static handle => (handle.Id, handle.TargetTaskId))]);
+                attempts.Enqueue([.. handles.Select(static handle => (handle.Id, handle.TargetTaskId, handle.TryGetAddress(out var address) ? address : (DurableTaskAddress?)null))]);
                 await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("wait");
             }));
 
@@ -3567,13 +3567,17 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await WaitUntilAsync(() => attempts.Count == 1);
 
-        // A detached start observes the target's root task, and a call reaches the task which its target stores under this
-        // grain's scope. A local child is stored under its own identifier.
-        (TaskId Id, TaskId TargetTaskId)[] expected =
+        // A detached start observes the target's root task, which other parties address. A call reaches the task which its
+        // target stores under this grain's scope, and a local child is stored under its own identifier; the execution's
+        // tree owns both, so neither has an address.
+        (TaskId Id, TaskId TargetTaskId, DurableTaskAddress? Address)[] expected =
         [
-            (starterId.Child($"$detach:{detachedRequest.Context!.TargetId}:detached"), TaskId.CreateRoot("detached")),
-            (starterId.Child("call"), CallerScope.GetTaskId(runtime.GrainId, starterId.Child("call"))),
-            (starterId.Child("local"), starterId.Child("local")),
+            (
+                starterId.Child($"$detach:{detachedRequest.Context!.TargetId}:detached"),
+                TaskId.CreateRoot("detached"),
+                new DurableTaskAddress(detachedRequest.Context.TargetId, TaskId.CreateRoot("detached"))),
+            (starterId.Child("call"), CallerScope.GetTaskId(runtime.GrainId, starterId.Child("call")), null),
+            (starterId.Child("local"), starterId.Child("local"), null),
         ];
         Assert.Equal(expected, Assert.Single(attempts));
 
@@ -4475,7 +4479,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
-        public TaskId GetTargetTaskId(TaskId taskId) => taskId;
+        public TaskId GetTargetTaskId(TaskId taskId, out GrainId addressedHost)
+        {
+            addressedHost = default;
+            return taskId;
+        }
 
         public DateTimeOffset? GetCompletedAt(TaskId taskId) => null;
 
@@ -4558,7 +4566,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId) =>
             new SchedulerProbeHandle(taskId);
 
-        public TaskId GetTargetTaskId(TaskId taskId) => taskId;
+        public TaskId GetTargetTaskId(TaskId taskId, out GrainId addressedHost)
+        {
+            addressedHost = default;
+            return taskId;
+        }
 
         public DateTimeOffset? GetCompletedAt(TaskId taskId) => null;
 
