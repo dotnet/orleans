@@ -1,0 +1,136 @@
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
+
+namespace Orleans.Journaling;
+
+/// <summary>
+/// Runs in every silo of a cluster whose partitions are on shared storage: assigns each partition whose host Orleans
+/// membership has declared dead, or no longer knows, or which has no silo as its host, to an active silo.
+/// </summary>
+/// <remarks>
+/// Hosts are silo addresses (<see cref="SiloAddress.ToParsableString"/>). Every silo runs this agent; the range map's
+/// compare-and-swap lets exactly one assignment of each partition per epoch succeed, and the new host's takeover of the
+/// partition's storage fences the previous host, so the agent needs no election and tolerates a wrong verdict.
+/// </remarks>
+internal sealed class GarnetJournalFailoverAgent(
+    GarnetJournalHostingCoordinator coordinator,
+    IClusterMembershipService membership,
+    TimeSpan interval,
+    ILogger? logger) : IAsyncDisposable
+{
+    private readonly CancellationTokenSource _stop = new();
+    private readonly Dictionary<string, UnknownHost> _unknown = new(StringComparer.Ordinal);
+    private long _refreshes;
+    private Task? _run;
+
+    public void Start() => _run = Task.Run(() => RunAsync(_stop.Token));
+
+    public async ValueTask DisposeAsync()
+    {
+        _stop.Cancel();
+        if (_run is { } run)
+        {
+            await run.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+
+        _stop.Dispose();
+    }
+
+    /// <summary>Assigns every partition which needs a host, by the current membership snapshot.</summary>
+    internal async Task<int> AssignAsync(CancellationToken cancellationToken)
+    {
+        // While some host is unknown to membership, read the membership table, so its verdict does not depend on the
+        // membership version advancing, which it does not in a stable cluster.
+        if (_unknown.Count > 0)
+        {
+            await membership.Refresh(cancellationToken: cancellationToken).ConfigureAwait(false);
+            _refreshes++;
+        }
+
+        var snapshot = membership.CurrentSnapshot;
+        var active = snapshot.Members.Values.Where(member => member.Status == SiloStatus.Active).Select(member => member.SiloAddress.ToParsableString()).ToList();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var dead = new HashSet<string>(StringComparer.Ordinal);
+        var assigned = await coordinator.AssignAsync(host => NeedsHost(snapshot, host, seen, dead), active, cancellationToken).ConfigureAwait(false);
+
+        // Forget hosts which no longer host partitions, which membership knows again, or whose partitions were just
+        // reassigned: the coordinator returns once every partition of a host it found dead has a new host.
+        foreach (var host in _unknown.Keys.Where(host => !seen.Contains(host) || dead.Contains(host)).ToList())
+        {
+            _unknown.Remove(host);
+        }
+
+        return assigned;
+    }
+
+    /// <summary>
+    /// A partition needs a host if its host is not a silo, or is a silo which membership has declared dead, or which
+    /// membership no longer knows, for example because its entry was cleaned up or the cluster was redeployed with a
+    /// new membership table.
+    /// </summary>
+    /// <remarks>
+    /// A silo which has just joined may be missing from this silo's snapshot, so an unknown host is dead only once a
+    /// newer membership version, or a membership table read which started after the host was first found unknown, still
+    /// does not know it. A refresh may join a read already in progress, so the second refresh after the host was first
+    /// found unknown is the first one guaranteed to read the table afterwards.
+    /// </remarks>
+    private bool NeedsHost(ClusterMembershipSnapshot snapshot, string host, HashSet<string> seen, HashSet<string> dead)
+    {
+        if (!SiloAddress.TryParse(host, out var silo))
+        {
+            return true;
+        }
+
+        var status = snapshot.GetSiloStatus(silo);
+        if (status != SiloStatus.None)
+        {
+            return status == SiloStatus.Dead;
+        }
+
+        seen.Add(host);
+        if (!_unknown.TryGetValue(host, out var since))
+        {
+            _unknown[host] = new(snapshot.Version, _refreshes);
+            return false;
+        }
+
+        if (_refreshes - since.Refreshes >= 2 || snapshot.GetSiloStatus(silo, since.Version) == SiloStatus.Dead)
+        {
+            dead.Add(host);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>When a host was first found unknown: the membership version and the number of refreshes by then.</summary>
+    private readonly record struct UnknownHost(MembershipVersion Version, long Refreshes);
+
+    private async Task RunAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await AssignAsync(cancellationToken).ConfigureAwait(false);
+                await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                logger?.LogWarning(exception, "Assigning Garnet journal partitions to hosts failed; retrying.");
+                try
+                {
+                    await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+            }
+        }
+    }
+}

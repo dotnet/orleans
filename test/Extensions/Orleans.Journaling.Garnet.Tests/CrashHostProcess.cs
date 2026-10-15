@@ -17,7 +17,14 @@ internal sealed class CrashHostProcess : IDisposable
 
     public IPEndPoint EndPoint { get; }
 
-    public static async Task<CrashHostProcess> StartAsync(string directory, CancellationToken cancellationToken)
+    public static Task<CrashHostProcess> StartAsync(string directory, CancellationToken cancellationToken)
+        => StartAsync([directory], cancellationToken);
+
+    /// <summary>Starts a partition on blob storage, taking it over at <paramref name="epoch"/>.</summary>
+    public static Task<CrashHostProcess> StartOnBlobsAsync(string connectionString, string container, string storageLocation, long epoch, CancellationToken cancellationToken)
+        => StartAsync(["blob", connectionString, container, storageLocation, epoch.ToString(System.Globalization.CultureInfo.InvariantCulture)], cancellationToken);
+
+    private static async Task<CrashHostProcess> StartAsync(string[] arguments, CancellationToken cancellationToken)
     {
         var port = GetFreePort();
         var hostPath = Path.Combine(AppContext.BaseDirectory, "Orleans.Journaling.Garnet.CrashHost.dll");
@@ -29,7 +36,11 @@ internal sealed class CrashHostProcess : IDisposable
             UseShellExecute = false,
         };
         startInfo.ArgumentList.Add(hostPath);
-        startInfo.ArgumentList.Add(directory);
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
         startInfo.ArgumentList.Add(port.ToString());
         var process = Process.Start(startInfo) ?? throw new InvalidOperationException("The crash host did not start.");
         var errors = process.StandardError.ReadToEndAsync(cancellationToken);

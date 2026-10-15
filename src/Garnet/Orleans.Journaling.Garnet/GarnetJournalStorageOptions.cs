@@ -10,12 +10,13 @@ namespace Orleans.Journaling;
 /// Each journal maps to one of the range map's buckets by a hash of its id, and each bucket is owned by one partition:
 /// one Garnet instance with its own append-only file and checkpoints. The range map, held in <see cref="MetaStore"/>,
 /// assigns ranges of buckets to partitions and partitions to hosts. A silo hosts the partitions assigned to
-/// <see cref="HostId"/>, with their durable state under <see cref="DataDirectory"/>, and connects to the others at the
-/// endpoints their hosts publish in the map.
+/// <see cref="HostId"/>, with their durable state under <see cref="DataDirectory"/> or in
+/// <see cref="PartitionBlobContainer"/>, and connects to the others at the endpoints their hosts publish in the map.
 /// </para>
 /// <para>
 /// The first silo to start writes <see cref="InitialRangeMap"/> to an empty MetaStore. If no initial map is configured,
-/// a silo with a <see cref="DataDirectory"/> writes a map with one partition, <c>p0</c>, which it hosts.
+/// a silo with a <see cref="DataDirectory"/> or a <see cref="PartitionBlobContainer"/> writes a map with one partition,
+/// <c>p0</c>, which it hosts.
 /// </para>
 /// </remarks>
 public sealed class GarnetJournalStorageOptions
@@ -51,10 +52,11 @@ public sealed class GarnetJournalStorageOptions
     /// Gets or sets the identifier of this silo in <see cref="PartitionHosting.Host"/>.
     /// </summary>
     /// <remarks>
-    /// The range map assigns partitions to hosts by this identifier, so it must be stable across restarts. If it is
-    /// <see langword="null"/>, a silo with a <see cref="DataDirectory"/> generates an identifier on first start and
-    /// stores it in the directory, and a silo without one hosts no partitions. Set it explicitly to name hosts in
-    /// <see cref="InitialRangeMap"/>.
+    /// The range map assigns partitions to hosts by this identifier. If it is <see langword="null"/>, a silo with
+    /// <see cref="PartitionBlobContainer"/> uses its silo address, which identifies one run of the silo, so its
+    /// partitions fail over when it dies; a silo with a <see cref="DataDirectory"/> generates an identifier on first
+    /// start and stores it in the directory, since its partitions stay in that directory; and other silos host no
+    /// partitions. Set it explicitly to name hosts in <see cref="InitialRangeMap"/>.
     /// </remarks>
     public string? HostId { get; set; }
 
@@ -74,9 +76,33 @@ public sealed class GarnetJournalStorageOptions
     /// <remarks>
     /// Each hosted partition's append-only file and checkpoints live in the subdirectory named by its
     /// <see cref="PartitionHosting.StorageLocation"/>. The directory must persist across silo restarts. Silos which host
-    /// no partitions need no directory.
+    /// no partitions, and silos whose partitions are in <see cref="PartitionBlobContainer"/>, need no directory.
     /// </remarks>
     public string? DataDirectory { get; set; }
+
+    /// <summary>
+    /// Gets or sets the Azure Storage container which holds every partition's durable state, shared by every silo.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// When set, each partition stores its append-only file, hybrid log, and checkpoints as page blobs under its
+    /// <see cref="PartitionHosting.StorageLocation"/> in this container, so any silo can host it. A silo starts a
+    /// partition by taking its storage over: it breaks the leases of the previous host, whose later writes then fail at
+    /// the storage service, and recovers the partition from the blobs. An acknowledged write therefore survives the loss
+    /// of the silo, and the machine, which acknowledged it.
+    /// </para>
+    /// <para>
+    /// Unless <see cref="HostId"/> is set, silos are identified by their silo addresses, and every silo assigns each
+    /// partition whose host Orleans membership has declared dead, or whose host is not a silo address, to an active silo.
+    /// </para>
+    /// </remarks>
+    public Azure.Storage.Blobs.BlobContainerClient? PartitionBlobContainer { get; set; }
+
+    /// <summary>
+    /// Gets or sets how often a silo reads the range map to start and stop the partitions assigned to it and, with
+    /// <see cref="PartitionBlobContainer"/>, to fail partitions over from dead silos.
+    /// </summary>
+    public TimeSpan HostingInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     /// <summary>
     /// Gets or sets the endpoint on which this silo's partitions accept connections.

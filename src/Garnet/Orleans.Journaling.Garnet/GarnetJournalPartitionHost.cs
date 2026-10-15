@@ -14,9 +14,10 @@ namespace Orleans.Journaling;
 /// <para>
 /// The server writes every operation to its append-only file (AOF) and replies only after the AOF commit containing
 /// the operation is flushed to the device (<c>--aof --aof-commit-freq 0 --aof-commit-wait</c>). Local devices write
-/// with write-through and unbuffered I/O, so an acknowledged operation survives the loss of the process. Reads also
-/// wait for the AOF commit covering every write they may have observed, so no read observes a write that a crash
-/// could lose.
+/// with write-through and unbuffered I/O, so an acknowledged operation survives the loss of the process; blob devices
+/// (<see cref="GarnetPartitionBlobStorage"/>) write page blobs under the hosting tenure's lease, so it survives the loss
+/// of the machine, and a host fenced by a later tenure fails every later commit. Reads also wait for an AOF commit,
+/// which covers every write they may have observed, so no read observes a write that a crash could lose.
 /// </para>
 /// <para>
 /// The journal procedures are registered before recovery, because recovery replays logged procedure invocations by
@@ -37,23 +38,45 @@ internal sealed class GarnetJournalPartitionHost : IDisposable
     public IPEndPoint EndPoint { get; }
 
     /// <summary>
-    /// Starts the partition, recovering its state from <see cref="GarnetJournalPartitionSettings.DataDirectory"/>.
+    /// Starts the partition, recovering its state from its storage: <see cref="GarnetJournalPartitionSettings.BlobStorage"/>
+    /// if set, otherwise <see cref="GarnetJournalPartitionSettings.DataDirectory"/>.
     /// </summary>
     public static GarnetJournalPartitionHost Start(GarnetJournalPartitionSettings settings, ILoggerFactory? loggerFactory)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentException.ThrowIfNullOrWhiteSpace(settings.DataDirectory);
-        var dataDirectory = Path.GetFullPath(settings.DataDirectory);
-        Directory.CreateDirectory(dataDirectory);
         var logger = loggerFactory?.CreateLogger<GarnetJournalPartitionHost>();
+        string logDirectory, checkpointDirectory, location;
+        INamedDeviceFactoryCreator devices;
+        if (settings.BlobStorage is { } blobStorage)
+        {
+            // Directory names become prefixes within the partition's storage location.
+            logDirectory = "log";
+            checkpointDirectory = "checkpoint";
+            devices = new GarnetPartitionBlobDeviceFactoryCreator(blobStorage);
+            location = $"blob storage at epoch {blobStorage.Epoch}";
+        }
+        else
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(settings.DataDirectory);
+            var dataDirectory = Path.GetFullPath(settings.DataDirectory);
+            Directory.CreateDirectory(dataDirectory);
+            logDirectory = Path.Combine(dataDirectory, "log");
+            checkpointDirectory = Path.Combine(dataDirectory, "checkpoint");
+
+            // The RandomAccess device opens files with write-through and unbuffered I/O on every platform, so a
+            // completed AOF flush is on stable storage rather than in the device's volatile cache.
+            devices = new LocalStorageNamedDeviceFactoryCreator(deviceType: DeviceType.RandomAccess, logger: logger);
+            location = $"data directory {dataDirectory}";
+        }
+
         var requested = settings.ListenEndPoint ?? new IPEndPoint(IPAddress.Loopback, 0);
         var endPoint = requested.Port == 0 ? new IPEndPoint(requested.Address, GetFreePort(requested.Address)) : requested;
         var options = new GarnetServerOptions(logger)
         {
             EndPoints = [endPoint],
             EnableStorageTier = true,
-            LogDir = Path.Combine(dataDirectory, "log"),
-            CheckpointDir = Path.Combine(dataDirectory, "checkpoint"),
+            LogDir = logDirectory,
+            CheckpointDir = checkpointDirectory,
             Recover = true,
             FailOnRecoveryError = true,
             EnableAOF = true,
@@ -69,9 +92,7 @@ internal sealed class GarnetJournalPartitionHost : IDisposable
             // AOF; compact the hybrid log before each checkpoint, keeping live records.
             AofSizeLimit = settings.CheckpointAofSize,
             CompactionType = LogCompactionType.Lookup,
-            // The RandomAccess device opens files with write-through and unbuffered I/O on every platform, so a
-            // completed AOF flush is on stable storage rather than in the device's volatile cache.
-            DeviceFactoryCreator = new LocalStorageNamedDeviceFactoryCreator(deviceType: DeviceType.RandomAccess, logger: logger),
+            DeviceFactoryCreator = devices,
         };
 
         var server = new GarnetServer(options, loggerFactory);
@@ -86,7 +107,7 @@ internal sealed class GarnetJournalPartitionHost : IDisposable
             throw;
         }
 
-        logger?.LogInformation("Started Garnet journal partition at {EndPoint} with data directory {DataDirectory}.", endPoint, dataDirectory);
+        logger?.LogInformation("Started Garnet journal partition at {EndPoint} with {Location}.", endPoint, location);
         return new(server, endPoint);
     }
 
@@ -108,8 +129,14 @@ internal sealed class GarnetJournalPartitionHost : IDisposable
 /// </summary>
 internal sealed class GarnetJournalPartitionSettings
 {
-    /// <summary>Gets or sets the directory holding the partition's AOF and checkpoints.</summary>
-    public required string DataDirectory { get; init; }
+    /// <summary>Gets or sets the directory holding the partition's AOF and checkpoints, if <see cref="BlobStorage"/> is not set.</summary>
+    public string? DataDirectory { get; init; }
+
+    /// <summary>
+    /// Gets or sets the hosting tenure's fenced storage, which holds the partition's AOF, hybrid log, and checkpoints in
+    /// shared blob storage (D12).
+    /// </summary>
+    public GarnetPartitionBlobStorage? BlobStorage { get; init; }
 
     /// <summary>Gets or sets the endpoint to listen on. Port 0 chooses a free port. Defaults to a free loopback port.</summary>
     public IPEndPoint? ListenEndPoint { get; init; }
