@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-using System.Diagnostics.Metrics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
@@ -7,6 +5,8 @@ using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Messaging;
 using Orleans.Messaging.Configuration;
+using Orleans.Messaging.Diagnostics;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.IntegrationTests;
@@ -48,9 +48,8 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
         var caller = _fixture.Client.GetGrain<IFragileResultCallerGrain>(Guid.NewGuid());
         var callee = _fixture.Client.GetGrain<IFragileResultCalleeGrain>(Guid.NewGuid());
         var probe = _probe;
-        using var deliveries = new DeliveryOutcomeListener(_fixture.Cluster.Silos
-            .Select(silo => _fixture.Cluster.GetSiloServiceProvider(silo.SiloAddress).GetRequiredService<OrleansInstruments>().Meter)
-            .ToHashSet());
+        var calleeId = callee.GetGrainId();
+        using var deliveries = new DiagnosticEventCollector(MessagingEvents.ListenerName);
 
         await caller.CallAsync(callee.GetPrimaryKey()).WithId("fragile-root").ScheduleAsync(cancellationToken);
         await probe.ProduceStarted.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
@@ -59,18 +58,26 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
         probe.BlockCallerActivation = true;
         await caller.RequestDeactivationAsync();
         await probe.CallerDeactivated.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
-        var attemptFailed = deliveries.WaitForAsync("error");
         probe.ReleaseProduce();
-        await attemptFailed.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        await deliveries.WaitForEventAsync(
+            nameof(MessagingEvents.OutboxRetryScheduled),
+            evt => evt.Payload is MessagingEvents.OutboxRetryScheduled retry && retry.GrainContext.GrainId == calleeId,
+            TimeSpan.FromSeconds(30),
+            cancellationToken);
         Assert.Empty(await callee.GetOutboxDeadLettersAsync());
 
         // A new callee activation recovers the completion and must decode its stored result to deliver it.
         await callee.RequestDeactivationAsync();
         await probe.CalleeDeactivated.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         _fixture.JobClock.Advance(RetryDelay * 2);
-        var deadLettered = deliveries.WaitForAsync("source_error");
         Assert.Empty(await callee.GetOutboxDeadLettersAsync());
-        await deadLettered.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        await deliveries.WaitForEventAsync(
+            nameof(MessagingEvents.OutboxMessageRetired),
+            evt => evt.Payload is MessagingEvents.OutboxMessageRetired retired
+                && retired.GrainContext.GrainId == calleeId
+                && retired.Retirement.Status == OutboxMessageRetirementStatus.DeadLettered,
+            TimeSpan.FromSeconds(30),
+            cancellationToken);
 
         var letter = Assert.Single(await callee.GetOutboxDeadLettersAsync());
         Assert.StartsWith("durable-rpc/complete/", letter.Message.Envelope.MessageId.ToString(), StringComparison.Ordinal);
@@ -105,46 +112,6 @@ public abstract class DurableTaskCompletionDeadLetterTests : IAsyncLifetime
         Assert.Contains(FragileResultHooks.Error, diagnostics[childId].Response, StringComparison.Ordinal);
         Assert.Equal("Completed", diagnostics[TaskId.CreateRoot("later")].Status);
         Assert.Equal("42", diagnostics[TaskId.CreateRoot("later")].Response);
-    }
-
-    /// <summary>Observes outbox delivery outcomes recorded by the cluster's silos.</summary>
-    private sealed class DeliveryOutcomeListener : IDisposable
-    {
-        private readonly MeterListener _listener = new();
-        private readonly ConcurrentDictionary<string, TaskCompletionSource> _outcomes = new();
-
-        public DeliveryOutcomeListener(HashSet<Meter> meters)
-        {
-            _listener.InstrumentPublished = (instrument, listener) =>
-            {
-                if (meters.Contains(instrument.Meter) && instrument.Name == "orleans-messaging-outbox-messages-delivered")
-                {
-                    listener.EnableMeasurementEvents(instrument);
-                }
-            };
-            _listener.SetMeasurementEventCallback<long>((_, _, tags, _) =>
-            {
-                string? grainType = null, status = null;
-                foreach (var tag in tags)
-                {
-                    if (tag.Key == "grain_type") grainType = tag.Value as string;
-                    else if (tag.Key == "status") status = tag.Value as string;
-                }
-
-                if (grainType == FragileResultCalleeGrain.GrainTypeName && status is not null)
-                {
-                    Get(status).TrySetResult();
-                }
-            });
-            _listener.Start();
-        }
-
-        public Task WaitForAsync(string status) => Get(status).Task;
-
-        private TaskCompletionSource Get(string status) =>
-            _outcomes.GetOrAdd(status, static _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
-
-        public void Dispose() => _listener.Dispose();
     }
 }
 

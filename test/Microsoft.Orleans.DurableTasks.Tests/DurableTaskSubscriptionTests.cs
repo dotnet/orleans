@@ -600,13 +600,7 @@ public sealed class DurableTaskSubscriptionTests
         /// <summary>Waits until the grain stages <paramref name="taskId"/>, which a running execution schedules.</summary>
         public async Task WaitUntilStoredAsync(TaskId taskId)
         {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestCancellation);
-            timeout.CancelAfter(TimeSpan.FromSeconds(10));
-            while (!Contains(taskId))
-            {
-                await Task.Delay(5, timeout.Token);
-            }
-
+            await StateChanges.WaitUntilAsync(() => Contains(taskId), description: $"task '{taskId}' is stored");
             await WriteAsync(TestCancellation);
         }
 

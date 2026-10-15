@@ -45,6 +45,7 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
     {
         BeforeSendInvocation?.Invoke(sender, target, taskId, request);
         Invocations.Add((sender, target, taskId, request));
+        StateChanges.Notify();
         return CreateInvocationMessage(sender, target, taskId, request, detached: false, subscriberId: null);
     }
 
@@ -58,6 +59,7 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
         TaskId? subscriberId)
     {
         DetachedInvocations.Add((sender, target, taskId, request, subscriberId));
+        StateChanges.Notify();
         return CreateInvocationMessage(sender, target, taskId, request, detached: true, subscriberId);
     }
 
@@ -109,6 +111,8 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
         {
             SentInvocations.Add(messageId);
         }
+
+        StateChanges.Notify();
     }
 
     public OutboxMessage CreateCompletionMessage(
@@ -127,17 +131,22 @@ internal sealed partial class RecordingDurableTaskMessageTransport : IDurableTas
         BeforeSendCancellation?.Invoke(sender, target, taskId);
         Cancellations.Add((sender, target, taskId));
         CancellationReasons.Add(reason);
+        StateChanges.Notify();
     }
 
     public List<(GrainId Sender, GrainId Target, TaskId TaskId, string Reason)> Aborts { get; } = [];
 
-    public void SendAbort(GrainId sender, GrainId target, TaskId taskId, string reason) =>
+    public void SendAbort(GrainId sender, GrainId target, TaskId taskId, string reason)
+    {
         Aborts.Add((sender, target, taskId, reason));
+        StateChanges.Notify();
+    }
 
     public void SendResume(GrainId grainId, TaskId taskId, long generation, DateTimeOffset dueTime)
     {
         Resumes.Add((grainId, taskId, generation, dueTime));
         _resumeSent.TrySetResult();
+        StateChanges.Notify();
     }
 }
 
@@ -185,6 +194,7 @@ internal sealed class RuntimeTestDurableTaskRequest(
     public DurableTask CreateTask()
     {
         CreateTaskCallCount++;
+        StateChanges.Notify();
         return createTask?.Invoke() ?? DurableTask.FromResult(0);
     }
 
