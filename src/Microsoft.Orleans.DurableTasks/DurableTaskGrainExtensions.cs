@@ -79,7 +79,7 @@ public static class DurableTaskGrainExtensions
     /// </summary>
     /// <typeparam name="T">The signal's value type.</typeparam>
     /// <param name="target">The grain which owns the task.</param>
-    /// <param name="rootId">The root ID under which a client or another grain invoked or detached the task.</param>
+    /// <param name="rootId">The root ID of a task which a client, a grain, or a durable execution started.</param>
     /// <param name="signal">The signal descriptor which the task's waits share.</param>
     /// <param name="value">The signal's value.</param>
     /// <param name="cancellationToken">A token which abandons the send.</param>
@@ -148,7 +148,7 @@ public static class DurableTaskGrainExtensions
     /// </summary>
     /// <typeparam name="T">The signal's value type.</typeparam>
     /// <param name="target">The grain which owns the task.</param>
-    /// <param name="rootId">The root ID under which a client or another grain invoked or detached the task.</param>
+    /// <param name="rootId">The root ID of a task which a client, a grain, or a durable execution started.</param>
     /// <param name="signal">The signal descriptor which the task's waits share.</param>
     /// <param name="value">The signal's value.</param>
     /// <param name="cancellationToken">A token which abandons the send.</param>
@@ -168,7 +168,7 @@ public static class DurableTaskGrainExtensions
     /// </summary>
     /// <typeparam name="TResult">The durable task result type.</typeparam>
     /// <param name="target">The grain which owns the durable task, which can be the calling grain.</param>
-    /// <param name="rootId">The root ID under which a client, another grain, or <c>DetachAsync</c> invoked the task.</param>
+    /// <param name="rootId">The root ID of a task which a client, a grain, or a durable execution started.</param>
     /// <returns>A reference which behaves as <see cref="GetDurableTask{TResult}(IAddressable, TaskId)"/> describes.</returns>
     /// <remarks>The reference addresses <c>TaskId.CreateRoot(rootId)</c>.</remarks>
     /// <exception cref="ArgumentNullException"><paramref name="target"/> is <see langword="null"/>.</exception>
@@ -186,7 +186,7 @@ public static class DurableTaskGrainExtensions
     /// </summary>
     /// <typeparam name="TResult">The durable task result type.</typeparam>
     /// <param name="target">The grain which owns the durable task, which can be the calling grain.</param>
-    /// <param name="taskId">The identifier of a task which a client, another grain, or <c>DetachAsync</c> invoked.</param>
+    /// <param name="taskId">The identifier of a task which a client, a grain, or a durable execution started.</param>
     /// <returns>
     /// A reference which a durable execution awaits, schedules, or passes to combinators to subscribe to the task's
     /// result, and which other code awaits, polls, cancels, or aborts.
@@ -202,17 +202,16 @@ public static class DurableTaskGrainExtensions
     /// <para>
     /// <paramref name="target"/> adds the child to the task's completion destinations, beside the task's invoker, sends
     /// the task's result through its outbox, as it does to the invoker, and retains the task until that completion
-    /// retires. A subscription to a terminal task completes promptly. A subscription can arrive before the task's
-    /// invocation, for example when one write of another grain starts both the task and the subscribing execution, so
-    /// <paramref name="target"/> holds it until the invocation arrives or Messaging's <c>OutboxRetryTimeout</c> has
-    /// elapsed. A task which <paramref name="target"/> doesn't retain as an invoked task then, such as one whose
-    /// retention ended, completes the child with <see cref="DurableTaskNotFoundException"/>, and so does a stored task
-    /// which isn't an invoked task, at once.
+    /// retires. A subscription to a terminal task completes promptly, and a task which <paramref name="target"/>
+    /// doesn't retain as an invoked task, such as one whose retention ended, completes the child with
+    /// <see cref="DurableTaskNotFoundException"/> promptly. A task identifier which escapes the code which started the
+    /// task refers to a task which its grain holds: <c>ScheduleAsync</c> returns once the task's grain has accepted the
+    /// task, and an execution which starts a detached task observes it through the start itself.
     /// </para>
     /// <para>
     /// Canceling the child, for example when a <c>WaitAsync</c> deadline passes or a <c>Race</c> input loses, ends it as
     /// canceled and ends its subscription; the task continues. Durable cancellation of the execution reaches the child
-    /// like any child, unless the execution scheduled it in a cancellation suppression scope.
+    /// like any child, unless the execution started it shielded.
     /// </para>
     /// <para>
     /// Outside a durable execution, such as in a client or an ordinary grain method, awaiting the reference waits for the

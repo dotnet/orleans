@@ -81,12 +81,11 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <remarks>
     /// The runtime supplies the operations which earlier attempts recorded in this execution's tree when the attempt
-    /// starts: its children, including subscriptions to other tasks, detach and signal-send markers, and effect records,
-    /// but not signal values, which senders record, invoked descendants, or cancellations and subscriptions which arrived
-    /// before their requests. The attempt reaches an
-    /// operation when it schedules it, looks up its handle, detaches or signals under its marker, selects a completion
-    /// under its decision, or runs an effect under its name. Scheduling an operation which no earlier attempt recorded
-    /// ends the replay; reaching an operation again doesn't.
+    /// starts: its children, including subscriptions to other tasks and records of detached tasks, signal-send markers,
+    /// and effect records, but not signal values, which senders record, invoked descendants, or cancellations which
+    /// arrived before their requests. The attempt reaches an operation when it starts or posts it, looks up its handle,
+    /// signals under its marker, selects a completion under its decision, or runs an effect under its name. Starting an
+    /// operation which no earlier attempt recorded ends the replay; reaching an operation again doesn't.
     /// </remarks>
     public override bool IsReplaying => Volatile.Read(ref _unreached) is not null;
 
@@ -196,24 +195,107 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
     }
 
-    protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
+    /// <remarks>
+    /// Only durable grain calls can be detached: the target recovers a root task from its serialized request. A detached
+    /// start is recorded under <c>$detach:{target}:{rootId}</c>, so each detached task which this execution starts has
+    /// one record, independently of other operations which a deployment adds or removes.
+    /// </remarks>
+    protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(
         TaskId taskId,
         DurableTask task,
+        DurableTaskStartOptions options,
         CancellationToken cancellationToken)
     {
-        // The suppression scope flows with the scheduling code, so it is read before switching schedulers.
-        var suppressCancellation = IsCancellationSuppressed;
+        // The shield flows with the starting code, so it is read before switching schedulers.
+        var shielded = SchedulesShieldedChildren;
+        var waitForAcceptance = options.HasFlag(DurableTaskStartOptions.WaitForAcceptance);
+        if (options.HasFlag(DurableTaskStartOptions.Detached))
+        {
+            var (recordId, request) = GetDetachedRecord(taskId, task);
+            return RunOnScheduler(
+                _scheduler,
+                () => StartDetachedCoreAsync(recordId, taskId, request, shielded, waitForAcceptance, cancellationToken));
+        }
+
         ObserveOperation(taskId, recordsOperation: true);
         return RunOnScheduler(
             _scheduler,
-            () => ScheduleChildTaskCoreAsync(taskId, task, suppressCancellation, cancellationToken));
+            () => ScheduleChildTaskCoreAsync(taskId, task, shielded, waitForAcceptance, cancellationToken));
     }
 
     private async ValueTask<IScheduledTaskHandle> ScheduleChildTaskCoreAsync(
         TaskId taskId,
         DurableTask task,
-        bool suppressCancellation,
+        bool shielded,
+        bool waitForAcceptance,
         CancellationToken cancellationToken)
+    {
+        ValidateChild(taskId, task);
+        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
+        var handle = await _runtime.ScheduleChildAsync(taskId, task, shielded, waitForAcceptance, executionCts.Token);
+        return new ExecutionTaskHandle(handle, this);
+    }
+
+    private async ValueTask<IScheduledTaskHandle> StartDetachedCoreAsync(
+        TaskId recordId,
+        TaskId rootId,
+        IDurableTaskRequest request,
+        bool shielded,
+        bool waitForAcceptance,
+        CancellationToken cancellationToken)
+    {
+        ThrowIfDeleted();
+        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
+        var handle = await _runtime.StartDetachedAsync(recordId, rootId, request, shielded, waitForAcceptance, executionCts.Token);
+        return new ExecutionTaskHandle(handle, this);
+    }
+
+    /// <remarks>
+    /// The start and its record are staged in the work item which calls this on the activation, so they commit in the
+    /// same journal write as the journaled state which that work item changed. A replay which reaches the record returns
+    /// the same handle without starting the task again.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
+    protected override IScheduledTaskHandle PostTask(TaskId taskId, DurableTask task, DurableTaskStartOptions options)
+    {
+        if (TaskScheduler.Current != _scheduler)
+        {
+            throw new InvalidOperationException(
+                $"Post runs on the scheduler of the grain activation which runs durable task '{Id}', so its start commits with the state which the calling code changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't post.");
+        }
+
+        var shielded = SchedulesShieldedChildren;
+        if (options.HasFlag(DurableTaskStartOptions.Detached))
+        {
+            var (recordId, request) = GetDetachedRecord(taskId, task);
+            ThrowIfDeleted();
+            return new ExecutionTaskHandle(_runtime.PostDetached(recordId, taskId, request, shielded), this);
+        }
+
+        ObserveOperation(taskId, recordsOperation: true);
+        ValidateChild(taskId, task);
+        return new ExecutionTaskHandle(_runtime.PostChild(taskId, task, shielded), this);
+    }
+
+    /// <summary>Returns the identifier which records a detached start in this execution, and the started request.</summary>
+    /// <exception cref="NotSupportedException">The definition isn't a durable grain call.</exception>
+    private (TaskId RecordId, IDurableTaskRequest Request) GetDetachedRecord(TaskId rootId, DurableTask task)
+    {
+        if (task is not IDurableTaskRequest { Context: { } requestContext } request)
+        {
+            throw new NotSupportedException("Only durable grain calls can be detached.");
+        }
+
+        var recordId = Id.Child(CreateMarkerSegment("detach", [requestContext.TargetId.ToString(), rootId.ToString()]));
+        ObserveOperation(recordId, recordsOperation: true);
+        return (recordId, request);
+    }
+
+    /// <summary>
+    /// Throws unless <paramref name="taskId"/> can be a child of this execution which runs <paramref name="task"/>: the
+    /// execution isn't deleted, and an earlier run recorded no other kind of operation for the child's name.
+    /// </summary>
+    private void ValidateChild(TaskId taskId, DurableTask task)
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ThrowIfNotChildTaskId(taskId);
@@ -230,10 +312,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                     _ => "a local child task",
                 });
         }
-
-        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        var handle = await _runtime.ScheduleChildAsync(taskId, task, suppressCancellation, executionCts.Token);
-        return new ExecutionTaskHandle(handle, this);
     }
 
     protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
@@ -352,37 +430,6 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         otherId = default;
         return false;
-    }
-
-    /// <remarks>
-    /// Only durable grain calls can be detached: the target recovers a root task from its serialized request. The start
-    /// is recorded under <c>$detach:{target}:{rootId}</c>, so each detached task which this execution starts has one
-    /// record, independently of other operations which a deployment adds or removes. Durable cancellation of this
-    /// execution doesn't abandon the start; host abort does.
-    /// </remarks>
-    protected override ValueTask DetachTaskAsync(
-        TaskId rootId,
-        DurableTask taskDefinition,
-        CancellationToken cancellationToken) =>
-        RunOnScheduler(
-            _scheduler,
-            () => DetachTaskCoreAsync(rootId, taskDefinition, cancellationToken));
-
-    private async ValueTask DetachTaskCoreAsync(
-        TaskId rootId,
-        DurableTask taskDefinition,
-        CancellationToken cancellationToken)
-    {
-        ThrowIfDeleted();
-        if (taskDefinition is not IDurableTaskRequest { Context: { } requestContext } request)
-        {
-            throw new NotSupportedException("Only durable grain calls can be detached.");
-        }
-
-        var markerId = Id.Child(CreateMarkerSegment("detach", [requestContext.TargetId.ToString(), rootId.ToString()]));
-        ObserveOperation(markerId, recordsOperation: true);
-        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        await _runtime.DetachAsync(rootId, request, markerId, executionCts.Token);
     }
 
     /// <summary>

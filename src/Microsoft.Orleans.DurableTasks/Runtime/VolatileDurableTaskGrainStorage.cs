@@ -272,10 +272,17 @@ public class VolatileDurableTaskGrainStorage(
         _workingCopy[taskId] = TrackState(taskId, updated);
     }
 
-    public void SuppressCancellation(TaskId taskId, IDurableTaskState state)
+    public void Shield(TaskId taskId, IDurableTaskState state)
     {
         var typedState = GetState(taskId, state);
-        typedState.CancellationSuppressed = true;
+        typedState.Shielded = true;
+        AddOrUpdateTask(taskId, typedState);
+    }
+
+    public void SetAccepted(TaskId taskId, IDurableTaskState state, bool accepted)
+    {
+        var typedState = GetState(taskId, state);
+        typedState.Accepted = accepted;
         AddOrUpdateTask(taskId, typedState);
     }
 
