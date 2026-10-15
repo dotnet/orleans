@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-A durable task body reads or changes grain state, such as an `IDurableValue<T>`, `IDurableDictionary<TKey, TValue>`, or `IPersistentState<TState>` member, at a point from which the body still reaches a durable operation. The first method counts a reminder before sending it, and the second branches on a status which its own step changes:
+A durable task body reads or changes grain state at a point from which the body still reaches a durable operation. Grain state is a field or property whose type is, or implements, a journaled collection, `IDurableValue<T>`, `IDurableDictionary<TKey, TValue>`, `IDurableList<T>`, `IDurableQueue<T>`, `IDurableSet<T>`, `IDurableTaskCompletionSource<T>`, or `IDurableLog<T>`, or persistent state, `IPersistentState<TState>`. The first method counts a reminder before sending it, and the second branches on a status which its own step changes:
 
 :::code source="snippets/durable-tasks/Orleans0100.cs" id="orleans0100_violation" language="csharp":::
 
@@ -36,7 +36,7 @@ For the replay model, see [Writing replay-safe workflows](https://github.com/dot
 
 ## How to fix violations
 
-**Record the access with `DurableTask.Once`.** The effect runs once and returns its outputs, and a replay returns the recorded values. Read state which decides later operations the same way:
+**Record the access with `DurableTask.Once`.** The effect runs once and returns its outputs, and a replay returns the recorded values. Read state which decides later operations the same way, and append progress to an `IDurableLog<T>` with `DurableTask.Once(() => log.Append(entry))`, so each entry is appended once:
 
 :::code source="snippets/durable-tasks/Orleans0100.cs" id="orleans0100_fix_once" language="csharp":::
 

@@ -173,6 +173,46 @@ internal static class DurableTaskStubs
             public interface IDurableDictionary<TKey, TValue> : IDictionary<TKey, TValue>
             {
             }
+
+            public interface IDurableList<T> : IList<T>
+            {
+                void AddRange(IEnumerable<T> collection);
+            }
+
+            public interface IDurableQueue<T> : IReadOnlyCollection<T>
+            {
+                void Enqueue(T item);
+
+                T Dequeue();
+            }
+
+            public interface IDurableSet<T> : ISet<T>
+            {
+            }
+
+            public interface IDurableTaskCompletionSource<T>
+            {
+                bool TrySetResult(T value);
+            }
+
+            public interface IDurableLog<T> : IReadOnlyCollection<T>
+            {
+                long Append(T item);
+
+                void TrimBefore(long sequence);
+
+                void Clear();
+            }
+        }
+
+        namespace Orleans.Runtime
+        {
+            public interface IPersistentState<TState>
+            {
+                TState State { get; set; }
+
+                Task WriteStateAsync();
+            }
         }
         """;
 }
