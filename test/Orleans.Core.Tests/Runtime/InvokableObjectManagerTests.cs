@@ -24,6 +24,23 @@ namespace UnitTests.Runtime;
 public class InvokableObjectManagerTests
 {
     [Fact]
+    public async Task Dispatch_InvokesObserverFilterWithoutSystemWideFilters()
+    {
+        var observer = new FilteringObserver();
+        await using var fixture = new ManagerFixture(observer: observer);
+        var body = new TestInvokable("observer-result");
+        body.Release.TrySetResult();
+        var message = fixture.Request(11, body);
+
+        fixture.Manager.Dispatch(message);
+        await fixture.WaitAsync(fixture.StopAsync(), "observer filter and invocation drain");
+
+        Assert.Equal(1, observer.InvocationCount);
+        fixture.AssertSuccess(message, body, "filtered-observer-result");
+        fixture.AssertResponseCount(1);
+    }
+
+    [Fact]
     public async Task StopAsync_WaitsForRunningNormalInvocation()
     {
         await using var fixture = new ManagerFixture();
@@ -545,6 +562,19 @@ public class InvokableObjectManagerTests
         }
     }
 
+    private sealed class FilteringObserver : IGrainObserver, IIncomingGrainCallFilter
+    {
+        internal int InvocationCount { get; private set; }
+
+        async Task IIncomingGrainCallFilter.Invoke(IIncomingGrainCallContext context)
+        {
+            InvocationCount++;
+            Assert.Same(this, context.Grain);
+            await context.Invoke();
+            context.Result = $"filtered-{context.Result}";
+        }
+    }
+
     private sealed class ManagerFixture : IAsyncDisposable
     {
         private readonly ServiceProvider _services;
@@ -555,9 +585,10 @@ public class InvokableObjectManagerTests
         private readonly ConcurrentDictionary<CorrelationId, TaskCompletionSource> _responseSignals = new();
         private readonly List<Task> _stops = [];
 
-        internal ManagerFixture(bool registerObserver = true, [CallerMemberName] string testName = "")
+        internal ManagerFixture(bool registerObserver = true, IGrainObserver? observer = null, [CallerMemberName] string testName = "")
         {
             _testName = testName;
+            Observer = observer ?? new DrainObserver();
             var services = new ServiceCollection();
             services.AddSerializer();
             services.AddLogging();
@@ -586,7 +617,7 @@ public class InvokableObjectManagerTests
             }
         }
 
-        internal DrainObserver Observer { get; } = new();
+        internal IGrainObserver Observer { get; }
         internal ObserverGrainId ObserverId { get; } =
             ObserverGrainId.Create(ClientGrainId.Create("observer-drain"), IdSpan.Create("observer"));
         internal GrainId Sender { get; } = ClientGrainId.Create("observer-drain-sender").GrainId;
