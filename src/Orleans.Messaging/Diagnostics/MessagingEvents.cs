@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Runtime;
 
@@ -121,7 +122,7 @@ public static class MessagingEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, InboxMessage message) =>
-            Listener.Write(nameof(InboxMessageReceiving), new InboxMessageReceiving(grainContext, message));
+            Write(nameof(InboxMessageReceiving), new InboxMessageReceiving(grainContext, message));
     }
 
     internal static void EmitOutboxRetryScheduled(
@@ -147,7 +148,7 @@ public static class MessagingEvents
             int attemptCount,
             DateTimeOffset nextAttemptAt,
             string error) =>
-            Listener.Write(
+            Write(
                 nameof(OutboxRetryScheduled),
                 new OutboxRetryScheduled(grainContext, messageId, receiverId, attemptCount, nextAttemptAt, error));
     }
@@ -163,8 +164,15 @@ public static class MessagingEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, MessageId messageId, OutboxMessageRetirement retirement) =>
-            Listener.Write(nameof(OutboxMessageRetired), new OutboxMessageRetired(grainContext, messageId, retirement));
+            Write(nameof(OutboxMessageRetired), new OutboxMessageRetired(grainContext, messageId, retirement));
     }
+
+    [UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2026",
+        Justification = "Event payloads are sealed types whose public fields and properties the generic annotation preserves, and subscribers consume the typed payload rather than reflecting over the members of the values it carries.")]
+    private static void Write<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicFields | DynamicallyAccessedMemberTypes.PublicProperties)] TEvent>(string name, TEvent payload)
+        where TEvent : MessagingEvent => Listener.Write(name, payload);
 
     private sealed class Observable : IObservable<MessagingEvent>
     {
