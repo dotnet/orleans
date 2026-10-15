@@ -1491,6 +1491,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             ? RunnableWakeupDelay
             : null;
 
+
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         throw new InvalidOperationException($"Journal state '{StateMachineName}' does not write journal entries.");
 
@@ -2175,11 +2176,22 @@ internal sealed partial class DurableTaskGrainRuntime(
         DurableTaskResponse response,
         CancellationToken cancellationToken)
     {
+        var stored = _storage.TryGetTask(taskId, out var state) && state.Result is { IsCompleted: true };
         var winningResponse = StageResponse(taskId, response);
+        if (!stored)
+        {
+            // The handle completes when a write commits the response: this write, or a later one when this write fails
+            // before it commits, because a failed preparation retains staged changes.
+            _pendingHandleResponses[taskId] = winningResponse;
+        }
+        else if (!_pendingHandleResponses.ContainsKey(taskId))
+        {
+            // A stored result without a pending handle completion is committed: a write which carried it, such as one
+            // which committed the result that the body's final code staged, completed the handle already. A pending one
+            // completes with the write which captured it, so the entry stays as that write captured it.
+            CompleteTaskHandle(taskId, winningResponse);
+        }
 
-        // The handle completes when a write commits the response: this write, or a later one when this write fails
-        // before it commits, because a failed preparation retains staged changes.
-        _pendingHandleResponses[taskId] = winningResponse;
         await WriteStateAsync(cancellationToken);
         if (DeleteExpiredTasks())
         {
