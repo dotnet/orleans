@@ -130,6 +130,16 @@ items:
         items:
           - name: Programming model and guarantees
             href: grains/durable-tasks.md
+          - name: Task identity and references
+            href: grains/durable-tasks-identity.md
+          - name: Structured concurrency
+            href: grains/durable-tasks-structured-concurrency.md
+          - name: Idempotency
+            href: grains/durable-tasks-idempotency.md
+          - name: Replay-safety rules
+            href: grains/durable-tasks-replay-rules.md
+          - name: Integrate with other systems
+            href: grains/durable-tasks-integrations.md
           - name: Practical recipes
             href: grains/durable-tasks-recipes.md
           - name: Operations and troubleshooting
