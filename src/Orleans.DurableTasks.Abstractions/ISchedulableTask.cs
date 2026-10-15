@@ -37,6 +37,12 @@ public interface IScheduledTaskHandle
     TaskId TaskId { get; }
 
     /// <summary>
+    /// Gets the identifier under which the task's host stores the task which this handle observes; see
+    /// <see cref="ScheduledTask.TargetTaskId"/>.
+    /// </summary>
+    TaskId TargetTaskId => TaskId;
+
+    /// <summary>
     /// Waits for a terminal response. Canceling <paramref name="cancellationToken"/> cancels this wait.
     /// </summary>
     ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken);
