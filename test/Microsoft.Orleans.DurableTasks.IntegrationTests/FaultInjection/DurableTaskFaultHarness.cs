@@ -104,8 +104,21 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     /// work once each wake-up job which was scheduled for it has completed. Call this after an outcome which follows the
     /// grains' last work, such as a result which their messages produced.
     /// </remarks>
-    public Task SettleAsync(IEnumerable<GrainId> grains, CancellationToken cancellationToken) =>
-        _wakeups.WaitForIdleAsync(grains).WaitAsync(RunTimeout, cancellationToken);
+    public async Task SettleAsync(IEnumerable<GrainId> grains, CancellationToken cancellationToken)
+    {
+        var targets = grains.ToList();
+        try
+        {
+            await _wakeups.WaitForIdleAsync(targets).WaitAsync(RunTimeout, cancellationToken);
+        }
+        catch (TimeoutException exception)
+        {
+            throw new TimeoutException(
+                $"Timed out after {RunTimeout} waiting for the grains to hold no messaging work. Outstanding wake-up jobs: "
+                + _wakeups.DescribeOutstanding(targets),
+                exception);
+        }
+    }
 
     /// <summary>Calls a grain until the call succeeds, retrying infrastructure failures at once.</summary>
     public async Task<TResult> CallAsync<TResult>(Func<CancellationToken, Task<TResult>> call, CancellationToken cancellationToken)
@@ -222,6 +235,15 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
                         }
                     }
                 }
+            }
+        }
+
+        public string DescribeOutstanding(IEnumerable<GrainId> grains)
+        {
+            lock (_outstanding)
+            {
+                return string.Join("; ", grains.Select(grain =>
+                    $"{grain}: [{string.Join(", ", _outstanding.TryGetValue(grain.ToString(), out var jobs) ? jobs : [])}]"));
             }
         }
 
