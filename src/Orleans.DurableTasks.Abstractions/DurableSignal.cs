@@ -51,8 +51,10 @@ public sealed class DurableSignal<T>
     /// it races other inputs, such as a <see cref="DurableTask.DelayUntil(DateTimeOffset)"/> timeout.
     /// </returns>
     /// <remarks>
-    /// Durable cancellation of the waiting execution cancels the wait. The value is the one the sender supplied for
-    /// this signal's type; a different value type fails the wait with <see cref="InvalidCastException"/>.
+    /// Durable cancellation of the waiting execution cancels the wait, unless the wait is shielded with
+    /// <see cref="DurableTaskExtensions.Shielded{TResult}(DurableTask{TResult})"/>: a shielded wait receives a signal which
+    /// arrives after the cancellation, and only an abort ends it. The value is the one the sender supplied for this
+    /// signal's type; a different value type fails the wait with <see cref="InvalidCastException"/>.
     /// </remarks>
     public DurableTask<T> WaitAsync() => new SignalWaitDurableTask<T>(Name);
 
@@ -75,7 +77,8 @@ public sealed class DurableSignal<T>
     /// </para>
     /// <para>
     /// After the deadline wins, the signal keeps its latch: a later <see cref="WaitAsync"/> returns a value which arrives
-    /// after the deadline. Durable cancellation of the waiting execution cancels the race.
+    /// after the deadline. Durable cancellation of the waiting execution cancels the race, unless the race is shielded with
+    /// <see cref="DurableTaskExtensions.Shielded{TResult}(DurableTask{TResult})"/>, which shields both inputs.
     /// </para>
     /// </remarks>
     public DurableTask<(bool Received, T Value)> TryWaitAsync(DateTimeOffset deadline)
@@ -101,7 +104,7 @@ public sealed class DurableSignal<T>
 internal sealed class SignalWaitDurableTask<T>(string name) : DurableTask<T>
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
-        => context.WaitForSignalAsync(name, context.CancellationToken);
+        => context.WaitForSignalAsync(name, context.InlineOperationCancellationToken);
 
     internal override bool RunsInlineInParent => true;
 }
