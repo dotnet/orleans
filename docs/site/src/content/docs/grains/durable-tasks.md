@@ -441,20 +441,24 @@ when the caller continues:
   that wait ends only the subscription.
 - <xref:Orleans.DurableTasks.ConfiguredDurableTask.ScheduleAsync*> returns once the
   target grain has accepted and durably stored the task, so the task's ID can be handed to
-  other parties, which address it with `GetDurableTask`. A start which the target rejects,
-  because the task ID already identifies another request, throws
-  `DurableTaskConflictException`.
+  other parties, which address it with `GetDurableTask`. The target acknowledges the
+  invocation, and the caller's outbox retires it, once the target's journal write stores
+  the task. A start which the target rejects, because the task ID already identifies
+  another request, throws `DurableTaskConflictException`, and one which isn't delivered
+  before Messaging's `OutboxRetryTimeout` throws `DurableTaskDeliveryException`; awaiting
+  the task throws the same failure.
 - <xref:Orleans.DurableTasks.ConfiguredDurableTask.Post*> is synchronous. It stages the
   invocation in the caller's outbox, which commits with the grain's next journal write,
-  together with the state changes which the calling code made, and delivers it once.
-  Inside a durable task, the start is recorded like a `DurableTask.Once` effect, so a
+  together with the state changes which the calling code made, and delivers it once. The
+  target holds the task once the invocation is delivered, so a task whose ID other
+  parties look up starts with `ScheduleAsync`. Inside a durable task, the start is recorded like a `DurableTask.Once` effect, so a
   replay returns the same handle, and awaiting the handle later observes the result. A
   client has no outbox, so `Post` throws `InvalidOperationException` there, and
   [ORLEANS0116](../diagnostics/orleans0116.md) reports it.
 - Inside a durable task, the record of a detached task, `$detach:{target}:{rootId}`,
   commits with the start, so a replay which reaches the record starts nothing. The
-  invocation carries the request, so the start survives the deletion of the starter's
-  tree. Starting the same request under the same root ID again leaves the task unchanged.
+  starter holds the invocation, which carries the request, until its target accepts it,
+  so the start survives the deletion of the starter's tree. Starting the same request under the same root ID again leaves the task unchanged.
 - Outside a durable task, every task is a root task, so `.Detached()` leaves the call
   unchanged. `WithId` supplies the root ID and makes a start safe to retry: a caller which
   retries a start after an ambiguous failure, such as a timeout, reaches the same task. A

@@ -301,7 +301,8 @@ public sealed class BasketGrain : DurableGrain, IBasketGrain
         }
         catch (DurableTaskNotFoundException)
         {
-            // No checkout scheduled this order, or the result's retention period has ended.
+            // No checkout started this order, the checkout's invocation hasn't reached the order yet, or the result's
+            // retention period has ended.
             return null;
         }
     }
