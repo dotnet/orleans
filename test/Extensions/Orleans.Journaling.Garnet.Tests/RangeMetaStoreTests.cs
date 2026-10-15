@@ -101,7 +101,8 @@ public abstract class RangeMetaStoreTests
                 if (result.Written)
                 {
                     Assert.Equal(current.Version + 1, result.Current!.Version);
-                    Assert.Same(next, result.Current.Map);
+                    // A store may return an equal map deserialized from storage, for example after recovering an ambiguous upload.
+                    Assert.Equal(next, result.Current.Map);
                     i++;
                 }
                 else
