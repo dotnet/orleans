@@ -179,6 +179,7 @@ namespace Orleans.Messaging
     {
         IInbox Register(IInboxHandler handler);
         IInbox Register(IInboxMessageSink sink);
+        IInbox Register(IInboxWorkSource source);
     }
 
     public partial interface IInboxHandler
@@ -198,6 +199,11 @@ namespace Orleans.Messaging
     public partial interface IInboxMessageSink
     {
         bool TryAccept(InboxMessage message, out DeliveryResult result);
+    }
+
+    public partial interface IInboxWorkSource
+    {
+        System.TimeSpan? GetWakeupDelay();
     }
 
     public partial interface IMessagingDiagnostics
