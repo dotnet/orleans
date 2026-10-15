@@ -271,7 +271,10 @@ internal sealed class GarnetJournalStorage : IJournalStorage
     public async ValueTask DeleteAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_exists is null)
+
+        // Refresh a cached absence, so a journal created since this instance observed it absent is deleted; only a
+        // creation concurrent with this call can still make it a no-op.
+        if (_exists != true)
         {
             await GetMetadataAsync(cancellationToken).ConfigureAwait(false);
         }
