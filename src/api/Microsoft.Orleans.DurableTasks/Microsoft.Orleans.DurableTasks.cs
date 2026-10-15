@@ -104,7 +104,7 @@ namespace Orleans.DurableTasks
         public static DurableTaskReferenceAwaiter<TResult> GetAwaiter<TResult>(this DurableTaskReference<TResult> reference) { throw null; }
     }
 
-    public sealed partial class DurableTaskReference<TResult> : DurableTask<TResult>
+    public sealed partial class DurableTaskReference<TResult> : DurableTask<TResult>, IDurableTaskReference
     {
         internal DurableTaskReference() { }
 
@@ -168,6 +168,13 @@ namespace Orleans.DurableTasks
         System.Threading.Tasks.ValueTask SignalAsync<T>(string rootId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<DurableSignalResult> TrySignalAsync<T>(TaskId taskId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask<DurableSignalResult> TrySignalAsync<T>(string rootId, DurableSignal<T> signal, T value, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IDurableTaskReference
+    {
+        TaskId Id { get; }
+
+        Orleans.Runtime.GrainId Target { get; }
     }
 }
 
