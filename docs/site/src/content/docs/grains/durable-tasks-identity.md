@@ -120,6 +120,7 @@ task's outcome.
 | `ScheduledTask.Id` | The operation in the execution which started or observes the task: a child ID, a `$detach:` record, or a subscription child. Outside a durable task, the root ID. |
 | `ScheduledTask.TargetTaskId` | The task on the grain which stores it, which other parties address: a detached task's root ID, a callee's `$caller/...` ID, or the task which a subscription observes. Outside a durable task, the root ID. |
 | `IDurableTaskReference.Id` | The referenced task, with `Target`, its grain. |
+| `DurableTaskAddress.Id` | A task which other parties address, with `Target`, its grain. |
 | `IDurableTaskGrainExtension.GetTasksAsync` | Every task which the grain retains, with its execution tree's records. |
 | `DurableTaskEvents` | The ID of each task, operation, signal wait, and selection which a transition concerns. |
 
@@ -193,6 +194,40 @@ report's ID alone:
 Derived references need no storage, and a start under the same name from a retried
 request reaches the same task. Choose names which identify the business operation, such
 as `archive-{reportId}`, and keep them stable across deployments.
+
+### Store and send addresses
+
+A <xref:Orleans.DurableTasks.DurableTaskAddress> is the value which names a task elsewhere:
+its `Target` grain and its task `Id`. Orleans serializes it in grain calls and journaled
+state, and System.Text.Json writes it as `{"Target":"report/q3","Id":"publish-q3"}` in
+JSON journals and HTTP payloads. A `TaskId` on its own serializes as its escaped path.
+
+| To | Use |
+| --- | --- |
+| Read a handle's address | `handle.TryGetAddress(out var address)`, which returns `true` for a root task, a detached task, or a task which `GetDurableTask` observes, and whose `Id` is the handle's `TargetTaskId`. An attached child's handle has no address. |
+| Read a reference's address | `DurableTaskReference<TResult>.Address`, or `Target` and `Id` through `IDurableTaskReference`. |
+| Resolve an address | `GrainFactory.GetDurableTask<TResult>(address)` in a grain, or `client.GetDurableTask<TResult>(address)` in a client. |
+| Signal the task | `GrainFactory.GetGrain(address.Target)`, then `SignalDurableTaskAsync` or `TrySignalDurableTaskAsync` with `address.Id`. |
+
+The reference which an address resolves to behaves as any other: a durable task awaits
+it to subscribe to the task's result, and other code awaits, polls, cancels, or aborts the
+task through it. A grain which hands off a detached task stores its address, and reaches
+the task again after any number of reactivations:
+
+:::code source="../snippets/compiled/Grains/DurableTaskIdentitySnippets.cs" id="durable_tasks_identity_store" language="csharp":::
+
+The workflow stores the address in its synchronous tail, so the address commits with the
+task's result. `AwaitArchiveAsync` reads the stored address in a recorded effect, so a
+replay subscribes to the same task.
+
+A client returns an address to an HTTP caller, and a later request carries it back to
+signal, await, or cancel the task:
+
+:::code source="../snippets/compiled/Grains/DurableTaskIdentitySnippets.cs" id="durable_tasks_identity_send" language="csharp":::
+
+An address grants control of the task to whoever holds it: anyone who can call the grain
+can cancel, abort, or signal the task. Authorize requests which carry an address before
+acting on it, as for any grain call which an external request triggers.
 
 ### Retention and not-found results
 
