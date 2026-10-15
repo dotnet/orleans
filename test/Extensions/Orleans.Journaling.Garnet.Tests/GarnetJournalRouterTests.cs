@@ -203,6 +203,53 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task StalledMetaStoreRefresh_IsBoundedByOperationTimeout()
+    {
+        // The owner of the journal's bucket has no published endpoint, so the router refreshes from a MetaStore whose
+        // reads never complete.
+        await CreateRouterAsync();
+        var current = (await _store.ReadAsync(CancellationToken))!;
+        var unpublished = current.Map with { Partitions = current.Map.Partitions.SetItem(P1, current.Map.Partitions[P1] with { Endpoint = null }) };
+        var view = (await _store.TryWriteAsync(unpublished, current.Version, CancellationToken)).Current!;
+        var store = new StalledMetaStore();
+        var router = new GarnetJournalRouter(store, view, TimeSpan.FromMilliseconds(500));
+        _routers.Add(router);
+        var storages = Enumerable.Range(0, 100).Select(index => CreateStorage(router, $"stalled-{index}")).Where(storage => view.Map.GetOwner(storage.Bucket) == P1).Take(2).ToArray();
+
+        foreach (var storage in storages)
+        {
+            var append = storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken).AsTask();
+            await Assert.ThrowsAsync<TimeoutException>(() => append.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken));
+        }
+
+        // Both operations waited for one shared read, which their deadlines did not cancel.
+        Assert.Equal(1, store.Reads);
+        Assert.False(store.ReadCancellation.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task Disposal_StopsRetriesWithoutReopeningConnections()
+    {
+        var router = await CreateRouterAsync();
+        var storage = CreateStorage(router, "disposal");
+        var bucket = storage.Bucket;
+
+        // Assign the bucket to p2, which never opens it, so the append retries until the router is disposed.
+        var current = (await _store.ReadAsync(CancellationToken))!;
+        Assert.True((await _store.TryWriteAsync(GarnetTestRouting.AssignBucket(current.Map, bucket, P2, current.Version + 1), current.Version, CancellationToken)).Written);
+        await router.RefreshAsync(CancellationToken);
+        var append = storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken).AsTask();
+        await Task.Delay(300, CancellationToken);
+        Assert.False(append.IsCompleted);
+        Assert.True(router.ConnectionCount > 0);
+
+        await router.DisposeAsync();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => append.WaitAsync(TimeSpan.FromSeconds(10), CancellationToken));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => CreateStorage(router, "after-disposal").AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken).AsTask());
+        Assert.Equal(0, router.ConnectionCount);
+    }
+
+    [Fact]
     public async Task PartitionOfAnotherMap_RejectsOperations()
     {
         // A router of another map whose endpoints, for example stale ones, reach this map's partitions.
@@ -258,6 +305,27 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         return ((IPEndPoint)listener.LocalEndpoint).Port;
+    }
+
+    /// <summary>A MetaStore whose reads never complete unless cancelled.</summary>
+    private sealed class StalledMetaStore : IRangeMetaStore
+    {
+        private int _reads;
+
+        public int Reads => Volatile.Read(ref _reads);
+
+        public CancellationToken ReadCancellation { get; private set; }
+
+        public async ValueTask<RangeMapSnapshot?> ReadAsync(CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _reads);
+            ReadCancellation = cancellationToken;
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return null;
+        }
+
+        public ValueTask<RangeMapWriteResult> TryWriteAsync(RangeMap next, long expectedVersion, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
     }
 
     /// <summary>A MetaStore whose reads can be made to return an older snapshot.</summary>
