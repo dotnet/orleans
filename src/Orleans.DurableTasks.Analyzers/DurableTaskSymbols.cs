@@ -39,6 +39,7 @@ internal sealed class DurableTaskSymbols
             "Orleans.Journaling.IDurableQueue`1",
             "Orleans.Journaling.IDurableSet`1",
             "Orleans.Journaling.IDurableTaskCompletionSource`1",
+            "Orleans.Journaling.IDurableLog`1",
             "Orleans.Runtime.IPersistentState`1");
         _grainStateTypes = stateTypes;
         NonDeterministicTypes = Resolve(
