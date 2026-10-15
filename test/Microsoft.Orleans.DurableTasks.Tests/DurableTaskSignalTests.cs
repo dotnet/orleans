@@ -528,7 +528,7 @@ public sealed partial class DurableTaskSignalTests
                 Options.Create(new DurableTaskOptions { ResultRetentionPeriod = TimeSpan.FromHours(1) }),
                 Options.Create(new DurableMessagingOptions()),
                 MessagingTestHelpers.Serializer);
-            Runtime = new DurableTaskGrainRuntime(Storage, Storage.LogicalTimes, shared, [Transport]);
+            Runtime = new DurableTaskGrainRuntime(Storage, Storage.LogicalTimes, Storage.Invocations, shared, [Transport]);
             Runtime.InitializeForActivation();
             manager.RegisterStateMachine(DurableTaskGrainRuntime.StateMachineName, Runtime);
         }
@@ -617,6 +617,8 @@ public sealed partial class DurableTaskSignalTests
         private readonly DurableTaskHierarchy _hierarchy = new();
 
         public DurableDictionary<TaskId, DateTimeOffset> LogicalTimes { get; } = [];
+
+        public DurableDictionary<MessageId, PendingInvocation> Invocations { get; } = [];
 
         public IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks =>
             _states.Select(static entry => (entry.Key, (IDurableTaskState)entry.Value));

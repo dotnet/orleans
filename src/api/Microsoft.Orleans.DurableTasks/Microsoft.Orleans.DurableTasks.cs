@@ -47,6 +47,19 @@ namespace Orleans.DurableTasks
         public TaskId TaskId { get { throw null; } }
     }
 
+    [GenerateSerializer]
+    [Alias("Orleans.DurableTasks.DurableTaskDeliveryException")]
+    public sealed partial class DurableTaskDeliveryException : System.Exception
+    {
+        public DurableTaskDeliveryException(TaskId taskId, Orleans.Runtime.GrainId target, string reason) { }
+
+        [Id(1)]
+        public Orleans.Runtime.GrainId Target { get { throw null; } }
+
+        [Id(0)]
+        public TaskId TaskId { get { throw null; } }
+    }
+
     public static partial class DurableTaskGrainExtensions
     {
         public static DurableTaskReference<TResult> GetDurableTask<TResult>(this Orleans.Runtime.IAddressable target, TaskId taskId) { throw null; }
@@ -618,6 +631,24 @@ namespace OrleansCodeGen.Orleans.DurableTasks
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableTaskDeliveryException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.DurableTaskDeliveryException>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_DurableTaskDeliveryException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableTasks.DurableTaskDeliveryException> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableTasks.DurableTaskDeliveryException instance) { }
+
+        public global::Orleans.DurableTasks.DurableTaskDeliveryException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableTasks.DurableTaskDeliveryException instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.DurableTaskDeliveryException value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_DurableTaskNotFoundException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.DurableTaskNotFoundException>, global::Orleans.Serialization.Codecs.IFieldCodec
     {
         public Codec_DurableTaskNotFoundException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableTasks.DurableTaskNotFoundException> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -641,6 +672,16 @@ namespace OrleansCodeGen.Orleans.DurableTasks
         public Copier_DurableTaskConflictException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
 
         public override void DeepCopy(global::Orleans.DurableTasks.DurableTaskConflictException input, global::Orleans.DurableTasks.DurableTaskConflictException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_DurableTaskDeliveryException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.DurableTasks.DurableTaskDeliveryException, System.Exception>
+    {
+        public Copier_DurableTaskDeliveryException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
+
+        public override void DeepCopy(global::Orleans.DurableTasks.DurableTaskDeliveryException input, global::Orleans.DurableTasks.DurableTaskDeliveryException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]

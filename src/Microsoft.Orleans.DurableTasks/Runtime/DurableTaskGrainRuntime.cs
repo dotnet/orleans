@@ -76,6 +76,7 @@ namespace Orleans.DurableTasks.Runtime;
 internal sealed partial class DurableTaskGrainRuntime(
     IDurableTaskGrainStorage storage,
     [FromKeyedServices("$task-logical-times")] IDurableDictionary<TaskId, DateTimeOffset> logicalTimes,
+    [FromKeyedServices("$task-invocations")] IDurableDictionary<MessageId, PendingInvocation> invocations,
     DurableTaskGrainRuntimeShared shared,
     IEnumerable<IDurableTaskMessageTransport> messageTransports) :
     IDurableTaskGrainRuntime,
@@ -104,6 +105,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     private readonly DurableTaskGrainRuntimeShared _shared = shared;
     private readonly IDurableTaskGrainStorage _storage = storage;
     private readonly IDurableDictionary<TaskId, DateTimeOffset> _logicalTimes = logicalTimes;
+    private readonly IDurableDictionary<MessageId, PendingInvocation> _invocations = invocations;
     private readonly IDurableTaskMessageTransport? _messageTransport = messageTransports.SingleOrDefault();
     private readonly CancellationTokenSource _deactivationCts = new();
     private TaskId[] _committingStarts = [];
@@ -530,7 +532,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var transport = MessageTransport;
         var messageId = transport.GetCompletionMessageId(GrainId, destination, taskId);
         PendingCompletions[messageId] = new(taskId, destination);
-        transport.SendCompletion(messageId);
+        transport.Send(messageId);
     }
 
     private Dictionary<MessageId, PendingCompletion> PendingCompletions
@@ -564,12 +566,20 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <remarks>
-    /// The runtime never withdraws a completion. A pending completion's destination keeps its task and result: only
-    /// <see cref="IOutboxMessageSource.OnRetired"/> removes the destination, and tasks with destinations are never
-    /// deleted. An exception from decoding the stored result propagates, so the outbox dead-letters the completion.
+    /// The runtime provides the invocations which its table of pending invocations holds, and the completions of its
+    /// tasks' destinations. It never withdraws either: a pending invocation stays in the table, and a pending completion's
+    /// destination keeps its task and result, until <see cref="IOutboxMessageSource.OnRetired"/> removes them, and tasks
+    /// with destinations are never deleted. An exception from decoding the stored result propagates, so the outbox
+    /// dead-letters the completion.
     /// </remarks>
     bool IOutboxMessageSource.TryGetMessage(MessageId messageId, out OutboxMessage message)
     {
+        if (_invocations.TryGetValue(messageId, out var invocation))
+        {
+            message = MessageTransport.CreateInvocation(messageId, invocation.Target, invocation.Payload);
+            return true;
+        }
+
         if (!PendingCompletions.TryGetValue(messageId, out var completion))
         {
             message = default;
@@ -588,25 +598,36 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>
-    /// Removes a retired completion's destination, deleting the task with its execution tree once its result has been
-    /// delivered to every destination.
+    /// Records the outcome of a retired invocation on the record which started it, or removes a retired completion's
+    /// destination, deleting the task with its execution tree once its result has been delivered to every destination.
     /// </summary>
     /// <remarks>
-    /// The outbox stages the completion's removal in the same journal write, so the deletion commits with the retirement.
+    /// The outbox stages the message's removal in the same journal write, so the changes commit with the retirement.
     /// Retirement updates only the task's metadata, so it succeeds when the stored result no longer decodes; polling such a
     /// result surfaces the decoding error to the poller.
     /// </remarks>
     void IOutboxMessageSource.OnRetired(MessageId messageId, OutboxMessageRetirement retirement)
     {
+        if (_invocations.TryGetValue(messageId, out var invocation))
+        {
+            _invocations.Remove(messageId);
+            RetireInvocation(invocation, retirement);
+            return;
+        }
+
         var removed = PendingCompletions.Remove(messageId, out var completion);
-        Debug.Assert(removed, "The outbox retires only the completions which the runtime provides.");
+        Debug.Assert(removed, "The outbox retires only the invocations and completions which the runtime provides.");
         if (!_storage.TryGetTask(completion.TaskId, out var state))
         {
             Debug.Fail("A pending completion's task is retained until the completion retires.");
             return;
         }
 
-        RetireDestination(completion.TaskId, state, completion.Destination, retirement.Status is not OutboxMessageRetirementStatus.Delivered);
+        RetireDestination(
+            completion.TaskId,
+            state,
+            completion.Destination,
+            deadLettered: retirement.Status != OutboxMessageRetirementStatus.Delivered);
     }
 
     /// <summary>
@@ -661,7 +682,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         ThrowIfStopping();
         cancellationToken.ThrowIfCancellationRequested();
-        var response = StageRemote(taskId, request, shielded: false, acknowledge: false);
+        var response = StageRemote(taskId, request, shielded: false);
         if (!response.IsCompleted)
         {
             await WriteStateAsync(cancellationToken);
@@ -674,8 +695,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// Stages the invocation of <paramref name="request"/> on another grain as the remote child <paramref name="taskId"/>,
     /// without writing, and returns the child's recorded terminal response, or <see cref="DurableTaskResponse.Pending"/>.
     /// </summary>
-    /// <param name="acknowledge">Whether the target replies with an acceptance once it stores the task.</param>
-    private DurableTaskResponse StageRemote(TaskId taskId, IDurableTaskRequest request, bool shielded, bool acknowledge)
+    private DurableTaskResponse StageRemote(TaskId taskId, IDurableTaskRequest request, bool shielded)
     {
         var transport = MessageTransport;
         var context = request.Context ?? throw new InvalidOperationException("The durable task request has no context.");
@@ -717,7 +737,13 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         context.CallerId = GrainId;
         context.SupportsDurableCompletion = true;
-        transport.SendInvocation(GrainId, context.TargetId, taskId, request, acknowledge);
+
+        // A recorded acceptance shows that the invocation retired, and the target holds the task.
+        if (state.Accepted is null)
+        {
+            SendInvocation(transport.CreateInvocation(GrainId, context.TargetId, taskId, request), recordId: taskId);
+        }
+
         return DurableTaskResponse.Pending;
     }
 
@@ -992,6 +1018,15 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         ThrowIfNotStartedBy(taskId, sourceTaskId, state, sender);
+
+        // The task's result shows that its grain holds the task, so it records the acceptance which the invocation's
+        // retirement would otherwise record.
+        if (state.Accepted is null && AwaitsAcceptance(state))
+        {
+            _storage.SetAccepted(taskId, state, accepted: true);
+            SignalAcceptance(taskId);
+        }
+
         if (TryGetSubscription(state, out _, out _))
         {
             CompleteSubscription(taskId, sourceTaskId, response);
@@ -1440,7 +1475,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                 cancellationToken);
         }
 
-        var staged = StageChild(taskId, durableTask, shielded, acknowledge: waitForAcceptance);
+        var staged = StageChild(taskId, durableTask, shielded);
         if (staged.RequiresWrite)
         {
             await WriteStateAsync(cancellationToken);
@@ -1468,14 +1503,13 @@ internal sealed partial class DurableTaskGrainRuntime(
             IDurableTaskSubscription subscription => StageSubscription(taskId, subscription, shielded).Handle,
             ISchedulableTask and not IDurableTaskRequest => throw new NotSupportedException(
                 "A durable task which a custom host schedules starts asynchronously, so it can't be posted. Await it, or schedule it with ScheduleAsync."),
-            _ => StageChild(taskId, durableTask, shielded, acknowledge: false).Handle,
+            _ => StageChild(taskId, durableTask, shielded).Handle,
         };
     }
 
     /// <summary>Stages the start of a local child or of a call to another grain, without writing.</summary>
-    /// <param name="acknowledge">Whether a call to another grain asks its target for an acceptance.</param>
     /// <returns>The child's handle, and whether its start staged changes which a write commits.</returns>
-    private StagedChild StageChild(TaskId taskId, DurableTask durableTask, bool shielded, bool acknowledge)
+    private StagedChild StageChild(TaskId taskId, DurableTask durableTask, bool shielded)
     {
         if (_shared.Logger.IsEnabled(LogLevel.Trace))
         {
@@ -1575,7 +1609,7 @@ internal sealed partial class DurableTaskGrainRuntime(
 
         if (remoteRequest is not null)
         {
-            return StageRemoteChild(taskId, remoteRequest, shielded, acknowledge);
+            return StageRemoteChild(taskId, remoteRequest, shielded);
         }
 
         // Otherwise, the task must be a local method invocation. Its state is staged and commits with the next write,
@@ -1594,9 +1628,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>A staged start's handle, and whether the start staged changes which a write commits.</summary>
     private readonly record struct StagedChild(IScheduledTaskHandle Handle, bool RequiresWrite);
 
-    private StagedChild StageRemoteChild(TaskId taskId, IDurableTaskRequest request, bool shielded, bool acknowledge)
+    private StagedChild StageRemoteChild(TaskId taskId, IDurableTaskRequest request, bool shielded)
     {
-        var response = StageRemote(taskId, request, shielded, acknowledge);
+        var response = StageRemote(taskId, request, shielded);
         if (response.IsCompleted)
         {
             return new(new CompletedTaskHandle(taskId, response), RequiresWrite: false);
