@@ -27,8 +27,13 @@ jobs:
           # Find all csproj files excluding specific paths
           find src -name '*.csproj' | egrep -v 'Orleans.Analyzers|Orleans.CodeGenerator' | while read proj; do
             export CI=false
+            # Generate from net8.0 when the project targets it; otherwise from its first target framework.
+            tfms=$(dotnet msbuild "$proj" -getProperty:TargetFrameworks -p:GenerateOrleansApiSource=true)
+            [[ -z "$tfms" ]] && tfms=$(dotnet msbuild "$proj" -getProperty:TargetFramework -p:GenerateOrleansApiSource=true)
+            framework=net8.0
+            [[ ";$tfms;" == *";net8.0;"* ]] || framework=${tfms%%;*}
             dotnet restore "$proj" --configfile .github/NuGet.GenAPI.Config -p:GenerateOrleansApiSource=true &&
-              dotnet build "$proj" -f net8.0 --configuration Release --no-incremental --no-restore -p:GenerateOrleansApiSource=true /t:"Build;GenAPIGenerateReferenceAssemblySource"
+              dotnet build "$proj" -f "$framework" --configuration Release --no-incremental --no-restore -p:GenerateOrleansApiSource=true /t:"Build;GenAPIGenerateReferenceAssemblySource"
           done
         continue-on-error: true
 
