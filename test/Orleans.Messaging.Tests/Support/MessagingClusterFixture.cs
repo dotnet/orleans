@@ -194,11 +194,18 @@ public class MessagingClusterFixture : IAsyncLifetime
     /// job would.
     /// </summary>
     internal Task<DurableJobRunResult> RunPumpAsync(IAddressable grain) =>
-        RunPumpAsync(grain, TestContext.Current.CancellationToken, duplicate: false);
+        RunCancelablePumpAsync(grain, TestContext.Current.CancellationToken);
 
     /// <summary>Executes the pump's durable job callback directly as a job other than its current wake-up job.</summary>
     internal Task<DurableJobRunResult> RunDuplicatePumpAsync(IAddressable grain) =>
         RunPumpAsync(grain, TestContext.Current.CancellationToken, duplicate: true);
+
+    /// <summary>
+    /// Executes the pump's durable job callback directly with <paramref name="runCancellation"/> as the run's token, so a
+    /// test can cancel the run as Durable Jobs does.
+    /// </summary>
+    internal Task<DurableJobRunResult> RunCancelablePumpAsync(IAddressable grain, CancellationToken runCancellation) =>
+        RunPumpAsync(grain, runCancellation, duplicate: false);
 
     private async Task<DurableJobRunResult> RunPumpAsync(IAddressable grain, CancellationToken runCancellation, bool duplicate)
     {
