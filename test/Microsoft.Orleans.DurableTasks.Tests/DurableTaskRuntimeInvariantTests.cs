@@ -4843,6 +4843,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         /// <summary>Runs after capture and before storage acknowledgement; throwing models a storage failure.</summary>
         public Func<ValueTask>? AfterWriteStarted { get; set; }
         public Action<int>? AfterWriteCompleted { get; set; }
+
+        /// <summary>
+        /// Models writes which carry no journal entries, such as one whose changes an earlier write captured: Journaling
+        /// stores nothing and doesn't acknowledge them to state machines.
+        /// </summary>
+        public bool WritesAreEmpty { get; set; }
+
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
         public void RegisterStateMachine(string name, IStateMachine stateMachine) => _stateMachines[name] = stateMachine;
@@ -4902,6 +4909,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                     _failure = exception;
                     StateChanges.Notify();
                     throw;
+                }
+
+                if (WritesAreEmpty)
+                {
+                    return;
                 }
 
                 WriteCount++;
