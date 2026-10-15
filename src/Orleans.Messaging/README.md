@@ -67,8 +67,9 @@ A handler finishes each message with `IInboxHandlerContext.Complete()` or
 - `Complete()` stages the message's removal and completion record.
 - `Fail(reason)` moves the message to the inbox dead letters and records its ID as
   processed.
-- A handler exception before either call retries the message with exponential
-  backoff, and dead-letters it after `MaxProcessingAttempts`.
+- A handler exception before either call leaves the outcome unknown, so the message
+  retries with exponential backoff until `InboxRetryTimeout` (6 hours) after its
+  first failure, then moves to the dead letters.
 - Returning without either call, or calling both, deactivates the grain.
 
 The inbox persists each batch's outcomes and business changes in one journal write.
