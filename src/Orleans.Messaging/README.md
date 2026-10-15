@@ -134,6 +134,12 @@ construction or activation setup, before journal recovery.
   sink honors their `DeliverAt`. Declined messages follow the handler path once
   `DeliverAt` passes. A message is offered again after its processed record leaves
   `DeduplicationWindow`, so sinks must be idempotent.
+- `IInbox.Register(IInboxWorkSource)` adds a work source: a component, such as a
+  sink, that holds durable work in the grain's journal. `GetWakeupDelay` returns how
+  soon a deactivated grain must wake to resume that work, or `null` when none is
+  pending. Every journal write that leaves work pending schedules the messaging
+  wake-up before it is stored, and the wake-up reactivates the grain until the work
+  clears. The source's owner resumes its work on activation.
 
 ## Delivery and processing
 
@@ -205,8 +211,9 @@ original `SentAt` for retries of the same logical send.
 Dead-letter retention limits control diagnostic history. The application-owned
 outcome and follow-up work have the lifetime the application gives them.
 Each activation runs one messaging pump on its scheduler, processing inbox batches.
-One durable job per grain wakes the pump while the inbox holds work. Journaled state determines which messages are due, so each
-wake-up processes exactly the ready work.
+One durable job per grain wakes the pump while the inbox or a registered work source
+holds work. Journaled state determines which messages are due, so each wake-up
+processes exactly the ready work.
 
 ## State
 
