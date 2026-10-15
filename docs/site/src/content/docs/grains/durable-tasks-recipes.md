@@ -1,6 +1,6 @@
 ---
 title: Durable task recipes
-description: Fan out, race, time out, compensate, settle every input, process completions in order, wait for signals, detach work, cancel, abort, and schedule durable tasks.
+description: Fan out, race, time out, compensate, settle every input, process completions in order, wait for signals, start detached work, cancel, abort, and schedule durable tasks.
 ms.date: 10/14/2026
 ms.topic: how-to
 ---
@@ -124,10 +124,11 @@ to the compensation:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_compensation" language="csharp":::
 
-Children which a canceled task schedules terminate as canceled without running, except
-inside a
-<xref:Orleans.DurableTasks.DurableTaskContext.SuppressCancellation*?displayProperty=nameWithType>
-scope. The `release` inputs and the `cancel` step therefore run to completion, and the
+Children which a canceled task starts terminate as canceled without running, unless the
+task starts them with
+<xref:Orleans.DurableTasks.DurableTaskExtensions.Shielded*>. The shielded `release`
+combinator shields each of its inputs, so the inputs and the `cancel` effect run to
+completion, and the
 workflow returns an `OrderResult` which records the reason. A reservation which never
 ran leaves nothing to release, so `ReleaseAsync` returns whether the order held a
 reservation, and releasing every line is safe:
@@ -136,13 +137,13 @@ reservation, and releasing every line is safe:
 
 Pitfalls:
 
-- Schedule every compensating child inside the scope. A child scheduled after the scope
-  is disposed terminates as canceled without running.
+- Shield every compensating child. A child which isn't shielded terminates as canceled
+  without running.
 - Make compensations idempotent and report whether they acted, so the workflow can
   compensate without knowing which steps ran.
 - An abort runs no compensation. Abort is for tasks whose compensation is stuck.
 - Work which must outlive the workflow, such as cleanup after the workflow's result is
-  delivered, belongs in a [detached task](#detach-fire-and-forget-side-effects).
+  delivered, belongs in a [detached task](#start-follow-up-work-without-waiting).
 
 **Verify:** after `CancelAsync` during the grace period, the order grain lists
 `grace-period` as `Canceled`, `release/{n}` and `cancel` as `Completed`, and the root
@@ -165,15 +166,14 @@ of a reservation which completed successfully, and
 <xref:Orleans.DurableTasks.ScheduledTask.Status>,
 <xref:Orleans.DurableTasks.ScheduledTask.Exception>, and
 <xref:Orleans.DurableTasks.ScheduledTask`1.GetResult*> inspect the others. The workflow
-releases the held lines in a suppression scope, so the release also runs when the
+releases the held lines with a shielded combinator, so the release also runs when the
 workflow was canceled, then rethrows the cancellation so the task ends as canceled.
 
 Pitfalls:
 
 - Branch on each handle's outcome, not on the combined result: the combinator never
   throws for an input.
-- Release inside `SuppressCancellation()` whenever the workflow can be canceled while it
-  compensates.
+- Shield the release whenever the workflow can be canceled while it compensates.
 - `WhenAllCompleted` runs only when awaited inside a durable execution. For handles which
   `ScheduleAll` returned earlier,
   <xref:Orleans.DurableTasks.ScheduledTask.WhenAllCompleted*?displayProperty=nameWithType>
@@ -270,36 +270,35 @@ Pitfalls:
 `Duplicate`, a different decision returns `Conflict`, and a decision after the task
 completed without one returns `TaskCompleted`.
 
-## Detach fire-and-forget side effects
+## Start follow-up work without waiting
 
 **Task:** send a receipt when an invoice is issued, without making the invoice wait for
 the notification service or cancel the receipt when the invoice is canceled.
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_detach" language="csharp":::
 
-<xref:Orleans.DurableTasks.DurableTaskExtensions.DetachAsync*> starts the call as an
-independent root task on the notification grain. The start and a marker in the
-invoice's execution tree commit in one journal write, so a replay which reaches the
-marker starts nothing.
-<xref:Orleans.DurableTasks.DetachedTaskId.For*?displayProperty=nameWithType> derives the
-root ID `issue-{invoiceId}:receipt` from the running task's ID, and observers derive the
-same ID from the starter's task ID to poll the receipt:
+<xref:Orleans.DurableTasks.DurableTaskExtensions.Detached*> makes the call an independent
+root task on the notification grain, named `receipt-{invoiceId}` by
+<xref:Orleans.DurableTasks.DurableTaskExtensions.WithId*>, and
+<xref:Orleans.DurableTasks.ConfiguredDurableTask.Post*> stages it in the invoice grain's
+outbox. The invocation and its record in the invoice's execution tree commit with the
+invoice's result, so a replay which reaches the record starts nothing. Observers address
+the receipt by its name:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_detach_observe" language="csharp":::
 
 Pitfalls:
 
-- Derive detached root IDs from stable values. Detaching a different request under an
-  existing root ID fails like other task ID reuse.
-- The detached task's result returns to no grain. The target retains it for
-  `ResultRetentionPeriod` after completion, for polling.
-- From an ordinary grain method, `DetachAsync(rootId)` commits the start with the grain's
-  pending state changes; pass an explicit root ID there, because `DetachedTaskId.For`
-  derives the ID from a running durable task.
+- Name detached tasks after stable values. Starting a different request under an existing
+  root ID fails like other task ID reuse.
+- A workflow which hands the receipt's ID to another party before its own result commits
+  starts it with `ScheduleAsync`, which returns once the notification grain holds it.
+- The notification grain retains the receipt's result for `ResultRetentionPeriod` after
+  completion, for polling.
 
-**Verify:** the notification grain lists `issue-{invoiceId}:receipt`, and the invoice
-grain lists a completed `$detach:…` marker beneath `issue-{invoiceId}`, named by the notification grain
-and the detached task's root ID, until the invoice's tree is deleted.
+**Verify:** the notification grain lists `receipt-{invoiceId}`, and the invoice grain
+lists a `$detach:…` record beneath the invoice's task, named by the notification grain and
+the receipt's root ID, until the invoice's tree is deleted.
 
 ## Cancel and abort from ordinary grain methods
 
@@ -336,43 +335,36 @@ reason as its response. An aborted root reports `Faulted` with
 
 **Task:** start the order workflow when a buyer checks out, and observe its result.
 
-A durable grain schedules the workflow from an ordinary method with
-<xref:Orleans.DurableTasks.DurableTaskExtensions.ScheduleAsync*>, which stages the
-invocation in its outbox and writes the journal, so the cleared basket and the
-invocation commit together:
+A durable grain starts the workflow from an ordinary method with
+<xref:Orleans.DurableTasks.ConfiguredDurableTask.Post*>, which stages the invocation in
+its outbox, so the cleared basket and the invocation commit together in the journal write
+which follows:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_schedule_from_grain" language="csharp":::
 
-The basket records the call under the root ID and receives the result through its
-inbox. `IDurableTaskManager.GetTask<TResult>(rootId)` reads that record, and the basket
-retains the result for `ResultRetentionPeriod` after it arrives. The order grain deletes
-the workflow's execution tree once the basket has accepted the result. A starter which
-doesn't use the result calls `DetachAsync(rootId)` instead, in the same write; the order
-grain then retains the workflow and its result for `ResultRetentionPeriod`, and
-observers poll it there.
+The workflow is a root task on the order grain, which retains it and its result for
+`ResultRetentionPeriod` after completion, and the basket polls it there with the
+`GetDurableTask<TResult>` grain-reference extension.
 
-A client schedules the workflow and awaits the returned handle, or reattaches to it
-later by root ID with the `GetDurableTask<TResult>` grain-reference extension:
+A client schedules the workflow with
+<xref:Orleans.DurableTasks.ConfiguredDurableTask.ScheduleAsync*>, which returns once the
+order grain holds the task, and awaits the returned handle, or reattaches to it later by
+root ID with `GetDurableTask<TResult>`:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_schedule_from_client" language="csharp":::
 
 A <xref:Orleans.DurableTasks.PollingOptions> value with a zero `PollTimeout` returns the
 current status at once; a longer timeout waits up to that time for completion. Inside a
-durable task, awaiting the call schedules it as a child, and
-`WithId(segment).ScheduleAsync()` schedules a child and returns its handle to await
-later.
+durable task, awaiting the call runs it as a child, and `WithId(name).ScheduleAsync()`
+starts a child and returns its handle to await later.
 
 Pitfalls:
 
-- Derive the root ID from a business identity, such as the order ID, so a retried
-  checkout schedules the same task instead of a second workflow.
-- From a durable grain, observe the result through `IDurableTaskManager`. The handle
-  which `ScheduleAsync` returns polls the target grain, which deletes the task after the
-  scheduling grain accepts its result.
-- A client-scheduled task is retained for `ResultRetentionPeriod` after completion.
-  Later polls throw `DurableTaskNotFoundException`, and scheduling the same root ID again
-  runs the workflow again.
+- Derive the root ID from a business identity, such as the order ID, with `WithId`, so a
+  retried checkout reaches the same task instead of starting a second workflow.
+- A root task is retained for `ResultRetentionPeriod` after completion. Later polls throw
+  `DurableTaskNotFoundException`, and starting the same root ID again runs the workflow
+  again.
 
-**Verify:** the basket lists `place-order-{orderId}` with the order grain as its remote
-target, `GetOrderResultAsync` returns the result after the order ships, and the order
-grain no longer lists the workflow.
+**Verify:** the order grain lists `place-order-{orderId}`, the basket lists no task for
+it, and `GetOrderResultAsync` returns the result after the order ships.
