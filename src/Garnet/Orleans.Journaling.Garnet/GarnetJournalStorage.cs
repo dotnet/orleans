@@ -349,7 +349,7 @@ internal sealed class GarnetJournalStorage : IJournalStorage
     }
 
     private ValueTask<RedisResult[]> ExecuteAsync(string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous = null)
-        => _router.ExecuteAsync(Bucket, procedure, args, cancellationToken);
+        => _router.ExecuteAsync(Bucket, procedure, args, cancellationToken, ambiguous);
 
     private void WriteKeys(object[] args)
     {
