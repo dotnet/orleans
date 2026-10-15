@@ -606,7 +606,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             return;
         }
 
-        RetireDestination(completion.TaskId, state, completion.Destination, retirement == OutboxMessageRetirement.DeadLettered);
+        RetireDestination(completion.TaskId, state, completion.Destination, retirement.Status is not OutboxMessageRetirementStatus.Delivered);
     }
 
     /// <summary>
