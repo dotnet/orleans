@@ -25,8 +25,12 @@ internal sealed partial class Inbox
 
     private bool IsDurable(InboxEntry entry) => entry.Sequence <= _durableSequence;
 
+    // Every journal write prepares every state, so a write which makes a work source's work pending ensures the wake-up
+    // before it can become durable.
     ValueTask IStateMachine.PrepareWriteAsync(CancellationToken cancellationToken) =>
-        _lastSequence != _capturedSequence ? _pump.EnsureWakeupAsync(cancellationToken) : ValueTask.CompletedTask;
+        _lastSequence != _capturedSequence || GetWorkSourceDelay() is not null
+            ? _pump.EnsureWakeupAsync(cancellationToken)
+            : ValueTask.CompletedTask;
 
     private void OnWriteCaptured() => _capturedSequence = _lastSequence;
 
