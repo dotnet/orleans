@@ -675,10 +675,10 @@ public sealed partial class DurableTaskSignalTests
         public void SetDelay(TaskId taskId, IDurableTaskState state, DateTimeOffset dueTime, long generation) =>
             (((State)state).DueTime, ((State)state).ResumeGeneration) = (dueTime, generation);
 
-        public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination) =>
+        public void AddCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination) =>
             ((State)state).CompletionDestinations.Add(destination);
 
-        public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, GrainId destination) =>
+        public void RemoveCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination) =>
             ((State)state).CompletionDestinations.Remove(destination);
 
         public void RetainResult(TaskId taskId, IDurableTaskState state) => ((State)state).RetainedSince = timeProvider.GetUtcNow();
@@ -715,7 +715,7 @@ public sealed partial class DurableTaskSignalTests
     private sealed class State : IDurableTaskState
     {
         public DurableTaskResponse? Result { get; set; }
-        public HashSet<GrainId> CompletionDestinations { get; } = [];
+        public HashSet<DurableTaskSubscriber> CompletionDestinations { get; } = [];
         public IDurableTaskRequest? Request { get; set; }
         public DateTimeOffset? CompletedAt { get; set; }
         public DateTimeOffset? CancellationRequestedAt { get; set; }
@@ -732,7 +732,7 @@ public sealed partial class DurableTaskSignalTests
 
         // This storage doesn't order completions, so the runtime records each completion decision.
         public long CompletionSequence => 0;
-        IReadOnlySet<GrainId> IDurableTaskState.CompletionDestinations => CompletionDestinations;
+        IReadOnlySet<DurableTaskSubscriber> IDurableTaskState.CompletionDestinations => CompletionDestinations;
     }
 
     private sealed class DurableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, IDurableDictionary<TKey, TValue>

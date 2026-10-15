@@ -118,7 +118,7 @@ public sealed class DurableTaskStorageTests
     {
         var storage = CreateStorage();
         var taskId = TaskId.Parse("root/undecodable");
-        var destination = GrainId.Create("caller", "undecodable");
+        var destination = new DurableTaskSubscriber(GrainId.Create("caller", "undecodable"), taskId);
         var state = storage.GetOrCreateTask(taskId, request: null);
         storage.SetResponse(taskId, state, DurableTaskResponse.FromResult(42));
         storage.AddCompletionDestination(taskId, state, destination);
@@ -218,7 +218,7 @@ public sealed class DurableTaskStorageTests
         var terminalResult = TaskId.Parse("root/result/42");
         var remoteTarget = GrainId.Create("remote-target", "alpha");
         var caller = GrainId.Create("caller", "beta");
-        var completionDestination = GrainId.Create("completion-destination", "gamma");
+        var completionDestination = new DurableTaskSubscriber(GrainId.Create("completion-destination", "gamma"), TaskId.Parse("subscriber/$child-1"));
         await using (var activation = await harness.ActivateAsync(cancellationToken))
         {
             var storage = activation.Storage;
@@ -342,10 +342,10 @@ public sealed class DurableTaskStorageTests
             var state = storage.GetOrCreateTask(taskId, CreateRequest(caller, GrainId.Create("target", "payloads")));
             storage.SetCallerId(taskId, state, caller);
             storage.SetRequestFingerprint(taskId, state, "fingerprint");
-            storage.AddCompletionDestination(taskId, state, caller);
+            storage.AddCompletionDestination(taskId, state, new(caller, taskId));
             await storage.WriteAsync(cancellationToken);
             storage.SetResponse(taskId, state, DurableTaskResponse.FromResult("payload result"));
-            storage.RemoveCompletionDestination(taskId, state, caller);
+            storage.RemoveCompletionDestination(taskId, state, new(caller, taskId));
             await storage.WriteAsync(cancellationToken);
             var typedState = Assert.IsType<DurableTaskState>(state);
             requestPayload = typedState.RequestPayload!;
