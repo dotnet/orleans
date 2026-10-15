@@ -1,9 +1,15 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json.Serialization;
 
 namespace Orleans.DurableTasks;
 
 /// <summary>Identifies a durable task within a hierarchy.</summary>
+/// <remarks>
+/// System.Text.Json serializes the identifier as its escaped hierarchical path, through
+/// <see cref="TaskIdJsonConverter"/>.
+/// </remarks>
+[JsonConverter(typeof(TaskIdJsonConverter))]
 public readonly struct TaskId : IEquatable<TaskId>, IParsable<TaskId>, ISpanParsable<TaskId>, ISpanFormattable
 {
     private readonly HierarchicalKey? _key;
