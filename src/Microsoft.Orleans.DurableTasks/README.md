@@ -139,12 +139,22 @@ var placement = await order.PlaceOrderAsync(request).WithId(PlaceOrderTaskId(ord
   The table is separate from the execution trees, so a start survives deletion of the tree which made
   it, and the invocation's payload is journaled once. A replay which reaches a start whose invocation
   is still pending coalesces with it.
-- A target which can't store an invoked task, because its ID already identifies another request or
-  another caller, dead-letters the invocation, and the starter's outbox retires it as rejected, with the
-  target's reason. The starter's record stores a `DurableTaskConflictException` with that reason as its
-  result. An invocation which the outbox dead-letters, because it wasn't delivered before Messaging's
-  `OutboxRetryTimeout`, stores a `DurableTaskDeliveryException` instead. `ScheduleAsync`, and awaiting
-  the task or its handle, throw the stored failure in every replay.
+- A target rejects an invocation at once only when its task ID already identifies another request or
+  caller, which is final: it dead-letters the invocation with the `durable-rpc/conflict` code from
+  `DurableTaskRejectionCodes` and its reason, and the starter's outbox retires the invocation as
+  rejected with both. A target which fails to accept an invocation for another reason, such as a
+  transient failure or a request which it can't decode, throws, so the starter's outbox retries the
+  delivery until Messaging's `OutboxRetryTimeout`; during a rolling deployment, a retry can reach an
+  activation which decodes it. The starter's record stores the failure as its result, and
+  `ScheduleAsync`, and awaiting the task or its handle, throw it in every replay:
+
+  | Outcome | Code | Failure |
+  | --- | --- | --- |
+  | The task ID already identifies another request or caller. | `durable-rpc/conflict` | `DurableTaskConflictException` |
+  | The target rejects the invocation with another code, or with none. | The target's code | `DurableTaskRejectedException` |
+  | The invocation isn't accepted before `OutboxRetryTimeout`, such as one which never decodes. | | `DurableTaskDeliveryException`, with the dead letter's reason |
+
+  `DurableTaskRejectedException.Code` reports the target's code, and `Target` the rejecting grain.
 - In an ordinary method of a durable grain, `ScheduleAsync` calls the target directly, like a client,
   and returns once the target has stored the task; a call to the grain itself goes through the grain's
   own runtime. `Post` stages the invocation in the grain's outbox, so it commits with the grain's next

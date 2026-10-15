@@ -124,6 +124,9 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
         var workflow = await starter.ScheduleConflictingEchoAsync(workerKey, "taken").WithId("workflow").ScheduleAsync(cancellationToken);
 
         Assert.Contains("different request", await workflow.WaitAsync(Timeout, cancellationToken), StringComparison.Ordinal);
+
+        // The worker rejected the conflicting invocation permanently, and its dead letter records the conflict's code.
+        Assert.Equal([DurableTaskRejectionCodes.Conflict], await worker.GetInboxDeadLetterCodesAsync());
     }
 
     [Fact]
