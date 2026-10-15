@@ -9,25 +9,89 @@ public static class DurableTaskExtensions
     /// <summary>Gets an awaiter for a durable task in the current execution context.</summary>
     public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).GetAwaiter();
 
-    /// <summary>
-    /// Assigns one stable logical identifier segment. Within a durable execution, a segment repeated in one run
-    /// identifies its later occurrences by their order, such as <c>reserve$2</c>, and segments don't contain <c>$</c>.
-    /// </summary>
-    public static ConfiguredDurableTask WithId(this DurableTask task, string segment) => new ConfiguredDurableTask(task).WithId(segment);
+    /// <summary>Returns a configuration which names the task.</summary>
+    /// <param name="task">The definition to start.</param>
+    /// <param name="name">The task's name.</param>
+    /// <remarks>
+    /// <para>
+    /// Within a durable execution, the name identifies an attached child among the execution's operations, and a replay
+    /// reaches the same child. A name repeated in one run identifies its later occurrences by their order, such as
+    /// <c>reserve$2</c>, and names don't contain <c>$</c>. A detached task uses the name verbatim as its root identifier,
+    /// so other parties can address it, for example with <c>GetDurableTask</c>.
+    /// </para>
+    /// <para>
+    /// Outside a durable execution, every task is a root task, and the name is its root identifier. The name makes a start
+    /// safe to retry: a caller which retries a start after an ambiguous failure, such as a timeout, reaches the same task.
+    /// A start without a name receives a new random root identifier, which its handle's <see cref="ScheduledTask.Id"/>
+    /// reports, so it behaves like an ordinary call.
+    /// </para>
+    /// </remarks>
+    public static ConfiguredDurableTask WithId(this DurableTask task, string name) => new ConfiguredDurableTask(task).WithId(name);
+
+    /// <inheritdoc cref="WithId(DurableTask, string)"/>
+    public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string name) => new ConfiguredDurableTask<TResult>(task).WithId(name);
+
+    /// <summary>Returns a configuration which starts the task as an independent root task.</summary>
+    /// <param name="task">The definition to start, such as a durable grain call.</param>
+    /// <remarks>
+    /// <para>
+    /// Within a durable execution, a detached task is a root of its own: the execution doesn't own it, can complete while
+    /// it runs, and its cancellation, abort, and deletion don't reach it. Awaiting the detached task, or the handle which
+    /// <see cref="ConfiguredDurableTask.ScheduleAsync"/> or <see cref="ConfiguredDurableTask.Post"/> returns, observes
+    /// its result: the start names the execution as a subscriber, and canceling the wait ends only that subscription.
+    /// </para>
+    /// <para>
+    /// The task's root identifier is the name which <see cref="WithId(DurableTask, string)"/> assigns, verbatim, or
+    /// <c>{executionId}:{segment}</c>, where <c>{segment}</c> is the identifier which the execution generates for its next
+    /// unnamed operation, so a replay derives the same identifier. Starting a detached task again under the same root
+    /// identifier, including during a replay, reaches the same task.
+    /// </para>
+    /// <para>Outside a durable execution, every task is already a root task, so the configuration is unchanged.</para>
+    /// </remarks>
+    public static ConfiguredDurableTask Detached(this DurableTask task) => new ConfiguredDurableTask(task).Detached();
+
+    /// <inheritdoc cref="Detached(DurableTask)"/>
+    public static ConfiguredDurableTask<TResult> Detached<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).Detached();
 
     /// <summary>
-    /// Assigns one stable logical identifier segment. Within a durable execution, a segment repeated in one run
-    /// identifies its later occurrences by their order, such as <c>reserve$2</c>, and segments don't contain <c>$</c>.
+    /// Returns a configuration which starts the task as an attached child which the starting execution's durable
+    /// cancellation doesn't reach.
     /// </summary>
-    public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string segment) => new ConfiguredDurableTask<TResult>(task).WithId(segment);
+    /// <param name="task">The definition to start.</param>
+    /// <remarks>
+    /// <para>
+    /// The execution still owns a shielded child and waits for it: the child runs to completion even when the execution's
+    /// cancellation was requested before the child started, which suits compensation that a canceled workflow runs. The
+    /// execution's own <see cref="DurableTaskContext.CancellationToken"/> and
+    /// <see cref="DurableTaskContext.IsCancellationRequested"/> still report its cancellation. An administrative abort
+    /// and deleting the execution's tree still reach the child, and canceling the child through its own handle still
+    /// cancels it and its children.
+    /// </para>
+    /// <para>
+    /// A shielded child's own children are reached only by the child's cancellation, so the whole subtree, such as a
+    /// <see cref="DurableTask.Run(Func{CancellationToken, Task})"/> step and the work it starts, runs to completion. A
+    /// shielded combinator, such as <see cref="DurableTask.WhenAll(IReadOnlyList{DurableTask})"/>, runs as part of the
+    /// execution and shields each input which it starts.
+    /// </para>
+    /// </remarks>
+    public static ConfiguredDurableTask Shielded(this DurableTask task) => new ConfiguredDurableTask(task).Shielded();
 
-    /// <summary>Schedules a root task using one explicit stable identifier segment.</summary>
-    public static Task<ScheduledTask> ScheduleAsync(this DurableTask task, string rootId, CancellationToken cancellationToken = default)
-        => new ConfiguredDurableTask(task, rootId).ScheduleAsync(cancellationToken);
+    /// <inheritdoc cref="Shielded(DurableTask)"/>
+    public static ConfiguredDurableTask<TResult> Shielded<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).Shielded();
 
-    /// <summary>Schedules a root task using one explicit stable identifier segment.</summary>
-    public static Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, string rootId, CancellationToken cancellationToken = default)
-        => new ConfiguredDurableTask<TResult>(task, rootId).ScheduleAsync(cancellationToken);
+    /// <inheritdoc cref="ConfiguredDurableTask.ScheduleAsync(CancellationToken)"/>
+    public static Task<ScheduledTask> ScheduleAsync(this DurableTask task, CancellationToken cancellationToken = default)
+        => new ConfiguredDurableTask(task).ScheduleAsync(cancellationToken);
+
+    /// <inheritdoc cref="ConfiguredDurableTask.ScheduleAsync(CancellationToken)"/>
+    public static Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, CancellationToken cancellationToken = default)
+        => new ConfiguredDurableTask<TResult>(task).ScheduleAsync(cancellationToken);
+
+    /// <inheritdoc cref="ConfiguredDurableTask.Post"/>
+    public static ScheduledTask Post(this DurableTask task) => new ConfiguredDurableTask(task).Post();
+
+    /// <inheritdoc cref="ConfiguredDurableTask.Post"/>
+    public static ScheduledTask<TResult> Post<TResult>(this DurableTask<TResult> task) => new ConfiguredDurableTask<TResult>(task).Post();
 
     /// <summary>
     /// Creates a durable task which runs <paramref name="task"/> and requests its durable cancellation once
@@ -120,46 +184,5 @@ public static class DurableTaskExtensions
     {
         ArgumentNullException.ThrowIfNull(task);
         return DurableTask.WithTimeout(task, DurableTask.DelayUntil(dueTime), ScheduledTask.GetDeadlineReason(dueTime));
-    }
-
-    /// <summary>
-    /// Starts <paramref name="task"/> as a new root task with identifier <paramref name="rootId"/>, detached from its
-    /// starter.
-    /// </summary>
-    /// <param name="task">The definition to start, such as a durable grain call.</param>
-    /// <param name="rootId">The stable root identifier of the detached task.</param>
-    /// <param name="cancellationToken">A token which abandons scheduling. It doesn't cancel the detached task.</param>
-    /// <returns>An operation which completes once the host has durably accepted the detached task.</returns>
-    /// <remarks>
-    /// <para>
-    /// A detached task is a root of its own: durable cancellation of the starter doesn't cancel it, the starter can't
-    /// await its result, and the host retains its result for polling by <paramref name="rootId"/> as it does for other
-    /// roots without an observing caller. Detaching the same definition under the same identifier again leaves the task
-    /// unchanged; another definition under that identifier fails like other identifier reuse.
-    /// </para>
-    /// <para>
-    /// Within a durable execution, the host records the start in the execution under an identifier which it derives from
-    /// the detached task's identity and commits both together, so a replay doesn't start the task again. Adding or
-    /// removing other operations doesn't change the record which a detach reaches. Outside a durable execution, the
-    /// definition must support root scheduling.
-    /// </para>
-    /// </remarks>
-    /// <exception cref="ArgumentNullException"><paramref name="task"/> or <paramref name="rootId"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="rootId"/> is empty.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// Outside a durable execution, <paramref name="task"/> doesn't support root scheduling.
-    /// </exception>
-    public static ValueTask DetachAsync(this DurableTask task, string rootId, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(task);
-        var taskId = TaskId.CreateRoot(rootId);
-        if (DurableTaskContext.Ambient is { } context)
-        {
-            return context.DetachTaskAsync(taskId, task, cancellationToken);
-        }
-
-        return task is ISchedulableTask schedulable
-            ? schedulable.DetachAsync(taskId, cancellationToken)
-            : throw new InvalidOperationException("The durable task definition does not support root scheduling.");
     }
 }

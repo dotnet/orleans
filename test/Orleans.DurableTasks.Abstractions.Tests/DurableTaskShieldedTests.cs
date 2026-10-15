@@ -8,31 +8,19 @@ namespace Orleans.DurableTasks.Abstractions.Tests;
 [TestProvider("None")]
 [TestArea("DurableTasks")]
 [TestCategory("BVT")]
-public class DurableCancellationSuppressionTests
+public class DurableTaskShieldedTests
 {
     private static CancellationToken TestCancellation => Xunit.TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task ChildrenScheduledInTheScopeAreSuppressedAcrossAwaitsAndNestedScopes()
+    public async Task ShieldedChildIsShieldedAndItsSiblingsAreNot()
     {
         var log = new ConcurrentDictionary<string, bool>();
         var response = await RunAsync(log, async () =>
         {
             await Step("before");
-            using (DurableTask.Current.SuppressCancellation())
-            {
-                await Step("inside");
-                await Task.Yield();
-                await Step("after-yield");
-                await DurableTask.Delay(TimeSpan.Zero).WithId("delay");
-                using (DurableTask.Current.SuppressCancellation())
-                {
-                    await Step("nested");
-                }
-
-                await Step("after-nested");
-            }
-
+            await Step("shielded").Shielded();
+            await DurableTask.Delay(TimeSpan.Zero).Shielded().WithId("delay");
             await Step("after");
         });
 
@@ -41,49 +29,52 @@ public class DurableCancellationSuppressionTests
             new Dictionary<string, bool>
             {
                 ["before"] = false,
-                ["inside"] = true,
-                ["after-yield"] = true,
+                ["shielded"] = true,
                 ["delay"] = true,
-                ["nested"] = true,
-                ["after-nested"] = true,
                 ["after"] = false,
             },
             log.ToDictionary());
     }
 
     [Fact]
-    public async Task ScopeEnteredByACalleeDoesNotLeakToItsCaller()
+    public async Task ShieldedCombinatorShieldsEachInput()
     {
         var log = new ConcurrentDictionary<string, bool>();
         var response = await RunAsync(log, async () =>
         {
-            await CompensateAsync();
-            await Step("after-callee");
+            await DurableTask.WhenAll([DurableTask.Run(static _ => { }), DurableTask.Run(static _ => { })]).WithId("all").Shielded();
+            await Step("after");
         });
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
-        Assert.True(log["compensation"]);
-        Assert.False(log["after-callee"]);
-
-        static async Task CompensateAsync()
-        {
-            using (DurableTask.Current.SuppressCancellation())
-            {
-                await Step("compensation");
-            }
-        }
+        Assert.True(log["0"]);
+        Assert.True(log["1"]);
+        Assert.False(log["after"]);
     }
 
     [Fact]
-    public async Task ScopeCoversOnlyChildrenOfTheExecutionWhichEnteredIt()
+    public async Task ShieldEndsWithTheStartWhichEnteredIt()
     {
         var log = new ConcurrentDictionary<string, bool>();
         var response = await RunAsync(log, async () =>
         {
-            using (DurableTask.Current.SuppressCancellation())
-            {
-                await DurableTask.Run(async _ => await Step("grandchild")).WithId("child");
-            }
+            await DurableTask.Run(static async _ => await Task.Yield()).Shielded();
+            await Task.Yield();
+            await Step("after");
+        });
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.True(log["$child-1"]);
+        Assert.False(log["after"]);
+    }
+
+    [Fact]
+    public async Task ShieldCoversOnlyChildrenOfTheStartingExecution()
+    {
+        var log = new ConcurrentDictionary<string, bool>();
+        var response = await RunAsync(log, async () =>
+        {
+            await DurableTask.Run(async _ => await Step("grandchild")).WithId("child").Shielded();
         });
 
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
@@ -92,7 +83,24 @@ public class DurableCancellationSuppressionTests
     }
 
     [Fact]
-    public async Task CanceledExecutionStillObservesItsCancellationInTheScope()
+    public async Task ShieldedPostAndScheduleAreShielded()
+    {
+        var log = new ConcurrentDictionary<string, bool>();
+        var response = await RunAsync(log, async () =>
+        {
+            _ = Step("posted").Shielded().Post();
+            await await Step("scheduled").Shielded().ScheduleAsync();
+            _ = Step("unshielded").Post();
+        });
+
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.True(log["posted"]);
+        Assert.True(log["scheduled"]);
+        Assert.False(log["unshielded"]);
+    }
+
+    [Fact]
+    public async Task CanceledExecutionStillObservesItsCancellationAfterAShieldedChild()
     {
         var log = new ConcurrentDictionary<string, bool>();
         var context = new RecordingContext(TaskId.CreateRoot("root"), log);
@@ -101,23 +109,14 @@ public class DurableCancellationSuppressionTests
         var response = await DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(async cancellationToken =>
             {
-                using (DurableTask.Current.SuppressCancellation())
-                {
-                    await Step("release");
-                    var current = DurableTask.Current;
-                    return (cancellationToken.IsCancellationRequested, current.IsCancellationRequested, current.CancellationReason);
-                }
+                await Step("release").Shielded();
+                var current = DurableTask.Current;
+                return (cancellationToken.IsCancellationRequested, current.IsCancellationRequested, current.CancellationReason);
             }),
             context);
 
         Assert.Equal((true, true, "buyer"), response.GetResult<(bool, bool, string?)>());
         Assert.True(log["release"]);
-    }
-
-    [Fact]
-    public void ScopeRequiresADurableExecution()
-    {
-        Assert.Throws<InvalidOperationException>(() => DurableTask.Current.SuppressCancellation());
     }
 
     private static ConfiguredDurableTask Step(string name) => DurableTask.Run(static _ => { }).WithId(name);
@@ -127,19 +126,26 @@ public class DurableCancellationSuppressionTests
             DurableTask.Run(async _ => await body()),
             new RecordingContext(TaskId.CreateRoot("root"), log));
 
-    /// <summary>Records, for each child it schedules, whether the scheduling code suppressed cancellation.</summary>
+    /// <summary>Records, for each child it starts, whether the starting code shields it.</summary>
     private sealed class RecordingContext(TaskId id, ConcurrentDictionary<string, bool> log) : DurableTaskContext(id)
     {
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
 
-        protected override async ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(
+        protected override async ValueTask<IScheduledTaskHandle> StartTaskAsync(
             TaskId taskId,
             DurableTask taskDefinition,
+            DurableTaskStartOptions options,
             CancellationToken cancellationToken)
         {
-            log[taskId.ToString().Split('/')[^1]] = IsCancellationSuppressed;
+            log[taskId.ToString().Split('/')[^1]] = SchedulesShieldedChildren;
             var response = await DurableTaskRuntimeHelper.RunAsync(taskDefinition, new RecordingContext(taskId, log));
             return new CompletedHandle(taskId, response);
+        }
+
+        protected override IScheduledTaskHandle PostTask(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options)
+        {
+            log[taskId.ToString().Split('/')[^1]] = SchedulesShieldedChildren;
+            return new CompletedHandle(taskId, DurableTaskResponse.Completed);
         }
 
         protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
