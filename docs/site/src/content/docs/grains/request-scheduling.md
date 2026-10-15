@@ -79,7 +79,7 @@ With the default <xref:Orleans.Runtime.LocalRequestOptions>, the request:
 - Restarts the activation's idle collection period.
 - Bypasses <xref:Orleans.Configuration.SiloMessagingOptions.MaxEnqueuedRequestsHardLimit>.
 
-The returned task completes with the callback's result or exception. The callback receives the cancellation token passed to `RunRequestAsync`, and cancelling it while the request is queued cancels the request. If the activation deactivates before the request runs, the task faults with <xref:Orleans.Runtime.OrleansMessageRejectionException>.
+The callback can be synchronous, as in this example, or return a `Task` or `Task<TResult>`. The returned task completes with the callback's result or exception. The callback receives the cancellation token passed to `RunRequestAsync`, and cancelling it while the request is queued cancels the request. If the activation deactivates before the request runs, the task faults with <xref:Orleans.Runtime.OrleansMessageRejectionException>.
 
 Pass the grain and other values through the `state` argument and use a `static` lambda, so the call doesn't allocate a closure. On a non-reentrant grain, awaiting the returned task from another request on the same activation deadlocks, because the queued request waits for the current one to complete.
 

@@ -262,11 +262,7 @@ public sealed class QuoteGrain(IPriceFeed feed) : Grain, IQuoteGrain
     // Runs the update as a request on this activation, where it can safely access grain state.
     private Task OnPrice(decimal price, CancellationToken cancellationToken) =>
         this.RunRequestAsync(
-            static (state, _) =>
-            {
-                state.Grain._price = state.Price;
-                return Task.CompletedTask;
-            },
+            static (state, _) => state.Grain._price = state.Price,
             (Grain: this, Price: price),
             cancellationToken);
 }
@@ -305,11 +301,7 @@ public sealed class QuoteGrain(IPriceFeed feed) : Grain, IQuoteGrain
 // Heartbeats don't extend the activation's lifetime, and they run between the turns of other requests.
 private Task OnHeartbeat(DateTimeOffset timestamp, CancellationToken cancellationToken) =>
     this.RunRequestAsync(
-        static (state, _) =>
-        {
-            state.Grain._lastSeen = state.Timestamp;
-            return Task.CompletedTask;
-        },
+        static (state, _) => state.Grain._lastSeen = state.Timestamp,
         (Grain: this, Timestamp: timestamp),
         new LocalRequestOptions { KeepAlive = false, Interleave = true },
         cancellationToken);
@@ -382,11 +374,7 @@ public sealed class RequestLoggingFilter(ILogger<RequestLoggingFilter> logger) :
 // when the activation's queue exceeds SiloMessagingOptions.MaxEnqueuedRequestsHardLimit.
 internal Task Ingest(int items, CancellationToken cancellationToken) =>
     this.RunRequestAsync(
-        static (state, _) =>
-        {
-            state.Grain._count += state.Items;
-            return Task.CompletedTask;
-        },
+        static (state, _) => state.Grain._count += state.Items,
         (Grain: this, Items: items),
         new LocalRequestOptions { EnforceQueueLimit = true },
         cancellationToken);

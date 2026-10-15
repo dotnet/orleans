@@ -96,12 +96,14 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
         Assert.Null(await grain.AwaitPendingRequest());
     }
 
-    [Fact]
-    public async Task RunRequest_PropagatesCallbackException()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task RunRequest_PropagatesCallbackException(bool synchronous)
     {
         var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
 
-        await grain.StartFaultingRequest();
+        await grain.StartFaultingRequest(synchronous);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(grain.AwaitPendingRequest);
         Assert.Equal("Request failed.", exception.Message);

@@ -33,7 +33,7 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task StartRequestContextRequest(string value);
 
-    Task StartFaultingRequest();
+    Task StartFaultingRequest(bool synchronous);
 
     Task StartCanceledRequest(bool cancelBeforeStart);
 

@@ -46,11 +46,7 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
     public async Task StartRequestDuringCall()
     {
         _log.Add("call-start");
-        _pending = this.RunRequestAsync(_ =>
-        {
-            _log.Add("request");
-            return Task.CompletedTask;
-        });
+        _pending = this.RunRequestAsync(_ => _log.Add("request"));
 
         await Task.Delay(200);
         _log.Add("call-end");
@@ -59,11 +55,7 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
     public async Task StartInterleavingRequestDuringCall()
     {
         _log.Add("call-start");
-        _pending = this.RunRequestAsync(_ =>
-        {
-            _log.Add("request");
-            return Task.CompletedTask;
-        }, new LocalRequestOptions { Interleave = true });
+        _pending = this.RunRequestAsync(_ => _log.Add("request"), new LocalRequestOptions { Interleave = true });
 
         await Task.Delay(200);
         _log.Add("call-end");
@@ -186,11 +178,7 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
     private static readonly LocalRequestOptions EnforceQueueLimit = new() { EnforceQueueLimit = true };
 
     private Task QueueLoggedRequest(string entry, LocalRequestOptions options) =>
-        this.RunRequestAsync(static (state, _) =>
-        {
-            state.Grain._log.Add(state.Entry);
-            return Task.CompletedTask;
-        }, (Grain: this, Entry: entry), options);
+        this.RunRequestAsync(static (state, _) => state.Grain._log.Add(state.Entry), (Grain: this, Entry: entry), options);
 
     public Task StartRequestContextRequest(string value)
     {
@@ -199,16 +187,20 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         return Task.CompletedTask;
     }
 
-    public Task StartFaultingRequest()
+    public Task StartFaultingRequest(bool synchronous)
     {
-        _pending = this.RunRequestAsync(static async _ =>
-        {
-            await Task.Yield();
-            throw new InvalidOperationException("Request failed.");
-        });
+        _pending = synchronous
+            ? this.RunRequestAsync(Fail)
+            : this.RunRequestAsync(static async _ =>
+            {
+                await Task.Yield();
+                throw new InvalidOperationException("Request failed.");
+            });
 
         return Task.CompletedTask;
     }
+
+    private static void Fail(CancellationToken cancellationToken) => throw new InvalidOperationException("Request failed.");
 
     public Task StartCanceledRequest(bool cancelBeforeStart)
     {
@@ -218,11 +210,7 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
             cancellation.Cancel();
         }
 
-        _pending = this.RunRequestAsync(_ =>
-        {
-            _log.Add("canceled-request");
-            return Task.CompletedTask;
-        }, cancellation.Token);
+        _pending = this.RunRequestAsync(_ => _log.Add("canceled-request"), cancellation.Token);
 
         cancellation.Cancel();
         return Task.CompletedTask;
