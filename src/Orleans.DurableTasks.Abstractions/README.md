@@ -358,6 +358,11 @@ public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
 - A shielded child's own children are reached only by the child's cancellation, so a shielded
   `DurableTask.Run` step and the work it starts run to completion. A shielded combinator runs as part
   of the workflow and shields each input which it starts.
+- Every awaited durable operation honors `.Shielded()` the same way, whether it runs as a child or as
+  part of the workflow: a shielded signal wait, `TryWaitAsync`, delay, `GetDurableTask` subscription,
+  `Race`, `WhenAny`, or `WaitAsync` completes after the workflow's cancellation, and only an abort ends
+  it. A workflow which waits for a payment with `await Paid.WaitAsync().Shielded()` still receives a
+  payment which arrives after a cancellation, and decides what the payment means.
 - Work which must outlive the workflow, such as cleanup which continues after the workflow's result is
   observed, runs as a detached task, which the workflow's cancellation doesn't reach either:
   `inventory.ReleaseAsync(order.Id).Detached().Post()`.

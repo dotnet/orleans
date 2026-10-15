@@ -191,6 +191,16 @@ public abstract class DurableTaskContext
     internal CancellationToken ExecutionAbortToken => _executionAbortToken;
 
     /// <summary>
+    /// Gets the token which ends an operation that runs as part of this execution, such as a signal wait: within a shield,
+    /// only an abort of the attempt ends it, and otherwise the execution's durable cancellation also does.
+    /// </summary>
+    /// <remarks>
+    /// A shield keeps this execution's durable cancellation from reaching the operations which the shielded start covers,
+    /// whether they run as children or as part of the execution, so a shielded wait completes after a cancellation.
+    /// </remarks>
+    internal CancellationToken InlineOperationCancellationToken => SchedulesShieldedChildren ? _executionAbortToken : CancellationToken;
+
+    /// <summary>
     /// Starts, or reattaches to, <paramref name="taskDefinition"/> under <paramref name="taskId"/>, and records the start
     /// in this execution.
     /// </summary>
