@@ -48,7 +48,8 @@ var response = await task.GetResponseAsync(cancellationToken);
 
 The reference is awaitable through the `GetAwaiter` extension method, so frameworks which inspect a
 return type's instance members, such as ASP.NET Core Minimal APIs, treat it as a value: a handler
-returns `grain.GetDurableTask<T>(id)` directly.
+returns `grain.GetDurableTask<T>(id)` directly. `IDurableTaskReference` reads a reference's `Target`
+and `Id` without its result type.
 
 An absent root or a root whose result retention has expired throws
 `DurableTaskNotFoundException`. A returned failed response remains an execution
