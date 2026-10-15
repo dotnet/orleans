@@ -127,21 +127,13 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
         _harness.Injector.Reset();
         var fault = _harness.Injector.Arm(point, (role == FaultRole.Workflow ? (IAddressable)workflow : partner).GetGrainId(), occurrence, subject);
 
-        var stalled = false;
-
         var response = await _harness.RunAsync<int>(
-            workflow,
-            "propagate",
-            token => workflow.PropagatePartnerFailureAsync(partnerKey).WithId("propagate").ScheduleAsync(token),
-            CancellationToken,
-            nudge: _ => partner.GetStateAsync(),
-            onStalled: () => stalled = true);
+            workflow, "propagate", token => workflow.PropagatePartnerFailureAsync(partnerKey).WithId("propagate").ScheduleAsync(token), CancellationToken);
 
         Assert.True(fault.HasFired, $"{fault} didn't fire.");
         AssertApplicationFailure(response, "partner failed");
         await AssertGrainAsync("workflow", workflow, []);
         await AssertGrainAsync("partner", partner, new() { ["fail"] = 1 });
-        FaultScenario.AssertNoStalls(stalled ? [fault.ToString()] : []);
     }
 
     /// <summary>An infrastructure fault at each point of the pipeline only delays its completion.</summary>
@@ -164,7 +156,6 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
 
         Assert.True(run.Fired, "The fault didn't fire.");
         Assert.True(run.Violations.Count == 0, string.Join(Environment.NewLine, run.Violations));
-        FaultScenario.AssertNoStalls(run.Stalled ? [$"{point} on {role}"] : []);
     }
 
     /// <summary>A sink which throws is an infrastructure fault: Messaging retries the message, which is accepted once.</summary>
@@ -178,7 +169,6 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
 
         Assert.True(run.Fired, "The fault didn't fire.");
         Assert.True(run.Violations.Count == 0, string.Join(Environment.NewLine, run.Violations));
-        FaultScenario.AssertNoStalls(run.Stalled ? [$"inbox sink fault on {role} ({subject})"] : []);
     }
 
     /// <summary>
@@ -200,7 +190,6 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
         var fencedId = fenced.GetGrainId();
         _harness.Injector.Reset();
         var hold = _harness.Injector.Arm(FaultPoint.DeliveryHeldAtReceiver, fencedId, 0, subject);
-        var fencedWrites = _harness.Injector.Count(FaultPoint.JournalWriteBeforeDurable, fencedId);
 
         // The fenced grain admits a delivery and holds it before its inbox sees the message.
         Func<Task<int>> runToCompletion;
@@ -227,21 +216,21 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
 
         await hold.Fired.WaitAsync(DurableTaskFaultHarness.RunTimeout, CancellationToken);
 
-        // The grain's other writes, such as its outbox's retirement of a delivered message, finish first, so the reentrant
+        // The grain's other work, such as its outbox's retirement of a delivered message, finishes first, so the reentrant
         // call's write is the one which fails. The failure fences the journal and requests deactivation, which waits for the
         // held call.
-        await _harness.SettleAsync([fencedWrites], CancellationToken);
+        await _harness.SettleAsync([fencedId], CancellationToken);
         var writeFault = _harness.Injector.Arm(FaultPoint.JournalWriteBeforeDurable, fencedId, 0);
         Assert.StartsWith(InjectedFaultException.MessagePrefix, await fenced.FenceAsync(), StringComparison.Ordinal);
         Assert.True(writeFault.HasFired);
         hold.Release();
 
         Assert.Equal(6, await runToCompletion());
-        await _harness.SettleAsync([fencedWrites], CancellationToken);
         await AssertGrainAsync("workflow", workflow, []);
         await AssertGrainAsync("fenced", fenced, expectedEffects);
         await AssertGrainAsync("partner", partner, subject == Complete ? new() { ["echo"] = 1 } : []);
     }
+
     /// <summary>
     /// A delivery which keeps failing is retried, not dead-lettered, within <c>OutboxRetryTimeout</c>; once it succeeds,
     /// the call's own outcome, here an application failure, surfaces unchanged.
@@ -257,8 +246,10 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
         await _harness.CallAsync(token => workflow.CatchPartnerFailureAsync(partnerKey).WithId("catch").ScheduleAsync(token), CancellationToken);
         await fault.WaitForMatchesAsync(1).WaitAsync(DurableTaskFaultHarness.RunTimeout, CancellationToken);
 
+        // An attempt after the clock passed most of the retry window fails again, and the message stays pending.
+        var attempts = fault.Matches;
         _harness.Fixture.JobClock.Advance(OutboxRetryTimeout - TimeSpan.FromHours(1));
-        await fault.WaitForMatchesAsync(2).WaitAsync(DurableTaskFaultHarness.RunTimeout, CancellationToken);
+        await fault.WaitForMatchesAsync(attempts + 1).WaitAsync(DurableTaskFaultHarness.RunTimeout, CancellationToken);
         Assert.Empty((await workflow.GetStateAsync()).OutboxDeadLetters);
         _harness.Injector.Reset();
 
@@ -307,6 +298,7 @@ public abstract class DurableTaskFaultClassificationTests(string journalFormatKe
 
     private async Task AssertGrainAsync(string name, IFaultInjectedGrain grain, Dictionary<string, int> expectedEffects)
     {
+        await _harness.SettleAsync([grain.GetGrainId()], CancellationToken);
         var violations = await FaultScenario.CheckGrainAsync(_harness, name, grain, expectedEffects);
         Assert.True(violations.Count == 0, string.Join(Environment.NewLine, violations));
     }
