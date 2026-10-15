@@ -6,10 +6,10 @@
 
 - **Partitions are the actors.** A view maps each bucket to the partition that owns it. Hosting is abstract: a partition is durable and linearizable, and a crashed or unavailable partition takes no steps until it recovers with its state intact.
 - **Bucket state is the seal.** Each partition holds each bucket `absent`, `open`, or `sealed`. Every operation checks that its bucket is open in the same transaction, so it commits before a seal or observes it.
-- **Journal records** carry their content (a list of appended op ids), a version (the content ETag), and the ids of the mutations applied to them (the recent-ETag list). Tombstones and absent markers read as absent.
+- **Journal records** carry their content (a list of appended op ids), a version (the content ETag), and the ids of the mutations applied to them (the recent-ETag list). Tombstones and absent markers read as absent. `evict` bounds the history: it removes a mutation id once no retry of its op can arrive (D28).
 - **Clients** issue conditional writes. A client conditions on the version it observed, or on the journal's absence; a stale condition models a duplicate activation. Any reply can be lost, and the client retries the same op at whichever partition it routes to. Requests carry no view version (D17), so clients may send any operation to any partition.
 - **Views.** A view change moves one or more buckets to one partition: a move, a split (some of a partition's buckets), or a merge (buckets of several partitions into one). In `step`, views change freely, so migrations chain and buckets return to earlier owners. `coordinatedStep` changes views only by the coordinator rule (`mayMove`).
-- **Migration.** `install` is both a pull (on `NeedPull`) and a consolidation step: it copies a journal from the bucket's migration chain, newest first, only if the destination holds no record for it. `markDone` completes migration once the destination holds every journal of the bucket. `reclaim` deletes a sealed bucket's journals once no read path reaches them; the bucket stays sealed and reads there fail. `dropMarker` removes absent markers after `done`, and tombstones after `done` once no retry on the journal can arrive.
+- **Migration.** A pull (on `NeedPull`) and a consolidation step are two actions, separate requests in the implementation. `fetch` reads a journal from the destination's migration chain, newest first, and records the destination's opening version as the pull's fence; `deliver` installs it later, in one transaction, only if the destination still holds the bucket open at that version with migration incomplete, and holds no record for the journal (D27). `dropPull` discards a pull the destination would reject. Up to `MAX_PULLS` pulls are in flight. `markDone` completes migration once the destination holds every journal of the bucket. `reclaim` deletes a sealed bucket's journals once no migration chain reaches them (`reachable`, computed from bucket states and stopping at a `done` bucket); the bucket stays sealed and reads there fail. `dropMarker` removes absent markers after `done`, and tombstones after `done` once no retry on the journal can arrive.
 - **Oracle:** `truth` records each journal's content after every committed write.
 
 ## Properties
@@ -19,32 +19,36 @@
 | `singleOpen` | At most one partition accepts writes for a bucket. |
 | `durability` | Reads through the bucket's current opener return every committed write. Deleted and never-written journals read as absent. No read path reaches reclaimed data. |
 | `exactlyOnce` | Each op applies at most once. An acknowledged op committed, and an op reported as a conflict did not. |
-| `migrationsComplete` (temporal) | Under weak fairness of `seal`, `open`, `install`, `markDone`, and `reclaim`, every bucket's latest move completes: its owner holds it open and `done`, and every other partition has reclaimed its copy. Holds with `coordinatedStep`. |
+| `migrationsComplete` (temporal) | Under weak fairness of `seal`, `open`, `fetch`, `deliver`, `dropPull`, `markDone`, and `reclaim`, every bucket's latest move completes: its owner holds it open and `done`, and every other partition has reclaimed its copy. Holds with `coordinatedStep`. |
 
 `safety` is the conjunction of the invariants.
 
 ## Mutants
 
-Each mutant breaks one rule of the design and must violate `safety`:
+Each mutant breaks one rule of the design and must violate `safety`. Random simulation catches each mutant except `mutantUnfencedInstall`, whose counterexample delays a delivery across three view changes; its directed scenario, `unfencedInstallHidesWriteTest`, catches it.
 
 | Mutant | Broken rule |
 | --- | --- |
 | `mutantOpenBeforeSeal` | Open before the current opener's seal. |
 | `mutantUnconditionalInstall` | A pull overwrites a newer write. |
+| `mutantUnfencedInstall` | A pull delivered after its destination reopened the bucket installs a stale copy. |
 | `mutantDeleteWithoutTombstone` | Delete during migration without a tombstone, so the source's copy resurrects. |
 | `mutantReclaimBeforeDone` | Reclaim a bucket that a read path still reaches. |
 | `mutantMarkDoneEarly` | Mark migration done before every journal is consolidated. |
 | `mutantRetryWithoutIdempotence` | Retry without recognizing the op's own committed mutation. |
+| `mutantEvictPendingId` | Evict a mutation id while a retry of its op can arrive, as a count-bounded history does: the retry reports a conflict for a committed op, or, after a deletion, recreates the journal. |
 | `mutantWriteAfterSeal` | Acknowledge a write in a sealed bucket (the Delos erratum). |
 
-Directed scenarios ending in `Test` exercise the protocol's main paths (handover, deletes and retries across a migration, chained migrations, merges and splits, and returns to an earlier owner), the coordinator rule, and one counterexample per mutant.
+Directed scenarios ending in `Test` exercise the protocol's main paths (handover, deletes and retries across a migration, chained migrations, merges and splits, returns to an earlier owner, and a pull delayed across a reopening), the coordinator and reclamation rules, history eviction, and one counterexample per mutant.
 
 ## Rules the model makes precise
 
 - **Reopen (D11).** A partition other than the current opener opens a bucket only if it holds no copy of it, or has reclaimed its copy. Otherwise it would serve its stale copy instead of pulling. (The model also lets the current opener reopen a bucket it sealed, keeping its history, after a move that never opened elsewhere; the coordinator rule never produces this.)
 - **Coordinator rule (D11).** A view moves bucket `b` to `p` only once the previous move of `b` has opened, and only if no read path reaches `p`'s copy of `b`. Without it, safety still holds but migrations can stall: a bucket that returns to a partition whose sealed copy is still on the chain can never open there (`returnToChainedCopyStallsTest`), and the same happens when a partition opens at a superseded view.
 - **Tombstone retention (D5).** A tombstone carries the mutation ids that retries rely on, so it is dropped only after migration is done and once no retry of an op on that journal can still arrive. Absent markers carry none and are dropped once migration is done.
-- **Reclamation (D26).** A sealed copy is reclaimable once the migration walk from the bucket's current opener no longer visits it, which holds once a later opener on its chain is done.
+- **Reclamation (D26).** A sealed copy is reclaimable once it is on no migration chain, which holds once a later opener on its chain is done. Holding every journal is not enough (`reclaimWaitsForDoneTest`, `returnWaitsForDoneTest`): the boundary is `done`, which the coordinator observes as the migration's `Done` phase.
+- **Install fencing (D27).** A pull is delivered only at the opening it was fetched for. A destination that reopens a bucket starts empty, so an install conditional only on absence would accept a pull delayed from an earlier opening and hide later writes (`unfencedInstallHidesWriteTest`).
+- **Retry history (D28).** A mutation id leaves a journal's history only once no retry of its op can arrive, so a retry finds its id or its op never committed.
 
 ## Running
 
@@ -68,12 +72,14 @@ The [workflow](../../.github/workflows/garnet-specs.yml) runs the directed scena
 
 Quint 0.33.0, TLC through Apalache 0.62.1, on a shared Azure VM (Intel Xeon Platinum 8370C):
 
-- Directed scenarios: all 20 pass.
-- Random simulation (`garnetRangeMigrationSim`): no violation in 100,000 traces of up to 40 steps (3 minutes 15 seconds).
-- Mutants: each violates `safety` within 5,000 traces of 30 steps (seed 7), in 2–7 seconds.
-- TLC safety (`garnetRangeMigrationTlc`): exhaustive, no violation; 1,515,186 distinct states (303 million generated), depth 27, 8 minutes 23 seconds.
-- TLC liveness (`garnetRangeMigrationLive`, `coordinatedStep`): `migrationsComplete` holds over all 119,370 distinct states, depth 26, 46 seconds.
-- TLC liveness under `step`: `migrationsComplete` is violated in 4 seconds. In the counterexample, bucket 1 moves 2 → 3 → 2; partition 3 opens at the superseded view, so partition 2's sealed copy stays on the chain of an opener that is itself sealed, and partition 2 can never reopen.
+- Directed scenarios: all 29 pass.
+- Random simulation (`garnetRangeMigrationSim`, two pull slots): no violation in 100,000 traces of up to 40 steps (10 minutes, sharing the machine with TLC).
+- Mutants: each mutant except `mutantUnfencedInstall` violates `safety` within 5,000 traces of 30 steps (seed 7), in 3–10 seconds. `mutantUnfencedInstall` survives 5,000 traces; `unfencedInstallHidesWriteTest` catches it.
+- TLC safety (`garnetRangeMigrationTlc`, one pull slot): exhaustive, no violation; 2,454,007 distinct states (349 million generated), depth 32, 23 minutes.
+- TLC liveness (`garnetRangeMigrationLive`, `coordinatedStep`): `migrationsComplete` holds over all 122,991 distinct states, depth 30, 2 minutes 51 seconds.
+- TLC liveness under `step`: `migrationsComplete` is violated within 573 distinct states. In the first run's counterexample, bucket 1 moves 2 → 3 → 2; partition 3 opens at the superseded view, so partition 2's sealed copy stays on the chain of an opener that is itself sealed, and partition 2 can never reopen.
+
+The TLC configurations allow at most three views, so they do not reach `mutantUnfencedInstall`'s counterexample, which needs four.
 
 ## Not yet modeled
 
