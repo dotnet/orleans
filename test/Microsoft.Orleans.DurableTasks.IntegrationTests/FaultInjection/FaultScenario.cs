@@ -28,10 +28,10 @@ public sealed record FaultSpec(FaultPoint Point, FaultRole Role, int Occurrence,
 }
 
 /// <summary>
-/// The outcome of a scenario run: whether its faults fired, the writes each grain performed, every violation of the safety
-/// contract, and whether the run stalled until the harness activated its grains.
+/// The outcome of a scenario run: whether its faults fired, the writes each grain performed, and every violation of the
+/// contract, including a stall.
 /// </summary>
-public sealed record FaultRunOutcome(bool Fired, Dictionary<FaultRole, int> Writes, List<string> Violations, bool Stalled);
+public sealed record FaultRunOutcome(bool Fired, Dictionary<FaultRole, int> Writes, List<string> Violations);
 
 /// <summary>
 /// Runs a representative workflow on fresh grains with faults armed, and checks the contract: the fault-free result, each
@@ -40,7 +40,6 @@ public sealed record FaultRunOutcome(bool Fired, Dictionary<FaultRole, int> Writ
 internal static class FaultScenario
 {
     public const string RootId = "workflow";
-
 
     public static async Task<FaultRunOutcome> RunAsync(DurableTaskFaultHarness harness, FaultWorkflow workflow, params FaultSpec[] faults)
     {
@@ -66,7 +65,6 @@ internal static class FaultScenario
 
         var (expected, expectedEffects) = GetExpectations(workflow);
         var violations = new List<string>();
-        var stalled = false;
         try
         {
             var response = await harness.RunAsync<string>(
@@ -75,9 +73,7 @@ internal static class FaultScenario
                 token => workflow == FaultWorkflow.Pipeline
                     ? workflowGrain.PipelineAsync(partnerKey, RootId).WithId(RootId).ScheduleAsync(token)
                     : workflowGrain.RaceAsync(partnerKey, RootId).WithId(RootId).ScheduleAsync(token),
-                cancellationToken,
-                nudge: token => Task.WhenAll(grains.Values.Select(static grain => grain.GetStateAsync())),
-                onStalled: () => stalled = true);
+                cancellationToken);
             if (response.Status != DurableTaskStatus.CompletedSuccessfully)
             {
                 violations.Add($"status {response.Status}: {response.Exception}");
@@ -88,7 +84,7 @@ internal static class FaultScenario
             }
 
             // Completions retire and records are deleted after the result, so the run's last writes follow it.
-            await harness.SettleAsync([.. writes.Values], cancellationToken);
+            await harness.SettleAsync(grains.Values.Select(static grain => grain.GetGrainId()), cancellationToken);
             foreach (var (role, grain) in grains)
             {
                 violations.AddRange(await CheckGrainAsync(harness, role.ToString(), grain, expectedEffects[role]));
@@ -102,18 +98,7 @@ internal static class FaultScenario
         return new(
             armed.All(static fault => fault.HasFired),
             writes.ToDictionary(static pair => pair.Key, static pair => pair.Value.Matches),
-            violations,
-            stalled);
-    }
-
-    /// <summary>
-    /// Asserts that no run stalled: each completed without the harness activating grains which only their own messages
-    /// and wake-ups activate.
-    /// </summary>
-    /// <remarks>Call it after the safety assertions, which the harness checks for a stalled run once it activated the grains.</remarks>
-    public static void AssertNoStalls(IReadOnlyCollection<string> stalls)
-    {
-        Assert.True(stalls.Count == 0, $"Runs stalled until the harness activated their grains: {string.Join("; ", stalls)}.");
+            violations);
     }
 
     /// <summary>Returns the violations of a grain's effects and dead letters against the expected effect counts.</summary>

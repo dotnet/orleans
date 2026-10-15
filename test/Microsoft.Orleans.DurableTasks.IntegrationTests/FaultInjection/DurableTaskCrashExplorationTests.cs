@@ -11,16 +11,16 @@ namespace Microsoft.Orleans.DurableTasks.IntegrationTests.FaultInjection;
 /// <remarks>
 /// <para>
 /// Each run uses fresh grains and arms one fault on the K-th journal write of one grain, for every K below the longest run
-/// observed, including the extra writes of recovery. Each run settles once its grains stop writing, so the writes which
-/// follow the result, such as completion retirements, are explored too. Every run must produce the fault-free result, apply each <see cref="DurableTask.Once(string, Func{int})"/>
-/// effect exactly once in the grain's journaled state, and leave no dead letters.
+/// observed, including the extra writes of recovery. Each run settles once its grains hold no messaging work, so the
+/// writes which follow the result, such as completion retirements, are explored too. Every run must produce the fault-free
+/// result, apply each <see cref="DurableTask.Once(string, Func{int})"/> effect exactly once in the grain's journaled state,
+/// and leave no dead letters.
 /// </para>
 /// <para>
 /// A failed write fences the grain's journal and deactivates the grain; an ambiguous write is the same failure after the
 /// write became durable, which models a crash after the commit point. The harness retries the client's calls, which an
-/// activation failure fails, with the same task ID. Only the client polls the workflow's grain: every other grain resumes
-/// through its messages and wake-ups, and a run which stalls is reported, once the harness has activated its grains and
-/// checked its outcome.
+/// activation failure fails, with the same task ID. Only the client calls the workflow's grain: every other grain resumes
+/// through its messages and wake-ups, so a run which stalls is a violation.
 /// </para>
 /// </remarks>
 public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) : IAsyncLifetime
@@ -38,7 +38,6 @@ public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) 
         var run = await FaultScenario.RunAsync(_harness, workflow);
 
         Assert.Empty(run.Violations);
-        Assert.False(run.Stalled);
     }
 
     [Theory]
@@ -51,7 +50,6 @@ public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) 
         var baseline = await FaultScenario.RunAsync(_harness, workflow);
         Assert.Empty(baseline.Violations);
         var violations = new List<string>();
-        var stalls = new List<string>();
         var injected = new Dictionary<FaultRole, int>();
         foreach (var role in Enum.GetValues<FaultRole>())
         {
@@ -70,10 +68,6 @@ public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) 
 
                 injected[role]++;
                 violations.AddRange(run.Violations.Select(violation => $"{role} write #{occurrence}: {violation}"));
-                if (run.Stalled)
-                {
-                    stalls.Add($"{role} write #{occurrence}");
-                }
             }
 
             Assert.True(injected[role] > 0, $"No fault fired on the {role}.");
@@ -82,7 +76,6 @@ public abstract class DurableTaskCrashExplorationTests(string journalFormatKey) 
         TestContext.Current.TestOutputHelper?.WriteLine(
             $"{workflow} {point}: baseline writes {string.Join(", ", baseline.Writes)}; injected {string.Join(", ", injected)}.");
         Assert.True(violations.Count == 0, string.Join(Environment.NewLine, violations));
-        FaultScenario.AssertNoStalls(stalls);
     }
 }
 

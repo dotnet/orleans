@@ -37,28 +37,25 @@ public abstract class DurableTaskFaultSchedulePropertyTests(string journalFormat
         Gen.Select(Gen.Enum<FaultRole>(), Gen.Int[0, 2])
             .Select(static (role, occurrence) => new FaultSpec(FaultPoint.JobWakeupFails, role, occurrence)));
 
-    private static readonly Gen<(FaultWorkflow Workflow, FaultSpec[] Faults)> Schedule =
-        Gen.Select(Gen.Enum<FaultWorkflow>(), Fault.Array[1, 3]);
+    private static readonly Gen<FaultSchedule> Schedule =
+        Gen.Select(Gen.Enum<FaultWorkflow>(), Fault.Array[1, 3]).Select(static (workflow, faults) => new FaultSchedule(workflow, faults));
 
     [Fact]
-    public async Task RandomFaultSchedulesOnlyDelayCompletion()
-    {
-        var stalls = new List<string>();
+    public async Task RandomFaultSchedulesOnlyDelayCompletion() =>
         await Schedule.SampleAsync(
             async schedule =>
             {
                 var run = await FaultScenario.RunAsync(_harness, schedule.Workflow, schedule.Faults);
                 Assert.True(run.Violations.Count == 0, string.Join(Environment.NewLine, run.Violations));
-                if (run.Stalled)
-                {
-                    stalls.Add($"{schedule.Workflow}: {string.Join(", ", schedule.Faults)}");
-                }
             },
             iter: 20,
             threads: 1,
-            print: static schedule => $"{schedule.Workflow}: {string.Join(", ", schedule.Faults)}");
+            print: static schedule => schedule.ToString());
 
-        FaultScenario.AssertNoStalls(stalls);
+    /// <summary>A workflow and the faults which a run of it injects.</summary>
+    public sealed record FaultSchedule(FaultWorkflow Workflow, FaultSpec[] Faults)
+    {
+        public override string ToString() => $"{Workflow}: {string.Join(", ", Faults.Select(static fault => fault.ToString()))}";
     }
 }
 
