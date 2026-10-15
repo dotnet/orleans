@@ -37,7 +37,9 @@ Durable grains derive from `DurableGrain` or implement `IMessagingGrain`. During
 activation setup, before journal recovery, the adapter binds its runtime to the
 grain's journal and inbox.
 
-Existing retained tasks can be observed without scheduling a new execution:
+`GetDurableTask<T>(rootId)`, or its `TaskId` overload, returns a `DurableTaskReference<T>` to an
+existing task without scheduling a new execution. Clients and ordinary grain methods await it, poll
+it, cancel it, or abort it:
 
 ```csharp
 var task = grain.GetDurableTask<MyResult>("stable-root-id");
@@ -48,38 +50,43 @@ An absent root or a root whose result retention has expired throws
 `DurableTaskNotFoundException`. A returned failed response remains an execution
 failure, including when the stored user exception has that same type.
 
-A durable task awaits the result of an invoked task which it didn't invoke, such as a
-client-scheduled operation which a webhook relay reports, with `ObserveDurableTask<T>`:
+A durable task awaits the same reference to subscribe to the result of an invoked task which it
+didn't invoke, such as a client-scheduled operation which a webhook relay reports:
 
 ```csharp
-var result = await operation.ObserveDurableTask<OperationResult>("operation-42")
+var result = await operation.GetDurableTask<OperationResult>("operation-42")
     .WaitAsync(TimeSpan.FromDays(1));
 ```
 
-- The observation is a child of the execution, recorded under the child ID which awaiting,
-  scheduling, or a combinator such as `WhenAny`, `Race`, or `WaitAsync` assigns. Its record's
-  fingerprint is `$observe:{target}{taskId}`, and the record and a `durable-rpc/observe`
-  subscription to the target commit in one journal write, so a replay which reaches the record
+- Awaiting the reference, scheduling it, or passing it to a combinator such as `WhenAny`, `Race`,
+  or `WaitAsync` subscribes a child of the execution, recorded under the child ID which that
+  operation assigns. The child's fingerprint, `$subscribe:{target}{taskId}`, names the task, and the
+  child and its subscription commit in one journal write, so a replay which reaches the child
   doesn't subscribe again and observes the recorded outcome.
-- The target records the subscription in the observed task's execution tree,
-  `{taskId}/$observer:{hash}`, and sends the task's terminal result through its outbox as a
-  completion addressed to the observation, as it sends one to the task's caller. The observation
-  completes with that outcome: the result, failure, or cancellation. A subscription to a terminal
-  task sends its completion at once. The outbox delivers messages independently, so a subscription
-  can arrive before the observed task's invocation, for example when one write of another grain
-  starts both the task and the observer. A subscription for a task which the target doesn't store is
-  recorded for that invocation, like an early signal; when no invocation arrives within Messaging's
-  `OutboxRetryTimeout`, a resume message scheduled for that deadline wakes the target, which deletes
-  the record and completes the observation with `DurableTaskNotFoundException`. A subscription to a
-  stored task which isn't an invoked task completes the observation as not found at once.
-- Canceling the observation ends it as canceled and sends an unsubscription, which removes the
-  target's record while the task is running; the observed task continues. An abort or deletion of
-  the observation's tree ends it the same way, and a completion which arrives for an ended
-  observation changes nothing.
-- An observation of a task of the same grain subscribes in task state, and the write which stores
-  the observed result also completes the observation.
-- `ObserveDurableTask` is available in durable executions of a grain. Clients and ordinary grain
-  methods poll with `GetDurableTask<T>`.
+- A subscription is a `durable-rpc/invoke` message which carries the child's ID instead of a
+  request: the target neither schedules nor claims the task, records no caller, and validates none.
+  It adds `(subscriber grain, child ID)` to the task's completion destinations, beside the invoker,
+  which subscribes as `(caller, task ID)`, and the task's result reaches every destination the same
+  way: through the outbox, with the task retained until the completion retires. The child completes
+  with that outcome: the result, failure, or cancellation.
+- A subscription to a terminal task sends its completion at once, and one to a stored task which
+  isn't an invoked task completes the child with `DurableTaskNotFoundException` at once. The outbox
+  delivers messages independently, so a subscription can arrive before the task's invocation, for
+  example when one write of another grain starts both the task and the subscriber. A subscription
+  for a task which the target doesn't store is held in a task state without a request, like an
+  early cancellation, which the invocation completes. When no invocation arrives within Messaging's
+  `OutboxRetryTimeout` after the latest subscription arrived, a resume message scheduled for that
+  deadline wakes the target, which deletes the state and completes each subscriber with
+  `DurableTaskNotFoundException`. A subscription to a cancellation which preceded the invocation, and
+  which recovery terminalized, receives that cancellation.
+- Canceling the child ends it as canceled and sends an unsubscription, a `durable-rpc/cancel`
+  message which names the child, which removes the destination while the task is running; the task
+  continues. An abort or deletion of the child's tree ends it the same way, and a completion which
+  arrives for an ended child changes nothing.
+- A subscription to a task of the same grain adds the destination in task state, and the write
+  which stores the task's result also completes the child.
+- Outside a durable execution, the reference's polling and control members, and awaiting it, call
+  the target; a durable execution doesn't record those calls.
 
 A durable grain observes, cancels, and aborts its own tasks through `IDurableTaskManager`, which
 it injects from its activation services. The manager runs against the activation's
@@ -233,18 +240,18 @@ framework assets; its first published version establishes the compatibility base
   re-invocation still observes the result.
 - Terminal responses and completion notifications commit together. The callee
   retains the result until the completion retires from its outbox.
-- An observed task's result and the completion to each subscribed observation commit
-  together, and the task is retained until each of those completions retires as well:
-  a task with a grain caller is deleted when the last completion to its caller or an
-  observation retires, and a task without one keeps its result for
-  `ResultRetentionPeriod` after completion, and at least until its observations'
-  completions retire. A dead-lettered observation completion restarts that
-  period, as a caller's does. The observing grain accepts the completion directly into
-  the observation's record, which retires the completion; a completion for an
-  observation which ended, or was deleted with its tree, is accepted without changes.
+- A task's completion destinations are its subscribers: its invoker, and each durable
+  execution's child which subscribed with `GetDurableTask`. Each receives the result in a
+  completion which commits with the result, and the task is retained until every
+  completion retires: a task with a grain caller is deleted when the last one retires,
+  and a task without one keeps its result for `ResultRetentionPeriod` after completion,
+  and at least until its subscribers' completions retire. A dead-lettered completion
+  restarts that period. A subscriber's grain accepts the completion directly into the
+  child; a completion for a child which ended, or was deleted with its tree, is
+  accepted without changes.
 - An invoked task, which a client or another grain scheduled as a request, owns
   an execution tree: the task and its descendants which aren't invoked tasks
-  themselves, such as local children, delays, combinator decisions, observations,
+  themselves, such as local children, delays, combinator decisions, subscriptions,
   and calls to other grains. Callers choose task identifiers, so an invoked task nested under
   another task's identifier keeps its own lifecycle. Once an invoked task is
   terminal, the grain deletes its execution tree: in the journal write which
@@ -257,7 +264,7 @@ framework assets; its first published version establishes the compatibility base
   clients poll retained results, and a poll after the deletion throws
   `DurableTaskNotFoundException`. The grain applies retention when it activates,
   after each journal write, and before it answers a poll, a client's schedule, or an
-  observation's subscription, so none observes a task whose retention has ended. Polls interleave with the grain's other
+  subscription, so none observes a task whose retention has ended. Polls interleave with the grain's other
   requests and messages, so a waiting client doesn't delay the work which
   completes the task.
 - Deleting an execution tree cancels its unfinished tasks: the deletion's journal
@@ -320,8 +327,8 @@ framework assets; its first published version establishes the compatibility base
   terminalizes it as canceled, and duplicate and stale resumes are harmless.
   Like every scheduled message, a resume doesn't count toward Messaging's
   `MaxCapacity`: its sender bounds it, and the grain holds one resume for each
-  delay it scheduled, until that delay's due time, and one for each subscription
-  which arrived before its task's invocation, until that subscription's deadline.
+  delay it scheduled, until that delay's due time, and one for each task state which
+  holds subscriptions that arrived before the task's invocation, until its deadline.
   A delay's due time is a commitment: a replay which requests another due time,
   for example after a configured duration changed, keeps the recorded one and
   logs a warning. A delay canceled while its write is in flight terminalizes as
@@ -362,9 +369,9 @@ framework assets; its first published version establishes the compatibility base
   in the same journal write as the step's result. Either way, a replay returns the
   recorded sequence number without appending or streaming again.
 - A run of a task's body reports `IsReplaying` from its start while earlier runs
-  recorded operations in the task's tree: children, including observations, detach
-  and signal-send markers, and recorded effects, but not signal values, other grains'
-  observation subscriptions, or invoked descendants.
+  recorded operations in the task's tree: children, including subscriptions to other
+  tasks, detach and signal-send markers, and recorded effects, but not signal values or
+  invoked descendants.
   It stops once the run has reached each of them, or starts an operation which
   no earlier run recorded; reaching an operation again doesn't stop it. It
   serves logging and diagnostics only.
