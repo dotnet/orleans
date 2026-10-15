@@ -258,7 +258,7 @@ public sealed partial class DurableTaskSignalTests
         var completion = Assert.Single(harness.Transport.Completions);
         Assert.True(harness.Storage.Contains(RecordId));
 
-        ((IOutboxMessageSource)harness.Runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)harness.Runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.Delivered());
 
         Assert.Empty(harness.Storage.Ids);
         await Assert.ThrowsAsync<DurableTaskNotFoundException>(
@@ -279,7 +279,7 @@ public sealed partial class DurableTaskSignalTests
         Assert.Equal("done", await harness.GetResultAsync<string>(WorkflowId));
         await harness.WaitForSignalWaitsAsync(1);
 
-        ((IOutboxMessageSource)harness.Runtime).OnRetired(Assert.Single(harness.Transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)harness.Runtime).OnRetired(Assert.Single(harness.Transport.Completions).MessageId, OutboxMessageRetirement.Delivered());
         await harness.Manager.WriteStateAsync(TestCancellation);
 
         await harness.WaitForSignalWaitsAsync(0);
@@ -337,7 +337,7 @@ public sealed partial class DurableTaskSignalTests
         Assert.Equal([WorkflowId, RecordId], harness.Storage.Ids);
 
         // The record belongs to the invoked task's tree once the invocation arrives, so it is deleted with that tree.
-        ((IOutboxMessageSource)harness.Runtime).OnRetired(Assert.Single(harness.Transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)harness.Runtime).OnRetired(Assert.Single(harness.Transport.Completions).MessageId, OutboxMessageRetirement.Delivered());
         Assert.Empty(harness.Storage.Ids);
     });
 

@@ -2055,7 +2055,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         runtime.AcceptResponseFromInbox(taskId, DurableTaskResponse.FromResult(8), target);
         var waiterCompletion = DurableTaskMessageTransport.CreateMessageId(runtime.GrainId, waiter, taskId, DurableTaskMessageTypes.CompletionSubject);
         Assert.True(((IOutboxMessageSource)runtime).TryGetMessage(waiterCompletion, out _));
-        ((IOutboxMessageSource)runtime).OnRetired(waiterCompletion, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)runtime).OnRetired(waiterCompletion, OutboxMessageRetirement.Delivered());
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(7, storage.Get(taskId).Result!.GetResult<int>());
@@ -2543,7 +2543,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var enumerations = storage.TasksEnumerationCount;
 
         // The outbox stages the completion's removal and calls the source in the same synchronous block.
-        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.Delivered());
 
         Assert.False(storage.Contains(taskId));
         Assert.False(storage.Contains(childId));
@@ -2579,7 +2579,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await WaitUntilAsync(() => transport.Completions.Count == 1 && manager.WriteCount >= 2);
         var completion = Assert.Single(transport.Completions);
 
-        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.DeadLettered);
+        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.DeadLettered("The outbox dead-lettered the completion."));
 
         var retained = storage.Get(taskId);
         Assert.Equal(0, retained.Result!.GetResult<int>());
@@ -2610,7 +2610,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         // The outbox dead-letters the completion after OutboxRetryTimeout, which exceeds the retention period.
         clock.Advance(TimeSpan.FromDays(1));
-        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.DeadLettered);
+        ((IOutboxMessageSource)runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.DeadLettered("The outbox dead-lettered the completion."));
         Assert.Equal(clock.GetUtcNow(), storage.Get(taskId).RetainedSince);
 
         clock.Advance(retention - TimeSpan.FromTicks(1));
@@ -2738,7 +2738,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.True(storage.Contains(nestedId));
         Assert.True(storage.Contains(nestedChildId));
 
-        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered());
 
         Assert.False(storage.Contains(nestedId));
         Assert.False(storage.Contains(nestedChildId));
@@ -2772,7 +2772,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             }), TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered());
 
         Assert.False(storage.Contains(rootId));
         Assert.False(storage.Contains(childId));
@@ -3471,7 +3471,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         // Deleting the starter's tree deletes the record and sends nothing more to the detached task.
         await WaitUntilIdleAsync(runtime);
-        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered());
         Assert.False(storage.Contains(starterId));
         Assert.False(storage.Contains(recordId));
         Assert.Empty(transport.Cancellations);
@@ -3514,7 +3514,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal(DurableTaskStatus.CompletedSuccessfully, storage.Get(starterId).Result!.Status);
 
         // Delivering the starter's completion deletes its tree, which holds the record but not the detached root.
-        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered());
         Assert.False(storage.Contains(starterId));
         Assert.False(storage.Contains(recordId));
         Assert.Equal(5, (await runtime.SubscribeOrPollAsync(rootId, new SubscribeOrPollOptions(), TestContext.Current.CancellationToken)).GetResult<int>());
