@@ -63,8 +63,10 @@ public interface IInboxMessageSink
     /// </description></item>
     /// </list>
     /// <para>
-    /// A sink which throws or reports another status must leave no staged change, and the inbox dead-letters the message
-    /// with the failure as its reason and no code.
+    /// A sink exception, or any other status, means the outcome is unknown, so the inbox stages nothing and fails the
+    /// delivery: the sender's outbox retries it with backoff until <c>OutboxRetryTimeout</c>, and a send to the grain
+    /// itself throws to its caller. A sink which throws must leave no staged change. Return
+    /// <see cref="DeliveryStatus.DeadLettered"/> to reject a message permanently.
     /// </para>
     /// </remarks>
     bool TryAccept(InboxMessage message, out DeliveryResult result);

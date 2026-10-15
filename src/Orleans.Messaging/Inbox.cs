@@ -153,7 +153,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// </para>
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// The inbox holds a different pending command with the same ID, or an inbox sink backpressured the message.
+    /// The inbox holds a different pending command with the same ID, or an inbox sink backpressured the message or
+    /// reported an unsupported status.
     /// </exception>
     internal void StageLocal(InboxMessage message)
     {
@@ -195,34 +196,26 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     /// <returns>The delivery result, or <see langword="null"/> when every sink declines the message.</returns>
     /// <remarks>
     /// An accepted message journals only its processed record, in the write which commits the sink's staged changes.
-    /// A duplicate or backpressured message stages nothing. A sink which dead-letters the message, throws, or reports
-    /// another status stages nothing itself, so the message is dead-lettered with its payload and recorded as processed.
+    /// A duplicate or backpressured message stages nothing. A sink which dead-letters the message stages nothing itself,
+    /// so the message is dead-lettered with its payload and recorded as processed. A sink exception, or an unsupported
+    /// status, leaves the outcome unknown: it propagates to the caller with nothing staged, so the sender retries.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">A sink reported an unsupported delivery status.</exception>
     private DeliveryResult? StageSinkAcceptance(InboxMessage message)
     {
         var key = message.Envelope.MessageId;
         foreach (var sink in _sinks)
         {
-            DeliveryResult result;
-            Exception? error = null;
-            try
-            {
-                if (!sink.TryAccept(message, out result)) continue;
-                if (result.Status is not (DeliveryStatus.Accepted or DeliveryStatus.Duplicate or DeliveryStatus.Backpressured or DeliveryStatus.DeadLettered))
-                {
-                    throw new InvalidOperationException($"The inbox message sink reported the unsupported delivery status '{result.Status}'.");
-                }
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-                result = DeliveryResult.DeadLettered(exception.Message);
-            }
-
+            if (!sink.TryAccept(message, out var result)) continue;
             if (result.Status is DeliveryStatus.Duplicate or DeliveryStatus.Backpressured)
             {
                 Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, result.Status == DeliveryStatus.Duplicate ? "duplicate" : "backpressured");
                 return result;
+            }
+
+            if (result.Status is not (DeliveryStatus.Accepted or DeliveryStatus.DeadLettered))
+            {
+                throw new InvalidOperationException($"The inbox message sink reported the unsupported delivery status '{result.Status}'.");
             }
 
             var accepted = result.Status == DeliveryStatus.Accepted;
@@ -235,7 +228,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 }
                 else
                 {
-                    LogSinkDeadLettered(Logger, error, key, GrainContext.GrainId, reason);
+                    LogSinkDeadLettered(Logger, key, GrainContext.GrainId, reason, result.Code);
                     StageDeadLetter(message, reason, attemptCount: 1, result.Code, new() { Reason = reason, Code = result.Code });
                 }
             }
@@ -658,6 +651,6 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
     [LoggerMessage(Level = LogLevel.Error, Message = "Handler threw exception for message {MessageId} to {ReceiverId}")]
     private static partial void LogHandlerException(ILogger logger, Exception exception, MessageId messageId, GrainId receiverId);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Inbox message sink dead-lettered message {MessageId} to {ReceiverId}: {Reason}")]
-    private static partial void LogSinkDeadLettered(ILogger logger, Exception? exception, MessageId messageId, GrainId receiverId, string reason);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Inbox message sink dead-lettered message {MessageId} to {ReceiverId} with code {Code}: {Reason}")]
+    private static partial void LogSinkDeadLettered(ILogger logger, MessageId messageId, GrainId receiverId, string reason, string? code);
 }
