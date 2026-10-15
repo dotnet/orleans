@@ -487,6 +487,8 @@ namespace Orleans.DurableTasks
         System.Threading.Tasks.ValueTask AbortAsync(string reason, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask CancelAsync(string? reason, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask CancelAsync(System.Threading.CancellationToken cancellationToken);
+        TFeature? GetFeature<TFeature>()
+            where TFeature : class;
         System.Threading.Tasks.ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask<DurableTaskResponse> WaitAsync(System.Threading.CancellationToken cancellationToken);
     }
@@ -548,6 +550,9 @@ namespace Orleans.DurableTasks
         protected virtual System.Threading.Tasks.ValueTask CancelAsyncCore(string? reason, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public ScheduledTaskAwaiter GetAwaiter() { throw null; }
+
+        public virtual TFeature? GetFeature<TFeature>()
+            where TFeature : class { throw null; }
 
         public System.Threading.Tasks.Task<DurableTaskResponse> GetResponseAsync(PollingOptions options, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
