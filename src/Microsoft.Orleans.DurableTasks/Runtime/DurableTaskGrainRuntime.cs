@@ -2888,13 +2888,15 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         _stopping = true;
         await _deactivationCts.CancelAsync();
-        var shutdownResponse = DurableTaskResponse.FromCanceled(
-            new OperationCanceledException("The grain activation is stopping.", _deactivationCts.Token));
+
+        // Pending tasks continue in the next activation, so a waiter on this activation's handle fails, as a call which
+        // arrives while the runtime stops does, instead of observing the stop as the task's outcome.
+        var stopping = new OperationCanceledException("The grain activation is stopping.", _deactivationCts.Token);
         foreach (var handle in _taskHandles.Values)
         {
             if (handle is TaskHandle localHandle)
             {
-                localHandle.TrySetResponse(shutdownResponse);
+                localHandle.SetStopping(stopping);
             }
         }
 
