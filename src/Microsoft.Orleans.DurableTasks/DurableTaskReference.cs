@@ -25,6 +25,11 @@ namespace Orleans.DurableTasks;
 /// <see cref="CancelAsync(string, CancellationToken)"/> and <see cref="AbortAsync"/>, call the task's grain. A durable
 /// execution doesn't record those calls.
 /// </para>
+/// <para>
+/// The reference is awaitable through <see cref="DurableTaskReferenceExtensions.GetAwaiter{TResult}"/>, an extension
+/// method, so frameworks which inspect a return type's instance members, such as ASP.NET Core Minimal APIs, treat the
+/// reference as a value.
+/// </para>
 /// </remarks>
 public sealed class DurableTaskReference<TResult> : DurableTask<TResult>, IDurableTaskSubscription
 {
@@ -49,11 +54,8 @@ public sealed class DurableTaskReference<TResult> : DurableTask<TResult>, IDurab
     private ScheduledTask<TResult> Handle =>
         _handle ??= new AttachedScheduledTask<TResult>(Id, _target.AsReference<IDurableTaskGrainExtension>());
 
-    /// <summary>
-    /// Gets an awaiter which, in a durable execution, subscribes a child of the execution to the task's result, and
-    /// otherwise waits for the task's result.
-    /// </summary>
-    public DurableTaskReferenceAwaiter<TResult> GetAwaiter() =>
+    /// <inheritdoc cref="DurableTaskReferenceExtensions.GetAwaiter{TResult}"/>
+    internal DurableTaskReferenceAwaiter<TResult> CreateAwaiter() =>
         DurableTaskContext.TryGetCurrent(out _)
             ? new(DurableTaskExtensions.GetAwaiter(this))
             : new(Handle.GetAwaiter());
@@ -180,6 +182,22 @@ public readonly struct DurableTaskReferenceAwaiter<TResult> : ICriticalNotifyCom
 
     /// <summary>Returns the task's successful result, or throws its failure or cancellation.</summary>
     public TResult GetResult() => _subscribes ? _subscription.GetResult() : _wait.GetResult();
+}
+
+/// <summary>Awaits references to existing durable tasks.</summary>
+public static class DurableTaskReferenceExtensions
+{
+    /// <summary>
+    /// Gets an awaiter which, in a durable execution, subscribes a child of the execution to the task's result, and
+    /// otherwise waits for the task's result.
+    /// </summary>
+    /// <typeparam name="TResult">The task's result type.</typeparam>
+    /// <param name="reference">The reference to the task.</param>
+    public static DurableTaskReferenceAwaiter<TResult> GetAwaiter<TResult>(this DurableTaskReference<TResult> reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        return reference.CreateAwaiter();
+    }
 }
 
 /// <summary>A reference to an existing task, which the durable task runtime schedules as a subscription child.</summary>

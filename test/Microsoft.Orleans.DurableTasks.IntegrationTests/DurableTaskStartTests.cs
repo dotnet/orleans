@@ -110,6 +110,9 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
         var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey);
         Assert.Equal(6, (await worker.GetDurableTask<int>("workflow:$child-1").GetResponseAsync(cancellationToken)).GetResult<int>());
         Assert.Equal(8, (await worker.GetDurableTask<int>("scheduled-echo").GetResponseAsync(cancellationToken)).GetResult<int>());
+
+        // Outside a durable execution, awaiting a reference waits for the task's result.
+        Assert.Equal(8, await worker.GetDurableTask<int>("scheduled-echo"));
     }
 
     [Fact]
