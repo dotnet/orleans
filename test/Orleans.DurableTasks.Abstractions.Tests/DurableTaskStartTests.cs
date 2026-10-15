@@ -156,6 +156,26 @@ public class DurableTaskStartTests
     }
 
     [Fact]
+    public async Task HostIdentityQualifiesTheRootIdsOfUnnamedDetachedTasksAndNotNamedOnes()
+    {
+        var definition = new RootDefinition();
+        var context = new StartRecordingContext(TaskId.Parse("order-42/charge"), hostId: "order/42");
+
+        var response = await RunAsync(context, async () =>
+        {
+            await definition.Detached();
+            await definition.Detached().WithId("receipt");
+        });
+
+        // Executions with the same identifier on different hosts derive different root identifiers, and a name is the
+        // root identifier on every host.
+        Assert.Equal(DurableTaskStatus.CompletedSuccessfully, response.Status);
+        Assert.Equal(
+            [TaskId.CreateRoot("order/42/order-42/charge:$child-1"), TaskId.CreateRoot("receipt")],
+            context.Starts.Select(static start => start.TaskId));
+    }
+
+    [Fact]
     public async Task DetachedConfigurationsWithinAnExecutionHaveNoHandleOperations()
     {
         var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
@@ -184,8 +204,10 @@ public class DurableTaskStartTests
     private static Task<DurableTaskResponse> RunAsync(StartRecordingContext context, Func<Task> body)
         => DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => body()), context).AsTask();
 
-    private sealed class StartRecordingContext(TaskId taskId, bool supportsPost = true) : DurableTaskContext(taskId)
+    private sealed class StartRecordingContext(TaskId taskId, bool supportsPost = true, string? hostId = null) : DurableTaskContext(taskId)
     {
+        protected override string? HostId => hostId;
+
         public List<(string Kind, TaskId TaskId, DurableTask Definition, DurableTaskStartOptions Options)> Starts { get; } = [];
 
         public override DateTimeOffset UtcNow => DateTimeOffset.UnixEpoch;
