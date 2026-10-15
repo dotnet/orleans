@@ -13,6 +13,8 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
     private Task _pending = Task.CompletedTask;
     private RequestFilterMode _requestFilterMode;
 
+    public const string NamedRequestInterfaceName = "IOrderProcessor";
+
     public async Task Invoke(IIncomingGrainCallContext context)
     {
         _filteredCalls.Add($"{context.InterfaceName}.{context.MethodName}");
@@ -29,6 +31,11 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
                     context.Result = "filtered";
                     return;
             }
+        }
+
+        else if (context.InterfaceName == NamedRequestInterfaceName)
+        {
+            _log.Add($"argument:{context.Request.GetArgument(0)}");
         }
 
         await context.Invoke();
@@ -51,6 +58,28 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
 
         await Task.Delay(200);
         _log.Add("call-end");
+    }
+
+    public async Task StartInterleavingRequestDuringCall()
+    {
+        _log.Add("call-start");
+        _pending = this.RunRequestAsync(_ =>
+        {
+            _log.Add("request");
+            return Task.CompletedTask;
+        }, new GrainRequestOptions { Interleave = true });
+
+        await Task.Delay(200);
+        _log.Add("call-end");
+    }
+
+    public Task StartNamedRequest(int orderId)
+    {
+        _pending = this.RunRequestAsync(
+            static (orderId, _) => Task.FromResult<string?>($"order-{orderId}"),
+            orderId,
+            new GrainRequestOptions { InterfaceName = NamedRequestInterfaceName, MethodName = "ProcessOrder", Arguments = [orderId] });
+        return Task.CompletedTask;
     }
 
     public Task StartBlockingRequest()

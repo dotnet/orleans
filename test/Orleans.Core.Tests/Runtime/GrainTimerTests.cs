@@ -498,16 +498,16 @@ public sealed class GrainTimerTests
             _logger.IsEnabled(LogLevel.Error).Returns(true);
             var loggerFactory = Substitute.For<ILoggerFactory>();
             loggerFactory.CreateLogger(Arg.Any<string>()).Returns(_logger);
-            Grain.GrainId.Returns(GrainId.Create("timer-test", "one"));
+            var grainId = GrainId.Create("timer-test", "one");
+            Grain.GrainId.Returns(grainId);
             Grain.When(context => context.ReceiveMessage(Arg.Any<object>())).Do(call =>
             {
                 BeforeReceive?.Invoke();
                 Messages.Add((Message)call[0]);
             });
-            var details = Substitute.For<ILocalSiloDetails>();
-            details.SiloAddress.Returns(SiloAddress.New(System.Net.IPAddress.Loopback, 11111, 1));
+            Grain.Address.Returns(GrainAddress.GetAddress(SiloAddress.New(System.Net.IPAddress.Loopback, 11111, 1), grainId, ActivationId.NewId()));
             MessageFactory = new(_services.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, null!);
-            Registry = new(loggerFactory, Time, MessageFactory, details);
+            Registry = new(loggerFactory, Time, MessageFactory);
             _subscription = GrainTimerEvents.AllEvents.Subscribe(this);
         }
 

@@ -574,28 +574,15 @@ internal sealed partial class ActivationData :
         }
     }
 
-    Task<TResult> IGrainRequestRunner.RunRequestAsync<TState, TResult>(Func<TState, CancellationToken, Task> callback, TState state, CancellationToken cancellationToken)
+    Task<TResult> IGrainRequestRunner.RunRequestAsync<TState, TResult>(Func<TState, CancellationToken, Task> callback, TState state, in GrainRequestOptions options, CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)
         {
             return Task.FromCanceled<TResult>(cancellationToken);
         }
 
-        var request = new GrainRequest<TState, TResult>(callback, state, cancellationToken);
-
-        // Requests start a new call chain, matching timer ticks.
-        var message = _shared.InternalRuntime.MessageFactory.CreateMessage(body: request, options: CodeGeneration.InvokeMethodOptions.OneWay, requestContextData: null);
-        message.SetInfiniteTimeToLive();
-        message.SendingGrain = GrainId;
-        message.TargetGrain = GrainId;
-        message.SendingSilo = Address.SiloAddress;
-        message.TargetSilo = Address.SiloAddress;
-        message.InterfaceType = IGrainRequestInvoker.InterfaceType;
-        message.IsKeepAlive = true;
-
-        // The request completes on this activation or is rejected with it.
-        message.IsLocalOnly = true;
-
+        var request = GrainRequest<TState, TResult>.Create(callback, state, options, cancellationToken);
+        var message = _shared.InternalRuntime.MessageFactory.CreateLocalRequest(this, request, IGrainRequestInvoker.InterfaceType, options.KeepAlive, options.Interleave);
         ReceiveMessage(message);
         return request.Task;
     }

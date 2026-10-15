@@ -6,6 +6,10 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 {
     Task StartRequestDuringCall();
 
+    Task StartInterleavingRequestDuringCall();
+
+    Task StartNamedRequest(int orderId);
+
     Task StartBlockingRequest();
 
     [AlwaysInterleave]

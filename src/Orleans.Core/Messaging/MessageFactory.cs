@@ -52,6 +52,28 @@ namespace Orleans.Runtime
             return new CorrelationId(unchecked((long)id));
         }
 
+        /// <summary>
+        /// Creates a one-way request which <paramref name="target"/> queues on itself.
+        /// </summary>
+        /// <remarks>
+        /// The request starts a new call chain, never expires, and completes on <paramref name="target"/> or is rejected with it.
+        /// </remarks>
+        public Message CreateLocalRequest(IGrainContext target, object body, GrainInterfaceType interfaceType, bool keepAlive, bool interleave)
+        {
+            var siloAddress = target.Address.SiloAddress;
+            var message = CreateMessage(body, InvokeMethodOptions.OneWay, requestContextData: null);
+            message.SetInfiniteTimeToLive();
+            message.SendingGrain = target.GrainId;
+            message.TargetGrain = target.GrainId;
+            message.SendingSilo = siloAddress;
+            message.TargetSilo = siloAddress;
+            message.InterfaceType = interfaceType;
+            message.IsKeepAlive = keepAlive;
+            message.IsAlwaysInterleave = interleave;
+            message.IsLocalOnly = true;
+            return message;
+        }
+
         public Message CreateResponseMessage(Message request)
         {
             var response = new Message

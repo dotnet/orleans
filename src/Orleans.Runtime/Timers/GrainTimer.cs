@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
-using Orleans.CodeGeneration;
 using Orleans.Runtime.Internal;
 using Orleans.Serialization.Invocation;
 using Orleans.Timers;
@@ -107,20 +106,7 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         try
         {
-            // Timer requests start a new call chain, including ticks queued immediately during registration.
-            var msg = _shared.MessageFactory.CreateMessage(body: _invoker, options: InvokeMethodOptions.OneWay, requestContextData: null);
-            msg.SetInfiniteTimeToLive();
-            msg.SendingGrain = _grainContext.GrainId;
-            msg.TargetGrain = _grainContext.GrainId;
-            msg.SendingSilo = _shared.LocalSiloDetails.SiloAddress;
-            msg.TargetSilo = _shared.LocalSiloDetails.SiloAddress;
-            msg.InterfaceType = InvokableInterfaceType;
-            msg.IsKeepAlive = _keepAlive;
-            msg.IsAlwaysInterleave = _interleave;
-
-            // Prevent the message from being forwarded in the case of deactivation.
-            msg.IsLocalOnly = true;
-
+            var msg = _shared.MessageFactory.CreateLocalRequest(_grainContext, _invoker, InvokableInterfaceType, _keepAlive, _interleave);
             _grainContext.ReceiveMessage(msg);
         }
         catch (Exception exception)

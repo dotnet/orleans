@@ -10,8 +10,10 @@ namespace Orleans.Runtime;
 /// The request is its own completion source, so queuing a request allocates only this object and its message.
 /// Cancellation applies while the request is queued. Once the callback starts, the task reflects the callback's outcome.
 /// When a call filter completes the invocation without running the callback, the task reflects the filter's outcome.
+/// Call filters observe the request as <see cref="IGrainRequestInvoker.RunRequestAsync"/> unless it is created with
+/// <see cref="Create"/> and named by <see cref="GrainRequestOptions"/>.
 /// </remarks>
-internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResult>, IInvokable, IGrainRequestInvoker, ILocalRequest
+internal class GrainRequest<TState, TResult> : TaskCompletionSource<TResult>, IInvokable, IGrainRequestInvoker, ILocalRequest
 {
     private readonly Func<TState, CancellationToken, Task> _callback;
     private readonly TState _state;
@@ -26,6 +28,18 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
             static (state, cancellationToken) => ((GrainRequest<TState, TResult>)state!).TrySetCanceled(cancellationToken),
             this);
     }
+
+    /// <summary>
+    /// Creates a request, allocating storage for the names and arguments in <paramref name="options"/> only when they are set.
+    /// </summary>
+    public static GrainRequest<TState, TResult> Create(
+        Func<TState, CancellationToken, Task> callback,
+        TState state,
+        in GrainRequestOptions options,
+        CancellationToken cancellationToken) =>
+        options.InterfaceName is null && options.MethodName is null && options.Arguments is null
+            ? new GrainRequest<TState, TResult>(callback, state, cancellationToken)
+            : new NamedGrainRequest<TState, TResult>(callback, state, options, cancellationToken);
 
     public ValueTask<Response> Invoke()
     {
@@ -85,13 +99,7 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
 
     private static TResult GetResult(Task task) => task is Task<TResult> typed ? typed.Result : default!;
 
-    void ILocalRequest.Reject(Exception exception)
-    {
-        _registration.Dispose();
-        TrySetException(exception);
-    }
-
-    bool ILocalRequest.OnInvoked(Response response)
+    bool ILocalRequest.Complete(Response response)
     {
         var task = Task;
         if (task.IsCompleted)
@@ -123,17 +131,17 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
     // Declared for call filters, which inspect the interface and implementation methods.
     Task IGrainRequestInvoker.RunRequestAsync(CancellationToken cancellationToken) => throw new InvalidOperationException();
 
-    public int GetArgumentCount() => 0;
+    public virtual int GetArgumentCount() => 0;
 
-    public object? GetArgument(int index) => throw new InvalidOperationException();
+    public virtual object? GetArgument(int index) => throw new ArgumentOutOfRangeException(nameof(index));
 
-    public void SetArgument(int index, object? value) => throw new InvalidOperationException();
+    public virtual void SetArgument(int index, object? value) => throw new ArgumentOutOfRangeException(nameof(index));
 
-    public string GetMethodName() => nameof(IGrainRequestInvoker.RunRequestAsync);
+    public virtual string GetMethodName() => nameof(IGrainRequestInvoker.RunRequestAsync);
 
-    public string GetInterfaceName() => nameof(IGrainRequestInvoker);
+    public virtual string GetInterfaceName() => nameof(IGrainRequestInvoker);
 
-    public string GetActivityName() => $"{nameof(IGrainRequestInvoker)}/{nameof(IGrainRequestInvoker.RunRequestAsync)}";
+    public virtual string GetActivityName() => $"{nameof(IGrainRequestInvoker)}/{nameof(IGrainRequestInvoker.RunRequestAsync)}";
 
     public MethodInfo GetMethod() => IGrainRequestInvoker.MethodInfo;
 
@@ -146,6 +154,47 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
     }
 
     public override string ToString() => $"Request '{_callback.Target}.{_callback.Method}'";
+}
+
+/// <summary>
+/// A <see cref="GrainRequest{TState, TResult}"/> which describes itself to call filters using the names and arguments
+/// in <see cref="GrainRequestOptions"/>. Each unset name falls back to <see cref="IGrainRequestInvoker"/>'s.
+/// </summary>
+internal sealed class NamedGrainRequest<TState, TResult> : GrainRequest<TState, TResult>
+{
+    private readonly string? _interfaceName;
+    private readonly string? _methodName;
+    private readonly object?[]? _arguments;
+
+    public NamedGrainRequest(Func<TState, CancellationToken, Task> callback, TState state, in GrainRequestOptions options, CancellationToken cancellationToken)
+        : base(callback, state, cancellationToken)
+    {
+        _interfaceName = options.InterfaceName;
+        _methodName = options.MethodName;
+        _arguments = options.Arguments;
+    }
+
+    public override int GetArgumentCount() => _arguments?.Length ?? 0;
+
+    public override object? GetArgument(int index) => _arguments is { } arguments ? arguments[index] : base.GetArgument(index);
+
+    public override void SetArgument(int index, object? value)
+    {
+        if (_arguments is { } arguments)
+        {
+            arguments[index] = value;
+        }
+        else
+        {
+            base.SetArgument(index, value);
+        }
+    }
+
+    public override string GetMethodName() => _methodName ?? base.GetMethodName();
+
+    public override string GetInterfaceName() => _interfaceName ?? base.GetInterfaceName();
+
+    public override string GetActivityName() => $"{GetInterfaceName()}/{GetMethodName()}";
 }
 
 /// <summary>
@@ -169,13 +218,13 @@ internal interface IGrainRequestInvoker : IAddressable
 internal interface ILocalRequest
 {
     /// <summary>
-    /// Completes the request with <paramref name="exception"/>.
-    /// </summary>
-    void Reject(Exception exception);
-
-    /// <summary>
-    /// Completes the request with the invocation's <paramref name="response"/> if the invocation did not run the request.
+    /// Completes the request with <paramref name="response"/> if the request has not already completed.
     /// </summary>
     /// <returns><see langword="true"/> if the request's task reports the response's exception, if any.</returns>
-    bool OnInvoked(Response response);
+    bool Complete(Response response);
+
+    /// <summary>
+    /// Completes the request with <paramref name="exception"/> if the request has not already completed.
+    /// </summary>
+    void Reject(Exception exception) => Complete(Response.FromException(exception));
 }

@@ -200,5 +200,11 @@ namespace UnitTests.Grains
             ((IActivationKeepAlive)GrainContext).ReleaseKeepAlive();
             return Task.CompletedTask;
         }
+
+        public Task QueueRequest(TimeSpan duration, bool keepAlive)
+        {
+            _ = this.RunRequestAsync(static (duration, cancellationToken) => Task.Delay(duration, cancellationToken), duration, new GrainRequestOptions { KeepAlive = keepAlive });
+            return Task.CompletedTask;
+        }
     }
 }

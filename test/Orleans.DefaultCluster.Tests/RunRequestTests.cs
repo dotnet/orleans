@@ -132,6 +132,29 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
     }
 
     [Fact]
+    public async Task NamedRequest_DescribesItselfToGrainCallFilter()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartNamedRequest(42);
+
+        Assert.Equal("order-42", await grain.AwaitPendingRequest());
+        Assert.Contains($"{RunRequestGrainBase.NamedRequestInterfaceName}.ProcessOrder", await grain.GetFilteredCalls());
+        Assert.Equal(["argument:42"], await grain.GetLog());
+    }
+
+    [Fact]
+    public async Task NonReentrantGrain_InterleavingRequestRunsDuringCurrentCall()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        await grain.StartInterleavingRequestDuringCall();
+        await grain.AwaitPendingRequest();
+
+        Assert.Equal(["call-start", "request", "call-end"], await grain.GetLog());
+    }
+
+    [Fact]
     public async Task RunRequest_FilterThrows_FaultsRequest()
     {
         var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());

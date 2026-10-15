@@ -62,13 +62,28 @@ namespace Orleans
         /// Cancels the request while it is queued. Once the callback starts, the token is passed to the callback.
         /// </param>
         /// <returns>A <see cref="Task"/> which completes with the outcome of the callback.</returns>
-        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, CancellationToken)" path="/remarks/node()"/></remarks>
-        public static Task RunRequestAsync(this IGrainBase grain, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default)
+        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, GrainRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        public static Task RunRequestAsync(this IGrainBase grain, Func<CancellationToken, Task> callback, CancellationToken cancellationToken = default) =>
+            RunRequestAsync(grain, callback, default(GrainRequestOptions), cancellationToken);
+
+        /// <summary>
+        /// Runs <paramref name="callback"/> as a request on this grain activation.
+        /// </summary>
+        /// <param name="grain">The grain instance.</param>
+        /// <param name="callback">The callback to run.</param>
+        /// <param name="options">The options for the request.</param>
+        /// <param name="cancellationToken">
+        /// Cancels the request while it is queued. Once the callback starts, the token is passed to the callback.
+        /// </param>
+        /// <returns>A <see cref="Task"/> which completes with the outcome of the callback.</returns>
+        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, GrainRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        public static Task RunRequestAsync(this IGrainBase grain, Func<CancellationToken, Task> callback, GrainRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
             return GetRequestRunner(grain).RunRequestAsync<Func<CancellationToken, Task>, object?>(
                 static (callback, cancellationToken) => callback(cancellationToken),
                 callback,
+                options,
                 cancellationToken);
         }
 
@@ -83,11 +98,27 @@ namespace Orleans
         /// </param>
         /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
         /// <returns>A <see cref="Task"/> which completes with the outcome of the callback.</returns>
-        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, CancellationToken)" path="/remarks/node()"/></remarks>
-        public static Task RunRequestAsync<TState>(this IGrainBase grain, Func<TState, CancellationToken, Task> callback, TState state, CancellationToken cancellationToken = default)
+        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, GrainRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        public static Task RunRequestAsync<TState>(this IGrainBase grain, Func<TState, CancellationToken, Task> callback, TState state, CancellationToken cancellationToken = default) =>
+            RunRequestAsync(grain, callback, state, default(GrainRequestOptions), cancellationToken);
+
+        /// <summary>
+        /// Runs <paramref name="callback"/> as a request on this grain activation.
+        /// </summary>
+        /// <param name="grain">The grain instance.</param>
+        /// <param name="callback">The callback to run.</param>
+        /// <param name="state">The state passed to the callback.</param>
+        /// <param name="options">The options for the request.</param>
+        /// <param name="cancellationToken">
+        /// Cancels the request while it is queued. Once the callback starts, the token is passed to the callback.
+        /// </param>
+        /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
+        /// <returns>A <see cref="Task"/> which completes with the outcome of the callback.</returns>
+        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, GrainRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        public static Task RunRequestAsync<TState>(this IGrainBase grain, Func<TState, CancellationToken, Task> callback, TState state, GrainRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
-            return GetRequestRunner(grain).RunRequestAsync<TState, object?>(callback, state, cancellationToken);
+            return GetRequestRunner(grain).RunRequestAsync<TState, object?>(callback, state, options, cancellationToken);
         }
 
         /// <summary>
@@ -100,13 +131,29 @@ namespace Orleans
         /// </param>
         /// <typeparam name="TResult">The type of the callback's result.</typeparam>
         /// <returns>A <see cref="Task{TResult}"/> which completes with the outcome of the callback.</returns>
-        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, CancellationToken)" path="/remarks/node()"/></remarks>
-        public static Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, Func<CancellationToken, Task<TResult>> callback, CancellationToken cancellationToken = default)
+        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, GrainRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        public static Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, Func<CancellationToken, Task<TResult>> callback, CancellationToken cancellationToken = default) =>
+            RunRequestAsync(grain, callback, default(GrainRequestOptions), cancellationToken);
+
+        /// <summary>
+        /// Runs <paramref name="callback"/> as a request on this grain activation.
+        /// </summary>
+        /// <param name="grain">The grain instance.</param>
+        /// <param name="callback">The callback to run.</param>
+        /// <param name="options">The options for the request.</param>
+        /// <param name="cancellationToken">
+        /// Cancels the request while it is queued. Once the callback starts, the token is passed to the callback.
+        /// </param>
+        /// <typeparam name="TResult">The type of the callback's result.</typeparam>
+        /// <returns>A <see cref="Task{TResult}"/> which completes with the outcome of the callback.</returns>
+        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, GrainRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        public static Task<TResult> RunRequestAsync<TResult>(this IGrainBase grain, Func<CancellationToken, Task<TResult>> callback, GrainRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
             return GetRequestRunner(grain).RunRequestAsync<Func<CancellationToken, Task<TResult>>, TResult>(
                 static (callback, cancellationToken) => callback(cancellationToken),
                 callback,
+                options,
                 cancellationToken);
         }
 
@@ -122,12 +169,29 @@ namespace Orleans
         /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
         /// <typeparam name="TResult">The type of the callback's result.</typeparam>
         /// <returns>A <see cref="Task{TResult}"/> which completes with the outcome of the callback.</returns>
+        /// <remarks><inheritdoc cref="RunRequestAsync{TState, TResult}(IGrainBase, Func{TState, CancellationToken, Task{TResult}}, TState, GrainRequestOptions, CancellationToken)" path="/remarks/node()"/></remarks>
+        public static Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, Func<TState, CancellationToken, Task<TResult>> callback, TState state, CancellationToken cancellationToken = default) =>
+            RunRequestAsync(grain, callback, state, default(GrainRequestOptions), cancellationToken);
+
+        /// <summary>
+        /// Runs <paramref name="callback"/> as a request on this grain activation.
+        /// </summary>
+        /// <param name="grain">The grain instance.</param>
+        /// <param name="callback">The callback to run.</param>
+        /// <param name="state">The state passed to the callback.</param>
+        /// <param name="options">The options for the request.</param>
+        /// <param name="cancellationToken">
+        /// Cancels the request while it is queued. Once the callback starts, the token is passed to the callback.
+        /// </param>
+        /// <typeparam name="TState">The type of the <paramref name="state"/> parameter.</typeparam>
+        /// <typeparam name="TResult">The type of the callback's result.</typeparam>
+        /// <returns>A <see cref="Task{TResult}"/> which completes with the outcome of the callback.</returns>
         /// <remarks>
         /// <para>
-        /// The request is scheduled with the activation's other requests and follows the grain's reentrancy rules:
+        /// The request is scheduled with the activation's other requests. By default, it follows the grain's reentrancy rules:
         /// on a non-reentrant grain, the callback runs exclusively, the same as a grain method call.
-        /// The request passes through grain call filters as <c>IGrainRequestInvoker.RunRequestAsync</c>,
-        /// starts a new call chain, and keeps the activation alive.
+        /// The request passes through grain call filters as <c>IGrainRequestInvoker.RunRequestAsync</c>, or with the names and arguments set in
+        /// <paramref name="options"/>. It starts a new call chain and, by default, keeps the activation alive.
         /// A call filter which fails or sets the result without invoking the request completes the returned task with that outcome.
         /// </para>
         /// <para>
@@ -142,10 +206,10 @@ namespace Orleans
         /// <see cref="LimitExceededException"/>.
         /// </para>
         /// </remarks>
-        public static Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, Func<TState, CancellationToken, Task<TResult>> callback, TState state, CancellationToken cancellationToken = default)
+        public static Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, Func<TState, CancellationToken, Task<TResult>> callback, TState state, GrainRequestOptions options, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(callback);
-            return GetRequestRunner(grain).RunRequestAsync<TState, TResult>(callback, state, cancellationToken);
+            return GetRequestRunner(grain).RunRequestAsync<TState, TResult>(callback, state, options, cancellationToken);
         }
 
         private static IGrainRequestRunner GetRequestRunner(IGrainBase grain) =>

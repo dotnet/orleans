@@ -339,7 +339,7 @@ namespace Orleans.Runtime
                 }
 
                 // Local requests report the response's exception through their tasks unless a filter failed after the callback completed.
-                var reportedByRequest = message.IsLocalOnly && message.BodyObject is ILocalRequest localRequest && localRequest.OnInvoked(response);
+                var reportedByRequest = message.IsLocalOnly && message.BodyObject is ILocalRequest localRequest && localRequest.Complete(response);
 
                 if (response.Exception is { } invocationException)
                 {

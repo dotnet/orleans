@@ -19,5 +19,6 @@ internal interface IGrainRequestRunner
     Task<TResult> RunRequestAsync<TState, TResult>(
         Func<TState, CancellationToken, Task> callback,
         TState state,
+        in GrainRequestOptions options,
         CancellationToken cancellationToken);
 }
