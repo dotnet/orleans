@@ -95,7 +95,7 @@ public sealed class GarnetJournalMigrationTests : IAsyncLifetime
 
         // Once the migration is done, absent markers are dropped, and tombstones once retention expires.
         var options = new GarnetJournalStorageOptions();
-        await using var agent = new GarnetJournalMigrationAgent(router, coordinator, new HashSet<PartitionId> { P2 }, options, logger: null);
+        await using var agent = new GarnetJournalMigrationAgent(router, coordinator, partition => partition == P2, options, logger: null);
         Assert.Equal(2, (await router.Migrator.GetBucketAsync(P2, 0, CancellationToken)).MarkerCount);
         Assert.Equal(1, await agent.CollectMarkersAsync(CancellationToken));
         Assert.Equal(1, (await router.Migrator.GetBucketAsync(P2, 0, CancellationToken)).MarkerCount);
@@ -313,7 +313,7 @@ public sealed class GarnetJournalMigrationTests : IAsyncLifetime
         var writer = _partitions.CreateRouter(TimeSpan.FromMinutes(10), writerTime);
         var host = _partitions.CreateRouter(timeProvider: hostTime);
         var options = new GarnetJournalStorageOptions();
-        await using var agent = new GarnetJournalMigrationAgent(host, new GarnetJournalMigrationCoordinator(host), new HashSet<PartitionId> { P0, P1 }, options, logger: null);
+        await using var agent = new GarnetJournalMigrationAgent(host, new GarnetJournalMigrationCoordinator(host), partition => partition == P0 || partition == P1, options, logger: null);
         var id = _partitions.JournalsInBucket(0, "delayed").First();
         var storage = Storage(writer, id);
 
@@ -355,7 +355,7 @@ public sealed class GarnetJournalMigrationTests : IAsyncLifetime
     {
         var router = _partitions.CreateRouter();
         var options = new GarnetJournalStorageOptions { TombstoneRetention = TimeSpan.FromMilliseconds(1) };
-        await using var agent = new GarnetJournalMigrationAgent(router, new GarnetJournalMigrationCoordinator(router), new HashSet<PartitionId> { P0 }, options, logger: null);
+        await using var agent = new GarnetJournalMigrationAgent(router, new GarnetJournalMigrationCoordinator(router), partition => partition == P0, options, logger: null);
         var ids = _partitions.JournalsInBucket(0, "unrelated").Take(2).ToArray();
 
         // The writer observes its journal absent; then another journal in the bucket is created, deleted, and collected.
@@ -390,7 +390,7 @@ public sealed class GarnetJournalMigrationTests : IAsyncLifetime
 
         var coordinator = new GarnetJournalMigrationCoordinator(router);
         var options = new GarnetJournalStorageOptions { MigrationInterval = TimeSpan.FromMilliseconds(20) };
-        await using var agent = new GarnetJournalMigrationAgent(router, coordinator, new HashSet<PartitionId> { P2 }, options, logger: null);
+        await using var agent = new GarnetJournalMigrationAgent(router, coordinator, partition => partition == P2, options, logger: null);
         agent.Start();
         try
         {

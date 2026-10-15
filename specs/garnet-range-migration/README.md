@@ -107,5 +107,6 @@ The TLC configurations allow at most three views, so they do not reach the fence
 ## Not yet modeled
 
 - Key filters.
-- Partition failover and epoch fencing (phase 4).
 - The MetaStore's migration records and phases; the model derives them from views and bucket states, and the implementation records them from observed bucket states (D27).
+
+Partition failover and fencing are specified separately, in [`garnet-partition-hosting`](../garnet-partition-hosting/README.md), which checks that failover preserves this specification's abstraction of a partition: a durable, linearizable store which takes no steps while it is unavailable.

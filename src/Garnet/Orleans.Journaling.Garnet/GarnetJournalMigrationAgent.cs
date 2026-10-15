@@ -17,7 +17,7 @@ internal sealed class GarnetJournalMigrationAgent : IAsyncDisposable
 {
     private readonly GarnetJournalRouter _router;
     private readonly GarnetJournalMigrationCoordinator _coordinator;
-    private readonly IReadOnlySet<PartitionId> _hosted;
+    private readonly Func<PartitionId, bool> _isHosted;
     private readonly GarnetJournalStorageOptions _options;
     private readonly ILogger? _logger;
     private readonly CancellationTokenSource _stop = new();
@@ -26,13 +26,13 @@ internal sealed class GarnetJournalMigrationAgent : IAsyncDisposable
     public GarnetJournalMigrationAgent(
         GarnetJournalRouter router,
         GarnetJournalMigrationCoordinator coordinator,
-        IReadOnlySet<PartitionId> hosted,
+        Func<PartitionId, bool> isHosted,
         GarnetJournalStorageOptions options,
         ILogger? logger)
     {
         _router = router;
         _coordinator = coordinator;
-        _hosted = hosted;
+        _isHosted = isHosted;
         _options = options;
         _logger = logger;
     }
@@ -91,7 +91,7 @@ internal sealed class GarnetJournalMigrationAgent : IAsyncDisposable
             var progress = false;
             try
             {
-                progress = await _coordinator.AdvanceAsync(_hosted.Contains, work, cancellationToken).ConfigureAwait(false);
+                progress = await _coordinator.AdvanceAsync(_isHosted, work, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -129,7 +129,7 @@ internal sealed class GarnetJournalMigrationAgent : IAsyncDisposable
         var dropped = 0;
         foreach (var range in view.Map.Ranges)
         {
-            if (!_hosted.Contains(range.Owner))
+            if (!_isHosted(range.Owner))
             {
                 continue;
             }

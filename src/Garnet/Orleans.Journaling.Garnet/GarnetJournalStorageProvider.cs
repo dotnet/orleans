@@ -21,19 +21,26 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
     private readonly ILoggerFactory? _loggerFactory;
     private readonly ILogger<GarnetJournalStorageProvider>? _logger;
     private readonly TimeProvider _timeProvider;
+    private readonly ILocalSiloDetails? _siloDetails;
+    private readonly IClusterMembershipService? _membership;
     private GarnetJournalPartitionManager? _partitions;
     private GarnetJournalRouter? _router;
     private GarnetJournalMigrationCoordinator? _coordinator;
     private GarnetJournalMigrationAgent? _agent;
+    private GarnetJournalFailoverAgent? _failoverAgent;
 
     public GarnetJournalStorageProvider(
         IOptions<GarnetJournalStorageOptions> options,
         IOptions<JournaledStateManagerOptions> managerOptions,
         ILoggerFactory? loggerFactory = null,
         OrleansInstruments? instruments = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ILocalSiloDetails? siloDetails = null,
+        IClusterMembershipService? membership = null)
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _siloDetails = siloDetails;
+        _membership = membership;
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(managerOptions);
         _options = options.Value;
@@ -54,8 +61,18 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
     internal GarnetJournalMigrationCoordinator Coordinator => _coordinator ?? throw new InvalidOperationException(
         $"{nameof(GarnetJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
 
-    /// <summary>Gets the agent which drives migrations into this silo's partitions, if it hosts any.</summary>
+    /// <summary>Gets the agent which drives migrations into this silo's partitions, if it can host any.</summary>
     internal GarnetJournalMigrationAgent? MigrationAgent => _agent;
+
+    /// <summary>Gets the manager of the partitions this silo hosts.</summary>
+    internal GarnetJournalPartitionManager PartitionManager => _partitions ?? throw new InvalidOperationException(
+        $"{nameof(GarnetJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
+
+    /// <summary>Gets the agent which fails partitions over from dead silos, if this silo runs one.</summary>
+    internal GarnetJournalFailoverAgent? FailoverAgent => _failoverAgent;
+
+    /// <summary>Gets the identifier of this silo in the range map's hosting assignments, if it can host partitions.</summary>
+    internal string? HostId { get; private set; }
 
     public IJournalStorage CreateStorage(JournalId journalId)
     {
@@ -162,26 +179,49 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
         cancellationToken.ThrowIfCancellationRequested();
         var metaStore = _options.MetaStore
             ?? throw new InvalidOperationException($"{nameof(GarnetJournalStorageOptions)}.{nameof(GarnetJournalStorageOptions.MetaStore)} is required.");
+        var shared = _options.PartitionBlobContainer is not null;
         var hostId = _options.HostId
-            ?? (string.IsNullOrWhiteSpace(_options.DataDirectory) ? null : GetOrCreateHostId(_options.DataDirectory));
-        var view = await GetRangeMapAsync(metaStore, hostId, cancellationToken).ConfigureAwait(false);
+            ?? (shared ? _siloDetails?.SiloAddress.ToParsableString()
+                : string.IsNullOrWhiteSpace(_options.DataDirectory) ? null : GetOrCreateHostId(_options.DataDirectory));
+        var canHost = hostId is not null && (shared || !string.IsNullOrWhiteSpace(_options.DataDirectory));
+        HostId = canHost ? hostId : null;
+        var view = await GetRangeMapAsync(metaStore, HostId, cancellationToken).ConfigureAwait(false);
         _partitions = await GarnetJournalPartitionManager.StartAsync(_options, hostId, metaStore, view, _loggerFactory, cancellationToken).ConfigureAwait(false);
-        _router = new GarnetJournalRouter(metaStore, _partitions.View, _options.OperationTimeout, _telemetry, _logger, _timeProvider);
+        var router = _router = new GarnetJournalRouter(metaStore, _partitions.View, _options.OperationTimeout, _telemetry, _logger, _timeProvider);
+        _partitions.ViewObserved = view => router.TryApplyView(view);
+        _partitions.StartMonitoring();
         _coordinator = new GarnetJournalMigrationCoordinator(_router, _loggerFactory?.CreateLogger<GarnetJournalMigrationCoordinator>());
-        if (_partitions.Hosts.Count > 0)
+        if (canHost)
         {
             _agent = new GarnetJournalMigrationAgent(
                 _router,
                 _coordinator,
-                _partitions.Hosts.Keys.ToHashSet(),
+                _partitions.IsHosted,
                 _options,
                 _loggerFactory?.CreateLogger<GarnetJournalMigrationAgent>());
             _agent.Start();
+        }
+
+        // Silos identified by their addresses fail partitions over from silos which membership declares dead.
+        if (shared && _options.HostId is null && _membership is not null)
+        {
+            _failoverAgent = new GarnetJournalFailoverAgent(
+                new GarnetJournalHostingCoordinator(metaStore, _loggerFactory?.CreateLogger<GarnetJournalHostingCoordinator>()),
+                _membership,
+                _options.HostingInterval,
+                _loggerFactory?.CreateLogger<GarnetJournalFailoverAgent>());
+            _failoverAgent.Start();
         }
     }
 
     internal async Task StopAsync(CancellationToken cancellationToken)
     {
+        if (_failoverAgent is { } failoverAgent)
+        {
+            _failoverAgent = null;
+            await failoverAgent.DisposeAsync().ConfigureAwait(false);
+        }
+
         if (_agent is { } agent)
         {
             _agent = null;
@@ -189,14 +229,17 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
         }
 
         _coordinator = null;
+        if (_partitions is { } partitions)
+        {
+            _partitions = null;
+            await partitions.DisposeAsync().ConfigureAwait(false);
+        }
+
         if (_router is { } router)
         {
             _router = null;
             await router.DisposeAsync().ConfigureAwait(false);
         }
-
-        _partitions?.Dispose();
-        _partitions = null;
     }
 
     public async ValueTask DisposeAsync() => await StopAsync(CancellationToken.None).ConfigureAwait(false);
@@ -244,7 +287,7 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
     private async Task<RangeMapSnapshot> GetRangeMapAsync(IRangeMetaStore metaStore, string? hostId, CancellationToken cancellationToken)
     {
         var initial = _options.InitialRangeMap;
-        if (initial is null && hostId is not null && !string.IsNullOrWhiteSpace(_options.DataDirectory))
+        if (initial is null && hostId is not null)
         {
             initial = RangeMap.CreateUniform(
                 _options.BucketCount,

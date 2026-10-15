@@ -50,9 +50,12 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
             return false;
         }
 
+        // Every procedure, reads included, locks the metadata key exclusively, so Garnet logs it to the AOF and its
+        // reply waits for a commit, which fails once a later hosting tenure has fenced the partition's storage. A
+        // fenced host therefore serves no reads, which could otherwise miss writes the later tenure acknowledged (D32).
         var type = IsWrite ? LockType.Exclusive : LockType.Shared;
         AddKey(bucketKey, LockType.Shared, StoreType.Object);
-        AddKey(metadataKey, type, StoreType.Object);
+        AddKey(metadataKey, LockType.Exclusive, StoreType.Object);
         if (LocksData)
         {
             AddKey(dataKey, type, StoreType.Object);
@@ -971,7 +974,9 @@ internal sealed class GarnetJournalIndexProcedure : CustomTransactionProcedure
         }
 
         AddKey(bucketKey, LockType.Shared, StoreType.Object);
-        AddKey(indexKey, LockType.Shared, StoreType.Object);
+
+        // The exclusive lock makes Garnet log the listing, so its reply waits for a fenced AOF commit (D32).
+        AddKey(indexKey, LockType.Exclusive, StoreType.Object);
         return true;
     }
 
