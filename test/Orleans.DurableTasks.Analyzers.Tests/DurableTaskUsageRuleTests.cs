@@ -71,7 +71,7 @@ public class DurableTaskUsageRuleTests
         """);
 
     [Fact]
-    public Task DefinitionsAreAwaitedScheduledOrDetached() => AnalyzerVerifier.VerifyAsync($$"""
+    public Task DefinitionsAreAwaitedScheduledOrPosted() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
         {{Members}}
@@ -80,8 +80,10 @@ public class DurableTaskUsageRuleTests
                 {|ORLEANS0105:Step(1);|}
                 {|ORLEANS0105:_ = LocalStep(2);|}
                 {|ORLEANS0105:Step(3).WithId("unobserved");|}
+                {|ORLEANS0105:Step(3).Detached().Shielded();|}
                 await Step(4).WithId("awaited");
-                await Step(5).DetachAsync("detached");
+                Step(5).Detached().Post();
+                _ = await Step(5).ScheduleAsync();
                 var definition = Step(6);
                 await definition.WithId("later");
             }
@@ -114,6 +116,10 @@ public class DurableTaskUsageRuleTests
                 var reusable = DurableTask.Run(_ => 3);
                 await reusable.WithId("run-1");
                 await reusable.WithId("run-2");
+
+                var configured = LocalStep(3).Detached();
+                configured.Post();
+                {|ORLEANS0106:configured|}.Post();
             }
         }
         """);
@@ -307,6 +313,49 @@ public class DurableTaskUsageRuleTests
                 await Step(1).WithId("step");
                 _plain.LogInformation("tail");
             }
+        }
+        """);
+
+    [Fact]
+    public Task PostRunsInGrainsAndDurableTaskBodies() => AnalyzerVerifier.VerifyAsync("""
+        public class CheckoutGrain : Orleans.Grain
+        {
+            private static DurableTask<int> Step(int value) => DurableTask.FromResult(value);
+
+            public void Checkout() => Step(1).Detached().WithId("order").Post();
+
+            public sealed class Nested
+            {
+                public void Checkout() => Step(1).Post();
+            }
+        }
+
+        public class Client
+        {
+            private static DurableTask<int> Step(int value) => DurableTask.FromResult(value);
+
+            public Task<ScheduledTask<int>> ScheduleAsync() => Step(1).WithId("order").ScheduleAsync();
+
+            public void Start() => {|ORLEANS0116:Step(1).WithId("order").Post()|};
+
+            public async DurableTask RunAsync(int[] items)
+            {
+                Step(2).Detached().Post();
+                await DurableTask.Run(_ => { Step(3).Post(); });
+                foreach (var item in items.Where(item => Step(item).Post() is not null))
+                {
+                }
+
+                async DurableTask LocalAsync()
+                {
+                    Step(4).Post();
+                    await Step(4).WithId("after-post");
+                }
+
+                await LocalAsync();
+            }
+
+            public static void Helper() => {|ORLEANS0116:Step(5).Post()|};
         }
         """);
 }

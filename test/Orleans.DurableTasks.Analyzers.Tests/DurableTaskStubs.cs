@@ -3,7 +3,7 @@ namespace Orleans.DurableTasks.Analyzers.Tests;
 /// <summary>
 /// Declares the durable task programming model, grain state, and signals by the metadata names which the analyzers match:
 /// <c>DurableTask.Current</c> returning <c>DurableTaskContext</c>, <c>DurableTask.Once</c>, <c>IsReplaying</c>,
-/// <c>ReplaySafe()</c>, and the journaled state types.
+/// <c>ReplaySafe()</c>, the journaled state types, and grains.
 /// </summary>
 internal static class DurableTaskStubs
 {
@@ -52,18 +52,26 @@ internal static class DurableTaskStubs
                 public string? CancellationReason => null;
                 public CancellationToken CancellationToken => default;
                 public virtual bool IsReplaying => false;
-                public IDisposable SuppressCancellation() => null!;
             }
 
             public readonly struct ConfiguredDurableTask
             {
                 public DurableTaskAwaiter GetAwaiter() => default;
+                public ConfiguredDurableTask WithId(string name) => default;
+                public ConfiguredDurableTask Detached() => default;
+                public ConfiguredDurableTask Shielded() => default;
                 public Task<ScheduledTask> ScheduleAsync(CancellationToken cancellationToken = default) => null!;
+                public ScheduledTask Post() => null!;
             }
 
             public readonly struct ConfiguredDurableTask<TResult>
             {
                 public DurableTaskAwaiter<TResult> GetAwaiter() => default;
+                public ConfiguredDurableTask<TResult> WithId(string name) => default;
+                public ConfiguredDurableTask<TResult> Detached() => default;
+                public ConfiguredDurableTask<TResult> Shielded() => default;
+                public Task<ScheduledTask<TResult>> ScheduleAsync(CancellationToken cancellationToken = default) => null!;
+                public ScheduledTask<TResult> Post() => null!;
             }
 
             public readonly struct DurableTaskAwaiter : ICriticalNotifyCompletion
@@ -86,10 +94,15 @@ internal static class DurableTaskStubs
             {
                 public static DurableTaskAwaiter GetAwaiter(this DurableTask task) => default;
                 public static DurableTaskAwaiter<TResult> GetAwaiter<TResult>(this DurableTask<TResult> task) => default;
-                public static ConfiguredDurableTask WithId(this DurableTask task, string segment) => default;
-                public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string segment) => default;
-                public static ValueTask DetachAsync(this DurableTask task, string rootId, CancellationToken cancellationToken = default) => default;
-                public static Task<ScheduledTask> ScheduleAsync(this DurableTask task, string rootId, CancellationToken cancellationToken = default) => null!;
+                public static ConfiguredDurableTask WithId(this DurableTask task, string name) => default;
+                public static ConfiguredDurableTask<TResult> WithId<TResult>(this DurableTask<TResult> task, string name) => default;
+                public static ConfiguredDurableTask Detached(this DurableTask task) => default;
+                public static ConfiguredDurableTask<TResult> Detached<TResult>(this DurableTask<TResult> task) => default;
+                public static ConfiguredDurableTask Shielded(this DurableTask task) => default;
+                public static ConfiguredDurableTask<TResult> Shielded<TResult>(this DurableTask<TResult> task) => default;
+                public static Task<ScheduledTask> ScheduleAsync(this DurableTask task, CancellationToken cancellationToken = default) => null!;
+                public static ScheduledTask Post(this DurableTask task) => null!;
+                public static ScheduledTask<TResult> Post<TResult>(this DurableTask<TResult> task) => null!;
                 public static DurableTask<TResult> WaitAsync<TResult>(this DurableTask<TResult> task, TimeSpan timeout) => null!;
             }
 
@@ -136,6 +149,17 @@ internal static class DurableTaskStubs
                 public void SetException(Exception exception) { }
                 public void AwaitOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine) where TAwaiter : INotifyCompletion where TStateMachine : IAsyncStateMachine { }
                 public void AwaitUnsafeOnCompleted<TAwaiter, TStateMachine>(ref TAwaiter awaiter, ref TStateMachine stateMachine) where TAwaiter : ICriticalNotifyCompletion where TStateMachine : IAsyncStateMachine { }
+            }
+        }
+
+        namespace Orleans
+        {
+            public interface IGrainBase
+            {
+            }
+
+            public abstract class Grain : IGrainBase
+            {
             }
         }
 
