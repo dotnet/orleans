@@ -216,6 +216,19 @@ public sealed class GarnetJournalStorageTests(GarnetPartitionFixture fixture) : 
     }
 
     [Fact]
+    public async Task Delete_AfterObservingAbsence_DeletesJournalCreatedSince()
+    {
+        var id = NewId("delete-cached-absence");
+        var deleter = Provider.CreateStorage(id);
+        Assert.Null(await deleter.GetMetadataAsync(CancellationToken));
+
+        await Provider.CreateStorage(id).AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken);
+        await deleter.DeleteAsync(CancellationToken);
+
+        Assert.Null(await Provider.CreateStorage(id).GetMetadataAsync(CancellationToken));
+    }
+
+    [Fact]
     public async Task Read_ReturnsOneSegmentPerAppend_AndObservesCancellation()
     {
         var id = NewId("segments");
