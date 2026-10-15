@@ -377,7 +377,7 @@ namespace Orleans
 
                         var filters = _manager.GrainCallFilters;
                         Response response;
-                        if (filters is { Count: > 0 } || LocalObject is IIncomingGrainCallFilter)
+                        if (filters is { Count: > 0 } || LocalObject.Target is IIncomingGrainCallFilter)
                         {
                             var invoker = new GrainMethodInvoker(message, this, request, filters, _manager._interfaceToImplementationMapping, _manager._responseCopier);
                             await invoker.Invoke();
