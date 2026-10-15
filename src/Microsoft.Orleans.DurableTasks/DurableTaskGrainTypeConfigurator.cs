@@ -11,10 +11,10 @@ namespace Orleans.DurableTasks.Runtime;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Applies to grain classes deriving from <see cref="DurableGrain"/> or implementing <see cref="IMessagingGrain"/>, the
-/// same grain classes for which messaging installs an inbox and outbox. Activation setup runs before journal recovery,
-/// so the runtime's journal hook, inbox sink and handler, and outbox message source are registered before recovered
-/// state or recovered messages are processed.
+/// Applies to grain classes deriving from <see cref="DurableGrain"/>. Activation setup resolves the grain's inbox and
+/// outbox, which enables messaging for the grain, and runs before journal recovery, so the runtime's journal hook, inbox
+/// sink, handler, and wake-up delay, and outbox message source are registered before recovered state or recovered
+/// messages are processed.
 /// </para>
 /// <para>
 /// The runtime's lifecycle stage follows <see cref="GrainLifecycleStage.Activate"/>, at which messaging starts the
@@ -44,7 +44,8 @@ internal sealed class DurableTaskGrainTypeConfigurator(GrainClassMap grainClasse
             var handler = services.GetRequiredService<DurableTaskMessageHandler>();
             services.GetRequiredService<IInbox>()
                 .Register((IInboxMessageSink)handler)
-                .Register((IInboxHandler)handler);
+                .Register((IInboxHandler)handler)
+                .RegisterWakeup(runtime.GetWakeupDelay);
             services.GetRequiredService<IOutbox>().Register(runtime);
             context.ObservableLifecycle.Subscribe(
                 nameof(DurableTaskGrainRuntime),
