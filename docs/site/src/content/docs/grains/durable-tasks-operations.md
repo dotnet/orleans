@@ -51,7 +51,7 @@ multi-silo deployments; see [Journaling configuration](journaling/configuration.
 ## Retention and deletion
 
 Each invoked task owns an execution tree: the task, its local steps, delays,
-combinator records, `DurableTask.Once` records, signal records, observation records,
+combinator records, `DurableTask.Once` records, signal records, subscriptions to other tasks,
 detach and signal-send markers, and its records of calls to other grains. The grain
 deletes the tree in one journal write:
 
@@ -61,8 +61,8 @@ deletes the tree in one journal write:
 | A client, or `DetachAsync` | `ResultRetentionPeriod` after completion. |
 | Any caller, after its completion was dead-lettered | `ResultRetentionPeriod` after the dead letter. |
 
-A task which durable tasks observe through `ObserveDurableTask` is also retained until
-the outbox retires the completion to each observation. A dead-lettered observation
+A task to which durable tasks subscribe through `GetDurableTask` is also retained until
+the outbox retires the completion to each subscriber. A dead-lettered subscriber
 completion restarts the retention period, like a caller's.
 
 A grain's record of a call which an ordinary method scheduled is a root of its own,
@@ -107,11 +107,12 @@ runs a call to another grain, `CreatedAt` and `CompletedAt` record timestamps, a
 stored payloads and report decoding failures instead of throwing.
 
 Grain references also expose task control: the `GetDurableTask<TResult>(rootId)`
-extension returns a handle which polls, waits for, cancels, or aborts an existing root
-task, the `ObserveDurableTask<TResult>(rootId)` extension lets a durable task await an
-existing task's result, and the `SignalDurableTaskAsync` and `TrySignalDurableTaskAsync`
-extensions deliver signals. Diagnostics describe an observation's `Request` as
-`an observation of task '{taskId}' on grain '{grain}'`.
+extension returns a reference which polls, waits for, cancels, or aborts an existing
+task, and which a durable task awaits to subscribe to its result, and the
+`SignalDurableTaskAsync` and `TrySignalDurableTaskAsync` extensions deliver signals.
+Diagnostics describe a subscription child's `Request` as
+`a subscription to task '{taskId}' on grain '{grain}'`, and `Waiters` lists a
+subscriber other than the invoker as its grain followed by its task ID.
 
 ## Diagnose replay divergence
 
