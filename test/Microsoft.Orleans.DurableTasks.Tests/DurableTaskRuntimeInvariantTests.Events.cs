@@ -44,7 +44,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     [Fact]
     public Task ReplayReportsWhenItRunsLive() => ActivationScheduler.RunAsync(async () =>
     {
-        var (runtime, storage, manager, _) = CreateRuntime();
+        var (runtime, storage, manager, transport) = CreateRuntime();
         var rootId = TaskId.Parse("root");
         var request = CreateRequest(
             1,
@@ -56,7 +56,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         runtime.ScheduleFromInbox(rootId, request);
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        await WaitUntilAsync(() => storage.Contains(TaskId.Parse("root/delay")));
+        // The delay's resume is staged with its due time, so the replacement replays a scheduled delay. A delay child whose
+        // body hasn't scheduled it yet is a pending execution, which recovery starts on its own.
+        await transport.ResumeSent.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // The replacement replays the recorded step and delay; reaching the delay, the last recorded operation, ends the
