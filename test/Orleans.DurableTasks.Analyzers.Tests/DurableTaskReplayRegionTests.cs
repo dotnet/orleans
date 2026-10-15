@@ -190,8 +190,10 @@ public class DurableTaskReplayRegionTests
             public async DurableTask<int> StepAsync()
             {
                 {|ORLEANS0103:_status.Value = 1|};
+                {|ORLEANS0103:_status.Value++|};
                 await FetchAsync();
                 _status.Value = 2;
+                _status.Value--;
                 return 2;
             }
 
