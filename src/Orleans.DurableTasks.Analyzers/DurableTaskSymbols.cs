@@ -18,6 +18,7 @@ internal sealed class DurableTaskSymbols
     {
         DurableTask = durableTask;
         DurableSignal = compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableSignal`1");
+        GrainBase = compilation.GetTypeByMetadataName("Orleans.IGrainBase");
         Task = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task");
         Thread = compilation.GetTypeByMetadataName("System.Threading.Thread");
         ThreadPool = compilation.GetTypeByMetadataName("System.Threading.ThreadPool");
@@ -55,6 +56,8 @@ internal sealed class DurableTaskSymbols
     public INamedTypeSymbol DurableTask { get; }
 
     public INamedTypeSymbol? DurableSignal { get; }
+
+    public INamedTypeSymbol? GrainBase { get; }
 
     public INamedTypeSymbol? Task { get; }
 
@@ -109,6 +112,28 @@ internal sealed class DurableTaskSymbols
     public bool ReturnsDefinition(IMethodSymbol method) =>
         IsDurableTask(method.ReturnType)
         || (IsDurableTasksType(method.ReturnType) && method.ReturnType.Name == "ConfiguredDurableTask");
+
+    /// <summary>Returns whether a type, or a type which contains it, is a grain: it implements <c>IGrainBase</c>.</summary>
+    public bool IsGrain(INamedTypeSymbol? type)
+    {
+        if (GrainBase is null)
+        {
+            return false;
+        }
+
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            foreach (var @interface in current.AllInterfaces)
+            {
+                if (SymbolEqualityComparer.Default.Equals(@interface, GrainBase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Returns whether a method is a durable task body: an async method which returns <c>DurableTask</c>.</summary>
     public bool IsDurableBody(IMethodSymbol method) => method.IsAsync && IsDurableTask(method.ReturnType);
@@ -165,6 +190,18 @@ internal sealed class DurableTaskSymbols
     /// <summary>Returns whether an invocation names a durable operation: <c>WithId</c> on a definition or configuration.</summary>
     public static bool IsWithId(IInvocationOperation invocation) =>
         invocation.TargetMethod.Name == "WithId" && IsDurableTasksType(invocation.TargetMethod.ContainingType);
+
+    /// <summary>
+    /// Returns whether an invocation configures a definition or configuration: <c>WithId</c>, <c>Detached</c>, or
+    /// <c>Shielded</c>.
+    /// </summary>
+    public static bool IsConfiguration(IInvocationOperation invocation) =>
+        invocation.TargetMethod.Name is "WithId" or "Detached" or "Shielded"
+        && IsDurableTasksType(invocation.TargetMethod.ContainingType);
+
+    /// <summary>Returns whether an invocation posts a definition or configuration.</summary>
+    public static bool IsPost(IInvocationOperation invocation) =>
+        invocation.TargetMethod.Name == "Post" && IsDurableTasksType(invocation.TargetMethod.ContainingType);
 
     /// <summary>Returns whether an invocation waits for a durable signal.</summary>
     public bool IsSignalWait(IInvocationOperation invocation) =>
@@ -306,7 +343,7 @@ internal sealed class DurableTaskSymbols
         StringComparer.Ordinal,
         "WithId",
         "Once",
-        "DetachAsync",
+        "Post",
         "ScheduleAsync",
         "SignalDurableTaskAsync",
         "TrySignalDurableTaskAsync",
