@@ -488,7 +488,7 @@ internal sealed partial class ActivationData :
         }
     }
 
-    internal List<Message> DequeueAllWaitingRequests()
+    private List<Message> DequeueAllWaitingRequests(ref List<(ILocalRequest Request, Exception Exception)>? rejectedLocalRequests)
     {
         lock (_lock)
         {
@@ -498,7 +498,11 @@ internal sealed partial class ActivationData :
                 // Local-only messages are not allowed to escape the activation.
                 if (message.IsLocalOnly)
                 {
-                    (message.BodyObject as ILocalRequest)?.Reject(new OrleansMessageRejectionException($"Activation {this} is no longer valid."));
+                    if (message.BodyObject is ILocalRequest request)
+                    {
+                        (rejectedLocalRequests ??= []).Add((request, new OrleansMessageRejectionException($"Activation {this} is no longer valid.")));
+                    }
+
                     continue;
                 }
 
@@ -1140,6 +1144,26 @@ internal sealed partial class ActivationData :
 
         void ProcessPendingRequests()
         {
+            List<(ILocalRequest Request, Exception Exception)>? rejectedLocalRequests = null;
+            try
+            {
+                ProcessPendingRequestsCore(ref rejectedLocalRequests);
+            }
+            finally
+            {
+                // Rejection can run application code which queues further requests, so it runs once the queue is consistent and unlocked.
+                if (rejectedLocalRequests is not null)
+                {
+                    foreach (var (request, exception) in rejectedLocalRequests)
+                    {
+                        request.Reject(exception);
+                    }
+                }
+            }
+        }
+
+        void ProcessPendingRequestsCore(ref List<(ILocalRequest Request, Exception Exception)>? rejectedLocalRequests)
+        {
             var i = 0;
 
             do
@@ -1158,7 +1182,7 @@ internal sealed partial class ActivationData :
                     // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
                     if (State != ActivationState.Valid && !(message.IsLocalOnly && State is ActivationState.Deactivating))
                     {
-                        ProcessRequestsToInvalidActivation();
+                        ProcessRequestsToInvalidActivation(ref rejectedLocalRequests);
                         break;
                     }
 
@@ -1218,9 +1242,9 @@ internal sealed partial class ActivationData :
                         {
                             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
                         }
-                        else
+                        else if (message.BodyObject is ILocalRequest request)
                         {
-                            (message.BodyObject as ILocalRequest)?.Reject(exception);
+                            (rejectedLocalRequests ??= []).Add((request, exception));
                         }
 
                         _waitingRequests.RemoveAt(i);
@@ -1253,7 +1277,7 @@ internal sealed partial class ActivationData :
             _busyDuration = stopwatch;
         }
 
-        void ProcessRequestsToInvalidActivation()
+        void ProcessRequestsToInvalidActivation(ref List<(ILocalRequest Request, Exception Exception)>? rejectedLocalRequests)
         {
             if (State is ActivationState.Creating or ActivationState.Activating)
             {
@@ -1289,12 +1313,12 @@ internal sealed partial class ActivationData :
             {
                 // Either this was a duplicate activation or it was at some point successfully activated
                 // Forward all pending messages
-                RerouteAllQueuedMessages();
+                RerouteAllQueuedMessages(ref rejectedLocalRequests);
             }
             else
             {
                 // Reject all pending messages
-                RejectAllQueuedMessages();
+                RejectAllQueuedMessages(ref rejectedLocalRequests);
             }
         }
 
@@ -1737,11 +1761,11 @@ internal sealed partial class ActivationData :
     /// <summary>
     /// Rejects all messages enqueued for the provided activation.
     /// </summary>
-    private void RejectAllQueuedMessages()
+    private void RejectAllQueuedMessages(ref List<(ILocalRequest Request, Exception Exception)>? rejectedLocalRequests)
     {
         lock (_lock)
         {
-            List<Message> msgs = DequeueAllWaitingRequests();
+            List<Message> msgs = DequeueAllWaitingRequests(ref rejectedLocalRequests);
             if (msgs == null || msgs.Count <= 0) return;
 
             LogRejectAllQueuedMessages(_shared.Logger, msgs.Count, this);
@@ -1756,11 +1780,11 @@ internal sealed partial class ActivationData :
         }
     }
 
-    private void RerouteAllQueuedMessages()
+    private void RerouteAllQueuedMessages(ref List<(ILocalRequest Request, Exception Exception)>? rejectedLocalRequests)
     {
         lock (_lock)
         {
-            List<Message> msgs = DequeueAllWaitingRequests();
+            List<Message> msgs = DequeueAllWaitingRequests(ref rejectedLocalRequests);
             if (msgs is not { Count: > 0 })
             {
                 return;

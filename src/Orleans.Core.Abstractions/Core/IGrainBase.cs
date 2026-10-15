@@ -314,7 +314,16 @@ namespace Orleans
 #pragma warning disable CA2000 // Dispose objects before losing scope
             var request = new GrainRequest<TState, TResult>(callback, state, cancellationToken);
 #pragma warning restore CA2000 // Dispose objects before losing scope
-            grainContext.ReceiveLocalRequest(request, request, options);
+            try
+            {
+                grainContext.ReceiveLocalRequest(request, request, options);
+            }
+            catch (Exception exception)
+            {
+                // Rejecting the request releases its cancellation registration and reports the failure through the returned task.
+                ((ILocalRequest)request).Reject(exception);
+            }
+
             return request.Task;
         }
 

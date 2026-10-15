@@ -328,7 +328,7 @@ namespace Orleans.Runtime
                         case IInvokable body:
                             {
                                 // Call filters observe the request rather than its completion envelope.
-                                var invokable = body is LocalRequestCompletion envelope ? envelope.Request : body;
+                                var invokable = LocalRequestCompletion.GetRequest(body);
                                 invokable.SetTarget(target);
 
                                 CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);

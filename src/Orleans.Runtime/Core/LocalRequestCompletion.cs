@@ -7,11 +7,16 @@ namespace Orleans.Runtime;
 /// The body of a local request whose response is reported to a completion source other than the request itself.
 /// </summary>
 /// <remarks>
-/// Message processing observes this envelope as the request, and grain call filters observe <see cref="Request"/>.
+/// Message processing observes this envelope as the request. Grain call filters and <c>[MayInterleave]</c> predicates observe <see cref="Request"/>.
 /// </remarks>
 internal sealed class LocalRequestCompletion(IInvokable request, IResponseCompletionSource completion) : IInvokable, ILocalRequest
 {
     public IInvokable Request { get; } = request;
+
+    /// <summary>
+    /// Returns the request carried by a message body, unwrapping the completion envelope if present.
+    /// </summary>
+    public static IInvokable GetRequest(object? body) => body is LocalRequestCompletion envelope ? envelope.Request : (IInvokable)body!;
 
     public bool Complete(Response response)
     {

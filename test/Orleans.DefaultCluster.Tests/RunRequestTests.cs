@@ -145,6 +145,21 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
         Assert.Contains("ICustomRequests.Apply", await grain.GetFilteredCalls());
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ReceiveLocalRequest_MayInterleavePredicate_ObservesCustomRequest(bool observeCompletion)
+    {
+        var grain = GrainFactory.GetGrain<IMayInterleaveRunRequestGrain>(Guid.NewGuid());
+        await grain.StartBlockingRequest();
+        await WaitForLogEntryAsync(grain, "request-start");
+
+        Assert.Equal("custom:True", await grain.RunCustomRequestDuringBlockingRequest(observeCompletion));
+
+        await grain.ReleaseBlockingRequest();
+        await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken);
+    }
+
     [Fact]
     public async Task NonReentrantGrain_InterleavingRequestRunsDuringCurrentCall()
     {
@@ -209,6 +224,26 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
         await grain.DeactivateAndRetainInstance();
 
         // Requests queued while the activation is still deactivating run; once it is invalid, they are rejected.
+        await WaitForRejectionAsync(key);
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_RejectionCompletionQueuesRequest_RejectsEachRequestOnce()
+    {
+        var key = Guid.NewGuid();
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(key);
+        await grain.DeactivateAndRetainInstance();
+        await WaitForRejectionAsync(key);
+
+        // The first request's rejection queues the second request while the activation drains its queue.
+        var (firstCompletions, secondResponse) = await RunRequestGrainBase.QueueChainedRequestsOnRetainedInstance(key).WaitAsync(Timeout, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, firstCompletions);
+        Assert.IsType<OrleansMessageRejectionException>(secondResponse.Exception);
+    }
+
+    private static async Task WaitForRejectionAsync(Guid key)
+    {
         using var timeout = new CancellationTokenSource(Timeout);
         while (true)
         {

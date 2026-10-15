@@ -57,6 +57,18 @@ public interface IReentrantRunRequestGrain : IRunRequestGrain
 }
 
 /// <summary>
+/// A non-reentrant grain whose <c>[MayInterleave]</c> predicate admits custom local requests.
+/// </summary>
+public interface IMayInterleaveRunRequestGrain : IRunRequestGrain
+{
+    /// <summary>
+    /// Queues a custom request and returns its result once it runs, which requires interleaving with a blocking request.
+    /// </summary>
+    [AlwaysInterleave]
+    Task<string?> RunCustomRequestDuringBlockingRequest(bool observeCompletion);
+}
+
+/// <summary>
 /// How the grain's call filter handles requests queued by <c>RunRequestAsync</c>.
 /// </summary>
 [GenerateSerializer]

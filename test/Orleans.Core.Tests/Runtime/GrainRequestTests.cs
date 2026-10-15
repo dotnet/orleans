@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using Orleans.Runtime;
 using Orleans.Serialization.Invocation;
 using Xunit;
@@ -146,6 +148,44 @@ public class GrainRequestTests
         Assert.Equal(typeof(IGrainRequestInvoker), request.GetInterfaceType());
         Assert.Equal(0, request.GetArgumentCount());
         Assert.Throws<ArgumentOutOfRangeException>(() => request.GetArgument(0));
+    }
+
+    [Fact]
+    public async Task RunRequestAsync_SubmissionFails_FaultsTaskAndReleasesRequest()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var grain = new ThrowingGrain();
+
+        var (task, state) = StartRequest(grain, cancellation.Token);
+
+        await Assert.ThrowsAsync<NotSupportedException>(() => task);
+
+        // The uncanceled token no longer retains the request or its state.
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(state.IsAlive);
+        GC.KeepAlive(cancellation);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static (Task Task, WeakReference State) StartRequest(IGrainBase grain, CancellationToken cancellationToken)
+        {
+            var state = new object();
+            return (grain.RunRequestAsync(static (_, _) => { }, state, cancellationToken), new WeakReference(state));
+        }
+    }
+
+    /// <summary>
+    /// A grain whose context rejects every local request.
+    /// </summary>
+    private sealed class ThrowingGrain : IGrainBase
+    {
+        public IGrainContext GrainContext { get; } = DispatchProxy.Create<IGrainContext, ThrowingContext>();
+    }
+
+    public class ThrowingContext : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) => throw new NotSupportedException(targetMethod?.Name);
     }
 
     [Fact]
