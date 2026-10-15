@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Runtime;
 
@@ -31,6 +32,11 @@ public static class DurableTaskEvents
     public static IObservable<DurableTaskEvent> AllEvents { get; } = new Observable();
 
     internal static bool IsTaskCreatedEnabled => Listener.IsEnabled(nameof(TaskCreated));
+
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Event payloads are sealed types whose public fields and properties the generic annotation preserves, and subscribers consume the typed payload rather than reflecting over the members of the values it carries.")]
+    private static void Write<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicFields | DynamicallyAccessedMemberTypes.PublicProperties)] TEvent>(string name, TEvent payload)
+        where TEvent : DurableTaskEvent
+        => Listener.Write(name, payload);
 
     /// <summary>The base class used for durable task runtime diagnostic events.</summary>
     /// <param name="grainContext">The activation whose runtime raised the event.</param>
@@ -137,7 +143,7 @@ public static class DurableTaskEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId) =>
-            Listener.Write(nameof(TaskCreated), new TaskCreated(grainContext, taskId));
+            Write(nameof(TaskCreated), new TaskCreated(grainContext, taskId));
     }
 
     internal static void EmitTaskCompleted(IGrainContext grainContext, TaskId taskId, DurableTaskResponse response)
@@ -151,7 +157,7 @@ public static class DurableTaskEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId, DurableTaskResponse response) =>
-            Listener.Write(nameof(TaskCompleted), new TaskCompleted(grainContext, taskId, response));
+            Write(nameof(TaskCompleted), new TaskCompleted(grainContext, taskId, response));
     }
 
     internal static void EmitTaskDeleted(IGrainContext grainContext, TaskId taskId)
@@ -165,7 +171,7 @@ public static class DurableTaskEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId) =>
-            Listener.Write(nameof(TaskDeleted), new TaskDeleted(grainContext, taskId));
+            Write(nameof(TaskDeleted), new TaskDeleted(grainContext, taskId));
     }
 
     internal static void EmitExecutionStarted(IGrainContext grainContext, TaskId taskId)
@@ -179,7 +185,7 @@ public static class DurableTaskEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId) =>
-            Listener.Write(nameof(ExecutionStarted), new ExecutionStarted(grainContext, taskId));
+            Write(nameof(ExecutionStarted), new ExecutionStarted(grainContext, taskId));
     }
 
     internal static void EmitExecutionStopped(IGrainContext grainContext, TaskId taskId)
@@ -193,7 +199,7 @@ public static class DurableTaskEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId) =>
-            Listener.Write(nameof(ExecutionStopped), new ExecutionStopped(grainContext, taskId));
+            Write(nameof(ExecutionStopped), new ExecutionStopped(grainContext, taskId));
     }
 
     internal static void EmitSignalWaitStarted(IGrainContext grainContext, TaskId taskId)
@@ -207,7 +213,7 @@ public static class DurableTaskEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId) =>
-            Listener.Write(nameof(SignalWaitStarted), new SignalWaitStarted(grainContext, taskId));
+            Write(nameof(SignalWaitStarted), new SignalWaitStarted(grainContext, taskId));
     }
 
     internal static void EmitSignalWaitEnded(IGrainContext grainContext, TaskId taskId)
@@ -221,7 +227,7 @@ public static class DurableTaskEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId) =>
-            Listener.Write(nameof(SignalWaitEnded), new SignalWaitEnded(grainContext, taskId));
+            Write(nameof(SignalWaitEnded), new SignalWaitEnded(grainContext, taskId));
     }
 
     internal static void EmitSelectionWaitStarted(IGrainContext grainContext, TaskId taskId)
@@ -235,7 +241,7 @@ public static class DurableTaskEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId) =>
-            Listener.Write(nameof(SelectionWaitStarted), new SelectionWaitStarted(grainContext, taskId));
+            Write(nameof(SelectionWaitStarted), new SelectionWaitStarted(grainContext, taskId));
     }
 
     internal static void EmitReplayEnded(IGrainContext grainContext, TaskId taskId)
@@ -249,7 +255,7 @@ public static class DurableTaskEvents
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId) =>
-            Listener.Write(nameof(ReplayEnded), new ReplayEnded(grainContext, taskId));
+            Write(nameof(ReplayEnded), new ReplayEnded(grainContext, taskId));
     }
 
     private sealed class Observable : IObservable<DurableTaskEvent>
