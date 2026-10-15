@@ -105,10 +105,11 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
 
         var workflow = await starter.AwaitDetachedEchoesAsync(workerKey, 3).WithId("workflow").ScheduleAsync(cancellationToken);
 
-        // The awaited detached task derives its root ID from the workflow, and the scheduled one uses its name.
+        // The awaited detached task derives its root ID from the starting grain and the workflow, and the scheduled one uses
+        // its name.
         Assert.Equal(6 + 8, await workflow.WaitAsync(Timeout, cancellationToken));
         var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey);
-        Assert.Equal(6, (await worker.GetDurableTask<int>("workflow:$child-1").GetResponseAsync(cancellationToken)).GetResult<int>());
+        Assert.Equal(6, (await worker.GetDurableTask<int>($"{starter.GetGrainId()}/workflow:$child-1").GetResponseAsync(cancellationToken)).GetResult<int>());
         Assert.Equal(8, (await worker.GetDurableTask<int>("scheduled-echo").GetResponseAsync(cancellationToken)).GetResult<int>());
 
         // Outside a durable execution, awaiting a reference waits for the task's result, and the reference reads its task
