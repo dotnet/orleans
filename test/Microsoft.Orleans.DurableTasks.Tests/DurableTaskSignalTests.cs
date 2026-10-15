@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -424,6 +425,7 @@ public sealed partial class DurableTaskSignalTests
             var first = await tasks.TrySignalAsync(orderId, Approved, "ada");
             if (Interlocked.Increment(ref sends) == 1)
             {
+                StateChanges.Notify();
                 await release.Task;
             }
 
@@ -470,15 +472,8 @@ public sealed partial class DurableTaskSignalTests
             harness.Storage.Get(WorkflowId.Child($"{signal}$3")).Result!.GetResult<DurableSignalResult>());
     });
 
-    private static async Task WaitUntilAsync(Func<bool> predicate)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestCancellation);
-        timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        while (!predicate())
-        {
-            await Task.Delay(5, timeout.Token);
-        }
-    }
+    private static Task WaitUntilAsync(Func<bool> predicate, [CallerArgumentExpression(nameof(predicate))] string? description = null) =>
+        StateChanges.WaitUntilAsync(predicate, description: description);
 
     [Fact]
     public void TransportStagesSignalsWithAValueScopedIdentity()
@@ -592,15 +587,8 @@ public sealed partial class DurableTaskSignalTests
         }
 
         /// <summary>Waits until the runtime holds <paramref name="count"/> signal records with registered waits.</summary>
-        public async Task WaitForSignalWaitsAsync(int count)
-        {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(TestCancellation);
-            timeout.CancelAfter(TimeSpan.FromSeconds(10));
-            while (SignalWaitCount != count)
-            {
-                await Task.Delay(5, timeout.Token);
-            }
-        }
+        public Task WaitForSignalWaitsAsync(int count) =>
+            StateChanges.WaitUntilAsync(() => SignalWaitCount == count, description: $"{count} signal waits");
 
         public async Task<(GrainId GrainId, TaskId TaskId, long Generation, DateTimeOffset DueTime)> WaitForResumeAsync()
         {
@@ -783,6 +771,8 @@ public sealed partial class DurableTaskSignalTests
                 {
                     stateMachine.OnWriteCompleted();
                 }
+
+                StateChanges.Notify();
             }
             finally
             {

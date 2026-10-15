@@ -25,8 +25,11 @@ internal sealed partial class RecordingDurableTaskMessageTransport
     public List<RecordedSubscription> NotFound =>
         [.. Responses.Where(static entry => entry.Response.Exception is DurableTaskNotFoundException).Select(static entry => entry.Subscriber)];
 
-    public void SendResponse(GrainId sender, DurableTaskSubscriber destination, TaskId taskId, DurableTaskResponse response) =>
+    public void SendResponse(GrainId sender, DurableTaskSubscriber destination, TaskId taskId, DurableTaskResponse response)
+    {
         Responses.Add((new(sender, destination.GrainId, taskId, destination.TaskId, Unsubscribe: false), response));
+        StateChanges.Notify();
+    }
 
     public void SendSubscription(GrainId sender, GrainId target, TaskId taskId, TaskId subscriberId) =>
         AddSubscription(new(sender, target, taskId, subscriberId, Unsubscribe: false));
@@ -44,6 +47,8 @@ internal sealed partial class RecordingDurableTaskMessageTransport
                 waiter.TrySetResult(Subscriptions[count - 1]);
             }
         }
+
+        StateChanges.Notify();
     }
 
     /// <summary>Waits until the runtime has staged <paramref name="count"/> subscription messages, and returns the last.</summary>

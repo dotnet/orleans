@@ -89,6 +89,7 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         var workerKey = Guid.NewGuid();
         var allStarted = _fixture.MessagingProbe.WaitForStartedAsync(workerKey, FanOut);
         var allCanceled = _fixture.MessagingProbe.WaitForCanceledAsync(workerKey, FanOut);
+        using var events = DurableTaskEventBarriers.Collect();
 
         var scheduled = await coordinator.WaitForCancellationAsync(workerKey, FanOut).WithId("fan-out").ScheduleAsync(cancellationToken);
         await allStarted.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
@@ -98,31 +99,14 @@ public abstract class DurableTaskMessagingTests(string journalFormatKey) : IAsyn
         await allCanceled.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
         Assert.Equal(DurableTaskStatus.Canceled, response.Status);
-        var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey).AsReference<IDurableTaskGrainExtension>();
+        var workerId = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey).GetGrainId();
         for (var index = 0; index < FanOut; index++)
         {
             // The worker retains each canceled child's terminal state under the caller's child identity until the
             // caller's inbox accepts its completion, then deletes it.
             var childId = TaskId.CreateRoot("fan-out").Child($"wait-{index}");
-            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
-            while (true)
-            {
-                try
-                {
-                    var childResponse = await worker.SubscribeOrPollAsync(
-                        childId,
-                        new SubscribeOrPollOptions { PollTimeout = TimeSpan.Zero },
-                        cancellationToken);
-                    Assert.Equal(DurableTaskStatus.Canceled, childResponse.Status);
-                }
-                catch (DurableTaskNotFoundException)
-                {
-                    break;
-                }
-
-                Assert.True(DateTime.UtcNow < deadline, $"Durable task '{childId}' was not deleted after its completion was delivered.");
-                await Task.Delay(10, cancellationToken);
-            }
+            Assert.Equal(DurableTaskStatus.Canceled, (await events.WaitForCompletedAsync(workerId, childId)).Status);
+            await events.WaitForDeletedAsync(workerId, childId);
         }
     }
 }
