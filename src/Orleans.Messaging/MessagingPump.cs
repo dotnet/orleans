@@ -13,8 +13,8 @@ namespace Orleans.Messaging;
 /// </summary>
 /// <remarks>
 /// A single loop runs on the activation scheduler and services both queues whenever it is signaled.
-/// One durable job keeps waking the grain while either queue holds work. Wake-ups may be early,
-/// late, or duplicated: every pass derives the work to perform from current state.
+/// One durable job keeps waking the grain while either queue or a registered <see cref="IInboxWorkSource"/> holds work.
+/// Wake-ups may be early, late, or duplicated: every pass derives the work to perform from current state.
 /// The loop keeps the activation alive while a pass runs over queued work and while outbox deliveries are in flight.
 /// Work which only becomes due later relies on the durable job, so the activation can be collected while it waits.
 /// </remarks>
@@ -119,7 +119,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
 
     public async ValueTask<DurableJobRunResult> ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
-        // A running job keeps rescheduling itself until both queues are empty.
+        // A running job keeps rescheduling itself until both queues and every work source are empty.
         _wakeupScheduled = true;
         EnsureStarted();
         var pass = _nextPass ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -132,7 +132,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
         {
             // This attempt no longer guarantees a future wake-up.
             ClearWakeup();
-            if (!_shutdown.IsCancellationRequested && (Inbox.Count > 0 || Outbox.Count > 0))
+            if (!_shutdown.IsCancellationRequested && (Inbox.HasWork || Outbox.Count > 0))
             {
                 RepairWakeupAsync().Ignore();
             }
@@ -234,7 +234,7 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     {
         await Outbox.StartAsync(cancellationToken).ConfigureAwait(true);
         await Inbox.StartAsync(cancellationToken).ConfigureAwait(true);
-        if (Inbox.Count > 0 || Outbox.Count > 0)
+        if (Inbox.HasWork || Outbox.Count > 0)
         {
             await EnsureWakeupAsync(cancellationToken).ConfigureAwait(true);
         }
