@@ -61,14 +61,14 @@ public abstract class DurableTaskFaultSchedulePropertyTests(string journalFormat
 
 /// <summary>Runs random fault schedules with task state stored in the default JSON journal format.</summary>
 [Collection(DurableTaskRecoveryCollection.Name)]
-[TestSuite("BVT")]
+[TestSuite("SlowBVT")]
 [TestProvider("None")]
 [TestArea("DurableTasks")]
 public sealed class JsonDurableTaskFaultSchedulePropertyTests() : DurableTaskFaultSchedulePropertyTests(DurableTaskRecoveryFixture.Json);
 
 /// <summary>Runs random fault schedules with task state stored in the Orleans binary journal format.</summary>
 [Collection(DurableTaskRecoveryCollection.Name)]
-[TestSuite("BVT")]
+[TestSuite("SlowBVT")]
 [TestProvider("None")]
 [TestArea("DurableTasks")]
 public sealed class OrleansBinaryDurableTaskFaultSchedulePropertyTests() : DurableTaskFaultSchedulePropertyTests(DurableTaskRecoveryFixture.OrleansBinary);
