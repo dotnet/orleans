@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CsCheck" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Microsoft.Orleans.DurableTasks\Microsoft.Orleans.DurableTasks.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
