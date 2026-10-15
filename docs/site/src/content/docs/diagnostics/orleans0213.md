@@ -27,7 +27,7 @@ A durable task body observes the operations which it awaits: their results, thei
 - A failure to send escapes the body, so the task completes successfully, and the exception surfaces outside the task.
 - Durable operations which the code performs after its first `await` run after the body completed, outside the task's execution.
 
-For the replay model, see [Replay and determinism](../grains/durable-tasks.md#replay-and-determinism).
+For the rules and the replay model, see [Replay-safety rules](../grains/durable-tasks-replay-rules.md).
 
 ## How to fix violations
 
