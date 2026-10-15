@@ -139,7 +139,9 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
     /// </summary>
     /// <remarks>
     /// A job is outstanding from the end of the activity which scheduled it until an execution of it ends with the job
-    /// removed: completed, failed without a retry, or canceled. Rescheduled and retried runs keep it outstanding.
+    /// removed: completed, failed without a retry, or canceled. Rescheduled and retried runs keep it outstanding. A job
+    /// which is due at once can run and end before the activity which scheduled it ends, so a job which ended is
+    /// remembered and never becomes outstanding.
     /// </remarks>
     private sealed class MessagingWakeupTracker : IDisposable
     {
@@ -154,6 +156,7 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
 
         private readonly ActivityListener _listener;
         private readonly Dictionary<string, HashSet<string>> _outstanding = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _ended = new(StringComparer.Ordinal);
         private readonly List<(HashSet<string> Grains, TaskCompletionSource Idle)> _waiters = [];
 
         public MessagingWakeupTracker()
@@ -196,22 +199,27 @@ internal sealed class DurableTaskFaultHarness : IAsyncLifetime
             {
                 if (activity.OperationName == ScheduleActivity)
                 {
-                    if (!_outstanding.TryGetValue(target, out var jobs))
+                    if (!_ended.Contains(jobId))
                     {
-                        _outstanding[target] = jobs = new(StringComparer.Ordinal);
-                    }
+                        if (!_outstanding.TryGetValue(target, out var jobs))
+                        {
+                            _outstanding[target] = jobs = new(StringComparer.Ordinal);
+                        }
 
-                    jobs.Add(jobId);
+                        jobs.Add(jobId);
+                    }
                 }
                 else if (activity.OperationName == ExecuteActivity
-                    && activity.GetTagItem(StatusTag) is "completed" or "failed" or "cancellation_requested"
-                    && _outstanding.TryGetValue(target, out var jobs)
-                    && jobs.Remove(jobId))
+                    && activity.GetTagItem(StatusTag) is "completed" or "failed" or "cancellation_requested")
                 {
-                    foreach (var waiter in _waiters.Where(waiter => IsIdle(waiter.Grains)).ToList())
+                    _ended.Add(jobId);
+                    if (_outstanding.TryGetValue(target, out var jobs) && jobs.Remove(jobId))
                     {
-                        _waiters.Remove(waiter);
-                        waiter.Idle.TrySetResult();
+                        foreach (var waiter in _waiters.Where(waiter => IsIdle(waiter.Grains)).ToList())
+                        {
+                            _waiters.Remove(waiter);
+                            waiter.Idle.TrySetResult();
+                        }
                     }
                 }
             }
