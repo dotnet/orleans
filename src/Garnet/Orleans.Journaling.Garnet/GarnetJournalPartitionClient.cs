@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -24,24 +25,37 @@ internal sealed class GarnetJournalPartitionClient(
     internal const string ProviderName = "garnet";
     private static readonly TimeSpan MaxBackoff = TimeSpan.FromSeconds(1);
     private const string TransactionFailedMessage = "ERR Transaction failed.";
+    private const string BucketCountField = "bucket-count";
+    private const string InitializedField = "initialized";
     private readonly JournalStorageTelemetry _telemetry = telemetry ?? JournalStorageTelemetry.CreateForDirectConstruction();
 
     public IDatabase Database { get; } = database;
 
     public int BucketCount { get; } = bucketCount;
 
-    public async ValueTask<RedisResult[]> ExecuteAsync(string procedure, object[] args, CancellationToken cancellationToken)
+    public async ValueTask<RedisResult[]> ExecuteAsync(
+        string procedure,
+        object[] args,
+        CancellationToken cancellationToken,
+        StrongBox<bool>? ambiguous = null)
     {
         var stopwatch = Stopwatch.StartNew();
         var backoff = TimeSpan.FromMilliseconds(10);
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var remaining = operationTimeout - stopwatch.Elapsed;
+            if (remaining <= TimeSpan.Zero)
+            {
+                throw new TimeoutException($"Garnet journal procedure {procedure} did not complete within {operationTimeout}.");
+            }
+
             string reason;
             Exception exception;
             try
             {
-                var result = await Database.ExecuteAsync(procedure, args).WaitAsync(cancellationToken).ConfigureAwait(false);
+                // Bound each attempt by the remaining budget, so a stalled or late reply cannot outlive the operation.
+                var result = await Database.ExecuteAsync(procedure, args).WaitAsync(remaining, cancellationToken).ConfigureAwait(false);
                 return (RedisResult[]?)result is { Length: > 0 } values
                     ? values
                     : throw new InvalidOperationException($"Garnet journal procedure {procedure} returned an invalid response.");
@@ -56,11 +70,22 @@ internal sealed class GarnetJournalPartitionClient(
                 reason = "timeout";
                 exception = ex;
             }
+            catch (TimeoutException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                reason = "deadline";
+                exception = ex;
+            }
             catch (RedisServerException ex) when (string.Equals(ex.Message, TransactionFailedMessage, StringComparison.Ordinal))
             {
                 // The transaction did not run, for example because its locks were not acquired in time.
                 reason = "transaction";
                 exception = ex;
+            }
+
+            // Only a transaction which did not run has a known outcome; any other failure may follow a commit.
+            if (ambiguous is not null && reason != "transaction")
+            {
+                ambiguous.Value = true;
             }
 
             if (stopwatch.Elapsed + backoff >= operationTimeout)
@@ -80,21 +105,24 @@ internal sealed class GarnetJournalPartitionClient(
     /// Initializes a new partition so that it owns every bucket, or verifies an initialized partition's bucket count.
     /// </summary>
     /// <remarks>
-    /// Opening a bucket is idempotent, and the partition descriptor is written after every bucket is open, so a crash
-    /// during initialization is repaired by the next initialization.
+    /// The bucket count is claimed atomically before any bucket opens, so concurrent initializations with different
+    /// counts cannot both succeed. Opening a bucket is idempotent, and the partition is marked initialized only after
+    /// every bucket is open, so a crash during initialization is repaired by the next initialization.
     /// </remarks>
     public async Task EnsureSinglePartitionInitializedAsync(CancellationToken cancellationToken)
     {
+        await Database.HashSetAsync(GarnetJournalKeys.PartitionKey, BucketCountField, BucketCount, When.NotExists)
+            .WaitAsync(cancellationToken).ConfigureAwait(false);
         var descriptor = await Database.HashGetAllAsync(GarnetJournalKeys.PartitionKey).WaitAsync(cancellationToken).ConfigureAwait(false);
-        var bucketCountValue = descriptor.FirstOrDefault(entry => entry.Name == "bucket-count").Value;
-        if (!bucketCountValue.IsNull)
+        var bucketCountValue = descriptor.FirstOrDefault(entry => entry.Name == BucketCountField).Value;
+        if (!int.TryParse(bucketCountValue.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var claimed) || claimed != BucketCount)
         {
-            if (!int.TryParse(bucketCountValue.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var existing) || existing != BucketCount)
-            {
-                throw new InvalidOperationException(
-                    $"The Garnet journal partition was initialized with {bucketCountValue} buckets, but {BucketCount} are configured. The bucket count is fixed when a partition is initialized.");
-            }
+            throw new InvalidOperationException(
+                $"The Garnet journal partition was initialized with {bucketCountValue} buckets, but {BucketCount} are configured. The bucket count is fixed when a partition is initialized.");
+        }
 
+        if (descriptor.Any(entry => entry.Name == InitializedField))
+        {
             return;
         }
 
@@ -123,7 +151,7 @@ internal sealed class GarnetJournalPartitionClient(
 
         await Database.HashSetAsync(
             GarnetJournalKeys.PartitionKey,
-            [new("bucket-count", BucketCount), new("schema-version", GarnetJournalProtocol.CurrentSchemaVersion)]).WaitAsync(cancellationToken).ConfigureAwait(false);
+            [new(InitializedField, "1"), new("schema-version", GarnetJournalProtocol.CurrentSchemaVersion)]).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public static int GetStatus(RedisResult[] result)
