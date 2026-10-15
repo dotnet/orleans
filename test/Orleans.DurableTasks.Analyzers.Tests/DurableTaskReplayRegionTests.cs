@@ -183,6 +183,59 @@ public class DurableTaskReplayRegionTests
         """);
 
     [Fact]
+    public Task EveryJournaledCollectionIsGrainState() => AnalyzerVerifier.VerifyAsync($$"""
+        using Orleans.Runtime;
+
+        public class C
+        {
+        {{Members}}
+            private readonly IDurableList<int> _list = null!;
+            private readonly IDurableQueue<int> _queue = null!;
+            private readonly IDurableSet<int> _set = null!;
+            private readonly IDurableTaskCompletionSource<int> _completion = null!;
+            private readonly IDurableLog<int> _log = null!;
+            private readonly IPersistentState<int> _state = null!;
+
+            public async DurableTask<int> RunAsync()
+            {
+                {|ORLEANS0100:_list|}.Add(1);
+                {|ORLEANS0100:_queue|}.Enqueue(1);
+                {|ORLEANS0100:_set|}.Add(1);
+                {|ORLEANS0100:_completion|}.TrySetResult(1);
+                {|ORLEANS0100:_log|}.Append(1);
+                {|ORLEANS0100:_state|}.State = 1;
+
+                // A recorded effect appends once, and the tail appends with the task's result.
+                var sequence = DurableTask.Once("progress", () => _log.Append(2));
+                await Step(1).WithId("step");
+                return (int)(sequence + _log.Append(3));
+            }
+        }
+        """);
+
+    [Fact]
+    public Task CollectionChangesBeforeAnExternalAwaitInTheTailAreReported() => AnalyzerVerifier.VerifyAsync($$"""
+        public class C
+        {
+        {{Members}}
+            private readonly IDurableList<int> _list = null!;
+            private readonly IDurableSet<int> _set = null!;
+            private readonly IDurableLog<int> _log = null!;
+
+            public async DurableTask<int> StepAsync()
+            {
+                {|ORLEANS0103:_list.AddRange(new[] { 1, 2 })|};
+                {|ORLEANS0103:_set.UnionWith(new[] { 1, 2 })|};
+                {|ORLEANS0103:_set.ExceptWith(new[] { 3 })|};
+                {|ORLEANS0103:_log.Append(1)|};
+                {|ORLEANS0103:_log.TrimBefore(1)|};
+                await FetchAsync();
+                return (int)_log.Append(2);
+            }
+        }
+        """);
+
+    [Fact]
     public Task StateChangesBeforeAnExternalAwaitInTheTailAreReported() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {

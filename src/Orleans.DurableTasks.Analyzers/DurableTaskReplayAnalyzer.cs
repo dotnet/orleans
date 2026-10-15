@@ -895,8 +895,10 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             }
 
             private static bool IsMutating(IMethodSymbol method) =>
-                method.Name is "Add" or "Remove" or "Clear" or "Insert" or "RemoveAt" or "Enqueue" or "Dequeue" or "TryDequeue"
-                    or "TryAdd" or "TrySetResult" or "TrySetException" or "TrySetCanceled" or "WriteStateAsync" or "ClearStateAsync";
+                method.Name is "Add" or "AddRange" or "Remove" or "Clear" or "Insert" or "RemoveAt" or "Enqueue" or "Dequeue"
+                    or "TryDequeue" or "TryAdd" or "UnionWith" or "IntersectWith" or "ExceptWith" or "SymmetricExceptWith"
+                    or "Append" or "TrimBefore" or "TrySetResult" or "TrySetException" or "TrySetCanceled" or "WriteStateAsync"
+                    or "ClearStateAsync";
 
             private static string MemberName(IOperation operation) => operation switch
             {
