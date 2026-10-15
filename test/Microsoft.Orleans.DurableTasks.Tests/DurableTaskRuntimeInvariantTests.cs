@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Collections.Concurrent;
 using Orleans.DurableTasks;
+using Orleans.DurableTasks.Diagnostics;
 using Orleans.DurableTasks.Protocol;
 using Orleans.DurableTasks.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using NSubstitute;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
@@ -1777,6 +1779,14 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var first = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var secondStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var selectionWaits = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var selection = DurableTaskEvents.AllEvents.Subscribe(new EventObserver(evt =>
+        {
+            if (evt is DurableTaskEvents.SelectionWaitStarted && ReferenceEquals(evt.GrainContext, runtime.GrainContext))
+            {
+                selectionWaits.TrySetResult();
+            }
+        }));
         var request = CreateRequest(1, () => DurableTask.Run(async _ =>
         {
             var (index, result) = await DurableTask.WhenAny(
@@ -1799,9 +1809,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        // Complete the first candidate only once both candidates run, so the selection has found no winner and waits.
+        // Complete the first candidate only once both candidates run and the selection, which found no winner, waits.
         await secondStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-        await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
+        await selectionWaits.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         first.SetResult(7);
         var response = await runtime.GetScheduledTaskHandle(rootId)
             .WaitAsync(TestContext.Current.CancellationToken)
@@ -4317,14 +4327,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         return services.BuildServiceProvider().GetRequiredService<Serializer>();
     }
 
-    private static async Task WaitUntilAsync(Func<bool> predicate)
-    {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        while (!predicate())
-        {
-            await Task.Delay(10, timeout.Token);
-        }
-    }
+    private static Task WaitUntilAsync(Func<bool> predicate, [CallerArgumentExpression(nameof(predicate))] string? description = null) =>
+        StateChanges.WaitUntilAsync(predicate, description: description);
 
     private sealed class ShutdownProbeRuntime : IDurableTaskGrainRuntime
     {
@@ -4761,6 +4765,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 catch (Exception exception)
                 {
                     _failure = exception;
+                    StateChanges.Notify();
                     throw;
                 }
 
@@ -4771,6 +4776,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 }
 
                 AfterWriteCompleted?.Invoke(WriteCount);
+                StateChanges.Notify();
             }
             finally
             {

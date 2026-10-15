@@ -106,6 +106,9 @@ public abstract class DurableTaskActivationRecoveryTests(string journalFormatKey
         var grain = _fixture.Client.GetGrain<IDurableTaskRecoveryTestGrain>(Guid.NewGuid());
         var grainId = grain.GetGrainId();
 
+        // The Durable Jobs clock runs ahead of the grain's clock by more than the delay, so the delay's resume is due when
+        // the grain schedules it.
+        _fixture.JobClock.Advance(TimeSpan.FromHours(2));
         var scheduled = await grain.DelayThenComputeAsync(argument).WithId(rootId).ScheduleAsync(cancellationToken);
         var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
 
@@ -464,7 +467,7 @@ public sealed class DurableTaskRecoveryTestGrain(DurableTaskRecoveryProbe probe)
     public async DurableTask<int> DelayThenComputeAsync(int value)
     {
         probe.RecordLogicalTime(this.GetGrainId(), DurableTask.Current.UtcNow);
-        await DurableTask.Delay(TimeSpan.FromSeconds(1)).WithId("pause");
+        await DurableTask.Delay(TimeSpan.FromHours(1)).WithId("pause");
         return checked((value * 3) + 7);
     }
 

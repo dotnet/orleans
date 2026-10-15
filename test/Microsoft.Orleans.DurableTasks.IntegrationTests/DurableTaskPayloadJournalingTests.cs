@@ -33,6 +33,7 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
         var seed = Random.Shared.Next();
         var input = PayloadMarkers.Input(seed);
         var output = PayloadMarkers.Transform(input);
+        using var events = DurableTaskEventBarriers.Collect();
 
         var scheduled = await caller.CallAsync(worker.GetPrimaryKey(), seed).WithId("payload-call").ScheduleAsync(cancellationToken);
         var response = await scheduled.GetResponseAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
@@ -41,7 +42,7 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
 
         // The caller's inbox accepted the completion, so the callee's outbox retires it and deletes the task.
         var childId = TaskId.CreateRoot("payload-call").Child(PayloadCallerGrain.CallId);
-        await WaitUntilDeletedAsync(worker, childId);
+        await events.WaitForDeletedAsync(worker.GetGrainId(), childId);
 
         var callerJournal = await ReadJournalAsync(caller.GetGrainId());
         var workerJournal = await ReadJournalAsync(worker.GetGrainId());
@@ -74,32 +75,6 @@ public abstract partial class DurableTaskPayloadJournalingTests(string journalFo
         var workerJournal = await ReadJournalAsync(worker.GetGrainId());
         Assert.Equal(1, CountPayload(workerJournal, input));
         Assert.Equal(1, CountPayload(workerJournal, output));
-    }
-
-    private async Task WaitUntilDeletedAsync(IAddressable grain, TaskId taskId)
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var extension = grain.AsReference<IDurableTaskGrainExtension>();
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
-        while (true)
-        {
-            try
-            {
-                var retained = await extension.SubscribeOrPollAsync(taskId, new SubscribeOrPollOptions { PollTimeout = TimeSpan.Zero }, cancellationToken);
-                Assert.Equal(DurableTaskStatus.CompletedSuccessfully, retained.Status);
-            }
-            catch (DurableTaskNotFoundException)
-            {
-                return;
-            }
-
-            if (DateTime.UtcNow > deadline)
-            {
-                throw new TimeoutException($"Durable task '{taskId}' was not deleted after its completion was delivered.");
-            }
-
-            await Task.Delay(10, cancellationToken);
-        }
     }
 
     private async Task<byte[]> ReadJournalAsync(GrainId grainId)
