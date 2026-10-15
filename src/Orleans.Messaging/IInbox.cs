@@ -29,4 +29,13 @@ public interface IInbox
     /// Register sinks during construction or activation setup, before the grain receives messages.
     /// </remarks>
     IInbox Register(IInboxMessageSink sink);
+
+    /// <summary>Registers a source of durable work which the inbox's wake-up keeps reactivating the grain for.</summary>
+    /// <param name="source">The work source.</param>
+    /// <returns>This inbox.</returns>
+    /// <remarks>
+    /// See <see cref="IInboxWorkSource"/>. Register work sources during construction or activation setup, before the
+    /// grain activates.
+    /// </remarks>
+    IInbox Register(IInboxWorkSource source);
 }
