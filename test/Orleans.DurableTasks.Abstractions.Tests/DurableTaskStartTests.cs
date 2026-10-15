@@ -176,6 +176,37 @@ public class DurableTaskStartTests
     }
 
     [Fact]
+    public async Task HandlesNameTheTasksWhichTheirHostsStore()
+    {
+        var definition = new RootDefinition();
+        var context = new StartRecordingContext(TaskId.CreateRoot("starter"), targetTaskId: TaskId.CreateRoot("stored"));
+        var plain = new StartRecordingContext(TaskId.CreateRoot("starter"));
+        (TaskId Id, TaskId TargetTaskId)[] handles = [];
+
+        await RunAsync(context, async () =>
+        {
+            var scheduled = await definition.Detached().WithId("scheduled").ScheduleAsync();
+            var posted = definition.Detached().WithId("posted").Post();
+            handles = [(scheduled.Id, scheduled.TargetTaskId), (posted.Id, posted.TargetTaskId)];
+        });
+        await RunAsync(plain, async () =>
+        {
+            var scheduled = await definition.Detached().WithId("scheduled").ScheduleAsync();
+            handles = [.. handles, (scheduled.Id, scheduled.TargetTaskId)];
+        });
+
+        // A handle names the task which its host stores, and a host which stores the task under the handle's identifier
+        // names that.
+        Assert.Equal(
+            [
+                (TaskId.CreateRoot("scheduled"), TaskId.CreateRoot("stored")),
+                (TaskId.CreateRoot("posted"), TaskId.CreateRoot("stored")),
+                (TaskId.CreateRoot("scheduled"), TaskId.CreateRoot("scheduled")),
+            ],
+            handles);
+    }
+
+    [Fact]
     public async Task DetachedConfigurationsWithinAnExecutionHaveNoHandleOperations()
     {
         var context = new StartRecordingContext(TaskId.CreateRoot("starter"));
@@ -204,7 +235,11 @@ public class DurableTaskStartTests
     private static Task<DurableTaskResponse> RunAsync(StartRecordingContext context, Func<Task> body)
         => DurableTaskRuntimeHelper.RunAsync(DurableTask.Run(_ => body()), context).AsTask();
 
-    private sealed class StartRecordingContext(TaskId taskId, bool supportsPost = true, string? hostId = null) : DurableTaskContext(taskId)
+    private sealed class StartRecordingContext(
+        TaskId taskId,
+        bool supportsPost = true,
+        string? hostId = null,
+        TaskId? targetTaskId = null) : DurableTaskContext(taskId)
     {
         protected override string? HostId => hostId;
 
@@ -219,7 +254,7 @@ public class DurableTaskStartTests
             CancellationToken cancellationToken)
         {
             Starts.Add(("start", taskId, taskDefinition, options));
-            return new(new CompletedHandle(taskId));
+            return new(CreateHandle(taskId));
         }
 
         protected override IScheduledTaskHandle PostTask(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options)
@@ -230,8 +265,11 @@ public class DurableTaskStartTests
             }
 
             Starts.Add(("post", taskId, taskDefinition, options));
-            return new CompletedHandle(taskId);
+            return CreateHandle(taskId);
         }
+
+        private IScheduledTaskHandle CreateHandle(TaskId taskId) =>
+            targetTaskId is { } target ? new TargetedHandle(taskId, target) : new CompletedHandle(taskId);
 
         protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(
             TaskId taskId,
@@ -249,6 +287,19 @@ public class DurableTaskStartTests
     private sealed class CompletedHandle(TaskId taskId) : IScheduledTaskHandle
     {
         public TaskId TaskId => taskId;
+
+        public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
+
+        public ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
+
+        public ValueTask CancelAsync(CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    }
+
+    private sealed class TargetedHandle(TaskId taskId, TaskId targetTaskId) : IScheduledTaskHandle
+    {
+        public TaskId TaskId => taskId;
+
+        public TaskId TargetTaskId => targetTaskId;
 
         public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) => new(DurableTaskResponse.Completed);
 

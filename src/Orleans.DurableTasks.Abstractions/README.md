@@ -187,6 +187,11 @@ and `Exception` inspect the task synchronously, and `ScheduledTask<T>.GetResult(
 recorded failure or cancellation, as awaiting does. `TryGetResult(out value)` returns `true` with the result of a task
 which completed successfully. Before the handle observes the terminal response, `Status` is `Pending`.
 
+A handle's `Id` names the operation in the execution which started or observes the task, which combinators and replays
+address, and its `TargetTaskId` names the task on its host, which other parties address. The two are equal unless the
+host stores the task under another identifier: a detached task's handle reports its root ID, and a host can scope the
+tasks which callers invoke by the caller, through `IScheduledTaskHandle.TargetTaskId`.
+
 `DurableTask.ScheduleAll(inputs)` schedules every input concurrently, so a host can commit the batch in one write, and
 returns their handles in input order without waiting for results. `DurableTask.WhenAllCompleted(inputs)` also waits until
 every input is terminal and returns the handles, each with its observed outcome; an input's failure or cancellation
@@ -260,8 +265,8 @@ continues:
   host supplies through `DurableTaskContext.HostId`, such as its grain, so executions with the same ID
   on different hosts derive different root IDs. Starting it again under the same root ID, including
   during a replay, reaches the same task.
-- `ScheduleAsync()` returns once the task's host holds the task, so its ID can be handed to other
-  parties, which address it with lookups such as `GetDurableTask`. A start which its host rejects, for
+- `ScheduleAsync()` returns once the task's host holds the task, so its ID, the handle's `TargetTaskId`,
+  can be handed to other parties, which address it with lookups such as `GetDurableTask`. A start which its host rejects, for
   example because the ID already identifies another definition, fails.
 - `Post()` is synchronous: it stages the start, and the start commits with the caller's next durable
   write, together with the state changes which the calling code made, and is then delivered once.
