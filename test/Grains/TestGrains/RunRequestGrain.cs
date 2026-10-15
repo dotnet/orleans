@@ -76,9 +76,9 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
 
     public Task StartCustomInvokableRequest(string value)
     {
-        var completion = new ResponseCompletionSource<string?>();
-        ((IGrainBase)this).GrainContext.ReceiveLocalRequest(new CustomRequest(value), completion, default);
-        _pending = completion.AsValueTask().AsTask();
+        var request = new CustomRequest(value);
+        ((IGrainBase)this).GrainContext.ReceiveLocalRequest(request, default);
+        _pending = request.GetResultAsync();
         return Task.CompletedTask;
     }
 
@@ -236,66 +236,55 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
             RetainedInstances[key]);
 
     /// <summary>
-    /// Queues a custom request on the retained instance whose rejection queues a second request from within the completion.
+    /// Queues a custom request on the retained instance whose rejection queues a second request from within <see cref="ILocalRequest.Complete"/>.
     /// </summary>
     /// <returns>The number of times the first request completed and the second request's response.</returns>
     public static async Task<(int FirstCompletions, Response SecondResponse)> QueueChainedRequestsOnRetainedInstance(Guid key)
     {
         var context = ((IGrainBase)RetainedInstances[key]).GrainContext;
-        var second = new ChainingCompletion(context, next: null);
-        var first = new ChainingCompletion(context, second);
-        context.ReceiveLocalRequest(new CustomRequest("first"), first, default);
-        var secondResponse = await second.Response;
-        await first.Response;
+        var second = new CustomRequest("second");
+        var first = new CustomRequest("first", _ => context.ReceiveLocalRequest(second, default));
+        context.ReceiveLocalRequest(first, default);
+        var secondResponse = await second.Outcome;
+        await first.Outcome;
         return (first.Completions, secondResponse);
     }
 }
 
 /// <summary>
-/// A completion source which queues a request completed by <paramref name="next"/> each time it completes.
+/// A hand-written request delivered through <see cref="IGrainContext.ReceiveLocalRequest"/>, which records its outcome.
 /// </summary>
-internal sealed class ChainingCompletion(IGrainContext context, ChainingCompletion? next) : IResponseCompletionSource
-{
-    private readonly TaskCompletionSource<Response> _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private int _completions;
-
-    public Task<Response> Response => _response.Task;
-
-    public int Completions => Volatile.Read(ref _completions);
-
-    public void Complete(Response value)
-    {
-        Interlocked.Increment(ref _completions);
-        if (next is not null)
-        {
-            context.ReceiveLocalRequest(new CustomRequest("next"), next, default);
-        }
-
-        _response.TrySetResult(value);
-    }
-
-    public void Complete() => Complete(Orleans.Serialization.Invocation.Response.Completed);
-}
-
-/// <summary>
-/// A hand-written request delivered through <see cref="IGrainContext.ReceiveLocalRequest"/>.
-/// </summary>
-internal sealed class CustomRequest(string value, TaskCompletionSource<string?>? invoked = null) : Request<string?>
+internal sealed class CustomRequest(string value, Action<Response>? onComplete = null) : Request<string?>, ILocalRequest
 {
     public const string InterfaceName = "ICustomRequests";
     public const string MethodName = "Apply";
+    private readonly TaskCompletionSource<Response> _outcome = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private RunRequestGrainBase? _grain;
+    private int _completions;
+
+    public Task<Response> Outcome => _outcome.Task;
+
+    public int Completions => Volatile.Read(ref _completions);
+
+    public async Task<string?> GetResultAsync()
+    {
+        var response = await Outcome;
+        return response.Exception is { } exception ? throw exception : (string?)response.Result;
+    }
+
+    public bool Complete(Response response)
+    {
+        Interlocked.Increment(ref _completions);
+        onComplete?.Invoke(response);
+        _outcome.TrySetResult(response);
+        return true;
+    }
 
     public override object GetTarget() => _grain!;
 
     public override void SetTarget(ITargetHolder holder) => _grain = (RunRequestGrainBase?)holder.GetTarget();
 
-    protected override ValueTask<string?> InvokeInner()
-    {
-        var result = $"{value}:{_grain is not null}";
-        invoked?.TrySetResult(result);
-        return new(result);
-    }
+    protected override ValueTask<string?> InvokeInner() => new($"{value}:{_grain is not null}");
 
     public override void Dispose() { }
 
@@ -324,13 +313,10 @@ public sealed class MayInterleaveRunRequestGrain : RunRequestGrainBase, IMayInte
 {
     public static bool CanInterleave(IInvokable request) => request is CustomRequest;
 
-    public async Task<string?> RunCustomRequestDuringBlockingRequest(bool observeCompletion)
+    public Task<string?> RunCustomRequestDuringBlockingRequest()
     {
-        var invoked = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var completion = observeCompletion ? new ResponseCompletionSource<string?>() : null;
-        ((IGrainBase)this).GrainContext.ReceiveLocalRequest(new CustomRequest("custom", invoked), completion, default);
-
-        var result = await invoked.Task.WaitAsync(TimeSpan.FromSeconds(10));
-        return completion is null ? result : await completion.AsValueTask();
+        var request = new CustomRequest("custom");
+        ((IGrainBase)this).GrainContext.ReceiveLocalRequest(request, default);
+        return request.GetResultAsync().WaitAsync(TimeSpan.FromSeconds(10));
     }
 }

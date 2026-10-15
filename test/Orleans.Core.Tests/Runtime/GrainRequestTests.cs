@@ -115,7 +115,7 @@ public class GrainRequestTests
     }
 
     [Fact]
-    public async Task Reject_QueuedRequest_FaultsWithoutRunningCallback()
+    public async Task Complete_RejectedQueuedRequest_FaultsWithoutRunningCallback()
     {
         using var cancellation = new CancellationTokenSource();
         var callbackRan = false;
@@ -129,7 +129,7 @@ public class GrainRequestTests
             cancellation.Token);
         var exception = new OrleansMessageRejectionException("Rejected.");
 
-        ((ILocalRequest)request).Reject(exception);
+        ((ILocalRequest)request).Complete(Response.FromException(exception));
         cancellation.Cancel();
         await request.Invoke();
 
@@ -189,11 +189,11 @@ public class GrainRequestTests
     }
 
     [Fact]
-    public async Task CompletionSource_Complete_CompletesTask()
+    public async Task Complete_FilterResultWithoutCallback_CompletesTask()
     {
         var request = new GrainRequest<object?, string>((_, _) => Task.FromResult("unused"), null, TestContext.Current.CancellationToken);
 
-        ((IResponseCompletionSource)request).Complete(Response.FromResult("filtered"));
+        Assert.True(((ILocalRequest)request).Complete(Response.FromResult("filtered")));
 
         Assert.Equal("filtered", await request.Task.WaitAsync(Timeout, TestContext.Current.CancellationToken));
     }

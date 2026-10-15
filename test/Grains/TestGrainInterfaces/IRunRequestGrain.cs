@@ -65,7 +65,7 @@ public interface IMayInterleaveRunRequestGrain : IRunRequestGrain
     /// Queues a custom request and returns its result once it runs, which requires interleaving with a blocking request.
     /// </summary>
     [AlwaysInterleave]
-    Task<string?> RunCustomRequestDuringBlockingRequest(bool observeCompletion);
+    Task<string?> RunCustomRequestDuringBlockingRequest();
 }
 
 /// <summary>

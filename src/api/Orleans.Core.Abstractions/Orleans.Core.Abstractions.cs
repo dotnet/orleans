@@ -2635,7 +2635,7 @@ namespace Orleans.Runtime
         void Activate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken = default);
         void Deactivate(DeactivationReason deactivationReason, System.Threading.CancellationToken cancellationToken = default);
         void Migrate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken = default);
-        void ReceiveLocalRequest(Orleans.Serialization.Invocation.IInvokable request, Orleans.Serialization.Invocation.IResponseCompletionSource? completion, LocalRequestOptions options);
+        void ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options);
         void ReceiveMessage(object message);
         void Rehydrate(IRehydrationContext context);
         void SetComponent<TComponent>(TComponent? value)
@@ -2712,6 +2712,11 @@ namespace Orleans.Runtime
     public partial interface IGrainTimer : System.IDisposable
     {
         void Change(System.TimeSpan dueTime, System.TimeSpan period);
+    }
+
+    public partial interface ILocalRequest : Orleans.Serialization.Invocation.IInvokable, System.IDisposable
+    {
+        bool Complete(Orleans.Serialization.Invocation.Response response);
     }
 
     public partial interface IRehydrationContext

@@ -70,7 +70,7 @@ public sealed class GrainTimerTests
         RequestContext.Set("parent", new UncopyableContextValue());
         try
         {
-            var body = new object();
+            var body = Substitute.For<ILocalRequest>();
             var message = fixture.MessageFactory.CreateLocalRequest(fixture.Grain, body, interfaceType, new() { Interleave = interleave, KeepAlive = keepAlive });
 
             Assert.Same(body, message.BodyObject);
@@ -513,7 +513,7 @@ public sealed class GrainTimerTests
         private readonly ILogger _logger = Substitute.For<ILogger>();
         public TrackingTimeProvider Time { get; } = new();
         public IGrainContext Grain { get; } = Substitute.For<IGrainContext>();
-        public List<(IInvokable Request, LocalRequestOptions Options)> Requests { get; } = [];
+        public List<(ILocalRequest Request, LocalRequestOptions Options)> Requests { get; } = [];
         public List<GrainTimerEvents.TimerEvent> Events { get; } = [];
         public Action? BeforeReceive { get; set; }
         public MessageFactory MessageFactory { get; }
@@ -526,11 +526,10 @@ public sealed class GrainTimerTests
             loggerFactory.CreateLogger(Arg.Any<string>()).Returns(_logger);
             var grainId = GrainId.Create("timer-test", "one");
             Grain.GrainId.Returns(grainId);
-            Grain.When(context => context.ReceiveLocalRequest(Arg.Any<IInvokable>(), Arg.Any<IResponseCompletionSource?>(), Arg.Any<LocalRequestOptions>())).Do(call =>
+            Grain.When(context => context.ReceiveLocalRequest(Arg.Any<ILocalRequest>(), Arg.Any<LocalRequestOptions>())).Do(call =>
             {
-                Assert.Null(call[1]);
                 BeforeReceive?.Invoke();
-                Requests.Add(((IInvokable)call[0], (LocalRequestOptions)call[2]));
+                Requests.Add(((ILocalRequest)call[0], (LocalRequestOptions)call[1]));
             });
             Grain.Address.Returns(GrainAddress.GetAddress(SiloAddress.New(System.Net.IPAddress.Loopback, 11111, 1), grainId, ActivationId.NewId()));
             MessageFactory = new(_services.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, null!);
@@ -542,7 +541,7 @@ public sealed class GrainTimerTests
             TimeSpan period, bool interleave = false, bool keepAlive = false) =>
             Registry.RegisterGrainTimer(Grain, callback, state, new(dueTime, period) { Interleave = interleave, KeepAlive = keepAlive });
 
-        public async Task InvokeAsync((IInvokable Request, LocalRequestOptions Options) request, Exception? expectedException = null)
+        public async Task InvokeAsync((ILocalRequest Request, LocalRequestOptions Options) request, Exception? expectedException = null)
         {
             RequestContextExtensions.Import(null);
             var invokable = request.Request;

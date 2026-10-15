@@ -374,11 +374,9 @@ namespace Orleans.Runtime
         public List<IMayInterleavePredicate?> MayInterleavePredicates { get; } = new List<IMayInterleavePredicate?>();
         public bool MayInterleave(object? instance, Message message)
         {
-            // Predicates observe the request rather than its completion envelope.
-            var request = LocalRequestCompletion.GetRequest(message.BodyObject);
             foreach (var predicate in this.MayInterleavePredicates)
             {
-                if (predicate!.Invoke(instance!, request)) return true;
+                if (predicate!.Invoke(instance!, (IInvokable)message.BodyObject!)) return true;
             }
 
             return false;

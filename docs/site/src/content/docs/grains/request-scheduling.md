@@ -93,6 +93,6 @@ Set <xref:Orleans.Runtime.LocalRequestOptions.EnforceQueueLimit> to `true` to ap
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_queue_limit":::
 ### Deliver a custom request
 
-<xref:Orleans.Runtime.IGrainContext.ReceiveLocalRequest*> delivers any <xref:Orleans.Serialization.Invocation.IInvokable> to the activation with the same scheduling as `RunRequestAsync`. Call filters, logs, and traces observe the request's own interface name, method name, and arguments, so a custom request can describe the work to them. The activation completes the supplied <xref:Orleans.Serialization.Invocation.IResponseCompletionSource> with the request's response, or with an exception if the activation rejects the request:
+<xref:Orleans.Runtime.IGrainContext.ReceiveLocalRequest*> delivers an <xref:Orleans.Runtime.ILocalRequest> to the activation with the same scheduling as `RunRequestAsync`. Call filters, logs, and traces observe the request's own interface name, method name, and arguments, so a custom request can describe the work to them. The activation passes the request's response to <xref:Orleans.Runtime.ILocalRequest.Complete*>, or an exception if the activation rejects the request:
 
 :::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="receive_local_request":::

@@ -335,9 +335,16 @@ internal Task Ingest(int items, CancellationToken cancellationToken) =>
 
     // <receive_local_request>
 // A request which increments IngestGrain's counter. Call filters observe it as IIngestRequests.Increment.
-internal sealed class IncrementRequest : Request
+internal sealed class IncrementRequest : Request, ILocalRequest
 {
+    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private IngestGrain? _grain;
+
+    public Task Completion => _completion.Task;
+
+    // Receives the outcome once the request and its call filters complete, or when the activation rejects the request.
+    public bool Complete(Response response) =>
+        response.Exception is { } exception ? _completion.TrySetException(exception) : _completion.TrySetResult();
 
     public override object GetTarget() => _grain!;
 
@@ -364,12 +371,12 @@ internal sealed class IncrementRequest : Request
 
 public static class IngestRequests
 {
-    // Delivers the request to the activation and completes the returned task with its response.
-    public static ValueTask Increment(IGrainContext activation)
+    // Delivers the request to the activation and returns a task which completes with the request's outcome.
+    public static Task Increment(IGrainContext activation)
     {
-        var completion = new ResponseCompletionSource<object?>();
-        activation.ReceiveLocalRequest(new IncrementRequest(), completion, default);
-        return completion.AsVoidValueTask();
+        var request = new IncrementRequest();
+        activation.ReceiveLocalRequest(request, default);
+        return request.Completion;
     }
 }
     // </receive_local_request>

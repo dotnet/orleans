@@ -135,7 +135,7 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
 
 
     [Fact]
-    public async Task ReceiveLocalRequest_CustomInvokable_CompletesSeparateCompletionSource()
+    public async Task ReceiveLocalRequest_CustomRequest_ReceivesResponse()
     {
         var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
 
@@ -145,16 +145,14 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
         Assert.Contains("ICustomRequests.Apply", await grain.GetFilteredCalls());
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task ReceiveLocalRequest_MayInterleavePredicate_ObservesCustomRequest(bool observeCompletion)
+    [Fact]
+    public async Task ReceiveLocalRequest_MayInterleavePredicate_ObservesCustomRequest()
     {
         var grain = GrainFactory.GetGrain<IMayInterleaveRunRequestGrain>(Guid.NewGuid());
         await grain.StartBlockingRequest();
         await WaitForLogEntryAsync(grain, "request-start");
 
-        Assert.Equal("custom:True", await grain.RunCustomRequestDuringBlockingRequest(observeCompletion));
+        Assert.Equal("custom:True", await grain.RunCustomRequestDuringBlockingRequest());
 
         await grain.ReleaseBlockingRequest();
         await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken);

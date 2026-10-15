@@ -139,16 +139,11 @@ namespace Orleans.Runtime
         /// <summary>
         /// Creates the message which queues <paramref name="request"/> on <paramref name="target"/> as a local request.
         /// </summary>
-        public Message CreateLocalRequest(IGrainContext target, IInvokable request, IResponseCompletionSource? completion, LocalRequestOptions options)
+        public Message CreateLocalRequest(IGrainContext target, ILocalRequest request, LocalRequestOptions options)
         {
             ArgumentNullException.ThrowIfNull(request);
             var interfaceType = interfaceTypeResolver.GetGrainInterfaceType(request.GetInterfaceType());
-
-            // A request which is its own completion source reports its response directly.
-            object body = completion is null || ReferenceEquals(completion, request) && request is ILocalRequest
-                ? request
-                : new LocalRequestCompletion(request, completion);
-            return messageFactory.CreateLocalRequest(target, body, interfaceType, options);
+            return messageFactory.CreateLocalRequest(target, request, interfaceType, options);
         }
 
         public void SendRequest(
@@ -306,6 +301,8 @@ namespace Orleans.Runtime
 
         public async Task Invoke(IGrainContext target, Message message)
         {
+            // A local request is completed exactly once, even if completing it fails.
+            var localRequestCompleted = false;
             try
             {
                 // Don't process messages that have already timed out
@@ -325,10 +322,8 @@ namespace Orleans.Runtime
                 {
                     switch (message.BodyObject)
                     {
-                        case IInvokable body:
+                        case IInvokable invokable:
                             {
-                                // Call filters observe the request rather than its completion envelope.
-                                var invokable = LocalRequestCompletion.GetRequest(body);
                                 invokable.SetTarget(target);
 
                                 CancellationSourcesExtension.RegisterCancellationTokens(target, invokable);
@@ -357,12 +352,17 @@ namespace Orleans.Runtime
                     response = Response.FromException(exc1);
                 }
 
-                // Local requests report the response's exception through their tasks unless a filter failed after the callback completed.
-                var reportedByRequest = message.IsLocalOnly && message.BodyObject is ILocalRequest localRequest && localRequest.Complete(response);
+                // A local request reports its outcome to its own observers.
+                var reportedByRequest = false;
+                if (message.IsLocalOnly)
+                {
+                    localRequestCompleted = true;
+                    reportedByRequest = ((ILocalRequest)message.BodyObject!).Complete(response);
+                }
 
                 if (response.Exception is { } invocationException)
                 {
-                    // Callers observe two-way failures.
+                    // Callers observe two-way failures and failures which local requests report.
                     var logLevel = message.Direction != Message.Directions.OneWay || reportedByRequest ? LogLevel.Debug : LogLevel.Warning;
                     LogGrainInvokeException(this.invokeExceptionLogger, logLevel, invocationException, message);
 
@@ -396,7 +396,10 @@ namespace Orleans.Runtime
             catch (Exception exc2)
             {
                 LogWarningInvokeException(this.logger, exc2, message);
-                (message.BodyObject as ILocalRequest)?.Reject(exc2);
+                if (message.IsLocalOnly && !localRequestCompleted)
+                {
+                    ((ILocalRequest)message.BodyObject!).Complete(Response.FromException(exc2));
+                }
 
                 if (message.Direction != Message.Directions.OneWay)
                 {

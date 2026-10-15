@@ -10,12 +10,12 @@ namespace Orleans.Runtime;
 /// A request queued on an activation by <see cref="GrainBaseExtensions.RunRequestAsync(IGrainBase, Func{CancellationToken, Task}, CancellationToken)"/>.
 /// </summary>
 /// <remarks>
-/// The request is its own completion source, so queuing a request allocates only this object and its message.
+/// The request receives its own response, so queuing a request allocates only this object and its message.
 /// Cancellation applies while the request is queued. Once the callback starts, the task reflects the callback's outcome.
 /// When a call filter completes the invocation without running the callback, the task reflects the filter's outcome.
 /// Call filters observe the request as <see cref="IGrainRequestInvoker.RunRequestAsync"/>.
 /// </remarks>
-internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResult>, IInvokable, IGrainRequestInvoker, ILocalRequest, IResponseCompletionSource
+internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResult>, IGrainRequestInvoker, ILocalRequest
 {
     private readonly Func<TState, CancellationToken, Task> _callback;
     private readonly TState _state;
@@ -112,9 +112,6 @@ internal sealed class GrainRequest<TState, TResult> : TaskCompletionSource<TResu
         return true;
     }
 
-    void IResponseCompletionSource.Complete(Response value) => ((ILocalRequest)this).Complete(value);
-
-    void IResponseCompletionSource.Complete() => ((ILocalRequest)this).Complete(Response.Completed);
 
     public object? GetTarget() => this;
 
@@ -161,21 +158,4 @@ internal interface IGrainRequestInvoker
     /// Runs the request callback.
     /// </summary>
     Task RunRequestAsync(CancellationToken cancellationToken = default);
-}
-
-/// <summary>
-/// A local-only request whose task reports its outcome to the code which queued it.
-/// </summary>
-internal interface ILocalRequest
-{
-    /// <summary>
-    /// Completes the request with <paramref name="response"/> if the request has not already completed.
-    /// </summary>
-    /// <returns><see langword="true"/> if the request's task reports the response's exception, if any.</returns>
-    bool Complete(Response response);
-
-    /// <summary>
-    /// Completes the request with <paramref name="exception"/> if the request has not already completed.
-    /// </summary>
-    void Reject(Exception exception) => Complete(Response.FromException(exception));
 }

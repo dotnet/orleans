@@ -498,11 +498,7 @@ internal sealed partial class ActivationData :
                 // Local-only messages are not allowed to escape the activation.
                 if (message.IsLocalOnly)
                 {
-                    if (message.BodyObject is ILocalRequest request)
-                    {
-                        (rejectedLocalRequests ??= []).Add((request, new OrleansMessageRejectionException($"Activation {this} is no longer valid.")));
-                    }
-
+                    (rejectedLocalRequests ??= []).Add(((ILocalRequest)message.BodyObject!, new OrleansMessageRejectionException($"Activation {this} is no longer valid.")));
                     continue;
                 }
 
@@ -1156,7 +1152,7 @@ internal sealed partial class ActivationData :
                 {
                     foreach (var (request, exception) in rejectedLocalRequests)
                     {
-                        request.Reject(exception);
+                        request.Complete(Response.FromException(exception));
                     }
                 }
             }
@@ -1242,9 +1238,9 @@ internal sealed partial class ActivationData :
                         {
                             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
                         }
-                        else if (message.BodyObject is ILocalRequest request)
+                        else
                         {
-                            (rejectedLocalRequests ??= []).Add((request, exception));
+                            (rejectedLocalRequests ??= []).Add(((ILocalRequest)message.BodyObject!, exception));
                         }
 
                         _waitingRequests.RemoveAt(i);
@@ -1688,9 +1684,9 @@ internal sealed partial class ActivationData :
         }
     }
 
-    public void ReceiveLocalRequest(IInvokable request, IResponseCompletionSource? completion, LocalRequestOptions options)
+    public void ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options)
     {
-        var message = _shared.InternalRuntime.RuntimeClient.CreateLocalRequest(this, request, completion, options);
+        var message = _shared.InternalRuntime.RuntimeClient.CreateLocalRequest(this, request, options);
         _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveMessage(message);
         ReceiveRequest(message, options.EnforceQueueLimit);
     }
@@ -1739,7 +1735,7 @@ internal sealed partial class ActivationData :
             var overloadException = new LimitExceededException(limitName, count, hardLimit, ToString());
             if (message.IsLocalOnly)
             {
-                (message.BodyObject as ILocalRequest)?.Reject(overloadException);
+                ((ILocalRequest)message.BodyObject!).Complete(Response.FromException(overloadException));
             }
             else
             {

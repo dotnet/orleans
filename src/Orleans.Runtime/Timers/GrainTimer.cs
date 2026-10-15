@@ -103,7 +103,7 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         try
         {
-            _grainContext.ReceiveLocalRequest(_invoker, completion: null, _options);
+            _grainContext.ReceiveLocalRequest(_invoker, _options);
         }
         catch (Exception exception)
         {
@@ -289,7 +289,7 @@ internal abstract partial class GrainTimer : IGrainTimer
 
     public override string ToString() => $"[{GetType()}] Grain: '{_grainContext}'";
 
-    private sealed class TimerTickInvoker(GrainTimer timer) : IInvokable, IGrainTimerInvoker
+    private sealed class TimerTickInvoker(GrainTimer timer) : ILocalRequest, IGrainTimerInvoker
     {
         public object? GetTarget() => this;
 
@@ -302,6 +302,9 @@ internal abstract partial class GrainTimer : IGrainTimer
         }
 
         public ValueTask<Response> Invoke() => timer.InvokeGrainTimerCallbackAsync();
+
+        // No caller observes a tick, so the runtime logs a failed tick.
+        public bool Complete(Response response) => false;
 
         // This method is declared for the sake of IGrainTimerCore, but it is not intended to be called directly.
         // It exists for grain call interceptors which inspect the implementation method.

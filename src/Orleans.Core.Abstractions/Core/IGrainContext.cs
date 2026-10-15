@@ -75,9 +75,6 @@ namespace Orleans.Runtime
         /// <param name="request">
         /// The request to invoke. Its <see cref="IInvokable.GetInterfaceType"/> method must return an interface type.
         /// </param>
-        /// <param name="completion">
-        /// The completion source which receives the request's response, or <see langword="null"/> if no caller observes the response.
-        /// </param>
         /// <param name="options">The options for the request.</param>
         /// <remarks>
         /// <para>
@@ -85,15 +82,12 @@ namespace Orleans.Runtime
         /// <paramref name="request"/>. It starts a new call chain and never leaves this instance.
         /// </para>
         /// <para>
-        /// <paramref name="completion"/> receives the response after the request and its call filters complete.
-        /// If this instance deactivates before the request starts, <paramref name="completion"/> receives an
-        /// <see cref="OrleansMessageRejectionException"/>. If <see cref="LocalRequestOptions.EnforceQueueLimit"/> is set and the
-        /// instance's queue exceeds the configured maximum number of enqueued requests, <paramref name="completion"/> receives a
-        /// <see cref="LimitExceededException"/>.
+        /// The instance passes the request's outcome to <see cref="ILocalRequest.Complete"/> after the request and its call filters complete,
+        /// or when it rejects the request.
         /// </para>
         /// </remarks>
         /// <exception cref="NotSupportedException">This instance does not support local requests.</exception>
-        void ReceiveLocalRequest(IInvokable request, IResponseCompletionSource? completion, LocalRequestOptions options)
+        void ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options)
             => throw new NotSupportedException($"{GetType()} does not support local requests.");
 
         /// <summary>

@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
 using Orleans.Timers;
 
 namespace Orleans
@@ -289,7 +290,7 @@ namespace Orleans
         /// If <see cref="LocalRequestOptions.EnforceQueueLimit"/> is set and the activation's queue exceeds the configured maximum number of enqueued requests,
         /// the returned task faults with <see cref="LimitExceededException"/>.
         /// To present the request to call filters and tracing with a different interface name, method name, or arguments,
-        /// queue a custom <see cref="Orleans.Serialization.Invocation.IInvokable"/> using <see cref="IGrainContext.ReceiveLocalRequest"/>.
+        /// queue a custom <see cref="ILocalRequest"/> using <see cref="IGrainContext.ReceiveLocalRequest"/>.
         /// </para>
         /// </remarks>
         public static Task<TResult> RunRequestAsync<TState, TResult>(this IGrainBase grain, Func<TState, CancellationToken, Task<TResult>> callback, TState state, LocalRequestOptions options, CancellationToken cancellationToken = default)
@@ -316,12 +317,12 @@ namespace Orleans
 #pragma warning restore CA2000 // Dispose objects before losing scope
             try
             {
-                grainContext.ReceiveLocalRequest(request, request, options);
+                grainContext.ReceiveLocalRequest(request, options);
             }
             catch (Exception exception)
             {
-                // Rejecting the request releases its cancellation registration and reports the failure through the returned task.
-                ((ILocalRequest)request).Reject(exception);
+                // Completing the request releases its cancellation registration and reports the failure through the returned task.
+                ((ILocalRequest)request).Complete(Response.FromException(exception));
             }
 
             return request.Task;
