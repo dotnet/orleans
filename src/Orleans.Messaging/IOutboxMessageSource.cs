@@ -28,7 +28,7 @@ namespace Orleans.Messaging;
 /// A source which can't provide a pending message after its send, for example because its stored payload no longer
 /// decodes, throws from <see cref="TryGetMessage"/>; an invalid message is handled the same way. The outbox then
 /// dead-letters that entry alone, without delivering it, and calls <see cref="OnRetired"/> with
-/// <see cref="OutboxMessageRetirement.DeadLettered"/>; the grain's messaging and its other messages are unaffected. Because no valid message exists, the dead letter's message carries only its
+/// <see cref="OutboxMessageRetirementStatus.DeadLettered"/>; the grain's messaging and its other messages are unaffected. Because no valid message exists, the dead letter's message carries only its
 /// <see cref="Envelope.MessageId"/>, with an empty payload and a default <see cref="OutboxMessage.ReceiverId"/>, and its
 /// reason records the failure.
 /// </para>
@@ -55,13 +55,13 @@ public interface IOutboxMessageSource
     /// message fails the send, and nothing is staged. Afterwards, the entry is durable: an exception or an invalid message,
     /// including one with a different <see cref="Envelope.MessageId"/> or addressed to the sending grain, dead-letters the
     /// entry with its failure as the reason, counting the failed materialization as a delivery attempt, and the outbox
-    /// then calls <see cref="OnRetired"/> with <see cref="OutboxMessageRetirement.DeadLettered"/>.
+    /// then calls <see cref="OnRetired"/> with <see cref="OutboxMessageRetirementStatus.DeadLettered"/>.
     /// </remarks>
     bool TryGetMessage(MessageId messageId, out OutboxMessage message);
 
     /// <summary>Notifies the source that the outbox retired a message, so the source can release its payload.</summary>
     /// <param name="messageId">The ID of the retired reference entry.</param>
-    /// <param name="retirement">Whether the receiver retired the message or the message was dead-lettered.</param>
+    /// <param name="retirement">How the message retired, and the dead letter's reason for a dead-lettered message.</param>
     /// <remarks>
     /// Stage the release synchronously in journaled state; it commits in the journal write which removes the entry.
     /// A dead-lettered message is materialized into the outbox dead letter before this call, unless the source failed to
@@ -72,14 +72,48 @@ public interface IOutboxMessageSource
 }
 
 /// <summary>Describes how an outbox message retired.</summary>
-public enum OutboxMessageRetirement
+/// <remarks>The outbox creates retirements; sources read them in <see cref="IOutboxMessageSource.OnRetired"/>.</remarks>
+public readonly struct OutboxMessageRetirement
+{
+    /// <summary>Gets how the message retired.</summary>
+    public OutboxMessageRetirementStatus Status { get; init; }
+
+    /// <summary>
+    /// Gets the dead letter's reason for a message which the receiver rejected or the outbox dead-lettered, such as the
+    /// rejection which the receiver reported; <see langword="null"/> for a delivered message.
+    /// </summary>
+    public string? Reason { get; init; }
+
+    /// <summary>Creates a retirement of a message which the receiver durably accepted or reported as a duplicate.</summary>
+    public static OutboxMessageRetirement Delivered() => new() { Status = OutboxMessageRetirementStatus.Delivered };
+
+    /// <summary>Creates a retirement of a message which the outbox dead-lettered for <paramref name="reason"/>.</summary>
+    public static OutboxMessageRetirement DeadLettered(string reason) => new()
+    {
+        Status = OutboxMessageRetirementStatus.DeadLettered,
+        Reason = reason
+    };
+
+    /// <summary>Creates a retirement of a message which the receiver dead-lettered for <paramref name="reason"/>.</summary>
+    public static OutboxMessageRetirement Rejected(string reason) => new()
+    {
+        Status = OutboxMessageRetirementStatus.Rejected,
+        Reason = reason
+    };
+}
+
+/// <summary>Describes how an outbox message retired.</summary>
+public enum OutboxMessageRetirementStatus
 {
     /// <summary>The receiver durably accepted the message, or reported it as a duplicate.</summary>
     Delivered = 1,
 
     /// <summary>
-    /// The receiver dead-lettered the message, or the outbox dead-lettered it after its retry limits elapsed or because
-    /// its source failed to provide it.
+    /// The outbox dead-lettered the message: its delivery attempts didn't succeed before its retry limits elapsed, or its
+    /// source failed to provide it.
     /// </summary>
-    DeadLettered = 2
+    DeadLettered = 2,
+
+    /// <summary>The receiver dead-lettered the message, with the reason which it reported.</summary>
+    Rejected = 3
 }

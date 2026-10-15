@@ -116,9 +116,10 @@ construction or activation setup, before journal recovery.
   delivery rule above applies. A source withdraws a pending message by returning
   `false`: the outbox removes the entry before its next attempt, without delivery or
   `OnRetired`, and an attempt already in flight still completes. When the message
-  retires, the outbox calls `OnRetired` with
-  `OutboxMessageRetirement.Delivered` (`Accepted` or `Duplicate`) or `DeadLettered`
-  (receiver-reported or outbox dead-lettering) while it stages the removal, so the
+  retires, the outbox calls `OnRetired` with an `OutboxMessageRetirement` whose
+  `Status` is `Delivered` (`Accepted` or `Duplicate`), `Rejected` (the receiver
+  dead-lettered it) or `DeadLettered` (the outbox dead-lettered it), and whose
+  `Reason` carries the dead letter's reason, while it stages the removal, so the
   source's changes commit in the same journal write. An outbox dead letter stores the
   materialized message. After the send, a source that throws or returns an invalid
   message, such as one with a different ID, dead-letters that entry alone in the

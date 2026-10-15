@@ -345,10 +345,26 @@ namespace Orleans.Messaging
         public readonly InboxMessage ToInboxMessage() { throw null; }
     }
 
-    public enum OutboxMessageRetirement
+    public readonly partial struct OutboxMessageRetirement
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public string? Reason { get { throw null; } init { } }
+
+        public OutboxMessageRetirementStatus Status { get { throw null; } init { } }
+
+        public static OutboxMessageRetirement DeadLettered(string reason) { throw null; }
+
+        public static OutboxMessageRetirement Delivered() { throw null; }
+
+        public static OutboxMessageRetirement Rejected(string reason) { throw null; }
+    }
+
+    public enum OutboxMessageRetirementStatus
     {
         Delivered = 1,
-        DeadLettered = 2
+        DeadLettered = 2,
+        Rejected = 3
     }
 }
 

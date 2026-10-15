@@ -39,7 +39,8 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Writes(sender).Length == 2);
         var senderState = await OnGrainAsync(sender, context => Grain(context).GetState());
         Assert.Empty(senderState.Outgoing);
-        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), Assert.Single(senderState.Retired).Value);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.Delivered), Assert.Single(senderState.Retired).Value);
+        Assert.Empty(await OnGrainAsync(sender, context => Grain(context).GetRetirementReasons()));
         // The outbox materializes the message once to validate the send and once for the delivery attempt.
         Assert.Equal(2, Probe.For(sender).Materializations);
 
@@ -49,7 +50,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
 
         // The retirement commits in the write which removes the outbox entry.
         var writes = Writes(sender);
-        var retirement = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirement.Delivered));
+        var retirement = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirementStatus.Delivered));
         Assert.True(writes[0].AsSpan().IndexOf(retirement) < 0);
         Assert.True(writes[1].AsSpan().IndexOf(retirement) >= 0);
 
@@ -110,8 +111,9 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
             Grain(context).GetState(),
             context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
         Assert.Empty(state.Outgoing);
-        Assert.Equal(nameof(OutboxMessageRetirement.DeadLettered), state.Retired[messageId.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.DeadLettered), state.Retired[messageId.ToString()]);
         var letter = Assert.Single(deadLetters);
+        Assert.Equal(letter.Reason, (await OnGrainAsync(sender, context => Grain(context).GetRetirementReasons()))[messageId.ToString()]);
         Assert.Equal(messageId, letter.Message.Envelope.MessageId);
         Assert.Equal(receiver.GetGrainId(), letter.Message.ReceiverId);
         Assert.Equal(payload, letter.Message.Envelope.Payload);
@@ -125,7 +127,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     }
 
     [Fact]
-    public async Task SourceMessage_DeadLetteredByTheReceiver_RetiresAsDeadLettered()
+    public async Task SourceMessage_DeadLetteredByTheReceiver_RetiresAsRejectedWithTheReceiversReason()
     {
         var sender = NewGrain();
         var receiver = NewGrain();
@@ -139,7 +141,8 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var (state, outboxDeadLetters) = await OnGrainAsync(sender, context => (
             Grain(context).GetState(),
             context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
-        Assert.Equal(nameof(OutboxMessageRetirement.DeadLettered), state.Retired[messageId.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.Rejected), state.Retired[messageId.ToString()]);
+        Assert.Equal(SourceSinkGrain.Rejection, (await OnGrainAsync(sender, context => Grain(context).GetRetirementReasons()))[messageId.ToString()]);
         Assert.Empty(state.Outgoing);
         Assert.Empty(outboxDeadLetters);
         var inboxLetter = Assert.Single(await OnGrainAsync(receiver, context =>
@@ -227,18 +230,21 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
             Grain(context).GetState(),
             context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
         Assert.Empty(state.Outgoing);
-        Assert.Equal(nameof(OutboxMessageRetirement.DeadLettered), state.Retired[failing.ToString()]);
-        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), state.Retired[first.ToString()]);
-        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), state.Retired[second.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.DeadLettered), state.Retired[failing.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.Delivered), state.Retired[first.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.Delivered), state.Retired[second.ToString()]);
         var received = (await OnGrainAsync(receiver, context => Grain(context).GetState())).Received;
         Assert.Equal(new[] { first.ToString(), second.ToString() }.Order(), received.Keys.Order());
         AssertSourceFailureDeadLetter(Assert.Single(deadLetters), failing, fault);
+        Assert.Equal(
+            Assert.Single(deadLetters).Reason,
+            Assert.Single(await OnGrainAsync(sender, context => Grain(context).GetRetirementReasons())).Value);
 
         // The dead letter and its retirement commit in one write, before the write which retires the delivered siblings.
         var writes = Writes(sender);
         Assert.Equal(3, writes.Length);
-        var deadLettered = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirement.DeadLettered));
-        var delivered = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirement.Delivered));
+        var deadLettered = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirementStatus.DeadLettered));
+        var delivered = Encoding.UTF8.GetBytes(nameof(OutboxMessageRetirementStatus.Delivered));
         Assert.True(writes[1].AsSpan().IndexOf(deadLettered) >= 0);
         Assert.True(writes[1].AsSpan().IndexOf(delivered) < 0);
         Assert.True(writes[2].AsSpan().IndexOf(deadLettered) < 0);
@@ -254,7 +260,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         var later = NewMessageId("later");
         await sender.StageFromSourceAsync(receiver.GetGrainId(), later, NewPayload(), write: true);
         await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 4);
-        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), (await OnGrainAsync(sender, context => Grain(context).GetState())).Retired[later.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.Delivered), (await OnGrainAsync(sender, context => Grain(context).GetState())).Retired[later.ToString()]);
         Assert.True(Cluster.TryGetGrainContext(sender.GetGrainId(), out var current));
         Assert.Same(activation, current);
         Assert.Equal(1, Probe.For(sender).Activations);
@@ -298,14 +304,14 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
             Grain(context).GetState(),
             context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters));
         Assert.Empty(state.Outgoing);
-        Assert.Equal(nameof(OutboxMessageRetirement.DeadLettered), state.Retired[messageId.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.DeadLettered), state.Retired[messageId.ToString()]);
         AssertSourceFailureDeadLetter(Assert.Single(deadLetters), messageId, SourceFault.Throw);
 
         // The activation keeps processing messages.
         var later = NewMessageId("after-recovered-failure");
         await grain.StageFromSourceAsync(receiver, later, NewPayload(), write: true);
         await WaitUntilAsync(grain, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 2);
-        Assert.Equal(nameof(OutboxMessageRetirement.Delivered), (await OnGrainAsync(grain, context => Grain(context).GetState())).Retired[later.ToString()]);
+        Assert.Equal(nameof(OutboxMessageRetirementStatus.Delivered), (await OnGrainAsync(grain, context => Grain(context).GetState())).Retired[later.ToString()]);
         Assert.Equal(1, Probe.For(grain).Activations);
     }
 
@@ -813,6 +819,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
     private readonly IDurableDictionary<string, string> _receivers;
     private readonly IDurableDictionary<string, byte[]> _received;
     private readonly IDurableDictionary<string, string> _retired;
+    private readonly IDurableDictionary<string, string> _reasons;
     private readonly SourceSinkProbe.Counters _probe;
 
     public SourceSinkGrain(
@@ -824,6 +831,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         [FromKeyedServices("receivers")] IDurableDictionary<string, string> receivers,
         [FromKeyedServices("received")] IDurableDictionary<string, byte[]> received,
         [FromKeyedServices("retired")] IDurableDictionary<string, string> retired,
+        [FromKeyedServices("reasons")] IDurableDictionary<string, string> reasons,
         SourceSinkProbe probe)
     {
         _manager = manager;
@@ -832,6 +840,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         _receivers = receivers;
         _received = received;
         _retired = retired;
+        _reasons = reasons;
         _probe = probe.For(context.GrainId);
         _probe.OnActivated();
         outbox.Register(this);
@@ -840,6 +849,9 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
 
     internal (Dictionary<string, byte[]> Outgoing, Dictionary<string, byte[]> Received, Dictionary<string, string> Retired) GetState() =>
         (new(_outgoing), new(_received), new(_retired));
+
+    /// <summary>Gets the reasons of this source's dead-lettered messages, by message ID.</summary>
+    internal Dictionary<string, string> GetRetirementReasons() => new(_reasons);
 
     /// <summary>Stores an outgoing message in the source's state without sending it.</summary>
     internal void StoreOutgoing(GrainId receiver, MessageId messageId, byte[] payload)
@@ -928,7 +940,8 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         var key = messageId.ToString();
         Assert.True(_outgoing.Remove(key));
         Assert.True(_receivers.Remove(key));
-        _retired[key] = retirement.ToString();
+        _retired[key] = retirement.Status.ToString();
+        if (retirement.Reason is { } reason) _reasons[key] = reason;
     }
 
     bool IInboxMessageSink.TryAccept(InboxMessage message, out DeliveryResult result)
