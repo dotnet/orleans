@@ -23,6 +23,12 @@ internal static class GarnetJournalKeys
     /// <summary>The key of the partition descriptor hash.</summary>
     public static readonly byte[] PartitionKey = "oj:partition"u8.ToArray();
 
+    /// <summary>
+    /// The partition descriptor field which claims the partition's identity: its map, partition id, and bucket count,
+    /// set only if absent before the partition opens any bucket.
+    /// </summary>
+    public const string IdentityField = "identity";
+
     /// <summary>The partition descriptor field holding the identity of the range map the partition belongs to.</summary>
     public const string MapIdField = "map-id";
 
