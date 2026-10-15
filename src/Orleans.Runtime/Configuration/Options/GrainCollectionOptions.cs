@@ -50,6 +50,7 @@ namespace Orleans.Configuration
         /// <remarks>
         /// The runtime awaits deactivation code to completion before it unregisters the activation and disposes the activation's services.
         /// Deactivation code observes the token and completes promptly once it is canceled.
+        /// The activation collector waits up to this period for each collection batch, then continues with subsequent passes while deactivation completes.
         /// </remarks>
         public TimeSpan DeactivationTimeout { get; set; } = DEFAULT_DEACTIVATION_TIMEOUT;
 

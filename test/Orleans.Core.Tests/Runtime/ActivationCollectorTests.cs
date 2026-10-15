@@ -8,7 +8,9 @@ using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Statistics;
+using Orleans.TestingHost.Diagnostics;
 using TestGrains;
 using Xunit;
 
@@ -165,6 +167,65 @@ namespace UnitTests.Runtime
             Assert.Same(registration, activation.CollectionRegistration);
             activation.Received(2).TryDeactivateForCollection(
                 Arg.Any<DeactivationReason>(), Arg.Any<DateTime>(), ageLimit, true, cancellationToken);
+        }
+
+        [Theory, TestCategory("Activation")]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task CollectionTimeout_AllowsLaterPassBeforeDeactivationCompletes(bool memoryPressure)
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var timeout = TimeSpan.FromSeconds(30);
+            var ageLimit = TimeSpan.FromMinutes(1);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var blocked = (ICollectibleGrainContext)PrepareActivation(ageLimit, collector);
+            blocked.GrainId.Returns(GrainId.Create("blocked-collection", Guid.NewGuid().ToString()));
+            blocked.Deactivated.Returns(release.Task);
+            collector.ScheduleCollection(blocked, ageLimit, timeProvider.GetUtcNow().UtcDateTime);
+            using var events = new DiagnosticEventCollector(ActivationCollectionEvents.ListenerName);
+            var blockedCompleted = WaitForCollection(blocked.GrainId);
+            timeProvider.Advance(ageLimit);
+            var collection = Collect();
+            try
+            {
+                Assert.False(collection.IsCompleted);
+                timeProvider.Advance(GrainCollectionOptions.DEFAULT_DEACTIVATION_TIMEOUT);
+                await collection.WaitAsync(timeout, cancellationToken);
+                Assert.False(release.Task.IsCompleted);
+                Assert.False(blockedCompleted.IsCompleted);
+
+                var other = (ICollectibleGrainContext)PrepareActivation(ageLimit, collector);
+                other.GrainId.Returns(GrainId.Create("later-collection", Guid.NewGuid().ToString()));
+                collector.ScheduleCollection(other, ageLimit, timeProvider.GetUtcNow().UtcDateTime);
+                var otherCompleted = WaitForCollection(other.GrainId);
+                timeProvider.Advance(ageLimit + TimeSpan.FromMinutes(1));
+                await Collect().WaitAsync(timeout, cancellationToken);
+                await otherCompleted;
+                other.Received(1).TryDeactivateForCollection(
+                    Arg.Any<DeactivationReason>(), Arg.Any<DateTime>(), Arg.Any<TimeSpan>(), Arg.Any<bool>(), cancellationToken);
+                Assert.False(blockedCompleted.IsCompleted);
+            }
+            finally
+            {
+                release.TrySetResult();
+                await collection.WaitAsync(timeout, cancellationToken);
+            }
+
+            await blockedCompleted;
+            Assert.Single(events.GetEvents(nameof(ActivationCollectionEvents.CollectionCompleted)),
+                evt => evt.Payload is ActivationCollectionEvents.CollectionCompleted batch
+                    && batch.Activations.Any(activation => activation.GrainId == blocked.GrainId));
+
+            Task Collect() => memoryPressure
+                ? collector.DeactivateInDueTimeOrder(1, cancellationToken)
+                : collector.CollectStaleActivations(cancellationToken);
+
+            Task WaitForCollection(GrainId grainId) => events.WaitForEventAsync(
+                nameof(ActivationCollectionEvents.CollectionCompleted),
+                evt => evt.Payload is ActivationCollectionEvents.CollectionCompleted batch
+                    && batch.Activations.Any(activation => activation.GrainId == grainId),
+                timeout,
+                cancellationToken);
         }
 
         [Theory, TestCategory("Activation")]

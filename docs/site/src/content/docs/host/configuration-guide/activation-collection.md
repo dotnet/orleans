@@ -132,6 +132,8 @@ Set container or process memory limits before tuning percentage thresholds. Leav
 
 Pass the token to state access and dependency calls so that callbacks complete promptly after cancellation. Keep these callbacks normally much faster than the timeouts.
 
+The activation collector waits up to the deactivation timeout for each batch, then continues collecting other idle activations. Activations with callbacks still running retain their services and registration until deactivation completes.
+
 ## Tune from measurements
 
 Track at least:

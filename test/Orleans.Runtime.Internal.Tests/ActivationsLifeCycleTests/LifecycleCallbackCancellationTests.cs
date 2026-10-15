@@ -1,10 +1,12 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.Diagnostics;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using Xunit;
 
@@ -32,8 +34,7 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
 
         // Deactivating during activation cancels the activation token, which is the token canceled by ActivationTimeout.
         probe.Context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Canceled during activation."), Cancellation);
-        await AssertCallbackAwaitedPastCancellation(probe);
-        Assert.False(call.IsCompleted);
+        await AssertCallbackAwaitedPastCancellation(probe, call);
 
         await call.WaitAsync(Timeout, Cancellation);
         Assert.True(probe.ScopeDisposed);
@@ -55,8 +56,7 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
         probe.Context.Deactivate(new(DeactivationReasonCode.ApplicationRequested, "Deactivation timeout test."), Cancellation);
         await probe.Entered.Task.WaitAsync(Timeout, Cancellation);
         var call = grain.Ping();
-        await AssertCallbackAwaitedPastCancellation(probe);
-        Assert.False(call.IsCompleted);
+        await AssertCallbackAwaitedPastCancellation(probe, call);
 
         await call.WaitAsync(Timeout, Cancellation);
         Assert.True(probe.ScopeDisposed);
@@ -65,9 +65,70 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
             fixture.GetTimeline(grain));
     }
 
-    private static async Task AssertCallbackAwaitedPastCancellation(LifecycleCallbackProbe probe)
+    [Theory]
+    [InlineData(false, LifecycleCallback.OnDeactivateAsync)]
+    [InlineData(true, LifecycleCallback.LifecycleStop)]
+    public async Task CollectionTimeout_AllowsLaterPassWhileCallbackRuns(bool memoryPressure, LifecycleCallback callback)
+    {
+        await using var isolated = new Fixture();
+        await isolated.InitializeAsync();
+        using var events = new DiagnosticEventCollector(ActivationCollectionEvents.ListenerName);
+        var collector = isolated.HostedCluster.Silos[0].ServiceProvider.GetRequiredService<ActivationCollector>();
+        var grain = isolated.GetGrain(callback);
+        await grain.Ping().WaitAsync(Timeout, Cancellation);
+        var probe = await isolated.ReadProbe(grain);
+        var completed = WaitForCollection(grain.GetGrainId());
+        var collection = Collect();
+        try
+        {
+            await probe.Entered.Task.WaitAsync(Timeout, Cancellation);
+            await probe.Canceled.Task.WaitAsync(Timeout, Cancellation);
+            isolated.CollectionTime.Advance(Fixture.DeactivationTimeout);
+            await collection.WaitAsync(Timeout, Cancellation);
+
+            Assert.False(probe.ScopeDisposed);
+            Assert.False(probe.Context.Deactivated.IsCompleted);
+            Assert.True(isolated.HostedCluster.TryGetGrainContext(grain.GetGrainId(), out var current));
+            Assert.Same(probe.Context, current);
+            Assert.False(completed.IsCompleted);
+
+            var other = isolated.GetGrain(LifecycleCallback.None);
+            await other.Ping().WaitAsync(Timeout, Cancellation);
+            var otherProbe = await isolated.ReadProbe(other);
+            var otherCompleted = WaitForCollection(other.GetGrainId());
+            await Collect().WaitAsync(Timeout, Cancellation);
+            await otherProbe.Context.Deactivated.WaitAsync(Timeout, Cancellation);
+            await otherCompleted;
+            Assert.True(otherProbe.ScopeDisposed);
+            Assert.False(probe.ScopeDisposed);
+            Assert.False(completed.IsCompleted);
+        }
+        finally
+        {
+            probe.Release.TrySetResult();
+            await collection.WaitAsync(Timeout, Cancellation);
+            await probe.Context.Deactivated.WaitAsync(Timeout, Cancellation);
+        }
+
+        await completed;
+        Assert.True(probe.ScopeDisposed);
+
+        Task Collect() => memoryPressure
+            ? collector.DeactivateInDueTimeOrder(1, Cancellation)
+            : collector.CollectActivations(TimeSpan.Zero, Cancellation);
+
+        Task WaitForCollection(GrainId grainId) => events.WaitForEventAsync(
+            nameof(ActivationCollectionEvents.CollectionCompleted),
+            evt => evt.Payload is ActivationCollectionEvents.CollectionCompleted batch
+                && batch.Activations.Any(activation => activation.GrainId == grainId),
+            Timeout,
+            Cancellation);
+    }
+
+    private static async Task AssertCallbackAwaitedPastCancellation(LifecycleCallbackProbe probe, Task call)
     {
         await probe.Canceled.Task.WaitAsync(Timeout, Cancellation);
+        Assert.False(call.IsCompleted);
 
         // Cancellation has already queued any runtime continuation on the activation scheduler, so release runs after it.
         probe.Context.Scheduler.QueueAction(() => probe.Release.SetResult());
@@ -79,6 +140,8 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
 
     public sealed class Fixture : BaseInProcessTestClusterFixture
     {
+        public static readonly TimeSpan DeactivationTimeout = TimeSpan.FromMilliseconds(1);
+        public FakeTimeProvider CollectionTime { get; } = new();
         private LifecycleCallbackRegistry Registry => HostedCluster.Silos[0].ServiceProvider.GetRequiredService<LifecycleCallbackRegistry>();
 
         public ILifecycleCallbackGrain GetGrain(LifecycleCallback callback)
@@ -100,7 +163,8 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
             {
                 silo.Services.AddSingleton<LifecycleCallbackRegistry>();
                 silo.Services.AddScoped<LifecycleCallbackProbe>();
-                silo.Services.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = TimeSpan.FromMilliseconds(1));
+                silo.Services.AddKeyedSingleton<TimeProvider>(TimeProviderNames.ActivationManagement, CollectionTime);
+                silo.Services.Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = DeactivationTimeout);
             });
         }
 
@@ -114,6 +178,7 @@ public class LifecycleCallbackCancellationTests(LifecycleCallbackCancellationTes
 
 public enum LifecycleCallback
 {
+    None,
     OnActivateAsync,
     LifecycleStart,
     OnDeactivateAsync,
