@@ -128,6 +128,8 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             Volatile.Write(ref _unreached, null);
             _reached = null;
         }
+
+        _runtime.OnReplayEnded(Id);
     }
 
     /// <summary>
