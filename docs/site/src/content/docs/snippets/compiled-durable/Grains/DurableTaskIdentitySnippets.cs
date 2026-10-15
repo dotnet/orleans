@@ -112,3 +112,80 @@ internal static class ReportClient
     }
     // </durable_tasks_identity_lookup>
 }
+
+// <durable_tasks_identity_store>
+public interface IPublisherGrain : IGrainWithStringKey
+{
+    DurableTask HandOffAsync(string reportId);
+
+    DurableTask<bool> AwaitArchiveAsync();
+
+    Task<DurableTaskStatus?> GetArchiveStatusAsync();
+
+    Task CancelArchiveAsync(string reason);
+}
+
+public sealed class PublisherGrain : DurableGrain, IPublisherGrain
+{
+    private readonly IDurableValue<DurableTaskAddress?> _archive;
+
+    public PublisherGrain() => _archive = StateManager.GetOrAddValue<DurableTaskAddress?>("archive");
+
+    public async DurableTask HandOffAsync(string reportId)
+    {
+        // A detached task is a root on the archive grain, so its handle has an address.
+        var archive = await GrainFactory.GetGrain<IArchiveGrain>("archive")
+            .ArchiveAsync(reportId, version: 1)
+            .Detached()
+            .ScheduleAsync();
+        archive.TryGetAddress(out var address);
+
+        // The synchronous tail: the address commits with this task's result.
+        _archive.Value = address;
+    }
+
+    // A durable task subscribes to the stored task, and the subscription is recorded for replay.
+    public async DurableTask<bool> AwaitArchiveAsync()
+    {
+        var archive = DurableTask.Once("archive", () => _archive.Value);
+        return archive is { } address && await GrainFactory.GetDurableTask<bool>(address).WithId("archived");
+    }
+
+    // An ordinary method polls or cancels the stored task through the same address.
+    public async Task<DurableTaskStatus?> GetArchiveStatusAsync() =>
+        _archive.Value is { } address
+            ? await GrainFactory.GetDurableTask<bool>(address).GetStatusAsync(new PollingOptions { PollTimeout = TimeSpan.Zero })
+            : null;
+
+    public async Task CancelArchiveAsync(string reason)
+    {
+        if (_archive.Value is { } address)
+        {
+            await GrainFactory.GetDurableTask<bool>(address).CancelAsync(reason);
+        }
+    }
+}
+// </durable_tasks_identity_store>
+
+internal static class ReportApi
+{
+    // <durable_tasks_identity_send>
+    // Returns the address to an HTTP caller: System.Text.Json writes {"Target":"report/q3","Id":"publish-q3"}.
+    public static async Task<DurableTaskAddress> StartPublishAsync(IClusterClient client, string reportId, string[] sections)
+    {
+        var publish = await client.GetGrain<IReportGrain>(reportId)
+            .PublishAsync(sections)
+            .WithId(ReportGrain.PublishTaskId(reportId))
+            .ScheduleAsync();
+        publish.TryGetAddress(out var address);
+        return address;
+    }
+
+    // A later request carries the address back, and signals, awaits, or cancels the task.
+    public static async Task<DurableSignalResult> ApproveAsync(IClusterClient client, DurableTaskAddress publish, bool approved) =>
+        await client.GetGrain(publish.Target).TrySignalDurableTaskAsync(publish.Id, ReportGrain.Approved, approved);
+
+    public static async Task<PublishReceipt> WaitAsync(IClusterClient client, DurableTaskAddress publish) =>
+        await client.GetDurableTask<PublishReceipt>(publish);
+    // </durable_tasks_identity_send>
+}
