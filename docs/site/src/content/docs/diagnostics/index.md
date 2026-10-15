@@ -9,6 +9,8 @@ ms.topic: reference
 
 Orleans analyzers detect unsupported RPC contracts, serialization schema problems, unsafe grain execution patterns, replay hazards in durable tasks, and compatibility changes. Select a diagnostic ID for its cause, impact, remediation, code-fix behavior, and suppression guidance.
 
+Durable task diagnostics ORLEANS0100 to ORLEANS0116 enforce the [replay-safety rules](../grains/durable-tasks-replay-rules.md) for durable task bodies.
+
 Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic ID as a URL fragment. The single redirect can therefore remain stable while this index and the detailed pages evolve.
 
 ## ORLEANS0001
