@@ -155,7 +155,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
 
         /// <summary>
         /// Returns whether a method in this compilation performs durable operations, judged from its source: it calls
-        /// <c>WithId</c>, <c>DetachAsync</c>, <c>ScheduleAsync</c>, or durable signal sends, or a static member of
+        /// <c>WithId</c>, <c>Post</c>, <c>ScheduleAsync</c>, or durable signal sends, or a static member of
         /// <c>DurableTask</c>.
         /// </summary>
         public bool IsDurableHelper(IMethodSymbol method) => _durableHelpers.GetOrAdd(method.OriginalDefinition, static method =>
@@ -197,7 +197,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         });
 
         private static bool IsDurableOperationName(string name) =>
-            name is "WithId" or "DetachAsync" or "ScheduleAsync" or "SignalDurableTaskAsync" or "TrySignalDurableTaskAsync";
+            name is "WithId" or "Post" or "ScheduleAsync" or "SignalDurableTaskAsync" or "TrySignalDurableTaskAsync";
 
         private static bool CallsReplaySafe(SyntaxNode value) =>
             value.DescendantNodesAndSelf().OfType<InvocationExpressionSyntax>().Any(static invocation => invocation.Expression switch
@@ -504,7 +504,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
         private bool IsDurableOperation(IOperation operation) => operation switch
         {
             IAwaitOperation await => IsDurableAwait(await),
-            IInvocationOperation invocation => symbols.IsOnce(invocation),
+            IInvocationOperation invocation => symbols.IsOnce(invocation) || DurableTaskSymbols.IsPost(invocation),
             _ => false,
         };
 
@@ -934,7 +934,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             private bool ContainsDurableOperationShallow(IOperation operation) => operation switch
             {
                 IAwaitOperation await => _analysis.IsDurableAwait(await),
-                IInvocationOperation invocation => Symbols.IsOnce(invocation),
+                IInvocationOperation invocation => Symbols.IsOnce(invocation) || DurableTaskSymbols.IsPost(invocation),
                 _ => false,
             };
 

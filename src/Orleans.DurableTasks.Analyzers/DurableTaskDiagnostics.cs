@@ -44,10 +44,10 @@ internal static class DurableTaskDiagnostics
 
     public static readonly DiagnosticDescriptor UnobservedDefinition = Create(
         "ORLEANS0105",
-        "Await or schedule durable task definitions",
-        "Await, schedule, or detach the durable task which '{0}' defines: a durable task runs only when it is awaited, scheduled, or detached",
+        "Await, schedule, or post durable task definitions",
+        "Await, schedule, or post the durable task which '{0}' defines: a durable task runs only when it is awaited, scheduled, or posted",
         DiagnosticSeverity.Warning,
-        "Calling a method which returns DurableTask creates a definition. The definition runs when it is awaited, scheduled with ScheduleAsync, or started with DetachAsync.");
+        "Calling a method which returns DurableTask creates a definition, and configuring it with WithId, Detached, or Shielded returns a configuration. The task runs when the definition is awaited, scheduled with ScheduleAsync, or started with Post.");
 
     public static readonly DiagnosticDescriptor ReusedDefinition = Create(
         "ORLEANS0106",
@@ -118,6 +118,13 @@ internal static class DurableTaskDiagnostics
         "Log through a logger which 'ReplaySafe()' returns: a replay re-runs this code and logs the event again",
         DiagnosticSeverity.Info,
         "A logger which ReplaySafe() returns skips events while the task replays, so each event is logged once.");
+
+    public static readonly DiagnosticDescriptor PostWithoutOutbox = Create(
+        "ORLEANS0116",
+        "Post durable tasks from grains or durable task bodies",
+        "Schedule '{0}' with ScheduleAsync: Post stages the start in the calling grain's durable outbox, and code outside grains and durable task bodies, such as a client, has none",
+        DiagnosticSeverity.Warning,
+        "Post stages a start in the durable outbox of the grain which runs the calling code, and the start commits with that grain's next durable write. Grains and durable task bodies run in a grain; other code, such as a client, schedules the task with ScheduleAsync, which completes once the task's host has accepted it.");
 
     private static DiagnosticDescriptor Create(
         string id,

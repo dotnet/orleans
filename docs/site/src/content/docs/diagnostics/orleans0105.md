@@ -1,11 +1,11 @@
 ---
-title: "ORLEANS0105: Await or schedule durable task definitions"
+title: "ORLEANS0105: Await, schedule, or post durable task definitions"
 description: Understand ORLEANS0105, which reports durable task code which creates a durable task definition which the code never observes.
 ms.date: 10/13/2026
 ms.topic: reference
 ---
 
-# ORLEANS0105: Await or schedule durable task definitions
+# ORLEANS0105: Await, schedule, or post durable task definitions
 
 | Property | Value |
 | --- | --- |
@@ -15,17 +15,17 @@ ms.topic: reference
 
 ## Cause
 
-Code calls a method which returns `DurableTask` or `DurableTask<TResult>` and discards the result.
+Code calls a method which returns `DurableTask` or `DurableTask<TResult>`, or configures one with `WithId`, `Detached`, or `Shielded`, and discards the result.
 
 ## Rule description
 
-Calling a method which returns `DurableTask` creates a definition. The definition runs when the code awaits it, schedules it with `ScheduleAsync`, or starts it with `DetachAsync`. A discarded definition never runs.
+Calling a method which returns `DurableTask` creates a definition, and configuring it returns a configuration. The task runs when the code awaits the definition, schedules it with `ScheduleAsync`, or starts it with `Post`. A discarded definition never runs.
 
 For the replay model, see [Writing replay-safe workflows](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#writing-replay-safe-workflows).
 
 ## How to fix violations
 
-Await the definition to run it as a child, schedule it to observe it later, or detach it to start a task which runs independently. For examples, see [Detached tasks](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#detached-tasks).
+Await the definition to run it and observe its result, schedule it with `ScheduleAsync` to observe it later through its handle, or post it with `Post` to start it with the caller's next durable write. A detached task, `.Detached().Post()`, runs independently of its starter. For the options, see [Starting and observing tasks](https://github.com/dotnet/orleans/blob/main/src/Orleans.DurableTasks.Abstractions/README.md#starting-and-observing-tasks).
 
 ## When to suppress
 

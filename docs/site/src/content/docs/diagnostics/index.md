@@ -141,7 +141,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0105
 
-[Await or schedule durable task definitions](orleans0105.md) â€” Warning. Durable task code creates a durable task definition which the code never observes.
+[Await, schedule, or post durable task definitions](orleans0105.md) â€” Warning. Durable task code creates a durable task definition which the code never observes.
 
 ## ORLEANS0106
 
@@ -182,3 +182,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0115
 
 [Log through a replay-safe logger](orleans0115.md) â€” Info. Durable task code logs through a logger which replays.
+
+## ORLEANS0116
+
+[Post durable tasks from grains or durable task bodies](orleans0116.md) â€” Warning. Code outside grains and durable task bodies posts a durable task.

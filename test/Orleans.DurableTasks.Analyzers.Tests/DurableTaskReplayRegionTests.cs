@@ -24,7 +24,7 @@ public class DurableTaskReplayRegionTests
 
     [Fact]
     public Task CanonicalWorkflowReportsNothing() => AnalyzerVerifier.VerifyAsync($$"""
-        public class OrderGrain
+        public class OrderGrain : Orleans.Grain
         {
         {{Members}}
             private readonly ILogger _log;
@@ -34,7 +34,7 @@ public class DurableTaskReplayRegionTests
             public async DurableTask<int> PlaceOrderAsync(string buyerId, int[] lines)
             {
                 var summary = DurableTask.Once("submit", () => SetStatus(1));
-                await RecordAsync(buyerId, summary);
+                Record(buyerId, summary);
                 _log.LogInformation("Submitted at {Time}", DateTime.UtcNow);
                 bool[] confirmed;
                 try
@@ -55,7 +55,7 @@ public class DurableTaskReplayRegionTests
 
                 await Shipped.WaitAsync();
                 summary = DurableTask.Once("ship", () => SetStatus(3));
-                await RecordAsync(buyerId, summary);
+                Record(buyerId, summary);
 
                 // The tail runs once, with the run which completes the body.
                 _status.Value = summary;
@@ -75,16 +75,14 @@ public class DurableTaskReplayRegionTests
 
             private async Task<int> CancelOrderAsync(string buyerId)
             {
-                using (DurableTask.Current.SuppressCancellation())
-                {
-                    var summary = DurableTask.Once("cancel", () => SetStatus(4));
-                    await RecordAsync(buyerId, summary);
-                    return summary;
-                }
+                var summary = DurableTask.Once("cancel", () => SetStatus(4));
+                await Step(summary).WithId("release").Shielded();
+                Record(buyerId, summary);
+                return summary;
             }
 
-            private ValueTask RecordAsync(string buyerId, int summary) =>
-                DurableTask.FromResult(summary).DetachAsync($"buyer-{buyerId}-v{summary}");
+            private static void Record(string buyerId, int summary) =>
+                DurableTask.FromResult(summary).Detached().WithId($"buyer-{buyerId}-v{summary}").Post();
 
             private static DurableTask<bool> Reserve(int line) => DurableTask.FromResult(line > 0);
         }
@@ -175,12 +173,12 @@ public class DurableTaskReplayRegionTests
                 var fetched = {|ORLEANS0102:await FetchAsync()|};
                 {|ORLEANS0111:await Task.Delay(1000)|};
                 await Task.Yield();
-                await DetachHelperAsync();
+                await ScheduleHelperAsync();
                 await Step(fetched).WithId("first");
                 return await FetchAsync();
             }
 
-            private ValueTask DetachHelperAsync() => Step(1).DetachAsync("detached");
+            private Task<ScheduledTask<int>> ScheduleHelperAsync() => Step(1).Detached().ScheduleAsync();
         }
         """);
 
@@ -288,7 +286,7 @@ public class DurableTaskReplayRegionTests
                 var status = _status.Value;
                 var id = Guid.NewGuid();
                 await FetchAsync();
-                await Step(status).ScheduleAsync(id.ToString());
+                await Step(status).WithId(id.ToString()).ScheduleAsync();
                 return status;
             }
         }

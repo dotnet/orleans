@@ -10,7 +10,7 @@ ORLEANS0101 | Usage | Warning | DurableTaskReplayAnalyzer, non-deterministic val
 ORLEANS0102 | Usage | Warning | DurableTaskReplayAnalyzer, external await in code which a replay re-runs
 ORLEANS0103 | Usage | Warning | DurableTaskReplayAnalyzer, grain state changed before an external await
 ORLEANS0104 | Usage | Warning | DurableTaskReplayAnalyzer, DurableTask.Once effect assigns a captured variable
-ORLEANS0105 | Usage | Warning | DurableTaskDefinitionAnalyzer, durable task definition never awaited, scheduled, or detached
+ORLEANS0105 | Usage | Warning | DurableTaskDefinitionAnalyzer, durable task definition never awaited, scheduled, or posted
 ORLEANS0106 | Usage | Warning | DurableTaskDefinitionAnalyzer, single-use durable task definition run more than once
 ORLEANS0107 | Usage | Error | DurableTaskReplayAnalyzer, durable operation name contains '$'
 ORLEANS0108 | Usage | Warning | DurableTaskReplayAnalyzer, durable operation name repeated at another call site
@@ -21,3 +21,4 @@ ORLEANS0112 | Usage | Info | DurableTaskReplayAnalyzer, cancellation handler wit
 ORLEANS0113 | Usage | Warning | DurableTaskReplayAnalyzer, async void code in a durable task body
 ORLEANS0114 | Usage | Info | DurableTaskReplayAnalyzer, repeated wait for one signal name
 ORLEANS0115 | Usage | Info | DurableTaskReplayAnalyzer, log in code which a replay re-runs
+ORLEANS0116 | Usage | Warning | DurableTaskDefinitionAnalyzer, durable task posted outside grains and durable task bodies
