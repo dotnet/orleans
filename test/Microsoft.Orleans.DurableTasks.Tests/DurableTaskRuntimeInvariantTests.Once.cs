@@ -30,7 +30,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.Equal(reference, storage.Get(taskId).Result!.GetResult<Guid>());
 
         // Delivering the task's completion deletes its tree, which holds the effect's record.
-        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)runtime).OnRetired(Assert.Single(transport.Completions).MessageId, OutboxMessageRetirement.Delivered());
 
         Assert.False(storage.Contains(taskId));
         Assert.False(storage.Contains(effectId));
