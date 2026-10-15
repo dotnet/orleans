@@ -159,7 +159,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
             protected override void ConfigureOptions(DurableMessagingOptions options)
             {
                 base.ConfigureOptions(options);
-                options.MaxProcessingAttempts = 5;
+                options.InboxRetryTimeout = TimeSpan.FromHours(4);
                 options.RetryInitialInterval = TimeSpan.FromHours(1);
                 options.DeduplicationWindow = TimeSpan.FromDays(7);
             }

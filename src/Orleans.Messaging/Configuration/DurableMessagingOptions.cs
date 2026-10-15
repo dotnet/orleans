@@ -110,6 +110,21 @@ public class DurableMessagingOptions
     /// </value>
     public TimeSpan RetryInitialInterval { get; set; } = TimeSpan.FromSeconds(1);
 
+    /// <summary>
+    /// Gets or sets how long the inbox retries a message whose handler attempts throw before the message is
+    /// dead-lettered.
+    /// </summary>
+    /// <remarks>
+    /// The timeout starts with the first failed attempt, and the last attempt runs when it elapses. A handler exception
+    /// leaves the message's outcome unknown, so retries span transient faults, such as outages and deployments which
+    /// fix a bug; a handler calls <c>IInboxHandlerContext.Fail</c> to dead-letter a message at once. A retrying message
+    /// keeps its place in <see cref="MaxCapacity"/>.
+    /// </remarks>
+    /// <value>
+    /// Must be greater than or equal to <see cref="TimeSpan.Zero"/>, which dead-letters a message at its first failure.
+    /// Defaults to 6 hours.
+    /// </value>
+    public TimeSpan InboxRetryTimeout { get; set; } = TimeSpan.FromHours(6);
 
     /// <summary>
     /// Gets or sets how long after a message's send time the outbox attempts delivery before it dead-letters the
@@ -195,6 +210,10 @@ public class DurableMessagingOptions
                 $"RetryInitialInterval must be less than or equal to {MaxSupportedRetryDelay}.");
         }
 
+        if (InboxRetryTimeout < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(InboxRetryTimeout), InboxRetryTimeout, "InboxRetryTimeout must be greater than or equal to TimeSpan.Zero.");
+        }
 
         if (OutboxRetryTimeout <= TimeSpan.Zero)
         {

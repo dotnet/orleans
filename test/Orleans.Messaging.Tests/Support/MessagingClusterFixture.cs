@@ -249,7 +249,7 @@ public class MessagingClusterFixture : IAsyncLifetime
         options.MaxCapacity = 2;
         options.DeduplicationWindow = TimeSpan.FromMinutes(10);
         options.OutboxRetryTimeout = TimeSpan.FromSeconds(3);
-        options.MaxProcessingAttempts = 1;
+        options.InboxRetryTimeout = TimeSpan.Zero;
         options.MaxRetainedDeadLetters = 2;
         options.DeadLetterRetentionPeriod = TimeSpan.FromHours(1);
         options.RetryInitialInterval = TimeSpan.FromMilliseconds(25);
@@ -282,7 +282,7 @@ public sealed class InboxCapacityClusterFixture : MessagingClusterFixture
     {
         base.ConfigureOptions(options);
         options.MaxCapacity = 1;
-        options.MaxProcessingAttempts = 2;
+        options.InboxRetryTimeout = TimeSpan.FromHours(1);
         options.RetryInitialInterval = TimeSpan.FromHours(1);
     }
 }
