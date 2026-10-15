@@ -349,15 +349,31 @@ public abstract class DurableTaskContext
     }
 
     /// <summary>
+    /// Gets the identity of the host which runs this execution, such as its grain, which qualifies the root identifiers of
+    /// the detached tasks which the execution starts without a name, or <see langword="null"/> for none.
+    /// </summary>
+    /// <remarks>
+    /// A task identifier is unique within its host, so executions on two hosts can share one. A host whose executions
+    /// start detached tasks on targets which other hosts also start tasks on supplies its identity, so the executions'
+    /// derived root identifiers differ.
+    /// </remarks>
+    protected internal virtual string? HostId => null;
+
+    /// <summary>
     /// Creates the root identifier of a detached task which this execution starts without a name:
-    /// <c>{Id}:{segment}</c>, where <c>{segment}</c> is the identifier which <see cref="CreateChildTaskId(string)"/>
-    /// generates for the next unnamed operation.
+    /// <c>{HostId}/{Id}:{segment}</c>, or <c>{Id}:{segment}</c> for a host without an identity, where <c>{segment}</c> is
+    /// the identifier which <see cref="CreateChildTaskId(string)"/> generates for the next unnamed operation.
     /// </summary>
     /// <remarks>
     /// The segment comes from the count which unnamed children share, so a replay which starts unnamed operations in the
-    /// same order derives the same root identifier, and other parties derive it from this execution's identifier.
+    /// same order derives the same root identifier, and other parties derive it from the host's identity and this
+    /// execution's identifier. A named detached task's root identifier is its name.
     /// </remarks>
-    internal TaskId CreateDetachedRootId() => TaskId.CreateRoot($"{Id}:{CreateChildTaskId(name: null).LastSegment}");
+    internal TaskId CreateDetachedRootId()
+    {
+        var root = $"{Id}:{CreateChildTaskId(name: null).LastSegment}";
+        return TaskId.CreateRoot(HostId is { } hostId ? $"{hostId}/{root}" : root);
+    }
 
     internal TaskId CreateOperationId(string kind)
         => Id.Child($"${kind}-{Interlocked.Increment(ref _nextOperationId).ToString(CultureInfo.InvariantCulture)}");
