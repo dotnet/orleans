@@ -273,7 +273,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ValidateChild(taskId, task);
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         var handle = await _runtime.ScheduleChildAsync(taskId, task, shielded, waitForAcceptance, executionCts.Token);
-        return new ExecutionTaskHandle(handle, this);
+        return CreateExecutionHandle(handle);
     }
 
     private async ValueTask<IScheduledTaskHandle> StartDetachedCoreAsync(
@@ -287,7 +287,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfDeleted();
         using var executionCts = CreateExecutionCancellationSource(cancellationToken);
         var handle = await _runtime.StartDetachedAsync(recordId, rootId, request, shielded, waitForAcceptance, executionCts.Token);
-        return new ExecutionTaskHandle(handle, this);
+        return CreateExecutionHandle(handle);
     }
 
     /// <remarks>
@@ -309,12 +309,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         {
             var (recordId, request) = GetDetachedRecord(taskId, task);
             ThrowIfDeleted();
-            return new ExecutionTaskHandle(_runtime.PostDetached(recordId, taskId, request, shielded), this);
+            return CreateExecutionHandle(_runtime.PostDetached(recordId, taskId, request, shielded));
         }
 
         ObserveOperation(taskId, recordsOperation: true);
         ValidateChild(taskId, task);
-        return new ExecutionTaskHandle(_runtime.PostChild(taskId, task, shielded), this);
+        return CreateExecutionHandle(_runtime.PostChild(taskId, task, shielded));
     }
 
     /// <summary>Returns the identifier which records a detached start in this execution, and the started request.</summary>
@@ -500,7 +500,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private IScheduledTaskHandle GetChildTaskHandleCore(TaskId taskId)
     {
         ThrowIfNotChildTaskId(taskId);
-        return new ExecutionTaskHandle(_runtime.GetScheduledTaskHandle(taskId), this);
+        return CreateExecutionHandle(_runtime.GetScheduledTaskHandle(taskId));
     }
 
     /// <remarks>
@@ -664,11 +664,18 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             scheduler).GetAwaiter().GetResult();
     }
 
+    /// <summary>Wraps a handle of this execution's operation, which the activation's scheduler runs.</summary>
+    private ExecutionTaskHandle CreateExecutionHandle(IScheduledTaskHandle handle) =>
+        new(handle, this, _runtime.GetTargetTaskId(handle.TaskId));
+
     private sealed class ExecutionTaskHandle(
         IScheduledTaskHandle inner,
-        GrainDurableTaskContext owner) : IScheduledTaskHandle
+        GrainDurableTaskContext owner,
+        TaskId targetTaskId) : IScheduledTaskHandle
     {
         public TaskId TaskId => inner.TaskId;
+
+        public TaskId TargetTaskId { get; } = targetTaskId;
 
         public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
 

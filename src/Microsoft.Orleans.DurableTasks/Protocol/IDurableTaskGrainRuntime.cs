@@ -208,6 +208,12 @@ internal interface IDurableTaskGrainRuntime
     ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken);
     IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId);
 
+    /// <summary>
+    /// Returns the identifier under which its host stores the task which the operation <paramref name="taskId"/> of an
+    /// execution started or observes.
+    /// </summary>
+    TaskId GetTargetTaskId(TaskId taskId);
+
     /// <summary>Returns when a task's terminal result was recorded, or <see langword="null"/> when it has none.</summary>
     DateTimeOffset? GetCompletedAt(TaskId taskId);
 
