@@ -65,12 +65,11 @@ public sealed class GrainTimerTests
     public void MessageFactory_CreateLocalRequest_CreatesOneWayLocalMessage(bool interleave, bool keepAlive)
     {
         using var fixture = new TimerFixture();
-        var interfaceType = GrainInterfaceType.Create("local-request");
         RequestContext.Set("parent", new UncopyableContextValue());
         try
         {
             var body = Substitute.For<ILocalRequest>();
-            var message = fixture.MessageFactory.CreateLocalRequest(fixture.Grain, body, interfaceType, new() { Interleave = interleave, KeepAlive = keepAlive });
+            var message = fixture.MessageFactory.CreateLocalRequest(fixture.Grain, body, new() { Interleave = interleave, KeepAlive = keepAlive });
 
             Assert.Same(body, message.BodyObject);
             Assert.Equal(Message.Directions.OneWay, message.Direction);
@@ -79,7 +78,7 @@ public sealed class GrainTimerTests
             Assert.True(message.IsLocalOnly);
             Assert.Null(message.TimeToLive);
             Assert.Null(message.RequestContextData);
-            Assert.Equal(interfaceType, message.InterfaceType);
+            Assert.True(message.InterfaceType.IsDefault);
             Assert.Equal(fixture.Grain.GrainId, message.TargetGrain);
             Assert.Equal(message.SendingGrain, message.TargetGrain);
             Assert.Equal(fixture.Grain.Address.SiloAddress, message.TargetSilo);

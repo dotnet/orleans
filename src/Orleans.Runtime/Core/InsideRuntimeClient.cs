@@ -48,7 +48,6 @@ namespace Orleans.Runtime
 
         private HostedClient HostedClient => this.hostedClient;
         private readonly MessageFactory messageFactory;
-        private readonly GrainInterfaceTypeResolver interfaceTypeResolver;
         private IGrainReferenceRuntime grainReferenceRuntime = null!;
         private Task? callbackTimerTask;
         private readonly MessagingTrace messagingTrace;
@@ -77,7 +76,6 @@ namespace Orleans.Runtime
             this.MySilo = siloDetails.SiloAddress;
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
             this.messageFactory = messageFactory;
-            this.interfaceTypeResolver = interfaceIdResolver;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
             this.invokeExceptionLogger = loggerFactory.CreateLogger($"{typeof(Grain).FullName}.InvokeException");
@@ -140,11 +138,7 @@ namespace Orleans.Runtime
         /// Creates the message which queues <paramref name="request"/> on <paramref name="target"/> as a local request.
         /// </summary>
         public Message CreateLocalRequest(IGrainContext target, ILocalRequest request, LocalRequestOptions options)
-        {
-            ArgumentNullException.ThrowIfNull(request);
-            var interfaceType = interfaceTypeResolver.GetGrainInterfaceType(request.GetInterfaceType());
-            return messageFactory.CreateLocalRequest(target, request, interfaceType, options);
-        }
+            => messageFactory.CreateLocalRequest(target, request, options);
 
         public void SendRequest(
             GrainReference target,
