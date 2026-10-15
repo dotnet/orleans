@@ -87,6 +87,7 @@ internal sealed partial class DurableTaskGrainRuntime
     /// <summary>Completes the waits for a signal record whose value has committed.</summary>
     private void CompleteSignalWaits(TaskId recordId)
     {
+        ResumeParkedWaits(recordId);
         List<TaskCompletionSource>? waiters;
         lock (_signalWaits)
         {

@@ -1523,10 +1523,6 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         release.SetResult();
         await runtime.GetScheduledTaskHandle(stepId).WaitAsync(TestContext.Current.CancellationToken).AsTask()
             .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        // The write which committed the result resumed its waiters, which run in later work items, so the next consult
-        // reports work once; consults after the attempt ended report none.
-        Assert.Equal(TimeSpan.FromSeconds(1), workSource.GetWakeupDelay());
         await WaitForNoWorkAsync();
 
         // A body parked on a delay waits for its resume message, which reactivates the grain.
@@ -1544,6 +1540,40 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 await Task.Yield();
             }
         }
+    });
+
+    [Fact]
+    public Task WorkSourceReportsAnAttemptWhichACommittedResultResumesBeforeItsCodeContinues() => ActivationScheduler.RunAsync(async () =>
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (runtime, _, manager, transport) = CreateRuntime();
+        var workSource = (IInboxWorkSource)runtime;
+        var rootId = TaskId.Parse("root");
+        var resumed = false;
+        runtime.ScheduleFromInbox(rootId, CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            await new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)).WithId("call");
+            resumed = true;
+            return 3;
+        })));
+        await manager.WriteStateAsync(cancellationToken);
+        for (var yields = 0; workSource.GetWakeupDelay() is not null; yields++)
+        {
+            Assert.True(yields < 100, "The root didn't park on its call.");
+            await Task.Yield();
+        }
+
+        // The write which commits the call's result resumes the root, whose code continues in a later work item. Every
+        // consult until then, such as a later write's and a wake-up's, reports the root as runnable.
+        (bool Resumed, TimeSpan? First, TimeSpan? Second)? consults = null;
+        manager.AfterWriteCompleted = _ => consults ??= (resumed, workSource.GetWakeupDelay(), workSource.GetWakeupDelay());
+        runtime.AcceptResponseFromInbox(rootId.Child("call"), DurableTaskResponse.FromResult(2), RemoteTarget);
+        await manager.WriteStateAsync(cancellationToken);
+        manager.AfterWriteCompleted = null;
+
+        Assert.Equal((false, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1)), consults);
+        Assert.Equal(3, (await WaitForResponseAsync(runtime, rootId)).GetResult<int>());
+        await runtime.StopAsync(cancellationToken).WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
     });
 
     [Fact]
