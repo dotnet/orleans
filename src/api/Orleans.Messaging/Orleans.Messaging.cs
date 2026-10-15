@@ -382,6 +382,8 @@ namespace Orleans.Messaging.Configuration
 
         public int InboxBatchSize { get { throw null; } set { } }
 
+        public System.TimeSpan InboxRetryTimeout { get { throw null; } set { } }
+
         public int MaxCapacity { get { throw null; } set { } }
 
         public int MaxRetainedDeadLetters { get { throw null; } set { } }

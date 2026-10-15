@@ -14,6 +14,9 @@ internal sealed class InboxMessageState
     [Id(2)]
     public string? LastError { get; set; }
 
+    /// <summary>Gets or sets when a failing message's retries end, <c>InboxRetryTimeout</c> after its first failure.</summary>
+    [Id(3)]
+    public DateTimeOffset? ExpirationTime { get; set; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxDeadLetter")]
