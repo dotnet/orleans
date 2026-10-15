@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Orleans.Journaling.Ranges;
 using StackExchange.Redis;
@@ -83,9 +84,18 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     /// <summary>
     /// Runs a journal procedure on the partition which owns <paramref name="bucket"/>.
     /// </summary>
+    /// <param name="bucket">The bucket the procedure's keys belong to.</param>
+    /// <param name="procedure">The procedure name.</param>
+    /// <param name="args">The procedure's arguments, reused unchanged by every attempt.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <param name="ambiguous">
+    /// Set to <see langword="true"/> if an attempt failed in a way which may follow a commit: a connection failure, a
+    /// lost reply, or the deadline passing after the command may have been sent. Attempts which the partition rejected
+    /// (<c>WrongPartition</c>), transactions which did not run, and attempts never sent leave it unchanged.
+    /// </param>
     /// <returns>The procedure's response, whose status is not <c>WrongPartition</c>.</returns>
     /// <exception cref="TimeoutException">The operation did not complete within the operation timeout.</exception>
-    public async ValueTask<RedisResult[]> ExecuteAsync(int bucket, string procedure, object[] args, CancellationToken cancellationToken)
+    public async ValueTask<RedisResult[]> ExecuteAsync(int bucket, string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous = null)
     {
         // Every wait is bounded by the operation's deadline: a stalled connection, command, or MetaStore refresh ends
         // the operation with a TimeoutException, while caller cancellation still surfaces as cancellation.
@@ -135,17 +145,20 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
                 {
                     reason = "connection";
                     exception = ex;
+                    MarkAmbiguous(ambiguous);
                 }
                 catch (RedisTimeoutException ex)
                 {
                     reason = "timeout";
                     exception = ex;
+                    MarkAmbiguous(ambiguous);
                 }
                 catch (TimeoutException ex)
                 {
-                    // The operation's deadline passed while waiting.
+                    // The operation's deadline passed while waiting, possibly for the reply to a command already sent.
                     reason = "deadline";
                     exception = ex;
+                    MarkAmbiguous(ambiguous);
                     break;
                 }
                 catch (ObjectDisposedException ex) when (!IsStopped)
@@ -153,6 +166,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
                     // The view changed the partition's endpoint and the old connection was closed.
                     reason = "connection";
                     exception = ex;
+                    MarkAmbiguous(ambiguous);
                 }
                 catch (RedisServerException ex) when (string.Equals(ex.Message, TransactionFailedMessage, StringComparison.Ordinal))
                 {
@@ -359,6 +373,14 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
             ObjectDisposedException.ThrowIf(IsStopped, this);
             _logger?.LogWarning(exception, "Failed to refresh the Garnet journal range map.");
             return View;
+        }
+    }
+
+    private static void MarkAmbiguous(StrongBox<bool>? ambiguous)
+    {
+        if (ambiguous is not null)
+        {
+            ambiguous.Value = true;
         }
     }
 

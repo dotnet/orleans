@@ -66,10 +66,11 @@ public sealed class GarnetJournalPartitionManagerTests
             var database = connection.GetDatabase();
             var map = RangeMap.CreateUniform(16, [new(P0, new PartitionHosting("host", 0, "p0"))]);
 
-            // An initialization which recorded its identity and opened one bucket before crashing.
+            // An initialization which claimed its identity and opened one bucket before crashing.
             await database.HashSetAsync(
                 GarnetJournalKeys.PartitionKey,
                 [
+                    new(GarnetJournalKeys.IdentityField, GarnetJournalPartitionManager.FormatIdentity(map.Id, P0.Value, map.BucketCount.ToString())),
                     new(GarnetJournalKeys.MapIdField, map.Id),
                     new(GarnetJournalKeys.PartitionIdField, P0.Value),
                     new(GarnetJournalKeys.BucketCountField, map.BucketCount),
@@ -107,6 +108,55 @@ public sealed class GarnetJournalPartitionManagerTests
     }
 
     [Fact]
+    public async Task ConcurrentInitialization_WithConflictingIdentities_StartsOnlyOne()
+    {
+        var directory = GarnetPartitionFixture.CreateTemporaryDirectory();
+        try
+        {
+            using var host = GarnetJournalPartitionHost.Start(
+                new GarnetJournalPartitionSettings { DataDirectory = directory, LogMemorySize = "64m", IndexMemorySize = "1m" },
+                loggerFactory: null);
+            await using var connection = await ConnectionMultiplexer.ConnectAsync(new ConfigurationOptions { EndPoints = { host.EndPoint }, Protocol = RedisProtocol.Resp2 });
+            var database = connection.GetDatabase();
+
+            // Maps which differ in identity and bucket count race to initialize the same storage.
+            var maps = new[] { 16, 32 }.Select(count => RangeMap.CreateUniform(count, [new(P0, new PartitionHosting("host", 0, "p0"))])).ToArray();
+            var failures = await Task.WhenAll(maps.Select(map => Capture(GarnetJournalPartitionManager.InitializeAsync(host.EndPoint, P0, map, CancellationToken))));
+
+            Assert.Single(failures, failure => failure is null);
+            Assert.All(failures.Where(failure => failure is not null), failure => Assert.IsType<InvalidOperationException>(failure));
+            var winner = maps[Array.IndexOf(failures, null)];
+            var loser = maps[1 - Array.IndexOf(failures, null)];
+            Assert.Equal(winner.Id, (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.MapIdField));
+            Assert.Equal(winner.BucketCount.ToString(), (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.BucketCountField));
+            Assert.Equal("1", (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.InitializedField));
+
+            // The losing initialization opened none of its buckets.
+            for (var bucket = 0; bucket < loser.BucketCount; bucket++)
+            {
+                Assert.False(await database.KeyExistsAsync(GarnetJournalKeys.GetBucketKey(loser.Id, bucket)));
+            }
+        }
+        finally
+        {
+            GarnetPartitionFixture.TryDeleteDirectory(directory);
+        }
+
+        static async Task<Exception?> Capture(Task task)
+        {
+            try
+            {
+                await task;
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+        }
+    }
+
+    [Fact]
     public async Task NewPartition_RecordsItsIdentityBeforeOpeningBuckets()
     {
         var directory = GarnetPartitionFixture.CreateTemporaryDirectory();
@@ -124,7 +174,10 @@ public sealed class GarnetJournalPartitionManagerTests
             await database.ExecuteAsync(GarnetJournalProtocol.Bucket, [(RedisKey)GarnetJournalKeys.GetBucketKey(map.Id, 5), GarnetJournalProtocol.BucketSealOperation, "3", GarnetJournalProtocol.NoSource, "1"]);
             await Assert.ThrowsAsync<InvalidOperationException>(() => GarnetJournalPartitionManager.InitializeAsync(host.EndPoint, P0, map, CancellationToken));
 
-            // The identity was recorded before any bucket was opened, and the initialization is not marked complete.
+            // The identity was claimed before any bucket was opened, and the initialization is not marked complete.
+            Assert.Equal(
+                GarnetJournalPartitionManager.FormatIdentity(map.Id, P0.Value, map.BucketCount.ToString()),
+                (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.IdentityField));
             Assert.Equal(map.Id, (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.MapIdField));
             Assert.Equal(P0.Value, (string?)await database.HashGetAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.PartitionIdField));
             Assert.False(await database.HashExistsAsync(GarnetJournalKeys.PartitionKey, GarnetJournalKeys.InitializedField));
