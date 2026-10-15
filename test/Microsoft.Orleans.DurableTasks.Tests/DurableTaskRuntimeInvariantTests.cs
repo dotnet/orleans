@@ -354,7 +354,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var target = GrainId.Create("target", "one");
         var handler = CreateHandler(runtime);
         TaskId[] rootIds = [TaskId.Parse("root-a"), TaskId.Parse("root-b"), TaskId.Parse("root-c")];
-        TaskId[] remoteIds = [TaskId.Parse("remote-a"), TaskId.Parse("remote-b")];
+        TaskId[] remoteIds = [TaskId.Parse("caller/remote-a"), TaskId.Parse("caller/remote-b")];
         var started = rootIds.ToDictionary(
             static id => id,
             static _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously));
@@ -3762,15 +3762,29 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task RootTaskCantUseTheReservedCallerScopeRoot() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            async () => await ((IDurableTaskServer)runtime).ScheduleAsync(CallerScope.Root, CreateRequest(1), TestContext.Current.CancellationToken));
+
+        Assert.False(storage.Contains(CallerScope.Root));
+    });
+
+    [Fact]
     public Task ConflictingInvocationIsDeadLetteredAndChangesNothing() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, _) = CreateRuntime();
         var sender = GrainId.Create("caller", "one");
         var taskId = TaskId.Parse("starter/call");
-        runtime.ScheduleFromInbox(taskId, CreateRequest(1, () => DurableTask.Run(static async cancellationToken => await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken))));
+
+        // This grain stores the sender's child under the sender's scope, where another request already runs.
+        var storedId = CallerScope.GetTaskId(sender, taskId);
+        runtime.ScheduleFromInbox(storedId, CreateRequest(1, () => DurableTask.Run(static async cancellationToken => await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken))));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
-        var fingerprint = storage.Get(taskId).RequestFingerprint;
-        var destinations = storage.Get(taskId).CompletionDestinations.ToArray();
+        var fingerprint = storage.Get(storedId).RequestFingerprint;
+        var destinations = storage.Get(storedId).CompletionDestinations.ToArray();
         var request = CreateSerializableRequest(runtime.GrainId);
 
         // The attached invocation's identifier already identifies another request, so the inbox dead-letters it with the
@@ -3785,9 +3799,9 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             out var result));
 
         Assert.Equal((DeliveryStatus.DeadLettered, DurableTaskRejectionCodes.Conflict), (result.Status, result.Code));
-        Assert.Contains($"Durable task '{taskId}' is already associated with a different request.", result.Message);
-        Assert.Equal(fingerprint, storage.Get(taskId).RequestFingerprint);
-        Assert.Equal(destinations, storage.Get(taskId).CompletionDestinations);
+        Assert.Contains($"Durable task '{storedId}' is already associated with a different request.", result.Message);
+        Assert.Equal(fingerprint, storage.Get(storedId).RequestFingerprint);
+        Assert.Equal(destinations, storage.Get(storedId).CompletionDestinations);
         await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     });
 
@@ -4210,17 +4224,24 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             taskId,
             new DurableTaskInvocationMessage { TaskId = taskId, Request = request, Sender = sender });
 
+    /// <summary>
+    /// Creates the completion which <paramref name="sender"/> sends for the remote child <paramref name="taskId"/> of
+    /// <paramref name="receiver"/>, which it stores under the receiver's caller scope.
+    /// </summary>
     private static InboxMessage CompletionMessage(
         GrainId sender,
         GrainId receiver,
         TaskId taskId,
-        DurableTaskResponse response) =>
-        MessagingTestHelpers.CreateMessage(
+        DurableTaskResponse response)
+    {
+        var storedId = CallerScope.GetTaskId(receiver, taskId);
+        return MessagingTestHelpers.CreateMessage(
             MessagingTestHelpers.MessageTypes.Completion,
             sender,
             receiver,
-            taskId,
-            new DurableTaskCompletionMessage { TaskId = taskId, Response = response, Sender = sender });
+            storedId,
+            new DurableTaskCompletionMessage { TaskId = storedId, SubscriberId = taskId, Response = response, Sender = sender });
+    }
 
     private static InboxMessage CancellationMessage(GrainId sender, GrainId receiver, TaskId taskId) =>
         MessagingTestHelpers.CreateMessage(

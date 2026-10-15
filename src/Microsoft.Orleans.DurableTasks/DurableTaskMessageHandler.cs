@@ -56,8 +56,10 @@ internal sealed class DurableTaskMessageHandler(
 
                 try
                 {
+                    // An attached invocation addresses the sender's child, which this grain stores under the sender's
+                    // scope; a detached invocation addresses a root task.
                     runtime.InvokeFromInbox(
-                        invocation.TaskId,
+                        CallerScope.Resolve(sender, invocation.TaskId),
                         request,
                         sender,
                         invocation.Detached,
@@ -86,13 +88,20 @@ internal sealed class DurableTaskMessageHandler(
                 {
                     runtime.UnsubscribeFromInbox(cancellation.TaskId, new(GetSender(cancellation.Sender), unsubscribedId));
                 }
-                else if (cancellation.AbortReason is { } abortReason)
-                {
-                    runtime.AbortFromInbox(cancellation.TaskId, abortReason, GetSender(cancellation.Sender));
-                }
                 else
                 {
-                    runtime.SignalCancellationFromInbox(cancellation.TaskId, GetSender(cancellation.Sender), cancellation.CancellationReason);
+                    // A cancellation or an abort addresses the sender's remote child, which this grain stores under the
+                    // sender's scope.
+                    var caller = GetSender(cancellation.Sender);
+                    var taskId = CallerScope.Resolve(caller, cancellation.TaskId);
+                    if (cancellation.AbortReason is { } abortReason)
+                    {
+                        runtime.AbortFromInbox(taskId, abortReason, caller);
+                    }
+                    else
+                    {
+                        runtime.SignalCancellationFromInbox(taskId, caller, cancellation.CancellationReason);
+                    }
                 }
 
                 return true;
