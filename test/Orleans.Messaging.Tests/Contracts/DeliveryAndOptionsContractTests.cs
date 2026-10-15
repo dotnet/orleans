@@ -45,6 +45,7 @@ public sealed class DeliveryAndOptionsContractTests
     {
         var handlerMissing = DeliveryResult.HandlerNotFound();
         var deadLettered = DeliveryResult.DeadLettered("poison body");
+        var coded = DeliveryResult.DeadLettered("poison body", "orders/poison");
 
         Assert.Equal(DeliveryStatus.Accepted, DeliveryResult.Accepted().Status);
         Assert.Equal(DeliveryStatus.Duplicate, DeliveryResult.Duplicate().Status);
@@ -53,6 +54,10 @@ public sealed class DeliveryAndOptionsContractTests
         Assert.Equal("No inbox handler is registered.", handlerMissing.Message);
         Assert.Equal(DeliveryStatus.DeadLettered, deadLettered.Status);
         Assert.Equal("poison body", deadLettered.Message);
+        Assert.Null(deadLettered.Code);
+        Assert.Equal(DeliveryStatus.DeadLettered, coded.Status);
+        Assert.Equal("poison body", coded.Message);
+        Assert.Equal("orders/poison", coded.Code);
     }
 
     [Fact]

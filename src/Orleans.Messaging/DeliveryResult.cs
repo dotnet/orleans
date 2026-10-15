@@ -21,6 +21,17 @@ public readonly struct DeliveryResult
     public string? Message { get; init; }
 
     /// <summary>
+    /// Gets the application-defined code which identifies why an inbox message sink dead-lettered the message, such as
+    /// <c>"orders/duplicate-order"</c>; <see langword="null"/> when the sink reported none.
+    /// </summary>
+    /// <remarks>
+    /// Messaging carries the code to the inbox dead letter and to the sender's
+    /// <see cref="OutboxMessageRetirement.Code"/> without interpreting it.
+    /// </remarks>
+    [Id(2)]
+    public string? Code { get; init; }
+
+    /// <summary>
     /// Creates a result indicating the message was accepted and persisted to inbox.
     /// </summary>
     public static DeliveryResult Accepted() => new() { Status = DeliveryStatus.Accepted };
@@ -47,9 +58,12 @@ public readonly struct DeliveryResult
     /// <summary>
     /// Creates a result indicating the message was dead-lettered.
     /// </summary>
-    public static DeliveryResult DeadLettered(string reason) => new()
+    /// <param name="reason">The diagnostic reason.</param>
+    /// <param name="code">The application-defined code which identifies the rejection, if any.</param>
+    public static DeliveryResult DeadLettered(string reason, string? code = null) => new()
     {
         Status = DeliveryStatus.DeadLettered,
-        Message = reason
+        Message = reason,
+        Code = code
     };
 }

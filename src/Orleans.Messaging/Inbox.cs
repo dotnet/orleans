@@ -221,7 +221,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
                 else
                 {
                     LogSinkDeadLettered(Logger, error, key, GrainContext.GrainId, reason);
-                    StageDeadLetter(message, reason, attemptCount: 1);
+                    StageDeadLetter(message, reason, attemptCount: 1, result.Code);
                 }
             }
             catch (Exception exception)
@@ -234,7 +234,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
 
             Shared.Instruments.OnInboxMessageReceived(Shared.GrainType, "accepted");
             Shared.Instruments.OnInboxMessageProcessed(Shared.GrainType, accepted ? "success" : "dead_lettered");
-            if (!accepted) return DeliveryResult.DeadLettered(reason);
+            if (!accepted) return DeliveryResult.DeadLettered(reason, result.Code);
             LogMessageAccepted(Logger, key, GrainContext.GrainId);
             return DeliveryResult.Accepted();
         }
@@ -404,7 +404,7 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             DeadLetter = deadLetter
         });
 
-    private void StageDeadLetter(InboxMessage message, string reason, int attemptCount)
+    private void StageDeadLetter(InboxMessage message, string reason, int attemptCount, string? code = null)
     {
         var now = TimeProvider.GetUtcNow();
         var key = message.Envelope.MessageId;
@@ -414,7 +414,8 @@ internal sealed partial class Inbox : IInbox, IMessagingExtension, IStateMachine
             Message = message,
             DeadLetteredAt = now,
             Reason = reason,
-            AttemptCount = attemptCount
+            AttemptCount = attemptCount,
+            Code = code
         });
     }
 

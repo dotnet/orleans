@@ -113,7 +113,7 @@ public sealed class MessagingCommandSerializationTests
 
     private static InboxCommand[] CreateInboxCommands()
     {
-        var deadLetter = new InboxDeadLetter { Message = InboxMessage("dead"), DeadLetteredAt = Now, Reason = "failed", AttemptCount = 3 };
+        var deadLetter = new InboxDeadLetter { Message = InboxMessage("dead"), DeadLetteredAt = Now, Reason = "failed", AttemptCount = 3, Code = "orders/invalid" };
         return
         [
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("accept"), State = new() },

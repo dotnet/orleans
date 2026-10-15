@@ -437,7 +437,7 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
                 {
                     Emit(new() { Kind = OutboxCommandKind.Delivery, MessageId = id });
                     Retire(current, status == DeliveryStatus.DeadLettered
-                        ? OutboxMessageRetirement.Rejected(outcome.Result!.Value.Message ?? "The receiver dead-lettered the message.")
+                        ? OutboxMessageRetirement.Rejected(outcome.Result!.Value.Message ?? "The receiver dead-lettered the message.", outcome.Result.Value.Code)
                         : OutboxMessageRetirement.Delivered());
                     delivered++;
                 }

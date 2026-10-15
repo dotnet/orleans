@@ -57,12 +57,13 @@ public interface IInboxMessageSink
     /// </description></item>
     /// <item><description>
     /// <see cref="DeliveryStatus.DeadLettered"/>: the sink rejects the message and stages nothing. The inbox
-    /// dead-letters it with its payload and the result's reason, and records it as processed.
+    /// dead-letters it with its payload and the result's reason and <see cref="DeliveryResult.Code"/>, records it as
+    /// processed, and returns the reason and code to the sender.
     /// </description></item>
     /// </list>
     /// <para>
     /// A sink which throws or reports another status must leave no staged change, and the inbox dead-letters the message
-    /// with the failure as its reason.
+    /// with the failure as its reason and no code.
     /// </para>
     /// </remarks>
     bool TryAccept(InboxMessage message, out DeliveryResult result);
