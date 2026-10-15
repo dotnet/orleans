@@ -15,8 +15,8 @@ public class DurableTaskAbortTests
     public async Task AbortPassesReasonAndWaitTokenToHostHandle()
     {
         var handle = new AbortRecordingHandle(TaskId.CreateRoot("root"));
-        var scheduled = await new RootDefinition(handle).ScheduleAsync("root", TestCancellation);
-        var typed = await new RootDefinition<int>(handle).ScheduleAsync("root", TestCancellation);
+        var scheduled = await new RootDefinition(handle).WithId("root").ScheduleAsync(TestCancellation);
+        var typed = await new RootDefinition<int>(handle).WithId("root").ScheduleAsync(TestCancellation);
         using var wait = new CancellationTokenSource();
 
         await scheduled.AbortAsync("operator stopped it", wait.Token);
@@ -32,7 +32,7 @@ public class DurableTaskAbortTests
     public async Task AbortValidatesReasonBeforeReachingHost()
     {
         var handle = new AbortRecordingHandle(TaskId.CreateRoot("root"));
-        var scheduled = await new RootDefinition(handle).ScheduleAsync("root", TestCancellation);
+        var scheduled = await new RootDefinition(handle).WithId("root").ScheduleAsync(TestCancellation);
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => scheduled.AbortAsync(null!, TestCancellation).AsTask());
         await Assert.ThrowsAsync<ArgumentException>(() => scheduled.AbortAsync(" ", TestCancellation).AsTask());
@@ -44,7 +44,7 @@ public class DurableTaskAbortTests
     public async Task AbortOfCompletedScheduleLeavesItUnchanged()
     {
         var scheduled = await new RootDefinition(new AbortRecordingHandle(TaskId.CreateRoot("root")), DurableTaskResponse.FromResult(7))
-            .ScheduleAsync("root", TestCancellation);
+            .WithId("root").ScheduleAsync(TestCancellation);
 
         await scheduled.AbortAsync("too late", TestCancellation);
 
@@ -54,7 +54,7 @@ public class DurableTaskAbortTests
     [Fact]
     public async Task AbortRequiresHostSupport()
     {
-        var scheduled = await new RootDefinition(new CancelOnlyHandle(TaskId.CreateRoot("root"))).ScheduleAsync("root", TestCancellation);
+        var scheduled = await new RootDefinition(new CancelOnlyHandle(TaskId.CreateRoot("root"))).WithId("root").ScheduleAsync(TestCancellation);
 
         await Assert.ThrowsAsync<NotSupportedException>(() => scheduled.AbortAsync("unsupported", TestCancellation).AsTask());
     }
@@ -76,7 +76,7 @@ public class DurableTaskAbortTests
     {
         var response = DurableTaskResponse.FromException(new DurableTaskAbortedException("operator"));
         var scheduled = await new RootDefinition<int>(new AbortRecordingHandle(TaskId.CreateRoot("root")), response)
-            .ScheduleAsync("root", TestCancellation);
+            .WithId("root").ScheduleAsync(TestCancellation);
 
         Assert.Equal(DurableTaskStatus.Failed, response.Status);
         var exception = await Assert.ThrowsAsync<DurableTaskAbortedException>(async () => await scheduled);

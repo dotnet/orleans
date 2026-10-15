@@ -393,7 +393,7 @@ public class DurableTaskOnceTests
             return outcome;
         }
 
-        protected override ValueTask<IScheduledTaskHandle> ScheduleChildTaskAsync(TaskId taskId, DurableTask taskDefinition, CancellationToken cancellationToken)
+        protected override ValueTask<IScheduledTaskHandle> StartTaskAsync(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
         protected override ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken)

@@ -455,7 +455,7 @@ public abstract partial class DurableTask
             ConfiguredDurableTaskCore<DurableTask> child,
             CancellationToken cancellationToken)
         {
-            var (response, handle) = await child.ScheduleCoreAsync(cancellationToken).ConfigureAwait(false);
+            var (_, response, handle) = await child.StartAsync(DurableTaskStartOptions.None, cancellationToken).ConfigureAwait(false);
             Debug.Assert(response is null && handle is not null, "A child of an execution is scheduled through a handle.");
             return handle;
         }

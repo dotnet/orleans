@@ -43,7 +43,7 @@ public class DurableTaskBatchTests
             return DurableTaskResponse.FromResult(handle.GetResult());
         });
 
-        Assert.Equal(42, await await root.ScheduleAsync("root", TestCancellation));
+        Assert.Equal(42, await await root.WithId("root").ScheduleAsync(TestCancellation));
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class DurableTaskBatchTests
             return DurableTaskResponse.FromResult(0);
         });
 
-        Assert.Equal(0, await await root.ScheduleAsync("root", TestCancellation));
+        Assert.Equal(0, await await root.WithId("root").ScheduleAsync(TestCancellation));
     }
 
     [Theory]
@@ -96,7 +96,7 @@ public class DurableTaskBatchTests
             return DurableTaskResponse.FromResult(new[] { await handles[0], await handles[1] });
         });
 
-        int[] results = await await root.ScheduleAsync("root", TestCancellation);
+        int[] results = await await root.WithId("root").ScheduleAsync(TestCancellation);
         Assert.Equal([10, 11], results);
         var operation = named ? "batch" : "$schedule-all-1";
         Assert.Equal(
@@ -115,7 +115,7 @@ public class DurableTaskBatchTests
             return DurableTaskResponse.FromResult(handles.Length);
         });
 
-        Assert.Equal(3, await await root.ScheduleAsync("root", TestCancellation));
+        Assert.Equal(3, await await root.WithId("root").ScheduleAsync(TestCancellation));
         Assert.True(host.Contains(TaskId.Parse("root/$schedule-all-1/2")));
     }
 
@@ -132,7 +132,7 @@ public class DurableTaskBatchTests
             return DurableTaskResponse.FromResult(exception.Message);
         });
 
-        Assert.Contains("scheduled task handles", await await root.ScheduleAsync("root", TestCancellation), StringComparison.Ordinal);
+        Assert.Contains("scheduled task handles", await await root.WithId("root").ScheduleAsync(TestCancellation), StringComparison.Ordinal);
         Assert.Equal([RootId], host.EntryIds);
 
         // A host which runs the definition as an execution's body receives a failed response.
@@ -178,7 +178,7 @@ public class DurableTaskBatchTests
             return DurableTaskResponse.FromResult(completed.Select(static task => task.Status).ToArray());
         });
 
-        var execution = (await root.ScheduleAsync("root", TestCancellation)).GetResponseAsync(TestCancellation);
+        var execution = (await root.WithId("root").ScheduleAsync(TestCancellation)).GetResponseAsync(TestCancellation);
 
         // The failed and canceled inputs complete first; the combinator waits for the slow input.
         Assert.Equal(DurableTaskStatus.Failed, (await ObserveAsync(inputs[0])).Status);
@@ -212,7 +212,7 @@ public class DurableTaskBatchTests
 
         Assert.Equal(
             [DurableTaskStatus.CompletedSuccessfully, DurableTaskStatus.Failed],
-            await await root.ScheduleAsync("root", TestCancellation));
+            await await root.WithId("root").ScheduleAsync(TestCancellation));
     }
 
     [Theory]
@@ -255,7 +255,7 @@ public class DurableTaskBatchTests
             return DurableTaskResponse.FromResult(exception.Message);
         });
 
-        Assert.Equal("first failure", await await root.ScheduleAsync("root", TestCancellation));
+        Assert.Equal("first failure", await await root.WithId("root").ScheduleAsync(TestCancellation));
     }
 
     [Fact]
@@ -274,7 +274,7 @@ public class DurableTaskBatchTests
             return DurableTaskResponse.FromResult(exception.Message);
         });
 
-        Assert.Equal("first", await await root.ScheduleAsync("root", TestCancellation));
+        Assert.Equal("first", await await root.WithId("root").ScheduleAsync(TestCancellation));
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public class DurableTaskBatchTests
             return DurableTaskResponse.FromResult(exception.CancellationToken.IsCancellationRequested);
         });
 
-        Assert.True(await await root.ScheduleAsync("root", TestCancellation));
+        Assert.True(await await root.WithId("root").ScheduleAsync(TestCancellation));
         Assert.Equal(1, host.ScheduleRequestCount);
     }
 
@@ -364,7 +364,7 @@ public class DurableTaskBatchTests
 
         Assert.Equal(
             [DurableTaskStatus.Canceled, DurableTaskStatus.Failed],
-            await await root.ScheduleAsync("root", TestCancellation));
+            await await root.WithId("root").ScheduleAsync(TestCancellation));
         Assert.Equal(
             [TaskId.Parse("root/$when-each-1/$next-0"), TaskId.Parse("root/$when-each-1/$next-1")],
             host.DecisionIds);
@@ -380,7 +380,7 @@ public class DurableTaskBatchTests
         {
             var release = releases[index];
             handles[index] = await host.CreateRootDefinition<int>(async _ => DurableTaskResponse.FromResult(await release.Task))
-                .ScheduleAsync($"root-{index}", TestCancellation);
+                .WithId($"root-{index}").ScheduleAsync(TestCancellation);
         }
 
         await using var enumerator = ScheduledTask.WhenEach(handles).GetAsyncEnumerator(TestCancellation);

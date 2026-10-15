@@ -101,8 +101,8 @@ public class DurableTaskCancellationReasonTests
     public async Task ScheduledTaskPassesTheReasonToItsHostHandle()
     {
         var handle = new ReasonRecordingHandle(TaskId.CreateRoot("root"));
-        var scheduled = await new RootDefinition(handle).ScheduleAsync("root", TestCancellation);
-        var typed = await new RootDefinition<int>(handle).ScheduleAsync("root", TestCancellation);
+        var scheduled = await new RootDefinition(handle).WithId("root").ScheduleAsync(TestCancellation);
+        var typed = await new RootDefinition<int>(handle).WithId("root").ScheduleAsync(TestCancellation);
         using var wait = new CancellationTokenSource();
 
         await scheduled.CancelAsync("buyer", wait.Token);
@@ -133,7 +133,7 @@ public class DurableTaskCancellationReasonTests
     public async Task HostWithoutReasonsCancelsWithoutTheReason()
     {
         var handle = new CancelOnlyHandle(TaskId.CreateRoot("root"));
-        var scheduled = await new RootDefinition(handle).ScheduleAsync("root", TestCancellation);
+        var scheduled = await new RootDefinition(handle).WithId("root").ScheduleAsync(TestCancellation);
 
         await scheduled.CancelAsync("buyer", TestCancellation);
 
