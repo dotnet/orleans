@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Examples for the durable task analyzer pages, ORLEANS0100 to ORLEANS0116. The analyzers run on this project, and the
+    build treats their diagnostics as errors, so each fix compiles cleanly. Each violating example disables the
+    diagnostic which it demonstrates around its region.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\..\..\..\..\..\'))</RepositoryRoot>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Durable grain state is experimental. -->
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reports the informational rules as warnings, so the build checks the fixes for every rule. -->
+    <GlobalAnalyzerConfigFiles Include="durable-task-rules.globalconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Server\Orleans.Server.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.DurableTasks.Abstractions\Orleans.DurableTasks.Abstractions.csproj" />
+    <ProjectReference Include="$(RepositoryRoot)src\Orleans.DurableTasks.Analyzers\Orleans.DurableTasks.Analyzers.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+</Project>
