@@ -2958,6 +2958,26 @@ internal sealed partial class DurableTaskGrainRuntime(
         return handle;
     }
 
+    /// <remarks>
+    /// The record of a subscription or a detached start names the task which it observes, and a call to a grain reaches
+    /// the task which the target stores under this grain's scope. The identifier of any other operation, or of one which
+    /// recorded nothing, such as a start which an earlier cancellation prevented, is its own.
+    /// </remarks>
+    public TaskId GetTargetTaskId(TaskId taskId)
+    {
+        if (!_storage.TryGetTask(taskId, out var state))
+        {
+            return taskId;
+        }
+
+        if (TryGetSubscription(state, out _, out var observedId))
+        {
+            return observedId;
+        }
+
+        return state.RemoteTarget.IsDefault ? taskId : CallerScope.GetTaskId(GrainId, taskId);
+    }
+
     public DateTimeOffset? GetCompletedAt(TaskId taskId) =>
         _storage.TryGetTask(taskId, out var state) ? state.CompletedAt : null;
 
