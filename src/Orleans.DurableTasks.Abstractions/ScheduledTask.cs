@@ -34,6 +34,19 @@ public abstract partial class ScheduledTask
     /// </remarks>
     public virtual TaskId TargetTaskId => Id;
 
+    /// <summary>
+    /// Returns the feature <typeparamref name="TFeature"/> through which the task's host describes the task, or
+    /// <see langword="null"/> when the host provides none.
+    /// </summary>
+    /// <typeparam name="TFeature">The feature's type, which the host defines or documents.</typeparam>
+    /// <returns>The feature, or <see langword="null"/>.</returns>
+    /// <remarks>
+    /// A host exposes host-specific information through features, such as the address under which other parties reach
+    /// the task, while the handle stays independent of the host.
+    /// </remarks>
+    public virtual TFeature? GetFeature<TFeature>()
+        where TFeature : class => null;
+
     /// <summary>Gets whether this handle has observed the task's terminal response.</summary>
     /// <remarks>
     /// The handle observes the terminal response when a wait, such as awaiting the handle or
@@ -657,6 +670,9 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
 
     public override TaskId TargetTaskId => handle.TargetTaskId;
 
+    public override TFeature? GetFeature<TFeature>()
+        where TFeature : class => handle.GetFeature<TFeature>();
+
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
 
     protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => handle.CancelAsync(reason, cancellationToken);
@@ -674,6 +690,9 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
     public override TaskId Id => handle.TaskId;
 
     public override TaskId TargetTaskId => handle.TargetTaskId;
+
+    public override TFeature? GetFeature<TFeature>()
+        where TFeature : class => handle.GetFeature<TFeature>();
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
 

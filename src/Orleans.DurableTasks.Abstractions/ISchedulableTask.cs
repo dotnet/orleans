@@ -43,6 +43,14 @@ public interface IScheduledTaskHandle
     TaskId TargetTaskId => TaskId;
 
     /// <summary>
+    /// Returns the feature <typeparamref name="TFeature"/> through which the host describes the task, or
+    /// <see langword="null"/>; see <see cref="ScheduledTask.GetFeature{TFeature}"/>.
+    /// </summary>
+    /// <typeparam name="TFeature">The feature's type.</typeparam>
+    TFeature? GetFeature<TFeature>()
+        where TFeature : class => null;
+
+    /// <summary>
     /// Waits for a terminal response. Canceling <paramref name="cancellationToken"/> cancels this wait.
     /// </summary>
     ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken);

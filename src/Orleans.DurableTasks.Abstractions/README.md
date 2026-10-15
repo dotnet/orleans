@@ -194,7 +194,9 @@ which completed successfully. Before the handle observes the terminal response, 
 A handle's `Id` names the operation in the execution which started or observes the task, which combinators and replays
 address, and its `TargetTaskId` names the task on its host, which other parties address. The two are equal unless the
 host stores the task under another identifier: a detached task's handle reports its root ID, and a host can scope the
-tasks which callers invoke by the caller, through `IScheduledTaskHandle.TargetTaskId`.
+tasks which callers invoke by the caller, through `IScheduledTaskHandle.TargetTaskId`. A host describes a task further
+through features, which `ScheduledTask.GetFeature<TFeature>()` returns from `IScheduledTaskHandle.GetFeature<TFeature>()`,
+such as the address under which other parties reach the task.
 
 `DurableTask.ScheduleAll(inputs)` schedules every input concurrently, so a host can commit the batch in one write, and
 returns their handles in input order without waiting for results. `DurableTask.WhenAllCompleted(inputs)` also waits until
