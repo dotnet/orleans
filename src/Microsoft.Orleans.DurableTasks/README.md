@@ -51,6 +51,28 @@ return type's instance members, such as ASP.NET Core Minimal APIs, treat it as a
 returns `grain.GetDurableTask<T>(id)` directly. `IDurableTaskReference` reads a reference's `Target`
 and `Id` without its result type.
 
+A `DurableTaskAddress(GrainId Target, TaskId Id)` is a task reference as a value, which code stores
+in journaled state or sends in grain calls and HTTP payloads. Orleans serializes it, and
+System.Text.Json writes it as `{"Target":"{grain type}/{grain key}","Id":"{task ID}"}`, with metadata
+which `AddDurableTasks` registers for JSON journals. `TaskId` serializes as its escaped path through
+the converter which the abstractions declare on it. `IGrainFactory.GetDurableTask<T>(address)`, which
+grains and `IClusterClient` share, turns an address back into a reference, and
+`DurableTaskReference<T>.Address` reads one from a reference:
+
+```csharp
+_pending.Value = order.GetDurableTask<OrderResult>(orderTaskId).Address;
+await WriteStateAsync();
+
+// Later, after any number of reactivations, in a durable task or elsewhere:
+var result = await GrainFactory.GetDurableTask<OrderResult>(_pending.Value);
+```
+
+`ScheduledTask.TryGetAddress(out address)` reads the address of a handle's task through the handle's
+`IDurableTaskReference` feature. Handles of root tasks, which clients and ordinary grain methods
+start or which `IDurableTaskManager.GetTask` returns, and, in a durable execution, handles of detached
+tasks and of `GetDurableTask` subscriptions have addresses. An attached child belongs to its caller's
+tree and has none.
+
 An absent root or a root whose result retention has expired throws
 `DurableTaskNotFoundException`. A returned failed response remains an execution
 failure, including when the stored user exception has that same type.

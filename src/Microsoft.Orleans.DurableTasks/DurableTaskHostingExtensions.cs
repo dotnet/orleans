@@ -38,7 +38,8 @@ public static class DurableTaskHostingExtensions
     /// Grains deriving from <see cref="Orleans.Journaling.DurableGrain"/> or implementing <see cref="IMessagingGrain"/>
     /// bind the runtime during activation setup, before journal recovery, and can inject its
     /// <see cref="IDurableTaskManager"/>. Task state can be stored in any journal format;
-    /// this method registers the source-generated JSON metadata which the JSON journal format requires.
+    /// this method registers the source-generated JSON metadata which the JSON journal format requires for task state and
+    /// for <see cref="DurableTaskAddress"/> values which grains journal.
     /// </remarks>
     public static ISiloBuilder AddDurableTasks(
         this ISiloBuilder siloBuilder,
@@ -47,7 +48,6 @@ public static class DurableTaskHostingExtensions
         siloBuilder.AddMessaging();
         siloBuilder.Services.Configure<JsonJournalOptions>(static options =>
         {
-            options.AddTypeInfoResolver(TaskIdJsonTypeInfoResolver.Instance);
             options.AddTypeInfoResolver(DurableTaskJsonContext.Default);
         });
         var options = siloBuilder.Services.AddOptions<DurableTaskOptions>();

@@ -235,12 +235,16 @@ public static class DurableTaskGrainExtensions
 
 internal sealed class AttachedScheduledTask<TResult>(
     TaskId taskId,
+    GrainId target,
     IDurableTaskServer server) : ScheduledTask<TResult>
 {
     private readonly GrainScheduledTaskHandle _handle =
-        new(taskId, request: null, server, lastResponse: null);
+        new(taskId, target, request: null, server, lastResponse: null);
 
     public override TaskId Id => taskId;
+
+    public override TFeature? GetFeature<TFeature>()
+        where TFeature : class => _handle.GetFeature<TFeature>();
 
     public override ValueTask CancelAsync(CancellationToken cancellationToken = default) =>
         _handle.CancelAsync(cancellationToken);
