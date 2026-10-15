@@ -81,17 +81,29 @@ internal sealed partial class DurableTaskGrainRuntime
             return await ResponseTask.WaitAsync(cancellationToken);
         }
 
-        public bool TrySetResponse(DurableTaskResponse response) => _responseTcs.TrySetResult(response);
-        public bool TrySetException(Exception exception) => _responseTcs.TrySetException(exception);
+        // Completing the handle resumes the attempts parked on it before their code continues.
+        public bool TrySetResponse(DurableTaskResponse response) => OnCompleted(_responseTcs.TrySetResult(response));
+
+        public bool TrySetException(Exception exception) => OnCompleted(_responseTcs.TrySetException(exception));
 
         /// <summary>Fails the handle's waiters because the activation stops, while the task continues in the next activation.</summary>
         /// <remarks>The handle may have no waiter, so the failure is marked observed.</remarks>
         public void SetStopping(OperationCanceledException exception)
         {
-            if (_responseTcs.TrySetException(exception))
+            if (OnCompleted(_responseTcs.TrySetException(exception)))
             {
                 _ = _responseTcs.Task.Exception;
             }
+        }
+
+        private bool OnCompleted(bool completed)
+        {
+            if (completed)
+            {
+                runtime.ResumeParkedWaits(TaskId);
+            }
+
+            return completed;
         }
     }
 }

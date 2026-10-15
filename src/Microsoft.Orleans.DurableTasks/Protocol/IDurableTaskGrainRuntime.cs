@@ -281,6 +281,25 @@ internal interface IDurableTaskGrainRuntime
     }
 
     /// <summary>
+    /// Resumes <paramref name="wait"/> when the runtime completes <paramref name="awaited"/>, a task or a signal record,
+    /// until <see cref="UnregisterParkedWait"/>.
+    /// </summary>
+    void RegisterParkedWait(TaskId awaited, ParkedWait wait)
+    {
+    }
+
+    /// <summary>Removes a registration which <see cref="RegisterParkedWait"/> added.</summary>
+    void UnregisterParkedWait(TaskId awaited, ParkedWait wait)
+    {
+    }
+
+    /// <summary>
+    /// Returns the record of the signal <paramref name="name"/> of the invoked task whose execution tree contains
+    /// <paramref name="executionId"/>, or <see langword="null"/> when the runtime doesn't record signals.
+    /// </summary>
+    TaskId? GetSignalRecordId(TaskId executionId, string name) => null;
+
+    /// <summary>
     /// Waits for the signal <paramref name="name"/> of the invoked task whose execution tree contains
     /// <paramref name="executionId"/>, and returns its committed value and the time it was recorded.
     /// </summary>
