@@ -25,6 +25,16 @@ and resumes executions after their grain deactivates.
 
 This page describes the programming model and its guarantees. Continue with:
 
+- [Task identity and references](durable-tasks-identity.md) for how task IDs are
+  constructed, which changes keep them stable, and how to address a task from elsewhere.
+- [Structured concurrency](durable-tasks-structured-concurrency.md) for task trees,
+  ownership, lifetimes, and how cancellation flows through them.
+- [Idempotency](durable-tasks-idempotency.md) for the effects which commit exactly once
+  and the external effects which need idempotency keys.
+- [Replay-safety rules](durable-tasks-replay-rules.md) for the rules which the durable
+  task analyzers enforce.
+- [Integrate with other systems](durable-tasks-integrations.md) for payment providers,
+  databases, HTTP services, webhooks, and where to retry.
 - [Practical recipes](durable-tasks-recipes.md) for fan-out, races, compensation,
   signals, detached work, cancellation, and scheduling workflows from other grains.
 - [Operations and troubleshooting](durable-tasks-operations.md) for configuration,
@@ -90,7 +100,8 @@ endpoints.
 
 A durable task is identified by its grain and its <xref:Orleans.DurableTasks.TaskId>.
 Task IDs are hierarchical: a root ID, which the starting caller chooses, followed by
-one segment per level of nesting. The order workflow above produces this tree:
+one segment per level of nesting. [Task identity and references](durable-tasks-identity.md)
+lists every kind of ID and its stability. The order workflow above produces this tree:
 
 ```text
 place-order-{orderId}
@@ -291,6 +302,9 @@ Follow these rules in re-executed code:
   one doesn't move others.
 - Log through a logger which `logger.ReplaySafe()` returns, so each event is logged once.
 
+[Replay-safety rules](durable-tasks-replay-rules.md) lists every rule, the failure which
+it prevents, and the analyzer diagnostic which reports it.
+
 <xref:Orleans.DurableTasks.DurableTaskContext.IsReplaying?displayProperty=nameWithType>
 reports whether a run is re-running operations which earlier runs recorded: it is `true`
 from the start of a run which finds recorded operations in the task's tree, other than
@@ -480,10 +494,7 @@ when the caller continues:
 
 A checkout clears the basket and starts the order's workflow in one journal write:
 
-```csharp
-_ = order.PlaceOrderAsync(request).Detached().WithId(PlaceOrderTaskId(orderId)).Post();
-await WriteStateAsync();
-```
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_checkout_post" language="csharp":::
 
 ## Signals
 
@@ -528,26 +539,7 @@ handler returns it as a value, and <xref:Orleans.DurableTasks.IDurableTaskRefere
 reads its `Target` and `Id` without its result type. A webhook relay, for example, waits
 for an operation and then delivers its result:
 
-```csharp
-public async DurableTask DeliverWebhookAsync(Guid operationKey, string operationId, Uri callback)
-{
-    var operation = GrainFactory.GetGrain<IOperationGrain>(operationKey);
-    try
-    {
-        var result = await operation.GetDurableTask<OperationResult>(operationId)
-            .WaitAsync(TimeSpan.FromDays(1));
-        await DurableTask.Run(async ct =>
-        {
-            using var response = await _http.PostAsJsonAsync(callback, result, ct);
-            response.EnsureSuccessStatusCode();
-        }).WithId("deliver");
-    }
-    catch (TimeoutException)
-    {
-        // The operation is still running after a day; it continues without this relay.
-    }
-}
-```
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_reference_relay" language="csharp":::
 
 - In a durable task, awaiting the reference, scheduling it, or passing it to `WhenAny`,
   `Race`, `WaitAsync`, or `WaitUntilAsync` subscribes a child of the execution, recorded
@@ -601,7 +593,8 @@ public async DurableTask DeliverWebhookAsync(Guid operationKey, string operation
 
 Durability covers state and messages which participate in Orleans Journaling and
 Messaging commits. External side effects, such as calls to a payment provider, need
-their own idempotency, for example a request key derived from the task ID.
+their own idempotency, for example a request key derived from the task ID; see
+[Idempotency in durable tasks](durable-tasks-idempotency.md).
 
 ## Lifecycle and retention
 
