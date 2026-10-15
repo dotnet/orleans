@@ -190,14 +190,16 @@ Durable task messages use subjects beginning with `durable-rpc/`: `invoke`,
 applies to them; inspect and remove dead letters through `IMessagingDiagnostics`, as
 described in [Inspect and replay dead letters](messaging-operations.md#inspect-and-replay-dead-letters).
 
-- The receiving inbox dead-letters a message which fails validation, such as an
-  invocation which reuses a task ID with a different request or caller, and a rejected
-  signal, such as one with a conflicting value or for a completed task, with the
-  rejection as its reason. The sender's outbox retires a rejected invocation with that
-  reason, and the starting task's record fails with `DurableTaskConflictException`.
-- The outbox dead-letters a message whose delivery fails for `OutboxRetryTimeout`. A
-  dead-lettered invocation fails the starting task's record with
-  `DurableTaskDeliveryException`, so `ScheduleAsync`, and awaiting the task, throw it.
+- The receiving inbox dead-letters a message which it rejects permanently, with the
+  rejection as its reason: an invocation whose task ID already identifies another request
+  or caller, and a rejected signal, such as one with a conflicting value or for a
+  completed task. A conflicting invocation's dead letter also carries the
+  `durable-rpc/conflict` code from `DurableTaskRejectionCodes`, which the sender's outbox
+  reports when it retires the invocation as rejected.
+- A message which the receiving grain fails to accept for another reason, such as a
+  transient failure or a payload which it can't decode, is retried. During a rolling
+  deployment, a retry can reach an activation which decodes it.
+- The outbox dead-letters a message whose delivery fails for `OutboxRetryTimeout`.
 - The outbox dead-letters a completion whose stored result no longer decodes, for
   example after a deployment removed the result type, with the decoding error as its
   reason. The runtime retires that completion and retains the task for
@@ -207,6 +209,20 @@ described in [Inspect and replay dead letters](messaging-operations.md#inspect-a
 A dead-lettered completion leaves the calling execution waiting. Decide whether to
 cancel or abort that execution, and replay a dead letter only after correcting its
 cause.
+
+A start which its target rejects, or which isn't delivered, fails the starting task's
+record, so `ScheduleAsync`, and awaiting the task or its handle, throw the failure in
+every replay:
+
+| Outcome | Rejection code | Failure |
+| --- | --- | --- |
+| The task ID already identifies another request or caller. The target rejects it at once. | `durable-rpc/conflict` | `DurableTaskConflictException` |
+| The target rejects the invocation with another code, or with none. | The target's code | `DurableTaskRejectedException` |
+| The target doesn't accept the invocation before `OutboxRetryTimeout`, because of transient failures or a request which it can't decode, or the outbox can't reach it. | | `DurableTaskDeliveryException`, with the dead letter's reason |
+
+A caller, such as an HTTP endpoint, tells a conflict, which it resolves by choosing
+another task ID, from a start which wasn't accepted, by the exception's type. `DurableTaskRejectedException.Code` reports the target's code, and
+`Target` the rejecting grain.
 
 ## Capacity and throughput
 
