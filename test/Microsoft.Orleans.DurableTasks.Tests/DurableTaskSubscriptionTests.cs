@@ -79,7 +79,7 @@ public sealed class DurableTaskSubscriptionTests
         Assert.Equal("done", (await subscriber.GetResponseAsync(RelayId, TestCancellation)).GetResult<string>());
 
         // Retirement removes the subscriber. A client-scheduled operation keeps its result for its retention period.
-        ((IOutboxMessageSource)operation.Runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)operation.Runtime).OnRetired(completion.MessageId, OutboxMessageRetirement.Delivered());
         await operation.WriteAsync(TestCancellation);
         Assert.Empty(operation.Subscribers(OperationId));
         Assert.Equal("done", (await operation.GetResponseAsync(OperationId, TestCancellation)).GetResult<string>());
@@ -274,11 +274,11 @@ public sealed class DurableTaskSubscriptionTests
         var toCaller = Assert.Single(completions, completion => completion.Target == caller);
         var toSubscriber = Assert.Single(completions, completion => completion.Target == SubscriberGrain);
 
-        ((IOutboxMessageSource)operation.Runtime).OnRetired(toCaller.MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)operation.Runtime).OnRetired(toCaller.MessageId, OutboxMessageRetirement.Delivered());
         await operation.WriteAsync(TestCancellation);
         Assert.True(operation.Contains(OperationId));
 
-        ((IOutboxMessageSource)operation.Runtime).OnRetired(toSubscriber.MessageId, OutboxMessageRetirement.Delivered);
+        ((IOutboxMessageSource)operation.Runtime).OnRetired(toSubscriber.MessageId, OutboxMessageRetirement.Delivered());
         await operation.WriteAsync(TestCancellation);
         Assert.Empty(operation.Ids);
     });
@@ -312,7 +312,7 @@ public sealed class DurableTaskSubscriptionTests
         Assert.Equal((OperationId, SubscriptionChildId, "done"), (body.TaskId, body.SubscriberId, body.Response.GetResult<string>()));
 
         // The pending completion held the task beyond its retention period; a dead letter restarts that period.
-        ((IOutboxMessageSource)replacement.Runtime).OnRetired(messageId, OutboxMessageRetirement.DeadLettered);
+        ((IOutboxMessageSource)replacement.Runtime).OnRetired(messageId, OutboxMessageRetirement.DeadLettered("The outbox dead-lettered the completion."));
         await replacement.WriteAsync(TestCancellation);
         Assert.Equal([OperationId], replacement.Ids);
         Assert.Equal(time.GetUtcNow(), replacement.Get(OperationId).RetainedSince);
