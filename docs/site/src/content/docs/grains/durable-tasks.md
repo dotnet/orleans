@@ -361,7 +361,11 @@ poll, or a combinator observes its terminal response, `IsCompleted`, `Status`, a
 recorded failure or cancellation, and
 <xref:Orleans.DurableTasks.ScheduledTask`1.TryGetResult*> returns `true` with the result
 of a task which completed successfully. Before the handle observes a terminal response,
-`Status` is `Pending`. For existing handles,
+`Status` is `Pending`. Inside a durable task, a handle's `Id` names the task's operation,
+which combinators and replays address, and
+<xref:Orleans.DurableTasks.ScheduledTask.TargetTaskId> names the task on the grain which
+stores it, which other parties address: a detached task's root ID, the task which
+`GetDurableTask` observes, or a call's task on its target. For existing handles,
 <xref:Orleans.DurableTasks.ScheduledTask.WhenAll*?displayProperty=nameWithType>,
 <xref:Orleans.DurableTasks.ScheduledTask.WhenAllCompleted*?displayProperty=nameWithType>,
 and <xref:Orleans.DurableTasks.ScheduledTask.WhenEach*?displayProperty=nameWithType>
@@ -447,8 +451,9 @@ when the caller continues:
   as a subscriber, so awaiting the task, or its handle, receives its result; canceling
   that wait ends only the subscription.
 - <xref:Orleans.DurableTasks.ConfiguredDurableTask.ScheduleAsync*> returns once the
-  target grain has accepted and durably stored the task, so the task's ID can be handed to
-  other parties, which address it with `GetDurableTask`. The target acknowledges the
+  target grain has accepted and durably stored the task, so the task's ID, the handle's
+  <xref:Orleans.DurableTasks.ScheduledTask.TargetTaskId>, can be handed to other parties,
+  which address it with `GetDurableTask`. The target acknowledges the
   invocation, and the caller's outbox retires it, once the target's journal write stores
   the task. A start which the target rejects, because the task ID already identifies
   another request, throws `DurableTaskConflictException`. Other failures to accept the
