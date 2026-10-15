@@ -1,7 +1,7 @@
 ---
 title: Grain request scheduling
 description: Understand Orleans turn-based execution, interleaving, and reentrancy.
-ms.date: 08/02/2026
+ms.date: 10/15/2026
 ms.topic: concept-article
 ---
 
@@ -62,6 +62,37 @@ The scope permits callbacks associated with that call chain until it is disposed
 
 Grain timer callbacks participate in scheduling. Callbacks don't interleave by default; configure `GrainTimerCreationOptions.Interleave` when intentional.
 
-<xref:Orleans.GrainBaseExtensions.RunRequestAsync*> runs a callback as a request on the activation, from any thread. The request follows the grain's reentrancy rules, passes through grain call filters, starts a new call chain, and keeps the activation alive. Pass <xref:Orleans.Runtime.GrainRequestOptions> to let the request interleave with other requests, to run it without restarting the idle period, or to give call filters an interface name, method name, and arguments that describe it. Use it to apply results from background work, such as stream or messaging handlers, under the same scheduling as grain calls. On a non-reentrant grain, awaiting the request from within another request on the same activation deadlocks.
+To run work from another thread under the activation's scheduling, see [Run background work as a grain request](#run-background-work-as-a-grain-request).
 
 Use <xref:System.Threading.Tasks.Task.Run*> only to isolate unavoidable synchronous blocking or CPU work from the Orleans scheduler. Don't access grain state from the thread-pool delegate. Await it and update grain state after execution resumes on the activation scheduler. See [External tasks and grains](external-tasks-and-grains.md).
+
+## Run background work as a grain request
+
+<xref:Orleans.GrainBaseExtensions.RunRequestAsync*> runs a callback as a request on the activation. Call it from any thread, such as a stream, messaging, or library callback, to apply results to grain state under the same scheduling as grain calls:
+
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_from_callback":::
+The request:
+
+- Follows the grain's reentrancy rules and queues behind the current request on a non-reentrant grain.
+- Passes through incoming grain call filters. By default, filters see it as `IGrainRequestInvoker.RunRequestAsync` with no arguments.
+- Starts a new call chain. <xref:Orleans.Runtime.RequestContext> values from the calling thread don't flow into the callback.
+- Restarts the activation's idle collection period.
+
+The returned task completes with the callback's result or exception. The callback receives the cancellation token passed to `RunRequestAsync`, and cancelling it while the request is queued cancels the request. If the activation deactivates before the request runs, the task faults with <xref:Orleans.Runtime.OrleansMessageRejectionException>.
+
+Pass the grain and other values through the `state` argument and use a `static` lambda, so the call doesn't allocate a closure. On a non-reentrant grain, awaiting the returned task from another request on the same activation deadlocks, because the queued request waits for the current one to complete.
+
+### Configure the request
+
+Pass <xref:Orleans.Runtime.GrainRequestOptions> to change how the request is scheduled. Set <xref:Orleans.Runtime.GrainRequestOptions.KeepAlive> to `false` for frequent background work that shouldn't keep an otherwise idle activation in memory. Set <xref:Orleans.Runtime.GrainRequestOptions.Interleave> to `true` to run the request between the turns of other requests, as with an `[AlwaysInterleave]` method:
+
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_options":::
+### Describe the request to call filters
+
+Set <xref:Orleans.Runtime.GrainRequestOptions.InterfaceName>, <xref:Orleans.Runtime.GrainRequestOptions.MethodName>, and <xref:Orleans.Runtime.GrainRequestOptions.Arguments> to identify the work in call filters, logs, and traces. Tracing names the request's activity `InterfaceName/MethodName`. The callback returns a result through the returned task:
+
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_named":::
+Call filters read the description through the call context:
+
+:::code language="csharp" source="../snippets/compiled/Grains/RequestsAndVersioningSnippets.cs" id="run_request_filter":::
+The arguments describe the request to filters; the callback receives its `state`. A filter that calls `SetArgument` writes into the array assigned to `Arguments`.

@@ -1,7 +1,7 @@
 ---
 title: Grain timers
 description: Schedule activation-scoped periodic work as Orleans grain turns.
-ms.date: 08/21/2026
+ms.date: 10/15/2026
 ms.topic: concept-article
 ---
 
@@ -11,7 +11,7 @@ A grain timer schedules periodic work for one grain activation. Each callback ex
 
 Use a grain timer for frequent work whose lifetime and state belong to the current activation. Use a [reminder](reminders.md) when the schedule belongs to the logical grain and must survive activation or cluster lifecycle changes.
 
-To run a callback once as a grain request, use <xref:Orleans.GrainBaseExtensions.RunRequestAsync*>. See [Request scheduling](request-scheduling.md#timers-and-external-work).
+To run a callback once as a grain request, use <xref:Orleans.GrainBaseExtensions.RunRequestAsync*>. See [Request scheduling](request-scheduling.md#run-background-work-as-a-grain-request).
 
 ## Register a grain timer
 

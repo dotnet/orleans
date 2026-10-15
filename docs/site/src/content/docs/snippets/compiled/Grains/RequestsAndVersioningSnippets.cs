@@ -225,3 +225,150 @@ public async Task JoinRoom(string roomName)
         // </call_chain_reentrancy>
     }
 }
+
+namespace Documentation.Grains.RequestScheduling.BackgroundWork
+{
+    public interface IPriceFeed
+    {
+        IDisposable Subscribe(string symbol, Func<decimal, CancellationToken, Task> onPrice);
+    }
+
+    public interface IQuoteGrain : IGrainWithStringKey
+    {
+        ValueTask<decimal> GetPrice();
+    }
+
+    // <run_request_from_callback>
+public sealed class QuoteGrain(IPriceFeed feed) : Grain, IQuoteGrain
+{
+    private IDisposable? _subscription;
+    private decimal _price;
+
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        // The feed invokes OnPrice on its own threads.
+        _subscription = feed.Subscribe(this.GetPrimaryKeyString(), OnPrice);
+        return Task.CompletedTask;
+    }
+
+    public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        _subscription?.Dispose();
+        return Task.CompletedTask;
+    }
+
+    public ValueTask<decimal> GetPrice() => ValueTask.FromResult(_price);
+
+    // Runs the update as a request on this activation, where it can safely access grain state.
+    private Task OnPrice(decimal price, CancellationToken cancellationToken) =>
+        this.RunRequestAsync(
+            static (state, _) =>
+            {
+                state.Grain._price = state.Price;
+                return Task.CompletedTask;
+            },
+            (Grain: this, Price: price),
+            cancellationToken);
+}
+    // </run_request_from_callback>
+
+    public interface IConnectionMonitor
+    {
+        IDisposable Subscribe(string sessionId, Func<DateTimeOffset, CancellationToken, Task> onHeartbeat);
+    }
+
+    public interface ISessionGrain : IGrainWithStringKey
+    {
+        ValueTask<DateTimeOffset> GetLastSeen();
+    }
+
+    public sealed class SessionGrain(IConnectionMonitor monitor) : Grain, ISessionGrain
+    {
+        private IDisposable? _subscription;
+        private DateTimeOffset _lastSeen;
+
+        public override Task OnActivateAsync(CancellationToken cancellationToken)
+        {
+            _subscription = monitor.Subscribe(this.GetPrimaryKeyString(), OnHeartbeat);
+            return Task.CompletedTask;
+        }
+
+        public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+        {
+            _subscription?.Dispose();
+            return Task.CompletedTask;
+        }
+
+        public ValueTask<DateTimeOffset> GetLastSeen() => ValueTask.FromResult(_lastSeen);
+
+        // <run_request_options>
+// Heartbeats don't extend the activation's lifetime, and they run between the turns of other requests.
+private Task OnHeartbeat(DateTimeOffset timestamp, CancellationToken cancellationToken) =>
+    this.RunRequestAsync(
+        static (state, _) =>
+        {
+            state.Grain._lastSeen = state.Timestamp;
+            return Task.CompletedTask;
+        },
+        (Grain: this, Timestamp: timestamp),
+        new GrainRequestOptions { KeepAlive = false, Interleave = true },
+        cancellationToken);
+        // </run_request_options>
+    }
+
+    [GenerateSerializer]
+    public sealed record Order([property: Id(0)] string Id, [property: Id(1)] decimal Total);
+
+    public interface IOrderBookGrain : IGrainWithStringKey
+    {
+        ValueTask<decimal> GetTotal();
+    }
+
+    public sealed class OrderBookGrain : Grain, IOrderBookGrain
+    {
+        private decimal _total;
+
+        public ValueTask<decimal> GetTotal() => ValueTask.FromResult(_total);
+
+        private int Apply(IReadOnlyList<Order> orders)
+        {
+            foreach (var order in orders)
+            {
+                _total += order.Total;
+            }
+
+            return orders.Count;
+        }
+
+        // <run_request_named>
+// Call filters and tracing observe this request as IOrderFeed.ApplyOrders with one argument.
+internal Task<int> ApplyOrders(IReadOnlyList<Order> orders, CancellationToken cancellationToken) =>
+    this.RunRequestAsync(
+        static (state, _) => Task.FromResult(state.Grain.Apply(state.Orders)),
+        (Grain: this, Orders: orders),
+        new GrainRequestOptions
+        {
+            InterfaceName = "IOrderFeed",
+            MethodName = "ApplyOrders",
+            Arguments = [orders.Count],
+        },
+        cancellationToken);
+        // </run_request_named>
+    }
+
+    // <run_request_filter>
+public sealed class RequestLoggingFilter(ILogger<RequestLoggingFilter> logger) : IIncomingGrainCallFilter
+{
+    public async Task Invoke(IIncomingGrainCallContext context)
+    {
+        logger.LogInformation(
+            "Running {InterfaceName}.{MethodName} with {ArgumentCount} arguments",
+            context.InterfaceName,
+            context.MethodName,
+            context.Request.GetArgumentCount());
+
+        await context.Invoke();
+    }
+}
+    // </run_request_filter>
+}
