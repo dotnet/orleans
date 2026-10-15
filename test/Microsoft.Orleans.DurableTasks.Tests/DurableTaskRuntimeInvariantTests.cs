@@ -3542,6 +3542,53 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     });
 
     [Fact]
+    public Task HandlesNameTheTasksWhichTheirOperationsStartOnEveryAttempt() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, manager, _) = CreateRuntime();
+        var starterId = TaskId.Parse("starter");
+        var detachedRequest = CreateRemoteRequest(1);
+        var callRequest = CreateRemoteRequest(2);
+        var attempts = new ConcurrentQueue<(TaskId Id, TaskId TargetTaskId)[]>();
+        var request = CreateRequest(
+            1,
+            () => DurableTask.Run(async executionToken =>
+            {
+                ScheduledTask[] handles =
+                [
+                    new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("detached").Post(),
+                    new TestStateManager.TestRemoteDurableTask(callRequest).WithId("call").Post(),
+                    DurableTask.Run(static _ => { }).WithId("local").Post(),
+                ];
+                attempts.Enqueue([.. handles.Select(static handle => (handle.Id, handle.TargetTaskId))]);
+                await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("wait");
+            }));
+
+        runtime.ScheduleFromInbox(starterId, request);
+        await manager.WriteStateAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => attempts.Count == 1);
+
+        // A detached start observes the target's root task, and a call reaches the task which its target stores under this
+        // grain's scope. A local child is stored under its own identifier.
+        (TaskId Id, TaskId TargetTaskId)[] expected =
+        [
+            (starterId.Child($"$detach:{detachedRequest.Context!.TargetId}:detached"), TaskId.CreateRoot("detached")),
+            (starterId.Child("call"), CallerScope.GetTaskId(runtime.GrainId, starterId.Child("call"))),
+            (starterId.Child("local"), starterId.Child("local")),
+        ];
+        Assert.Equal(expected, Assert.Single(attempts));
+
+        // A replay reaches the same records, whose handles name the same tasks.
+        await WaitUntilAsync(() => storage.Contains(starterId.Child("wait")));
+        await runtime.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        var (replacement, _, _, _) = CreateRuntime(storage, manager);
+        await replacement.ResumePendingTasksAsync(TestContext.Current.CancellationToken);
+        await WaitUntilAsync(() => attempts.Count == 2);
+
+        Assert.Equal(expected, attempts.Last());
+        await replacement.StopAsync(TestContext.Current.CancellationToken).WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    });
+
+    [Fact]
     public Task CanceledStarterStillStartsTheDetachedTaskAndEndsOnlyItsSubscription() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
@@ -4428,6 +4475,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId) => throw new NotSupportedException();
 
+        public TaskId GetTargetTaskId(TaskId taskId) => taskId;
+
         public DateTimeOffset? GetCompletedAt(TaskId taskId) => null;
 
         private static async ValueTask<DurableTaskResponse> WaitForCancellationAsync(
@@ -4508,6 +4557,8 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         public IScheduledTaskHandle GetScheduledTaskHandle(TaskId taskId) =>
             new SchedulerProbeHandle(taskId);
+
+        public TaskId GetTargetTaskId(TaskId taskId) => taskId;
 
         public DateTimeOffset? GetCompletedAt(TaskId taskId) => null;
 

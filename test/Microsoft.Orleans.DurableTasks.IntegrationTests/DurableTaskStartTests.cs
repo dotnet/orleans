@@ -1,5 +1,6 @@
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Protocol;
+using Orleans.DurableTasks.Runtime;
 using Orleans.Journaling;
 using Xunit;
 
@@ -121,6 +122,30 @@ public abstract class DurableTaskStartTests(string journalFormatKey) : IAsyncLif
     }
 
     [Fact]
+    public async Task HandlesNameTheTasksWhichOtherPartiesAddress()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var starter = _fixture.Client.GetGrain<IDurableTaskStartingGrain>(Guid.NewGuid());
+        var workerKey = Guid.NewGuid();
+        var workflowId = TaskId.CreateRoot("workflow");
+
+        var workflow = await starter.ReportTargetTaskIdsAsync(workerKey).WithId("workflow").ScheduleAsync(cancellationToken);
+        var ids = await workflow.WaitAsync(Timeout, cancellationToken);
+
+        // The detached start's handle names the worker's root task, which the workflow observes through it, and which a
+        // client reads through it. The call's handle names the task which the worker stores under the starter's scope.
+        var detachedRootId = TaskId.CreateRoot($"{starter.GetGrainId()}/workflow:$child-1");
+        Assert.Equal(detachedRootId, ids.DetachedTarget);
+        Assert.NotEqual(ids.DetachedTarget, ids.Detached);
+        Assert.Equal((workflowId.Child("$child-2"), detachedRootId), (ids.Observed, ids.ObservedTarget));
+        Assert.Equal(
+            (workflowId.Child("$child-3"), CallerScope.GetTaskId(starter.GetGrainId(), workflowId.Child("$child-3"))),
+            (ids.Call, ids.CallTarget));
+        var worker = _fixture.Client.GetGrain<IDurableTaskWorkerGrain>(workerKey);
+        Assert.Equal(8, (await worker.GetDurableTask<int>(ids.DetachedTarget).GetResponseAsync(cancellationToken)).GetResult<int>());
+    }
+
+    [Fact]
     public async Task WorkflowScheduleFailsWhenItsHostRejectsTheStart()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -194,10 +219,21 @@ public interface IDurableTaskStartingGrain : IGrainWithGuidKey
 
     DurableTask<string> ScheduleConflictingEchoAsync(Guid workerKey, string rootId);
 
+    DurableTask<TargetTaskIds> ReportTargetTaskIdsAsync(Guid workerKey);
+
     DurableTask<int> WaitForCancellationAsync();
 
     Task<DurableTaskStatus> CancelThroughManagerAsync(string rootId);
 }
+
+[GenerateSerializer]
+public sealed record TargetTaskIds(
+    [property: Id(0)] TaskId Detached,
+    [property: Id(1)] TaskId DetachedTarget,
+    [property: Id(2)] TaskId Observed,
+    [property: Id(3)] TaskId ObservedTarget,
+    [property: Id(4)] TaskId Call,
+    [property: Id(5)] TaskId CallTarget);
 
 [GrainType("durable-task-starting-test")]
 public sealed class DurableTaskStartingGrain(IDurableTaskManager tasks, DurableTaskMessagingProbe probe)
@@ -244,6 +280,18 @@ public sealed class DurableTaskStartingGrain(IDurableTaskManager tasks, DurableT
         {
             return conflict.Message;
         }
+    }
+
+    public async DurableTask<TargetTaskIds> ReportTargetTaskIdsAsync(Guid workerKey)
+    {
+        var worker = GrainFactory.GetGrain<IDurableTaskWorkerGrain>(workerKey);
+        var detached = await worker.EchoAsync(4).Detached().ScheduleAsync();
+        var observed = await worker.GetDurableTask<int>(detached.TargetTaskId).ScheduleAsync();
+        var call = await worker.EchoAsync(5).ScheduleAsync();
+        await detached;
+        await observed;
+        await call;
+        return new(detached.Id, detached.TargetTaskId, observed.Id, observed.TargetTaskId, call.Id, call.TargetTaskId);
     }
 
     public DurableTask<int> WaitForCancellationAsync() =>
