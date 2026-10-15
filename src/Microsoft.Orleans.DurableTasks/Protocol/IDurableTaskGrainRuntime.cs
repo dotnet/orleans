@@ -160,6 +160,9 @@ internal interface IDurableTaskGrainRuntime
 {
     DateTimeOffset UtcNow { get; }
 
+    /// <summary>Gets the grain whose executions the runtime runs.</summary>
+    GrainId GrainId { get; }
+
     /// <summary>
     /// Starts or reattaches to the child <paramref name="taskId"/>, and waits for the journal write which commits it, and,
     /// when <paramref name="waitForAcceptance"/> is set, for the acceptance of the child's host.
