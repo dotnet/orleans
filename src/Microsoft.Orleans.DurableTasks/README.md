@@ -231,6 +231,15 @@ Repository consumers which need a preview package can opt this project into
 packing with `-p:PackDurableTaskAdapter=true`. Packing validates the package's
 framework assets; its first published version establishes the compatibility baseline.
 
+## Diagnostics
+
+`IDurableTaskGrainExtension.GetTasksAsync` lists a grain's tasks with their status, request, and result.
+`DurableTaskEvents`, the `Orleans.DurableTasks` diagnostic listener, reports the runtime's transitions
+synchronously on the activation which makes them, when the runtime stages them: `TaskCreated`,
+`TaskCompleted`, `TaskDeleted`, `ExecutionStarted`, `ExecutionStopped`, `ReplayEnded`,
+`SignalWaitStarted`, `SignalWaitEnded`, and `SelectionWaitStarted`. Each event carries the activation's
+`IGrainContext` and the task's ID. Tests use the events as barriers instead of polling.
+
 ## Runtime guarantees
 
 - `(target GrainId, TaskId)` identifies one execution. A stable request
