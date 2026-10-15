@@ -693,7 +693,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     case IInvocationOperation invocation:
                         AnalyzeInvocation(invocation, replayed, position);
                         break;
-                    case ISimpleAssignmentOperation or ICompoundAssignmentOperation or ICoalesceAssignmentOperation when !replayed && IsStateChange(operation, out var changed) && ReachesExternal(position, block, roots):
+                    case ISimpleAssignmentOperation or ICompoundAssignmentOperation or ICoalesceAssignmentOperation or IIncrementOrDecrementOperation when !replayed && IsStateChange(operation, out var changed) && ReachesExternal(position, block, roots):
                         _analysis.Report(DurableTaskDiagnostics.StateChangeBeforeExternalAwait, operation.Syntax.GetLocation(), changed);
                         break;
                 }
@@ -881,6 +881,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                     ISimpleAssignmentOperation simple => simple.Target,
                     ICompoundAssignmentOperation compound => compound.Target,
                     ICoalesceAssignmentOperation coalesce => coalesce.Target,
+                    IIncrementOrDecrementOperation increment => increment.Target,
                     _ => null,
                 };
                 if (target is IPropertyReferenceOperation { Instance: { } instance } property && Symbols.IsGrainState(instance.Type))
