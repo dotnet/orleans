@@ -1,7 +1,7 @@
 ---
 title: Operate durable tasks
 description: Configure retention and storage, inspect task state, diagnose replay divergence, version workflows, abort stuck tasks, handle dead letters, and size durable task workloads.
-ms.date: 10/13/2026
+ms.date: 10/16/2026
 ms.topic: how-to
 ---
 
@@ -51,7 +51,7 @@ multi-silo deployments; see [Journaling configuration](journaling/configuration.
 ## Retention and deletion
 
 Each invoked task owns an execution tree: the task, its local steps, delays,
-combinator records, `DurableTask.Once` records, signal records, subscriptions to other tasks,
+combinator records, `DurableTask.Once` records, version decisions, signal records, subscriptions to other tasks,
 records of detached tasks, signal-send markers, and its records of calls to other grains. The grain
 deletes the tree in one journal write:
 
@@ -132,6 +132,8 @@ with the grain's next journal write.
 | `ReplayEnded` | A replaying attempt started an operation which no earlier attempt recorded, so `IsReplaying` reports `false`. |
 | `SignalWaitStarted`, `SignalWaitEnded` | An execution started or ended a wait for a signal, under the signal's record. |
 | `SelectionWaitStarted` | A selection, such as `DurableTask.WhenAny`'s, found no completed candidate and waits, under its decision. |
+| `VersionRecorded` | An execution recorded the version of a change which it follows, which the event carries with the change's name. |
+| `ExecutionStalled` | An attempt stalled on a recorded version which the running code doesn't support; the task stays pending. See [Stalled executions](durable-tasks-versioning.md#stalled-executions). |
 
 Tests subscribe to `DurableTaskEvents.AllEvents`, or use `DiagnosticEventCollector`, to
 wait for a transition instead of polling. Messaging reports deliveries, retries, and
@@ -159,7 +161,8 @@ and the requested one. Typical causes:
   `DateTime.UtcNow`, a random number, or mutable grain state, and passes it to a child.
   `DurableTask.Once` records such a value, so every replay passes the same one.
 - A deployment changed a step's arguments, reordered unnamed children, or added an
-  unnamed child or combinator before existing ones.
+  unnamed child or combinator before existing ones. Branch such changes on
+  `DurableTask.GetVersion`, so pending executions keep their recorded operations.
 - A loop or condition schedules children under IDs which depend on a nondeterministic
   value.
 
@@ -187,6 +190,11 @@ replay under the new code:
   members with new `[Id(n)]` values.
 - A changed delay duration applies to new delays. A replayed delay keeps its recorded
   due time, and the runtime logs a warning.
+
+To change operations which pending executions already passed, such as replacing a step
+or changing its arguments, branch on `DurableTask.GetVersion`: each execution follows
+the version which it recorded, and executions which started on earlier code follow
+version `0`. See [Version durable tasks](durable-tasks-versioning.md).
 
 To retire an old workflow shape, add the new shape as a new method and schedule new work
 with it, and keep the old method until its pending tasks complete.
