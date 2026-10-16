@@ -53,21 +53,24 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
 
         if (existing != null)
         {
-            grainState.RecordExists = true;
+            T state;
+            string? etag;
 
             if (existing.Contains(FieldDoc))
             {
-                grainState.ETag = existing[FieldEtag].AsString;
-
-                grainState.State = serializer.Deserialize<T>(existing[FieldDoc]);
+                etag = existing[FieldEtag].AsString;
+                state = serializer.Deserialize<T>(existing[FieldDoc]);
             }
             else
             {
-                grainState.ETag = null;
+                etag = null;
                 existing.Remove(FieldId);
-
-                grainState.State = serializer.Deserialize<T>(existing);
+                state = serializer.Deserialize<T>(existing);
             }
+
+            grainState.State = state;
+            grainState.ETag = etag;
+            grainState.RecordExists = true;
         }
         else
         {

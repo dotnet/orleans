@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Core.Events;
 using Orleans.Configuration;
@@ -16,6 +17,50 @@ namespace Orleans.MongoDB.Tests.Clustering;
 [TestProvider("MongoDB"), TestSuite("BVT"), TestArea("Membership")]
 public sealed class MongoMembershipRegressionTests
 {
+    [Theory]
+    [InlineData(ReadPreferenceMode.SecondaryPreferred)]
+    [InlineData(ReadPreferenceMode.Nearest)]
+    public async Task MultipleTransactions_UsePrimaryWithNonPrimarySharedClient(ReadPreferenceMode preference)
+    {
+        var commands = new ConcurrentQueue<BsonDocument>();
+        await using var database = await MongoDatabase.CreateAsync(settings =>
+        {
+            settings.ReadPreference = new ReadPreference(preference);
+            settings.ClusterConfigurator = cluster => cluster.Subscribe<CommandStartedEvent>(e =>
+                commands.Enqueue(e.Command.DeepClone().AsBsonDocument));
+        });
+        var table = database.CreateMembershipTable("read-preference", MongoDBMembershipStrategy.Multiple);
+        var token = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, token);
+        var empty = await table.ReadAllAsync(token);
+        Assert.Empty(empty.Members);
+        var entry = Entry(1, SiloStatus.Active, 30001);
+        Assert.True(await table.InsertRowAsync(entry, empty.Version.Next(), token));
+        var inserted = await table.ReadAllAsync(token);
+        var row = Assert.Single(inserted.Members);
+        Assert.Equal(entry.SiloAddress, row.Item1.SiloAddress);
+        entry.HostName = "updated-primary";
+        Assert.True(await table.UpdateRowAsync(entry, row.Item2, inserted.Version.Next(), token));
+#pragma warning disable CS0618 // Cover the transactional compatibility read.
+        var updated = Assert.Single((await table.ReadRowAsync(entry.SiloAddress, token)).Members);
+#pragma warning restore CS0618
+        Assert.Equal("updated-primary", updated.Item1.HostName);
+        await table.DeleteMembershipTableEntriesAsync("read-preference", token);
+        Assert.Empty((await table.ReadAllAsync(token)).Members);
+        var transactional = commands.Where(command => command.Contains("autocommit")).ToArray();
+        Assert.Contains(transactional, command => command.Contains("find"));
+        Assert.Contains(transactional, command => command.Contains("update"));
+        Assert.Contains(transactional, command => command.Contains("delete"));
+        Assert.All(transactional, command =>
+        {
+            if (command.TryGetValue("$readPreference", out var readPreference))
+            {
+                Assert.Equal("primary", readPreference["mode"].AsString);
+            }
+        });
+        Assert.Equal(preference, database.Client.Settings.ReadPreference.ReadPreferenceMode);
+    }
+
     [Theory]
     [InlineData(MongoDBMembershipStrategy.SingleDocument)]
     [InlineData(MongoDBMembershipStrategy.Multiple)]

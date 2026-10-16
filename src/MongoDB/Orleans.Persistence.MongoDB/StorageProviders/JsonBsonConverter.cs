@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using MongoDB.Bson;
 using Newtonsoft.Json.Linq;
 
@@ -88,11 +89,11 @@ internal static class JsonBsonConverter
 
                     if (value is DateTime dateTime)
                     {
-                        return dateTime.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFFK");
+                        return dateTime.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFFK", CultureInfo.InvariantCulture);
                     }
                     else if (value is DateTimeOffset dateTimeOffset)
                     {
-                        return dateTimeOffset.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFFK");
+                        return dateTimeOffset.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.FFFFFFFK", CultureInfo.InvariantCulture);
                     }
                     else
                     {
