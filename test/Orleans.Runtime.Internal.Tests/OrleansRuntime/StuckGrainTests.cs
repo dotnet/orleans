@@ -121,9 +121,8 @@ namespace UnitTests.StuckGrainTests
                 calls[i] = stuckGrain.NonBlockingCall();
             }
 
-            // OnDeactivateAsync runs past its deactivation timeout. The runtime awaits it, then forwards queued calls to a new activation.
-            var cleaner = this.fixture.GrainFactory.GetGrain<IStuckCleanGrain>(id);
-            await cleaner.Release(id);
+            // Readiness guarantees that the deactivation callback's release task is registered.
+            Assert.True(StuckGrain.Release(id));
             await Task.WhenAll(calls).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
             // No issue on this one

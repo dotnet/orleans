@@ -824,14 +824,22 @@ namespace Orleans.Runtime
             LogDeactivateActivationsFromCollector(list.Count);
             _catalogInstruments.ActivationShutdownViaCollection();
 
-            var options = new ParallelOptions
+            // Snapshot tasks and diagnostic identities so completed activation contexts can be reclaimed independently.
+            var completions = new Task[list.Count];
+            var collectedActivations = ActivationCollectionEvents.IsCollectionCompletedEnabled
+                ? new ActivationCollectionEvents.CollectedActivation[list.Count]
+                : null;
+            for (var i = 0; i < list.Count; i++)
             {
-                // Continue observing completion after the collector's wait ends.
-                CancellationToken = CancellationToken.None,
-                MaxDegreeOfParallelism = Environment.ProcessorCount * 512
-            };
+                var activation = list[i];
+                completions[i] = activation.Deactivated;
+                if (collectedActivations is not null)
+                {
+                    collectedActivations[i] = new(activation.GrainId, activation.ActivationId);
+                }
+            }
 
-            var deactivationTask = ObserveDeactivationCompletion();
+            var deactivationTask = ObserveDeactivationCompletion(completions, collectedActivations, collectionSource, ageLimit, deactivationReason);
 
             try
             {
@@ -849,14 +857,19 @@ namespace Orleans.Runtime
                 throw;
             }
 
-            async Task ObserveDeactivationCompletion()
+            static async Task ObserveDeactivationCompletion(
+                Task[] completions,
+                ActivationCollectionEvents.CollectedActivation[]? collectedActivations,
+                ActivationCollectionEvents.CollectionSource collectionSource,
+                TimeSpan ageLimit,
+                DeactivationReason deactivationReason)
             {
-                await Parallel.ForEachAsync(list, options, async (activationData, token) =>
-                {
-                    await activationData.Deactivated.ConfigureAwait(false);
-                });
+                await Task.WhenAll(completions);
 
-                ActivationCollectionEvents.EmitCollectionCompleted(collectionSource, ageLimit, deactivationReason, list);
+                if (collectedActivations is not null)
+                {
+                    ActivationCollectionEvents.EmitCollectionCompleted(collectionSource, ageLimit, deactivationReason, collectedActivations);
+                }
             }
 
             void ObserveFailure()
