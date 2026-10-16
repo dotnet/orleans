@@ -82,6 +82,16 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         return Task.CompletedTask;
     }
 
+    public async Task<string> RunCustomRequestLifecycle()
+    {
+        // The request interleaves so that it runs while this call waits for it.
+        var request = new CustomRequest("lifecycle");
+        ((IGrainBase)this).GrainContext.ReceiveLocalRequest(request, new LocalRequestOptions { Interleave = true });
+        var response = await request.Outcome.WaitAsync(TimeSpan.FromSeconds(10));
+        await request.Disposed.WaitAsync(TimeSpan.FromSeconds(10));
+        return $"{response.Result}:disposed-before-completion={request.DisposedBeforeCompletion}";
+    }
+
     public Task StartBlockingRequest()
     {
         var gate = _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -208,10 +218,17 @@ internal sealed class CustomRequest(string value, Action<Response>? onComplete =
     public const string InterfaceName = "ICustomRequests";
     public const string MethodName = "Apply";
     private readonly TaskCompletionSource<Response> _outcome = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private RunRequestGrainBase? _grain;
     private int _completions;
 
+    public string Value => value;
+
     public Task<Response> Outcome => _outcome.Task;
+
+    public Task Disposed => _disposed.Task;
+
+    public bool DisposedBeforeCompletion { get; private set; }
 
     public int Completions => Volatile.Read(ref _completions);
 
@@ -224,8 +241,9 @@ internal sealed class CustomRequest(string value, Action<Response>? onComplete =
     public void Complete(Response response)
     {
         Interlocked.Increment(ref _completions);
-        onComplete?.Invoke(response);
+        DisposedBeforeCompletion = _disposed.Task.IsCompleted;
         _outcome.TrySetResult(response);
+        onComplete?.Invoke(response);
     }
 
     public override object GetTarget() => _grain!;
@@ -234,7 +252,7 @@ internal sealed class CustomRequest(string value, Action<Response>? onComplete =
 
     protected override ValueTask<string?> InvokeInner() => new($"{value}:{_grain is not null}");
 
-    public override void Dispose() { }
+    public override void Dispose() => _disposed.TrySetResult();
 
     public override string GetMethodName() => MethodName;
 
@@ -259,7 +277,28 @@ public sealed class ReentrantRunRequestGrain : RunRequestGrainBase, IReentrantRu
 [MayInterleave(nameof(CanInterleave))]
 public sealed class MayInterleaveRunRequestGrain : RunRequestGrainBase, IMayInterleaveRunRequestGrain
 {
-    public static bool CanInterleave(IInvokable request) => request is CustomRequest;
+    public const string RejectedValue = "rejected";
+
+    public static bool CanInterleave(IInvokable request) => request switch
+    {
+        CustomRequest { Value: RejectedValue } => throw new InvalidOperationException("Predicate failed."),
+        CustomRequest => true,
+        _ => false,
+    };
+
+    public async Task<string> RejectRequestsWithThrowingCompletion()
+    {
+        // Both requests are queued in one turn, so the activation rejects them together when the predicate throws.
+        var context = ((IGrainBase)this).GrainContext;
+        var first = new CustomRequest(RejectedValue, _ => throw new InvalidOperationException("Completion failed."));
+        var second = new CustomRequest(RejectedValue);
+        context.ReceiveLocalRequest(first, default);
+        context.ReceiveLocalRequest(second, default);
+
+        var secondResponse = await second.Outcome.WaitAsync(TimeSpan.FromSeconds(10));
+        var firstResponse = await first.Outcome.WaitAsync(TimeSpan.FromSeconds(10));
+        return $"{firstResponse.Exception?.Message}:{first.Completions}|{secondResponse.Exception?.Message}:{second.Completions}";
+    }
 
     public Task<string?> RunCustomRequestDuringBlockingRequest()
     {

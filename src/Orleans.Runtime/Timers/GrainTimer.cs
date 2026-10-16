@@ -159,7 +159,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             GrainTimerEvents.EmitTickStop(GrainContext, this, exc);
             OnTickCompleted();
-            return new(OnCallbackException(exc));
+            return new(Response.FromException(exc));
         }
     }
 
@@ -184,12 +184,6 @@ internal abstract partial class GrainTimer : IGrainTimer
         }
     }
 
-    private Response OnCallbackException(Exception exc)
-    {
-        LogWarningCallbackException(Logger, exc, this);
-        return Response.FromException(exc);
-    }
-
     private async ValueTask<Response> AwaitCallbackTask(Task task)
     {
         try
@@ -206,7 +200,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             GrainTimerEvents.EmitTickStop(GrainContext, this, exc);
 
-            return OnCallbackException(exc);
+            return Response.FromException(exc);
         }
         finally
         {
@@ -303,9 +297,14 @@ internal abstract partial class GrainTimer : IGrainTimer
 
         public ValueTask<Response> Invoke() => timer.InvokeGrainTimerCallbackAsync();
 
-        // The timer logs callback failures as the tick runs.
+        // No caller observes a tick, so the tick logs its failures, including call filter failures.
+        // Ticks dropped by deactivation are expected and are not logged.
         public void Complete(Response response)
         {
+            if (response.Exception is { } exception and not OrleansMessageRejectionException)
+            {
+                LogWarningCallbackException(timer.Logger, exception, timer);
+            }
         }
 
         // This method is declared for the sake of IGrainTimerCore, but it is not intended to be called directly.
@@ -361,7 +360,7 @@ internal abstract partial class GrainTimer : IGrainTimer
     [LoggerMessage(
         EventId = (int)ErrorCode.Timer_GrainTimerCallbackError,
         Level = LogLevel.Warning,
-        Message = "Caught and ignored exception thrown from timer callback for timer '{Timer}'."
+        Message = "Caught and ignored exception thrown from timer tick for timer '{Timer}'."
     )]
     private static partial void LogWarningCallbackException(ILogger logger, Exception exception, GrainTimer timer);
 

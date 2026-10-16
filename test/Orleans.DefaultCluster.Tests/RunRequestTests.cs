@@ -146,6 +146,27 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
     }
 
     [Fact]
+    public async Task ReceiveLocalRequest_CustomRequest_IsDisposedAfterCompletion()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        Assert.Equal("lifecycle:True:disposed-before-completion=False", await grain.RunCustomRequestLifecycle().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_RejectedBatchWithThrowingCompletion_CompletesEveryRequestOnce()
+    {
+        var grain = GrainFactory.GetGrain<IMayInterleaveRunRequestGrain>(Guid.NewGuid());
+        await grain.StartBlockingRequest();
+        await WaitForLogEntryAsync(grain, "request-start");
+
+        Assert.Equal("Predicate failed.:1|Predicate failed.:1", await grain.RejectRequestsWithThrowingCompletion().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+
+        await grain.ReleaseBlockingRequest();
+        await grain.AwaitPendingRequest().WaitAsync(Timeout, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task ReceiveLocalRequest_MayInterleavePredicate_ObservesCustomRequest()
     {
         var grain = GrainFactory.GetGrain<IMayInterleaveRunRequestGrain>(Guid.NewGuid());

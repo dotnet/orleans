@@ -334,7 +334,12 @@ namespace Orleans.Runtime
                                     response = this.responseCopier.Copy(response)!;
                                 }
 
-                                invokable.Dispose();
+                                // A local request is disposed once it is completed.
+                                if (!message.IsLocalOnly)
+                                {
+                                    invokable.Dispose();
+                                }
+
                                 break;
                             }
                         default:
@@ -344,12 +349,6 @@ namespace Orleans.Runtime
                 catch (Exception exc1)
                 {
                     response = Response.FromException(exc1);
-                }
-
-                // A local request owns its outcome, including reporting its failure, in place of a response.
-                if (message.IsLocalOnly)
-                {
-                    ((ILocalRequest)message.BodyObject!).Complete(response);
                 }
 
                 if (response.Exception is { } invocationException)
@@ -377,6 +376,13 @@ namespace Orleans.Runtime
                     }
                 }
 
+                // A local request owns its outcome, including reporting its failure, in place of a response.
+                // Completing it is the last step, so a failure before it completes the request exactly once.
+                if (message.IsLocalOnly)
+                {
+                    LocalRequests.Complete((ILocalRequest)message.BodyObject!, response, this.logger);
+                }
+
                 if (message.Direction != Message.Directions.OneWay)
                 {
                     SafeSendResponse(message, response);
@@ -389,7 +395,7 @@ namespace Orleans.Runtime
                 LogWarningInvokeException(this.logger, exc2, message);
                 if (message.IsLocalOnly)
                 {
-                    ((ILocalRequest)message.BodyObject!).Complete(Response.FromException(exc2));
+                    LocalRequests.Complete((ILocalRequest)message.BodyObject!, Response.FromException(exc2), this.logger);
                 }
 
                 if (message.Direction != Message.Directions.OneWay)

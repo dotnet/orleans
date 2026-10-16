@@ -91,6 +91,21 @@ public sealed class GrainTimerTests
     }
 
     [Fact]
+    public void Tick_Complete_LogsFailuresExceptRejections()
+    {
+        using var fixture = new TimerFixture();
+        using var timer = fixture.Register<object?>((_, _) => Task.CompletedTask, null, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        var tick = Assert.Single(fixture.Requests).Request;
+        var failure = new InvalidOperationException("Filter failed.");
+
+        tick.Complete(Response.FromException(new OrleansMessageRejectionException("Rejected.")));
+        tick.Complete(Response.Completed);
+        tick.Complete(Response.FromException(failure));
+
+        Assert.Same(failure, Assert.Single(fixture.LoggedWarnings()));
+    }
+
+    [Fact]
     public void MessageFactory_DefaultContextIsCopiedWhileExplicitContextSkipsExport()
     {
         using var fixture = new TimerFixture();
@@ -520,6 +535,7 @@ public sealed class GrainTimerTests
         public TimerFixture()
         {
             _logger.IsEnabled(LogLevel.Error).Returns(true);
+            _logger.IsEnabled(LogLevel.Warning).Returns(true);
             var loggerFactory = Substitute.For<ILoggerFactory>();
             loggerFactory.CreateLogger(Arg.Any<string>()).Returns(_logger);
             var grainId = GrainId.Create("timer-test", "one");
@@ -547,6 +563,11 @@ public sealed class GrainTimerTests
             using var response = await invokable.Invoke();
             Assert.Same(expectedException, response.Exception);
         }
+
+        public List<Exception> LoggedWarnings() =>
+            [.. _logger.ReceivedCalls()
+                .Where(call => call.GetMethodInfo().Name == nameof(ILogger.Log) && Equals(call.GetArguments()[0], LogLevel.Warning))
+                .Select(call => (Exception)call.GetArguments()[3]!)];
 
         public Exception SingleLoggedError()
         {

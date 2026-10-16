@@ -11,6 +11,8 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task StartCustomInvokableRequest(string value);
 
+    Task<string> RunCustomRequestLifecycle();
+
     Task<int> QueueRequests(int count);
 
     Task StartBlockingRequest();
@@ -63,6 +65,12 @@ public interface IMayInterleaveRunRequestGrain : IRunRequestGrain
     /// </summary>
     [AlwaysInterleave]
     Task<string?> RunCustomRequestDuringBlockingRequest();
+
+    /// <summary>
+    /// Queues two requests which the activation rejects together, the first of which throws from its completion.
+    /// </summary>
+    [AlwaysInterleave]
+    Task<string> RejectRequestsWithThrowingCompletion();
 }
 
 /// <summary>

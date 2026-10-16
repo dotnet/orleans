@@ -1188,7 +1188,7 @@ internal sealed partial class ActivationData :
                 {
                     foreach (var (request, exception) in rejectedLocalRequests)
                     {
-                        request.Complete(Response.FromException(exception));
+                        LocalRequests.Complete(request, Response.FromException(exception), _shared.Logger);
                     }
                 }
             }

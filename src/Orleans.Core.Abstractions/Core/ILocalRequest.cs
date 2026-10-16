@@ -6,8 +6,8 @@ namespace Orleans.Runtime;
 /// A request which a grain context receives through <see cref="IGrainContext.ReceiveLocalRequest"/> and which receives its own response.
 /// </summary>
 /// <remarks>
-/// The grain context invokes the request on the activation, through its incoming grain call filters, and then passes the
-/// response to <see cref="Complete"/>. Call filters, logs, and traces observe the request's interface name, method name, and arguments.
+/// The grain context invokes the request on the activation, through its incoming grain call filters, passes the
+/// response to <see cref="Complete"/>, and then disposes the request. Call filters, logs, and traces observe the request's interface name, method name, and arguments.
 /// </remarks>
 public interface ILocalRequest : IInvokable
 {
