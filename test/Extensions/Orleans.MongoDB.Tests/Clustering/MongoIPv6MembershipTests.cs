@@ -11,6 +11,63 @@ namespace Orleans.MongoDB.Tests.Clustering;
 public sealed class MongoIPv6MembershipTests
 {
     [Theory]
+    [InlineData(MongoDBMembershipStrategy.Multiple, "2001:db8::c000:201", "192.0.2.1")]
+    [InlineData(MongoDBMembershipStrategy.Multiple, "192.0.2.1", "2001:db8::c000:201")]
+    [InlineData(MongoDBMembershipStrategy.MultipleDeprecated, "2001:db8::c000:201", "192.0.2.1")]
+    [InlineData(MongoDBMembershipStrategy.MultipleDeprecated, "192.0.2.1", "2001:db8::c000:201")]
+    public async Task MixedIPv4AndIPv6_LegacyAndCanonicalIdsRemainDistinct(
+        MongoDBMembershipStrategy strategy, string legacyIp, string newIp)
+    {
+        await using var database = await MongoDatabase.CreateAsync();
+        var table = database.CreateMembershipTable("mixed", strategy);
+        var token = TestContext.Current.CancellationToken;
+        await table.InitializeMembershipTableAsync(true, token);
+        var legacy = Entry(legacyIp);
+        var canonical = Entry(newIp);
+        var legacyId = MongoMembershipDocument.GetLegacyId("mixed", legacy.SiloAddress);
+        Assert.Equal(legacyId, MongoMembershipDocument.GetLegacyId("mixed", canonical.SiloAddress));
+        var collection = database.Database.GetCollection<MongoMembershipDocument>(
+            strategy == MongoDBMembershipStrategy.Multiple ? "OrleansMembershipV3" : "OrleansMembershipV2");
+        await collection.InsertOneAsync(MongoMembershipDocument.Create(legacy, "mixed", legacyId), cancellationToken: token);
+
+        var initial = await table.ReadAllAsync(token);
+        Assert.True(await table.InsertRowAsync(canonical, initial.Version.Next(), token));
+        var inserted = await table.ReadAllAsync(token);
+        Assert.Equal(2, inserted.Members.Count);
+        var canonicalRow = Assert.Single(inserted.Members, row => row.Item1.SiloAddress.Equals(canonical.SiloAddress));
+        var legacyRow = Assert.Single(inserted.Members, row => row.Item1.SiloAddress.Equals(legacy.SiloAddress));
+        Assert.False(await table.InsertRowAsync(canonical, inserted.Version.Next(), token));
+        Assert.False(await table.InsertRowAsync(legacy, inserted.Version.Next(), token));
+
+        var heartbeat = canonical.IAmAliveTime.AddMinutes(5);
+        await table.UpdateIAmAliveAsync(new MembershipEntry { SiloAddress = canonical.SiloAddress, IAmAliveTime = heartbeat }, token);
+#pragma warning disable CS0618 // Verify both compatibility lookup paths select the full address.
+        var canonicalRead = Assert.Single((await table.ReadRowAsync(canonical.SiloAddress, token)).Members);
+        var legacyRead = Assert.Single((await table.ReadRowAsync(legacy.SiloAddress, token)).Members);
+#pragma warning restore CS0618
+        Assert.Equal(heartbeat, canonicalRead.Item1.IAmAliveTime);
+        Assert.Equal(legacy.IAmAliveTime, legacyRead.Item1.IAmAliveTime);
+        Assert.Equal(canonicalRow.Item2, canonicalRead.Item2);
+        Assert.Equal(legacyRow.Item2, legacyRead.Item2);
+        legacy.HostName = "updated-legacy";
+        Assert.True(await table.UpdateRowAsync(legacy, legacyRead.Item2, inserted.Version.Next(), token));
+        var afterLegacyUpdate = await table.ReadAllAsync(token);
+        canonical.HostName = "updated-canonical";
+        canonical.IAmAliveTime = heartbeat;
+        Assert.True(await table.UpdateRowAsync(canonical, canonicalRead.Item2, afterLegacyUpdate.Version.Next(), token));
+        var after = await table.ReadAllAsync(token);
+        Assert.Equal("updated-legacy", Assert.Single(after.Members, row => row.Item1.SiloAddress.Equals(legacy.SiloAddress)).Item1.HostName);
+        Assert.Equal("updated-canonical", Assert.Single(after.Members, row => row.Item1.SiloAddress.Equals(canonical.SiloAddress)).Item1.HostName);
+        var documents = await collection.Find(FilterDefinition<MongoMembershipDocument>.Empty).ToListAsync(token);
+        Assert.Equal(2, documents.Select(document => document.Id).Distinct().Count());
+        Assert.Equal(legacyId, Assert.Single(documents, document => document.SiloAddress == legacy.SiloAddress.ToParsableString()).Id);
+        var canonicalId = Assert.Single(documents, document => document.SiloAddress == canonical.SiloAddress.ToParsableString()).Id;
+        Assert.StartsWith("v2:", canonicalId);
+        Assert.DoesNotContain("@", canonicalId);
+        Assert.NotEqual(legacyId, canonicalId);
+    }
+
+    [Theory]
     [InlineData(MongoDBMembershipStrategy.Multiple, false)]
     [InlineData(MongoDBMembershipStrategy.Multiple, true)]
     [InlineData(MongoDBMembershipStrategy.MultipleDeprecated, false)]
