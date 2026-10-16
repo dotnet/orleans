@@ -1,3 +1,5 @@
+using System;
+using System.Text;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
@@ -16,7 +18,9 @@ internal sealed class MongoMembershipDocument : MembershipBase
     {
         var ip = address.Endpoint.Address;
         var host = ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4().ToString() : ip.ToString();
-        return $"{deploymentId}@{host}:{address.Endpoint.Port}/{address.Generation}";
+        // Legacy IDs always contain '@'; canonical IDs exclude it for every address family.
+        var cluster = Convert.ToBase64String(Encoding.UTF8.GetBytes(deploymentId));
+        return $"v2:{cluster}:{host}:{address.Endpoint.Port}/{address.Generation}";
     }
 
     internal static string GetLegacyId(string deploymentId, Runtime.SiloAddress address)

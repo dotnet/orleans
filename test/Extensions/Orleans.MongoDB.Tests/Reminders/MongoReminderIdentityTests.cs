@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Core.Events;
@@ -11,6 +12,73 @@ namespace Orleans.MongoDB.Tests.Reminders;
 [TestProvider("MongoDB"), TestSuite("BVT"), TestArea("Reminders")]
 public sealed class MongoReminderIdentityTests
 {
+    [Fact]
+    public async Task ConcurrentFirstRegistrations_CompleteWithoutRetriesAndKeepOneReminder()
+    {
+        const int registrations = 8;
+        var commands = new ConcurrentQueue<BsonDocument>();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var arrivals = 0;
+        await using var database = await MongoDatabase.CreateAsync(settings =>
+            settings.ClusterConfigurator = cluster => cluster.Subscribe<CommandStartedEvent>(command =>
+            {
+                if (command.CommandName != "update") return;
+                commands.Enqueue(command.Command.DeepClone().AsBsonDocument);
+                if (Interlocked.Increment(ref arrivals) == registrations) entered.TrySetResult();
+                release.Task.GetAwaiter().GetResult();
+            }));
+        var table = database.CreateReminderTable("service");
+        var token = TestContext.Current.CancellationToken;
+        await table.StartAsync(token);
+        // Initialize indexes before arming all concurrent first writes.
+        Assert.Empty((await table.ReadRows(0, 0, token)).Reminders);
+        var id = GrainId.Create("account", "concurrent-first");
+        var entries = Enumerable.Range(1, registrations).Select(index =>
+        {
+            var entry = Entry(id, "bill");
+            entry.Period = TimeSpan.FromMinutes(index);
+            return entry;
+        }).ToArray();
+        var writes = entries.Select(entry => Task.Run(() => table.UpsertRow(entry, token), token)).ToArray();
+        var allWrites = Task.WhenAll(writes);
+        try
+        {
+            var reached = await Task.WhenAny(entered.Task, allWrites).WaitAsync(token);
+            if (reached == allWrites) await allWrites;
+            Assert.Equal(registrations, commands.Count);
+            Assert.All(commands, command =>
+            {
+                var update = Assert.Single(command["updates"].AsBsonArray).AsBsonDocument;
+                Assert.Equal(new[] { "_id" }, update["q"].AsBsonDocument.Names);
+                Assert.StartsWith("v2:", update["q"]["_id"].AsString);
+                Assert.True(update["upsert"].AsBoolean);
+            });
+        }
+        finally
+        {
+            release.TrySetResult();
+            await allWrites;
+        }
+
+        var etags = await allWrites;
+        Assert.All(etags, tag => Assert.False(string.IsNullOrWhiteSpace(tag)));
+        Assert.Equal(registrations, etags.Distinct().Count());
+        Assert.Equal(registrations, commands.Count);
+        var documents = await database.Database.GetCollection<MongoReminderDocument>("OrleansReminderV2")
+            .Find(FilterDefinition<MongoReminderDocument>.Empty).ToListAsync(token);
+        var document = Assert.Single(documents);
+        var winner = Assert.Single(entries, entry => entry.ETag == document.Etag);
+        Assert.Equal(winner.Period, document.Period);
+        var point = await table.ReadRow(id, "bill", token);
+        Assert.Equal(winner.ETag, point!.ETag);
+        Assert.Equal(winner.Period, point.Period);
+        Assert.Equal(winner.ETag, Assert.Single((await table.ReadRows(0, 0, token)).Reminders).ETag);
+        Assert.True(await table.RemoveRow(id, "bill", winner.ETag!, token));
+        Assert.Null(await table.ReadRow(id, "bill", token));
+        Assert.Empty((await table.ReadRows(0, 0, token)).Reminders);
+    }
+
     [Fact]
     public async Task ConcurrentLegacyRemoveAndReregister_UsesOneEncodedRegistration()
     {

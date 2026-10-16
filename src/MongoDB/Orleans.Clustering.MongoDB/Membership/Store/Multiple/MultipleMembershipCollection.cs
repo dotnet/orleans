@@ -74,12 +74,9 @@ internal sealed class MultipleMembershipCollection : CollectionBase<MongoMembers
     {
         var collection = GetCollection(cancellationToken);
         var id = MongoMembershipDocument.GetId(deploymentId, entry.SiloAddress);
-        if (id != MongoMembershipDocument.GetLegacyId(deploymentId, entry.SiloAddress))
-        {
-            var existing = await collection.Find(session, MongoMembershipDocument.IdentityFilter(deploymentId, entry.SiloAddress))
-                .FirstOrDefaultAsync(cancellationToken);
-            id = existing?.Id ?? id;
-        }
+        var existing = await collection.Find(session, MongoMembershipDocument.IdentityFilter(deploymentId, entry.SiloAddress))
+            .FirstOrDefaultAsync(cancellationToken);
+        id = existing?.Id ?? id;
 
         var document = MongoMembershipDocument.Create(entry, deploymentId, id);
 
