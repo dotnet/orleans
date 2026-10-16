@@ -66,6 +66,7 @@ public sealed class MongoStorageCancellationTests
 
     [Theory]
     [InlineData("Read", "find")]
+    [InlineData("Insert", "insert")]
     [InlineData("Write", "update")]
     [InlineData("Clear", "delete")]
     [InlineData("WriteConflict", "find")]
@@ -83,18 +84,22 @@ public sealed class MongoStorageCancellationTests
         var storage = host.Services.GetRequiredKeyedService<IGrainStorage>("store");
         var id = GrainId.Create("account", "in-flight");
         var state = new GrainState<MongoTestState> { State = new MongoTestState { Count = 42 } };
-        await storage.WriteStateAsync("Account", id, state, TestContext.Current.CancellationToken);
+        if (operation != "Insert")
+        {
+            await storage.WriteStateAsync("Account", id, state, TestContext.Current.CancellationToken);
+        }
         if (operation.EndsWith("Conflict", StringComparison.Ordinal)) state.ETag = "stale";
         var etag = state.ETag;
+        var recordExists = state.RecordExists;
         await AssertCancellation(barrier, token => operation switch
         {
             "Read" => storage.ReadStateAsync("Account", id, state, token),
-            "Write" or "WriteConflict" => storage.WriteStateAsync("Account", id, state, token),
+            "Insert" or "Write" or "WriteConflict" => storage.WriteStateAsync("Account", id, state, token),
             "Clear" or "ClearConflict" => storage.ClearStateAsync("Account", id, state, token),
             _ => throw new ArgumentOutOfRangeException(nameof(operation))
         });
         Assert.Equal(etag, state.ETag);
-        Assert.True(state.RecordExists);
+        Assert.Equal(recordExists, state.RecordExists);
         Assert.Equal(42, state.State.Count);
     }
 

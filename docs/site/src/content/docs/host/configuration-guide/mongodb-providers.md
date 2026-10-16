@@ -159,6 +159,11 @@ clears reject stale ETags with <xref:Orleans.Storage.InconsistentStateException>
 preserving the caller's metadata on failure. A `*` ETag requests an unconditional
 write or clear. Configure acknowledged MongoDB writes so the provider can observe
 these outcomes.
+For a null or empty ETag, `RecordExists=false` creates a new document atomically,
+while `RecordExists=true` updates a previously read raw document only while it
+still exists. Read raw state before updating it, and retain both its ETag and
+existence metadata. Conflict checks read the primary so their outcomes reflect
+the authoritative document even when application reads use secondaries.
 Refresh reads replace the state and its ETag together after successful deserialization;
 a deserialization failure preserves the previous state, ETag, and existence metadata.
 Storage and reminder cancellation-token overloads propagate cancellation through

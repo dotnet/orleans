@@ -338,6 +338,9 @@ public sealed class MongoClientSharingTests
         await storage.WriteStateAsync(stateName, id, state, token);
         Assert.True(state.RecordExists);
         Assert.False(string.IsNullOrWhiteSpace(state.ETag));
+        var createdTag = state.ETag;
+        await storage.WriteStateAsync(stateName, id, state, token);
+        Assert.NotEqual(createdTag, state.ETag);
         var restored = new GrainState<MongoTestState> { State = new MongoTestState { Name = "stale", Count = -1 } };
         await storage.ReadStateAsync(stateName, id, restored, token);
         Assert.Equal("Ada", restored.State.Name);
