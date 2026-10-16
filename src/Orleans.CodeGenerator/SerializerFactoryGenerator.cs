@@ -58,11 +58,34 @@ internal static class SerializerFactoryGenerator
             var registration = new Registration(type);
             if (Describe(registration, services, implementationCompilation, cancellationToken, out var requiresImplementation) is { } reason)
             {
-                failure = new(type, reason, requiresImplementation);
-                return false;
+                if (!requiresImplementation)
+                {
+                    failure = new(type, reason);
+                    return false;
+                }
+
+                // Keep checking contracts whose types are available even when runtime metadata is omitted.
+                failure ??= new(type, reason, RequiresImplementation: true);
             }
             registrations.Add(type, registration);
             foreach (var dependency in registration.Dependencies) pending.Enqueue(dependency);
+        }
+
+        if (failure is not null)
+        {
+            var metadata = new StringBuilder();
+            var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+            foreach (var type in registrations.Keys)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (AppendTypeMetadata(metadata, type, services.LibraryTypes, visited) is { } metadataFailure)
+                {
+                    failure = metadataFailure;
+                    break;
+                }
+            }
+
+            return false;
         }
 
         var serializerGenerator = new SerializerGenerator(services);
@@ -331,6 +354,17 @@ internal static class SerializerFactoryGenerator
         registration.ReferencedCopier = ResolveImplementation(CopierGenerator.GetSimpleClassName(named.Name));
         if (registration.ReferencedCodec is null || registration.ReferencedCopier is null && !model.IsShallowCopyable)
         {
+            var consumerLibrary = services.LibraryTypes;
+            var includeConstructorParameters = SerializableSourceOutputGenerator.ShouldIncludePrimaryConstructorParameters(named, consumerLibrary);
+            var constructorParameters = SerializableSourceOutputGenerator.ResolveConstructorParameters(named, includeConstructorParameters, consumerLibrary);
+            var members = new FieldIdAssignmentHelper(
+                named,
+                constructorParameters,
+                SerializableSourceOutputGenerator.GetGenerateFieldIdsOptionFromType(named, consumerLibrary),
+                consumerLibrary);
+            registration.Dependencies.AddRange(SerializableSourceOutputGenerator.GetDataMembers(members)
+                .Where(static member => member.IsSerializable || member.IsCopyable)
+                .Select(static member => member.Type));
             requiresImplementation = true;
             return "provide the referenced assembly's generated codec and copier implementations";
         }

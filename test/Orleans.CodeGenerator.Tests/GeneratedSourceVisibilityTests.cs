@@ -102,7 +102,7 @@ public sealed class GeneratedSourceVisibilityTests
             diagnostic => diagnostic.Id == "CS0246" && diagnostic.Location.SourceTree == tree);
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
         Assert.NotEqual(LineVisibility.Hidden, tree.GetLineVisibility(diagnostic.Location.SourceSpan.Start, TestContext.Current.CancellationToken));
-        Assert.Equal(tree.FilePath, diagnostic.Location.GetMappedLineSpan(TestContext.Current.CancellationToken).Path);
+        Assert.Equal(tree.FilePath, tree.GetMappedLineSpan(diagnostic.Location.SourceSpan, TestContext.Current.CancellationToken).Path);
         Assert.Equal("MissingGeneratedType", tree.GetText(TestContext.Current.CancellationToken).ToString(diagnostic.Location.SourceSpan));
     }
 

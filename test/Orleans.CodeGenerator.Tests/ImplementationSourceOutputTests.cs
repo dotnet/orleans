@@ -172,6 +172,136 @@ public sealed class ImplementationSourceOutputTests
         }
     }
 
+    [Theory]
+    [InlineData("System.IO.Stream", false)]
+    [InlineData("System.IO.Stream", true)]
+    [InlineData("InvalidPayload", false)]
+    [InlineData("InvalidPayload", true)]
+    public async Task IndependentContractDiagnosticsSurviveMissingProducerImplementations(
+        string unsupportedRoot, bool unsupportedRootFirst)
+    {
+        var producer = await TestCompilationHelper.CreateCompilation(
+            """
+            namespace Producer;
+
+            [Orleans.GenerateSerializer]
+            public sealed class Payload
+            {
+                [Orleans.Id(0)]
+                public int Value { get; set; }
+            }
+            """,
+            "Producer");
+        var (producerOutput, producerResult) = Generate(producer, IncrementalGeneratorOutputKind.Implementation);
+        Assert.Empty(producerResult.Diagnostics);
+        Assert.Empty(producerResult.GeneratedSources);
+
+        var attributes = unsupportedRootFirst
+            ? $"[Orleans.GenerateSerializerContext<{unsupportedRoot}>][Orleans.GenerateSerializerContext<Producer.Payload>]"
+            : $"[Orleans.GenerateSerializerContext<Producer.Payload>][Orleans.GenerateSerializerContext<{unsupportedRoot}>]";
+        var consumer = await TestCompilationHelper.CreateCompilation(
+            $$"""
+            [Orleans.GenerateSerializer]
+            public sealed class InvalidPayload
+            {
+                [Orleans.Id(0)]
+                public System.IO.Stream Value { get; set; }
+            }
+
+            {{attributes}}
+            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            """,
+            "Consumer",
+            producerOutput.ToMetadataReference());
+        AssertIndependentContract(consumer, "System.IO.Stream", "GenerateSerializerAttribute");
+    }
+
+    [Fact]
+    public async Task ReferencedMemberContractsSurviveMissingProducerImplementations()
+    {
+        var producer = await TestCompilationHelper.CreateCompilation(
+            """
+            namespace Producer;
+
+            [Orleans.GenerateSerializer]
+            public sealed class Payload
+            {
+                [Orleans.Id(0)]
+                public Payload Next { get; set; }
+
+                [Orleans.Id(1)]
+                public System.IO.Stream Value { get; set; }
+            }
+            """,
+            "Producer");
+        var (producerOutput, producerResult) = Generate(producer, IncrementalGeneratorOutputKind.Implementation);
+        Assert.Empty(producerResult.Diagnostics);
+        Assert.Empty(producerResult.GeneratedSources);
+
+        var consumer = await TestCompilationHelper.CreateCompilation(
+            """
+            [Orleans.GenerateSerializerContext<Producer.Payload>]
+            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            """,
+            "Consumer",
+            producerOutput.ToMetadataReference());
+        AssertIndependentContract(consumer, "System.IO.Stream", "GenerateSerializerAttribute");
+    }
+
+    [Fact]
+    public async Task ReferencedMetadataContractsSurviveMissingProducerImplementations()
+    {
+        var producer = await TestCompilationHelper.CreateCompilation(
+            """
+            namespace Producer;
+
+            public interface ITag<T> { }
+
+            [Orleans.GenerateSerializer]
+            public sealed class Payload : ITag<Payload.Hidden>
+            {
+                [Orleans.CompoundTypeAlias("required-private-alias")]
+                private sealed class Hidden { }
+
+                [Orleans.Id(0)]
+                public int Value { get; set; }
+            }
+            """,
+            "Producer");
+        var (producerOutput, producerResult) = Generate(producer, IncrementalGeneratorOutputKind.Implementation);
+        Assert.Empty(producerResult.Diagnostics);
+        Assert.Empty(producerResult.GeneratedSources);
+        var consumer = await TestCompilationHelper.CreateCompilation(
+            """
+            [Orleans.GenerateSerializerContext<Producer.Payload>]
+            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            """,
+            "Consumer",
+            producerOutput.ToMetadataReference());
+        AssertIndependentContract(consumer, "Hidden", "inaccessible");
+    }
+
+    private static void AssertIndependentContract(CSharpCompilation consumer, string expectedType, string expectedReason)
+    {
+        var (editorOutput, editorResult) = Generate(consumer, IncrementalGeneratorOutputKind.Implementation);
+        var diagnostic = Assert.Single(editorResult.Diagnostics);
+        Assert.Equal(DiagnosticRuleId.UnsupportedSerializerContextType, diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains(expectedType, diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains(expectedReason, diagnostic.GetMessage(), StringComparison.Ordinal);
+        Assert.Empty(editorOutput.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var declaration = Assert.Single(editorResult.GeneratedSources);
+        Assert.Contains(".context-declaration.", declaration.HintName, StringComparison.Ordinal);
+
+        var (buildOutput, buildResult) = Generate(consumer, IncrementalGeneratorOutputKind.None);
+        Assert.Equal(diagnostic.ToString(), Assert.Single(buildResult.Diagnostics).ToString());
+        Assert.Empty(buildOutput.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.DoesNotContain(buildResult.GeneratedSources, static source =>
+            source.HintName.Contains(".context.", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task ContractDiagnosticsRemainAvailableWithoutImplementationOutputs()
     {
