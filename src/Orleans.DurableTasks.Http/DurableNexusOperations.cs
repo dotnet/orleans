@@ -9,6 +9,7 @@ namespace Orleans.DurableTasks.Http;
 /// <remarks>See <see href="https://github.com/nexus-rpc/api/blob/main/SPEC.md">the Nexus HTTP specification</see>.</remarks>
 internal sealed class DurableNexusOperations(
     DurableOperationService operations,
+    DurableCallbackRegistrar callbacks,
     INexusOperationTokenFormat tokens,
     IOptions<DurableHttpOptions> options,
     IOptions<HttpJsonOptions> jsonOptions)
@@ -30,6 +31,17 @@ internal sealed class DurableNexusOperations(
                 StatusCodes.Status400BadRequest,
                 "BAD_REQUEST",
                 $"A Nexus-Request-Id has 1 to {DurableHttpRequestHeaders.MaxIdempotencyKeyLength} printable ASCII characters other than '/'.");
+        }
+
+
+        if (!callbacks.TryRead(
+            context,
+            context.Request.Query[NexusProtocol.CallbackQuery].ToString(),
+            NexusProtocol.CallbackHeaderPrefix,
+            out var callback,
+            out var callbackError))
+        {
+            return NexusProtocol.HandlerError(StatusCodes.Status400BadRequest, "BAD_REQUEST", callbackError!);
         }
 
         DurableTaskResponse response;
@@ -68,8 +80,14 @@ internal sealed class DurableNexusOperations(
                     NexusJsonContext.Default.NexusFailure,
                     statusCode: StatusCodes.Status424FailedDependency);
             default:
+                var token = tokens.Format(operationId);
+                if (callback is not null)
+                {
+                    await callbacks.RegisterAsync(callback, DurableCallbackProtocol.Nexus, operations.GetHostId(key), token, operationLocation: null, context.RequestAborted);
+                }
+
                 return TypedResults.Json(
-                    new NexusOperationInfo(tokens.Format(operationId), NexusProtocol.Running),
+                    new NexusOperationInfo(token, NexusProtocol.Running),
                     NexusJsonContext.Default.NexusOperationInfo,
                     statusCode: StatusCodes.Status201Created);
         }

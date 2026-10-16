@@ -17,7 +17,7 @@ namespace Orleans.DurableTasks.Http;
 /// </summary>
 internal sealed class DurableHttpOperations(
     DurableOperationService operations,
-
+    DurableCallbackRegistrar callbacks,
     LinkGenerator links,
     EndpointDataSource endpoints,
     IOptions<DurableHttpOptions> options,
@@ -33,10 +33,21 @@ internal sealed class DurableHttpOperations(
 
     /// <summary>
     /// Starts <paramref name="work"/> as the operation <paramref name="operationId"/>, waits for it as the request prefers,
-    /// and returns its result or its status monitor.
+    /// and returns its result or its status monitor. A request which registers a callback with an
+    /// <c>Operation-Callback</c> header receives the status monitor there once a running operation is terminal.
     /// </summary>
     public async Task<IResult> StartAsync(HttpContext context, DurableOperationsMetadata group, DurableTask work, string operationId)
     {
+        if (!callbacks.TryRead(
+            context,
+            context.Request.Headers[DurableHttpHeaders.OperationCallback].ToString(),
+            DurableHttpHeaders.OperationCallbackHeaderPrefix,
+            out var callback,
+            out var callbackError))
+        {
+            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Operation-Callback is not accepted", detail: callbackError);
+        }
+
         DurableTaskResponse response;
         var key = group.GetKey(context, endpoints, _options.MapOperationId(context, operationId));
         var wait = DurableHttpRequestHeaders.GetWait(context.Request.Headers, _options.MaxWait);
@@ -60,7 +71,13 @@ internal sealed class DurableHttpOperations(
                 detail: "The grain which runs the operation didn't accept it.");
         }
 
-        context.Response.Headers[DurableHttpHeaders.OperationLocation] = GetOperationLocation(context, group, operationId);
+        var location = GetOperationLocation(context, group, operationId);
+        context.Response.Headers[DurableHttpHeaders.OperationLocation] = location;
+        if (callback is not null && !response.IsCompleted)
+        {
+            await callbacks.RegisterAsync(callback, DurableCallbackProtocol.Webhook, operations.GetHostId(key), operationId, location, context.RequestAborted);
+        }
+
         if (wait > TimeSpan.Zero)
         {
             context.Response.Headers[DurableHttpHeaders.PreferenceApplied] = $"wait={(int)wait.TotalSeconds}";

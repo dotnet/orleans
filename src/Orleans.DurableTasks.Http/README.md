@@ -8,7 +8,7 @@
 `Microsoft.Orleans.DurableTasks.Http` carries the idempotence of Orleans durable tasks
 across HTTP. Route groups of ASP.NET Core Minimal APIs start durable grain calls as
 long-running HTTP operations, keyed by the request's `Idempotency-Key`, and serve
-their status, results, event streams, cancellation, and signals.
+their status, results, event streams, cancellation, signals, and webhooks.
 
 ## Serving durable operations
 
@@ -147,3 +147,34 @@ A token is the operation's identifier; register an `INexusOperationTokenFormat` 
 sign, encrypt, or otherwise format tokens. A group of the service's scope without
 route parameters addresses the service's operations by their Nexus request
 identifiers, so it streams their status and delivers their signals.
+
+## Callbacks
+
+A request which starts an operation registers a callback URL, which receives the
+operation's outcome once it is terminal: an `Operation-Callback` header, whose
+delivery carries the status monitor with Standard Webhooks headers, or a Nexus
+`callback` query value, whose delivery is a Nexus completion. Each delivery carries
+the request's headers which start with `Operation-Callback-` or `Nexus-Callback-`,
+without the prefix, such as a receiver's credentials. Headers which address the
+connection, such as `Host`, `Transfer-Encoding`, and `Proxy-*`, and headers which
+deliveries set themselves, such as `webhook-*` and `Nexus-Operation-*`, receive
+`400 Bad Request`.
+
+```csharp
+builder.Services.AddDurableHttp(options =>
+    options.AllowCallback = (context, url) => url.Scheme == "https" && IsTrustedReceiver(context.User, url));
+
+siloBuilder.Services.AddDurableHttpCallbacks();
+siloBuilder.Services.AddSingleton<IDurableWebhookSigner, MyWebhookSigner>();
+```
+
+`DurableHttpOptions.AllowCallback` decides which URLs the application accepts; by
+default it accepts none, and a request with another URL receives `400 Bad Request`.
+Each callback is a durable task on a relay grain in the silos, which subscribes to
+the operation and delivers its outcome, retrying with backoff and `Retry-After` until
+the receiver answers `2xx`, or `410 Gone`, or `DurableCallbackOptions.RetryTimeout`
+elapses. A retried start registers the same callback, which delivers once.
+Deliveries are at least once: a webhook's `webhook-id` is equal for each attempt, and
+an `IDurableWebhookSigner`, which holds the application's keys, adds
+`webhook-signature`. `AddDurableHttpCallbacks` returns the builder of the
+`HttpClient` which delivers callbacks, to configure its handlers.
