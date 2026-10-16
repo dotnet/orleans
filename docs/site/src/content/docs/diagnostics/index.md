@@ -9,7 +9,7 @@ ms.topic: reference
 
 Orleans analyzers detect unsupported RPC contracts, serialization schema problems, unsafe grain execution patterns, replay hazards in durable tasks, and compatibility changes. Select a diagnostic ID for its cause, impact, remediation, code-fix behavior, and suppression guidance.
 
-Durable task diagnostics ORLEANS0100 to ORLEANS0116 enforce the [replay-safety rules](../grains/durable-tasks-replay-rules.md) for durable task bodies.
+Durable task diagnostics ORLEANS0100 to ORLEANS0117 enforce the [replay-safety rules](../grains/durable-tasks-replay-rules.md) for durable task bodies.
 
 Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic ID as a URL fragment. The single redirect can therefore remain stable while this index and the detailed pages evolve.
 
@@ -171,7 +171,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0112
 
-[Filter cancellation handlers by IsCancellationRequested](orleans0112.md) — Info. Durable task code catches cancellation without telling durable cancellation from a host stop.
+[Filter cancellation handlers by IsTaskCancellationRequested](orleans0112.md) — Info. Durable task code catches cancellation without telling task cancellation from attempt cancellation.
 
 ## ORLEANS0113
 
@@ -188,3 +188,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0116
 
 [Post durable tasks from grains or durable task bodies](orleans0116.md) — Warning. Code outside grains and durable task bodies posts a durable task, which throws.
+
+## ORLEANS0117
+
+[Pass AttemptCancellationToken to calls in task-cancellation cleanup](orleans0117.md) — Warning. Code which runs only after task cancellation passes the already-canceled `CancellationToken` to a call.

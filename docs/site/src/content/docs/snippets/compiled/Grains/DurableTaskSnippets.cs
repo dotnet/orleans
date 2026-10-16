@@ -169,10 +169,10 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
                     order.Lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units)))
                 .WithId("reserve");
         }
-        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
             // WhenAll has waited for every reservation, so none is still running.
-            return await CancelOrderAsync(order.Lines, DurableTask.Current.CancellationReason);
+            return await CancelOrderAsync(order.Lines, DurableTask.Current.TaskCancellationReason);
         }
 
         if (Array.IndexOf(reserved, false) >= 0)

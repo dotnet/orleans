@@ -117,9 +117,9 @@ carrier's request ends canceled.
 and record why the order was canceled.
 
 The `catch` block in [the fan-out recipe](#fan-out-to-every-line-with-a-named-whenall)
-filters on `IsCancellationRequested`, so it handles the workflow's own durable
+filters on `IsTaskCancellationRequested`, so it handles the workflow's own task
 cancellation, and passes
-<xref:Orleans.DurableTasks.DurableTaskContext.CancellationReason?displayProperty=nameWithType>
+<xref:Orleans.DurableTasks.DurableTaskContext.TaskCancellationReason?displayProperty=nameWithType>
 to the compensation:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_compensation" language="csharp":::
