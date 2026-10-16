@@ -11,6 +11,7 @@ namespace Orleans.Runtime
         private const int StateCompleted = 1;
         private const int StateCancellationRegistrationPending = 2;
         private const int StateCancellationRegistrationPublished = 4;
+        private const int StateCancellationRequested = 8;
 
         private readonly SharedCallbackData shared;
         private readonly IResponseCompletionSource context;
@@ -44,10 +45,10 @@ namespace Orleans.Runtime
                 return;
             }
 
-            if (Interlocked.CompareExchange(
-                ref _state,
-                StateCancellationRegistrationPending,
-                StateNone) != StateNone)
+            if (!TryUpdateState(
+                blockingFlags: StateCompleted | StateCancellationRegistrationPending | StateCancellationRegistrationPublished,
+                clearFlags: StateNone,
+                setFlags: StateCancellationRegistrationPending))
             {
                 return;
             }
@@ -59,13 +60,30 @@ namespace Orleans.Runtime
             }, this);
 
             _cancellationTokenRegistration = registration;
-            if (Interlocked.CompareExchange(
-                ref _state,
-                StateCancellationRegistrationPublished,
-                StateCancellationRegistrationPending) != StateCancellationRegistrationPending)
+            if (!TryUpdateState(
+                blockingFlags: StateCompleted,
+                clearFlags: StateCancellationRegistrationPending,
+                setFlags: StateCancellationRegistrationPublished))
             {
                 registration.Dispose();
             }
+        }
+
+        private bool TryUpdateState(int blockingFlags, int clearFlags, int setFlags)
+        {
+            var state = Volatile.Read(ref _state);
+            while ((state & blockingFlags) == 0)
+            {
+                var observed = Interlocked.CompareExchange(ref _state, (state & ~clearFlags) | setFlags, state);
+                if (observed == state)
+                {
+                    return true;
+                }
+
+                state = observed;
+            }
+
+            return false;
         }
 
         private void SignalCancellation()
@@ -82,6 +100,46 @@ namespace Orleans.Runtime
         public void OnStatusUpdate(StatusResponse status)
         {
             this.lastKnownStatus = status;
+        }
+
+        /// <summary>
+        /// Moves this call's target to the silo which now owns the request, after that silo has accepted it.
+        /// </summary>
+        /// <param name="targetSilo">The silo which now hosts the request.</param>
+        /// <param name="forwardCount">The request's forward count at <paramref name="targetSilo"/>, which orders retargets for the same call.</param>
+        /// <param name="isDeadSilo">Determines whether a silo has been declared dead. The call fails if <paramref name="targetSilo"/> is dead.</param>
+        /// <returns><see langword="true"/> if the call was retargeted; <see langword="false"/> if the retarget was superseded.</returns>
+        /// <remarks>
+        /// A retarget which races with completion has no effect on the call's outcome. It only propagates a requested cancellation to the new target.
+        /// </remarks>
+        public bool TryRetarget(SiloAddress targetSilo, int forwardCount, Func<SiloAddress, bool> isDeadSilo)
+        {
+            lock (Message)
+            {
+                if (forwardCount <= Message.ForwardCount)
+                {
+                    return false;
+                }
+
+                Message.ForwardCount = forwardCount;
+                Message.TargetSilo = targetSilo;
+            }
+
+            // Publish the new target before observing cancellation, so either this or OnCancellation signals the new target.
+            Interlocked.MemoryBarrier();
+            if ((Volatile.Read(ref _state) & StateCancellationRequested) != 0)
+            {
+                SignalCancellation();
+            }
+
+            // The new target's failure sweep only completes calls which it observes targeting that silo.
+            // Membership marks a silo dead before sweeping its calls, so either the sweep observes this retarget or this check observes the death.
+            if (isDeadSilo(targetSilo))
+            {
+                OnTargetSiloFail(targetSilo);
+            }
+
+            return true;
         }
 
         public bool IsExpired(long currentTimestamp)
@@ -111,6 +169,8 @@ namespace Orleans.Runtime
 
         private void OnCancellation(CancellationToken cancellationToken)
         {
+            Interlocked.Or(ref _state, StateCancellationRequested);
+
             // If waiting for acknowledgement is enabled, simply signal to the remote grain that cancellation
             // is requested and return.
             if (shared.WaitForCancellationAcknowledgement)
@@ -145,6 +205,8 @@ namespace Orleans.Runtime
             RecordElapsedTime();
             if (shared.CancelRequestOnTimeout)
             {
+                // Record the request before signaling, so that a concurrent retarget also signals its new target.
+                Interlocked.Or(ref _state, StateCancellationRequested);
                 SignalCancellation();
             }
 
@@ -164,11 +226,18 @@ namespace Orleans.Runtime
             context.Complete(Response.FromException(exception));
         }
 
-        public void OnTargetSiloFail()
+        /// <summary>
+        /// Fails the call because <paramref name="failedSilo"/> became unavailable, unless the call has since been retargeted to another silo.
+        /// </summary>
+        public void OnTargetSiloFail(SiloAddress failedSilo)
         {
-            if (!TryComplete())
+            // Retargeting changes the target under this lock, so the call fails only if it still targets the failed silo.
+            lock (Message)
             {
-                return;
+                if (!failedSilo.Equals(Message.TargetSilo) || !TryComplete())
+                {
+                    return;
+                }
             }
 
             RecordElapsedTime();

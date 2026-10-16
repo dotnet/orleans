@@ -19,6 +19,7 @@ namespace Orleans.Runtime
         private readonly CatalogInstruments _catalogInstruments;
         private readonly MessagingProcessingInstruments _messagingProcessingInstruments;
         private ISiloStatusOracle _siloStatusOracle = null!;
+        private volatile bool _isRetiring;
 
         // Lock striping is used for activation creation to reduce contention
         private const int LockCount = 32; // Must be a power of 2
@@ -134,7 +135,25 @@ namespace Orleans.Runtime
             in GrainId grainId,
             Dictionary<string, object>? requestContextData,
             MigrationContext? rehydrationContext)
+            => GetOrCreateActivation(grainId, requestContextData, rehydrationContext, migratedRequests: null, out _);
+
+        /// <summary>
+        /// If activation already exists, return it.
+        /// Otherwise, creates a new activation, begins rehydrating it and activating it, then returns it.
+        /// </summary>
+        /// <param name="grainId">The grain identity.</param>
+        /// <param name="requestContextData">Optional request context data.</param>
+        /// <param name="rehydrationContext">Optional rehydration context.</param>
+        /// <param name="migratedRequests">Requests which were queued for the grain's previous activation, which a new activation queues ahead of any other request.</param>
+        /// <param name="requestsAccepted">Whether this call created the activation and it took ownership of <paramref name="migratedRequests"/>.</param>
+        public IGrainContext? GetOrCreateActivation(
+            in GrainId grainId,
+            Dictionary<string, object>? requestContextData,
+            MigrationContext? rehydrationContext,
+            List<Message>? migratedRequests,
+            out bool requestsAccepted)
         {
+            requestsAccepted = false;
             if (TryGetGrainContext(grainId, out var result))
             {
                 rehydrationContext?.Dispose();
@@ -200,6 +219,12 @@ namespace Orleans.Runtime
             if (rehydrationContext is not null)
             {
                 result.Rehydrate(rehydrationContext);
+            }
+
+            // Migrated requests are queued before activation, so they precede any request which reaches the new activation directly.
+            if (migratedRequests is not null && result is ActivationData activation)
+            {
+                requestsAccepted = activation.TryEnqueueMigratedRequests(migratedRequests);
             }
 
             // Initialize the new activation asynchronously.
@@ -303,8 +328,21 @@ namespace Orleans.Runtime
             }).WaitAsync(cancellationToken);
         }
 
+        /// <summary>
+        /// Gets whether this silo is retiring, in which case an activation which still has queued requests when it deactivates migrates with them, including one whose deactivation was already underway.
+        /// </summary>
+        internal bool IsRetiring => _isRetiring;
+
+        /// <summary>
+        /// Deactivates every activation in the catalog and waits for their deactivation to complete.
+        /// </summary>
+        /// <remarks>
+        /// An activation leaves the catalog in the final, synchronous step of its deactivation, unless it is abandoned as stuck,
+        /// so this also waits for deactivations which were already underway, including the migration of their queued requests.
+        /// </remarks>
         public async Task DeactivateAllActivations(CancellationToken cancellationToken)
         {
+            _isRetiring = true;
             LogDebugDeactivateAllActivations();
             LogDebugDeactivateActivations(activations.Count);
             var reason = new DeactivationReason(DeactivationReasonCode.ShuttingDown, "This process is terminating.");

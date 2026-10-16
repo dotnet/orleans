@@ -49,6 +49,16 @@ If the external grace period expires first, the process is killed and graceful s
 
 Grains can move or reactivate elsewhere after a silo leaves. Don't use graceful shutdown as an application-wide drain barrier unless the application separately coordinates that behavior.
 
+### Queued requests during shutdown
+
+When a silo shuts down gracefully, an activation which still has queued requests after its running requests finish migrates to another silo, carrying those requests in its migration package. The new activation queues them before it can receive any other request, registers in the grain directory in place of the old one, and processes them first. The calling silos then record the request's new location, so their calls keep waiting for a response after the original silo leaves the cluster. Calls retain their original identities and response timeouts. Every migration carries the activation's queued requests in the same way, including migrations requested with <xref:Orleans.Grain.MigrateOnIdle>.
+
+Requests which can't migrate with their activation are forwarded instead. This includes requests for stateless workers and <xref:Orleans.Placement.ImmovableAttribute> grains, requests which together exceed <xref:Orleans.Configuration.MessagingOptions.MaxMessageBodySize>, requests which arrive after the activation's migration has begun, requests for a grain which is already active on the destination silo, and requests migrating to a silo which runs an earlier version. Callers of forwarded requests fail with <xref:Orleans.Runtime.SiloUnavailableException> if the original silo leaves the cluster before the response arrives, as they do when a silo crashes.
+
+A migration counts as a forward. Requests which have already been forwarded <xref:Orleans.Configuration.SiloMessagingOptions.MaxForwardCount> times stay with the original activation and are rejected when it deactivates, so their callers fail with a rejection without the request executing.
+
+Migration adds activation time on the destination silo to shutdown, bounded by <xref:Orleans.Configuration.GrainCollectionOptions.DeactivationTimeout> and the host shutdown budget.
+
 ## Containers and orchestrators
 
 Remove the instance from application traffic before requesting host shutdown. Then send the platform's normal termination request, allow the host shutdown budget to elapse, and reserve forceful termination for hung processes. A forced termination, power loss, or process crash can bypass the host entirely, so correctness must not depend on graceful shutdown.

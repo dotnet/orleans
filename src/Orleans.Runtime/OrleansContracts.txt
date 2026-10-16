@@ -73,6 +73,10 @@ interface [GrainInterfaceType("Orleans.Runtime.IGrainCallCancellationManagerSyst
 interface [GrainInterfaceType("Orleans.Runtime.IGrainTimerInvoker")] Orleans.Runtime.IGrainTimerInvoker [Version(0)]
   3F6C2672: InvokeCallbackAsync(System.Threading.CancellationToken) -> Task
 
+interface [GrainInterfaceType("Orleans.Runtime.IMigratingRequestsSystemTarget")] Orleans.Runtime.IMigratingRequestsSystemTarget [Version(0)]
+  AcceptMigratingGrainsWithRequests: AcceptMigratingGrainsWithRequests(System.Collections.Generic.List<Orleans.Runtime.GrainMigrationPackage>, System.Threading.CancellationToken) -> ValueTask<bool[]>
+  RetargetMigratedRequests: RetargetMigratedRequests(System.Collections.Generic.List<Orleans.Runtime.MigratedRequestRoute>, System.Threading.CancellationToken) -> ValueTask
+
 interface [GrainInterfaceType("Orleans.Runtime.IRemoteGrainDirectory")] Orleans.Runtime.IRemoteGrainDirectory [Version(0)]
   9ABE3793: AcceptSplitPartition(System.Collections.Generic.List<Orleans.Runtime.GrainAddress>, System.Threading.CancellationToken) -> Task
   7DF50601: LookUpMany(System.Collections.Generic.List<(Orleans.Runtime.GrainId, int)>, System.Threading.CancellationToken) -> Task<System.Collections.Generic.List<Orleans.GrainDirectory.AddressAndTag>>
