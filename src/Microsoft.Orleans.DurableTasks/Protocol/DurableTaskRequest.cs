@@ -217,52 +217,60 @@ public abstract class DurableTaskRequest(DurableTaskRequestShared shared) : Dura
             : shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(target);
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
+    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) =>
+        RunRemoteAsync(_shared, this, executionContext);
+
+    /// <summary>
+    /// Runs <paramref name="request"/> as an operation of <paramref name="executionContext"/>, a durable execution which
+    /// a host other than a grain runs: schedules the request on its target under the execution's identifier, and polls
+    /// the target until the task completes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Scheduling is idempotent: a target which already holds the task under the identifier, with the same request,
+    /// accepts it again, so an execution which runs again reattaches to the same task. A grain's executions stage their
+    /// calls to other grains in the grain's durable outbox instead.
+    /// </para>
+    /// <para>
+    /// The execution's task cancellation is requested of the target task, which decides its outcome, so polling continues
+    /// until the target task completes. The cancellation of the execution's attempt ends the wait.
+    /// </para>
+    /// </remarks>
+    internal static async ValueTask<DurableTaskResponse> RunRemoteAsync(
+        DurableTaskRequestShared shared,
+        IDurableTaskRequest request,
+        DurableTaskContext executionContext)
     {
-        // Schedule this request with the remote service.
-        // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
-        // * The task is semantically identical (same implementation and arguments).
-        // * The task did not complete already and was subsequently cleaned up.
-        // We can be sure that the task was not already cleaned up if we are calling from a grain which has a stable identifier, since
-        // the caller must acknowledge completion before the task is eligible for garbage collection.
-        // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
-        // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
-        Debug.Assert(Context is not null);
-        if (TryGetRuntime(_shared, out var runtime))
-        {
-            using var durableCts = new CancellationTokenSource();
-            await using var durableRegistration = await executionContext.RegisterCancellationCallbackAsync(
-                async _ =>
-                {
-                    await durableCts.CancelAsync();
-                    await runtime.CancelRemoteAsync(executionContext.Id, Context.TargetId, executionContext.CancellationReason, CancellationToken.None);
-                });
-            var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.Id, this, durableCts.Token);
-            return durableResponse.IsCompleted
-                ? durableResponse
-                : await runtime.GetScheduledTaskHandle(executionContext.Id).WaitAsync(durableCts.Token);
-        }
+        var context = request.Context;
+        Debug.Assert(context is not null);
+        PrepareClientContext(context);
 
-        PrepareClientContext(Context);
-
-        var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        using var cts = new CancellationTokenSource();
-        await using var registration = await executionContext.RegisterCancellationCallbackAsync(
-            async _ =>
-            {
-                await cts.CancelAsync();
-                await GrainScheduledTaskHandle.RequestCancellationAsync(remote, executionContext.Id, executionContext.CancellationReason);
-            });
-        var response = await remote.ScheduleAsync(executionContext.Id, this, cts.Token);
+        var remote = shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(context.TargetId);
+        var response = await remote.ScheduleAsync(executionContext.Id, request, executionContext.AttemptCancellationToken);
         var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
-        while (!response.IsCompleted && !cts.IsCancellationRequested)
+        var cancellationRequested = false;
+        while (!response.IsCompleted)
         {
-            response = await DurableTaskPolling.PollAsync(remote, executionContext.Id, options, cts.Token);
+            if (!cancellationRequested && executionContext.IsTaskCancellationRequested)
+            {
+                cancellationRequested = true;
+                await GrainScheduledTaskHandle.RequestCancellationAsync(remote, executionContext.Id, executionContext.TaskCancellationReason);
+            }
+
+            try
+            {
+                // Until task cancellation is requested, its token ends the poll so that the request is made promptly.
+                var token = cancellationRequested ? executionContext.AttemptCancellationToken : executionContext.CancellationToken;
+                response = await DurableTaskPolling.PollAsync(remote, executionContext.Id, options, token);
+            }
+            catch (OperationCanceledException) when (!cancellationRequested && !executionContext.AttemptCancellationToken.IsCancellationRequested)
+            {
+                // Task cancellation was requested, which the next iteration requests of the target task.
+            }
         }
 
         return response;
     }
-
     /// <inheritdoc/>
     ValueTask<Response> IInvokable.Invoke()
         // This could be made to work... maybe pick a random task id, for example.
@@ -392,52 +400,8 @@ public abstract class DurableTaskRequest<TResult>(DurableTaskRequestShared share
     IScheduledTaskHandle ISchedulableTask.Post(TaskId taskId) => DurableTaskRequest.PostRoot(_shared, this, taskId);
 
     /// <inheritdoc/>
-    protected override async ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext)
-    {
-        // Schedule this request with the remote service.
-        // If the task has already been submitted then this will submit it again, which is an idempotent operation if:
-        // * The task is semantically identical (same implementation and arguments).
-        // * The task did not complete already and was subsequently cleaned up.
-        // We can be sure that the task was not already cleaned up if we are calling from a grain which has a stable identifier, since
-        // the caller must acknowledge completion before the task is eligible for garbage collection.
-        // For the first point (identical implementation and arguments), we could store the task locally and verify it against its already-stored copy.
-        // This check can also be performed remotely instead, since the remote host must have stored a copy of the request in order to be able to execute it.
-        Debug.Assert(Context is not null);
-        if (DurableTaskRequest.TryGetRuntime(_shared, out var runtime))
-        {
-            using var durableCts = new CancellationTokenSource();
-            await using var durableRegistration = await executionContext.RegisterCancellationCallbackAsync(
-                async _ =>
-                {
-                    await durableCts.CancelAsync();
-                    await runtime.CancelRemoteAsync(executionContext.Id, Context.TargetId, executionContext.CancellationReason, CancellationToken.None);
-                });
-            var durableResponse = await runtime.ScheduleRemoteAsync(executionContext.Id, this, durableCts.Token);
-            return durableResponse.IsCompleted
-                ? durableResponse
-                : await runtime.GetScheduledTaskHandle(executionContext.Id).WaitAsync(durableCts.Token);
-        }
-
-        DurableTaskRequest.PrepareClientContext(Context);
-
-        var remote = _shared.GrainFactory.GetGrain<IDurableTaskGrainExtension>(Context.TargetId);
-        using var cts = new CancellationTokenSource();
-        await using var registration = await executionContext.RegisterCancellationCallbackAsync(
-            async _ =>
-            {
-                await cts.CancelAsync();
-                await GrainScheduledTaskHandle.RequestCancellationAsync(remote, executionContext.Id, executionContext.CancellationReason);
-            });
-        var response = await remote.ScheduleAsync(executionContext.Id, this, cts.Token);
-        var options = new SubscribeOrPollOptions { PollTimeout = TimeSpan.FromSeconds(5) };
-        while (!response.IsCompleted && !cts.IsCancellationRequested)
-        {
-            response = await DurableTaskPolling.PollAsync(remote, executionContext.Id, options, cts.Token);
-        }
-
-        return response;
-    }
-
+    protected override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext executionContext) =>
+        DurableTaskRequest.RunRemoteAsync(_shared, this, executionContext);
     /// <inheritdoc/>
     ValueTask<Response> IInvokable.Invoke() => throw new NotImplementedException("Durable task requests can not be invoked directly");
 

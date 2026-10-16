@@ -8,6 +8,7 @@ using Orleans.DurableTasks.Protocol;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Journaling;
 using Orleans.Runtime;
 
 namespace Orleans.DurableTasks.Runtime;
@@ -16,10 +17,11 @@ namespace Orleans.DurableTasks.Runtime;
 /// Executes one attempt of a durable task within a grain activation.
 /// </summary>
 /// <remarks>
-/// The attempt's host execution-abort token is canceled when the activation shuts down or when the task is aborted:
-/// <see cref="DurableTaskContext.CancellationToken"/> observes it, while
-/// <see cref="DurableTaskContext.IsCancellationRequested"/> reports durable cancellation only. The runtime drains the
-/// aborted attempt and discards its response; after shutdown, the next activation replays the task in a new context.
+/// The runtime cancels the attempt when the activation stops, or when the task is aborted or deleted with its execution
+/// tree, through <see cref="CancelAttempt"/>. From then on, the attempt's durable operations throw
+/// <see cref="DurableTaskAttemptCanceledException"/>, and so do the changes which its code makes to the grain's journaled
+/// state, through <see cref="MutationFence"/>. The runtime drains the canceled attempt and discards its response; after
+/// the activation stops, the next activation replays the task in a new context.
 /// </remarks>
 internal sealed class GrainDurableTaskContext : DurableTaskContext
 {
@@ -29,12 +31,11 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     private readonly TaskScheduler _scheduler;
     private long _utcNowTicks;
 
-    // The attempt's abort source. It is linked to activation shutdown through a registration which the attempt releases
-    // when it ends, so a completed attempt retains nothing on the shutdown token.
-    private readonly CancellationTokenSource _abortSource;
-    private readonly CancellationTokenRegistration _shutdownRegistration;
-    private bool _deleted;
-    private bool _aborted;
+    // Closed when the runtime cancels the attempt, so the journaled state changes which the attempt's code makes throw.
+    private readonly JournaledStateMutationFence _mutationFence;
+
+    // Why the runtime canceled the attempt, or null. Set on the activation's scheduler. Guarded by _lock.
+    private DurableTaskAttemptCancellationReason? _attemptCancellationReason;
 
     // The attempt's waits for events which messages deliver: those which are pending, and those which resumed but whose
     // waiting code hasn't continued yet. The attempt is parked while a wait is pending and none has resumed. Guarded by
@@ -62,29 +63,32 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         TaskId taskId,
         IDurableTaskGrainRuntime runtime,
         TaskScheduler scheduler,
-        CancellationToken shutdownToken,
         DateTimeOffset? utcNow = null)
-        : this(taskId, runtime, scheduler, shutdownToken, new CancellationTokenSource(), utcNow)
-    {
-    }
-
-    private GrainDurableTaskContext(
-        TaskId taskId,
-        IDurableTaskGrainRuntime runtime,
-        TaskScheduler scheduler,
-        CancellationToken shutdownToken,
-        CancellationTokenSource abortSource,
-        DateTimeOffset? utcNow)
-        : base(taskId, abortSource.Token)
+        : base(taskId)
     {
         _runtime = runtime;
         _scheduler = scheduler;
         _utcNowTicks = (utcNow ?? runtime.UtcNow).UtcTicks;
-        _abortSource = abortSource;
-        _shutdownRegistration = shutdownToken.UnsafeRegister(
-            static state => ((CancellationTokenSource)state!).Cancel(),
-            abortSource);
+        _mutationFence = new(static state => ((GrainDurableTaskContext)state!).CreateAttemptCanceledException(), this);
         _unreached = runtime.GetRecordedOperations(taskId);
+    }
+
+    /// <summary>
+    /// Gets the fence which the runtime enters around the attempt's code, and which closes when the runtime cancels the
+    /// attempt.
+    /// </summary>
+    internal JournaledStateMutationFence MutationFence => _mutationFence;
+
+    /// <summary>Gets whether the runtime canceled this attempt.</summary>
+    internal bool IsAttemptCanceled
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _attemptCancellationReason is not null;
+            }
+        }
     }
 
     /// <remarks>
@@ -177,31 +181,55 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     }
 
     /// <summary>
-    /// Marks this attempt's task as deleted with its execution tree, so the attempt can no longer schedule durable work.
+    /// Cancels this attempt for <paramref name="reason"/>: from now on, its durable operations and the journaled state
+    /// changes which its code makes throw <see cref="DurableTaskAttemptCanceledException"/>.
     /// </summary>
-    /// <remarks>The runtime deletes tasks on the activation scheduler, where this attempt schedules its work.</remarks>
-    internal void MarkDeleted() => _deleted = true;
-
-    /// <summary>
-    /// Marks this attempt's task as aborted, so the attempt can no longer schedule durable work. The runtime discards the
-    /// attempt's result and calls <see cref="SignalAbort"/> once the abort is durable.
-    /// </summary>
-    internal void MarkAborted() => _aborted = true;
-
-    /// <summary>Cancels the attempt's host execution-abort token, so the attempt stops.</summary>
-    internal void SignalAbort()
+    /// <returns><see langword="true"/> when this call canceled the attempt, which the runtime then signals.</returns>
+    /// <remarks>
+    /// The runtime cancels attempts on the activation's scheduler, where the attempt's code runs, so a synchronous run of
+    /// that code observes one state of the attempt. The attempt's tokens are canceled by <see cref="SignalAttemptCanceled"/>,
+    /// which the runtime calls in a later work item, so code which observes them doesn't run within the runtime's operation.
+    /// </remarks>
+    internal bool CancelAttempt(DurableTaskAttemptCancellationReason reason)
     {
-        Debug.Assert(_aborted, "Only an aborted attempt is signaled.");
-        _abortSource.Cancel();
+        Debug.Assert(TaskScheduler.Current == _scheduler, "The runtime cancels attempts on the activation's scheduler.");
+        lock (_lock)
+        {
+            if (_attemptCancellationReason is not null)
+            {
+                return false;
+            }
+
+            _attemptCancellationReason = reason;
+        }
+
+        _mutationFence.Close();
+        return true;
     }
 
     /// <summary>
-    /// Releases the attempt's link to activation shutdown once the attempt has ended, and its parked state, which a wait
-    /// that the attempt left pending would otherwise keep.
+    /// Cancels <see cref="DurableTaskContext.AttemptCancellationToken"/> and
+    /// <see cref="DurableTaskContext.CancellationToken"/> of an attempt which <see cref="CancelAttempt"/> canceled.
+    /// </summary>
+    /// <exception cref="AggregateException">A registration on a token threw.</exception>
+    internal void SignalAttemptCanceled()
+    {
+        DurableTaskAttemptCancellationReason reason;
+        lock (_lock)
+        {
+            Debug.Assert(_attemptCancellationReason is not null, "Only a canceled attempt is signaled.");
+            reason = _attemptCancellationReason.GetValueOrDefault();
+        }
+
+        DurableTaskRuntimeHelper.CancelAttempt(this, reason);
+    }
+
+    /// <summary>
+    /// Releases the attempt's parked state once the attempt has ended, which a wait that the attempt left pending would
+    /// otherwise keep.
     /// </summary>
     internal void OnAttemptCompleted()
     {
-        _shutdownRegistration.Dispose();
         lock (_lock)
         {
             _ended = true;
@@ -308,17 +336,64 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
     }
 
-    private void ThrowIfDeleted()
+    /// <summary>Throws <see cref="DurableTaskAttemptCanceledException"/> when the runtime canceled this attempt.</summary>
+    private void ThrowIfAttemptCanceled()
     {
-        if (_aborted)
+        if (IsAttemptCanceled)
         {
-            throw new OperationCanceledException($"Durable task '{Id}' was aborted.", _abortSource.Token);
+            throw CreateAttemptCanceledException();
+        }
+    }
+
+    private DurableTaskAttemptCanceledException CreateAttemptCanceledException(Exception? innerException = null)
+    {
+        DurableTaskAttemptCancellationReason? reason;
+        lock (_lock)
+        {
+            reason = _attemptCancellationReason;
         }
 
-        if (_deleted)
+        Debug.Assert(reason is not null, "Only a canceled attempt throws its cancellation.");
+        return new(reason.GetValueOrDefault(), AttemptCancellationToken, innerException);
+    }
+
+    /// <summary>
+    /// Completes an operation of this attempt with its outcome, or with the attempt's cancellation once the runtime
+    /// canceled the attempt.
+    /// </summary>
+    /// <remarks>
+    /// The runtime cancels an attempt before it signals the attempt's tokens, so an operation which completes in between,
+    /// such as the wait for a child whose abort committed, ends with the attempt's cancellation rather than its outcome.
+    /// </remarks>
+    private async ValueTask<T> CompleteOperationAsync<T>(ValueTask<T> operation)
+    {
+        T result;
+        try
         {
-            throw new OperationCanceledException($"Durable task '{Id}' was deleted with its execution tree.");
+            result = await operation;
         }
+        catch (Exception exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
+        {
+            throw CreateAttemptCanceledException(exception);
+        }
+
+        ThrowIfAttemptCanceled();
+        return result;
+    }
+
+    /// <inheritdoc cref="CompleteOperationAsync{T}(ValueTask{T})"/>
+    private async ValueTask CompleteOperationAsync(ValueTask operation)
+    {
+        try
+        {
+            await operation;
+        }
+        catch (Exception exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
+        {
+            throw CreateAttemptCanceledException(exception);
+        }
+
+        ThrowIfAttemptCanceled();
     }
 
     /// <remarks>
@@ -357,8 +432,8 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         CancellationToken cancellationToken)
     {
         ValidateChild(taskId, task);
-        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        var handle = await _runtime.ScheduleChildAsync(taskId, task, shielded, waitForAcceptance, executionCts.Token);
+        using var operationCts = CreateOperationCancellationSource(cancellationToken);
+        var handle = await CompleteOperationAsync(_runtime.ScheduleChildAsync(taskId, task, shielded, waitForAcceptance, operationCts.Token));
         return CreateExecutionHandle(handle);
     }
 
@@ -370,9 +445,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         bool waitForAcceptance,
         CancellationToken cancellationToken)
     {
-        ThrowIfDeleted();
-        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        var handle = await _runtime.StartDetachedAsync(recordId, rootId, request, shielded, waitForAcceptance, executionCts.Token);
+        ThrowIfAttemptCanceled();
+        using var operationCts = CreateOperationCancellationSource(cancellationToken);
+        var handle = await CompleteOperationAsync(_runtime.StartDetachedAsync(recordId, rootId, request, shielded, waitForAcceptance, operationCts.Token));
         return CreateExecutionHandle(handle);
     }
 
@@ -390,11 +465,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
                 $"Post runs on the scheduler of the grain activation which runs durable task '{Id}', so its start commits with the state which the calling code changes. Code which continues elsewhere, for example after ConfigureAwait(false), can't post.");
         }
 
+        ThrowIfAttemptCanceled();
         var shielded = SchedulesShieldedChildren;
+        using var _ = JournaledStateMutationFence.Suspend();
         if (options.HasFlag(DurableTaskStartOptions.Detached))
         {
             var (recordId, request) = GetDetachedRecord(taskId, task);
-            ThrowIfDeleted();
             return CreateExecutionHandle(_runtime.PostDetached(recordId, taskId, request, shielded));
         }
 
@@ -425,7 +501,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
         ThrowIfNotChildTaskId(taskId);
-        ThrowIfDeleted();
+        ThrowIfAttemptCanceled();
         if (TryGetOtherKindId(taskId, out var effectId))
         {
             _runtime.ThrowIfRecordedAsOtherKind(
@@ -465,10 +541,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             ThrowIfNotChildTaskId(taskId);
         }
 
-        ThrowIfDeleted();
+        ThrowIfAttemptCanceled();
 
-        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        return await _runtime.ScheduleDelayAsync(taskId, dueTime, executionCts.Token);
+        using var operationCts = CreateOperationCancellationSource(cancellationToken);
+        return await CompleteOperationAsync(_runtime.ScheduleDelayAsync(taskId, dueTime, operationCts.Token));
     }
 
     protected override IScheduledTaskHandle GetChildTaskHandle(TaskId taskId)
@@ -482,11 +558,12 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// <remarks>
     /// The body's final code runs in the work item which calls this, so staging the response here commits it in the same
     /// journal write as the journaled state that code changed, whichever operation requests that write. A body which
-    /// completes on another scheduler, or after its attempt was aborted, has its response handled by the attempt.
+    /// completes on another scheduler has its response handled by the attempt, and a canceled attempt's response is
+    /// discarded.
     /// </remarks>
     protected override void OnBodyCompleted(DurableTaskResponse response)
     {
-        if (TaskScheduler.Current != _scheduler || _aborted || _deleted || _abortSource.IsCancellationRequested)
+        if (TaskScheduler.Current != _scheduler || IsAttemptCanceled)
         {
             return;
         }
@@ -516,7 +593,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         ThrowIfNotChildTaskId(effectId);
-        ThrowIfDeleted();
+        ThrowIfAttemptCanceled();
         ObserveOperation(effectId, recordsOperation: true);
         if (TryGetOtherKindId(effectId, out var stepId))
         {
@@ -600,13 +677,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     private async ValueTask<DurableTaskResponse> WaitForSignalCoreAsync(string name, CancellationToken cancellationToken)
     {
-        ThrowIfDeleted();
-        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
+        ThrowIfAttemptCanceled();
+        using var operationCts = CreateOperationCancellationSource(cancellationToken);
         var recordId = _runtime.GetSignalRecordId(Id, name);
-        var (value, recordedAt) = await ParkAsync(
-            _runtime.WaitForSignalAsync(Id, name, executionCts.Token),
-            executionCts.Token,
-            recordId is { } id ? [id] : []);
+        var (value, recordedAt) = await CompleteOperationAsync(ParkAsync(
+            _runtime.WaitForSignalAsync(Id, name, operationCts.Token),
+            operationCts.Token,
+            recordId is { } id ? [id] : []));
         ObserveTime(recordedAt);
         return value;
     }
@@ -621,7 +698,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// <see cref="DurableSignalResult.TaskNotFound"/>, are numbered by occurrence, <c>$send:{target}:{taskId}:{name}$2</c>
     /// and so on, so each reaches its own record; the target reports an equal value as
     /// <see cref="DurableSignalResult.Duplicate"/> and a different one as <see cref="DurableSignalResult.Conflict"/>.
-    /// Durable cancellation of this execution doesn't abandon the send; host abort does.
+    /// Task cancellation of this execution doesn't abandon the send; the cancellation of the attempt does.
     /// </remarks>
     /// <param name="throwOnRejection">Whether a rejection by a task of this grain throws rather than being recorded and returned.</param>
     internal ValueTask<DurableSignalResult> SendSignalAsync(
@@ -657,9 +734,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         bool throwOnRejection,
         CancellationToken cancellationToken)
     {
-        ThrowIfDeleted();
-        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        return await _runtime.SendSignalAsync(markerId, target, taskId, name, value, throwOnRejection, executionCts.Token);
+        ThrowIfAttemptCanceled();
+        using var operationCts = CreateOperationCancellationSource(cancellationToken);
+        return await CompleteOperationAsync(_runtime.SendSignalAsync(markerId, target, taskId, name, value, throwOnRejection, operationCts.Token));
     }
 
     protected override ValueTask<TaskId> SelectCompletionAsync(
@@ -684,10 +761,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             ThrowIfNotChildTaskId(candidate);
         }
 
-        ThrowIfDeleted();
+        ThrowIfAttemptCanceled();
 
-        using var executionCts = CreateExecutionCancellationSource(cancellationToken);
-        return await ParkAsync(_runtime.SelectCompletionAsync(decisionId, candidates, executionCts.Token), executionCts.Token, candidates);
+        using var operationCts = CreateOperationCancellationSource(cancellationToken);
+        return await CompleteOperationAsync(ParkAsync(_runtime.SelectCompletionAsync(decisionId, candidates, operationCts.Token), operationCts.Token, candidates));
     }
 
     private void ThrowIfNotChildTaskId(TaskId taskId)
@@ -698,21 +775,29 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
     }
 
-    private CancellationTokenSource CreateExecutionCancellationSource(CancellationToken cancellationToken) =>
+    /// <summary>Links an operation's token with the attempt's cancellation, which ends every operation of the attempt.</summary>
+    private CancellationTokenSource CreateOperationCancellationSource(CancellationToken cancellationToken) =>
         CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
-            _abortSource.Token);
+            AttemptCancellationToken);
 
+    // The runtime's work on behalf of the attempt, such as recording a child's start, runs outside the attempt's mutation
+    // fence: the attempt's operations check its cancellation before they reach the runtime.
     private static ValueTask RunOnScheduler(TaskScheduler scheduler, Func<ValueTask> callback)
     {
         if (TaskScheduler.Current == scheduler)
         {
+            using var _ = JournaledStateMutationFence.Suspend();
             return callback();
         }
 
         return new(
             Task.Factory.StartNew(
-                static async state => await ((Func<ValueTask>)state!)(),
+                static async state =>
+                {
+                    using var _ = JournaledStateMutationFence.Suspend();
+                    await ((Func<ValueTask>)state!)();
+                },
                 callback,
                 CancellationToken.None,
                 TaskCreationOptions.DenyChildAttach,
@@ -725,12 +810,17 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         if (TaskScheduler.Current == scheduler)
         {
+            using var _ = JournaledStateMutationFence.Suspend();
             return callback();
         }
 
         return new(
             Task.Factory.StartNew(
-                static async state => await ((Func<ValueTask<TResult>>)state!)(),
+                static async state =>
+                {
+                    using var _ = JournaledStateMutationFence.Suspend();
+                    return await ((Func<ValueTask<TResult>>)state!)();
+                },
                 callback,
                 CancellationToken.None,
                 TaskCreationOptions.DenyChildAttach,
@@ -743,11 +833,16 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     {
         if (TaskScheduler.Current == scheduler)
         {
+            using var _ = JournaledStateMutationFence.Suspend();
             return callback();
         }
 
         return Task.Factory.StartNew(
-            static state => ((Func<TResult>)state!)(),
+            static state =>
+            {
+                using var _ = JournaledStateMutationFence.Suspend();
+                return ((Func<TResult>)state!)();
+            },
             callback,
             CancellationToken.None,
             TaskCreationOptions.DenyChildAttach,
@@ -788,10 +883,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         private async ValueTask CancelCoreAsync(string? reason, CancellationToken cancellationToken)
         {
-            using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                owner._abortSource.Token);
-            await inner.CancelAsync(reason, executionCts.Token);
+            owner.ThrowIfAttemptCanceled();
+            using var operationCts = owner.CreateOperationCancellationSource(cancellationToken);
+            await owner.CompleteOperationAsync(inner.CancelAsync(reason, operationCts.Token));
         }
 
         public ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
@@ -801,10 +895,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         private async ValueTask AbortCoreAsync(string reason, CancellationToken cancellationToken)
         {
-            using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                owner._abortSource.Token);
-            await inner.AbortAsync(reason, executionCts.Token);
+            owner.ThrowIfAttemptCanceled();
+            using var operationCts = owner.CreateOperationCancellationSource(cancellationToken);
+            await owner.CompleteOperationAsync(inner.AbortAsync(reason, operationCts.Token));
         }
 
         public ValueTask<DurableTaskResponse> PollAsync(
@@ -818,10 +911,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             PollingOptions options,
             CancellationToken cancellationToken)
         {
-            using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                owner._abortSource.Token);
-            return Observe(await inner.PollAsync(options, executionCts.Token));
+            owner.ThrowIfAttemptCanceled();
+            using var operationCts = owner.CreateOperationCancellationSource(cancellationToken);
+            return Observe(await owner.CompleteOperationAsync(inner.PollAsync(options, operationCts.Token)));
         }
 
         public ValueTask<DurableTaskResponse> WaitAsync(CancellationToken cancellationToken) =>
@@ -831,10 +923,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         private async ValueTask<DurableTaskResponse> WaitCoreAsync(CancellationToken cancellationToken)
         {
-            using var executionCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                owner._abortSource.Token);
-            return Observe(await owner.ParkAsync(inner.WaitAsync(executionCts.Token), executionCts.Token, [inner.TaskId]));
+            owner.ThrowIfAttemptCanceled();
+            using var operationCts = owner.CreateOperationCancellationSource(cancellationToken);
+            return Observe(await owner.CompleteOperationAsync(owner.ParkAsync(inner.WaitAsync(operationCts.Token), operationCts.Token, [inner.TaskId])));
         }
 
         private DurableTaskResponse Observe(DurableTaskResponse response)

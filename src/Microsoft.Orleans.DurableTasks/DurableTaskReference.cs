@@ -106,7 +106,7 @@ public sealed class DurableTaskReference<TResult> : DurableTask<TResult>, IDurab
 
     /// <summary>Requests durable cancellation of the task carrying <paramref name="reason"/>.</summary>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or <see langword="null"/>
+    /// The reason which the task's <see cref="DurableTaskContext.TaskCancellationReason"/> reports, or <see langword="null"/>
     /// for none. The first request determines the reason.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>

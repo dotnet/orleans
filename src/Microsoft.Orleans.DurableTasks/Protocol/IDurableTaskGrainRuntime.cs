@@ -36,7 +36,7 @@ public interface IDurableTaskServer : IGrainExtension
     /// <summary>Durably requests cancellation of a task of this grain, carrying <paramref name="reason"/>.</summary>
     /// <param name="taskId">The task identifier.</param>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.TaskCancellationReason"/> reports, or
     /// <see langword="null"/> for none.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
@@ -202,7 +202,6 @@ internal interface IDurableTaskGrainRuntime
     /// </summary>
     void PostRoot(TaskId rootId, IDurableTaskRequest request);
 
-    ValueTask<DurableTaskResponse> ScheduleRemoteAsync(TaskId taskId, IDurableTaskRequest request, CancellationToken cancellationToken);
     ValueTask<DurableTaskResponse> ScheduleDelayAsync(TaskId taskId, DateTimeOffset dueTime, CancellationToken cancellationToken);
     ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, string? reason, CancellationToken cancellationToken);
     ValueTask<TaskId> SelectCompletionAsync(TaskId decisionId, IReadOnlyList<TaskId> candidates, CancellationToken cancellationToken);
