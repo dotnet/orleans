@@ -163,7 +163,8 @@ public sealed class GarnetJournalProviderComparison
             var router = provider.Router;
             var storage = provider.CreateStorage(JournalId.Create("roundtrip", "1"));
             await storage.AppendAsync(new ReadOnlySequence<byte>(new byte[PayloadSize]), CancellationToken);
-            var database = (await ConnectionMultiplexer.ConnectAsync(new ConfigurationOptions { EndPoints = { provider.HostedPartitions.Values.Single().EndPoint }, Protocol = RedisProtocol.Resp2 })).GetDatabase();
+            await using var connection = await ConnectionMultiplexer.ConnectAsync(new ConfigurationOptions { EndPoints = { provider.HostedPartitions.Values.Single().EndPoint }, Protocol = RedisProtocol.Resp2 });
+            var database = connection.GetDatabase();
             var bucketArgs = GarnetJournalKeySet.GetBucketArgs(router.MapId, 0);
             var ping = await TimeAsync(() => database.PingAsync());
             var info = await TimeAsync(() => database.ExecuteAsync(GarnetJournalProtocol.BucketInfo, bucketArgs));
