@@ -120,9 +120,9 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
                 .WaitAsync(_options.PaymentTimeout)
                 .WithId("authorize-payment");
         }
-        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
-            return await CancelOrderAsync(order, reservable, DurableTask.Current.CancellationReason);
+            return await CancelOrderAsync(order, reservable, DurableTask.Current.TaskCancellationReason);
         }
         catch (TimeoutException)
         {
