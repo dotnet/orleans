@@ -86,6 +86,24 @@ public sealed class AzureTableStorageJournalingProviderBuilderTests
         Assert.Equal(TimeSpan.FromMilliseconds(500), options.MetadataOnlyConflictMaxBackoff);
     }
 
+    [Theory]
+    [InlineData("DeleteOldGenerations", "maybe", typeof(bool))]
+    [InlineData("CompactionRowCountThreshold", "many", typeof(long))]
+    [InlineData("CompactionSizeThreshold", "1.5", typeof(long))]
+    [InlineData("MaxMetadataOnlyConflictRetries", "lots", typeof(int))]
+    [InlineData("MetadataOnlyConflictInitialBackoff", "soon", typeof(TimeSpan))]
+    [InlineData("MetadataOnlyConflictMaxBackoff", "later", typeof(TimeSpan))]
+    public void Configure_InvalidOperationalOption_ThrowsWhenOptionsAreResolved(string key, string value, Type valueType)
+    {
+        var builder = CreateBuilder(($"Provider:{key}", value));
+
+        Configure(builder, "Provider");
+
+        using var services = builder.Services.BuildServiceProvider();
+        var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
+        Assert.Equal($"Failed to convert configuration value at 'Provider:{key}' to type '{valueType}'.", exception.Message);
+    }
+
     [Fact]
     public async Task Configure_ServiceKey_TakesPrecedenceOverConnectionSettings()
     {

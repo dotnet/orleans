@@ -23,32 +23,32 @@ internal sealed class AzureTableStorageJournalingProviderBuilder : IProviderBuil
                 options.TableName = tableName;
             }
 
-            if (bool.TryParse(configurationSection[nameof(options.DeleteOldGenerations)], out var deleteOldGenerations))
+            if (TryParseValue<bool>(configurationSection, nameof(options.DeleteOldGenerations), out var deleteOldGenerations))
             {
                 options.DeleteOldGenerations = deleteOldGenerations;
             }
 
-            if (long.TryParse(configurationSection[nameof(options.CompactionRowCountThreshold)], NumberStyles.Integer, CultureInfo.InvariantCulture, out var compactionRowCountThreshold))
+            if (TryParseValue<long>(configurationSection, nameof(options.CompactionRowCountThreshold), out var compactionRowCountThreshold))
             {
                 options.CompactionRowCountThreshold = compactionRowCountThreshold;
             }
 
-            if (long.TryParse(configurationSection[nameof(options.CompactionSizeThreshold)], NumberStyles.Integer, CultureInfo.InvariantCulture, out var compactionSizeThreshold))
+            if (TryParseValue<long>(configurationSection, nameof(options.CompactionSizeThreshold), out var compactionSizeThreshold))
             {
                 options.CompactionSizeThreshold = compactionSizeThreshold;
             }
 
-            if (int.TryParse(configurationSection[nameof(options.MaxMetadataOnlyConflictRetries)], NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxMetadataOnlyConflictRetries))
+            if (TryParseValue<int>(configurationSection, nameof(options.MaxMetadataOnlyConflictRetries), out var maxMetadataOnlyConflictRetries))
             {
                 options.MaxMetadataOnlyConflictRetries = maxMetadataOnlyConflictRetries;
             }
 
-            if (TimeSpan.TryParse(configurationSection[nameof(options.MetadataOnlyConflictInitialBackoff)], CultureInfo.InvariantCulture, out var metadataOnlyConflictInitialBackoff))
+            if (TryParseValue<TimeSpan>(configurationSection, nameof(options.MetadataOnlyConflictInitialBackoff), out var metadataOnlyConflictInitialBackoff))
             {
                 options.MetadataOnlyConflictInitialBackoff = metadataOnlyConflictInitialBackoff;
             }
 
-            if (TimeSpan.TryParse(configurationSection[nameof(options.MetadataOnlyConflictMaxBackoff)], CultureInfo.InvariantCulture, out var metadataOnlyConflictMaxBackoff))
+            if (TryParseValue<TimeSpan>(configurationSection, nameof(options.MetadataOnlyConflictMaxBackoff), out var metadataOnlyConflictMaxBackoff))
             {
                 options.MetadataOnlyConflictMaxBackoff = metadataOnlyConflictMaxBackoff;
             }
@@ -89,5 +89,24 @@ internal sealed class AzureTableStorageJournalingProviderBuilder : IProviderBuil
         {
             builder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
         }
+    }
+
+    // Returns false when the key is absent or empty, and throws when a configured value is invalid.
+    private static bool TryParseValue<T>(IConfigurationSection section, string key, out T value) where T : IParsable<T>
+    {
+        var text = section[key];
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            value = default!;
+            return false;
+        }
+
+        if (T.TryParse(text, CultureInfo.InvariantCulture, out var parsed))
+        {
+            value = parsed;
+            return true;
+        }
+
+        throw new InvalidOperationException($"Failed to convert configuration value at '{section.Path}:{key}' to type '{typeof(T)}'.");
     }
 }

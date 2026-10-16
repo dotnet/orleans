@@ -541,7 +541,11 @@ namespace Orleans.Serialization.Serializers
 
             if (!TrySelectImplementation(typeof(IActivator<>), concreteType, searchType, out var activatorType))
             {
-                if (searchType.IsValueType)
+                if (Nullable.GetUnderlyingType(concreteType) is { } underlyingType)
+                {
+                    activatorType = ConstructGenericImplementation(typeof(DefaultNullableActivator<>), underlyingType);
+                }
+                else if (searchType.IsValueType)
                 {
                     activatorType = ConstructGenericImplementation(typeof(DefaultValueTypeActivator<>), concreteType);
                 }
