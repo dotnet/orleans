@@ -372,6 +372,34 @@ public sealed class DurableTaskStorageTests
         Assert.Empty(deleted.Storage.Tasks);
     }
 
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public async Task RecordJournalsItsCompleteStateOnce(string journalFormatKey)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var harness = new DurableTaskJournalHarness(journalFormatKey);
+        var recordId = TaskId.Parse("root/$version:change");
+        byte[] resultPayload;
+        await using (var activation = await harness.ActivateAsync(cancellationToken))
+        {
+            var state = activation.Storage.AddRecord(recordId, "$record-kind", DurableTaskResponse.FromResult(3));
+            await activation.Storage.WriteAsync(cancellationToken);
+            resultPayload = Assert.IsType<DurableTaskState>(state).ResultPayload!;
+        }
+
+        // One state entry carries the fingerprint, and the result's payload is journaled once.
+        var journal = await ReadJournalAsync(harness, cancellationToken);
+        Assert.Equal(1, CountOccurrences(journal, "$record-kind"u8));
+        Assert.Equal(1, CountPayload(journal, resultPayload));
+
+        await using var recovery = await harness.ActivateAsync(cancellationToken);
+        Assert.True(recovery.Storage.TryGetTask(recordId, out var recovered));
+        Assert.Equal("$record-kind", recovered.RequestFingerprint);
+        Assert.Equal(3, recovered.Result!.GetResult<int>());
+        Assert.NotNull(recovered.CompletedAt);
+        Assert.Equal(recordId, Assert.Single(recovery.Storage.GetChildren(TaskId.Parse("root"))).Id);
+    }
+
     private static async Task<byte[]> ReadJournalAsync(DurableTaskJournalHarness harness, CancellationToken cancellationToken)
     {
         var consumer = new JournalBytes();

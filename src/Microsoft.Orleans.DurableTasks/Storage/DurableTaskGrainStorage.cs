@@ -150,6 +150,28 @@ internal sealed class DurableTaskGrainStorage : IDurableTaskGrainStorage
         _results[taskId] = typedState.ResultPayload!;
     }
 
+    /// <remarks>
+    /// The record's state is complete before it is added, so the journal holds one entry for the state and one for the
+    /// result's payload. A result which doesn't serialize throws before anything is staged.
+    /// </remarks>
+    public IDurableTaskState AddRecord(TaskId taskId, string fingerprint, DurableTaskResponse response)
+    {
+        ArgumentOutOfRangeException.ThrowIfEqual(taskId, default);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+        ArgumentNullException.ThrowIfNull(response);
+        Debug.Assert(!_items.ContainsKey(taskId), "A record is added once.");
+        var now = _timeProvider.GetUtcNow();
+        var state = new DurableTaskState { CreatedAt = now, RequestFingerprint = fingerprint }.Bind(_serializer);
+        state.SetRequest(null);
+        state.SetResult(response);
+        state.CompletedAt = now;
+        state.CompletionSequence = NextCompletionSequence();
+        _items.Add(taskId, state);
+        _hierarchy?.Add(taskId);
+        _results[taskId] = state.ResultPayload!;
+        return state;
+    }
+
     private long NextCompletionSequence()
     {
         if (_lastCompletionSequence is not { } last)

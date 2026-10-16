@@ -132,6 +132,41 @@ public static class DurableTaskEvents
     {
     }
 
+    /// <summary>
+    /// Event payload for a version decision which an execution recorded: the version of a change which the execution
+    /// follows from then on, which <c>DurableTask.GetVersion</c> returns to it and to its steps.
+    /// </summary>
+    /// <param name="grainContext">The activation whose runtime raised the event.</param>
+    /// <param name="taskId">The execution which recorded the decision.</param>
+    /// <param name="name">The change's name.</param>
+    /// <param name="version">
+    /// The recorded version: the calling code's newest version for an execution which reached the call first, or
+    /// <c>0</c> for one which an earlier deployment ran past it.
+    /// </param>
+    public sealed class VersionRecorded(IGrainContext grainContext, TaskId taskId, string name, int version)
+        : DurableTaskEvent(grainContext, taskId)
+    {
+        /// <summary>The change's name.</summary>
+        public readonly string Name = name;
+
+        /// <summary>The recorded version.</summary>
+        public readonly int Version = version;
+    }
+
+    /// <summary>
+    /// Event payload for an attempt which stalled because its execution recorded a version which the running code doesn't
+    /// support: the runtime discarded the attempt's result and keeps the task pending, and a later activation replays it.
+    /// </summary>
+    /// <param name="grainContext">The activation whose runtime raised the event.</param>
+    /// <param name="taskId">The stalled execution.</param>
+    /// <param name="exception">The exception which describes the recorded version and the supported range.</param>
+    public sealed class ExecutionStalled(IGrainContext grainContext, TaskId taskId, DurableTaskVersionException exception)
+        : DurableTaskEvent(grainContext, taskId)
+    {
+        /// <summary>The exception which describes the recorded version and the supported range.</summary>
+        public readonly DurableTaskVersionException Exception = exception;
+    }
+
     internal static void EmitTaskCreated(IGrainContext grainContext, TaskId taskId)
     {
         if (!Listener.IsEnabled(nameof(TaskCreated)))
@@ -256,6 +291,34 @@ public static class DurableTaskEvents
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(IGrainContext grainContext, TaskId taskId) =>
             Write(nameof(ReplayEnded), new ReplayEnded(grainContext, taskId));
+    }
+
+    internal static void EmitVersionRecorded(IGrainContext grainContext, TaskId taskId, string name, int version)
+    {
+        if (!Listener.IsEnabled(nameof(VersionRecorded)))
+        {
+            return;
+        }
+
+        Emit(grainContext, taskId, name, version);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(IGrainContext grainContext, TaskId taskId, string name, int version) =>
+            Write(nameof(VersionRecorded), new VersionRecorded(grainContext, taskId, name, version));
+    }
+
+    internal static void EmitExecutionStalled(IGrainContext grainContext, TaskId taskId, DurableTaskVersionException exception)
+    {
+        if (!Listener.IsEnabled(nameof(ExecutionStalled)))
+        {
+            return;
+        }
+
+        Emit(grainContext, taskId, exception);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(IGrainContext grainContext, TaskId taskId, DurableTaskVersionException exception) =>
+            Write(nameof(ExecutionStalled), new ExecutionStalled(grainContext, taskId, exception));
     }
 
     private sealed class Observable : IObservable<DurableTaskEvent>
