@@ -23,6 +23,7 @@ public sealed class DurableHttpFixture : IAsyncLifetime
 {
     public const string TestUserHeader = "X-Test-User";
     public const string ForbiddenUser = "mallory";
+    public const string ApprovalsScope = "approvals";
     public const string ApprovalRootId = "approval";
 
     private readonly InProcessTestCluster _cluster;
@@ -105,6 +106,12 @@ public sealed class DurableHttpFixture : IAsyncLifetime
             grains.GetGrain<IDurableHttpTestGrain>(orderId).WaitForShipmentAsync(request.Item));
         orders.MapDurableSignal(DurableHttpTestGrain.Approved);
         orders.MapDurableSignal(DurableHttpTestGrain.Shipped);
+        // Approvals through Nexus, whose request identifiers name operations of the 'approvals' scope, which the
+        // '/approvals' group also serves, so its routes stream and signal them.
+        var nexus = _app.MapGroup("/nexus").MapNexusService("orders.v1", scope: ApprovalsScope);
+        nexus.MapNexusOperation("approval", static (NexusApprovalInput input, IGrainFactory grains) =>
+            grains.GetGrain<IDurableHttpTestGrain>(input.OrderId).WaitForApprovalAsync(input.Item));
+        _app.MapGroup("/approvals").WithDurableOperations(ApprovalsScope).MapDurableSignal(DurableHttpTestGrain.Approved);
 
         await _app.StartAsync();
         _server = _app.GetTestServer();
