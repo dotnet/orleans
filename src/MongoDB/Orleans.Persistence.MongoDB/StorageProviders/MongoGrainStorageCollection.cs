@@ -92,22 +92,35 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
 
         try
         {
-            var filter = Filter.Eq(FieldId, grainKey);
-            if (etag != "*")
+            var collection = GetCollection(cancellationToken);
+            if (string.IsNullOrEmpty(etag) && !grainState.RecordExists)
             {
-                filter &= Filter.Eq<BsonValue>(FieldEtag, string.IsNullOrEmpty(etag) ? BsonNull.Value : new BsonString(etag));
+                await collection.InsertOneAsync(new BsonDocument
+                {
+                    [FieldId] = grainKey,
+                    [FieldEtag] = newETag,
+                    [FieldDoc] = newData
+                }, cancellationToken: cancellationToken);
             }
-
-            var result = await GetCollection(cancellationToken).UpdateOneAsync(
-                filter,
-                Update
-                    .Set(FieldEtag, newETag)
-                    .Set(FieldDoc, newData),
-                new UpdateOptions { IsUpsert = string.IsNullOrEmpty(etag) || etag == "*" }, cancellationToken);
-
-            if (result.MatchedCount == 0 && result.UpsertedId is null)
+            else
             {
-                await ThrowForOtherEtag(grainKey, etag, cancellationToken);
+                var filter = Filter.Eq(FieldId, grainKey);
+                if (etag != "*")
+                {
+                    filter &= Filter.Eq<BsonValue>(FieldEtag, string.IsNullOrEmpty(etag) ? BsonNull.Value : new BsonString(etag));
+                }
+
+                var result = await collection.UpdateOneAsync(
+                    filter,
+                    Update
+                        .Set(FieldEtag, newETag)
+                        .Set(FieldDoc, newData),
+                    new UpdateOptions { IsUpsert = etag == "*" }, cancellationToken);
+
+                if (result.MatchedCount == 0 && result.UpsertedId is null)
+                {
+                    await ThrowForOtherEtag(grainKey, etag, cancellationToken);
+                }
             }
         }
         catch (MongoException ex) when (ex.IsDuplicateKey())
@@ -132,7 +145,7 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
         var result = await GetCollection(cancellationToken).DeleteOneAsync(filter, cancellationToken);
         if (result.DeletedCount == 0)
         {
-            var existing = await GetCollection(cancellationToken).Find(Filter.Eq(FieldId, grainKey))
+            var existing = await GetCollection(cancellationToken).WithReadPreference(ReadPreference.Primary).Find(Filter.Eq(FieldId, grainKey))
                 .Project<BsonDocument>(Project.Include(FieldEtag)).FirstOrDefaultAsync(cancellationToken);
             if (existing is not null)
             {
@@ -152,7 +165,7 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
     private async Task ThrowForOtherEtag(string key, string? etag, CancellationToken cancellationToken, Exception? ex = null)
     {
         var existingEtag =
-            await GetCollection(cancellationToken).Find(Filter.Eq(FieldId, key))
+            await GetCollection(cancellationToken).WithReadPreference(ReadPreference.Primary).Find(Filter.Eq(FieldId, key))
                 .Project<BsonDocument>(Project.Exclude(FieldDoc)).FirstOrDefaultAsync(cancellationToken);
 
         var storedEtag = existingEtag?.GetValue(FieldEtag, BsonNull.Value);
