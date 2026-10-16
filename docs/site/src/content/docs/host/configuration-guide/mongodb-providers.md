@@ -165,6 +165,27 @@ when its outcome is uncertain.
 
 ## Migrate the contributed package
 
+### Coordinate the cluster upgrade
+
+For `Multiple` and `MultipleDeprecated`, **stop every silo using the contributed
+provider before starting any silo using the updated provider**, including IPv4-only
+deployments. Use a coordinated stopped-cluster deployment. New writers read existing
+legacy rows, but old writers address new rows using legacy IDs and can create a
+second membership row with conflicting status or suspicion votes. Pausing reminder
+creation alone is insufficient because silos continue writing membership updates.
+
+Drain client traffic, stop all old-provider silos and wait for them to exit, back up
+the provider collections, then deploy the updated provider across the cluster and
+resume traffic after membership and reminders have loaded successfully. Preserve
+the configured database, prefixes, and cluster identity when retaining membership
+history. For rollback, stop all updated-provider silos first and restore the
+pre-migration membership snapshot or choose a fresh cluster ID; keep grain state
+and reminder collections intact. The single-document strategy keeps its existing
+membership ID format; apply the reminder rollout constraints below whenever
+reminder-table writers overlap.
+
+### Update application configuration
+
 Replace the `Orleans.Providers.MongoDB` package reference with the capability
 packages listed above. The provider retains the `Orleans.Providers.MongoDB.*`
 implementation and serializer namespaces, provider builder method names, collection names, and stored document formats.
@@ -193,6 +214,10 @@ and removable with their ETags; stored identity fields protect against ambiguous
 legacy IDs. During rollout, pause new reminder creation until every reminder-table
 writer uses the updated provider so point operations consistently understand the
 new ID encoding.
+Reads treat contributed-provider documents with `IsDeleted=true` as deleted,
+while absent or false flags represent active registrations. Explicit
+re-registration removes the deletion marker and assigns a new ETag, including
+when the existing legacy document is updated in place.
 <xref:Orleans.Reminders.MongoDB.MongoDBRemindersOptions.CreateIndexes>
 defaults to `true`. Set it to `false` when administrators manage indexes or the
 application identity has data-only permissions. Administrators should provision
