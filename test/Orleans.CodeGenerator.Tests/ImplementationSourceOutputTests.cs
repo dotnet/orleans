@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.IO;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Orleans.CodeGenerator.Diagnostics;
@@ -246,6 +247,70 @@ public sealed class ImplementationSourceOutputTests
             "Consumer",
             producerOutput.ToMetadataReference());
         AssertIndependentContract(consumer, "System.IO.Stream", "GenerateSerializerAttribute");
+    }
+
+    [Theory]
+    [InlineData("System.IO.Stream", MetadataImportOptions.Public, true)]
+    [InlineData("System.IO.Stream", MetadataImportOptions.All, true)]
+    [InlineData("System.Collections.Generic.List<System.IO.Stream>", MetadataImportOptions.Public, true)]
+    [InlineData("System.Collections.Generic.List<System.IO.Stream>", MetadataImportOptions.All, true)]
+    [InlineData("System.IO.Stream[]", MetadataImportOptions.Public, true)]
+    [InlineData("System.IO.Stream[]", MetadataImportOptions.All, true)]
+    [InlineData("System.Collections.Generic.List<int[]>", MetadataImportOptions.Public, false)]
+    [InlineData("System.Collections.Generic.List<int[]>", MetadataImportOptions.All, false)]
+    public async Task EmittedPrivateMemberContractsSurviveMissingProducerImplementations(
+        string memberType, MetadataImportOptions metadataImport, bool unsupportedDependency)
+    {
+        var producer = await TestCompilationHelper.CreateCompilation(
+            """
+            namespace Producer;
+
+            [Orleans.GenerateSerializer]
+            public sealed class Payload<T>
+            {
+                [Orleans.Id(0)]
+                private T _value;
+
+                public T Value { get => _value; set => _value = value; }
+            }
+            """,
+            "Producer");
+        var (producerOutput, producerResult) = Generate(producer, IncrementalGeneratorOutputKind.Implementation);
+        Assert.Empty(producerResult.Diagnostics);
+        Assert.Empty(producerResult.GeneratedSources);
+        using var image = new MemoryStream();
+        var emitted = producerOutput.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+
+        var consumer = await TestCompilationHelper.CreateCompilation(
+            $$"""
+            [Orleans.GenerateSerializerContext<Producer.Payload<{{memberType}}>>]
+            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            """,
+            "Consumer",
+            MetadataReference.CreateFromImage(image.ToArray()));
+        consumer = consumer.WithOptions(consumer.Options.WithMetadataImportOptions(metadataImport));
+        var payload = consumer.GetTypeByMetadataName("Producer.Payload`1");
+        Assert.NotNull(payload);
+        Assert.Equal(metadataImport == MetadataImportOptions.All ? 1 : 0, payload.GetMembers("_value").Length);
+
+        if (unsupportedDependency)
+        {
+            AssertIndependentContract(consumer, "System.IO.Stream", "GenerateSerializerAttribute");
+        }
+        else
+        {
+            var (editorOutput, editorResult) = Generate(consumer, IncrementalGeneratorOutputKind.Implementation);
+            Assert.Empty(editorResult.Diagnostics);
+            Assert.Empty(editorOutput.GetDiagnostics(TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+            Assert.Contains(".context-declaration.", Assert.Single(editorResult.GeneratedSources).HintName, StringComparison.Ordinal);
+
+            var (_, buildResult) = Generate(consumer, IncrementalGeneratorOutputKind.None);
+            var diagnostic = Assert.Single(buildResult.Diagnostics);
+            Assert.Equal(DiagnosticRuleId.UnsupportedSerializerContextType, diagnostic.Id);
+            Assert.Contains("generated codec and copier implementations", diagnostic.GetMessage(), StringComparison.Ordinal);
+        }
     }
 
     [Fact]

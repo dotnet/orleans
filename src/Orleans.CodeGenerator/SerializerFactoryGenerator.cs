@@ -352,20 +352,27 @@ internal static class SerializerFactoryGenerator
         registration.Model = model;
         registration.ReferencedCodec = ResolveImplementation(SerializerGenerator.GetSimpleClassName(named.Name));
         registration.ReferencedCopier = ResolveImplementation(CopierGenerator.GetSimpleClassName(named.Name));
+        var consumerBinding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
         if (registration.ReferencedCodec is null || registration.ReferencedCopier is null && !model.IsShallowCopyable)
         {
-            var consumerLibrary = services.LibraryTypes;
-            var includeConstructorParameters = SerializableSourceOutputGenerator.ShouldIncludePrimaryConstructorParameters(named, consumerLibrary);
-            var constructorParameters = SerializableSourceOutputGenerator.ResolveConstructorParameters(named, includeConstructorParameters, consumerLibrary);
-            var members = new FieldIdAssignmentHelper(
-                named,
-                constructorParameters,
-                SerializableSourceOutputGenerator.GetGenerateFieldIdsOptionFromType(named, consumerLibrary),
-                consumerLibrary);
-            registration.Dependencies.AddRange(SerializableSourceOutputGenerator.GetDataMembers(members)
-                .Where(static member => member.IsSerializable || member.IsCopyable)
-                .Select(static member => member.Type));
             requiresImplementation = true;
+            var constructorParameters = SerializableSourceOutputGenerator.ResolveConstructorParameters(
+                implementationType, model.IncludePrimaryConstructorParameters, library);
+            var members = new FieldIdAssignmentHelper(
+                implementationType,
+                constructorParameters,
+                SerializableSourceOutputGenerator.GetGenerateFieldIdsOptionFromType(implementationType, library),
+                library);
+            foreach (var member in SerializableSourceOutputGenerator.GetDataMembers(members))
+            {
+                if (!member.IsSerializable && !member.IsCopyable) continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                var dependency = consumerBinding.GetSpeculativeTypeInfo(0, member.Type.ToTypeSyntax(),
+                    SpeculativeBindingOption.BindAsTypeOrNamespace).Type;
+                if (dependency is null)
+                    return "provide complete referenced model metadata to discover the producer's serialization dependencies";
+                registration.Dependencies.Add(dependency);
+            }
             return "provide the referenced assembly's generated codec and copier implementations";
         }
         registration.Codec = Name(registration.ReferencedCodec);
@@ -373,7 +380,6 @@ internal static class SerializerFactoryGenerator
             ? Name(referencedCopier)
             : Name(services.LibraryTypes.ShallowCopier.Construct(named));
 
-        var consumerBinding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
         foreach (var implementation in new[] { registration.ReferencedCodec, registration.ReferencedCopier })
         {
             if (implementation is null) continue;
