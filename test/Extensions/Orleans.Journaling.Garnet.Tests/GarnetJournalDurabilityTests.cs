@@ -39,6 +39,8 @@ public sealed class GarnetJournalDurabilityTests
                     Protocol = RedisProtocol.Resp2,
                     AbortOnConnectFail = false,
                     AllowAdmin = true,
+                    // SAVE checkpoints while writers append, which can exceed the default timeout on a loaded machine.
+                    AsyncTimeout = (int)TimeSpan.FromSeconds(60).TotalMilliseconds,
                 });
                 var client = new GarnetJournalPartitionClient(
                     connection.GetDatabase(),
@@ -62,9 +64,24 @@ public sealed class GarnetJournalDurabilityTests
                 }
 
                 using var stop = new CancellationTokenSource();
+                var baseline = acknowledged.ToArray();
                 var writers = Enumerable.Range(0, JournalCount)
                     .Select(j => Task.Run(() => WriteAsync(client, ids[j], acknowledged, j, stop.Token)))
                     .ToArray();
+
+                // Kill only after every writer has made progress in this cycle.
+                var progressDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
+                while (Enumerable.Range(0, JournalCount).Any(j => Volatile.Read(ref acknowledged[j]) <= baseline[j]))
+                {
+                    Assert.True(DateTime.UtcNow < progressDeadline, $"Writers made no progress in cycle {cycle}: {string.Join(", ", acknowledged)}.");
+                    if (Enumerable.Range(0, JournalCount).FirstOrDefault(j => writers[j].IsCompleted && Volatile.Read(ref acknowledged[j]) <= baseline[j], -1) is var stalled and >= 0)
+                    {
+                        Assert.Fail($"Writer {stalled} stopped without progress in cycle {cycle}.");
+                    }
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(20), CancellationToken);
+                }
+
                 await Task.Delay(TimeSpan.FromMilliseconds(200 + random.Next(300)), CancellationToken);
                 if (cycle % 2 == 1)
                 {
