@@ -309,8 +309,10 @@ public sealed class MongoClientSharingTests
         {
             var entry = new ReminderEntry
             {
-                GrainId = GrainId.Create("account", "shared-client"), ReminderName = "bill",
-                StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), Period = TimeSpan.FromMinutes(7)
+                GrainId = GrainId.Create("account", "shared-client"),
+                ReminderName = "bill",
+                StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Period = TimeSpan.FromMinutes(7)
             };
             var tag = await reminders.UpsertRow(entry, token);
             Assert.False(string.IsNullOrWhiteSpace(tag));
@@ -352,7 +354,9 @@ public sealed class MongoClientSharingTests
         var table = new MongoMembershipTable(client, NullLogger<MongoMembershipTable>.Instance,
             Options.Create(cluster), Options.Create(new MongoDBMembershipTableOptions
             {
-                DatabaseName = databaseName, CollectionPrefix = prefix, Strategy = strategy
+                DatabaseName = databaseName,
+                CollectionPrefix = prefix,
+                Strategy = strategy
             }));
         var token = TestContext.Current.CancellationToken;
         await table.InitializeMembershipTableAsync(true, token);
@@ -387,8 +391,11 @@ public sealed class MongoClientSharingTests
 
     private static MembershipEntry Member(int port, int gatewayPort) => new()
     {
-        SiloAddress = SiloAddress.New(IPAddress.Loopback, port, 1), HostName = "shared-host", SiloName = "shared-silo",
-        Status = SiloStatus.Active, ProxyPort = gatewayPort,
+        SiloAddress = SiloAddress.New(IPAddress.Loopback, port, 1),
+        HostName = "shared-host",
+        SiloName = "shared-silo",
+        Status = SiloStatus.Active,
+        ProxyPort = gatewayPort,
         StartTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
         IAmAliveTime = new DateTime(2026, 1, 1, 0, 1, 0, DateTimeKind.Utc)
     };
