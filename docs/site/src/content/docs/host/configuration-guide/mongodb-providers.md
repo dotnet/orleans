@@ -106,7 +106,8 @@ per-silo membership storage. Provision a replica set for local tests that exerci
 `Multiple`; a single-node replica set supports MongoDB transactions.
 
 `Multiple` reads the membership rows and table version in one snapshot
-transaction with a fresh session for each operation. Membership async methods
+transaction with a fresh session for each operation and an explicit primary read
+preference, including when the shared client prefers secondary reads. Membership async methods
 propagate cancellation to MongoDB commands, cursor reads, and transactions.
 Per-silo document IDs preserve complete native IPv6 addresses. Existing records
 with legacy IPv4-mapped IDs remain readable and are updated in place using the
@@ -134,6 +135,8 @@ BSON document serialization supports application-owned MongoDB class maps.
 Orleans stream pub-sub state uses the JSON or binary serializer.
 
 The JSON serializer supports object, scalar, and array roots. Its legacy BSON
+date strings use the invariant Gregorian calendar and time separators across cultures.
+Its field-name
 mapping encodes a leading `$` in a JSON property name as `__`. JSON property
 names beginning with `__` are reserved and rejected before a write reaches MongoDB,
 including nested properties. Use JSON property-name attributes or a naming
@@ -152,6 +155,8 @@ clears reject stale ETags with <xref:Orleans.Storage.InconsistentStateException>
 preserving the caller's metadata on failure. A `*` ETag requests an unconditional
 write or clear. Configure acknowledged MongoDB writes so the provider can observe
 these outcomes.
+Refresh reads replace the state and its ETag together after successful deserialization;
+a deserialization failure preserves the previous state, ETag, and existence metadata.
 Storage and reminder cancellation-token overloads propagate cancellation through
 lazy collection/index initialization, reads, writes, removals, and conflict lookups.
 A cancelled write may already have reached MongoDB; refresh state before retrying
