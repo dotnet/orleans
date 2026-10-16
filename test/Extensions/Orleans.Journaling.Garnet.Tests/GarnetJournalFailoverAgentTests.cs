@@ -156,7 +156,7 @@ public sealed class GarnetJournalFailoverAgentTests
         }
     }
 
-    private sealed class FakeMembership(ClusterMembershipSnapshot current) : IClusterMembershipService
+    internal sealed class FakeMembership(ClusterMembershipSnapshot current) : IClusterMembershipService
     {
         public ClusterMembershipSnapshot Current { get; set; } = current;
 
