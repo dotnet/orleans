@@ -167,7 +167,7 @@ internal sealed class GarnetJournalPartitionManager : IDisposable
             {
                 tasks.Add(database.ExecuteAsync(
                     GarnetJournalProtocol.Bucket,
-                    [(RedisKey)GarnetJournalKeys.GetBucketKey(map.Id, bucket), GarnetJournalProtocol.BucketOpenOperation, version.ToString(CultureInfo.InvariantCulture), GarnetJournalProtocol.NoSource, "1"]));
+                    GarnetJournalKeySet.GetBucketArgs(map.Id, bucket, GarnetJournalProtocol.BucketOpenOperation, version.ToString(CultureInfo.InvariantCulture), GarnetJournalProtocol.NoSource, "1")));
             }
 
             foreach (var result in await Task.WhenAll(tasks).WaitAsync(cancellationToken).ConfigureAwait(false))

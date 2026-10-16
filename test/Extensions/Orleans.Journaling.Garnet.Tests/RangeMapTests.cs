@@ -74,7 +74,9 @@ public sealed class RangeMapTests
         ["empty endpoint"] = new RangeMap(MapId, 4, [new(0, 3, A)], [], ImmutableSortedDictionary<PartitionId, PartitionHosting>.Empty.Add(A, new PartitionHosting("h", 0, "a", " "))),
         ["migration to non-owner"] = new RangeMap(MapId, 4, [new(0, 1, A), new(2, 3, B, 2)], [new(1, 2, A, B, 2, MigrationPhase.Committed)], Partitions(A, B)),
         ["migration to self"] = new RangeMap(MapId, 4, [new(0, 3, A)], [new(1, 2, A, A, 2, MigrationPhase.Committed)], Partitions(A)),
-        ["overlapping migrations"] = new RangeMap(MapId, 4, [new(0, 3, B, 2)], [new(0, 1, A, B, 2, MigrationPhase.Sealed), new(1, 2, C, B, 2, MigrationPhase.Committed)], Partitions(A, B, C)),
+        ["unchained migrations"] = new RangeMap(MapId, 4, [new(0, 3, B, 2)], [new(0, 1, A, B, 2, MigrationPhase.Sealed), new(1, 2, C, B, 2, MigrationPhase.Committed)], Partitions(A, B, C)),
+        ["chain not ending at owner"] = new RangeMap(MapId, 4, [new(0, 3, B, 2)], [new(0, 0, A, B, 2, MigrationPhase.Opened), new(0, 0, B, C, 3, MigrationPhase.Committed)], Partitions(A, B, C)),
+        ["chain out of order"] = new RangeMap(MapId, 4, [new(0, 3, C, 3)], [new(0, 0, A, B, 3, MigrationPhase.Opened), new(0, 0, B, C, 3, MigrationPhase.Committed)], Partitions(A, B, C)),
         ["undefined phase"] = new RangeMap(MapId, 4, [new(0, 3, B, 2)], [new(0, 1, A, B, 2, (MigrationPhase)17)], Partitions(A, B)),
     };
 
@@ -97,6 +99,14 @@ public sealed class RangeMapTests
             [new(4, 5, A, B, 2, MigrationPhase.Opened), new(6, 7, B, C, 3, MigrationPhase.Committed)],
             Partitions(A, B, C));
         map.Validate();
+
+        // Bucket 5 then moves on to C before its first migration is done: its migrations chain A -> B -> C.
+        var chained = map with
+        {
+            Ranges = [new(0, 3, A), new(4, 4, B, 2), new(5, 7, C, 4)],
+            Migrations = [.. map.Migrations, new(5, 5, B, C, 4, MigrationPhase.Committed)],
+        };
+        chained.Validate();
     }
 
     [Theory]
@@ -145,5 +155,46 @@ public sealed class RangeMapTests
     public void Json_RejectsInvalidDocuments(string json)
     {
         Assert.Throws<InvalidDataException>(() => RangeMapJsonSerializer.Deserialize(System.Text.Encoding.UTF8.GetBytes(json)));
+    }
+
+    [Fact]
+    public void Buckets_EditMigrationChainsAndMergeThemIntoRanges()
+    {
+        var map = new RangeMap(MapId, 8, [new(0, 3, A), new(4, 7, B)], [], Partitions(A, B, C));
+        var editor = new RangeMapBuckets(map);
+        foreach (var bucket in new[] { 1, 2, 3 })
+        {
+            editor.Move(bucket, C, 2);
+        }
+
+        // Bucket 2 moves on to B before its first migration completes, so it has a chain A -> C -> B.
+        var first = editor.GetLatestMigration(2)!.Value;
+        Assert.True(editor.TryAdvance(2, first, MigrationPhase.Opened));
+        Assert.False(editor.TryAdvance(2, first, MigrationPhase.Sealed));
+        editor.Move(2, B, 3);
+        var moved = editor.ToMap();
+        moved.Validate();
+        Assert.Equal(
+            [new(0, 0, A), new(1, 1, C, 2), new(2, 2, B, 3), new(3, 3, C, 2), new(4, 7, B)],
+            moved.Ranges);
+        Assert.Equal(
+            [new(1, 1, A, C, 2, MigrationPhase.Committed), new(2, 2, A, C, 2, MigrationPhase.Opened), new(2, 2, C, B, 3, MigrationPhase.Committed), new(3, 3, A, C, 2, MigrationPhase.Committed)],
+            moved.Migrations);
+
+        // Migrations complete and are removed oldest first; adjacent buckets with equal migrations merge.
+        editor = new RangeMapBuckets(moved);
+        Assert.False(editor.TryRemove(2, first));
+        Assert.True(editor.TryAdvance(2, first, MigrationPhase.Complete));
+        Assert.True(editor.TryRemove(2, first));
+        Assert.True(editor.TryAdvance(2, editor.GetLatestMigration(2)!.Value, MigrationPhase.Complete));
+        Assert.True(editor.TryRemove(2, editor.GetLatestMigration(2)!.Value));
+        foreach (var bucket in new[] { 1, 3 })
+        {
+            Assert.True(editor.TryAdvance(bucket, editor.GetLatestMigration(bucket)!.Value, MigrationPhase.Done));
+        }
+
+        var completed = editor.ToMap();
+        completed.Validate();
+        Assert.Equal([new(1, 1, A, C, 2, MigrationPhase.Done), new(3, 3, A, C, 2, MigrationPhase.Done)], completed.Migrations);
     }
 }

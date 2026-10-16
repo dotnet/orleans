@@ -24,6 +24,9 @@ public sealed class GarnetJournalStorageOptionsTests
         ["compaction threshold"] = options => options.CompactionThresholdBytes = -1,
         ["operation timeout"] = options => options.OperationTimeout = TimeSpan.Zero,
         ["log memory size"] = options => options.LogMemorySize = "",
+        ["tombstone retention"] = options => options.TombstoneRetention = TimeSpan.Zero,
+        ["migration interval"] = options => options.MigrationInterval = TimeSpan.Zero,
+        ["marker collection interval"] = options => options.MarkerCollectionInterval = TimeSpan.Zero,
     };
 
     [Theory]

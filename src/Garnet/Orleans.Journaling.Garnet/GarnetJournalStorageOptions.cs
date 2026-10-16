@@ -35,6 +35,9 @@ public sealed class GarnetJournalStorageOptions
     /// <summary>The default AOF size at which an embedded partition takes a checkpoint.</summary>
     public const string DEFAULT_CHECKPOINT_AOF_SIZE = "256m";
 
+    /// <summary>The default time for which a partition retains a deleted journal's tombstone.</summary>
+    public static readonly TimeSpan DEFAULT_TOMBSTONE_RETENTION = TimeSpan.FromMinutes(5);
+
     /// <summary>
     /// Gets or sets the store holding the range map. Every silo of the cluster must use the same store.
     /// </summary>
@@ -106,6 +109,35 @@ public sealed class GarnetJournalStorageOptions
     /// instead of applying it again.
     /// </remarks>
     public TimeSpan OperationTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets or sets how long a partition retains the tombstone of a deleted journal once its bucket's migration is done.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A tombstone holds the ETags of the journal's recent mutations, which let a retried mutation recognize that it
+    /// committed. When a partition drops a tombstone, it advances the bucket's collection generation past the one the
+    /// deletion recorded, and rejects writes to absent journals which observed the absence at an earlier generation,
+    /// so a retry never applies twice, whatever any silo's <see cref="OperationTimeout"/> or clock (D25).
+    /// </para>
+    /// <para>
+    /// Retries which arrive after their tombstone is dropped fail with <see cref="Storage.InconsistentStateException"/>
+    /// instead of reporting their committed outcome. Retain tombstones for longer than the longest
+    /// <see cref="OperationTimeout"/> in the cluster, plus an allowance for clock skew between silos, which only affects
+    /// when tombstones are dropped.
+    /// </para>
+    /// </remarks>
+    public TimeSpan TombstoneRetention { get; set; } = DEFAULT_TOMBSTONE_RETENTION;
+
+    /// <summary>
+    /// Gets or sets how often a silo checks for migration work in the partitions it hosts, when it has none in progress.
+    /// </summary>
+    public TimeSpan MigrationInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Gets or sets how often a silo drops expired tombstones and absent markers from the partitions it hosts.
+    /// </summary>
+    public TimeSpan MarkerCollectionInterval { get; set; } = TimeSpan.FromMinutes(1);
 
     /// <summary>Gets or sets the in-memory size of each hosted partition's hybrid log, for example <c>1g</c>.</summary>
     public string LogMemorySize { get; set; } = DEFAULT_LOG_MEMORY_SIZE;
