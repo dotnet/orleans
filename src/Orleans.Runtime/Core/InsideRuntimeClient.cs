@@ -330,8 +330,13 @@ namespace Orleans.Runtime
                                 else
                                 {
                                     response = await invokable.Invoke();
-                                    // The copier preserves the null state of its input.
-                                    response = this.responseCopier.Copy(response)!;
+
+                                    // A local request is passed by reference, and so is its response.
+                                    if (!message.IsLocalOnly)
+                                    {
+                                        // The copier preserves the null state of its input.
+                                        response = this.responseCopier.Copy(response)!;
+                                    }
                                 }
 
                                 // A local request is disposed once it is completed.

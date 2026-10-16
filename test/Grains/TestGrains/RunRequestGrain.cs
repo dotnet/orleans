@@ -82,6 +82,8 @@ public abstract class RunRequestGrainBase : Grain, IRunRequestGrain, IIncomingGr
         return Task.CompletedTask;
     }
 
+    public Task<bool> ReceiveLocalRequestReturnsResultInstance() => ResultInstanceRequest.ReturnsResultInstanceAsync(this);
+
     public async Task<string> RunCustomRequestLifecycle()
     {
         // The request interleaves so that it runs while this call waits for it.
@@ -263,6 +265,54 @@ internal sealed class CustomRequest(string value, Action<Response>? onComplete =
     public override Type GetInterfaceType() => typeof(IRunRequestGrain);
 
     public override MethodInfo GetMethod() => typeof(IRunRequestGrain).GetMethod(nameof(IRunRequestGrain.Ping))!;
+}
+
+/// <summary>
+/// A local request which returns a mutable result instance and records the response it receives.
+/// </summary>
+internal sealed class ResultInstanceRequest(List<string> result) : Request<List<string>>, ILocalRequest
+{
+    private readonly TaskCompletionSource<Response> _outcome = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private object? _grain;
+
+    /// <summary>
+    /// Returns whether a local request on <paramref name="grain"/> completes with the same result instance which it returned.
+    /// </summary>
+    public static async Task<bool> ReturnsResultInstanceAsync(IGrainBase grain)
+    {
+        var result = new List<string> { "mutable" };
+        var request = new ResultInstanceRequest(result);
+
+        // The request interleaves so that it runs while the calling request waits for it.
+        grain.GrainContext.ReceiveLocalRequest(request, new LocalRequestOptions { Interleave = true });
+        var response = await request._outcome.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        return ReferenceEquals(result, response.Result);
+    }
+
+    public void Complete(Response response) => _outcome.TrySetResult(response);
+
+    public override object GetTarget() => _grain!;
+
+    public override void SetTarget(ITargetHolder holder) => _grain = holder.GetTarget();
+
+    protected override ValueTask<List<string>> InvokeInner() => new(result);
+
+    public override void Dispose() { }
+
+    public override string GetMethodName() => "ReturnResult";
+
+    public override string GetInterfaceName() => CustomRequest.InterfaceName;
+
+    public override string GetActivityName() => $"{CustomRequest.InterfaceName}/ReturnResult";
+
+    public override Type GetInterfaceType() => typeof(IRunRequestGrain);
+
+    public override MethodInfo GetMethod() => typeof(IRunRequestGrain).GetMethod(nameof(IRunRequestGrain.Ping))!;
+}
+
+public sealed class UnfilteredRunRequestGrain : Grain, IUnfilteredRunRequestGrain
+{
+    public Task<bool> ReceiveLocalRequestReturnsResultInstance() => ResultInstanceRequest.ReturnsResultInstanceAsync(this);
 }
 
 public sealed class NonReentrantRunRequestGrain : RunRequestGrainBase, INonReentrantRunRequestGrain

@@ -146,6 +146,22 @@ public class RunRequestTests : HostedTestClusterEnsureDefaultStarted
     }
 
     [Fact]
+    public async Task ReceiveLocalRequest_ThroughCallFilter_CompletesWithResultInstance()
+    {
+        var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());
+
+        Assert.True(await grain.ReceiveLocalRequestReturnsResultInstance().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ReceiveLocalRequest_WithoutCallFilters_CompletesWithResultInstance()
+    {
+        var grain = GrainFactory.GetGrain<IUnfilteredRunRequestGrain>(Guid.NewGuid());
+
+        Assert.True(await grain.ReceiveLocalRequestReturnsResultInstance().WaitAsync(Timeout, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task ReceiveLocalRequest_CustomRequest_IsDisposedAfterCompletion()
     {
         var grain = GrainFactory.GetGrain<INonReentrantRunRequestGrain>(Guid.NewGuid());

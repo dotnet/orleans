@@ -13,6 +13,8 @@ public interface IRunRequestGrain : IGrainWithGuidKey
 
     Task<string> RunCustomRequestLifecycle();
 
+    Task<bool> ReceiveLocalRequestReturnsResultInstance();
+
     Task<int> QueueRequests(int count);
 
     Task StartBlockingRequest();
@@ -53,6 +55,14 @@ public interface INonReentrantRunRequestGrain : IRunRequestGrain
 
 public interface IReentrantRunRequestGrain : IRunRequestGrain
 {
+}
+
+/// <summary>
+/// A grain without incoming grain call filters, whose local requests run without a call filter chain.
+/// </summary>
+public interface IUnfilteredRunRequestGrain : IGrainWithGuidKey
+{
+    Task<bool> ReceiveLocalRequestReturnsResultInstance();
 }
 
 /// <summary>

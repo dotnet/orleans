@@ -8,6 +8,7 @@ namespace Orleans.Runtime;
 /// <remarks>
 /// The grain context invokes the request on the activation, through its incoming grain call filters, passes the
 /// response to <see cref="Complete"/>, and then disposes the request. Call filters, logs, and traces observe the request's interface name, method name, and arguments.
+/// The request and its response are passed by reference rather than copied, so a request which shares mutable state with its caller copies it itself.
 /// </remarks>
 public interface ILocalRequest : IInvokable
 {
