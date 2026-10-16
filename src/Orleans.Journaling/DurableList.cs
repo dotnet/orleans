@@ -203,6 +203,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IStateMachine, IDurableL
     private JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
+        JournaledStateMutationFence.ThrowIfClosed();
         _hasStagedEntries = true;
         return _writer;
     }

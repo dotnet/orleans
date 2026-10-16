@@ -155,6 +155,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     private JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
+        JournaledStateMutationFence.ThrowIfClosed();
         _hasStagedEntries = true;
         return _writer;
     }

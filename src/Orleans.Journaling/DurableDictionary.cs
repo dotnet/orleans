@@ -155,6 +155,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     protected virtual JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
+        JournaledStateMutationFence.ThrowIfClosed();
         _hasStagedEntries = true;
         return _writer;
     }

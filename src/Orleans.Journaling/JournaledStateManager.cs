@@ -893,6 +893,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
     {
+        JournaledStateMutationFence.ThrowIfClosed();
         cancellationToken.ThrowIfCancellationRequested();
 
         Task pendingWrite;

@@ -89,6 +89,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        JournaledStateMutationFence.ThrowIfClosed();
         _status = DurableTaskCompletionSourceStatus.Completed;
         _value = _copier.Copy(value);
         return true;
@@ -101,6 +102,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        JournaledStateMutationFence.ThrowIfClosed();
         _status = DurableTaskCompletionSourceStatus.Faulted;
         _exception = _exceptionCopier.Copy(exception);
         return true;
@@ -113,6 +115,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             return false;
         }
 
+        JournaledStateMutationFence.ThrowIfClosed();
         _status = DurableTaskCompletionSourceStatus.Canceled;
         return true;
     }
