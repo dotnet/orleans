@@ -20,15 +20,20 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
     private readonly JournalStorageTelemetry _telemetry;
     private readonly ILoggerFactory? _loggerFactory;
     private readonly ILogger<GarnetJournalStorageProvider>? _logger;
+    private readonly TimeProvider _timeProvider;
     private GarnetJournalPartitionManager? _partitions;
     private GarnetJournalRouter? _router;
+    private GarnetJournalMigrationCoordinator? _coordinator;
+    private GarnetJournalMigrationAgent? _agent;
 
     public GarnetJournalStorageProvider(
         IOptions<GarnetJournalStorageOptions> options,
         IOptions<JournaledStateManagerOptions> managerOptions,
         ILoggerFactory? loggerFactory = null,
-        OrleansInstruments? instruments = null)
+        OrleansInstruments? instruments = null,
+        TimeProvider? timeProvider = null)
     {
+        _timeProvider = timeProvider ?? TimeProvider.System;
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(managerOptions);
         _options = options.Value;
@@ -45,6 +50,13 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
     internal GarnetJournalRouter Router => _router ?? throw new InvalidOperationException(
         $"{nameof(GarnetJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
 
+    /// <summary>Gets the coordinator which commits and drives migrations.</summary>
+    internal GarnetJournalMigrationCoordinator Coordinator => _coordinator ?? throw new InvalidOperationException(
+        $"{nameof(GarnetJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
+
+    /// <summary>Gets the agent which drives migrations into this silo's partitions, if it hosts any.</summary>
+    internal GarnetJournalMigrationAgent? MigrationAgent => _agent;
+
     public IJournalStorage CreateStorage(JournalId journalId)
     {
         if (journalId.IsDefault)
@@ -58,7 +70,8 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
     /// <remarks>
     /// Reads each bucket's index from the partition which owns it, as one snapshot per bucket. The index is updated in
     /// the same transaction as every create and delete, so a listing includes every journal which exists for its
-    /// whole duration.
+    /// whole duration. A bucket whose migration is incomplete is consolidated first, so its index lists every journal
+    /// on its migration chain.
     /// </remarks>
     public async IAsyncEnumerable<JournalCatalogEntry> ListAsync(
         JournalCatalogListOptions? options = null,
@@ -78,24 +91,13 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
             var reads = new Task<RedisResult[]>[count];
             for (var i = 0; i < count; i++)
             {
-                var bucket = start + i;
-                reads[i] = router.ExecuteAsync(
-                    bucket,
-                    GarnetJournalProtocol.Index,
-                    [(RedisKey)GarnetJournalKeys.GetBucketKey(router.MapId, bucket), (RedisKey)GarnetJournalKeys.GetIndexKey(bucket)],
-                    cancellationToken).AsTask();
+                reads[i] = ReadIndexAsync(router, start + i, cancellationToken);
             }
 
             var results = await Task.WhenAll(reads).ConfigureAwait(false);
             for (var i = 0; i < results.Length; i++)
             {
                 var members = results[i];
-                if (GarnetJournalRouter.GetStatus(members) != GarnetJournalProtocol.SuccessStatus)
-                {
-                    throw new InvalidOperationException(
-                        $"Garnet journal bucket {start + i} has an incomplete migration, which this version cannot list.");
-                }
-
                 _telemetry.OnCatalogPage(GarnetJournalRouter.ProviderName, members.Length - 1);
                 for (var m = 1; m < members.Length; m++)
                 {
@@ -115,6 +117,41 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
         }
     }
 
+    /// <summary>Reads a bucket's index at its owner, consolidating the bucket first while its migration is incomplete.</summary>
+    private static async Task<RedisResult[]> ReadIndexAsync(GarnetJournalRouter router, int bucket, CancellationToken cancellationToken)
+    {
+        var start = System.Diagnostics.Stopwatch.GetTimestamp();
+        while (true)
+        {
+            var result = await router.ExecuteAsync(
+                bucket,
+                GarnetJournalProtocol.Index,
+                [(RedisKey)GarnetJournalKeys.GetBucketKey(router.MapId, bucket), (RedisKey)GarnetJournalKeys.GetIndexKey(bucket)],
+                cancellationToken).ConfigureAwait(false);
+            var status = GarnetJournalRouter.GetStatus(result);
+            if (status == GarnetJournalProtocol.SuccessStatus)
+            {
+                return result;
+            }
+
+            if (status != GarnetJournalProtocol.NeedPullStatus)
+            {
+                throw new InvalidOperationException($"Listing Garnet journal bucket {bucket} failed with status {status}.");
+            }
+
+            var (consolidation, _) = await router.Migrator.ConsolidateAsync(bucket, router.View.Map.GetOwner(bucket), cancellationToken).ConfigureAwait(false);
+            if (consolidation != ConsolidationResult.Done)
+            {
+                if (System.Diagnostics.Stopwatch.GetElapsedTime(start) >= router.OperationTimeout)
+                {
+                    throw new TimeoutException($"Garnet journal bucket {bucket} could not be consolidated for listing within {router.OperationTimeout}.");
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
     public void Participate(ISiloLifecycle observer)
     {
         observer.Subscribe(nameof(GarnetJournalStorageProvider), _options.InitStage, onStart: StartAsync, onStop: StopAsync);
@@ -129,11 +166,29 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
             ?? (string.IsNullOrWhiteSpace(_options.DataDirectory) ? null : GetOrCreateHostId(_options.DataDirectory));
         var view = await GetRangeMapAsync(metaStore, hostId, cancellationToken).ConfigureAwait(false);
         _partitions = await GarnetJournalPartitionManager.StartAsync(_options, hostId, metaStore, view, _loggerFactory, cancellationToken).ConfigureAwait(false);
-        _router = new GarnetJournalRouter(metaStore, _partitions.View, _options.OperationTimeout, _telemetry, _logger);
+        _router = new GarnetJournalRouter(metaStore, _partitions.View, _options.OperationTimeout, _telemetry, _logger, _timeProvider);
+        _coordinator = new GarnetJournalMigrationCoordinator(_router, _loggerFactory?.CreateLogger<GarnetJournalMigrationCoordinator>());
+        if (_partitions.Hosts.Count > 0)
+        {
+            _agent = new GarnetJournalMigrationAgent(
+                _router,
+                _coordinator,
+                _partitions.Hosts.Keys.ToHashSet(),
+                _options,
+                _loggerFactory?.CreateLogger<GarnetJournalMigrationAgent>());
+            _agent.Start();
+        }
     }
 
     internal async Task StopAsync(CancellationToken cancellationToken)
     {
+        if (_agent is { } agent)
+        {
+            _agent = null;
+            await agent.DisposeAsync().ConfigureAwait(false);
+        }
+
+        _coordinator = null;
         if (_router is { } router)
         {
             _router = null;

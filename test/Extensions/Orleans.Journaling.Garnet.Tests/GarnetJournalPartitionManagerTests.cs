@@ -76,7 +76,7 @@ public sealed class GarnetJournalPartitionManagerTests
                     new(GarnetJournalKeys.BucketCountField, map.BucketCount),
                     new(GarnetJournalKeys.SchemaVersionField, GarnetJournalProtocol.CurrentSchemaVersion),
                 ]);
-            await database.ExecuteAsync(GarnetJournalProtocol.Bucket, [(RedisKey)GarnetJournalKeys.GetBucketKey(map.Id, 0), GarnetJournalProtocol.BucketOpenOperation, "0", GarnetJournalProtocol.NoSource, "1"]);
+            await database.ExecuteAsync(GarnetJournalProtocol.Bucket, GarnetJournalKeySet.GetBucketArgs(map.Id, 0, GarnetJournalProtocol.BucketOpenOperation, "0", GarnetJournalProtocol.NoSource, "1"));
 
             // The storage belongs to p0 of this map: another map, or another partition, cannot take it over.
             var otherMap = map with { Id = RangeMap.CreateId() };
@@ -170,8 +170,8 @@ public sealed class GarnetJournalPartitionManagerTests
             var map = RangeMap.CreateUniform(16, [new(P0, new PartitionHosting("host", 0, "p0"))]);
 
             // A bucket which cannot be opened stops the initialization partway through.
-            await database.ExecuteAsync(GarnetJournalProtocol.Bucket, [(RedisKey)GarnetJournalKeys.GetBucketKey(map.Id, 5), GarnetJournalProtocol.BucketOpenOperation, "0", GarnetJournalProtocol.NoSource, "1"]);
-            await database.ExecuteAsync(GarnetJournalProtocol.Bucket, [(RedisKey)GarnetJournalKeys.GetBucketKey(map.Id, 5), GarnetJournalProtocol.BucketSealOperation, "3", GarnetJournalProtocol.NoSource, "1"]);
+            await database.ExecuteAsync(GarnetJournalProtocol.Bucket, GarnetJournalKeySet.GetBucketArgs(map.Id, 5, GarnetJournalProtocol.BucketOpenOperation, "0", GarnetJournalProtocol.NoSource, "1"));
+            await database.ExecuteAsync(GarnetJournalProtocol.Bucket, GarnetJournalKeySet.GetBucketArgs(map.Id, 5, GarnetJournalProtocol.BucketSealOperation, "3", GarnetJournalProtocol.NoSource, "1"));
             await Assert.ThrowsAsync<InvalidOperationException>(() => GarnetJournalPartitionManager.InitializeAsync(host.EndPoint, P0, map, CancellationToken));
 
             // The identity was claimed before any bucket was opened, and the initialization is not marked complete.

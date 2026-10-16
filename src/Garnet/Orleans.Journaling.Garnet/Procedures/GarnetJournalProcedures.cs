@@ -11,7 +11,7 @@ namespace Orleans.Journaling;
 /// <remarks>
 /// <para>
 /// Journal procedures take their keys as the first arguments: the bucket state key, the journal metadata key, the
-/// journal data key, the bucket index key, and the encoded journal id. Every procedure locks the bucket state key, so
+/// journal data key, the bucket index key, the bucket marker key, and the encoded journal id. Every procedure locks the bucket state key, so
 /// it linearizes against bucket transitions (the in-band seal): a procedure which observes an open bucket commits before
 /// any seal of that bucket, and a procedure ordered after a seal observes the seal and fails.
 /// </para>
@@ -26,7 +26,9 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
     private const int MetadataKeyArg = 1;
     private const int DataKeyArg = 2;
     private const int IndexKeyArg = 3;
-    protected const int FirstOperationArg = 5;
+    private const int MarkerKeyArg = 4;
+    private const int MemberArg = 5;
+    protected const int FirstOperationArg = 6;
 
     // Locks are held only while Main runs in memory; AOF commit waits happen after the locks are released.
     public override TimeSpan KeyLockTimeout => TimeSpan.FromSeconds(10);
@@ -42,7 +44,8 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
         var metadataKey = GetNextArg(ref procInput, ref offset);
         var dataKey = GetNextArg(ref procInput, ref offset);
         var indexKey = GetNextArg(ref procInput, ref offset);
-        if (!bucketKey.IsValid || !metadataKey.IsValid || !dataKey.IsValid || !indexKey.IsValid)
+        var markerKey = GetNextArg(ref procInput, ref offset);
+        if (!bucketKey.IsValid || !metadataKey.IsValid || !dataKey.IsValid || !indexKey.IsValid || !markerKey.IsValid)
         {
             return false;
         }
@@ -56,6 +59,7 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
             if (IsWrite)
             {
                 AddKey(indexKey, LockType.Exclusive, StoreType.Object);
+                AddKey(markerKey, LockType.Exclusive, StoreType.Object);
             }
         }
 
@@ -76,7 +80,19 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
 
     protected static PinnedSpanByte IndexKey(ref CustomProcedureInput procInput) => GetArg(ref procInput, IndexKeyArg);
 
-    protected static PinnedSpanByte Member(ref CustomProcedureInput procInput) => GetArg(ref procInput, 4);
+    protected static PinnedSpanByte MarkerKey(ref CustomProcedureInput procInput) => GetArg(ref procInput, MarkerKeyArg);
+
+    protected static PinnedSpanByte Member(ref CustomProcedureInput procInput) => GetArg(ref procInput, MemberArg);
+
+    /// <summary>Writes <c>WrongPartition(state, version)</c> for a bucket this partition does not hold as required.</summary>
+    protected static void WriteWrongPartition(in BucketRecord bucket, ref MemoryResult<byte> output)
+    {
+        var response = new GarnetRespArrayWriter();
+        response.WriteBulk(GarnetJournalProtocol.WrongPartitionStatus);
+        response.WriteBulk(bucket.Exists ? bucket.State : GarnetJournalProtocol.AbsentState);
+        response.WriteBulk(bucket.Exists ? bucket.Version : GarnetJournalProtocol.ZeroValue);
+        response.CopyTo(ref output);
+    }
 
     /// <summary>
     /// Checks that the bucket is open in this partition and, for journals absent from it, that its migration is complete.
@@ -88,27 +104,56 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
         var bucket = BucketRecord.Load(api, BucketKey(ref procInput));
         if (!bucket.IsOpen)
         {
-            var response = new GarnetRespArrayWriter();
-            response.WriteBulk(GarnetJournalProtocol.WrongPartitionStatus);
-            response.WriteBulk(bucket.Exists ? bucket.State : GarnetJournalProtocol.AbsentState);
-            response.WriteBulk(bucket.Exists ? bucket.Version : GarnetJournalProtocol.ZeroValue);
-            response.CopyTo(ref output);
+            WriteWrongPartition(bucket, ref output);
             return false;
         }
 
-        // Journals the partition holds, including deletion tombstones, are authoritative. Others may still be in the
-        // bucket's source until migration completes.
+        // Journals the partition holds, including deletion tombstones and absent markers, are authoritative. Others
+        // may still be on the bucket's migration chain until migration completes.
         if (!journal.Exists && !bucket.IsDone)
         {
-            var response = new GarnetRespArrayWriter();
-            response.WriteBulk(GarnetJournalProtocol.NeedPullStatus);
-            response.WriteBulk(bucket.Source);
-            response.CopyTo(ref output);
+            WriteNeedPull(bucket, ref output);
             return false;
         }
 
         return true;
     }
+
+    /// <summary>Writes <c>NeedPull(source, version)</c>: the source to pull from, for the bucket's tenure at <c>version</c>.</summary>
+    protected static void WriteNeedPull(in BucketRecord bucket, ref MemoryResult<byte> output)
+    {
+        var response = new GarnetRespArrayWriter();
+        response.WriteBulk(GarnetJournalProtocol.NeedPullStatus);
+        response.WriteBulk(bucket.Source);
+        response.WriteBulk(bucket.Version);
+        response.CopyTo(ref output);
+    }
+
+    /// <summary>Gets the bucket's collection generation (see <see cref="IsCollectedSince"/>).</summary>
+    protected static long GetCollectionGeneration<TGarnetApi>(TGarnetApi api, ref CustomProcedureInput procInput)
+        where TGarnetApi : IGarnetReadApi
+        => api.HashGet(BucketKey(ref procInput), Pinned(GarnetJournalProtocol.BucketCollectedField), out var value) == GarnetStatus.OK
+            && GarnetJournalProtocol.TryParseNonNegativeCanonical(value.ReadOnlySpan, out var generation)
+            ? generation
+            : 0;
+
+    /// <summary>
+    /// Gets a value indicating whether the journal is in the empty absence and the bucket has dropped, since the caller
+    /// observed that absence at <paramref name="observedGeneration"/>, a tombstone of a deletion stamped at or after it.
+    /// </summary>
+    /// <remarks>
+    /// Dropping a tombstone discards the ETags which let a retried mutation recognize that it committed, and restores
+    /// the empty absence, which a retried create is conditioned on. The partition stamps each tombstone with the
+    /// bucket's collection generation, and dropping it raises the generation past the stamp; generations only grow, and
+    /// every later opener of the bucket inherits its source's. A mutation which committed before a deletion observed its
+    /// absence before it, at a generation no later than the deletion's stamp, so once the tombstone is dropped the
+    /// retry is rejected, however long it was delayed (D25). Generations are assigned by the partitions holding the
+    /// bucket, so the comparison depends on no client's clock. A fresh observation of the empty absence reads the
+    /// current generation and is accepted.
+    /// </remarks>
+    protected static bool IsCollectedSince<TGarnetApi>(TGarnetApi api, ref CustomProcedureInput procInput, in JournalRecord journal, long observedGeneration)
+        where TGarnetApi : IGarnetReadApi
+        => journal.AbsenceETag.IsEmpty && observedGeneration < GetCollectionGeneration(api, ref procInput);
 
     protected static void WriteStatus(ref MemoryResult<byte> output, int status)
     {
@@ -117,12 +162,17 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
         response.CopyTo(ref output);
     }
 
-    /// <summary>Writes the missing status followed by the journal's absence ETag.</summary>
-    protected static void WriteMissing(ref MemoryResult<byte> output, in JournalRecord journal)
+    /// <summary>
+    /// Writes the missing status followed by the journal's absence ETag and the bucket's collection generation, which a
+    /// write conditioned on this absence carries.
+    /// </summary>
+    protected static void WriteMissing<TGarnetApi>(TGarnetApi api, ref CustomProcedureInput procInput, ref MemoryResult<byte> output, in JournalRecord journal)
+        where TGarnetApi : IGarnetReadApi
     {
         var response = new GarnetRespArrayWriter();
         response.WriteBulk(GarnetJournalProtocol.MissingStatus);
         response.WriteBulk(journal.AbsenceETag);
+        response.WriteBulk(GetCollectionGeneration(api, ref procInput));
         response.CopyTo(ref output);
     }
 
@@ -173,13 +223,14 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
         return GarnetJournalProtocol.SuccessStatus;
     }
 
-    /// <summary>Removes a deletion tombstone and any stale data before the journal is created.</summary>
+    /// <summary>Removes a tombstone or absent marker and any stale data before the journal is created.</summary>
     protected static void ClearForCreate<TGarnetApi>(TGarnetApi api, ref CustomProcedureInput procInput, in JournalRecord journal)
         where TGarnetApi : IGarnetApi
     {
-        if (journal.IsTombstone)
+        if (journal.IsMarker)
         {
             api.DELETE(MetadataKey(ref procInput));
+            api.SetRemove(MarkerKey(ref procInput), Member(ref procInput), out _);
         }
 
         api.DELETE(DataKey(ref procInput));
@@ -214,6 +265,37 @@ internal abstract class GarnetJournalProcedure : CustomTransactionProcedure
 
     protected static PinnedSpanByte Pinned(ReadOnlySpan<byte> staticData) => PinnedSpanByte.FromPinnedSpan(staticData);
 
+    /// <summary>Appends the journal's data segments, one bulk string per append, to <paramref name="response"/>.</summary>
+    protected static void WriteSegments<TGarnetApi>(TGarnetApi api, PinnedSpanByte dataKey, GarnetRespArrayWriter response)
+        where TGarnetApi : IGarnetReadApi
+    {
+        // RespInputHeader stores the object type in its first byte and the object operation in its second.
+        var header = new RespInputHeader(GarnetObjectType.List);
+        header.SetHeader((ushort)((byte)GarnetObjectType.List | ((byte)ListOperation.LRANGE << 8)), 0);
+        var input = new ObjectInput(header, 0, -1);
+        var listOutput = new ObjectOutput();
+        try
+        {
+            if (api.ListRange(dataKey, ref input, ref listOutput) == GarnetStatus.OK)
+            {
+                // The output is a RESP array of bulk strings: copy its elements after the header.
+                var encoded = listOutput.SpanByteAndMemory.ReadOnlySpan;
+                var headerEnd = encoded.IndexOf((byte)'\n');
+                if (encoded.Length == 0 || encoded[0] != (byte)'*' || headerEnd < 2
+                    || !Utf8Parser.TryParse(encoded[1..(headerEnd - 1)], out int count, out _))
+                {
+                    throw new InvalidOperationException("Unexpected journal data encoding.");
+                }
+
+                response.WriteEncodedBulkStrings(encoded[(headerEnd + 1)..], count);
+            }
+        }
+        finally
+        {
+            listOutput.SpanByteAndMemory.Dispose();
+        }
+    }
+
     protected static bool ArgEquals(PinnedSpanByte arg, ReadOnlySpan<byte> value) => arg.ReadOnlySpan.SequenceEqual(value);
 }
 
@@ -225,7 +307,14 @@ internal readonly ref struct BucketRecord
     public ReadOnlySpan<byte> Version { get; init; }
     public ReadOnlySpan<byte> Source { get; init; }
     public bool IsDone { get; init; }
+
+    /// <summary>Gets a value indicating whether the partition has reclaimed its sealed copy of the bucket.</summary>
+    public bool IsReclaimed { get; init; }
+
+    /// <summary>Gets the bucket's collection generation (see <see cref="GarnetJournalProcedure.IsCollectedSince"/>).</summary>
+    public long CollectionGeneration { get; init; }
     public bool IsOpen => Exists && State.SequenceEqual(GarnetJournalProtocol.OpenState);
+    public bool IsSealed => Exists && State.SequenceEqual(GarnetJournalProtocol.SealedState);
 
     public static BucketRecord Load<TGarnetApi>(TGarnetApi api, PinnedSpanByte key)
         where TGarnetApi : IGarnetReadApi
@@ -235,7 +324,7 @@ internal readonly ref struct BucketRecord
             return default;
         }
 
-        ReadOnlySpan<byte> state = default, version = default, source = default, done = default;
+        ReadOnlySpan<byte> state = default, version = default, source = default, done = default, reclaimed = default, collected = default;
         for (var i = 0; i + 1 < values.Length; i += 2)
         {
             var field = values[i].ReadOnlySpan;
@@ -244,6 +333,8 @@ internal readonly ref struct BucketRecord
             else if (field.SequenceEqual(GarnetJournalProtocol.BucketVersionField)) version = value;
             else if (field.SequenceEqual(GarnetJournalProtocol.BucketSourceField)) source = value;
             else if (field.SequenceEqual(GarnetJournalProtocol.BucketDoneField)) done = value;
+            else if (field.SequenceEqual(GarnetJournalProtocol.BucketReclaimedField)) reclaimed = value;
+            else if (field.SequenceEqual(GarnetJournalProtocol.BucketCollectedField)) collected = value;
         }
 
         return new()
@@ -253,6 +344,8 @@ internal readonly ref struct BucketRecord
             Version = version,
             Source = source,
             IsDone = done.SequenceEqual(GarnetJournalProtocol.TrueValue),
+            IsReclaimed = reclaimed.SequenceEqual(GarnetJournalProtocol.TrueValue),
+            CollectionGeneration = GarnetJournalProtocol.TryParseNonNegativeCanonical(collected, out var generation) ? generation : 0,
         };
     }
 }
@@ -260,10 +353,14 @@ internal readonly ref struct BucketRecord
 /// <summary>The provider-owned metadata of a journal in a partition.</summary>
 internal readonly ref struct JournalRecord
 {
-    /// <summary>Gets a value indicating whether the partition holds the journal or its deletion tombstone.</summary>
+    /// <summary>Gets a value indicating whether the partition holds a record of the journal: the journal, its deletion tombstone, or an absent marker.</summary>
     public bool Exists { get; init; }
     public bool IsTombstone { get; init; }
-    public bool IsLive => Exists && !IsTombstone;
+
+    /// <summary>Gets a value indicating whether the record is an absent marker: a pull found no record of the journal on the bucket's migration chain.</summary>
+    public bool IsAbsentMarker { get; init; }
+    public bool IsMarker => IsTombstone || IsAbsentMarker;
+    public bool IsLive => Exists && !IsMarker;
     public ReadOnlySpan<byte> ETag { get; init; }
     public ReadOnlySpan<byte> ContentETag { get; init; }
     public ReadOnlySpan<byte> Format { get; init; }
@@ -271,11 +368,18 @@ internal readonly ref struct JournalRecord
     public long AppendLength { get; init; }
     public bool HasValidAppendLength { get; init; }
 
+    /// <summary>Gets the time of a tombstone's deletion, in Unix milliseconds by the deleting client's clock.</summary>
+    public ReadOnlySpan<byte> DeletedAt { get; init; }
+
+    /// <summary>Gets the bucket's collection generation when the tombstone's deletion committed (D25).</summary>
+    public ReadOnlySpan<byte> DeletedGeneration { get; init; }
+
     /// <summary>Gets the newline-separated ETags of the journal's most recent mutations, including its deletion.</summary>
     public ReadOnlySpan<byte> RecentETags { get; init; }
 
     /// <summary>
-    /// Gets the identity of the journal's absence: its tombstone's ETag, or empty if the partition holds no record.
+    /// Gets the identity of the journal's absence: its tombstone's ETag, or empty if the partition holds no record or
+    /// an absent marker.
     /// </summary>
     /// <remarks>
     /// Each deletion writes a fresh ETag, so an absence never recurs while retries can arrive. A write conditioned on
@@ -312,8 +416,9 @@ internal readonly ref struct JournalRecord
             return default;
         }
 
-        ReadOnlySpan<byte> eTag = default, contentETag = default, format = default, schemaVersion = default, appendLength = default, recent = default;
+        ReadOnlySpan<byte> eTag = default, contentETag = default, format = default, schemaVersion = default, appendLength = default, recent = default, deletedAt = default, deletedGeneration = default;
         var deleted = false;
+        var absent = false;
         for (var i = 0; i + 1 < values.Length; i += 2)
         {
             var field = values[i].ReadOnlySpan;
@@ -325,6 +430,9 @@ internal readonly ref struct JournalRecord
             else if (field.SequenceEqual(GarnetJournalProtocol.AppendLengthField)) appendLength = value;
             else if (field.SequenceEqual(GarnetJournalProtocol.RecentETagsField)) recent = value;
             else if (field.SequenceEqual(GarnetJournalProtocol.DeletedField)) deleted = true;
+            else if (field.SequenceEqual(GarnetJournalProtocol.DeletedAtField)) deletedAt = value;
+            else if (field.SequenceEqual(GarnetJournalProtocol.DeletedGenerationField)) deletedGeneration = value;
+            else if (field.SequenceEqual(GarnetJournalProtocol.AbsentField)) absent = true;
         }
 
         var validLength = GarnetJournalProtocol.TryParseNonNegativeCanonical(appendLength, out var length);
@@ -332,6 +440,7 @@ internal readonly ref struct JournalRecord
         {
             Exists = true,
             IsTombstone = deleted,
+            IsAbsentMarker = absent,
             ETag = eTag,
             ContentETag = contentETag,
             Format = format,
@@ -339,6 +448,8 @@ internal readonly ref struct JournalRecord
             AppendLength = length,
             HasValidAppendLength = validLength,
             RecentETags = recent,
+            DeletedAt = deletedAt,
+            DeletedGeneration = deletedGeneration,
         };
     }
 }
@@ -363,7 +474,7 @@ internal sealed class GarnetJournalReadProcedure : GarnetJournalProcedure
 
         if (!journal.IsLive)
         {
-            WriteMissing(ref output, journal);
+            WriteMissing(api, ref procInput, ref output, journal);
             return;
         }
 
@@ -376,32 +487,7 @@ internal sealed class GarnetJournalReadProcedure : GarnetJournalProcedure
             response.WriteBulk(value.ReadOnlySpan);
         }
 
-        // RespInputHeader stores the object type in its first byte and the object operation in its second.
-        var header = new RespInputHeader(GarnetObjectType.List);
-        header.SetHeader((ushort)((byte)GarnetObjectType.List | ((byte)ListOperation.LRANGE << 8)), 0);
-        var input = new ObjectInput(header, 0, -1);
-        var listOutput = new ObjectOutput();
-        try
-        {
-            if (api.ListRange(DataKey(ref procInput), ref input, ref listOutput) == GarnetStatus.OK)
-            {
-                // The output is a RESP array of bulk strings: copy its elements after the header.
-                var encoded = listOutput.SpanByteAndMemory.ReadOnlySpan;
-                var headerEnd = encoded.IndexOf((byte)'\n');
-                if (encoded.Length == 0 || encoded[0] != (byte)'*' || headerEnd < 2
-                    || !Utf8Parser.TryParse(encoded[1..(headerEnd - 1)], out int count, out _))
-                {
-                    throw new InvalidOperationException("Unexpected journal data encoding.");
-                }
-
-                response.WriteEncodedBulkStrings(encoded[(headerEnd + 1)..], count);
-            }
-        }
-        finally
-        {
-            listOutput.SpanByteAndMemory.Dispose();
-        }
-
+        WriteSegments(api, DataKey(ref procInput), response);
         response.CopyTo(ref output);
     }
 }
@@ -425,7 +511,7 @@ internal sealed class GarnetJournalGetMetadataProcedure : GarnetJournalProcedure
 
         if (!journal.IsLive)
         {
-            WriteMissing(ref output, journal);
+            WriteMissing(api, ref procInput, ref output, journal);
             return;
         }
 
@@ -434,9 +520,12 @@ internal sealed class GarnetJournalGetMetadataProcedure : GarnetJournalProcedure
 }
 
 /// <summary>
-/// Creates a journal if it does not exist. Arguments: keys, new ETag, format, observed absence ETag, property count, properties.
-/// Returns <c>[1, metadata...]</c> if created, <c>[0, metadata...]</c> if it already existed, or <c>[-1]</c> if the
-/// journal is absent but its absence is not the one the caller observed.
+/// Creates a journal if it does not exist. Arguments: keys, new ETag, format, expected absence ETag, the collection
+/// generation observed with that absence, property count, properties.
+/// Returns <c>[1, metadata...]</c> if created, <c>[0, metadata...]</c> if it already existed, or <c>[-1]</c> if it is
+/// absent with another absence ETag than expected (it was created and deleted since the caller observed it), or the
+/// bucket has collected a tombstone since the caller observed the empty absence (see
+/// <see cref="GarnetJournalProcedure.IsCollectedSince"/>).
 /// </summary>
 internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
 {
@@ -454,8 +543,9 @@ internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
 
         var newETag = GetArg(ref procInput, FirstOperationArg);
         var format = GetArg(ref procInput, FirstOperationArg + 1);
-        var absence = GetArg(ref procInput, FirstOperationArg + 2);
-        var countArg = GetArg(ref procInput, FirstOperationArg + 3);
+        var expectedAbsence = GetArg(ref procInput, FirstOperationArg + 2);
+        var observedGeneration = GetArg(ref procInput, FirstOperationArg + 3);
+        var countArg = GetArg(ref procInput, FirstOperationArg + 4);
         if (journal.Exists && journal.HasCommitted(newETag))
         {
             // A retry of a create which committed reports the creation.
@@ -484,9 +574,14 @@ internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
             return;
         }
 
-        // Every absence has an identity (its tombstone's ETag), so a retry whose ETag has left the journal's history
-        // cannot satisfy this condition after a later creation and deletion.
-        if (!journal.AbsenceETag.SequenceEqual(absence.ReadOnlySpan))
+        if (!GarnetJournalProtocol.TryParseNonNegativeCanonical(observedGeneration.ReadOnlySpan, out var observedGenerationValue))
+        {
+            WriteStatus(ref output, GarnetJournalProtocol.InvalidMetadataStatus);
+            return;
+        }
+
+        if (!journal.AbsenceETag.SequenceEqual(expectedAbsence.ReadOnlySpan)
+            || IsCollectedSince(api, ref procInput, journal, observedGenerationValue))
         {
             WriteStatus(ref output, GarnetJournalProtocol.ConflictStatus);
             return;
@@ -507,7 +602,7 @@ internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
         fields[5] = (Pinned(GarnetJournalProtocol.RecentETagsField), AppendRecentETag(journal.RecentETags, newETag));
         for (var i = 0; i < count; i++)
         {
-            fields[6 + i] = (GetArg(ref procInput, FirstOperationArg + 4 + 2 * i), GetArg(ref procInput, FirstOperationArg + 5 + 2 * i));
+            fields[6 + i] = (GetArg(ref procInput, FirstOperationArg + 5 + 2 * i), GetArg(ref procInput, FirstOperationArg + 6 + 2 * i));
         }
 
         ClearForCreate(api, ref procInput, journal);
@@ -519,7 +614,9 @@ internal sealed class GarnetJournalCreateProcedure : GarnetJournalProcedure
 
 /// <summary>
 /// Appends to or replaces a journal, creating it if it is expected to be absent.
-/// Arguments: keys, expectation (<c>1</c>: the content ETag matches; <c>0</c>: the journal is absent), expected content ETag or observed absence ETag, new ETag, payload, format.
+/// Arguments: keys, expectation (<c>1</c>: the journal's content ETag matches; <c>0</c>: the journal is absent with the
+/// expected absence ETag), expected ETag, new ETag, payload, format, the collection generation observed with the
+/// absence (see <see cref="GarnetJournalProcedure.IsCollectedSince"/>).
 /// Returns <c>[1, appendLength]</c> or a failure status.
 /// </summary>
 internal abstract class GarnetJournalWriteProcedure : GarnetJournalProcedure
@@ -543,8 +640,14 @@ internal abstract class GarnetJournalWriteProcedure : GarnetJournalProcedure
         var newETag = GetArg(ref procInput, FirstOperationArg + 2);
         var payload = GetArg(ref procInput, FirstOperationArg + 3);
         var format = GetArg(ref procInput, FirstOperationArg + 4);
+        var observedGeneration = GetArg(ref procInput, FirstOperationArg + 5);
         var dataKey = DataKey(ref procInput);
         var metadataKey = MetadataKey(ref procInput);
+        if (!GarnetJournalProtocol.TryParseNonNegativeCanonical(observedGeneration.ReadOnlySpan, out var observedGenerationValue))
+        {
+            WriteStatus(ref output, GarnetJournalProtocol.InvalidMetadataStatus);
+            return;
+        }
 
         // A retry of a write which committed reports its success instead of applying it again.
         if (journal.Exists && journal.HasCommitted(newETag))
@@ -556,7 +659,9 @@ internal abstract class GarnetJournalWriteProcedure : GarnetJournalProcedure
         if (!journal.IsLive)
         {
             // A write which creates the journal names the absence it observed: its tombstone's ETag, or no record.
-            if (expectsETag || !journal.AbsenceETag.SequenceEqual(expected.ReadOnlySpan))
+            if (expectsETag
+                || !journal.AbsenceETag.SequenceEqual(expected.ReadOnlySpan)
+                || IsCollectedSince(api, ref procInput, journal, observedGenerationValue))
             {
                 WriteStatus(ref output, GarnetJournalProtocol.ConflictStatus);
                 return;
@@ -642,8 +747,10 @@ internal sealed class GarnetJournalReplaceProcedure : GarnetJournalWriteProcedur
 }
 
 /// <summary>
-/// Deletes a journal, leaving a tombstone which carries the deletion's ETag.
-/// Arguments: keys, expected content ETag, expected to exist (0 or 1), new ETag.
+/// Deletes a journal, leaving a tombstone which carries the deletion's ETag, its time, and the bucket's collection
+/// generation when it committed (D25).
+/// Arguments: keys, expected content ETag, expected to exist (0 or 1), new ETag, deletion time (Unix milliseconds by the
+/// client's clock, which bounds only how long the tombstone is retained).
 /// Returns <c>[1]</c>, <c>[2]</c> if a journal expected to be absent exists, or a failure status.
 /// </summary>
 internal sealed class GarnetJournalDeleteProcedure : GarnetJournalProcedure
@@ -663,6 +770,7 @@ internal sealed class GarnetJournalDeleteProcedure : GarnetJournalProcedure
         var expected = GetArg(ref procInput, FirstOperationArg);
         var expectExists = ArgEquals(GetArg(ref procInput, FirstOperationArg + 1), GarnetJournalProtocol.TrueValue);
         var newETag = GetArg(ref procInput, FirstOperationArg + 2);
+        var deletedAt = GetArg(ref procInput, FirstOperationArg + 3);
         if (journal.Exists && journal.HasCommitted(newETag))
         {
             // A retry of a delete which committed.
@@ -695,8 +803,15 @@ internal sealed class GarnetJournalDeleteProcedure : GarnetJournalProcedure
             return;
         }
 
+        if (!GarnetJournalProtocol.TryParseNonNegativeCanonical(deletedAt.ReadOnlySpan, out _))
+        {
+            WriteStatus(ref output, GarnetJournalProtocol.InvalidMetadataStatus);
+            return;
+        }
+
         var metadataKey = MetadataKey(ref procInput);
         var recent = AppendRecentETag(journal.RecentETags, newETag);
+        var generation = CreateArgSlice(GarnetJournalProtocol.FormatInt64(GetCollectionGeneration(api, ref procInput)));
         api.DELETE(DataKey(ref procInput));
         api.DELETE(metadataKey);
         api.HashSet(metadataKey,
@@ -704,8 +819,11 @@ internal sealed class GarnetJournalDeleteProcedure : GarnetJournalProcedure
             (Pinned(GarnetJournalProtocol.DeletedField), Pinned(GarnetJournalProtocol.TrueValue)),
             (Pinned(GarnetJournalProtocol.ETagField), newETag),
             (Pinned(GarnetJournalProtocol.RecentETagsField), recent),
+            (Pinned(GarnetJournalProtocol.DeletedAtField), deletedAt),
+            (Pinned(GarnetJournalProtocol.DeletedGenerationField), generation),
         ], out _);
         api.SetRemove(IndexKey(ref procInput), Member(ref procInput), out _);
+        api.SetAdd(MarkerKey(ref procInput), Member(ref procInput), out _);
         WriteStatus(ref output, GarnetJournalProtocol.SuccessStatus);
     }
 }
@@ -874,6 +992,7 @@ internal sealed class GarnetJournalIndexProcedure : CustomTransactionProcedure
         {
             response.WriteBulk(GarnetJournalProtocol.NeedPullStatus);
             response.WriteBulk(bucket.Source);
+            response.WriteBulk(bucket.Version);
         }
         else
         {
@@ -893,12 +1012,22 @@ internal sealed class GarnetJournalIndexProcedure : CustomTransactionProcedure
 
 /// <summary>
 /// Transitions a bucket's state in this partition.
-/// Arguments: bucket key, operation (<c>open</c> or <c>seal</c>), version, source, done (0 or 1).
-/// Returns <c>[1]</c>, or <c>[-1, state, version]</c> if the transition does not apply to the current state.
+/// Arguments: bucket key, index key, marker key, operation (<c>open</c>, <c>seal</c>, or <c>reclaim</c>), version, source,
+/// done (0 or 1), and the collection generation the bucket opens with (the source's; <c>-</c> or <c>0</c> for none).
+/// Returns <c>[1]</c>, or <c>[-1, state, version, reclaimed]</c> if the transition does not apply to the current state.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The procedure takes the bucket key's exclusive lock, which waits for journal procedures holding its shared lock, so
 /// a seal is ordered after every operation that observed the bucket open and before every operation that follows it.
+/// </para>
+/// <para>
+/// <c>open</c> opens a bucket the partition holds no copy of: an absent bucket, or a reclaimed one, at a later version,
+/// whose journals have all been purged (the reopen rule, D11). <c>seal</c> seals an open bucket at a later version.
+/// <c>reclaim</c> marks the copy sealed at <c>version</c> as reclaimed (D42): from then on, every read of it fails, and
+/// its journals may be purged. Each transition reports success if it has already been applied, so retries and
+/// duplicate coordinators are harmless.
+/// </para>
 /// </remarks>
 internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
 {
@@ -908,12 +1037,16 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
     {
         var offset = 0;
         var bucketKey = GetNextArg(ref procInput, ref offset);
-        if (!bucketKey.IsValid)
+        var indexKey = GetNextArg(ref procInput, ref offset);
+        var markerKey = GetNextArg(ref procInput, ref offset);
+        if (!bucketKey.IsValid || !indexKey.IsValid || !markerKey.IsValid)
         {
             return false;
         }
 
         AddKey(bucketKey, LockType.Exclusive, StoreType.Object);
+        AddKey(indexKey, LockType.Shared, StoreType.Object);
+        AddKey(markerKey, LockType.Shared, StoreType.Object);
         return true;
     }
 
@@ -921,13 +1054,17 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
     {
         var offset = 0;
         var bucketKey = GetNextArg(ref procInput, ref offset);
+        var indexKey = GetNextArg(ref procInput, ref offset);
+        var markerKey = GetNextArg(ref procInput, ref offset);
         var operation = GetNextArg(ref procInput, ref offset);
         var version = GetNextArg(ref procInput, ref offset);
         var source = GetNextArg(ref procInput, ref offset);
         var done = GetNextArg(ref procInput, ref offset);
+        var collected = GetNextArg(ref procInput, ref offset);
         var bucket = BucketRecord.Load(api, bucketKey);
         var response = new GarnetRespArrayWriter();
-        if (!GarnetJournalProtocol.TryParseNonNegativeCanonical(version.ReadOnlySpan, out var requestedVersion))
+        if (!GarnetJournalProtocol.TryParseNonNegativeCanonical(version.ReadOnlySpan, out var requestedVersion)
+            || collected.IsValid && !collected.ReadOnlySpan.SequenceEqual("-"u8) && !GarnetJournalProtocol.TryParseNonNegativeCanonical(collected.ReadOnlySpan, out _))
         {
             response.WriteBulk(GarnetJournalProtocol.InvalidMetadataStatus);
             response.CopyTo(ref output);
@@ -947,9 +1084,16 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
         if (operation.ReadOnlySpan.SequenceEqual(GarnetJournalProtocol.OpenOperation))
         {
             alreadyApplied = bucket.IsOpen && currentVersion == requestedVersion;
-            applies = !bucket.Exists;
+            applies = !bucket.Exists
+                || bucket.IsSealed && bucket.IsReclaimed && currentVersion < requestedVersion
+                    && IsEmpty(api, indexKey) && IsEmpty(api, markerKey);
             if (applies)
             {
+                if (bucket.Exists)
+                {
+                    api.DELETE(bucketKey);
+                }
+
                 api.HashSet(bucketKey,
                 [
                     (PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketStateField), PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.OpenState)),
@@ -957,11 +1101,18 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
                     (PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketSourceField), source),
                     (PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketDoneField), done),
                 ], out _);
+
+                // The bucket inherits its source's collection generation, so generations only grow along the bucket's
+                // history: retries rejected there are rejected here too.
+                if (collected.IsValid && !collected.ReadOnlySpan.SequenceEqual("-"u8))
+                {
+                    api.HashSet(bucketKey, PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketCollectedField), collected, out _);
+                }
             }
         }
         else if (operation.ReadOnlySpan.SequenceEqual(GarnetJournalProtocol.SealOperation))
         {
-            alreadyApplied = bucket.Exists && bucket.State.SequenceEqual(GarnetJournalProtocol.SealedState) && currentVersion == requestedVersion;
+            alreadyApplied = bucket.IsSealed && currentVersion == requestedVersion;
             applies = bucket.IsOpen && currentVersion < requestedVersion;
             if (applies)
             {
@@ -969,6 +1120,19 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
                 [
                     (PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketStateField), PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.SealedState)),
                     (PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketVersionField), version),
+                ], out _);
+            }
+        }
+        else if (operation.ReadOnlySpan.SequenceEqual(GarnetJournalProtocol.ReclaimOperation))
+        {
+            // Only the tenure sealed at the requested version is reclaimed, so a stale request cannot reclaim a later tenure.
+            alreadyApplied = bucket.IsSealed && bucket.IsReclaimed && currentVersion == requestedVersion;
+            applies = bucket.IsSealed && !bucket.IsReclaimed && currentVersion == requestedVersion;
+            if (applies)
+            {
+                api.HashSet(bucketKey,
+                [
+                    (PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.BucketReclaimedField), PinnedSpanByte.FromPinnedSpan(GarnetJournalProtocol.TrueValue)),
                 ], out _);
             }
         }
@@ -988,10 +1152,15 @@ internal sealed class GarnetJournalBucketProcedure : CustomTransactionProcedure
             response.WriteBulk(GarnetJournalProtocol.ConflictStatus);
             response.WriteBulk(bucket.Exists ? bucket.State : GarnetJournalProtocol.AbsentState);
             response.WriteBulk(bucket.Exists ? bucket.Version : GarnetJournalProtocol.ZeroValue);
+            response.WriteBulk(bucket.IsReclaimed ? GarnetJournalProtocol.TrueValue : GarnetJournalProtocol.FalseValue);
         }
 
         response.CopyTo(ref output);
     }
+
+    private static bool IsEmpty<TGarnetApi>(TGarnetApi api, PinnedSpanByte key)
+        where TGarnetApi : IGarnetReadApi
+        => api.SetLength(key, out var count) != GarnetStatus.OK || count == 0;
 }
 
 /// <summary>
@@ -1017,7 +1186,19 @@ internal static class GarnetJournalProcedures
             static () => new GarnetJournalUpdateMetadataProcedure(),
             static () => new GarnetJournalBucketProcedure(),
             static () => new GarnetJournalIndexProcedure(),
+            static () => new GarnetJournalPullReadProcedure(),
+            static () => new GarnetJournalInstallProcedure(),
+            static () => new GarnetJournalDoneProcedure(),
+            static () => new GarnetJournalLinkProcedure(),
+            static () => new GarnetJournalPurgeProcedure(),
+            static () => new GarnetJournalDropMarkerProcedure(),
+            static () => new GarnetJournalBucketInfoProcedure(),
         ];
+
+        if (factories.Length != GarnetJournalProtocol.Names.Length)
+        {
+            throw new InvalidOperationException("Every journal procedure name requires a procedure.");
+        }
 
         for (var i = 0; i < factories.Length; i++)
         {

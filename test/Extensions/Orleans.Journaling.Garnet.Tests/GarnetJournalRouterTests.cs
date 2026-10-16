@@ -372,7 +372,7 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
     {
         var result = (RedisResult[])(await _admin[partition].GetDatabase().ExecuteAsync(
             GarnetJournalProtocol.Bucket,
-            [(RedisKey)GarnetJournalKeys.GetBucketKey(_mapId, bucket), operation, version.ToString(), GarnetJournalProtocol.NoSource, "1"]))!;
+            GarnetJournalKeySet.GetBucketArgs(_mapId, bucket, operation, version.ToString(), GarnetJournalProtocol.NoSource, "1")))!;
         return (string?)result[0];
     }
 

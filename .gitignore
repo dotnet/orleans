@@ -223,3 +223,6 @@ src/SetupTestScriptOutput.txt
 
 # code coverage
 *.cobertura.xml
+
+# Apalache server output (Quint model checking)
+_apalache-out/

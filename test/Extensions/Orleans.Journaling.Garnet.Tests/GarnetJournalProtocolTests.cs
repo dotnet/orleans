@@ -57,7 +57,7 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         var contentETag = metadata.ETag!;
 
         // Replay identical append invocations, as a client does when a reply is lost.
-        object[] append = [.. Keys(storage), "1", contentETag, "append-etag", new byte[] { 7 }, "json"];
+        object[] append = [.. Keys(storage), "1", contentETag, "append-etag", new byte[] { 7 }, "json", "0"];
         Assert.Equal(["1", "1"], await ExecuteAsync(GarnetJournalProtocol.Append, append));
         Assert.Equal(["1", "1"], await ExecuteAsync(GarnetJournalProtocol.Append, append));
 
@@ -71,20 +71,46 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         Assert.Equal("metadata-etag", consumer.Metadata!.ETag);
         Assert.Equal("retry", consumer.Metadata.Properties["owner"]);
 
-        object[] delete = [.. Keys(storage), "append-etag", "1", "delete-etag"];
+        object[] delete = [.. Keys(storage), "append-etag", "1", "delete-etag", "1000"];
         Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Delete, delete));
         Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Delete, delete));
 
         // A different delete expecting the journal finds it absent.
-        object[] otherDelete = [.. Keys(storage), "append-etag", "1", "other-etag"];
+        object[] otherDelete = [.. Keys(storage), "append-etag", "1", "other-etag", "1000"];
         Assert.Equal(["-1"], await ExecuteAsync(GarnetJournalProtocol.Delete, otherDelete));
         Assert.Null(await Provider.CreateStorage(id).GetMetadataAsync(CancellationToken));
 
-        object[] create = [.. Keys(storage), "create-etag", "json", "delete-etag", "0"];
+        // A missing journal reports its absence ETag, the deletion's, and the bucket's collection generation, on which
+        // creates are conditioned.
+        Assert.Equal(["0", "delete-etag", "0"], await ExecuteAsync(GarnetJournalProtocol.GetMetadata, [.. Keys(storage)]));
+        Assert.Equal(["-1"], await ExecuteAsync(GarnetJournalProtocol.Create, [.. Keys(storage), "stale-create-etag", "json", "", "0", "0"]));
+        object[] create = [.. Keys(storage), "create-etag", "json", "delete-etag", "0", "0"];
         Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Create, create))[0]);
         Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Create, create))[0]);
-        object[] otherCreate = [.. Keys(storage), "other-create-etag", "json", "delete-etag", "0"];
+        object[] otherCreate = [.. Keys(storage), "other-create-etag", "json", "delete-etag", "0", "0"];
         Assert.Equal("0", (await ExecuteAsync(GarnetJournalProtocol.Create, otherCreate))[0]);
+    }
+
+    [Fact]
+    public async Task RetriedCreate_AfterItsETagIsEvicted_NeverAppliesTwice()
+    {
+        var storage = (GarnetJournalStorage)Provider.CreateStorage(NewId("evicted"));
+
+        // A create-by-append whose reply is lost; other writers then append, evicting its ETag, and delete the journal.
+        object[] first = [.. Keys(storage), "0", "", "first", new byte[] { 1 }, "json", "0"];
+        Assert.Equal(["1", "1"], await ExecuteAsync(GarnetJournalProtocol.Append, first));
+        var previous = "first";
+        for (var i = 0; i < GarnetJournalProtocol.RecentETagCount; i++)
+        {
+            Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", previous, $"later-{i}", new byte[] { 2 }, "json", "0"]))[0]);
+            previous = $"later-{i}";
+        }
+
+        Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Delete, [.. Keys(storage), previous, "1", "gone", "1000"]));
+
+        // The journal is absent again, but not in the absence the create observed, so the retry conflicts.
+        Assert.Equal(["-1"], await ExecuteAsync(GarnetJournalProtocol.Append, first));
+        Assert.Null(await Provider.CreateStorage(storage.JournalId).GetMetadataAsync(CancellationToken));
     }
 
     [Fact]
@@ -94,12 +120,12 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         var storage = (GarnetJournalStorage)Provider.CreateStorage(id);
 
         // A create-by-append whose reply is lost, followed by another writer's append and delete.
-        object[] first = [.. Keys(storage), "0", "", "first", new byte[] { 1 }, "json"];
+        object[] first = [.. Keys(storage), "0", "", "first", new byte[] { 1 }, "json", "0"];
         Assert.Equal(["1", "1"], await ExecuteAsync(GarnetJournalProtocol.Append, first));
-        Assert.Equal(["1", "2"], await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", "first", "second", new byte[] { 2 }, "json"]));
+        Assert.Equal(["1", "2"], await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", "first", "second", new byte[] { 2 }, "json", "0"]));
         Assert.Equal(["1", "2"], await ExecuteAsync(GarnetJournalProtocol.Append, first));
 
-        Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Delete, [.. Keys(storage), "second", "1", "deleted"]));
+        Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Delete, [.. Keys(storage), "second", "1", "deleted", "1000"]));
 
         // The retry does not resurrect the deleted journal.
         Assert.Equal(["1", "0"], await ExecuteAsync(GarnetJournalProtocol.Append, first));
@@ -107,19 +133,19 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
 
         // Retries are recognized while fewer than RecentETagCount later mutations have committed.
         var previous = "recreated-0";
-        Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "0", "deleted", previous, new byte[] { 0 }, "json"]))[0]);
-        object[] tracked = [.. Keys(storage), "1", previous, "tracked", new byte[] { 9 }, "json"];
+        Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "0", "deleted", previous, new byte[] { 0 }, "json", "0"]))[0]);
+        object[] tracked = [.. Keys(storage), "1", previous, "tracked", new byte[] { 9 }, "json", "0"];
         Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, tracked))[0]);
         previous = "tracked";
         for (var i = 1; i < GarnetJournalProtocol.RecentETagCount; i++)
         {
             var next = $"later-{i}";
-            Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", previous, next, new byte[] { 0 }, "json"]))[0]);
+            Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", previous, next, new byte[] { 0 }, "json", "0"]))[0]);
             previous = next;
         }
 
         Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, tracked))[0]);
-        Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", previous, "evicting", new byte[] { 0 }, "json"]))[0]);
+        Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", previous, "evicting", new byte[] { 0 }, "json", "0"]))[0]);
         Assert.Equal(["-1"], await ExecuteAsync(GarnetJournalProtocol.Append, tracked));
 
         var consumer = new CapturingConsumer();
@@ -137,8 +163,8 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         var id = NewId($"resurrect-{procedure}");
         var storage = (GarnetJournalStorage)Provider.CreateStorage(id);
         object[] creation = procedure == GarnetJournalProtocol.Create
-            ? [.. Keys(storage), "created", "json", "", "1", "owner", "first"]
-            : [.. Keys(storage), "0", "", "created", new byte[] { 1 }, "json"];
+            ? [.. Keys(storage), "created", "json", "", "0", "1", "owner", "first"]
+            : [.. Keys(storage), "0", "", "created", new byte[] { 1 }, "json", "0"];
 
         // The creation commits but its reply is lost; enough later mutations to evict its ETag end in a deletion.
         Assert.Equal("1", (await ExecuteAsync(procedure, creation))[0]);
@@ -146,16 +172,16 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         for (var i = 1; i < GarnetJournalProtocol.RecentETagCount; i++)
         {
             var next = $"later-{i}";
-            Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", previous, next, new byte[] { 2 }, "json"]))[0]);
+            Assert.Equal("1", (await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(storage), "1", previous, next, new byte[] { 2 }, "json", "0"]))[0]);
             previous = next;
         }
 
-        Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Delete, [.. Keys(storage), previous, "1", "deleted"]));
+        Assert.Equal(["1"], await ExecuteAsync(GarnetJournalProtocol.Delete, [.. Keys(storage), previous, "1", "deleted", "1000"]));
 
         // The retry names the absence it observed (no record), not the deletion's, so it does not create the journal again.
         Assert.Equal(["-1"], await ExecuteAsync(procedure, creation));
         Assert.Null(await Provider.CreateStorage(id).GetMetadataAsync(CancellationToken));
-        Assert.Equal(["0", "deleted"], await ExecuteAsync(GarnetJournalProtocol.GetMetadata, [.. Keys(storage)]));
+        Assert.Equal(["0", "deleted", "0"], await ExecuteAsync(GarnetJournalProtocol.GetMetadata, [.. Keys(storage)]));
     }
 
     [Fact]
@@ -289,10 +315,13 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken);
         var bucketKey = storage.BucketKey;
 
-        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [bucketKey, "seal", "5", "-", "1"]));
-        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [bucketKey, "seal", "5", "-", "1"]));
-        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [bucketKey, "seal", "6", "-", "1"]));
-        Assert.Equal(["-1", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, [bucketKey, "open", "6", "-", "1"]));
+        var mapId = fixture.Provider.Router.MapId;
+        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, GarnetJournalKeySet.GetBucketArgs(mapId, storage.Bucket, "seal", "5", "-", "1")));
+        Assert.Equal(["1"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, GarnetJournalKeySet.GetBucketArgs(mapId, storage.Bucket, "seal", "5", "-", "1")));
+        Assert.Equal(["-1", "sealed", "5", "0"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, GarnetJournalKeySet.GetBucketArgs(mapId, storage.Bucket, "seal", "6", "-", "1")));
+
+        // A sealed bucket reopens only once reclaimed and purged.
+        Assert.Equal(["-1", "sealed", "5", "0"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Bucket, GarnetJournalKeySet.GetBucketArgs(mapId, storage.Bucket, "open", "6", "-", "1")));
 
         Assert.Equal(["-10", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Read, [.. Keys(storage)]));
         Assert.Equal(["-10", "sealed", "5"], await ExecuteAsync(fixture.Database, GarnetJournalProtocol.Index, [bucketKey, (RedisKey)GarnetJournalKeys.GetIndexKey(storage.Bucket)]));
@@ -328,8 +357,8 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         }
         while (absent.Bucket != present.Bucket);
 
-        Assert.Equal(["-11", "7"], await ExecuteAsync(GarnetJournalProtocol.Read, [.. Keys(absent)]));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => absent.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken).AsTask());
+        Assert.Equal(["-11", "7", "0"], await ExecuteAsync(GarnetJournalProtocol.Read, [.. Keys(absent)]));
+        Assert.Equal(["-11", "7", "0"], await ExecuteAsync(GarnetJournalProtocol.Append, [.. Keys(absent), "0", "", "absent-etag", new byte[] { 2 }, "json", "0"]));
 
         var consumer = new CapturingConsumer();
         await Provider.CreateStorage(present.JournalId).ReadAsync(consumer, CancellationToken);
@@ -351,16 +380,10 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
         Assert.True(await _fixture.Database.SetLengthAsync(indexKey) > 0);
         await _fixture.Database.HashSetAsync(present.BucketKey, [new("done", "0"), new("source", "7")]);
 
-        Assert.Equal(["-11", "7"], await ExecuteAsync(GarnetJournalProtocol.Index, [present.BucketKey, indexKey]));
-
-        // The listing fails rather than completing with only the journals this partition holds.
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-        {
-            await foreach (var _ in Provider.ListAsync(cancellationToken: CancellationToken))
-            {
-            }
-        });
-        Assert.Contains($"bucket {present.Bucket}", exception.Message);
+        // The index reports NeedPull with the source and the bucket's opening version, so the catalog consolidates the
+        // bucket before listing it (GarnetJournalMigrationTests.Catalog_ListsJournalsOfBucketsWithIncompleteMigrations)
+        // rather than completing with only the journals this partition holds.
+        Assert.Equal(["-11", "7", "0"], await ExecuteAsync(GarnetJournalProtocol.Index, [present.BucketKey, indexKey]));
 
         // Once the migration completes, the bucket lists its journals again.
         await _fixture.Database.HashSetAsync(present.BucketKey, "done", "1");

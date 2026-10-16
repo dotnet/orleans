@@ -19,6 +19,7 @@ internal static class GarnetJournalKeys
     private static ReadOnlySpan<byte> MetadataPrefix => "oj:m:"u8;
     private static ReadOnlySpan<byte> DataPrefix => "oj:j:"u8;
     private static ReadOnlySpan<byte> IndexPrefix => "oj:i:"u8;
+    private static ReadOnlySpan<byte> MarkerPrefix => "oj:x:"u8;
 
     /// <summary>The key of the partition descriptor hash.</summary>
     public static readonly byte[] PartitionKey = "oj:partition"u8.ToArray();
@@ -67,6 +68,9 @@ internal static class GarnetJournalKeys
     }
 
     public static byte[] GetIndexKey(int bucket) => Concat(IndexPrefix, bucket, separator: false, []);
+
+    /// <summary>Gets the key of the set of journals for which a bucket holds a tombstone or an absent marker.</summary>
+    public static byte[] GetMarkerKey(int bucket) => Concat(MarkerPrefix, bucket, separator: false, []);
 
     public static byte[] GetMetadataKey(int bucket, ReadOnlySpan<byte> encodedJournalId) => Concat(MetadataPrefix, bucket, separator: true, encodedJournalId);
 

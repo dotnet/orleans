@@ -1,8 +1,5 @@
 using System.Buffers;
 using System.Buffers.Binary;
-using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
 using StackExchange.Redis;
 
 namespace Orleans.Journaling.Garnet.Tests;
@@ -59,10 +56,11 @@ public sealed class GarnetJournalDurabilityTests
                     break;
                 }
 
+                using var killing = new CancellationTokenSource();
                 using var stop = new CancellationTokenSource();
                 var baseline = acknowledged.ToArray();
                 var writers = Enumerable.Range(0, JournalCount)
-                    .Select(j => Task.Run(() => WriteAsync(client, ids[j], acknowledged, j, stop.Token)))
+                    .Select(j => Task.Run(() => WriteAsync(client, ids[j], acknowledged, j, killing.Token, stop.Token)))
                     .ToArray();
 
                 // Kill only after every writer has made progress in this cycle.
@@ -86,6 +84,8 @@ public sealed class GarnetJournalDurabilityTests
                     await Task.Delay(TimeSpan.FromMilliseconds(100 + random.Next(200)), CancellationToken);
                 }
 
+                // Writers keep appending until after the kill, so appends are in flight when it happens.
+                killing.Cancel();
                 host.Kill();
                 stop.Cancel();
                 await Task.WhenAll(writers);
@@ -98,7 +98,7 @@ public sealed class GarnetJournalDurabilityTests
         }
     }
 
-    private static async Task WriteAsync(GarnetJournalRouter client, JournalId id, int[] acknowledged, int index, CancellationToken stop)
+    private static async Task WriteAsync(GarnetJournalRouter client, JournalId id, int[] acknowledged, int index, CancellationToken killing, CancellationToken stop)
     {
         var storage = new GarnetJournalStorage(client, id, "json", compactionThresholdBytes: 0);
         try
@@ -113,7 +113,7 @@ public sealed class GarnetJournalDurabilityTests
                 Volatile.Write(ref acknowledged[index], ++next);
             }
         }
-        catch (Exception exception) when (exception is TimeoutException or RedisException)
+        catch (Exception exception) when (exception is TimeoutException or RedisException && killing.IsCancellationRequested)
         {
             // The host was killed; this append's outcome is unknown.
         }
@@ -132,90 +132,5 @@ public sealed class GarnetJournalDurabilityTests
         }
 
         return values;
-    }
-
-    /// <summary>A partition hosted in a child process.</summary>
-    private sealed class CrashHostProcess : IDisposable
-    {
-        private readonly Process _process;
-
-        private CrashHostProcess(Process process, IPEndPoint endPoint)
-        {
-            _process = process;
-            EndPoint = endPoint;
-        }
-
-        public IPEndPoint EndPoint { get; }
-
-        public static async Task<CrashHostProcess> StartAsync(string directory, CancellationToken cancellationToken)
-        {
-            var port = GetFreePort();
-            var hostPath = Path.Combine(AppContext.BaseDirectory, "Orleans.Journaling.Garnet.CrashHost.dll");
-            var startInfo = new ProcessStartInfo(GetDotNetPath())
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardInput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            };
-            startInfo.ArgumentList.Add(hostPath);
-            startInfo.ArgumentList.Add(directory);
-            startInfo.ArgumentList.Add(port.ToString());
-            var process = Process.Start(startInfo) ?? throw new InvalidOperationException("The crash host did not start.");
-            var errors = process.StandardError.ReadToEndAsync(cancellationToken);
-            try
-            {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeout.CancelAfter(TimeSpan.FromSeconds(60));
-                while (true)
-                {
-                    var line = await process.StandardOutput.ReadLineAsync(timeout.Token);
-                    if (line is null)
-                    {
-                        throw new InvalidOperationException($"The crash host exited: {await errors}");
-                    }
-
-                    if (line.StartsWith("READY ", StringComparison.Ordinal))
-                    {
-                        return new(process, new IPEndPoint(IPAddress.Loopback, port));
-                    }
-                }
-            }
-            catch
-            {
-                process.Kill(entireProcessTree: true);
-                process.Dispose();
-                throw;
-            }
-        }
-
-        public void Kill()
-        {
-            if (!_process.HasExited)
-            {
-                _process.Kill(entireProcessTree: true);
-                _process.WaitForExit();
-            }
-        }
-
-        public void Dispose()
-        {
-            Kill();
-            _process.Dispose();
-        }
-
-        private static string GetDotNetPath()
-            => Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } path && File.Exists(path)
-                ? path
-                : "dotnet";
-
-        private static int GetFreePort()
-        {
-            using var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
-        }
     }
 }
