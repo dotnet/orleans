@@ -78,7 +78,7 @@ public sealed class GrainTimerTests
             Assert.True(message.IsLocalOnly);
             Assert.Null(message.TimeToLive);
             Assert.Null(message.RequestContextData);
-            Assert.True(message.InterfaceType.IsDefault);
+            Assert.Equal(GrainInterfaceType.Create("Orleans.Runtime.ILocalRequest"), message.InterfaceType);
             Assert.Equal(fixture.Grain.GrainId, message.TargetGrain);
             Assert.Equal(message.SendingGrain, message.TargetGrain);
             Assert.Equal(fixture.Grain.Address.SiloAddress, message.TargetSilo);
