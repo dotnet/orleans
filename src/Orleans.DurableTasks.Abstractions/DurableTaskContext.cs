@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
@@ -14,32 +15,30 @@ public abstract class DurableTaskContext
     private static readonly AsyncLocal<DurableTaskContext?> AmbientContext = new();
     private static readonly AsyncLocal<DurableTaskContext?> ShieldedContext = new();
     private readonly object _lock = new();
+
+    // Canceled by task cancellation and by attempt cancellation: the source of CancellationToken.
     private readonly CancellationTokenSource _cancellationSource = new();
-    private readonly CancellationTokenSource? _executionCancellationSource;
-    private readonly CancellationToken _executionAbortToken;
-    private List<CancellationRegistration>? _registrations;
-    private CancellationOperation? _cancellationOperation;
-    private bool _cancellationRequested;
-    private string? _cancellationReason;
+
+    // Canceled by attempt cancellation only, before _cancellationSource, so code which observes either token finds the
+    // attempt canceled.
+    private readonly CancellationTokenSource _attemptCancellationSource = new();
+    private bool _taskCancellationRequested;
+    private string? _taskCancellationReason;
+    private DurableTaskAttemptCancellationReason? _attemptCancellationReason;
     private long _nextChildId;
     private long _nextOperationId;
     private Dictionary<string, int>? _nameOccurrences;
 
-    /// <summary>Initializes an execution with durable cancellation.</summary>
-    protected DurableTaskContext(TaskId taskId) : this(taskId, CancellationToken.None)
-    {
-    }
-
-    /// <summary>Initializes an execution with durable cancellation and a host execution-abort token.</summary>
-    /// <param name="taskId">The stable identifier of this execution.</param>
-    /// <param name="executionAbortToken">The host-owned token for aborting this execution attempt.</param>
+    /// <summary>Initializes an attempt of the durable task <paramref name="taskId"/>.</summary>
+    /// <param name="taskId">The stable identifier of the task which this attempt runs.</param>
     /// <remarks>
-    /// <see cref="CancellationToken"/>, and the delegate and delay operations which receive it, observe both durable
-    /// cancellation and host execution abort. <see cref="IsCancellationRequested"/> and durable cancellation callbacks
-    /// observe the durable request only. The host owns the abort source for this execution's lifetime, drains
-    /// the aborted attempt, discards its response, and replays it in a new context.
+    /// The host requests the task's durable cancellation with
+    /// <see cref="DurableTaskRuntimeHelper.RequestTaskCancellation(DurableTaskContext, string?)"/>, and stops this attempt
+    /// with <see cref="DurableTaskRuntimeHelper.CancelAttempt(DurableTaskContext, DurableTaskAttemptCancellationReason)"/>.
+    /// A host drains a canceled attempt, discards its response, and runs the task again in a new context when the task
+    /// still needs an outcome.
     /// </remarks>
-    protected DurableTaskContext(TaskId taskId, CancellationToken executionAbortToken)
+    protected DurableTaskContext(TaskId taskId)
     {
         if (taskId.IsDefault)
         {
@@ -47,13 +46,6 @@ public abstract class DurableTaskContext
         }
 
         Id = taskId;
-        _executionAbortToken = executionAbortToken;
-        if (executionAbortToken.CanBeCanceled)
-        {
-            _executionCancellationSource = CancellationTokenSource.CreateLinkedTokenSource(
-                _cancellationSource.Token,
-                executionAbortToken);
-        }
     }
 
     /// <summary>Gets the context of the durable task which the calling code runs in, if any.</summary>
@@ -100,34 +92,41 @@ public abstract class DurableTaskContext
     /// </remarks>
     public virtual bool IsReplaying => false;
 
-    /// <summary>Gets a value indicating whether durable cancellation has been requested.</summary>
-    public bool IsCancellationRequested
+    /// <summary>Gets a value indicating whether durable cancellation of the task has been requested.</summary>
+    /// <remarks>
+    /// Task cancellation is durable: the host records the request, and every attempt of the task, including a replay,
+    /// observes it from the start. Code which decides a durable outcome, such as whether to compensate, checks this value,
+    /// for example in <c>catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)</c>.
+    /// The cancellation of an attempt leaves it <see langword="false"/>.
+    /// </remarks>
+    public bool IsTaskCancellationRequested
     {
         get
         {
             lock (_lock)
             {
-                return _cancellationRequested;
+                return _taskCancellationRequested;
             }
         }
     }
 
     /// <summary>
-    /// Gets the reason which the durable cancellation request carries, or <see langword="null"/> when cancellation hasn't
-    /// been requested or its request carries no reason.
+    /// Gets the reason which the durable cancellation request carries, or <see langword="null"/> when task cancellation
+    /// hasn't been requested or its request carries no reason.
     /// </summary>
     /// <remarks>
     /// The first cancellation request determines the reason, and later requests leave it unchanged. The host retains the
-    /// reason with the task's cancellation, so a replay observes the same reason. The reason is set before the durable
-    /// token is canceled, so code which observes the cancellation, such as a <see langword="catch"/> block, reads it.
+    /// reason with the task's cancellation, so a replay observes the same reason. The reason is set before
+    /// <see cref="CancellationToken"/> is canceled, so code which observes the cancellation, such as a
+    /// <see langword="catch"/> block, reads it.
     /// </remarks>
-    public string? CancellationReason
+    public string? TaskCancellationReason
     {
         get
         {
             lock (_lock)
             {
-                return _cancellationReason;
+                return _taskCancellationReason;
             }
         }
     }
@@ -162,43 +161,203 @@ public abstract class DurableTaskContext
     internal static void RestoreShield(DurableTaskContext? previous) => ShieldedContext.Value = previous;
 
     /// <summary>
-    /// Gets the token which is canceled when durable cancellation is requested or the host aborts this execution attempt.
+    /// Gets the token which is canceled when durable cancellation of the task is requested or the host cancels this
+    /// attempt. Pass it to the calls which ordinary task code makes.
     /// </summary>
     /// <remarks>
-    /// <see cref="IsCancellationRequested"/> reports durable cancellation only, so code which decides a durable outcome,
-    /// such as whether to compensate, checks it rather than this token. An aborted attempt's response is discarded and the
-    /// task replays in a new context.
-    ///
     /// <para>
-    /// Registrations on this token are ordinary synchronous .NET cleanup observers only. They follow
-    /// standard <see cref="CancellationToken"/> behavior, including registration-time
-    /// <see cref="ExecutionContext"/> capture, optional <see cref="SynchronizationContext"/> dispatch,
-    /// and current execution-context behavior for unsafe registrations.
+    /// The token ends the task's calls, such as an HTTP request or a wait for a semaphore, promptly in both cases.
+    /// <see cref="IsTaskCancellationRequested"/> tells them apart: code which runs durable cleanup after task cancellation
+    /// checks it, and passes <see cref="AttemptCancellationToken"/> to the calls which the cleanup makes, because this
+    /// token is already canceled.
     /// </para>
-    ///
     /// <para>
-    /// These observers must return promptly. They must not call, block on, await, or otherwise
-    /// orchestrate <see cref="DurableTaskRuntimeHelper.RequestCancellationAsync(DurableTaskContext, CancellationToken)"/> or durable
-    /// cancellation of any context. Doing so is outside this contract and has the usual synchronous
-    /// reentrancy and sync-over-async risks. Use <see cref="RegisterCancellationCallbackAsync"/> for
-    /// all cancellation work which requests another durable context, awaits asynchronous work, needs
-    /// cycle handling, or participates in durable failure aggregation.
+    /// A task started with <see cref="DurableTaskExtensions.Shielded(DurableTask)"/> isn't reached by its owner's task
+    /// cancellation, so within a shielded task, this token is canceled only by the task's own cancellation and by the
+    /// cancellation of its attempt.
+    /// </para>
+    /// <para>
+    /// Registrations on this token are ordinary synchronous .NET observers, which run when the token is canceled and return
+    /// promptly.
     /// </para>
     /// </remarks>
-    public CancellationToken CancellationToken => _executionCancellationSource?.Token ?? _cancellationSource.Token;
+    public CancellationToken CancellationToken => _cancellationSource.Token;
 
-    /// <summary>Gets the host-owned token for aborting this execution attempt.</summary>
-    internal CancellationToken ExecutionAbortToken => _executionAbortToken;
+    /// <summary>
+    /// Gets the token which is canceled when the host cancels this attempt: its grain activation is stopping, or the task
+    /// was aborted or deleted. Pass it to the calls which durable cleanup makes after task cancellation.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every durable operation of a canceled attempt throws <see cref="DurableTaskAttemptCanceledException"/>, and the host
+    /// discards the attempt's response. A stopping activation's task replays in a new attempt, which runs the cleanup
+    /// again; an aborted or deleted task already has its outcome. Code which observes this token releases in-process
+    /// resources and returns. Changes which it makes to the grain's journaled state commit with the grain's next journal
+    /// write.
+    /// </para>
+    /// <para>
+    /// Task cancellation leaves this token uncanceled, so a call made with it during task-cancellation cleanup, such as a
+    /// compensating HTTP request, runs to completion unless the attempt itself is canceled.
+    /// </para>
+    /// </remarks>
+    public CancellationToken AttemptCancellationToken => _attemptCancellationSource.Token;
+
+    /// <summary>Gets a value indicating whether the host canceled this attempt.</summary>
+    internal bool IsAttemptCanceled => _attemptCancellationSource.IsCancellationRequested;
 
     /// <summary>
     /// Gets the token which ends an operation that runs as part of this execution, such as a signal wait: within a shield,
-    /// only an abort of the attempt ends it, and otherwise the execution's durable cancellation also does.
+    /// only the cancellation of the attempt ends it, and otherwise the task's durable cancellation also does.
     /// </summary>
     /// <remarks>
     /// A shield keeps this execution's durable cancellation from reaching the operations which the shielded start covers,
     /// whether they run as children or as part of the execution, so a shielded wait completes after a cancellation.
     /// </remarks>
-    internal CancellationToken InlineOperationCancellationToken => SchedulesShieldedChildren ? _executionAbortToken : CancellationToken;
+    internal CancellationToken InlineOperationCancellationToken => SchedulesShieldedChildren ? AttemptCancellationToken : CancellationToken;
+
+    /// <summary>Throws <see cref="DurableTaskAttemptCanceledException"/> when the host canceled this attempt.</summary>
+    internal void ThrowIfAttemptCanceled()
+    {
+        if (IsAttemptCanceled)
+        {
+            throw CreateAttemptCanceledException(innerException: null);
+        }
+    }
+
+    /// <summary>Creates the exception which this canceled attempt's durable operations throw.</summary>
+    /// <param name="innerException">The exception which the canceled operation threw, if any.</param>
+    internal DurableTaskAttemptCanceledException CreateAttemptCanceledException(Exception? innerException)
+    {
+        DurableTaskAttemptCancellationReason? reason;
+        lock (_lock)
+        {
+            reason = _attemptCancellationReason;
+        }
+
+        Debug.Assert(reason is not null, "Only a canceled attempt throws the attempt's cancellation, whose reason is recorded first.");
+        return new(reason.GetValueOrDefault(), AttemptCancellationToken, innerException);
+    }
+
+    /// <summary>
+    /// Returns <paramref name="operation"/>, converting a cancellation which ends it because this attempt was canceled to
+    /// <see cref="DurableTaskAttemptCanceledException"/>.
+    /// </summary>
+    internal ValueTask<T> ObserveAttempt<T>(ValueTask<T> operation)
+    {
+        return operation.IsCompletedSuccessfully ? operation : ObserveAsync(operation);
+
+        async ValueTask<T> ObserveAsync(ValueTask<T> operation)
+        {
+            try
+            {
+                return await operation.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
+            {
+                throw CreateAttemptCanceledException(exception);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns <paramref name="operation"/>'s response, converting a cancellation which ends it, or which it reports, because
+    /// this attempt was canceled to <see cref="DurableTaskAttemptCanceledException"/>.
+    /// </summary>
+    internal ValueTask<DurableTaskResponse> ObserveAttempt(ValueTask<DurableTaskResponse> operation)
+    {
+        return operation.IsCompletedSuccessfully && operation.Result is not CanceledDurableTaskResponse ? operation : ObserveAsync(operation);
+
+        async ValueTask<DurableTaskResponse> ObserveAsync(ValueTask<DurableTaskResponse> operation)
+        {
+            DurableTaskResponse response;
+            try
+            {
+                response = await operation.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
+            {
+                throw CreateAttemptCanceledException(exception);
+            }
+
+            if (response is CanceledDurableTaskResponse { Exception: not DurableTaskAttemptCanceledException } canceled && IsAttemptCanceled)
+            {
+                throw CreateAttemptCanceledException(canceled.Exception);
+            }
+
+            return response;
+        }
+    }
+
+    /// <inheritdoc cref="ObserveAttempt{T}(ValueTask{T})"/>
+    internal ValueTask ObserveAttempt(ValueTask operation)
+    {
+        return operation.IsCompletedSuccessfully ? operation : ObserveAsync(operation);
+
+        async ValueTask ObserveAsync(ValueTask operation)
+        {
+            try
+            {
+                await operation.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
+            {
+                throw CreateAttemptCanceledException(exception);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="exception"/> ends an operation because the caller canceled
+    /// <paramref name="cancellationToken"/>, rather than because the host canceled the attempt.
+    /// </summary>
+    internal static bool IsCallerCancellation(OperationCanceledException exception, CancellationToken cancellationToken)
+        => cancellationToken.IsCancellationRequested && exception is not DurableTaskAttemptCanceledException;
+
+    /// <summary>
+    /// Records durable cancellation of the task carrying <paramref name="reason"/>, and cancels
+    /// <see cref="CancellationToken"/>. Later requests leave the first request's reason unchanged.
+    /// </summary>
+    internal void RequestTaskCancellation(string? reason)
+    {
+        lock (_lock)
+        {
+            if (_taskCancellationRequested)
+            {
+                return;
+            }
+
+            _taskCancellationReason = reason;
+            _taskCancellationRequested = true;
+        }
+
+        _cancellationSource.Cancel();
+    }
+
+    /// <summary>
+    /// Cancels this attempt for <paramref name="reason"/>: cancels <see cref="AttemptCancellationToken"/>, then
+    /// <see cref="CancellationToken"/>. Later calls leave the first call's reason unchanged.
+    /// </summary>
+    internal void CancelAttempt(DurableTaskAttemptCancellationReason reason)
+    {
+        lock (_lock)
+        {
+            if (_attemptCancellationReason is not null)
+            {
+                return;
+            }
+
+            _attemptCancellationReason = reason;
+        }
+
+        try
+        {
+            _attemptCancellationSource.Cancel();
+        }
+        finally
+        {
+            _cancellationSource.Cancel();
+        }
+    }
 
     /// <summary>
     /// Starts, or reattaches to, <paramref name="taskDefinition"/> under <paramref name="taskId"/>, and records the start
@@ -464,191 +623,6 @@ public abstract class DurableTaskContext
         Func<TState, DurableTaskResponse> effect)
         => throw new NotSupportedException("The durable task host does not support DurableTask.Once.");
 
-    /// <summary>
-    /// Registers an asynchronous callback which observes the durable cancellation request.
-    /// </summary>
-    /// <remarks>
-    /// This API establishes cancellation-operation causality. The callback executes with this durable
-    /// context as <see cref="DurableTask.Current"/> and participates in durable cancellation dependency tracking
-    /// and failure aggregation. Its cancellation operation flows with <see cref="ExecutionContext"/>
-    /// across ordinary awaits and safe thread-pool dispatch, including <see cref="Task.Run(Action)"/>.
-    /// Suppressing execution-context flow or using unsafe dispatch detaches subsequent asynchronous
-    /// work according to standard .NET behavior, so cancellation requests made by that work are
-    /// external rather than durable dependencies. Dependency edges are based only on this explicitly
-    /// flowed operation; no thread or global activity is inferred.
-    ///
-    /// <para>
-    /// Disposing the returned registration prevents an invocation which has not started, or
-    /// asynchronously waits for an active invocation to finish. A callback can dispose its own
-    /// registration without blocking. A registration accepted before cancellation completion is
-    /// enlisted in that cancellation operation: its callback, completion, and failure contribute to
-    /// the shared cancellation result. Once cancellation completion has closed registration, the
-    /// callback starts immediately in a new callback causality scope. It cannot change the completed
-    /// shared cancellation result; disposing its returned registration waits for that invocation and
-    /// propagates its failure.
-    /// </para>
-    /// </remarks>
-    [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope", Justification = "Ownership of the registration is returned to the caller while the context controls invocation.")]
-    public ValueTask<IAsyncDisposable> RegisterCancellationCallbackAsync(
-        Func<CancellationToken, ValueTask> callback,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(callback);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        CancellationRegistration registration;
-        CancellationOperation? callbackOperation = null;
-        lock (_lock)
-        {
-            if (!_cancellationRequested || !_cancellationOperation!.Task.IsCompleted)
-            {
-                registration = new(this, callback);
-                (_registrations ??= []).Add(registration);
-                return new(registration);
-            }
-
-            registration = new(this, callback, propagateInvocationExceptionOnDispose: true);
-            callbackOperation = new(this);
-        }
-
-        // Record nested callback causality before the callback can request its caller's cancellation.
-        _ = CancellationOperation.TryAddDependency(CancellationOperation.Current, callbackOperation!);
-        _ = InvokePostCompletionCallbackAsync(callbackOperation!, registration);
-        return new(registration);
-    }
-
-    internal Task RequestCancellationAsync(string? reason, CancellationToken cancellationToken)
-    {
-        CancellationOperation operation;
-        lock (_lock)
-        {
-            if (!_cancellationRequested)
-            {
-                _cancellationReason = reason;
-                _cancellationRequested = true;
-            }
-
-            operation = _cancellationOperation ??= new(this);
-        }
-
-        var waitForCompletion = CancellationOperation.TryAddDependency(
-            CancellationOperation.Current,
-            operation);
-        operation.Start();
-        if (!waitForCompletion)
-        {
-            return Task.CompletedTask;
-        }
-
-        return cancellationToken.CanBeCanceled
-            ? operation.Task.WaitAsync(cancellationToken)
-            : operation.Task;
-    }
-
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Every cancellation observer failure is aggregated into the durable cancellation result.")]
-    [SuppressMessage("Performance", "CA1849:Call async methods when in an async method", Justification = "CancellationTokenSource.Cancel is intentionally synchronous so ordinary token observers run before durable callbacks.")]
-    [SuppressMessage("Maintainability", "CA1508:Avoid dead conditional code", Justification = "CancellationTokenSource.Cancel can populate the exception list by throwing AggregateException.")]
-    private async Task CompleteCancellationAsync(CancellationOperation operation)
-    {
-        List<Exception>? exceptions = null;
-        using (operation.Enter())
-        {
-            try
-            {
-                using (operation.Detach())
-                {
-                    _cancellationSource.Cancel();
-                }
-            }
-            catch (AggregateException exception)
-            {
-                (exceptions ??= []).AddRange(exception.InnerExceptions);
-            }
-            catch (Exception exception)
-            {
-                (exceptions ??= []).Add(exception);
-            }
-
-            while (true)
-            {
-                List<CancellationRegistration> callbacks;
-                lock (_lock)
-                {
-                    if (_registrations is not { Count: > 0 })
-                    {
-                        CompleteCancellation(operation, exceptions);
-                        return;
-                    }
-
-                    callbacks = _registrations;
-                    _registrations = null;
-                }
-
-                foreach (var callback in callbacks)
-                {
-                    try
-                    {
-                        using (Enter(this))
-                        {
-                            await callback.InvokeAsync(CancellationToken).ConfigureAwait(false);
-                        }
-                    }
-                    catch (Exception exception)
-                    {
-                        (exceptions ??= []).Add(exception);
-                    }
-                }
-            }
-        }
-    }
-
-    private static void CompleteCancellation(
-        CancellationOperation operation,
-        List<Exception>? exceptions)
-    {
-        if (exceptions is not null)
-        {
-            operation.SetException(new AggregateException(
-                "One or more cancellation observers failed.",
-                exceptions));
-        }
-        else
-        {
-            operation.SetResult();
-        }
-    }
-
-    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The registration records post-completion callback failures for observation during disposal.")]
-    private async Task InvokePostCompletionCallbackAsync(
-        CancellationOperation operation,
-        CancellationRegistration registration)
-    {
-        using (operation.Enter())
-        using (Enter(this))
-        {
-            try
-            {
-                await registration.InvokeAsync(CancellationToken).ConfigureAwait(false);
-            }
-            catch
-            {
-                // The registration owns post-completion callback observation.
-            }
-            finally
-            {
-                operation.CompleteGraph();
-            }
-        }
-    }
-
-    private void Unregister(CancellationRegistration registration)
-    {
-        lock (_lock)
-        {
-            _registrations?.Remove(registration);
-        }
-    }
-
     internal static ContextScope Enter(DurableTaskContext context)
     {
         var previous = AmbientContext.Value;
@@ -659,257 +633,5 @@ public abstract class DurableTaskContext
     internal readonly struct ContextScope(DurableTaskContext? previous) : IDisposable
     {
         public void Dispose() => AmbientContext.Value = previous;
-    }
-
-    private sealed class CancellationOperation(DurableTaskContext context)
-    {
-        private static readonly object GraphLock = new();
-        private static readonly AsyncLocal<CancellationOperation?> AmbientOperation = new();
-        private readonly TaskCompletionSource _completion =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private HashSet<CancellationOperation>? _dependencies;
-        private bool _graphCompleted;
-        private int _started;
-
-        public static CancellationOperation? Current => AmbientOperation.Value;
-
-        public Task Task => _completion.Task;
-
-        public void Start()
-        {
-            if (Interlocked.Exchange(ref _started, 1) == 0)
-            {
-                _ = context.CompleteCancellationAsync(this);
-            }
-        }
-
-        public static bool TryAddDependency(
-            CancellationOperation? source,
-            CancellationOperation target)
-        {
-            if (source is null)
-            {
-                return true;
-            }
-
-            lock (GraphLock)
-            {
-                if (source._graphCompleted || target._graphCompleted)
-                {
-                    return true;
-                }
-
-                if (ReferenceEquals(source, target) || HasPath(target, source))
-                {
-                    return false;
-                }
-
-                (source._dependencies ??= []).Add(target);
-                return true;
-            }
-        }
-
-        public OperationScope Enter()
-        {
-            var previous = AmbientOperation.Value;
-            AmbientOperation.Value = this;
-            return new(previous);
-        }
-
-        public OperationScope Detach()
-        {
-            var previous = AmbientOperation.Value;
-            AmbientOperation.Value = null;
-            return new(previous);
-        }
-
-        public void SetException(Exception exception)
-        {
-            CompleteGraph();
-            _completion.SetException(exception);
-        }
-
-        public void SetResult()
-        {
-            CompleteGraph();
-            _completion.SetResult();
-        }
-
-        private static bool HasPath(
-            CancellationOperation start,
-            CancellationOperation destination)
-        {
-            var pending = new Stack<CancellationOperation>();
-            var visited = new HashSet<CancellationOperation>();
-            pending.Push(start);
-            while (pending.TryPop(out var current))
-            {
-                if (!visited.Add(current))
-                {
-                    continue;
-                }
-
-                if (ReferenceEquals(current, destination))
-                {
-                    return true;
-                }
-
-                if (current._dependencies is { } dependencies)
-                {
-                    foreach (var dependency in dependencies)
-                    {
-                        pending.Push(dependency);
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        public void CompleteGraph()
-        {
-            lock (GraphLock)
-            {
-                _graphCompleted = true;
-                _dependencies = null;
-            }
-        }
-
-        public readonly struct OperationScope(CancellationOperation? previous) : IDisposable
-        {
-            public void Dispose() => AmbientOperation.Value = previous;
-        }
-    }
-
-    private sealed class CancellationRegistration : IAsyncDisposable
-    {
-        private static readonly AsyncLocal<CancellationRegistration?> Current = new();
-        private const int Pending = 0;
-        private const int Invoking = 1;
-        private const int Completed = 2;
-        private const int DisposedState = 3;
-        private readonly DurableTaskContext? _context;
-        private readonly Func<CancellationToken, ValueTask>? _callback;
-        private readonly bool _propagateInvocationExceptionOnDispose;
-        private TaskCompletionSource? _completion;
-        private Exception? _invocationException;
-        private CancellationRegistration? _previous;
-        private int _state;
-
-        public CancellationRegistration(
-            DurableTaskContext context,
-            Func<CancellationToken, ValueTask> callback,
-            bool propagateInvocationExceptionOnDispose = false)
-        {
-            _context = context;
-            _callback = callback;
-            _propagateInvocationExceptionOnDispose = propagateInvocationExceptionOnDispose;
-        }
-
-        public async ValueTask InvokeAsync(CancellationToken cancellationToken)
-        {
-            if (Interlocked.CompareExchange(ref _state, Invoking, Pending) != Pending)
-            {
-                return;
-            }
-
-            var previous = Current.Value;
-            _previous = previous;
-            Current.Value = this;
-            try
-            {
-                await _callback!(cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                _invocationException = exception;
-                throw;
-            }
-            finally
-            {
-                Current.Value = previous;
-                _previous = null;
-                Interlocked.Exchange(ref _state, Completed);
-                CompleteInvocation(Volatile.Read(ref _completion));
-            }
-        }
-
-        public ValueTask DisposeAsync()
-        {
-            _context?.Unregister(this);
-            while (true)
-            {
-                switch (Volatile.Read(ref _state))
-                {
-                    case Pending:
-                        if (Interlocked.CompareExchange(ref _state, DisposedState, Pending) == Pending)
-                        {
-                            return ValueTask.CompletedTask;
-                        }
-
-                        break;
-                    case Invoking:
-                        if (IsCurrentCallback(this))
-                        {
-                            return ValueTask.CompletedTask;
-                        }
-
-                        return new(GetInvocationCompletionTask());
-                    case Completed when _propagateInvocationExceptionOnDispose
-                        && _invocationException is not null:
-                        return new(GetInvocationCompletionTask());
-                    case Completed:
-                    case DisposedState:
-                        return ValueTask.CompletedTask;
-                }
-            }
-        }
-
-        private Task GetInvocationCompletionTask()
-        {
-            var completion = Volatile.Read(ref _completion);
-            if (completion is null)
-            {
-                var candidate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                completion = Interlocked.CompareExchange(ref _completion, candidate, null) ?? candidate;
-            }
-
-            if (Volatile.Read(ref _state) == Completed)
-            {
-                CompleteInvocation(completion);
-            }
-
-            return completion.Task;
-        }
-
-        private void CompleteInvocation(TaskCompletionSource? completion)
-        {
-            if (completion is null)
-            {
-                return;
-            }
-
-            if (_propagateInvocationExceptionOnDispose && _invocationException is { } exception)
-            {
-                completion.TrySetException(exception);
-            }
-            else
-            {
-                completion.TrySetResult();
-            }
-        }
-
-        private static bool IsCurrentCallback(CancellationRegistration registration)
-        {
-            for (var current = Current.Value; current is not null; current = current._previous)
-            {
-                if (ReferenceEquals(current, registration))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
     }
 }

@@ -175,7 +175,7 @@ public abstract partial class DurableTask
     /// <para>
     /// An input's failure or cancellation doesn't fail the combinator, so the awaiting execution can act on each input's
     /// outcome, for example by compensating exactly the inputs which succeeded. Durable cancellation reaches the inputs,
-    /// which are attached children, and the combinator waits for their outcomes; host abort of the attempt fails it.
+    /// which are attached children, and the combinator waits for their outcomes; the cancellation of the attempt fails it with <see cref="DurableTaskAttemptCanceledException"/>.
     /// </para>
     /// <para>
     /// The inputs are scheduled concurrently and identified like <see cref="ScheduleAll(IReadOnlyList{DurableTask})"/>
@@ -289,7 +289,7 @@ public abstract partial class DurableTask
         TTask[] tasks;
         using (var linked = ScheduledTask.CreateLinkedWaitCancellation(context, cancellationToken))
         {
-            tasks = await ScheduleInputsAsync(inputs, context, operationId, createTask, linked?.Token ?? context.ExecutionAbortToken)
+            tasks = await ScheduleInputsAsync(inputs, context, operationId, createTask, linked?.Token ?? context.AttemptCancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -300,7 +300,7 @@ public abstract partial class DurableTask
     }
 
     private static Task<ScheduledTask[]> ScheduleAllCoreAsync(DurableTask[] inputs, DurableTaskContext context, TaskId operationId)
-        => ScheduleInputsAsync(inputs, context, operationId, static handle => (ScheduledTask)new ScheduledTaskHandle(handle), context.ExecutionAbortToken);
+        => ScheduleInputsAsync(inputs, context, operationId, static handle => (ScheduledTask)new ScheduledTaskHandle(handle), context.AttemptCancellationToken);
 
     private static Task<ScheduledTask<TResult>[]> ScheduleAllCoreAsync<TResult>(
         DurableTask[] inputs,
@@ -311,7 +311,7 @@ public abstract partial class DurableTask
             context,
             operationId,
             static handle => (ScheduledTask<TResult>)new ScheduledTaskHandle<TResult>(handle),
-            context.ExecutionAbortToken);
+            context.AttemptCancellationToken);
 
     private static async Task<ScheduledTask[]> WhenAllCompletedCoreAsync(
         DurableTask[] inputs,
@@ -319,7 +319,7 @@ public abstract partial class DurableTask
         TaskId operationId)
         => await WaitForEveryCompletionAsync(
             await ScheduleAllCoreAsync(inputs, context, operationId).ConfigureAwait(false),
-            context.ExecutionAbortToken).ConfigureAwait(false);
+            context.AttemptCancellationToken).ConfigureAwait(false);
 
     private static async Task<ScheduledTask<TResult>[]> WhenAllCompletedCoreAsync<TResult>(
         DurableTask[] inputs,
@@ -327,7 +327,7 @@ public abstract partial class DurableTask
         TaskId operationId)
         => await WaitForEveryCompletionAsync(
             await ScheduleAllCoreAsync<TResult>(inputs, context, operationId).ConfigureAwait(false),
-            context.ExecutionAbortToken).ConfigureAwait(false);
+            context.AttemptCancellationToken).ConfigureAwait(false);
 
     private static async Task<TTask[]> WaitForEveryCompletionAsync<TTask>(TTask[] tasks, CancellationToken cancellationToken)
         where TTask : ScheduledTask
@@ -341,7 +341,7 @@ public abstract partial class DurableTask
     }
 
     // Cancellation reaches the inputs, which are attached children, so each combinator waits for their outcomes and stops
-    // waiting only when the host aborts the attempt.
+    // waiting only when the host cancels the attempt.
     private static async Task WhenAllCoreAsync(DurableTask[] inputs, DurableTaskContext context, TaskId operationId)
         => await WaitForAllAsync(inputs, context, operationId).ConfigureAwait(false);
 
@@ -370,7 +370,7 @@ public abstract partial class DurableTask
         DurableTaskContext context,
         TaskId operationId)
     {
-        var cancellationToken = context.ExecutionAbortToken;
+        var cancellationToken = context.AttemptCancellationToken;
         var tasks = await ScheduleInputsAsync(inputs, context, operationId, static handle => new ScheduledTaskHandle(handle), cancellationToken)
             .ConfigureAwait(false);
         var responses = new DurableTaskResponse[tasks.Length];
@@ -385,7 +385,7 @@ public abstract partial class DurableTask
 
     private static async Task<int> WhenAnyCoreAsync(DurableTask[] inputs, DurableTaskContext context, TaskId operationId)
     {
-        var cancellationToken = context.ExecutionAbortToken;
+        var cancellationToken = context.AttemptCancellationToken;
         var (tasks, index) = await SelectAsync(inputs, context, operationId, cancellationToken).ConfigureAwait(false);
         await tasks[index].WaitAsync(cancellationToken).ConfigureAwait(false);
         return index;
@@ -396,7 +396,7 @@ public abstract partial class DurableTask
         DurableTaskContext context,
         TaskId operationId)
     {
-        var cancellationToken = context.ExecutionAbortToken;
+        var cancellationToken = context.AttemptCancellationToken;
         var (tasks, index) = await SelectAsync(inputs, context, operationId, cancellationToken).ConfigureAwait(false);
         return (index, (await tasks[index].WaitAsyncCore(cancellationToken).ConfigureAwait(false)).GetResult<TResult>());
     }

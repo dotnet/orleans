@@ -116,9 +116,30 @@ public partial class DurableSignalTests
             context).AsTask();
         await host.WaitStarted("approved");
 
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, Xunit.TestContext.Current.CancellationToken);
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
 
         Assert.Equal(DurableTaskStatus.Canceled, (await running).Status);
+    }
+
+    [Fact]
+    public async Task AttemptCancellationEndsAPendingWaitWithTheAttemptsCancellation()
+    {
+        var host = new SignalHost();
+        var context = new SignalContext(host, TaskId.CreateRoot("workflow"));
+        var running = DurableTaskRuntimeHelper.RunAsync(
+            DurableTask.Run(async _ => await Approved.WaitAsync()),
+            context).AsTask();
+        await host.WaitStarted("approved");
+
+        DurableTaskRuntimeHelper.CancelAttempt(context, DurableTaskAttemptCancellationReason.ActivationStopping);
+
+        var response = await running;
+        Assert.Equal(DurableTaskStatus.Canceled, response.Status);
+        var exception = Assert.IsType<DurableTaskAttemptCanceledException>(response.Exception);
+        Assert.Equal(DurableTaskAttemptCancellationReason.ActivationStopping, exception.Reason);
+        Assert.Equal(context.AttemptCancellationToken, exception.CancellationToken);
+        Assert.Equal(context.CancellationToken, Assert.IsAssignableFrom<OperationCanceledException>(exception.InnerException).CancellationToken);
+        Assert.False(context.IsTaskCancellationRequested);
     }
 
     [Fact]
@@ -227,7 +248,8 @@ public partial class DurableSignalTests
             public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
             {
                 CancellationReason ??= reason;
-                return new(DurableTaskRuntimeHelper.RequestCancellationAsync(context, reason, cancellationToken));
+                DurableTaskRuntimeHelper.RequestTaskCancellation(context, reason);
+                return ValueTask.CompletedTask;
             }
         }
     }

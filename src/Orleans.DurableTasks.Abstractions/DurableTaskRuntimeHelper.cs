@@ -22,59 +22,39 @@ public static class DurableTaskRuntimeHelper
         }
     }
 
-    /// <summary>Requests monotonic durable cancellation and waits for callback acknowledgement.</summary>
+    /// <summary>
+    /// Requests durable cancellation of the task which <paramref name="context"/> runs, carrying <paramref name="reason"/>.
+    /// </summary>
+    /// <param name="context">The attempt of the task whose cancellation is requested.</param>
+    /// <param name="reason">
+    /// The reason which <see cref="DurableTaskContext.TaskCancellationReason"/> reports, or <see langword="null"/> for none.
+    /// The first request determines the reason, so a host which replays a canceled task passes the reason it recorded
+    /// with the task's cancellation.
+    /// </param>
     /// <remarks>
-    /// Repeated requests share one completion. Ordinary token observers run synchronously according
-    /// to <see cref="CancellationTokenSource"/> cancellation semantics. Durable callbacks registered
-    /// through <see cref="DurableTaskContext.RegisterCancellationCallbackAsync"/> participate in
-    /// durable dependency and failure aggregation. External callers and acyclic durable callback
-    /// dependencies wait for completion. If a call made from a durable callback, or asynchronous work
-    /// carrying its normally flowed <see cref="ExecutionContext"/>, would close a dependency cycle,
-    /// the target request is still initiated but that cycle-closing edge is not awaited. There is no
-    /// global or thread-based inference. Durable callbacks registered before the shared completion
-    /// closes are enlisted in that operation and contribute to its completion and failures. Callbacks
-    /// registered after that atomic boundary run in an independent callback scope and cannot change
-    /// this method's already-completed shared result.
-    ///
-    /// <para>
-    /// The <paramref name="cancellationToken"/> only abandons this caller's wait; it does not undo the
-    /// durable request. Callbacks registered directly on
-    /// <see cref="DurableTaskContext.CancellationToken"/> are ordinary synchronous cleanup
-    /// observers. They must return promptly and must not call, block on, await, or otherwise
-    /// orchestrate this method or durable cancellation of any context. Such use is outside the
-    /// contract. Use <see cref="DurableTaskContext.RegisterCancellationCallbackAsync"/> for all
-    /// cancellation work which requests another durable context, awaits asynchronous work, needs
-    /// cycle handling, or participates in durable failure aggregation.
-    /// </para>
+    /// The request sets <see cref="DurableTaskContext.IsTaskCancellationRequested"/> and then cancels
+    /// <see cref="DurableTaskContext.CancellationToken"/>, whose registrations run synchronously, as they do for any
+    /// <see cref="CancellationTokenSource"/>. Later requests change nothing. A host records the request durably before it
+    /// calls this, so every later attempt of the task observes it.
     /// </remarks>
-    public static Task RequestCancellationAsync(
-        DurableTaskContext context,
-        CancellationToken cancellationToken = default)
+    public static void RequestTaskCancellation(DurableTaskContext context, string? reason = null)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return context.RequestCancellationAsync(reason: null, cancellationToken);
+        context.RequestTaskCancellation(reason);
     }
 
-    /// <summary>
-    /// Requests monotonic durable cancellation carrying <paramref name="reason"/> and waits for callback acknowledgement.
-    /// </summary>
-    /// <param name="context">The execution whose cancellation is requested.</param>
-    /// <param name="reason">
-    /// The reason which <see cref="DurableTaskContext.CancellationReason"/> reports, or <see langword="null"/> for
-    /// none. The first request determines the reason, so a host which replays a canceled execution passes the reason it
-    /// recorded with the task's cancellation.
-    /// </param>
-    /// <param name="cancellationToken">A token which abandons this caller's wait.</param>
+    /// <summary>Cancels the attempt which <paramref name="context"/> runs, for <paramref name="reason"/>.</summary>
+    /// <param name="context">The attempt to cancel.</param>
+    /// <param name="reason">Why the host cancels the attempt.</param>
     /// <remarks>
-    /// Apart from the reason, this request behaves as
-    /// <see cref="RequestCancellationAsync(DurableTaskContext, CancellationToken)"/>.
+    /// The cancellation cancels <see cref="DurableTaskContext.AttemptCancellationToken"/> and then
+    /// <see cref="DurableTaskContext.CancellationToken"/>, whose registrations run synchronously. From then on, the
+    /// attempt's durable operations throw <see cref="DurableTaskAttemptCanceledException"/> carrying
+    /// <paramref name="reason"/>. Later calls change nothing. The host drains the attempt and discards its response.
     /// </remarks>
-    public static Task RequestCancellationAsync(
-        DurableTaskContext context,
-        string? reason,
-        CancellationToken cancellationToken = default)
+    public static void CancelAttempt(DurableTaskContext context, DurableTaskAttemptCancellationReason reason)
     {
         ArgumentNullException.ThrowIfNull(context);
-        return context.RequestCancellationAsync(reason, cancellationToken);
+        context.CancelAttempt(reason);
     }
 }

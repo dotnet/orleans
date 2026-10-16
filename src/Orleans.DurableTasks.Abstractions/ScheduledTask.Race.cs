@@ -33,7 +33,7 @@ public abstract partial class ScheduledTask
     /// </para>
     /// <para>
     /// Every other task then receives a durable cancellation request carrying the reason <c>Another task won the race.</c>,
-    /// which its <see cref="DurableTaskContext.CancellationReason"/> reports when the request is the task's first.
+    /// which its <see cref="DurableTaskContext.TaskCancellationReason"/> reports when the request is the task's first.
     /// Cancellation is cooperative, so each other task decides its own outcome, and the returned task completes once every
     /// task is terminal. Caller cancellation and host wait failures are propagated.
     /// </para>
@@ -75,7 +75,7 @@ public abstract partial class ScheduledTask
     /// <para>
     /// When the task completes first, the wait cancels the delay and returns the task's outcome: its result, failure, or
     /// cancellation. When the timeout elapses first, the wait requests cancellation of the task carrying the reason
-    /// <c>The operation timed out after {timeout}.</c>, which the task's <see cref="DurableTaskContext.CancellationReason"/>
+    /// <c>The operation timed out after {timeout}.</c>, which the task's <see cref="DurableTaskContext.TaskCancellationReason"/>
     /// reports when the request is the task's first, and waits until the task is terminal. A task which then ends canceled
     /// fails the wait with a <see cref="TimeoutException"/> whose inner exception is the task's
     /// <see cref="OperationCanceledException"/>, and any other outcome, such as a result which the task returns after
@@ -161,7 +161,7 @@ public abstract partial class ScheduledTask
         CancellationToken cancellationToken)
     {
         using var linked = CreateLinkedWaitCancellation(context, cancellationToken);
-        var waitToken = linked?.Token ?? context.ExecutionAbortToken;
+        var waitToken = linked?.Token ?? context.AttemptCancellationToken;
         try
         {
             var delayHandle = await DurableTask.ScheduleChildAsync(delay, context, operationId.Child(TimeoutDelaySegment), waitToken)
@@ -170,7 +170,7 @@ public abstract partial class ScheduledTask
             var index = await SelectIndexAsync(context, operationId, tasks, waitToken).ConfigureAwait(false);
             return await SettleTimeoutAsync(tasks, index, reason, waitToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
         {
             throw new OperationCanceledException(cancellationToken);
         }
@@ -185,7 +185,7 @@ public abstract partial class ScheduledTask
             {
                 return await ObserveTerminalAsync(timeoutCancellation.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
             {
                 throw new OperationCanceledException(cancellationToken);
             }
@@ -283,7 +283,7 @@ public abstract partial class ScheduledTask
         CancellationToken cancellationToken)
     {
         using var linked = context is null ? null : CreateLinkedWaitCancellation(context, cancellationToken);
-        var waitToken = context is null ? cancellationToken : linked?.Token ?? context.ExecutionAbortToken;
+        var waitToken = context is null ? cancellationToken : linked?.Token ?? context.AttemptCancellationToken;
         try
         {
             var index = context is null
@@ -292,7 +292,7 @@ public abstract partial class ScheduledTask
             _ = await SettleRaceAsync(tasks, index, RaceLostReason, waitToken).ConfigureAwait(false);
             return index;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
         {
             throw new OperationCanceledException(cancellationToken);
         }
