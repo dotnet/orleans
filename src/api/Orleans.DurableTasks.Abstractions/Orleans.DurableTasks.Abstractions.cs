@@ -101,6 +101,8 @@ namespace Orleans.DurableTasks
 
         public static DurableTask<TResult> FromResult<TResult>(TResult value) { throw null; }
 
+        public static int GetVersion(string name, int minSupported, int maxSupported) { throw null; }
+
         public static void Once(System.Action effect) { }
 
         [System.Obsolete("DurableTask.Once runs a synchronous effect. Run asynchronous work as a durable child, such as an async DurableTask step or DurableTask.Run, and await it.", true)]
@@ -235,7 +237,8 @@ namespace Orleans.DurableTasks
     {
         ActivationStopping = 0,
         TaskAborted = 1,
-        TaskDeleted = 2
+        TaskDeleted = 2,
+        UnsupportedVersion = 3
     }
 
     public readonly partial struct DurableTaskAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
@@ -285,6 +288,8 @@ namespace Orleans.DurableTasks
         protected internal virtual TaskId CreateChildTaskId(string? name) { throw null; }
 
         protected internal abstract IScheduledTaskHandle GetChildTaskHandle(TaskId taskId);
+        protected internal virtual int GetVersion(string name, int minSupported, int maxSupported) { throw null; }
+
         protected internal virtual void OnBodyCompleted(DurableTaskResponse response) { }
 
         protected internal virtual IScheduledTaskHandle PostTask(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options) { throw null; }
@@ -473,9 +478,41 @@ namespace Orleans.DurableTasks
         Failed = 4
     }
 
+    public sealed partial class DurableTaskVersionException : System.Exception
+    {
+        public DurableTaskVersionException(TaskId taskId, string name, int version, int minSupported, int maxSupported) { }
+
+        public int MaxSupported { get { throw null; } }
+
+        public int MinSupported { get { throw null; } }
+
+        public string Name { get { throw null; } }
+
+        public TaskId TaskId { get { throw null; } }
+
+        public int Version { get { throw null; } }
+    }
+
     [System.Runtime.CompilerServices.AsyncMethodBuilder(typeof(DurableTaskMethodBuilder<>))]
     public abstract partial class DurableTask<TResult> : DurableTask
     {
+    }
+
+    public sealed partial class DurableVersion
+    {
+        public DurableVersion(string name, int minSupported, int maxSupported) { }
+
+        public int MaxSupported { get { throw null; } }
+
+        public int MinSupported { get { throw null; } }
+
+        public string Name { get { throw null; } }
+
+        public int Get() { throw null; }
+
+        public bool IsAtLeast(int version) { throw null; }
+
+        public override string ToString() { throw null; }
     }
 
     public sealed partial class ExceptionDurableTaskResponse : DurableTaskResponse
