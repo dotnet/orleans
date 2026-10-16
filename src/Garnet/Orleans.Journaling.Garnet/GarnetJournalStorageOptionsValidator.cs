@@ -21,6 +21,13 @@ internal sealed class GarnetJournalStorageOptionsValidator(
             throw new OrleansConfigurationException($"{prefix}.{nameof(options.HostId)} must not be empty.");
         }
 
+        // With shared storage, silo addresses name silos with automatic hosting, which failover judges by membership.
+        if (options.PartitionBlobContainer is not null && options.HostId is not null && Runtime.SiloAddress.TryParse(options.HostId, out _))
+        {
+            throw new OrleansConfigurationException(
+                $"{prefix}.{nameof(options.HostId)} must not have the form of a silo address when {nameof(options.PartitionBlobContainer)} is set; leave it unset to host partitions under this silo's address.");
+        }
+
         if (options.BucketCount <= 0 || !BitOperations.IsPow2(options.BucketCount))
         {
             throw new OrleansConfigurationException($"{prefix}.{nameof(options.BucketCount)} must be a positive power of two.");

@@ -39,6 +39,8 @@ public sealed class GarnetPartitionStorageLocationTests
     [InlineData("a//b")]
     [InlineData("a/./b")]
     [InlineData("../a")]
+    [InlineData("~hosts")]
+    [InlineData("~hosts/p0")]
     public void InvalidLocations_AreRejected(string location)
         => Assert.Throws<InvalidOperationException>(() => GarnetPartitionBlobStorage.ValidateStorageLocations(Locations(location)));
 

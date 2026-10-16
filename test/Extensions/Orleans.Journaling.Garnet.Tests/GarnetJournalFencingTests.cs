@@ -224,6 +224,25 @@ public sealed class GarnetJournalFencingTests : IAsyncDisposable
         Assert.NotEqual(0u, errorCode);
     }
 
+    [Fact]
+    public async Task HostRegistry_RegistersListsAndUnregistersHosts_OutsidePartitionStorage()
+    {
+        var registry = new GarnetJournalHostRegistry(_container);
+        Assert.Empty(await registry.ListAsync(CancellationToken));
+        await registry.RegisterAsync("127.0.0.1:11111@1", CancellationToken);
+        await registry.RegisterAsync("silo/b", CancellationToken);
+        await registry.RegisterAsync("silo/b", CancellationToken);
+
+        // A partition's takeover fences only its own location, never the registry.
+        var storage = await GarnetPartitionBlobStorage.OpenAsync(_container, "p0", epoch: 1, logger: null, CancellationToken);
+        Assert.Empty(storage.List(""));
+        Assert.Equal(new[] { "127.0.0.1:11111@1", "silo/b" }, (await registry.ListAsync(CancellationToken)).Order(StringComparer.Ordinal));
+
+        await registry.UnregisterAsync("silo/b", CancellationToken);
+        await registry.UnregisterAsync("absent", CancellationToken);
+        Assert.Equal(new[] { "127.0.0.1:11111@1" }, await registry.ListAsync(CancellationToken));
+    }
+
     public async ValueTask DisposeAsync()
     {
         foreach (var host in _hosts)
