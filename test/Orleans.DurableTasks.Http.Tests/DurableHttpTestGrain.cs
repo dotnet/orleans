@@ -72,3 +72,5 @@ public sealed class DurableHttpTestGrain : DurableGrain, IDurableHttpTestGrain
 public sealed record EchoRequest(string Value);
 
 public sealed record ApprovalRequest(string Item);
+
+public sealed record NexusApprovalInput(string OrderId, string Item);

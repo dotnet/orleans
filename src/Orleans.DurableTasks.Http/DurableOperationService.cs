@@ -9,7 +9,8 @@ namespace Orleans.DurableTasks.Http;
 /// <remarks>
 /// An operation is the root task of an operation host grain, keyed by the operation's key, which subscribes to the task
 /// that performs the operation's work: a durable grain call, which the host starts as a root on its grain named by the
-/// operation's key, or an existing task. Protocols, such as this package's own convention, derive the key from the request and map their requests and responses onto these operations.
+/// operation's key, or an existing task. Protocols, such as this package's own convention and Nexus,
+/// derive the key from the request and map their requests and responses onto these operations.
 /// </remarks>
 internal sealed class DurableOperationService(IGrainFactory grainFactory, TimeProvider timeProvider)
 {
