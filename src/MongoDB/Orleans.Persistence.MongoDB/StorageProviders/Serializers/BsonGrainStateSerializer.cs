@@ -33,7 +33,7 @@ public class BsonGrainStateSerializer : IGrainStateSerializer
         }
         else
         {
-            // A primitive types is not a valid BsonDocument, so it is wrapped here.
+            // Wrap primitive values in a document for the BSON deserializer.
             var document = new BsonDocument("value", value);
             var wrapper = BsonSerializer.Deserialize<ValueWrapper<T>>(document);
             return wrapper.Value;

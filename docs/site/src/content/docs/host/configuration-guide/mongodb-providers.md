@@ -108,6 +108,9 @@ per-silo membership storage. Provision a replica set for local tests that exerci
 `Multiple` reads the membership rows and table version in one snapshot
 transaction with a fresh session for each operation. Membership async methods
 propagate cancellation to MongoDB commands, cursor reads, and transactions.
+Per-silo document IDs preserve complete native IPv6 addresses. Existing records
+with legacy IPv4-mapped IDs remain readable and are updated in place using the
+stored full silo address to distinguish identities.
 
 ## Select a persistence format
 
@@ -130,6 +133,13 @@ serializer. For example, configure binary serialization for stream pub-sub state
 BSON document serialization supports application-owned MongoDB class maps.
 Orleans stream pub-sub state uses the JSON or binary serializer.
 
+The JSON serializer supports object, scalar, and array roots. Its legacy BSON
+mapping encodes a leading `$` in a JSON property name as `__`. JSON property
+names beginning with `__` are reserved and rejected before a write reaches MongoDB,
+including nested properties. Use JSON property-name attributes or a naming
+strategy to choose another name for those members; native BSON serialization
+supports application-owned document mappings.
+
 Persistence documents contain `_id` (grain key), `_etag` (optimistic-concurrency
 token), and `_doc` (serialized state). The default collection prefix is `Grains`;
 the collection suffix is the state name, or the state type name when the state
@@ -142,6 +152,10 @@ clears reject stale ETags with <xref:Orleans.Storage.InconsistentStateException>
 preserving the caller's metadata on failure. A `*` ETag requests an unconditional
 write or clear. Configure acknowledged MongoDB writes so the provider can observe
 these outcomes.
+Storage and reminder cancellation-token overloads propagate cancellation through
+lazy collection/index initialization, reads, writes, removals, and conflict lookups.
+A cancelled write may already have reached MongoDB; refresh state before retrying
+when its outcome is uncertain.
 
 ## Migrate the contributed package
 
@@ -167,6 +181,12 @@ representative existing documents before deployment.
 
 Reminders use the `<CollectionPrefix>OrleansReminderV2` collection. The provider
 creates a service-ID/grain-hash index and removes obsolete hash indexes.
+New reminder document IDs encode the service, grain, and reminder components
+separately. Existing underscore-delimited IDs remain readable, updatable in place,
+and removable with their ETags; stored identity fields protect against ambiguous
+legacy IDs. During rollout, pause new reminder creation until every reminder-table
+writer uses the updated provider so point operations consistently understand the
+new ID encoding.
 <xref:Orleans.Reminders.MongoDB.MongoDBRemindersOptions.CreateIndexes>
 defaults to `true`. Set it to `false` when administrators manage indexes or the
 application identity has data-only permissions. Administrators should provision

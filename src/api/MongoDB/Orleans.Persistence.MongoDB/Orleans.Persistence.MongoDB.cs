@@ -63,11 +63,17 @@ namespace Orleans.Providers.MongoDB.StorageProviders
     {
         public MongoGrainStorage(global::MongoDB.Driver.IMongoClient mongoClient, Microsoft.Extensions.Logging.ILogger<MongoGrainStorage> logger, Persistence.MongoDB.MongoDBGrainStorageOptions options, Serialization.Serializers.IActivatorProvider activatorProvider) { }
 
+        public System.Threading.Tasks.Task ClearStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task ClearStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
+
+        public System.Threading.Tasks.Task ReadStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task ReadStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
 
         protected virtual string ReturnGrainName<T>(string stateName, Runtime.GrainId grainId) { throw null; }
+
+        public System.Threading.Tasks.Task WriteStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task WriteStateAsync<T>(string stateName, Runtime.GrainId grainId, IGrainState<T> grainState) { throw null; }
     }

@@ -154,7 +154,7 @@ public sealed class MongoMembershipCancellationTests
         // Persisted non-mutation is asserted separately for pre-cancelled operations.
     }
 
-    private sealed class CommandBarrier(int blockAt)
+    internal sealed class CommandBarrier(int blockAt, string? targetCommand = null)
     {
         private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -164,7 +164,9 @@ public sealed class MongoMembershipCancellationTests
 
         public void OnCommand(CommandStartedEvent command)
         {
-            if (!Armed || command.CommandName is not ("find" or "update" or "delete")) return;
+            if (!Armed || (targetCommand is null
+                ? command.CommandName is not ("find" or "update" or "delete")
+                : command.CommandName != targetCommand)) return;
             Commands.Enqueue(command.Command.DeepClone().AsBsonDocument);
             if (Commands.Count != blockAt) return;
             Entered.TrySetResult();
