@@ -42,6 +42,7 @@ public sealed class MongoReminderTable : IReminderTable
     /// <inheritdoc />
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         collection =
             new MongoReminderCollection(
                 mongoClient,
@@ -60,65 +61,95 @@ public sealed class MongoReminderTable : IReminderTable
 
     /// <inheritdoc />
     public Task<ReminderTableData> ReadRows(GrainId grainId)
+        => ReadRows(grainId, CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task<ReminderTableData> ReadRows(GrainId grainId, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return DoAndLog(nameof(ReadRows), () =>
         {
-            return collection.ReadRow(grainId);
+            return collection.ReadRow(grainId, cancellationToken);
         });
     }
 
     /// <inheritdoc />
     public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+        => RemoveRow(grainId, reminderName, eTag, CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         CheckGrainId(grainId);
         ArgumentException.ThrowIfNullOrEmpty(reminderName);
 
         return DoAndLog(nameof(RemoveRow), () =>
         {
-            return collection.RemoveRow(grainId, reminderName, eTag);
+            return collection.RemoveRow(grainId, reminderName, eTag, cancellationToken);
         });
     }
 
     /// <inheritdoc />
     public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
+        => ReadRow(grainId, reminderName, CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         CheckGrainId(grainId);
         ArgumentException.ThrowIfNullOrEmpty(reminderName);
 
         return DoAndLog(nameof(ReadRow), () =>
         {
-            return collection.ReadRow(grainId, reminderName);
+            return collection.ReadRow(grainId, reminderName, cancellationToken);
         });
     }
 
     /// <inheritdoc />
     public Task TestOnlyClearTable()
+        => TestOnlyClearTable(CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task TestOnlyClearTable(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return DoAndLog(nameof(TestOnlyClearTable), () =>
         {
-            return collection.RemoveRows();
+            return collection.RemoveRows(cancellationToken);
         });
     }
 
     /// <inheritdoc />
     public Task<string?> UpsertRow(ReminderEntry entry)
+        => UpsertRow(entry, CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task<string?> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(entry);
         CheckGrainId(entry.GrainId);
         ArgumentException.ThrowIfNullOrEmpty(entry.ReminderName);
 
         return DoAndLog<string?>(nameof(UpsertRow), async () =>
         {
-            return await collection.UpsertRow(entry);
+            return await collection.UpsertRow(entry, cancellationToken);
         });
     }
 
     /// <inheritdoc />
     public Task<ReminderTableData> ReadRows(uint begin, uint end)
+        => ReadRows(begin, end, CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task<ReminderTableData> ReadRows(uint begin, uint end, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return DoAndLog(nameof(ReadRows), () =>
         {
-            return collection.ReadRows(begin, end);
+            return collection.ReadRows(begin, end, cancellationToken);
         });
     }
 

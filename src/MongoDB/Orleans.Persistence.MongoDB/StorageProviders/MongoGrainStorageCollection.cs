@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -42,13 +43,13 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
         return collectionName;
     }
 
-    public async Task ReadAsync<T>(GrainId grainId, IGrainState<T> grainState)
+    public async Task ReadAsync<T>(GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
         var grainKey = keyGenerator(grainId);
 
         var existing =
-            await Collection.Find(Filter.Eq(FieldId, grainKey))
-                .FirstOrDefaultAsync();
+            await GetCollection(cancellationToken).Find(Filter.Eq(FieldId, grainKey))
+                .FirstOrDefaultAsync(cancellationToken);
 
         if (existing != null)
         {
@@ -76,7 +77,7 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
         }
     }
 
-    public async Task WriteAsync<T>(GrainId grainId, IGrainState<T> grainState)
+    public async Task WriteAsync<T>(GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
         var grainKey = keyGenerator(grainId);
 
@@ -94,28 +95,28 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
                 filter &= Filter.Eq<BsonValue>(FieldEtag, string.IsNullOrEmpty(etag) ? BsonNull.Value : new BsonString(etag));
             }
 
-            var result = await Collection.UpdateOneAsync(
+            var result = await GetCollection(cancellationToken).UpdateOneAsync(
                 filter,
                 Update
                     .Set(FieldEtag, newETag)
                     .Set(FieldDoc, newData),
-                new UpdateOptions { IsUpsert = string.IsNullOrEmpty(etag) || etag == "*" });
+                new UpdateOptions { IsUpsert = string.IsNullOrEmpty(etag) || etag == "*" }, cancellationToken);
 
             if (result.MatchedCount == 0 && result.UpsertedId is null)
             {
-                await ThrowForOtherEtag(grainKey, etag);
+                await ThrowForOtherEtag(grainKey, etag, cancellationToken);
             }
         }
         catch (MongoException ex) when (ex.IsDuplicateKey())
         {
-            await ThrowForOtherEtag(grainKey, etag, ex);
+            await ThrowForOtherEtag(grainKey, etag, cancellationToken, ex);
         }
 
         grainState.ETag = newETag;
         grainState.RecordExists = true;
     }
 
-    public async Task ClearAsync<T>(GrainId grainId, IGrainState<T> grainState)
+    public async Task ClearAsync<T>(GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
         var grainKey = keyGenerator(grainId);
         var etag = grainState.ETag;
@@ -125,11 +126,11 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
             filter &= Filter.Eq<BsonValue>(FieldEtag, string.IsNullOrEmpty(etag) ? BsonNull.Value : new BsonString(etag));
         }
 
-        var result = await Collection.DeleteOneAsync(filter);
+        var result = await GetCollection(cancellationToken).DeleteOneAsync(filter, cancellationToken);
         if (result.DeletedCount == 0)
         {
-            var existing = await Collection.Find(Filter.Eq(FieldId, grainKey))
-                .Project<BsonDocument>(Project.Include(FieldEtag)).FirstOrDefaultAsync();
+            var existing = await GetCollection(cancellationToken).Find(Filter.Eq(FieldId, grainKey))
+                .Project<BsonDocument>(Project.Include(FieldEtag)).FirstOrDefaultAsync(cancellationToken);
             if (existing is not null)
             {
                 var storedEtag = existing.GetValue(FieldEtag, BsonNull.Value);
@@ -145,11 +146,11 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
         grainState.RecordExists = false;
     }
 
-    private async Task ThrowForOtherEtag(string key, string? etag, Exception? ex = null)
+    private async Task ThrowForOtherEtag(string key, string? etag, CancellationToken cancellationToken, Exception? ex = null)
     {
         var existingEtag =
-            await Collection.Find(Filter.Eq(FieldId, key))
-                .Project<BsonDocument>(Project.Exclude(FieldDoc)).FirstOrDefaultAsync();
+            await GetCollection(cancellationToken).Find(Filter.Eq(FieldId, key))
+                .Project<BsonDocument>(Project.Exclude(FieldDoc)).FirstOrDefaultAsync(cancellationToken);
 
         var storedEtag = existingEtag?.GetValue(FieldEtag, BsonNull.Value);
         throw new InconsistentStateException(

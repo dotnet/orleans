@@ -139,6 +139,11 @@ internal static class JsonBsonConverter
 
     private static string EscapeJson(this string value)
     {
+        if (value.StartsWith("__", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("JSON property names beginning with '__' are reserved for MongoDB's legacy dollar-prefix encoding.", nameof(value));
+        }
+
         if (value.Length == 0)
         {
             return value;

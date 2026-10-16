@@ -37,7 +37,6 @@ public class JsonGrainStateSerializer : IGrainStateSerializer
     public BsonValue Serialize<T>(T state)
     {
         var jsonSerializer = JsonSerializer.CreateDefault(_jsonSettings);
-        ArgumentNullException.ThrowIfNull(state);
-        return JObject.FromObject(state, jsonSerializer).ToBson();
+        return state is null ? BsonNull.Value : JToken.FromObject(state, jsonSerializer).ToBson();
     }
 }

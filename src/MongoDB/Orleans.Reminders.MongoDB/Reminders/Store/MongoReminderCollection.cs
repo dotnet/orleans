@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MongoDB.Driver;
@@ -110,7 +111,7 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
         }
     }
 
-    public virtual async Task<ReminderTableData> ReadRows(uint beginHash, uint endHash)
+    public virtual async Task<ReminderTableData> ReadRows(uint beginHash, uint endHash, CancellationToken cancellationToken = default)
     {
         // (begin) is beginning exclusive of hash
         // [end] is the stop point, inclusive of hash
@@ -128,60 +129,73 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
                     Filter.Gt(x => x.GrainHash, beginHash)
                 )
             );
-        var reminders = await Collection.Find(filter).ToListAsync();
+        var reminders = await GetCollection(cancellationToken).Find(filter).ToListAsync(cancellationToken);
 
         return new ReminderTableData(reminders.Select(x => x.ToEntry()));
     }
 
-    public virtual async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName)
+    public virtual async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken = default)
     {
-        var id = ReturnId(serviceId, grainId, reminderName);
-        var reminder =
-            await Collection.Find(Filter.Eq(x => x.Id, id))
-                .FirstOrDefaultAsync();
+        var collection = GetCollection(cancellationToken);
+        var reminder = await collection.Find(Filter.Eq(x => x.Id, ReturnId(serviceId, grainId, reminderName)))
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? await collection.Find(Filter.Eq(x => x.Id, ReturnLegacyId(serviceId, grainId, reminderName)))
+                .FirstOrDefaultAsync(cancellationToken);
 
-        return reminder?.ToEntry();
+        var entry = reminder?.ToEntry();
+        return reminder?.ServiceId == serviceId && entry?.GrainId == grainId && entry.ReminderName == reminderName ? entry : null;
     }
 
-    public virtual async Task<ReminderTableData> ReadRow(GrainId grainId)
+    public virtual async Task<ReminderTableData> ReadRow(GrainId grainId, CancellationToken cancellationToken = default)
     {
         var reminders =
-            await Collection.Find(
+            await GetCollection(cancellationToken).Find(
                 Filter.And(
                     Filter.Eq(x => x.ServiceId, serviceId),
                     Filter.Eq(x => x.GrainHash, grainId.GetUniformHashCode()),
                     Filter.Eq(x => x.GrainId, grainId.ToString())
                 )
-            ).ToListAsync();
+            ).ToListAsync(cancellationToken);
 
         return new ReminderTableData(reminders.Select(x => x.ToEntry()));
     }
 
-    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)
+    public async Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag, CancellationToken cancellationToken = default)
     {
-        var id = ReturnId(serviceId, grainId, reminderName);
-
-        var deleteResult = await Collection.DeleteOneAsync(
+        var deleteResult = await GetCollection(cancellationToken).DeleteOneAsync(
             Filter.And(
-                Filter.Eq(x => x.Id, id),
-                Filter.Eq(x => x.Etag, eTag))
+                Filter.In(x => x.Id, new[] { ReturnId(serviceId, grainId, reminderName), ReturnLegacyId(serviceId, grainId, reminderName) }),
+                IdentityFilter(grainId, reminderName),
+                Filter.Eq(x => x.Etag, eTag)),
+            cancellationToken
         );
         return deleteResult.DeletedCount > 0;
     }
 
-    public virtual Task RemoveRows()
+    public virtual Task RemoveRows(CancellationToken cancellationToken = default)
     {
         // note: only used and called by the test harness
-        return Collection.DeleteManyAsync(r => r.ServiceId == serviceId);
+        return GetCollection(cancellationToken).DeleteManyAsync(r => r.ServiceId == serviceId, cancellationToken);
     }
 
-    public virtual async Task<string> UpsertRow(ReminderEntry entry)
+    public virtual async Task<string> UpsertRow(ReminderEntry entry, CancellationToken cancellationToken = default)
     {
+        var collection = GetCollection(cancellationToken);
         var id = ReturnId(serviceId, entry.GrainId, entry.ReminderName);
+        // Retain existing IDs so updates remain visible to older readers during upgrades.
+        var legacyId = ReturnLegacyId(serviceId, entry.GrainId, entry.ReminderName);
+        var legacy = await collection.Find(Filter.And(
+            Filter.Eq(x => x.Id, legacyId), IdentityFilter(entry.GrainId, entry.ReminderName)))
+            .FirstOrDefaultAsync(cancellationToken);
+        if (legacy is not null)
+        {
+            id = legacy.Id;
+        }
+
         var document = MongoReminderDocument.Create(id, serviceId, entry, Guid.NewGuid().ToString());
 
-        await Collection.UpdateOneAsync(
-            Filter.Eq(x => x.Id, id),
+        await collection.UpdateOneAsync(
+            Filter.And(Filter.Eq(x => x.Id, id), IdentityFilter(entry.GrainId, entry.ReminderName)),
             Update
                 .SetOnInsert(x => x.ServiceId, document.ServiceId)
                 .SetOnInsert(x => x.GrainId, document.GrainId)
@@ -190,13 +204,25 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
                 .Set(x => x.Etag, document.Etag)
                 .Set(x => x.Period, document.Period)
                 .Set(x => x.StartAt, document.StartAt),
-            Upsert);
+            Upsert, cancellationToken);
 
         return entry.ETag = document.Etag;
     }
 
     private static string ReturnId(string serviceId, GrainId grainId, string reminderName)
     {
-        return $"{serviceId}_{grainId}_{reminderName}";
+        // Base64 has neither ':' nor '_', keeping components distinct and new IDs disjoint from legacy IDs.
+        return $"v2:{Encode(serviceId)}:{Encode(grainId.ToString())}:{Encode(reminderName)}";
     }
+
+    private static string Encode(string value) => Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
+
+    private static string ReturnLegacyId(string serviceId, GrainId grainId, string reminderName)
+        => $"{serviceId}_{grainId}_{reminderName}";
+
+    private FilterDefinition<MongoReminderDocument> IdentityFilter(GrainId grainId, string reminderName)
+        => Filter.And(
+            Filter.Eq(x => x.ServiceId, serviceId),
+            Filter.Eq(x => x.GrainId, grainId.ToString()),
+            Filter.Eq(x => x.ReminderName, reminderName));
 }
