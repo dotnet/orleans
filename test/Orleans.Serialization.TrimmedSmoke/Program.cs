@@ -42,6 +42,7 @@ internal static class Program
         ValidateRecursiveArrayRoots();
         ValidateGeneratedSerializer(serviceProvider);
         ValidateManualRegistrations(codecProvider);
+        ValidateDefaultActivators(codecProvider);
         ValidateSerializableCallbacks(serviceProvider);
         ValidateGeneratedHelper(codecProvider);
         ValidateConfigurationAnalyzer(serviceProvider, codecProvider);
@@ -153,6 +154,13 @@ internal static class Program
         Ensure(
             codecProvider.GetActivator<CustomTarget<string>>().GetType() == typeof(CustomGenericActivator<string>),
             "The manually registered generic activator constructor was not preserved.");
+    }
+
+    private static void ValidateDefaultActivators(CodecProvider codecProvider)
+    {
+        Ensure(codecProvider.GetActivator<int?>().Create() is null, "The default nullable activator constructor was not preserved.");
+        Ensure(codecProvider.GetActivator<int>().Create() == 0, "The default value-type activator constructor was not preserved.");
+        Ensure(codecProvider.GetActivator<List<int>>().Create() is { Count: 0 }, "The default reference-type activator constructor was not preserved.");
     }
 
     private static void ValidateGeneratedSerializer(IServiceProvider serviceProvider)
