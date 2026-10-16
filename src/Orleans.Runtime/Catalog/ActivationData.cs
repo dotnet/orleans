@@ -1193,10 +1193,12 @@ internal sealed partial class ActivationData :
                     // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
                     if (State != ActivationState.Valid && !(message.IsLocalOnly && State is ActivationState.Deactivating))
                     {
-                        invalidRequests = DequeueRequestsToInvalidActivation();
+                        if (TryDequeueUnprocessableRequests(out invalidRequests))
+                        {
+                            // Forward pending messages if this was a duplicate activation or it was at some point successfully activated. Otherwise, reject them.
+                            rejectInvalidRequests = DeactivationException is not null && ForwardingAddress is null;
+                        }
 
-                        // Forward pending messages if this was a duplicate activation or it was at some point successfully activated. Otherwise, reject them.
-                        rejectInvalidRequests = DeactivationException is not null && ForwardingAddress is null;
                         break;
                     }
 
@@ -1294,13 +1296,14 @@ internal sealed partial class ActivationData :
             _busyDuration = stopwatch;
         }
 
-        // Called with the lock held. Returns the requests to reject or forward, or null while the activation may still process them.
-        List<Message>? DequeueRequestsToInvalidActivation()
+        // Called with the lock held. Dequeues the waiting requests once this activation can no longer process them.
+        bool TryDequeueUnprocessableRequests([NotNullWhen(true)] out List<Message>? requests)
         {
+            requests = null;
             if (State is ActivationState.Creating or ActivationState.Activating)
             {
                 // Do nothing until the activation becomes either valid or invalid
-                return null;
+                return false;
             }
 
             if (State is ActivationState.Deactivating)
@@ -1323,11 +1326,12 @@ internal sealed partial class ActivationData :
                 {
                     // Do not forward messages while the grain is still deactivating and has not been declared stuck, since they
                     // will be forwarded to the same grain instance.
-                    return null;
+                    return false;
                 }
             }
 
-            return DequeueAllWaitingRequests();
+            requests = DequeueAllWaitingRequests();
+            return true;
         }
 
         void AbandonStuckDeactivatingActivation()
