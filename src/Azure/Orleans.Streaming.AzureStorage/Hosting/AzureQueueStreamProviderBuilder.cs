@@ -53,7 +53,7 @@ public sealed class AzureQueueStreamProviderBuilder : IProviderBuilder<ISiloBuil
                     options.QueueNames = queueNames;
                 }
 
-                if (ConfigurationValueParser.TryParseValue<TimeSpan>(configurationSection, nameof(options.MessageVisibilityTimeout), out var visibilityTimeout))
+                if (configurationSection.GetValue<TimeSpan?>(nameof(options.MessageVisibilityTimeout)) is { } visibilityTimeout)
                 {
                     options.MessageVisibilityTimeout = visibilityTimeout;
                 }

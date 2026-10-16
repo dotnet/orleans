@@ -27,8 +27,4 @@
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\Orleans.Core\Configuration\ConfigurationValueParser.cs" Link="Configuration\ConfigurationValueParser.cs" />
-  </ItemGroup>
 </Project>

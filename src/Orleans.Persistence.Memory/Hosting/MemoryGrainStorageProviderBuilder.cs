@@ -19,10 +19,7 @@ internal sealed class MemoryGrainStorageProviderBuilder : IProviderBuilder<ISilo
     {
         builder.AddMemoryGrainStorage(name!, (OptionsBuilder<MemoryGrainStorageOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
-            if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(options.NumStorageGrains), out var nsg))
-            {
-                options.NumStorageGrains = nsg;
-            }
+            options.NumStorageGrains = configurationSection.GetValue(nameof(options.NumStorageGrains), options.NumStorageGrains);
 
             var serializerKey = configurationSection["SerializerKey"];
             if (!string.IsNullOrEmpty(serializerKey))

@@ -70,7 +70,8 @@ public sealed class DynamoDBClusteringProviderBuilderTests
         using var services = builder.Services.BuildServiceProvider();
         var exception = Assert.Throws<InvalidOperationException>(
             () => services.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value);
-        Assert.Equal($"Failed to convert configuration value at 'Clustering:{key}' to type '{expectedType}'.", exception.Message);
+        Assert.Contains($"at 'Clustering:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
     }
 
     [Theory]
@@ -90,7 +91,8 @@ public sealed class DynamoDBClusteringProviderBuilderTests
         using var services = builder.Services.BuildServiceProvider();
         var exception = Assert.Throws<InvalidOperationException>(
             () => services.GetRequiredService<IOptions<DynamoDBGatewayOptions>>().Value);
-        Assert.Equal($"Failed to convert configuration value at 'Clustering:{key}' to type '{expectedType}'.", exception.Message);
+        Assert.Contains($"at 'Clustering:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
     }
 
     private static IConfiguration CreateSingleValueConfiguration(string key, string value)

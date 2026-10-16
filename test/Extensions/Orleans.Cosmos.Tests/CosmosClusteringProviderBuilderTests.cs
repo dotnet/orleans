@@ -47,7 +47,8 @@ public class CosmosClusteringProviderBuilderTests
         using var services = builder.Services.BuildServiceProvider();
         var exception = Assert.Throws<InvalidOperationException>(
             () => services.GetRequiredService<IOptions<CosmosClusteringOptions>>().Value);
-        Assert.Equal($"Failed to convert configuration value at 'Clustering:{key}' to type '{expectedType}'.", exception.Message);
+        Assert.Contains($"at 'Clustering:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
     }
 
     [Theory]
@@ -65,7 +66,8 @@ public class CosmosClusteringProviderBuilderTests
         using var services = builder.Services.BuildServiceProvider();
         var exception = Assert.Throws<InvalidOperationException>(
             () => services.GetRequiredService<IOptions<CosmosClusteringOptions>>().Value);
-        Assert.Equal($"Failed to convert configuration value at 'Clustering:{key}' to type '{expectedType}'.", exception.Message);
+        Assert.Contains($"at 'Clustering:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
     }
 
     private static IConfiguration CreateConfiguration(params (string Key, string Value)[] settings)

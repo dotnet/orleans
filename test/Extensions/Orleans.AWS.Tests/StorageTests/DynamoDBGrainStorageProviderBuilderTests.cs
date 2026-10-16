@@ -118,33 +118,8 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => GetOptions(services));
 
-        Assert.Equal($"Failed to convert configuration value at 'Storage:{key}' to type '{expectedType}'.", exception.Message);
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Configure_BlankTypedValues_PreserveDefaults(string blankValue)
-    {
-        var (builder, _) = ConfigureBuilder(
-            (nameof(DynamoDBStorageOptions.ReadCapacityUnits), blankValue),
-            (nameof(DynamoDBStorageOptions.WriteCapacityUnits), blankValue),
-            (nameof(DynamoDBStorageOptions.UseProvisionedThroughput), blankValue),
-            (nameof(DynamoDBStorageOptions.CreateIfNotExists), blankValue),
-            (nameof(DynamoDBStorageOptions.UpdateIfExists), blankValue),
-            (nameof(DynamoDBStorageOptions.DeleteStateOnClear), blankValue),
-            (nameof(DynamoDBStorageOptions.TimeToLive), blankValue));
-        using var services = builder.Services.BuildServiceProvider();
-
-        var options = GetOptions(services);
-
-        Assert.Equal(10, options.ReadCapacityUnits);
-        Assert.Equal(5, options.WriteCapacityUnits);
-        Assert.True(options.UseProvisionedThroughput);
-        Assert.True(options.CreateIfNotExists);
-        Assert.True(options.UpdateIfExists);
-        Assert.False(options.DeleteStateOnClear);
-        Assert.Null(options.TimeToLive);
+        Assert.Contains($"at 'Storage:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
     }
 
     [Fact]

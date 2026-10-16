@@ -21,8 +21,4 @@
     <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
     <InternalsVisibleTo Include="TestExtensions" />
   </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\Orleans.Core\Configuration\ConfigurationValueParser.cs" Link="Configuration\ConfigurationValueParser.cs" />
-  </ItemGroup>
 </Project>

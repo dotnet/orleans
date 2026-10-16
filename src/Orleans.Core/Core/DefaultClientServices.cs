@@ -185,7 +185,7 @@ namespace Orleans
             services.Configure<ClientMessagingOptions>(cfg.GetSection("Messaging"));
             services.Configure<GatewayOptions>(cfg.GetSection("Gateway"));
 
-            if (ConfigurationValueParser.TryParseValue<bool>(cfg, "EnableDistributedTracing", out var enableDistributedTracing) && enableDistributedTracing)
+            if (cfg.GetValue<bool>("EnableDistributedTracing"))
             {
                 builder.AddActivityPropagation();
             }

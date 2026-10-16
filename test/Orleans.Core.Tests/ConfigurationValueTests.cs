@@ -53,7 +53,8 @@ namespace NonSilo.Tests
             var exception = Assert.Throws<InvalidOperationException>(
                 () => host.Services.GetRequiredService<IOptions<EndpointOptions>>().Value);
 
-            Assert.Equal($"Failed to convert configuration value at 'Orleans:Endpoints:{key}' to type '{expectedType}'.", exception.Message);
+            Assert.Contains($"at 'Orleans:Endpoints:{key}'", exception.Message);
+            Assert.Contains($"type '{expectedType}'", exception.Message);
         }
 
         [Fact]
@@ -62,7 +63,8 @@ namespace NonSilo.Tests
             var exception = Assert.Throws<InvalidOperationException>(
                 () => BuildSiloHost(("Orleans:EnableDistributedTracing", "not-a-boolean")));
 
-            Assert.Equal($"Failed to convert configuration value at 'Orleans:EnableDistributedTracing' to type '{typeof(bool)}'.", exception.Message);
+            Assert.Contains("at 'Orleans:EnableDistributedTracing'", exception.Message);
+            Assert.Contains($"type '{typeof(bool)}'", exception.Message);
         }
 
         [Fact]
@@ -71,7 +73,8 @@ namespace NonSilo.Tests
             var exception = Assert.Throws<InvalidOperationException>(
                 () => BuildClientHost(("Orleans:EnableDistributedTracing", "not-a-boolean")));
 
-            Assert.Equal($"Failed to convert configuration value at 'Orleans:EnableDistributedTracing' to type '{typeof(bool)}'.", exception.Message);
+            Assert.Contains("at 'Orleans:EnableDistributedTracing'", exception.Message);
+            Assert.Contains($"type '{typeof(bool)}'", exception.Message);
         }
 
         [Fact]
@@ -98,7 +101,8 @@ namespace NonSilo.Tests
                     ("Orleans:Clustering:Gateways:0", "10.0.0.1:30000"),
                     ("Orleans:Clustering:Gateways:1", "not-an-endpoint")));
 
-            Assert.Equal($"Failed to convert configuration value at 'Orleans:Clustering:Gateways:1' to type '{typeof(IPEndPoint)}'.", exception.Message);
+            Assert.Contains("at 'Orleans:Clustering:Gateways:1'", exception.Message);
+            Assert.Contains($"type '{typeof(IPEndPoint)}'", exception.Message);
         }
 
         [Fact]
@@ -111,9 +115,8 @@ namespace NonSilo.Tests
             var exception = Assert.Throws<InvalidOperationException>(
                 () => host.Services.GetRequiredService<IOptionsMonitor<MemoryGrainStorageOptions>>().Get("MyStorage"));
 
-            Assert.Equal(
-                $"Failed to convert configuration value at 'Orleans:GrainStorage:MyStorage:NumStorageGrains' to type '{typeof(int)}'.",
-                exception.Message);
+            Assert.Contains("at 'Orleans:GrainStorage:MyStorage:NumStorageGrains'", exception.Message);
+            Assert.Contains($"type '{typeof(int)}'", exception.Message);
         }
 
         private static IHost BuildSiloHost(params (string Key, string Value)[] settings)

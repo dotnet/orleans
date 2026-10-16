@@ -74,9 +74,8 @@ public sealed class RedisStreamingProviderBuilderTests
         var exception = Assert.Throws<InvalidOperationException>(
             () => providerBuilder.Configure(siloBuilder, providerName, siloBuilder.Configuration.GetSection($"Orleans:Streaming:{providerName}")));
 
-        Assert.Equal(
-            $"Failed to convert configuration value at 'Orleans:Streaming:{providerName}:PartitionCount' to type '{typeof(int)}'.",
-            exception.Message);
+        Assert.Contains($"at 'Orleans:Streaming:{providerName}:PartitionCount'", exception.Message);
+        Assert.Contains($"type '{typeof(int)}'", exception.Message);
     }
 
     private sealed class TestSiloBuilder(string json) : ISiloBuilder

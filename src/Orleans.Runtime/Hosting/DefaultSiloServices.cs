@@ -497,7 +497,7 @@ namespace Orleans.Hosting
                 services.Configure<EndpointOptions>(o => o.Bind(ep));
             }
 
-            if (ConfigurationValueParser.TryParseValue<bool>(cfg, "EnableDistributedTracing", out var enableDistributedTracing) && enableDistributedTracing)
+            if (cfg.GetValue<bool>("EnableDistributedTracing"))
             {
                 builder.AddActivityPropagation();
             }

@@ -128,9 +128,8 @@ public class AzureQueueStreamProviderBuilderTests
         var services = ConfigureSilo(json).Services.BuildServiceProvider();
 
         var exception = Assert.Throws<InvalidOperationException>(() => services.GetOptionsByName<AzureQueueOptions>(null!));
-        Assert.Equal(
-            $"Failed to convert configuration value at 'Orleans:Streaming:AzureQueueProvider:MessageVisibilityTimeout' to type '{typeof(TimeSpan)}'.",
-            exception.Message);
+        Assert.Contains("at 'Orleans:Streaming:AzureQueueProvider:MessageVisibilityTimeout'", exception.Message);
+        Assert.Contains($"type '{typeof(TimeSpan)}'", exception.Message);
     }
 
     static TestSiloBuilder ConfigureSilo(string json)

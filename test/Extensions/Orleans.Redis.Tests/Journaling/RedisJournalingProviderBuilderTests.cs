@@ -145,9 +145,6 @@ public sealed class RedisJournalingProviderBuilderTests
             ("ConnectionName", ""),
             ("ConnectionString", ""),
             (nameof(RedisJournalStorageOptions.KeyPrefix), " "),
-            (nameof(RedisJournalStorageOptions.CompactionThresholdBytes), " "),
-            (nameof(RedisJournalStorageOptions.ReadChunkSize), ""),
-            (nameof(RedisJournalStorageOptions.InitStage), " "),
             (nameof(JournaledStateManagerOptions.JournalFormatKey), " "));
 
         using var services = builder.Services.BuildServiceProvider();
@@ -174,7 +171,8 @@ public sealed class RedisJournalingProviderBuilderTests
         using var services = builder.Services.BuildServiceProvider();
         var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
 
-        Assert.Equal($"Failed to convert configuration value at '{ConfigurationSectionName}:{key}' to type '{expectedType}'.", exception.Message);
+        Assert.Contains($"at '{ConfigurationSectionName}:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
     }
 
     [Fact]

@@ -1,41 +1,39 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.Configuration;
 
 namespace Orleans.Configuration;
 
 /// <summary>
-/// Parses optional typed values from configuration.
+/// Parses optional network address values from configuration, which <see cref="ConfigurationBinder"/> cannot convert.
 /// </summary>
 /// <remarks>
-/// Provider packages compile this file as linked source.
-/// An absent or empty value leaves the caller's default in place, and an invalid value throws the same
-/// <see cref="InvalidOperationException"/> message as <see cref="ConfigurationBinder"/>.
+/// An absent or empty value leaves the caller's default in place, and an invalid value throws an
+/// <see cref="InvalidOperationException"/> in the style of <see cref="ConfigurationBinder"/>.
 /// </remarks>
 internal static class ConfigurationValueParser
 {
     /// <summary>
-    /// Parses the value at <paramref name="key"/> using <see cref="CultureInfo.InvariantCulture"/>.
+    /// Parses the <see cref="IPAddress"/> value at <paramref name="key"/>.
     /// </summary>
     /// <returns><see langword="true"/> when the key has a value; <see langword="false"/> when it is absent or empty.</returns>
-    /// <exception cref="InvalidOperationException">The configured value is not a valid <typeparamref name="T"/>.</exception>
-    public static bool TryParseValue<T>(IConfiguration configuration, string key, [MaybeNullWhen(false)] out T value) where T : IParsable<T>
+    /// <exception cref="InvalidOperationException">The configured value is not a valid <see cref="IPAddress"/>.</exception>
+    public static bool TryParseIPAddress(IConfiguration configuration, string key, [NotNullWhen(true)] out IPAddress? value)
     {
         var text = configuration[key];
-        if (string.IsNullOrWhiteSpace(text))
+        if (string.IsNullOrEmpty(text))
         {
-            value = default;
+            value = null;
             return false;
         }
 
-        if (T.TryParse(text, CultureInfo.InvariantCulture, out value))
+        if (IPAddress.TryParse(text, out value))
         {
             return true;
         }
 
-        throw CreateInvalidValueException(configuration, key, typeof(T));
+        throw CreateInvalidValueException(configuration, key, typeof(IPAddress));
     }
 
     /// <summary>
@@ -46,7 +44,7 @@ internal static class ConfigurationValueParser
     public static bool TryParseIPEndPoint(IConfiguration configuration, string key, [NotNullWhen(true)] out IPEndPoint? value)
     {
         var text = configuration[key];
-        if (string.IsNullOrWhiteSpace(text))
+        if (string.IsNullOrEmpty(text))
         {
             value = null;
             return false;

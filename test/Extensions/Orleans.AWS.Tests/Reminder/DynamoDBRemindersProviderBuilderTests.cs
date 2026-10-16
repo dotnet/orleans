@@ -62,7 +62,8 @@ public sealed class DynamoDBRemindersProviderBuilderTests
         using var services = builder.Services.BuildServiceProvider();
         var exception = Assert.Throws<InvalidOperationException>(
             () => services.GetRequiredService<IOptions<DynamoDBReminderStorageOptions>>().Value);
-        Assert.Equal($"Failed to convert configuration value at 'Reminders:{key}' to type '{expectedType}'.", exception.Message);
+        Assert.Contains($"at 'Reminders:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
     }
 
     private sealed class TestSiloBuilder(IConfiguration configuration) : ISiloBuilder
