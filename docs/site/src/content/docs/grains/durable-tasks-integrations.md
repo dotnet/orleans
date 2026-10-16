@@ -57,8 +57,9 @@ twice inside the step:
 
 :::code source="../snippets/compiled/Grains/DurableTaskIntegrationSnippets.cs" id="durable_tasks_charge_in_step" language="csharp":::
 
-- The step receives a cancellation token which durable cancellation of the workflow
-  signals. Pass it to the client and to the delay between attempts.
+- The step receives `DurableTask.Current.CancellationToken`, which the workflow's task
+  cancellation and the cancellation of the step's attempt both cancel. Pass it to the
+  client and to the delay between attempts.
 - Every attempt sends the same key, so the provider charges once. When the silo fails
   after the provider charged and before the step's result committed, the next run sends
   the same key again, and the provider returns the original charge.
@@ -74,7 +75,8 @@ Pitfalls:
   replays. A key from `Guid.NewGuid()` in the body changes in every replay; see
   [ORLEANS0101](../diagnostics/orleans0101.md).
 - Keep in-step retries short. The step holds an execution running while it retries, and a
-  deactivation ends the attempt, which the next run starts again from the first attempt.
+  deactivation cancels the step's attempt, which the next run starts again from the first
+  retry.
 
 **Verify:** the grain lists `charge` as `Completed` with the charge's ID, and the
 provider's dashboard shows one charge for the key, with any repeated requests marked as

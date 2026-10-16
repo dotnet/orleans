@@ -475,6 +475,8 @@ items:
             href: diagnostics/orleans0026.md
           - name: ORLEANS0027
             href: diagnostics/orleans0027.md
+          - name: ORLEANS0224
+            href: diagnostics/orleans0224.md
           - name: ORLEANS0200
             href: diagnostics/orleans0200.md
           - name: ORLEANS0201
@@ -509,8 +511,8 @@ items:
             href: diagnostics/orleans0215.md
           - name: ORLEANS0216
             href: diagnostics/orleans0216.md
-          - name: ORLEANS0224
-            href: diagnostics/orleans0224.md
+          - name: ORLEANS0217
+            href: diagnostics/orleans0217.md
       - name: API context and examples
         href: resources/api-reference-guide.md
       - name: Best practices

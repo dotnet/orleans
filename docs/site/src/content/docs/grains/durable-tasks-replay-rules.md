@@ -1,6 +1,6 @@
 ---
 title: Replay-safety rules for durable tasks
-description: Reference for the rules which keep durable task bodies correct under replay, the failures each rule prevents, and the analyzer diagnostics ORLEANS0100 to ORLEANS0116 which enforce them.
+description: Reference for the rules which keep durable task bodies correct under replay, the failures each rule prevents, and the analyzer diagnostics ORLEANS0100 to ORLEANS0117 which enforce them.
 ms.date: 10/15/2026
 ms.topic: reference
 ---
@@ -11,7 +11,7 @@ A durable task resumes after a deactivation or a failure by running its body aga
 the start, while each recorded operation returns its recorded outcome. The rules on this
 page keep that replay equivalent to the run which recorded the operations. The
 `Microsoft.Orleans.DurableTasks.Abstractions` package carries analyzers which check them
-at build time and report diagnostics ORLEANS0100 to ORLEANS0116; each diagnostic's page
+at build time and report diagnostics ORLEANS0100 to ORLEANS0117; each diagnostic's page
 shows the code which triggers it and common fixes.
 
 For the model behind the rules, see
@@ -63,11 +63,12 @@ awaiting, or helpers in other assemblies.
 | Keep bodies on the activation's scheduler. | Work races with the grain, and `Once` and `Post` throw off the scheduler. | [ORLEANS0109](../diagnostics/orleans0109.md) |
 | Run concurrent durable work through durable combinators. | Children receive IDs in thread order, which a replay can change, and losing inputs keep running. | [ORLEANS0110](../diagnostics/orleans0110.md) |
 | Wait with `DurableTask.Delay` and `DelayUntil`. | A deactivation loses the wait, and a replay waits the whole duration again. | [ORLEANS0111](../diagnostics/orleans0111.md) |
-| Filter cancellation handlers by `DurableTask.Current.IsCancellationRequested`. | A host stop runs compensation for a task which nobody canceled. | [ORLEANS0112](../diagnostics/orleans0112.md) |
+| Filter cancellation handlers by `DurableTask.Current.IsTaskCancellationRequested`. | The cancellation of an attempt, such as a deactivation, runs compensation for a task which nobody canceled. | [ORLEANS0112](../diagnostics/orleans0112.md) |
 | Return a task from asynchronous code in bodies. | Work continues after the body completed, and its failures escape. | [ORLEANS0113](../diagnostics/orleans0113.md) |
 | Derive a signal name for each repeated wait. | Every wait returns the first value which the signal received. | [ORLEANS0114](../diagnostics/orleans0114.md) |
 | Log replayed code through `logger.ReplaySafe()`. | Each replay logs the events of the completed operations again. | [ORLEANS0115](../diagnostics/orleans0115.md) |
 | Post from grains and durable task bodies, and schedule from clients. | `Post` throws, because a client has no durable outbox. | [ORLEANS0116](../diagnostics/orleans0116.md) |
+| Pass `AttemptCancellationToken` to the calls which task-cancellation cleanup makes. | The cleanup's calls end at once, because `CancellationToken` is already canceled. | [ORLEANS0117](../diagnostics/orleans0117.md) |
 
 The analyzers also suppress CS1998 for `async DurableTask` methods without an `await`,
 which are ordinary steps; see [ORLEANS0028](../diagnostics/orleans0028.md).
