@@ -54,6 +54,9 @@ internal readonly struct SourceOutputResult(GeneratedSourceEntry? sourceEntry, D
     }
 }
 
+// The declaration completes the authored partial type; the implementation provides its runtime registrations.
+internal readonly record struct SerializerContextOutput(SourceOutputResult Declaration, SourceOutputResult Implementation);
+
 internal readonly struct ReferenceAssemblyDataResult(ReferenceAssemblyModel model, ImmutableArray<Diagnostic> diagnostics) : IEquatable<ReferenceAssemblyDataResult>
 {
     public ReferenceAssemblyModel Model { get; } = model;

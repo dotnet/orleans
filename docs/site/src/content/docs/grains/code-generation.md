@@ -61,7 +61,13 @@ For end-to-end interop examples, see the [Orleans F# sample](https://learn.micro
 
 ## Inspect diagnostics and output
 
-Treat Orleans analyzer and generator diagnostics as contract errors, not warnings to suppress. Generated files can be inspected through normal compiler-generated-file tooling when debugging, but application code should depend on the public interfaces rather than generated implementation names.
+Treat Orleans analyzer and generator diagnostics as contract errors. Orleans marks generated implementation types and their browsable members with `EditorBrowsable(Never)` for editors which honor this metadata. Generated files retain their source locations for diagnostics and debugging, and remain available through compiler-generated-file tooling and direct definition navigation to generated symbols.
+
+Visual Studio uses `EditorBrowsable` when browsing referenced assemblies. Same-assembly browsing and definition navigation follow the IDE's own policies.
+
+The generator registers serializers, copiers, activators, proxies, invocation helpers, runtime metadata, and serializer-context registration bodies with Roslyn's `RegisterImplementationSourceOutput`. Minimal serializer-context declarations use regular source output to complete authored partial types for editor type checking. Hosts choose whether to include implementation outputs in their compilations; ordinary builds include the complete generated implementation. Generator diagnostics remain available when a host omits implementation outputs.
+
+XML documentation contains authored API comments. The documentation site's API reference filters generated implementation types and members using their generated-code attributes, preserving authored partial types such as serializer contexts.
 
 The optional [Orleans contract compatibility analyzer](grain-versioning/contract-compatibility-analyzer.md) records grain RPC identities and signatures in `OrleansContracts.txt` so contract drift can be reviewed before a rolling upgrade.
 

@@ -17,12 +17,13 @@ namespace OrleansCodeGen.TestProject
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoData> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<RequiredStringPropInitOnly>k__BackingField")]
         private extern static ref string accessField_3(global::TestProject.DemoData instance);
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public Codec_DemoData(global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoData> _activator)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
         }
 
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.DemoData instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
@@ -32,7 +33,7 @@ namespace OrleansCodeGen.TestProject
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 1U, instance.RequiredStringPropInitOnly);
         }
 
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::TestProject.DemoData instance)
         {
             uint id = 0U;
@@ -81,7 +82,7 @@ namespace OrleansCodeGen.TestProject
             }
         }
 
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::TestProject.DemoData @value)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
@@ -97,7 +98,7 @@ namespace OrleansCodeGen.TestProject
                 writer.SerializeUnexpectedType(fieldIdDelta, expectedType, @value);
         }
 
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::TestProject.DemoData ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
             if (field.IsReference)
@@ -122,7 +123,7 @@ namespace OrleansCodeGen.TestProject
         private readonly global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoData> _activator;
         [global::System.Runtime.CompilerServices.UnsafeAccessorAttribute(global::System.Runtime.CompilerServices.UnsafeAccessorKind.Field, Name = "<RequiredStringPropInitOnly>k__BackingField")]
         private extern static ref string accessField_3(global::TestProject.DemoData instance);
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::TestProject.DemoData DeepCopy(global::TestProject.DemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (context.TryGetCopy(original, out global::TestProject.DemoData existing))
@@ -135,12 +136,13 @@ namespace OrleansCodeGen.TestProject
             return result;
         }
 
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public Copier_DemoData(global::Orleans.Serialization.Activators.IActivator<global::TestProject.DemoData> _activator)
         {
             this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
         }
 
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void DeepCopy(global::TestProject.DemoData input, global::TestProject.DemoData output, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             output.NullableStringProp = input.NullableStringProp;
@@ -153,6 +155,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
     {
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
             config.AddSerializer(typeof(OrleansCodeGen.TestProject.Codec_DemoData), typeof(global::TestProject.DemoData));

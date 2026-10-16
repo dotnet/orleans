@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -77,21 +78,30 @@ internal static class GeneratedCodeUtilities
 
     internal static AttributeListSyntax GetGeneratedCodeAttributes() => GeneratedCodeAttributeSyntax;
 
+    internal static AttributeListSyntax GetEditorBrowsableAttribute() => EditorBrowsableAttributeSyntax;
+
+    private static readonly AttributeListSyntax EditorBrowsableAttributeSyntax =
+        AttributeList(SingletonSeparatedList(
+            Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
+                .AddArgumentListArguments(
+                    AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never")))));
+
     private static readonly AttributeListSyntax GeneratedCodeAttributeSyntax =
         AttributeList().AddAttributes(
             Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
                 .AddArgumentListArguments(
                     AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
                     AttributeArgument(typeof(GeneratedCodeUtilities).Assembly.GetName().Version.ToString().GetLiteralExpression())),
-            Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
-                .AddArgumentListArguments(
-                    AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never"))),
-                    Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"))
+            EditorBrowsableAttributeSyntax.Attributes[0],
+            Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"))
         );
 
-    internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
-
-    private static readonly AttributeSyntax MethodImplAttributeSyntax =
-        Attribute(ParseName("global::System.Runtime.CompilerServices.MethodImplAttribute"))
-            .AddArgumentListArguments(AttributeArgument(ParseName("global::System.Runtime.CompilerServices.MethodImplOptions").Member("AggressiveInlining")));
+    internal static ClassDeclarationSyntax AddEditorBrowsableAttributes(ClassDeclarationSyntax declaration) =>
+        declaration.WithMembers(List(declaration.Members.Select(static member =>
+            member.Modifiers.Any(SyntaxKind.PublicKeyword)
+            || member.Modifiers.Any(SyntaxKind.ProtectedKeyword)
+            || member.Modifiers.Any(SyntaxKind.InternalKeyword)
+            || member is MethodDeclarationSyntax { ExplicitInterfaceSpecifier: not null }
+                ? member.AddAttributeLists(GetEditorBrowsableAttribute())
+                : member)));
 }

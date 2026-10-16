@@ -14,23 +14,34 @@ namespace OrleansCodeGen
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::IMyGrain), "6D39E404")]
     public sealed class Invokable_IMyGrain_GrainReference_6D39E404 : global::Orleans.Runtime.TaskRequest<string>
     {
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public string arg0;
         global::IMyGrain _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::IMyGrain), "SayHello", null, new[] { typeof(string) });
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override int GetArgumentCount() => 1;
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override string GetMethodName() => "SayHello";
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override string GetInterfaceName() => "IMyGrain";
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override string GetActivityName() => "IMyGrain/SayHello";
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override global::System.Type GetInterfaceType() => typeof(global::IMyGrain);
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) => _target = (global::IMyGrain)holder.GetTarget();
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override object GetTarget() => _target;
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override void Dispose()
         {
             arg0 = default;
             _target = default;
         }
 
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override object GetArgument(int index)
         {
             switch (index)
@@ -42,6 +53,7 @@ namespace OrleansCodeGen
             }
         }
 
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public override void SetArgument(int index, object value)
         {
             switch (index)
@@ -55,16 +67,19 @@ namespace OrleansCodeGen
             }
         }
 
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.SayHello(arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Proxy_IMyGrain : global::Orleans.Runtime.GrainReference, global::IMyGrain
     {
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public Proxy_IMyGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
         }
 
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         global::System.Threading.Tasks.Task<string> global::IMyGrain.SayHello(string arg0)
         {
             var request = new OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404();
@@ -77,14 +92,14 @@ namespace OrleansCodeGen
     public sealed class Codec_Invokable_IMyGrain_GrainReference_6D39E404 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404);
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.arg0);
         }
 
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 instance)
         {
             uint id = 0U;
@@ -106,7 +121,7 @@ namespace OrleansCodeGen
             }
         }
 
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 @value)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
@@ -122,7 +137,7 @@ namespace OrleansCodeGen
             writer.WriteEndObject();
         }
 
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
             if (field.IsReference)
@@ -138,7 +153,7 @@ namespace OrleansCodeGen
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IMyGrain_GrainReference_6D39E404 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404>
     {
-        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 DeepCopy(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
@@ -158,6 +173,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
     {
+        [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
         {
             config.AddSerializer(typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404), typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404));
