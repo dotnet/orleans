@@ -32,6 +32,7 @@
   </Folder>
   <Folder Name="/playground/DurableOrderProcessing/">
     <Project Path="playground/DurableOrderProcessing/DurableOrderProcessing.csproj" />
+    <Project Path="test/DurableOrderProcessing.Tests/DurableOrderProcessing.Tests.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />

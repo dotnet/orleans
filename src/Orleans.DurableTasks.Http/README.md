@@ -250,3 +250,7 @@ application sets options whose resolver handles its request and result types.
 
 `AddDurableIdempotencyKey` adds the key handler to any `HttpClient`, for durable tasks
 which send requests from their own steps with `DurableTask.Run`.
+
+The [DurableOrderProcessing playground](../../playground/DurableOrderProcessing) runs these
+pieces together, from a browser which persists each checkout's key to a payment gateway which
+deduplicates by the key that each payment step derives.
