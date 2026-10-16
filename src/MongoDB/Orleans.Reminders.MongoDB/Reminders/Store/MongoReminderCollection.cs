@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MongoDB.Driver;
@@ -139,10 +138,7 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
         var collection = GetCollection(cancellationToken);
         var reminder = await collection.Find(Filter.And(
                 Filter.Eq(x => x.Id, ReturnId(serviceId, grainId, reminderName)), ActiveRows()))
-            .FirstOrDefaultAsync(cancellationToken)
-            ?? await collection.Find(Filter.And(
-                    Filter.Eq(x => x.Id, ReturnLegacyId(serviceId, grainId, reminderName)), ActiveRows()))
-                .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync(cancellationToken);
 
         var entry = reminder?.ToEntry();
         return reminder?.ServiceId == serviceId && entry?.GrainId == grainId && entry.ReminderName == reminderName ? entry : null;
@@ -167,7 +163,7 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
     {
         var deleteResult = await GetCollection(cancellationToken).DeleteOneAsync(
             Filter.And(
-                Filter.In(x => x.Id, new[] { ReturnId(serviceId, grainId, reminderName), ReturnLegacyId(serviceId, grainId, reminderName) }),
+                Filter.Eq(x => x.Id, ReturnId(serviceId, grainId, reminderName)),
                 IdentityFilter(grainId, reminderName),
                 Filter.Eq(x => x.Etag, eTag)),
             cancellationToken
@@ -185,11 +181,6 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
     {
         var collection = GetCollection(cancellationToken);
         var id = ReturnId(serviceId, entry.GrainId, entry.ReminderName);
-        // Retain existing IDs so updates remain visible to older readers during upgrades.
-        var legacyId = ReturnLegacyId(serviceId, entry.GrainId, entry.ReminderName);
-        var legacy = await collection.Find(Filter.And(
-            Filter.Eq(x => x.Id, legacyId), IdentityFilter(entry.GrainId, entry.ReminderName)))
-            .FirstOrDefaultAsync(cancellationToken);
         var document = MongoReminderDocument.Create(id, serviceId, entry, Guid.NewGuid().ToString());
         var update = Update
             .SetOnInsert(x => x.ServiceId, document.ServiceId)
@@ -203,34 +194,35 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
             .Unset(x => x.IsDeleted);
 #pragma warning restore CS0618
 
-        if (legacy is not null)
+        while (true)
         {
-            var result = await collection.UpdateOneAsync(
-                Filter.And(Filter.Eq(x => x.Id, legacy.Id), IdentityFilter(entry.GrainId, entry.ReminderName)),
-                update, cancellationToken: cancellationToken);
-            if (result.MatchedCount > 0)
+            try
             {
+                await collection.UpdateOneAsync(
+                    Filter.And(Filter.Eq(x => x.Id, id), IdentityFilter(entry.GrainId, entry.ReminderName)),
+                    update, Upsert, cancellationToken);
                 return entry.ETag = document.Etag;
             }
+            catch (MongoException exception) when (exception.IsDuplicateKey())
+            {
+                var existing = await collection.WithReadPreference(ReadPreference.Primary).Find(row => row.Id == id)
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (existing is not null
+                    && (existing.ServiceId != serviceId
+                        || existing.GrainId != entry.GrainId.ToString()
+                        || existing.ReminderName != entry.ReminderName))
+                {
+                    throw new InvalidOperationException(
+                        $"MongoDB reminder key collision for service '{serviceId}', grain '{entry.GrainId}', reminder '{entry.ReminderName}'. The legacy key is already used by service '{existing.ServiceId}', grain '{existing.GrainId}', reminder '{existing.ReminderName}'.",
+                        exception);
+                }
+
+                // A concurrent first registration won the insert; retry the identity-guarded update.
+            }
         }
-
-        // A removed legacy row is recreated only at the canonical encoded ID.
-        await collection.UpdateOneAsync(
-            Filter.Eq(x => x.Id, id),
-            update, Upsert, cancellationToken);
-
-        return entry.ETag = document.Etag;
     }
 
     private static string ReturnId(string serviceId, GrainId grainId, string reminderName)
-    {
-        // Base64 has neither ':' nor '_', keeping components distinct and new IDs disjoint from legacy IDs.
-        return $"v2:{Encode(serviceId)}:{Encode(grainId.ToString())}:{Encode(reminderName)}";
-    }
-
-    private static string Encode(string value) => Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
-
-    private static string ReturnLegacyId(string serviceId, GrainId grainId, string reminderName)
         => $"{serviceId}_{grainId}_{reminderName}";
 
     private static FilterDefinition<MongoReminderDocument> ActiveRows()

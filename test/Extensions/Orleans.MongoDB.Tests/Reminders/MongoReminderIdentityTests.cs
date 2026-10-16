@@ -13,7 +13,7 @@ namespace Orleans.MongoDB.Tests.Reminders;
 public sealed class MongoReminderIdentityTests
 {
     [Fact]
-    public async Task ConcurrentFirstRegistrations_CompleteWithoutRetriesAndKeepOneReminder()
+    public async Task ConcurrentFirstRegistrations_CompleteWithoutCallerRetriesAndKeepOneReminder()
     {
         const int registrations = 8;
         var commands = new ConcurrentQueue<BsonDocument>();
@@ -50,8 +50,10 @@ public sealed class MongoReminderIdentityTests
             Assert.All(commands, command =>
             {
                 var update = Assert.Single(command["updates"].AsBsonArray).AsBsonDocument;
-                Assert.Equal(new[] { "_id" }, update["q"].AsBsonDocument.Names);
-                Assert.StartsWith("v2:", update["q"]["_id"].AsString);
+                Assert.Equal($"service_{id}_bill", update["q"]["_id"].AsString);
+                Assert.Equal("service", update["q"]["ServiceId"].AsString);
+                Assert.Equal(id.ToString(), update["q"]["GrainId"].AsString);
+                Assert.Equal("bill", update["q"]["ReminderName"].AsString);
                 Assert.True(update["upsert"].AsBoolean);
             });
         }
@@ -64,7 +66,7 @@ public sealed class MongoReminderIdentityTests
         var etags = await allWrites;
         Assert.All(etags, tag => Assert.False(string.IsNullOrWhiteSpace(tag)));
         Assert.Equal(registrations, etags.Distinct().Count());
-        Assert.Equal(registrations, commands.Count);
+        Assert.True(commands.Count >= registrations);
         var documents = await database.Database.GetCollection<MongoReminderDocument>("OrleansReminderV2")
             .Find(FilterDefinition<MongoReminderDocument>.Empty).ToListAsync(token);
         var document = Assert.Single(documents);
@@ -80,7 +82,7 @@ public sealed class MongoReminderIdentityTests
     }
 
     [Fact]
-    public async Task ConcurrentLegacyRemoveAndReregister_UsesOneEncodedRegistration()
+    public async Task ConcurrentRemoveAndReregister_UsesOneLegacyRegistration()
     {
         var barrier = new MongoMembershipCancellationTests.CommandBarrier(1, "update");
         await using var database = await MongoDatabase.CreateAsync(settings =>
@@ -125,8 +127,7 @@ public sealed class MongoReminderIdentityTests
         var firstTag = await pending;
         Assert.NotEqual(secondTag, firstTag);
         var stored = Assert.Single(await collection.Find(FilterDefinition<MongoReminderDocument>.Empty).ToListAsync(token));
-        Assert.NotEqual(legacyId, stored.Id);
-        Assert.StartsWith("v2:", stored.Id);
+        Assert.Equal(legacyId, stored.Id);
         Assert.Equal(firstTag, stored.Etag);
         Assert.Equal(TimeSpan.FromMinutes(9), stored.Period);
         var row = Assert.Single((await firstTable.ReadRows(0, 0, token)).Reminders);
@@ -134,7 +135,7 @@ public sealed class MongoReminderIdentityTests
         var point = await firstTable.ReadRow(first.GrainId, "bill", token);
         Assert.Equal(firstTag, point!.ETag);
         Assert.Equal(TimeSpan.FromMinutes(9), point.Period);
-        Assert.False(barrier.Commands.First()["updates"][0].AsBsonDocument.GetValue("upsert", false).AsBoolean);
+        Assert.True(barrier.Commands.First()["updates"][0].AsBsonDocument["upsert"].AsBoolean);
         Assert.False(await secondTable.RemoveRow(first.GrainId, "bill", secondTag!, token));
         Assert.True(await firstTable.RemoveRow(first.GrainId, "bill", firstTag!, token));
         Assert.Null(await firstTable.ReadRow(first.GrainId, "bill", token));
@@ -143,90 +144,108 @@ public sealed class MongoReminderIdentityTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task CollidingServiceIds_PreserveReadRemoveAndClearIsolation(bool seedLegacy)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task LegacyIdentityCollision_RejectsRegistrationAndPreservesStoredReminder(bool serviceCollision, bool seedLegacy)
     {
         await using var database = await MongoDatabase.CreateAsync();
-        var firstTable = database.CreateReminderTable("s");
-        var secondTable = database.CreateReminderTable("s_a/b");
+        var firstService = serviceCollision ? "s" : "service";
+        var secondService = serviceCollision ? "s_a/b" : "service";
+        var firstTable = database.CreateReminderTable(firstService);
+        var secondTable = database.CreateReminderTable(secondService);
         var token = TestContext.Current.CancellationToken;
         await firstTable.StartAsync(token);
         await secondTable.StartAsync(token);
-        var first = Entry(GrainId.Create("a", "b"), "c/d_e");
-        var second = Entry(GrainId.Create("c", "d"), "e");
-        var legacyId = $"s_{first.GrainId}_{first.ReminderName}";
-        Assert.Equal(legacyId, $"s_a/b_{second.GrainId}_{second.ReminderName}");
+        var first = serviceCollision ? Entry(GrainId.Create("a", "b"), "c/d_e") : Entry(GrainId.Create("a", "b_c"), "d");
+        var second = serviceCollision ? Entry(GrainId.Create("c", "d"), "e") : Entry(GrainId.Create("a", "b"), "c_d");
+        var legacyId = $"{firstService}_{first.GrainId}_{first.ReminderName}";
+        Assert.Equal(legacyId, $"{secondService}_{second.GrainId}_{second.ReminderName}");
+        var collection = database.Database.GetCollection<MongoReminderDocument>("OrleansReminderV2");
         if (seedLegacy)
         {
-            await database.Database.GetCollection<MongoReminderDocument>("OrleansReminderV2")
-                .InsertOneAsync(MongoReminderDocument.Create(legacyId, "s", first, "legacy"), cancellationToken: token);
+            await collection.InsertOneAsync(MongoReminderDocument.Create(legacyId, firstService, first, "legacy"), cancellationToken: token);
             first.ETag = "legacy";
-            Assert.Null(await secondTable.ReadRow(second.GrainId, second.ReminderName, token));
-            Assert.False(await secondTable.RemoveRow(second.GrainId, second.ReminderName, "legacy", token));
         }
         else first.ETag = await firstTable.UpsertRow(first, token);
-        var secondTag = await secondTable.UpsertRow(second, token);
+        second.ETag = "unchanged";
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => secondTable.UpsertRow(second, token));
+        Assert.Contains("key collision", error.Message);
+        Assert.Equal("unchanged", second.ETag);
+        Assert.Null(await secondTable.ReadRow(second.GrainId, second.ReminderName, token));
+        Assert.False(await secondTable.RemoveRow(second.GrainId, second.ReminderName, first.ETag!, token));
+        Assert.Empty((await secondTable.ReadRows(second.GrainId, token)).Reminders);
+        if (serviceCollision)
+        {
+            Assert.Empty((await secondTable.ReadRows(0, 0, token)).Reminders);
+            await secondTable.TestOnlyClearTable(token);
+        }
         Assert.Equal(first.ETag, (await firstTable.ReadRow(first.GrainId, first.ReminderName, token))!.ETag);
-        Assert.Equal(secondTag, (await secondTable.ReadRow(second.GrainId, second.ReminderName, token))!.ETag);
-        await firstTable.TestOnlyClearTable(token);
+        Assert.Equal(first.ETag, Assert.Single((await firstTable.ReadRows(0, 0, token)).Reminders).ETag);
+        var retained = Assert.Single(await collection.Find(FilterDefinition<MongoReminderDocument>.Empty).ToListAsync(token));
+        Assert.Equal(legacyId, retained.Id);
+        Assert.Equal(firstService, retained.ServiceId);
+        Assert.Equal(first.GrainId.ToString(), retained.GrainId);
+        Assert.Equal(first.ReminderName, retained.ReminderName);
+        Assert.Equal(first.ETag, retained.Etag);
+        Assert.Equal(TimeSpan.FromMinutes(3), retained.Period);
+        first.Period = TimeSpan.FromMinutes(9);
+        var updatedTag = await firstTable.UpsertRow(first, token);
+        Assert.NotEqual(retained.Etag, updatedTag);
+        Assert.Equal(TimeSpan.FromMinutes(9), (await firstTable.ReadRow(first.GrainId, first.ReminderName, token))!.Period);
+        Assert.True(await firstTable.RemoveRow(first.GrainId, first.ReminderName, updatedTag!, token));
         Assert.Empty((await firstTable.ReadRows(0, 0, token)).Reminders);
-        Assert.Equal(secondTag, Assert.Single((await secondTable.ReadRows(0, 0, token)).Reminders).ETag);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task CollidingLegacyIds_KeepDistinctGrainAndReminderIdentities(bool seedLegacy)
+    public async Task UpstreamAndUpdatedWriters_ShareReminderIdsAcrossRegistrationUpdateAndRemoval(bool updatedCreates)
     {
         await using var database = await MongoDatabase.CreateAsync();
         var table = database.CreateReminderTable("service");
         var token = TestContext.Current.CancellationToken;
         await table.StartAsync(token);
-        var first = Entry(GrainId.Create("a", "b_c"), "d");
-        var second = Entry(GrainId.Create("a", "b"), "c_d");
-        var legacyId = $"service_{first.GrainId}_{first.ReminderName}";
-        Assert.Equal(legacyId, $"service_{second.GrainId}_{second.ReminderName}");
+        var entry = Entry(GrainId.Create("account", "rolling-update"), "bill");
+        var id = $"service_{entry.GrainId}_bill";
         var collection = database.Database.GetCollection<MongoReminderDocument>("OrleansReminderV2");
-        if (seedLegacy)
-        {
-            await collection.InsertOneAsync(MongoReminderDocument.Create(legacyId, "service", first, "legacy-etag"),
-                cancellationToken: token);
-            first.ETag = "legacy-etag";
-            Assert.Null(await table.ReadRow(second.GrainId, second.ReminderName, token));
-            Assert.False(await table.RemoveRow(second.GrainId, second.ReminderName, "legacy-etag", token));
-        }
-        else
-        {
-            first.ETag = await table.UpsertRow(first, token);
-        }
+        if (updatedCreates) await table.UpsertRow(entry, token);
+        else await UpstreamUpsert();
+        Assert.Equal(entry.ETag, (await table.ReadRow(entry.GrainId, "bill", token))!.ETag);
+        Assert.Equal(entry.ETag, (await collection.Find(row => row.Id == id).SingleAsync(token)).Etag);
+        entry.Period = TimeSpan.FromMinutes(7);
+        var upstreamTag = await UpstreamUpsert();
+        Assert.Equal(upstreamTag, (await table.ReadRow(entry.GrainId, "bill", token))!.ETag);
+        Assert.Equal(TimeSpan.FromMinutes(7), Assert.Single((await table.ReadRows(0, 0, token)).Reminders).Period);
+        entry.Period = TimeSpan.FromMinutes(9);
+        var updatedTag = await table.UpsertRow(entry, token);
+        var upstreamRead = await collection.Find(row => row.Id == id).SingleAsync(token);
+        Assert.Equal(updatedTag, upstreamRead.Etag);
+        Assert.Equal(TimeSpan.FromMinutes(9), upstreamRead.Period);
+        Assert.False(await table.RemoveRow(entry.GrainId, "bill", upstreamTag, token));
+        // Original-provider point removal addresses only the legacy ID and ETag.
+        var removed = await collection.DeleteOneAsync(row => row.Id == id && row.Etag == updatedTag, token);
+        Assert.Equal(1, removed.DeletedCount);
+        Assert.Null(await table.ReadRow(entry.GrainId, "bill", token));
+        var recreated = await table.UpsertRow(entry, token);
+        Assert.Equal(recreated, (await collection.Find(row => row.Id == id).SingleAsync(token)).Etag);
+        Assert.True(await table.RemoveRow(entry.GrainId, "bill", recreated!, token));
+        Assert.Empty(await collection.Find(FilterDefinition<MongoReminderDocument>.Empty).ToListAsync(token));
 
-        second.Period = TimeSpan.FromMinutes(7);
-        var secondTag = await table.UpsertRow(second, token);
-        Assert.Equal(first.ETag, (await table.ReadRow(first.GrainId, first.ReminderName, token))!.ETag);
-        Assert.Equal(secondTag, (await table.ReadRow(second.GrainId, second.ReminderName, token))!.ETag);
-        Assert.Equal(first.GrainId, Assert.Single((await table.ReadRows(first.GrainId, token)).Reminders).GrainId);
-        Assert.Equal(second.GrainId, Assert.Single((await table.ReadRows(second.GrainId, token)).Reminders).GrainId);
-        Assert.Equal(2, (await table.ReadRows(0, 0, token)).Reminders.Count);
-        first.Period = TimeSpan.FromMinutes(9);
-        var firstTag = await table.UpsertRow(first, token);
-        Assert.Equal(TimeSpan.FromMinutes(9), (await table.ReadRow(first.GrainId, first.ReminderName, token))!.Period);
-        Assert.Equal(TimeSpan.FromMinutes(7), (await table.ReadRow(second.GrainId, second.ReminderName, token))!.Period);
-        var documents = await collection.Find(FilterDefinition<MongoReminderDocument>.Empty).ToListAsync(token);
-        Assert.Equal(2, documents.Select(document => document.Id).Distinct().Count());
-        if (seedLegacy)
+        async Task<string> UpstreamUpsert()
         {
-            Assert.Equal(legacyId, Assert.Single(documents, document => document.GrainId == first.GrainId.ToString()).Id);
+            var document = MongoReminderDocument.Create(id, "service", entry, Guid.NewGuid().ToString());
+            // Match the contributed provider's identity filter and mutable-field update.
+            await collection.UpdateOneAsync(
+                row => row.Id == id && row.ServiceId == "service" && row.GrainId == document.GrainId
+                    && row.ReminderName == "bill" && row.GrainHash == document.GrainHash,
+                Builders<MongoReminderDocument>.Update.Set(row => row.Etag, document.Etag)
+                    .Set(row => row.Period, document.Period).Set(row => row.StartAt, document.StartAt),
+                new UpdateOptions { IsUpsert = true }, token);
+            entry.ETag = document.Etag;
+            return document.Etag;
         }
-        else
-        {
-            Assert.All(documents, document => Assert.DoesNotContain("_", document.Id));
-        }
-
-        Assert.False(await table.RemoveRow(first.GrainId, first.ReminderName, secondTag!, token));
-        Assert.True(await table.RemoveRow(first.GrainId, first.ReminderName, firstTag!, token));
-        Assert.Null(await table.ReadRow(first.GrainId, first.ReminderName, token));
-        Assert.Equal(secondTag, Assert.Single((await table.ReadRows(0, 0, token)).Reminders).ETag);
     }
 
     private static ReminderEntry Entry(GrainId grainId, string name) => new()

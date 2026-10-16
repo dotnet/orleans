@@ -16,8 +16,8 @@ public sealed class MongoMembershipRolloutTests
     [InlineData(MongoDBMembershipStrategy.Multiple, true)]
     [InlineData(MongoDBMembershipStrategy.MultipleDeprecated, false)]
     [InlineData(MongoDBMembershipStrategy.MultipleDeprecated, true)]
-    public async Task UpstreamLegacyWriter_DuplicatesCanonicalRowsAndRequiresStoppedClusterUpgrade(
-        MongoDBMembershipStrategy strategy, bool canonical)
+    public async Task UpstreamAndUpdatedWriters_ShareMembershipRowsInBothDirections(
+        MongoDBMembershipStrategy strategy, bool newWriterCreates)
     {
         await using var database = await MongoDatabase.CreateAsync();
         var token = TestContext.Current.CancellationToken;
@@ -36,13 +36,12 @@ public sealed class MongoMembershipRolloutTests
         var collection = database.Database.GetCollection<MongoMembershipDocument>(
             strategy == MongoDBMembershipStrategy.Multiple ? "OrleansMembershipV3" : "OrleansMembershipV2");
         var legacyId = $"rollout@192.0.2.1:11111/1";
-        if (canonical)
+        if (newWriterCreates)
         {
             Assert.True(await table.InsertRowAsync(entry, (await table.ReadAllAsync(token)).Version.Next(), token));
         }
         else
         {
-            // A stopped upgrade retains existing legacy rows and updates them in place.
             await collection.InsertOneAsync(MongoMembershipDocument.Create(entry, "rollout", legacyId), cancellationToken: token);
             var seed = await table.ReadAllAsync(token);
             entry.HostName = "new-writer";
@@ -53,8 +52,7 @@ public sealed class MongoMembershipRolloutTests
         var observed = Assert.Single(before.Members);
         Assert.Equal(SiloStatus.Active, observed.Item1.Status);
         var beforeDocument = Assert.Single(await collection.Find(FilterDefinition<MongoMembershipDocument>.Empty).ToListAsync(token));
-        if (canonical) Assert.StartsWith("v2:", beforeDocument.Id);
-        else Assert.Equal(legacyId, beforeDocument.Id);
+        Assert.Equal(legacyId, beforeDocument.Id);
 
         entry.Status = SiloStatus.Dead;
         entry.SuspectTimes = [Tuple.Create(entry.SiloAddress, entry.IAmAliveTime.AddMinutes(1))];
@@ -80,22 +78,20 @@ public sealed class MongoMembershipRolloutTests
         }
 
         var after = await table.ReadAllAsync(token);
-        Assert.Equal(canonical ? 2 : 1, after.Members.Count);
+        Assert.Single(after.Members);
         Assert.All(after.Members, row => Assert.Equal(entry.SiloAddress, row.Item1.SiloAddress));
         var dead = Assert.Single(after.Members, row => row.Item1.Status == SiloStatus.Dead);
         Assert.NotEqual(observed.Item2, dead.Item2);
         Assert.Equal(entry.IAmAliveTime.AddMinutes(1), Assert.Single(dead.Item1.SuspectTimes!).Item2);
-        if (canonical)
-        {
-            var active = Assert.Single(after.Members, row => row.Item1.Status == SiloStatus.Active);
-            Assert.Equal(observed.Item2, active.Item2);
-            Assert.Equal(beforeDocument.Id, Assert.Single(
-                await collection.Find(row => row.Etag == observed.Item2).ToListAsync(token)).Id);
-        }
-        else
-        {
-            Assert.Equal(legacyId, Assert.Single(
-                await collection.Find(FilterDefinition<MongoMembershipDocument>.Empty).ToListAsync(token)).Id);
-        }
+        Assert.Equal(legacyId, Assert.Single(
+            await collection.Find(FilterDefinition<MongoMembershipDocument>.Empty).ToListAsync(token)).Id);
+        entry.HostName = "updated-after-old-writer";
+        Assert.True(await table.UpdateRowAsync(entry, dead.Item2, after.Version.Next(), token));
+        var last = Assert.Single((await table.ReadAllAsync(token)).Members);
+        Assert.Equal("updated-after-old-writer", last.Item1.HostName);
+        Assert.Equal(SiloStatus.Dead, last.Item1.Status);
+        Assert.NotEqual(dead.Item2, last.Item2);
+        Assert.Equal(legacyId, Assert.Single(
+            await collection.Find(FilterDefinition<MongoMembershipDocument>.Empty).ToListAsync(token)).Id);
     }
 }

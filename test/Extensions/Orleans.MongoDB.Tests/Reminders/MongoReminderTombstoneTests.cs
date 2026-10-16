@@ -1,4 +1,3 @@
-using System.Text;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Orleans.Providers.MongoDB.Reminders.Store;
@@ -11,13 +10,10 @@ namespace Orleans.MongoDB.Tests.Reminders;
 public sealed class MongoReminderTombstoneTests
 {
     [Theory]
-    [InlineData(true, true)]
-    [InlineData(true, false)]
-    [InlineData(true, null)]
-    [InlineData(false, true)]
-    [InlineData(false, false)]
-    [InlineData(false, null)]
-    public async Task SeededDeletionFlags_ApplyToEveryReadAndReregistration(bool legacy, bool? isDeleted)
+    [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(null)]
+    public async Task SeededDeletionFlags_ApplyToEveryReadAndReregistration(bool? isDeleted)
     {
         await using var database = await MongoDatabase.CreateAsync();
         var table = database.CreateReminderTable("service");
@@ -31,9 +27,7 @@ public sealed class MongoReminderTombstoneTests
             StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             Period = TimeSpan.FromMinutes(3)
         };
-        var id = legacy
-            ? $"service_{grainId}_target"
-            : $"v2:{Encode("service")}:{Encode(grainId.ToString())}:{Encode("target")}";
+        var id = $"service_{grainId}_target";
         var document = MongoReminderDocument.Create(id, "service", target, "seeded-etag").ToBsonDocument();
         if (isDeleted.HasValue) document.Add("IsDeleted", isDeleted.Value);
         var collection = database.Database.GetCollection<BsonDocument>("OrleansReminderV2");
@@ -97,5 +91,4 @@ public sealed class MongoReminderTombstoneTests
         Assert.Equal(neighborTag, Assert.Single((await table.ReadRows(0, 0, token)).Reminders).ETag);
     }
 
-    private static string Encode(string value) => Convert.ToBase64String(Encoding.UTF8.GetBytes(value));
 }

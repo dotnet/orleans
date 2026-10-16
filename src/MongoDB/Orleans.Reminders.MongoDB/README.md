@@ -19,11 +19,13 @@ That setting delegates both index creation and legacy index cleanup to administr
 Reminder updates generate ETags; removal succeeds when the supplied ETag matches
 the stored reminder.
 
-New IDs encode each identity component separately. Existing underscore-delimited
-IDs are read and updated in place using the full stored service/grain/reminder
-identity. Pause new reminder creation during a rolling upgrade until every writer
-uses the updated provider. Cancellation tokens reach collection/index setup and
-all MongoDB read/write operations.
+IDs retain the contributed provider's `<ServiceId>_<GrainId>_<ReminderName>`
+format, supporting old and updated writers during rolling upgrades. Choose
+identity combinations with distinct concatenated keys. Updated registrations
+report key collisions explicitly, and reads/removals validate the full stored
+identity. Concurrent first registrations of the same identity retry a losing
+insert as an identity-guarded update. Cancellation tokens reach collection/index
+setup and all MongoDB read/write operations.
 
 Aspire's MongoDB database resources configure the `MongoDBDatabase` provider.
 Register the resource client with `AddKeyedMongoDBClient`; the provider consumes

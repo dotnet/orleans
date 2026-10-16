@@ -17,13 +17,13 @@ version and silo row in a MongoDB transaction; it requires a replica set or a
 transaction-capable sharded cluster. `MultipleDeprecated` supports the contributed
 provider's legacy collection format.
 
-When migrating `Multiple` or `MultipleDeprecated` from the contributed provider,
-stop **all old-provider silos before starting any updated-provider silo**, including
-IPv4-only deployments. Older writers can duplicate a new-format member when they
-apply membership updates. Use a coordinated stopped-cluster deployment rather than
-an overlapping rolling upgrade. Rollback also requires stopping the updated silos
-and restoring a pre-migration membership snapshot or using a fresh cluster ID.
-Keep application state and reminder collections intact.
+`Multiple` and `MultipleDeprecated` retain the contributed provider's IDs:
+`<ClusterId>@<IPv4-mapped-address>:<port>/<generation>`. Compatible old and updated
+writers address the same rows during rolling upgrades. This format requires
+distinct mapped address/port/generation combinations within a cluster; native IPv6
+addresses with identical low 32 bits can collide. Updated insertions report a
+collision explicitly and preserve the stored identity. `SingleDocument` retains
+its full-address member keys.
 
 Membership reads in `Multiple` use snapshot transactions and an independent session
 per operation. Cancellation-aware membership methods propagate cancellation to

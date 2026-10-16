@@ -74,15 +74,12 @@ internal sealed class MultipleMembershipCollection : CollectionBase<MongoMembers
     {
         var collection = GetCollection(cancellationToken);
         var id = MongoMembershipDocument.GetId(deploymentId, entry.SiloAddress);
-        var existing = await collection.Find(session, MongoMembershipDocument.IdentityFilter(deploymentId, entry.SiloAddress))
-            .FirstOrDefaultAsync(cancellationToken);
-        id = existing?.Id ?? id;
-
         var document = MongoMembershipDocument.Create(entry, deploymentId, id);
 
         try
         {
-            var result = await collection.ReplaceOneAsync(session, x => x.Id == id && x.Etag == etag, document,
+            var result = await collection.ReplaceOneAsync(session,
+                Filter.And(MongoMembershipDocument.IdentityFilter(deploymentId, entry.SiloAddress), Filter.Eq(x => x.Etag, etag)), document,
                 new ReplaceOptions { IsUpsert = etag is null }, cancellationToken);
 
             return result.MatchedCount > 0 || result.UpsertedId is not null;
@@ -91,6 +88,7 @@ internal sealed class MultipleMembershipCollection : CollectionBase<MongoMembers
         {
             if (ex.IsDuplicateKey())
             {
+                await MongoMembershipDocument.ThrowIfIdentityCollision(collection, deploymentId, entry.SiloAddress, cancellationToken);
                 return false;
             }
             throw;
