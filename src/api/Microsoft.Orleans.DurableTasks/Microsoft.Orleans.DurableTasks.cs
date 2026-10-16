@@ -236,6 +236,12 @@ namespace Orleans.DurableTasks.Diagnostics
             protected DurableTaskEvent(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) { }
         }
 
+        public sealed partial class ExecutionStalled : DurableTaskEvent
+        {
+            public readonly DurableTaskVersionException Exception;
+            public ExecutionStalled(Orleans.Runtime.IGrainContext grainContext, TaskId taskId, DurableTaskVersionException exception) : base(default!, default) { }
+        }
+
         public sealed partial class ExecutionStarted : DurableTaskEvent
         {
             public ExecutionStarted(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
@@ -280,6 +286,13 @@ namespace Orleans.DurableTasks.Diagnostics
         public sealed partial class TaskDeleted : DurableTaskEvent
         {
             public TaskDeleted(Orleans.Runtime.IGrainContext grainContext, TaskId taskId) : base(default!, default) { }
+        }
+
+        public sealed partial class VersionRecorded : DurableTaskEvent
+        {
+            public readonly string Name;
+            public readonly int Version;
+            public VersionRecorded(Orleans.Runtime.IGrainContext grainContext, TaskId taskId, string name, int version) : base(default!, default) { }
         }
     }
 }
@@ -496,6 +509,7 @@ namespace Orleans.DurableTasks.Protocol
         System.Collections.Generic.IEnumerable<(TaskId Id, IDurableTaskState State)> Tasks { get; }
 
         void AddCompletionDestination(TaskId taskId, IDurableTaskState state, DurableTaskSubscriber destination);
+        IDurableTaskState AddRecord(TaskId taskId, string fingerprint, DurableTaskResponse response);
         void Clear();
         System.Collections.Generic.IEnumerable<(TaskId Id, IDurableTaskState State)> GetChildren(TaskId task);
         IDurableTaskState GetOrCreateTask(TaskId taskId, IDurableTaskRequest? request);

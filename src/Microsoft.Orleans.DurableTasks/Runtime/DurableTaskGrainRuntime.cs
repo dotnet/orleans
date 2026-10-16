@@ -122,6 +122,13 @@ internal sealed partial class DurableTaskGrainRuntime(
     // while they run; see GetWakeupDelay.
     private static readonly TimeSpan RunnableWakeupDelay = TimeSpan.FromSeconds(1);
 
+    // How often a grain which holds a stalled execution wakes, so that once its activation ends, a later activation
+    // replays the execution, typically on a deployment whose code supports the execution's recorded versions.
+    private static readonly TimeSpan StalledWakeupDelay = TimeSpan.FromMinutes(1);
+
+    // The executions whose attempts stalled on a version which the running code doesn't support, and which stay pending.
+    private readonly ConcurrentDictionary<TaskId, byte> _stalledExecutions = [];
+
     // The attempts which run, and those of them which are parked on a message-driven wait.
     private int _runningAttempts;
     private int _parkedAttempts;
@@ -407,6 +414,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         { RequestFingerprint: { } fingerprint } when fingerprint.StartsWith(SignalFingerprintPrefix, StringComparison.Ordinal) => "a signal's value",
         { RequestFingerprint: { } fingerprint } when TryParseIdentity(SubscriptionFingerprintPrefix, fingerprint, out var target, out var subscribed) => DescribeSubscription(target, subscribed),
         { RequestFingerprint: EffectFingerprint } => "a DurableTask.Once effect",
+        { RequestFingerprint: VersionFingerprint } => "a version decision",
         { RequestFingerprint: { } fingerprint } => $"a request ({AbbreviateFingerprint(fingerprint)})",
         { CancellationRequestedAt: not null, CompletedAt: null } => "a cancellation which arrived before its request",
         _ => "a local child task",
@@ -718,6 +726,14 @@ internal sealed partial class DurableTaskGrainRuntime(
         DurableTaskEvents.EmitTaskCompleted(GrainContext, taskId, response);
     }
 
+    /// <summary>Stages a new terminal record of an execution, such as an effect's outcome or a version decision.</summary>
+    private void AddRecord(TaskId taskId, string fingerprint, DurableTaskResponse response)
+    {
+        _storage.AddRecord(taskId, fingerprint, response);
+        DurableTaskEvents.EmitTaskCreated(GrainContext, taskId);
+        DurableTaskEvents.EmitTaskCompleted(GrainContext, taskId, response);
+    }
+
     /// <summary>Stages a task's deletion.</summary>
     private void RemoveTask(TaskId taskId)
     {
@@ -819,20 +835,59 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         var response = effect(state);
-        record = GetOrCreateTask(effectId, request: null);
-        _storage.SetRequestFingerprint(effectId, record, EffectFingerprint);
         try
         {
-            SetResponse(effectId, record, response);
+            AddRecord(effectId, EffectFingerprint, response);
         }
         catch (Exception exception) when (response.Exception is null)
         {
             response = DurableTaskResponse.FromException(exception);
-            SetResponse(effectId, record, response);
+            AddRecord(effectId, EffectFingerprint, response);
         }
 
         return response;
     }
+
+    // Version records are terminal records of their execution, as effect records are, whose result is the version.
+    private const string VersionFingerprint = "$version";
+
+    /// <summary>The segment prefix of the records of version decisions beneath an execution.</summary>
+    internal const string VersionSegmentPrefix = "$version:";
+
+    /// <remarks>
+    /// The search walks from the execution through its enclosing executions, such as a step's parent, and stops at the
+    /// invoked task which owns the tree, so a callee's or an invoked descendant's decisions stay its own. The record is
+    /// a terminal entry of the execution's tree, staged in the calling work item, and is deleted with the tree.
+    /// </remarks>
+    int IDurableTaskGrainRuntime.GetOrRecordVersion(TaskId executionId, string name, int version)
+    {
+        ThrowIfStopping();
+        var segment = VersionSegmentPrefix + name;
+        for (var execution = executionId; !execution.IsDefault; execution = execution.Parent())
+        {
+            if (_storage.TryGetTask(execution.Child(segment), out var recorded))
+            {
+                Debug.Assert(
+                    string.Equals(recorded.RequestFingerprint, VersionFingerprint, StringComparison.Ordinal)
+                    && recorded.Result is { IsCompleted: true },
+                    "Only version decisions are recorded under version segments.");
+                return recorded.Result!.GetResult<int>();
+            }
+
+            if (_storage.TryGetTask(execution, out var state) && IsInvoked(state))
+            {
+                break;
+            }
+        }
+
+        var recordId = executionId.Child(segment);
+        AddRecord(recordId, VersionFingerprint, DurableTaskResponse.FromResult(version));
+        DurableTaskEvents.EmitVersionRecorded(GrainContext, executionId, name, version);
+        return version;
+    }
+
+    private static bool IsVersionRecord(IDurableTaskState state) =>
+        string.Equals(state.RequestFingerprint, VersionFingerprint, StringComparison.Ordinal);
 
     /// <remarks>
     /// A record of the other kind is the operation itself or, for a named combinator, which records only its inputs, a
@@ -1472,6 +1527,11 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// the grain is active a wake-up only reschedules itself. Most attempts run only briefly between parked waits, so their
     /// wake-up job finds no work on its first run and ends.
     /// </para>
+    /// <para>
+    /// A stalled execution waits for code which supports its recorded versions, which only a later activation runs, so it
+    /// keeps a slow wake-up: once the activation ends, such as when a rolling deployment stops its silo, the wake-up
+    /// reactivates the grain and recovery replays the execution.
+    /// </para>
     /// </remarks>
     TimeSpan? IInboxWorkSource.GetWakeupDelay() =>
         Volatile.Read(ref _runningAttempts) > Volatile.Read(ref _parkedAttempts)
@@ -1481,7 +1541,44 @@ internal sealed partial class DurableTaskGrainRuntime(
         || !_backgroundTasks.IsEmpty
         || Volatile.Read(ref _recoveredStarts) is not null
             ? RunnableWakeupDelay
-            : null;
+            : HasStalledExecutions() ? StalledWakeupDelay : null;
+
+    /// <summary>Returns whether a stalled execution is still pending, forgetting those which ended, such as by an abort.</summary>
+    private bool HasStalledExecutions()
+    {
+        foreach (var (taskId, _) in _stalledExecutions)
+        {
+            if (_storage.TryGetTask(taskId, out var state) && state.Result is not { IsCompleted: true })
+            {
+                return true;
+            }
+
+            _stalledExecutions.TryRemove(taskId, out _);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Cancels the attempt of an execution which recorded a version that the running code doesn't support, keeps its
+    /// task pending, and reports the stall.
+    /// </summary>
+    /// <remarks>
+    /// The attempt is canceled as deactivation, an abort, or a deletion cancels it, so nothing which it does afterwards
+    /// commits and its result is discarded. The task keeps no outcome, and the grain's slow wake-up lets a later
+    /// activation replay it.
+    /// </remarks>
+    void IDurableTaskGrainRuntime.StallAttempt(GrainDurableTaskContext context, DurableTaskVersionException exception)
+    {
+        if (!CancelAttempt(context, DurableTaskAttemptCancellationReason.UnsupportedVersion))
+        {
+            return;
+        }
+
+        _stalledExecutions[context.Id] = 0;
+        _shared.Logger.LogWarning(exception, "{Id} durable task '{TaskId}' stalled on an unsupported version.", GrainId, context.Id);
+        DurableTaskEvents.EmitExecutionStalled(GrainContext, context.Id, exception);
+    }
 
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
@@ -3045,15 +3142,17 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <remarks>
     /// An execution's recorded operations are its nearest stored descendants: descendants which are themselves executions,
     /// such as local steps, hold their own operations. Signal values belong to the invoked task, which senders deliver
-    /// independently of its attempts; invoked descendants keep their own lifecycle; and a cancellation which arrived
-    /// before its request records no operation of this execution.
+    /// independently of its attempts; invoked descendants keep their own lifecycle; a cancellation which arrived
+    /// before its request records no operation of this execution; and version decisions record which code the execution
+    /// follows rather than an operation which it reaches, so a deployment which removes a version check leaves no
+    /// operation which its replays never reach.
     /// </remarks>
     public HashSet<TaskId>? GetRecordedOperations(TaskId executionId)
     {
         HashSet<TaskId>? operations = null;
         foreach (var (id, state) in _storage.GetChildren(executionId))
         {
-            if (!IsInvoked(state) && !IsSignalRecord(state) && !IsCancellationRecord(state))
+            if (!IsInvoked(state) && !IsSignalRecord(state) && !IsCancellationRecord(state) && !IsVersionRecord(state))
             {
                 (operations ??= []).Add(id);
             }
@@ -3137,12 +3236,15 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// attempt's result is discarded. Its code observes the cancellation through its tokens once they are signaled, outside
     /// the runtime's current operation.
     /// </remarks>
-    private void CancelAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason)
+    private bool CancelAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason)
     {
-        if (context.CancelAttempt(reason))
+        if (!context.CancelAttempt(reason))
         {
-            TrackBackgroundTask(SignalAttemptCanceledAsync(context), "signaling a canceled durable task attempt");
+            return false;
         }
+
+        TrackBackgroundTask(SignalAttemptCanceledAsync(context), "signaling a canceled durable task attempt");
+        return true;
 
         static async Task SignalAttemptCanceledAsync(GrainDurableTaskContext context)
         {
