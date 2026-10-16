@@ -17,8 +17,9 @@ ORLEANS0108 | Usage | Warning | DurableTaskReplayAnalyzer, durable operation nam
 ORLEANS0109 | Usage | Warning | DurableTaskReplayAnalyzer, durable task body runs work off its scheduler
 ORLEANS0110 | Usage | Warning | DurableTaskReplayAnalyzer, Task combinator runs durable work
 ORLEANS0111 | Usage | Warning | DurableTaskReplayAnalyzer, non-durable delay in code which a replay re-runs
-ORLEANS0112 | Usage | Info | DurableTaskReplayAnalyzer, cancellation handler without an IsCancellationRequested filter
+ORLEANS0112 | Usage | Info | DurableTaskReplayAnalyzer, cancellation handler without an IsTaskCancellationRequested filter
 ORLEANS0113 | Usage | Warning | DurableTaskReplayAnalyzer, async void code in a durable task body
 ORLEANS0114 | Usage | Info | DurableTaskReplayAnalyzer, repeated wait for one signal name
 ORLEANS0115 | Usage | Info | DurableTaskReplayAnalyzer, log in code which a replay re-runs
 ORLEANS0116 | Usage | Warning | DurableTaskDefinitionAnalyzer, durable task posted outside grains and durable task bodies
+ORLEANS0117 | Usage | Warning | DurableTaskCleanupAnalyzer, task-cancellation cleanup passes the already-canceled CancellationToken
