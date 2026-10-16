@@ -1,7 +1,7 @@
 ---
 title: Replay-safety rules for durable tasks
-description: Reference for the rules which keep durable task bodies correct under replay, the failures each rule prevents, and the analyzer diagnostics ORLEANS0100 to ORLEANS0117 which enforce them.
-ms.date: 10/15/2026
+description: Reference for the rules which keep durable task bodies correct under replay, the failures each rule prevents, and the analyzer diagnostics ORLEANS0100 to ORLEANS0118 which enforce them.
+ms.date: 10/16/2026
 ms.topic: reference
 ---
 
@@ -11,7 +11,7 @@ A durable task resumes after a deactivation or a failure by running its body aga
 the start, while each recorded operation returns its recorded outcome. The rules on this
 page keep that replay equivalent to the run which recorded the operations. The
 `Microsoft.Orleans.DurableTasks.Abstractions` package carries analyzers which check them
-at build time and report diagnostics ORLEANS0100 to ORLEANS0117; each diagnostic's page
+at build time and report diagnostics ORLEANS0100 to ORLEANS0118; each diagnostic's page
 shows the code which triggers it and common fixes.
 
 For the model behind the rules, see
@@ -69,6 +69,7 @@ awaiting, or helpers in other assemblies.
 | Log replayed code through `logger.ReplaySafe()`. | Each replay logs the events of the completed operations again. | [ORLEANS0115](../diagnostics/orleans0115.md) |
 | Post from grains and durable task bodies, and schedule from clients. | `Post` throws, because a client has no durable outbox. | [ORLEANS0116](../diagnostics/orleans0116.md) |
 | Pass `AttemptCancellationToken` to the calls which task-cancellation cleanup makes. | The cleanup's calls end at once, because `CancellationToken` is already canceled. | [ORLEANS0117](../diagnostics/orleans0117.md) |
+| Pass constant names and ranges to version checks. | One change records several decisions, or a deployment records versions which no branch handles. | [ORLEANS0118](../diagnostics/orleans0118.md) |
 
 The analyzers also suppress CS1998 for `async DurableTask` methods without an `await`,
 which are ordinary steps; see [ORLEANS0028](../diagnostics/orleans0028.md).
@@ -119,10 +120,11 @@ These rules depend on data or deployment history which the analyzers can't obser
 - **Don't branch on `IsReplaying`.** `DurableTask.Current.IsReplaying` serves logging and
   diagnostics. A run which ended before its work committed is replayed, so code which
   runs only while `IsReplaying` is `false` can run twice or never.
-- **Version by addition.** Keep existing operations, names, and arguments while
-  executions are pending; add new operations with new names after existing ones, and add
-  new workflow shapes as new methods. See
-  [Version workflows safely](durable-tasks-operations.md#version-workflows-safely).
+- **Version by addition or by branch.** Keep existing operations, names, and arguments
+  while executions are pending; add new operations with new names after existing ones,
+  branch changes to operations which pending executions passed on
+  `DurableTask.GetVersion`, and add new workflow shapes as new methods. See
+  [Version durable tasks](durable-tasks-versioning.md).
 - **Bound the history.** Every recorded operation stays in the task's tree until the
   tree is deleted. A workflow which loops indefinitely ends each generation and starts
   its successor as a detached task, such as `subscription-{id}-{generation}`.
