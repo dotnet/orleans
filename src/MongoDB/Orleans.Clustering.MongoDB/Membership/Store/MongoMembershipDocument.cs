@@ -1,5 +1,6 @@
 using System;
-using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
@@ -15,24 +16,32 @@ internal sealed class MongoMembershipDocument : MembershipBase
     public string DeploymentId { get; set; } = null!;
 
     internal static string GetId(string deploymentId, Runtime.SiloAddress address)
-    {
-        var ip = address.Endpoint.Address;
-        var host = ip.IsIPv4MappedToIPv6 ? ip.MapToIPv4().ToString() : ip.ToString();
-        // Legacy IDs always contain '@'; canonical IDs exclude it for every address family.
-        var cluster = Convert.ToBase64String(Encoding.UTF8.GetBytes(deploymentId));
-        return $"v2:{cluster}:{host}:{address.Endpoint.Port}/{address.Generation}";
-    }
-
-    internal static string GetLegacyId(string deploymentId, Runtime.SiloAddress address)
         => $"{deploymentId}@{address.Endpoint.Address.MapToIPv4()}:{address.Endpoint.Port}/{address.Generation}";
 
     internal static FilterDefinition<MongoMembershipDocument> IdentityFilter(string deploymentId, Runtime.SiloAddress address)
     {
         var filter = Builders<MongoMembershipDocument>.Filter;
         return filter.And(
-            filter.In(row => row.Id, new[] { GetId(deploymentId, address), GetLegacyId(deploymentId, address) }),
+            filter.Eq(row => row.Id, GetId(deploymentId, address)),
             filter.Eq(row => row.DeploymentId, deploymentId),
             filter.Eq(row => row.SiloAddress, address.ToParsableString()));
+    }
+
+    internal static async Task ThrowIfIdentityCollision(
+        IMongoCollection<MongoMembershipDocument> collection,
+        string deploymentId,
+        Runtime.SiloAddress address,
+        CancellationToken cancellationToken)
+    {
+        var id = GetId(deploymentId, address);
+        var existing = await collection.WithReadPreference(ReadPreference.Primary).Find(row => row.Id == id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existing is not null
+            && (existing.DeploymentId != deploymentId || existing.SiloAddress != address.ToParsableString()))
+        {
+            throw new InvalidOperationException(
+                $"MongoDB membership key collision for silo '{address}'. The legacy key is already used by silo '{existing.SiloAddress}' in cluster '{existing.DeploymentId}'.");
+        }
     }
 
     public static MongoMembershipDocument Create(MembershipEntry entry, string deploymentId, string id)
