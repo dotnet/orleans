@@ -1,3 +1,4 @@
+using Orleans.Core.Internal;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Journaling.Ranges;
 using Orleans.Journaling.Tests;
@@ -46,6 +47,7 @@ public sealed class GarnetIntegrationTestFixture : IntegrationTestFixture
                 storage.LogMemorySize = "64m";
                 storage.IndexMemorySize = "1m";
                 storage.OperationTimeout = TimeSpan.FromSeconds(10);
+                storage.MigrationInterval = TimeSpan.FromMilliseconds(50);
             });
         });
     }
@@ -104,6 +106,54 @@ public sealed class GarnetDurableGrainTests(GarnetIntegrationTestFixture fixture
         finally
         {
             await observer.StopAsync(cancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task Migrations_DrivenByHostingSilos_PreserveGrainState()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var grains = Enumerable.Range(0, 32).Select(_ => fixture.Client.GetGrain<ITestDurableGrainInterface>(Guid.NewGuid())).ToArray();
+        await Task.WhenAll(grains.Select((grain, index) => grain.SetValues("before", index)));
+
+        // A process which hosts no partitions commits the moves; the silos hosting the destinations drive them.
+        var observer = GarnetPartitionFixture.CreateProvider(dataDirectory: null, fixture.MetaStore, options => options.HostId = "mover");
+        await observer.StartAsync(cancellationToken);
+        try
+        {
+            var map = observer.Router.View.Map;
+            var p0 = Enumerable.Range(0, map.BucketCount).Where(bucket => map.GetOwner(bucket) == new PartitionId("p0")).ToArray();
+            var p1 = Enumerable.Range(0, map.BucketCount).Where(bucket => map.GetOwner(bucket) == new PartitionId("p1")).ToArray();
+            Assert.Equal(MoveStatus.Committed, (await observer.Coordinator.TryMoveAsync(p0[..(p0.Length / 2)], new PartitionId("p1"), cancellationToken)).Status);
+            Assert.Equal(MoveStatus.Committed, (await observer.Coordinator.TryMoveAsync(p1, new PartitionId("p3"), cancellationToken)).Status);
+
+            // Grains keep writing while their buckets move.
+            await Task.WhenAll(grains.Select((grain, index) => grain.SetValues("during", index)));
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(60));
+            while ((await fixture.MetaStore.ReadAsync(timeout.Token))!.Map.Migrations.Length > 0)
+            {
+                await Task.Delay(50, timeout.Token);
+            }
+
+            await Task.WhenAll(grains.Select((grain, index) => grain.SetValues("after", index)));
+            map = (await fixture.MetaStore.ReadAsync(cancellationToken))!.Map;
+            Assert.All(p1, bucket => Assert.Equal(new PartitionId("p3"), map.GetOwner(bucket)));
+        }
+        finally
+        {
+            await observer.StopAsync(cancellationToken);
+        }
+
+        // New activations recover each grain's state from its journal at the bucket's new owner.
+        foreach (var grain in grains)
+        {
+            await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle(cancellationToken);
+        }
+
+        for (var i = 0; i < grains.Length; i++)
+        {
+            Assert.Equal(("after", i), await grains[i].GetValues());
         }
     }
 }

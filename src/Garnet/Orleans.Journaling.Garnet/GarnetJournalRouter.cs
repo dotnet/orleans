@@ -22,6 +22,11 @@ namespace Orleans.Journaling;
 /// among the journal's recent mutations reports the earlier attempt's success.
 /// </para>
 /// <para>
+/// A partition which holds a bucket open but does not hold a journal answers <c>NeedPull</c> while the bucket's
+/// migration is incomplete. The router then pulls the journal from the bucket's migration chain into the partition
+/// (see <see cref="GarnetJournalMigrator.TryPullAsync"/>) and retries the operation.
+/// </para>
+/// <para>
 /// Safety does not depend on the view: only a partition which holds a bucket open accepts operations on it, and at
 /// most one partition holds a bucket open. A stale view or endpoint costs retries, never correctness.
 /// </para>
@@ -53,12 +58,14 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     /// <param name="operationTimeout">How long an operation retries.</param>
     /// <param name="telemetry">The telemetry sink.</param>
     /// <param name="logger">The logger.</param>
+    /// <param name="timeProvider">The clock which timestamps deletions.</param>
     public GarnetJournalRouter(
         IRangeMetaStore metaStore,
         RangeMapSnapshot view,
         TimeSpan operationTimeout,
         JournalStorageTelemetry? telemetry = null,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(metaStore);
         ArgumentNullException.ThrowIfNull(view);
@@ -68,9 +75,35 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
         _operationTimeout = operationTimeout;
         _telemetry = telemetry ?? JournalStorageTelemetry.CreateForDirectConstruction();
         _logger = logger;
+        TimeProvider = timeProvider ?? TimeProvider.System;
         BucketCount = view.Map.BucketCount;
         MapId = view.Map.Id;
+        Migrator = new GarnetJournalMigrator(this);
     }
+
+    /// <summary>Gets the clock which timestamps deletions.</summary>
+    public TimeProvider TimeProvider { get; }
+
+    /// <summary>Gets the client of the migration procedures, which pulls journals for this router.</summary>
+    public GarnetJournalMigrator Migrator { get; }
+
+    /// <summary>Gets how long an operation retries.</summary>
+    public TimeSpan OperationTimeout => _operationTimeout;
+
+    /// <summary>Gets the MetaStore from which the router refreshes its view.</summary>
+    public IRangeMetaStore MetaStore => _metaStore;
+
+    /// <summary>
+    /// Gets or sets a fault injector for tests: when it returns <see langword="true"/> for a command which ran, the
+    /// router discards the reply as if it were lost, and the caller retries.
+    /// </summary>
+    internal Func<string, bool>? DropReply { get; set; }
+
+    /// <summary>
+    /// Gets or sets a hook for tests, awaited before a command is sent to a specific partition, so a test can hold a
+    /// migration step at a procedure boundary while it injects a fault.
+    /// </summary>
+    internal Func<string, CancellationToken, ValueTask>? BeforeSend { get; set; }
 
     /// <summary>Gets the number of buckets, which is the same in every view.</summary>
     public int BucketCount { get; }
@@ -82,7 +115,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     public RangeMapSnapshot View => Volatile.Read(ref _view);
 
     /// <summary>
-    /// Runs a journal procedure on the partition which owns <paramref name="bucket"/>.
+    /// Runs a procedure on the partition which owns <paramref name="bucket"/>.
     /// </summary>
     /// <param name="bucket">The bucket the procedure's keys belong to.</param>
     /// <param name="procedure">The procedure name.</param>
@@ -96,11 +129,99 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     /// <returns>The procedure's response, whose status is not <c>WrongPartition</c>.</returns>
     /// <exception cref="TimeoutException">The operation did not complete within the operation timeout.</exception>
     /// <exception cref="ObjectDisposedException">The router was disposed before the operation completed.</exception>
-    public async ValueTask<RedisResult[]> ExecuteAsync(int bucket, string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous = null)
+    public ValueTask<RedisResult[]> ExecuteAsync(int bucket, string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous = null)
+        => ExecuteCoreAsync(bucket, keys: null, procedure, args, ambiguous, cancellationToken);
+
+    /// <summary>
+    /// Runs a journal procedure on the partition which owns the journal's bucket, pulling the journal from the bucket's
+    /// migration chain whenever the partition answers <c>NeedPull</c>.
+    /// </summary>
+    /// <param name="keys">The journal's keys.</param>
+    /// <param name="procedure">The procedure.</param>
+    /// <param name="args">The procedure's arguments, identical on every attempt.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <param name="ambiguous">
+    /// Set to <see langword="true"/> if an attempt failed in a way which may follow a commit, as for
+    /// <see cref="ExecuteAsync"/>. A <c>NeedPull</c> reply leaves it unchanged: the procedure did not run.
+    /// </param>
+    /// <returns>The procedure's response, whose status is neither <c>WrongPartition</c> nor <c>NeedPull</c>.</returns>
+    /// <exception cref="TimeoutException">The operation did not complete within the operation timeout.</exception>
+    /// <exception cref="ObjectDisposedException">The router was disposed before the operation completed.</exception>
+    public ValueTask<RedisResult[]> ExecuteJournalAsync(GarnetJournalKeySet keys, string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous = null)
+        => ExecuteCoreAsync(keys.Bucket, keys, procedure, args, ambiguous, cancellationToken);
+
+    /// <summary>
+    /// Runs a command once on a specific partition, at its endpoint in the current view.
+    /// </summary>
+    /// <returns>The command's response, or <see langword="null"/> if the view has no endpoint for the partition.</returns>
+    /// <exception cref="RedisException">The partition was unreachable or the transaction did not run; see <see cref="IsTransient"/>.</exception>
+    public async ValueTask<RedisResult[]?> TryExecuteAtAsync(PartitionId partition, string command, object[] args, CancellationToken cancellationToken)
+    {
+        if (GetConnection(View, partition) is not { } connection)
+        {
+            return null;
+        }
+
+        if (BeforeSend is { } beforeSend)
+        {
+            await beforeSend(command, cancellationToken).ConfigureAwait(false);
+        }
+
+        var database = await connection.GetDatabaseAsync().WaitAsync(cancellationToken).ConfigureAwait(false);
+        var result = await database.ExecuteAsync(command, args).WaitAsync(cancellationToken).ConfigureAwait(false);
+        ThrowIfReplyDropped(command);
+        return result.Resp2Type == ResultType.Array ? (RedisResult[])result! : [result];
+    }
+
+    /// <summary>
+    /// Runs a command on a specific partition, retrying while the partition is unavailable until the operation timeout.
+    /// </summary>
+    /// <returns>The command's response, whatever its status.</returns>
+    /// <exception cref="TimeoutException">The partition was unavailable for the whole operation timeout.</exception>
+    public async ValueTask<RedisResult[]> ExecuteAtAsync(PartitionId partition, string command, object[] args, CancellationToken cancellationToken)
+    {
+        var start = Stopwatch.GetTimestamp();
+        var backoff = InitialBackoff;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Exception? exception = null;
+            try
+            {
+                if (await TryExecuteAtAsync(partition, command, args, cancellationToken).AsTask().WaitAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false) is { } result)
+                {
+                    return result;
+                }
+            }
+            catch (Exception ex) when (IsTransient(ex) || ex is OperationCanceledException && !IsStopped && !cancellationToken.IsCancellationRequested)
+            {
+                // Closing a connection retired by a view change cancels the commands still in flight on it.
+                exception = ex;
+            }
+
+            if (Stopwatch.GetElapsedTime(start) + backoff >= _operationTimeout)
+            {
+                throw new TimeoutException($"Garnet journal partition '{partition}' was unavailable for {_operationTimeout} running {command}.", exception);
+            }
+
+            await Task.Delay(backoff, cancellationToken).ConfigureAwait(false);
+            backoff = TimeSpan.FromTicks(Math.Min(backoff.Ticks * 2, MaxBackoff.Ticks));
+            await TryRefreshAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether an exception from a partition means that the command may not have run and can be retried.
+    /// </summary>
+    public static bool IsTransient(Exception exception)
+        => exception is RedisConnectionException or RedisTimeoutException or ObjectDisposedException
+            || exception is RedisServerException && string.Equals(exception.Message, TransactionFailedMessage, StringComparison.Ordinal);
+
+    private async ValueTask<RedisResult[]> ExecuteCoreAsync(int bucket, GarnetJournalKeySet? keys, string procedure, object[] args, StrongBox<bool>? ambiguous, CancellationToken cancellationToken)
     {
         try
         {
-            return await ExecuteCoreAsync(bucket, procedure, args, cancellationToken, ambiguous).ConfigureAwait(false);
+            return await ExecuteAttemptsAsync(bucket, keys, procedure, args, cancellationToken, ambiguous).ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is not ObjectDisposedException && IsStopped && !cancellationToken.IsCancellationRequested)
         {
@@ -112,7 +233,7 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
         }
     }
 
-    private async ValueTask<RedisResult[]> ExecuteCoreAsync(int bucket, string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous)
+    private async ValueTask<RedisResult[]> ExecuteAttemptsAsync(int bucket, GarnetJournalKeySet? keys, string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous)
     {
         // Every wait is bounded by the operation's deadline: a stalled connection, command, or MetaStore refresh ends
         // the operation with a TimeoutException, while caller cancellation still surfaces as cancellation.
@@ -140,22 +261,36 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
                 {
                     var database = await connection.GetDatabaseAsync().WaitAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false);
                     var result = await database.ExecuteAsync(procedure, args).WaitAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false);
+                    ThrowIfReplyDropped(procedure);
                     var values = (RedisResult[]?)result is { Length: > 0 } array
                         ? array
                         : throw new InvalidOperationException($"Garnet journal procedure {procedure} returned an invalid response.");
-                    if (GetStatus(values) != GarnetJournalProtocol.WrongPartitionStatus)
+                    var status = GetStatus(values);
+                    if (status == GarnetJournalProtocol.NeedPullStatus && keys is not null)
+                    {
+                        reason = "need_pull";
+                        if (await Migrator.TryPullAsync(keys, partition, values, cancellationToken).WaitAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false))
+                        {
+                            // The partition now holds the journal, its tombstone, or an absent marker.
+                            _telemetry.OnRetry(ProviderName, reason);
+                            continue;
+                        }
+                    }
+                    else if (status != GarnetJournalProtocol.WrongPartitionStatus)
                     {
                         return values;
                     }
-
-                    reason = "wrong_partition";
-                    var reportedVersion = GetReportedVersion(values);
-                    if (reportedVersion > view.Version
-                        && (await TryRefreshAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false)).Version >= reportedVersion)
+                    else
                     {
-                        // The bucket moved in a view newer than the one used, and the router now has that view.
-                        _telemetry.OnRetry(ProviderName, reason);
-                        continue;
+                        reason = "wrong_partition";
+                        var reportedVersion = GetReportedVersion(values);
+                        if (reportedVersion > view.Version
+                            && (await TryRefreshAsync(GetRemaining(start), cancellationToken).ConfigureAwait(false)).Version >= reportedVersion)
+                        {
+                            // The bucket moved in a view newer than the one used, and the router now has that view.
+                            _telemetry.OnRetry(ProviderName, reason);
+                            continue;
+                        }
                     }
                 }
                 catch (RedisConnectionException ex)
@@ -343,6 +478,14 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     }
 
     private bool IsStopped => Volatile.Read(ref _stopped);
+
+    private void ThrowIfReplyDropped(string command)
+    {
+        if (DropReply?.Invoke(command) == true)
+        {
+            throw new RedisTimeoutException($"Injected loss of the reply to {command}.", CommandStatus.Sent);
+        }
+    }
 
     public static int GetStatus(RedisResult[] result)
         => int.TryParse(result[0].ToString(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var status)
