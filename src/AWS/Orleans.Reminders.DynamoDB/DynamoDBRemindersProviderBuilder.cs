@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
+using Orleans.Configuration;
 
 [assembly: RegisterProvider("DynamoDB", "Reminders", "Silo", typeof(DynamoDBRemindersProviderBuilder))]
 
@@ -72,6 +73,22 @@ internal sealed class DynamoDBRemindersProviderBuilder : IProviderBuilder<ISiloB
                 if (bool.TryParse(configurationSection[nameof(options.UpdateIfExists)], out var uie))
                 {
                     options.UpdateIfExists = uie;
+                }
+
+                var v2TableName = configurationSection[nameof(options.V2TableName)];
+                if (!string.IsNullOrEmpty(v2TableName))
+                {
+                    options.V2TableName = v2TableName;
+                }
+
+                if (Enum.TryParse<DynamoDBReminderTableMode>(configurationSection[nameof(options.TableMode)], ignoreCase: true, out var tableMode))
+                {
+                    options.TableMode = tableMode;
+                }
+
+                if (int.TryParse(configurationSection[nameof(options.MigrationPageSize)], out var migrationPageSize))
+                {
+                    options.MigrationPageSize = migrationPageSize;
                 }
             });
     }
