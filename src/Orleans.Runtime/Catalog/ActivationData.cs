@@ -1193,7 +1193,10 @@ internal sealed partial class ActivationData :
                     // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
                     if (State != ActivationState.Valid && !(message.IsLocalOnly && State is ActivationState.Deactivating))
                     {
-                        invalidRequests = DequeueRequestsToInvalidActivation(out rejectInvalidRequests);
+                        invalidRequests = DequeueRequestsToInvalidActivation();
+
+                        // Forward pending messages if this was a duplicate activation or it was at some point successfully activated. Otherwise, reject them.
+                        rejectInvalidRequests = DeactivationException is not null && ForwardingAddress is null;
                         break;
                     }
 
@@ -1292,9 +1295,8 @@ internal sealed partial class ActivationData :
         }
 
         // Called with the lock held. Returns the requests to reject or forward, or null while the activation may still process them.
-        List<Message>? DequeueRequestsToInvalidActivation(out bool reject)
+        List<Message>? DequeueRequestsToInvalidActivation()
         {
-            reject = false;
             if (State is ActivationState.Creating or ActivationState.Activating)
             {
                 // Do nothing until the activation becomes either valid or invalid
@@ -1325,8 +1327,6 @@ internal sealed partial class ActivationData :
                 }
             }
 
-            // Forward pending messages if this was a duplicate activation or it was at some point successfully activated. Otherwise, reject them.
-            reject = DeactivationException is not null && ForwardingAddress is null;
             return DequeueAllWaitingRequests();
         }
 
