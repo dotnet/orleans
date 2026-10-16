@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.DurableTasks;
 using Orleans.DurableTasks.Http;
 using Orleans.DurableTasks.Protocol;
@@ -22,10 +23,18 @@ namespace Orleans.DurableTasks.Http.Tests;
 /// </summary>
 public sealed class DurableHttpFixture : IAsyncLifetime
 {
+    public const string ApiClientName = "api";
+    public const string RawClientName = "raw";
     public const string TestUserHeader = "X-Test-User";
     public const string ForbiddenUser = "mallory";
     public const string ApprovalsScope = "approvals";
     public const string ApprovalRootId = "approval";
+
+    /// <summary>Gets the event streams of <c>/dropped</c>.</summary>
+    public static ConcurrentDictionary<string, DroppedStream> DroppedStreams { get; } = new();
+
+    /// <summary>Gets the jobs of the <c>/jobs</c> API, and how many times each was polled.</summary>
+    public static ConcurrentDictionary<string, (string Value, int Polls)> Jobs { get; } = new();
 
     private readonly InProcessTestCluster _cluster;
     private TestServer? _server;
@@ -44,6 +53,12 @@ public sealed class DurableHttpFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton<IJournalStorageCatalog>(journals);
             siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.AddDurableTasks();
+            siloBuilder.Services.AddDurableHttpClient(ApiClientName)
+                .ConfigureHttpClient(static client => client.BaseAddress = new Uri("http://localhost/"))
+                .ConfigurePrimaryHttpMessageHandler(() => Server.CreateHandler());
+            siloBuilder.Services.AddHttpClient(RawClientName, static client => client.BaseAddress = new Uri("http://localhost/"))
+                .AddDurableIdempotencyKey()
+                .ConfigurePrimaryHttpMessageHandler(() => Server.CreateHandler());
             siloBuilder.Services.AddDurableHttpCallbacks(static options => options.InitialRetryInterval = TimeSpan.FromMilliseconds(100))
                 .ConfigurePrimaryHttpMessageHandler(() => new RedirectingHandler(Server.CreateHandler()))
                 .ConfigureHttpClient(static client => client.Timeout = TimeSpan.FromMilliseconds(500));
@@ -58,11 +73,16 @@ public sealed class DurableHttpFixture : IAsyncLifetime
 
     public IClusterClient Client => _cluster.Client;
 
+    /// <summary>Gets the durable HTTP client which silos use to call the test server.</summary>
+    public IDurableHttpClient DurableHttp => _cluster.GetSiloServiceProvider().GetRequiredKeyedService<IDurableHttpClient>(ApiClientName);
+
     public TestServer Server => _server ?? throw new InvalidOperationException("The test server has not started.");
 
     /// <summary>Gets the test server's endpoints.</summary>
     public IReadOnlyList<Microsoft.AspNetCore.Http.Endpoint> Endpoints =>
         _app!.Services.GetRequiredService<Microsoft.AspNetCore.Routing.EndpointDataSource>().Endpoints;
+
+    public string ServiceId => Client.ServiceProvider.GetRequiredService<IOptions<ClusterOptions>>().Value.ServiceId;
 
     public async ValueTask InitializeAsync()
     {
@@ -116,12 +136,81 @@ public sealed class DurableHttpFixture : IAsyncLifetime
         _app.MapPost("/callbacks/{name}", static async (string name, HttpRequest request) =>
             await Callbacks.ReceiveAsync(name, request));
 
+        // An Azure Resource Manager style API, whose Azure-AsyncOperation monitor reports InProgress before it succeeds.
+        _app.MapPost("/arm/jobs", static (EchoRequest request, HttpResponse response) =>
+        {
+            var id = Guid.NewGuid().ToString("N");
+            Jobs[id] = (request.Value, Polls: 0);
+            response.Headers["Azure-AsyncOperation"] = $"/arm/operations/{id}";
+            response.Headers.RetryAfter = "0";
+            return Results.Accepted();
+        });
+        // An Azure create, which answers 201 Created with the resource it still provisions and its status monitor.
+        _app.MapPost("/arm/resources", static (EchoRequest request, HttpResponse response) =>
+        {
+            var id = Guid.NewGuid().ToString("N");
+            Jobs[id] = (request.Value, Polls: 0);
+            response.Headers["Azure-AsyncOperation"] = $"/arm/operations/{id}";
+            response.Headers.RetryAfter = "0";
+            return Results.Created($"/arm/resources/{id}", new { name = id, provisioningState = "Creating" });
+        });
+        _app.MapGet("/arm/operations/{id}", static (string id) =>
+        {
+            var (value, polls) = Jobs[id];
+            Jobs[id] = (value, polls + 1);
+            return polls == 0
+                ? Results.Json(new { name = id, status = "InProgress" })
+                : Results.Json(new { name = id, status = "succeeded", result = value });
+        });
+
+        // An API which reports a running job at its Location until the job's second poll returns the result.
+        _app.MapPost("/jobs", static (EchoRequest request) =>
+        {
+            var id = Guid.NewGuid().ToString("N");
+            Jobs[id] = (request.Value, Polls: 0);
+            return Results.Accepted($"/jobs/{id}");
+        });
+        _app.MapGet("/jobs/{id}", static (string id, HttpResponse response) =>
+        {
+            var (value, polls) = Jobs[id];
+            Jobs[id] = (value, polls + 1);
+            if (polls == 0)
+            {
+                response.Headers.RetryAfter = "0";
+                return Results.Accepted($"/jobs/{id}");
+            }
+
+            return Results.Ok(value);
+        });
+
         // Approvals through Nexus, whose request identifiers name operations of the 'approvals' scope, which the
         // '/approvals' group also serves, so its routes stream and signal them.
         var nexus = _app.MapGroup("/nexus").MapNexusService("orders.v1", scope: ApprovalsScope);
         nexus.MapNexusOperation("approval", static (NexusApprovalInput input, IGrainFactory grains) =>
             grains.GetGrain<IDurableHttpTestGrain>(input.OrderId).WaitForApprovalAsync(input.Item));
         _app.MapGroup("/approvals").WithDurableOperations(ApprovalsScope).MapDurableSignal(DurableHttpTestGrain.Approved);
+
+        // An operation's events, whose first connection drops once the test releases it, after the running status, and
+        // whose reconnect reports the terminal status.
+        _app.MapGet("/dropped/{id}/events", static async (string id, HttpContext context) =>
+        {
+            var stream = DroppedStreams.GetOrAdd(id, static _ => new());
+            context.Response.ContentType = "text/event-stream";
+            if (Interlocked.Increment(ref stream.Connections) == 1)
+            {
+                await context.Response.WriteAsync($"event: status\nid: Running\nretry: 10\ndata: {{\"id\":\"{id}\",\"status\":\"Running\"}}\n\n");
+                await context.Response.Body.FlushAsync();
+                await stream.Drop.Task.WaitAsync(context.RequestAborted);
+                context.Abort();
+                return;
+            }
+
+            stream.LastEventId = context.Request.Headers["Last-Event-ID"].ToString();
+            await context.Response.WriteAsync($"event: status\nid: Succeeded\ndata: {{\"id\":\"{id}\",\"status\":\"Succeeded\",\"result\":\"done\"}}\n\n");
+        });
+
+        // Echoes the idempotency key of each request, by method, which idempotency key tests read.
+        _app.MapMethods("/echo-idempotency-key", [HttpMethods.Get, HttpMethods.Post], static (HttpRequest request) => request.Headers[DurableHttpHeaders.IdempotencyKey].ToString());
 
         await _app.StartAsync();
         _server = _app.GetTestServer();
@@ -231,6 +320,16 @@ public sealed class CallbackReceiver
 }
 
 public sealed record ReceivedCallback(IReadOnlyDictionary<string, string> Headers, string Body);
+
+/// <summary>An event stream of <c>/dropped</c>, whose first connection drops once <see cref="Drop"/> completes.</summary>
+public sealed class DroppedStream
+{
+    public readonly TaskCompletionSource Drop = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public int Connections;
+
+    /// <summary>Gets the <c>Last-Event-ID</c> of the reconnect.</summary>
+    public string? LastEventId { get; set; }
+}
 
 /// <summary>
 /// Follows redirects like an <see cref="HttpClientHandler"/> with <see cref="HttpClientHandler.AllowAutoRedirect"/>, over

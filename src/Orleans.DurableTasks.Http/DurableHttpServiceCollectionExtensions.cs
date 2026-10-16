@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Orleans.DurableTasks.Http;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,47 @@ public static class DurableHttpServiceCollectionExtensions
         services.TryAddSingleton<INexusOperationTokenFormat, PlainTextNexusOperationTokenFormat>();
         services.TryAddSingleton<DurableNexusOperations>();
         return services;
+    }
+
+    /// <summary>
+    /// Adds an <see cref="IDurableHttpClient"/>, which durable tasks inject as a keyed service named
+    /// <paramref name="name"/>, and returns the builder of the named <see cref="HttpClient"/> which it sends requests with.
+    /// </summary>
+    /// <param name="services">The silo's service collection.</param>
+    /// <param name="name">The client's name, which keys the service and names the <see cref="HttpClient"/>.</param>
+    /// <param name="configureOptions">Configures the client, or <see langword="null"/> for the defaults.</param>
+    /// <returns>
+    /// The builder of the named client, whose first handler is a <see cref="DurableIdempotencyKeyHandler"/>, so handlers
+    /// which the builder adds, such as a resilience handler, retry requests with their keys.
+    /// </returns>
+    /// <example>
+    /// <code>
+    /// services.AddDurableHttpClient("payments")
+    ///     .ConfigureHttpClient(client =&gt; client.BaseAddress = new("https://payments.example"))
+    ///     .AddStandardResilienceHandler();
+    ///
+    /// public sealed class OrderGrain([FromKeyedServices("payments")] IDurableHttpClient payments) : DurableGrain, IOrderGrain
+    /// </code>
+    /// </example>
+    public static IHttpClientBuilder AddDurableHttpClient(this IServiceCollection services, string name, Action<DurableHttpClientOptions>? configureOptions = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        var options = services.AddOptions<DurableHttpClientOptions>(name);
+        if (configureOptions is not null)
+        {
+            options.Configure(configureOptions);
+        }
+
+        services.TryAddKeyedSingleton<IDurableHttpClient>(name, static (provider, key) =>
+        {
+            var name = (string)key!;
+            return new DurableHttpClient(
+                provider.GetRequiredService<IHttpClientFactory>(),
+                name,
+                provider.GetRequiredService<IOptionsMonitor<DurableHttpClientOptions>>().Get(name));
+        });
+        return services.AddHttpClient(name).AddDurableIdempotencyKey();
     }
 
     /// <summary>
