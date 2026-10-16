@@ -22,6 +22,7 @@ namespace Orleans.Journaling
         public const long DEFAULT_COMPACTION_THRESHOLD_BYTES = 8388608L;
         public const string DEFAULT_INDEX_MEMORY_SIZE = "64m";
         public const string DEFAULT_LOG_MEMORY_SIZE = "1g";
+        public static readonly System.TimeSpan DEFAULT_TOMBSTONE_RETENTION;
         public int BucketCount { get { throw null; } set { } }
 
         public string CheckpointAofSize { get { throw null; } set { } }
@@ -42,9 +43,15 @@ namespace Orleans.Journaling
 
         public string LogMemorySize { get { throw null; } set { } }
 
+        public System.TimeSpan MarkerCollectionInterval { get { throw null; } set { } }
+
         public Ranges.IRangeMetaStore? MetaStore { get { throw null; } set { } }
 
+        public System.TimeSpan MigrationInterval { get { throw null; } set { } }
+
         public System.TimeSpan OperationTimeout { get { throw null; } set { } }
+
+        public System.TimeSpan TombstoneRetention { get { throw null; } set { } }
     }
 }
 

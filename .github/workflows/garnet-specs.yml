@@ -31,7 +31,7 @@ jobs:
         with:
           node-version: 22
       - run: npm install -g "@informalsystems/quint@$QUINT_VERSION"
-      - run: quint typecheck "$SPEC"
+      - run: quint typecheck "$SPEC" && quint typecheck garnetRangeMigrationTraces.qnt
       - name: Directed scenarios
         run: quint test "$SPEC" --main=garnetRangeMigrationSim --match=Test
       - name: Random simulation
@@ -44,8 +44,8 @@ jobs:
         # unfencedOpenTest, unfencedDoneHidesWriteTest, unfencedReclaimLosesWriteTest) catch them.
         run: |
           for step in mutantOpenBeforeSeal mutantUnconditionalInstall mutantDeleteWithoutTombstone \
-                      mutantReclaimBeforeDone mutantMarkDoneEarly mutantInventoryLiveOnly mutantCollectWithAttempt \
-                      mutantRetryWithoutIdempotence mutantRetryAnyAbsence mutantWriteAfterSeal; do
+                      mutantReclaimBeforeDone mutantMarkDoneEarly mutantInventoryLiveOnly mutantDropWithoutHorizon \
+                      mutantClientClock mutantRetryWithoutIdempotence mutantRetryAnyAbsence mutantWriteAfterSeal; do
             if quint run "$SPEC" --main=garnetRangeMigrationSim --backend=rust --step="$step" \
                  --invariant=safety --max-steps=30 --max-samples=5000 --seed=7 > "$step.log" 2>&1; then
               echo "::error::$step was not caught by the safety invariant"

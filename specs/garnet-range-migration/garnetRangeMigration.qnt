@@ -26,6 +26,13 @@
 // - Any reply can be lost; the client later retries the same op. An attempt
 //   whose reply was lost may also execute again later (a queued or delayed
 //   duplicate), until it expires.
+// - Once migration is done, a partition drops tombstones and absent markers,
+//   whatever attempts are outstanding. A deletion stamps its tombstone with
+//   the bucket's collection generation, and dropping the tombstone raises the
+//   generation past the stamp. A write conditioned on the empty absence
+//   carries the generation observed with it and fails if the generation has
+//   since passed it (D25). The partitions holding the bucket assign
+//   generations; no client clock enters.
 // - Pulls (on NeedPull) and consolidation are two requests: a fetch from the
 //   bucket's migration chain, and a later install, fenced by the opening the
 //   destination fetched for, if the destination holds no record (D43).
@@ -44,27 +51,33 @@ module garnetRangeMigration {
 
   // ---------------------------------------------------------------- Types
 
-  type JRec = { kind: str, vals: List[int], ver: int, ids: List[int] }
+  // dgen: for a tombstone, the bucket's collection generation when its
+  // deletion committed; 0 otherwise.
+  type JRec = { kind: str, vals: List[int], ver: int, ids: List[int], dgen: int }
 
   // st: "absent" | "open" | "sealed". ver: view at which the partition opened
   // the bucket. sealVer: view whose change sealed it. src: partition holding
-  // the bucket's earlier history (-1: none).
-  type Bucket = { st: str, ver: int, sealVer: int, src: int, done: bool, reclaimed: bool }
+  // the bucket's earlier history (-1: none). gen: the collection generation,
+  // one more than the greatest stamp (dgen) of a tombstone which this copy, or
+  // a copy before it on the bucket's history, dropped (0: none).
+  type Bucket = { st: str, ver: int, sealVer: int, src: int, done: bool, reclaimed: bool, gen: int }
 
   // live: whether the condition names a live journal or an absence. expect:
-  // the identity of the state the client observed.
-  type Op = { key: str, del: bool, live: bool, expect: int }
+  // the identity of the state the client observed. obs: the collection
+  // generation observed with it.
+  type Op = { key: str, del: bool, live: bool, expect: int, obs: int }
 
   type Walk = { q: int, finished: bool, err: bool, rec: JRec }
 
-  // The state a client observed: a live journal or an absence, and its
-  // identity.
-  type Obs = { live: bool, ver: int }
+  // The state a client observed: a live journal or an absence, its identity,
+  // and the bucket's collection generation.
+  type Obs = { live: bool, ver: int, gen: int }
 
   // An open in flight: partition m may open bucket b at view v, with src as
-  // the source of its history. Authorized once the source's seal is observed,
-  // and applied later at m.
-  type Ticket = { active: bool, m: int, b: int, v: int, src: int }
+  // the source of its history and gen as its collection generation, which is
+  // final once the source is sealed. Authorized once the source's seal is
+  // observed, and applied later at m.
+  type Ticket = { active: bool, m: int, b: int, v: int, src: int, gen: int }
 
   // A completion in flight: p may set bucket b `done` once it holds a record
   // of every journal in inv, the migration inventory enumerated while p held
@@ -102,11 +115,11 @@ module garnetRangeMigration {
   pure val DONE_SLOTS = 0.to(MAX_DONES - 1)
   pure val RECLAIM_SLOTS = 0.to(MAX_RECLAIMS - 1)
 
-  pure val NONE: JRec = { kind: "none", vals: List(), ver: 0, ids: List() }
-  pure val ABSENT_MARKER: JRec = { kind: "absent", vals: List(), ver: 0, ids: List() }
-  pure val NO_BUCKET: Bucket = { st: "absent", ver: -1, sealVer: -1, src: -1, done: false, reclaimed: false }
+  pure val NONE: JRec = { kind: "none", vals: List(), ver: 0, ids: List(), dgen: 0 }
+  pure val ABSENT_MARKER: JRec = { kind: "absent", vals: List(), ver: 0, ids: List(), dgen: 0 }
+  pure val NO_BUCKET: Bucket = { st: "absent", ver: -1, sealVer: -1, src: -1, done: false, reclaimed: false, gen: 0 }
   pure val NO_PULL: Pull = { active: false, p: -1, k: "", fence: -1, rec: NONE }
-  pure val NO_TICKET: Ticket = { active: false, m: -1, b: -1, v: -1, src: -1 }
+  pure val NO_TICKET: Ticket = { active: false, m: -1, b: -1, v: -1, src: -1, gen: 0 }
   pure val NO_DONE: DoneReq = { active: false, p: -1, b: -1, fence: -1, inv: Set() }
   pure val NO_RECLAIM: ReclaimReq = { active: false, a: -1, b: -1, ver: -1 }
 
@@ -149,6 +162,9 @@ module garnetRangeMigration {
   var opens: int -> Ticket
   var dones: int -> DoneReq
   var reclaims: int -> ReclaimReq
+  // Oracle: for each journal, the latest deletion whose tombstone a partition
+  // dropped (-1: none).
+  var collected: str -> int
 
   // ------------------------------------------------------------ Derived state
 
@@ -216,20 +232,24 @@ module garnetRangeMigration {
     { err: w.err or not(w.finished), vals: w.rec.vals }
   }
 
-  // Applies op `id` to record r. Returns the new record and the outcome. A
-  // retry that fails its condition reports the outcome as unknown, since an
-  // earlier attempt may have committed and left the history.
-  pure def apply(r: JRec, id: int, op: Op, checkIds: bool, isRetry: bool, anyAbsence: bool): { rec: JRec, status: str, commit: bool } =
+  // Applies op `id` to record r in a bucket copy with collection generation
+  // gen; a deletion stamps its tombstone with `stamp`. Returns the new record
+  // and the outcome. A retry that fails its condition reports the outcome as
+  // unknown, since an earlier attempt may have committed and left the history.
+  // The empty absence (no record, or an absent marker) fails every condition
+  // observed at an earlier generation: a dropped tombstone, of a deletion at or
+  // after the observation, may have held the op's own commitment (D25).
+  pure def apply(r: JRec, id: int, op: Op, checkIds: bool, isRetry: bool, anyAbsence: bool, gen: int, stamp: int): { rec: JRec, status: str, commit: bool } =
     if (checkIds and has(r.ids, id)) { rec: r, status: "acked", commit: false }
     else {
       val ok =
         if (op.live) isLive(r) and r.ver == op.expect
-        else not(isLive(r)) and (anyAbsence or r.ver == op.expect)
+        else not(isLive(r)) and (anyAbsence or r.ver == op.expect) and not(r.ver == 0 and op.obs < gen)
       if (not(ok) or (op.del and not(isLive(r)))) { rec: r, status: if (isRetry) "ambiguous" else "conflict", commit: false }
-      else if (op.del) { rec: { kind: "tomb", vals: List(), ver: id + 1, ids: remember(r.ids, id) }, status: "acked", commit: true }
+      else if (op.del) { rec: { kind: "tomb", vals: List(), ver: id + 1, ids: remember(r.ids, id), dgen: stamp }, status: "acked", commit: true }
       else {
         val base = if (isLive(r)) r.vals else List()
-        { rec: { kind: "live", vals: base.append(id), ver: id + 1, ids: remember(r.ids, id) }, status: "acked", commit: true }
+        { rec: { kind: "live", vals: base.append(id), ver: id + 1, ids: remember(r.ids, id), dgen: 0 }, status: "acked", commit: true }
       }
     }
 
@@ -239,21 +259,22 @@ module garnetRangeMigration {
     views' = List(Map(0 -> 1, 1 -> 2)),
     bkt' = PARTITIONS.mapBy(p => BUCKETS.mapBy(b =>
       if ((p == 1 and b == 0) or (p == 2 and b == 1))
-        { st: "open", ver: 0, sealVer: -1, src: -1, done: true, reclaimed: false }
+        { st: "open", ver: 0, sealVer: -1, src: -1, done: true, reclaimed: false, gen: 0 }
       else NO_BUCKET)),
     jr' = PARTITIONS.mapBy(_ => KEYS.mapBy(_ => NONE)),
     truth' = KEYS.mapBy(_ => List()),
-    ops' = OPS.mapBy(_ => { key: "", del: false, live: false, expect: 0 }),
+    ops' = OPS.mapBy(_ => { key: "", del: false, live: false, expect: 0, obs: 0 }),
     outcome' = OPS.mapBy(_ => "none"),
     applied' = OPS.mapBy(_ => 0),
     log' = KEYS.mapBy(_ => List()),
     nextOp' = 0,
     pulls' = PULL_SLOTS.mapBy(_ => NO_PULL),
-    seen' = KEYS.mapBy(_ => Set({ live: false, ver: 0 })),
+    seen' = KEYS.mapBy(_ => Set({ live: false, ver: 0, gen: 0 })),
     inflight' = OPS.mapBy(_ => false),
     opens' = OPEN_SLOTS.mapBy(_ => NO_TICKET),
     dones' = DONE_SLOTS.mapBy(_ => NO_DONE),
     reclaims' = RECLAIM_SLOTS.mapBy(_ => NO_RECLAIM),
+    collected' = KEYS.mapBy(_ => -1),
   }
 
   // Runs op `id` (already recorded in `opsNext`) at partition p, which must
@@ -261,12 +282,14 @@ module garnetRangeMigration {
   // completed migration (otherwise the partition answers NeedPull and the
   // client pulls first). A lost reply leaves the outcome pending, and the
   // attempt may execute again later. A delayed attempt changes no outcome:
-  // the client has its outcome already, or retries.
-  action executeWith(p: int, id: int, op: Op, checkIds: bool, isRetry: bool, anyAbsence: bool, sealCheck: bool, lost: bool, delayed: bool): bool = {
+  // the client has its outcome already, or retries. A deletion stamps its
+  // tombstone with the bucket's collection generation, or, with `clientStamp`
+  // (a mutant), with the time the client supplied.
+  action executeWith(p: int, id: int, op: Op, checkIds: bool, isRetry: bool, anyAbsence: bool, sealCheck: bool, lost: bool, delayed: bool, clientStamp: bool): bool = {
     val b = KEY_BUCKET.get(op.key)
     val bs = bkt.get(p).get(b)
     val r = jr.get(p).get(op.key)
-    val res = apply(r, id, op, checkIds, isRetry, anyAbsence)
+    val res = apply(r, id, op, checkIds, isRetry, anyAbsence, bs.gen, if (clientStamp) op.obs else bs.gen)
     all {
       if (sealCheck) bs.st == "open" else bs.st != "absent",
       isPresent(r) or bs.done,
@@ -274,28 +297,35 @@ module garnetRangeMigration {
       truth' = if (res.commit) truth.set(op.key, res.rec.vals) else truth,
       applied' = if (res.commit) applied.set(id, applied.get(id) + 1) else applied,
       log' = if (res.commit) log.set(op.key, log.get(op.key).append(id)) else log,
-      seen' = if (res.commit) seen.set(op.key, seen.get(op.key).union(Set({ live: isLive(res.rec), ver: res.rec.ver }))) else seen,
+      seen' = if (res.commit) seen.set(op.key, seen.get(op.key).union(Set({ live: isLive(res.rec), ver: res.rec.ver, gen: bs.gen }))) else seen,
       outcome' = if (delayed) outcome else outcome.set(id, if (lost) "pending" else res.status),
       inflight' = if (lost) inflight.set(id, true) else inflight,
     }
   }
 
-  def current(p: int, k: str): Obs = { live: isLive(jr.get(p).get(k)), ver: jr.get(p).get(k).ver }
+  def current(p: int, k: str): Obs =
+    { live: isLive(jr.get(p).get(k)), ver: jr.get(p).get(k).ver, gen: bkt.get(p).get(KEY_BUCKET.get(k)).gen }
 
   // A client issues a new write, conditional on a state it observed: the
   // current one, or any earlier one (a duplicate activation, or a client
-  // holding an old observation).
-  action writeWith(p: int, k: str, del: bool, obs: Obs, lost: bool, sealCheck: bool): bool = {
+  // holding an old observation), with the collection generation observed with
+  // it. With `clock` >= 0 (a mutant), the write carries a client timestamp
+  // instead, which also stamps a deletion's tombstone: a horizon of client
+  // times.
+  action writeWithClock(p: int, k: str, del: bool, obs: Obs, lost: bool, sealCheck: bool, clock: int): bool = {
     val id = nextOp
-    val op = { key: k, del: del, live: obs.live, expect: obs.ver }
+    val op = { key: k, del: del, live: obs.live, expect: obs.ver, obs: if (clock >= 0) clock else obs.gen }
     all {
       nextOp < MAX_OPS,
       ops' = ops.set(id, op),
       nextOp' = nextOp + 1,
-      executeWith(p, id, op, true, false, false, sealCheck, lost, false),
-      views' = views, bkt' = bkt, pulls' = pulls, dones' = dones, reclaims' = reclaims, opens' = opens,
+      executeWith(p, id, op, true, false, false, sealCheck, lost, false, clock >= 0),
+      views' = views, bkt' = bkt, pulls' = pulls, opens' = opens, collected' = collected, dones' = dones, reclaims' = reclaims,
     }
   }
+
+  action writeWith(p: int, k: str, del: bool, obs: Obs, lost: bool, sealCheck: bool): bool =
+    writeWithClock(p, k, del, obs, lost, sealCheck, -1)
 
   action write(p: int, k: str, del: bool, lost: bool): bool = writeWith(p, k, del, current(p, k), lost, true)
 
@@ -303,8 +333,8 @@ module garnetRangeMigration {
   // whichever partition it routes to.
   action retryWith(p: int, id: int, checkIds: bool, anyAbsence: bool, lost: bool): bool = all {
     outcome.get(id) == "pending",
-    executeWith(p, id, ops.get(id), checkIds, true, anyAbsence, true, lost, false),
-    views' = views, bkt' = bkt, ops' = ops, nextOp' = nextOp, pulls' = pulls, dones' = dones, reclaims' = reclaims, opens' = opens,
+    executeWith(p, id, ops.get(id), checkIds, true, anyAbsence, true, lost, false, false),
+    views' = views, bkt' = bkt, ops' = ops, nextOp' = nextOp, pulls' = pulls, opens' = opens, collected' = collected, dones' = dones, reclaims' = reclaims,
   }
 
   action retry(p: int, id: int, lost: bool): bool = retryWith(p, id, true, false, lost)
@@ -313,17 +343,18 @@ module garnetRangeMigration {
   action deliverAttempt(p: int, id: int): bool = all {
     inflight.get(id),
     outcome.get(id) != "pending",
-    executeWith(p, id, ops.get(id), true, true, false, true, false, true),
-    views' = views, bkt' = bkt, ops' = ops, nextOp' = nextOp, pulls' = pulls, dones' = dones, reclaims' = reclaims, opens' = opens,
+    executeWith(p, id, ops.get(id), true, true, false, true, false, true, false),
+    views' = views, bkt' = bkt, ops' = ops, nextOp' = nextOp, pulls' = pulls, opens' = opens, collected' = collected, dones' = dones, reclaims' = reclaims,
   }
 
-  // An attempt expires once its deadline passes: no partition executes it
-  // after that (D41). The client has stopped retrying the op.
+  // An attempt expires once the client stops retrying and no longer holds it
+  // queued. Collection does not wait for expiry: the collection generation
+  // rejects an attempt which arrives after its tombstone was dropped (D25).
   action expire(id: int): bool = all {
     inflight.get(id),
     outcome.get(id) != "pending",
     inflight' = inflight.set(id, false),
-    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, dones' = dones, reclaims' = reclaims, seen' = seen, opens' = opens,
+    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, opens' = opens, collected' = collected, dones' = dones, reclaims' = reclaims,
   }
 
   // A view change moves the buckets `bs` to partition p in one version: a
@@ -339,8 +370,8 @@ module garnetRangeMigration {
       bs.size() > 0,
       bs.forall(b => last.get(b) != p),
       not(coordinated) or bs.forall(b => mayMove(b, p)),
-      views' = views.append(bs.fold(last, (m, b) => m.set(b, p))),
-      bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, dones' = dones, reclaims' = reclaims, seen' = seen, inflight' = inflight, opens' = opens,
+      views' = views.append(bs.fold(last, (m, b) => m.set(b, p))), collected' = collected,
+      bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, dones' = dones, reclaims' = reclaims,
     }
   }
 
@@ -358,14 +389,15 @@ module garnetRangeMigration {
       bs.st == "open",
       laterView >= 0,
       bkt' = bkt.set(p, bkt.get(p).set(b, { ...bs, st: "sealed", sealVer: laterView })),
-      views' = views, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, dones' = dones, reclaims' = reclaims, seen' = seen, inflight' = inflight, opens' = opens,
+      views' = views, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, dones' = dones, reclaims' = reclaims,
     }
   }
 
   // An open of bucket b at partition m for view v is authorized once the
   // bucket's current opener has sealed it, as the coordinator records in the
   // migration's `Sealed` phase. The migration is the latest map's: m owns b
-  // there, and v is the version which assigned it. The authorization is
+  // there, and v is the version which assigned it. The authorization carries
+  // the sealed source's collection generation, which is final. It is
   // recorded in open slot i and applied later, possibly more than once
   // (duplicate requests), after the map has moved on.
   action authorizeWith(i: int, m: int, b: int, v: int, requireSeal: bool): bool = {
@@ -377,8 +409,8 @@ module garnetRangeMigration {
       v == assignedAt(b, m),
       v > curState.ver,
       not(requireSeal) or curState.st == "sealed",
-      opens' = opens.set(i, { active: true, m: m, b: b, v: v, src: cur }),
-      views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, dones' = dones, reclaims' = reclaims, seen' = seen, inflight' = inflight,
+      opens' = opens.set(i, { active: true, m: m, b: b, v: v, src: cur, gen: curState.gen }),
+      views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, collected' = collected, dones' = dones, reclaims' = reclaims,
     }
   }
 
@@ -404,12 +436,12 @@ module garnetRangeMigration {
     val mine = bkt.get(t.m).get(t.b)
     val opened =
       if (t.src == t.m) { ...mine, st: "open", ver: t.v, sealVer: -1 }
-      else { st: "open", ver: t.v, sealVer: -1, src: t.src, done: false, reclaimed: false }
+      else { st: "open", ver: t.v, sealVer: -1, src: t.src, done: false, reclaimed: false, gen: t.gen }
     all {
       openable(i, fenced),
       bkt' = bkt.set(t.m, bkt.get(t.m).set(t.b, opened)),
       opens' = opens.set(i, NO_TICKET),
-      views' = views, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, dones' = dones, reclaims' = reclaims, seen' = seen, inflight' = inflight,
+      views' = views, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, collected' = collected, dones' = dones, reclaims' = reclaims,
     }
   }
 
@@ -421,7 +453,7 @@ module garnetRangeMigration {
     opens.get(i).active,
     not(openable(i, true)),
     opens' = opens.set(i, NO_TICKET),
-    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, dones' = dones, reclaims' = reclaims, seen' = seen, inflight' = inflight,
+    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, collected' = collected, dones' = dones, reclaims' = reclaims,
   }
 
   // Pull or consolidation, first half: a client (or B's consolidator) reads
@@ -442,8 +474,8 @@ module garnetRangeMigration {
       not(isPresent(jr.get(p).get(k))),
       w.finished,
       not(w.err),
-      pulls' = pulls.set(i, { active: true, p: p, k: k, fence: bs.ver, rec: rec }), dones' = dones, reclaims' = reclaims,
-      views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, seen' = seen, inflight' = inflight, opens' = opens,
+      pulls' = pulls.set(i, { active: true, p: p, k: k, fence: bs.ver, rec: rec }),
+      views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, dones' = dones, reclaims' = reclaims,
     }
   }
 
@@ -469,8 +501,8 @@ module garnetRangeMigration {
     all {
       deliverable(i, conditional, fenced),
       jr' = jr.set(pl.p, jr.get(pl.p).set(pl.k, pl.rec)),
-      pulls' = pulls.set(i, NO_PULL), dones' = dones, reclaims' = reclaims,
-      views' = views, bkt' = bkt, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, seen' = seen, inflight' = inflight, opens' = opens,
+      pulls' = pulls.set(i, NO_PULL),
+      views' = views, bkt' = bkt, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, dones' = dones, reclaims' = reclaims,
     }
   }
 
@@ -481,21 +513,23 @@ module garnetRangeMigration {
   action dropPull(i: int): bool = all {
     pulls.get(i).active,
     not(deliverable(i, true, true)),
-    pulls' = pulls.set(i, NO_PULL), dones' = dones, reclaims' = reclaims,
-    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, seen' = seen, inflight' = inflight, opens' = opens,
+    pulls' = pulls.set(i, NO_PULL),
+    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, dones' = dones, reclaims' = reclaims,
   }
 
   // Whether the migration inventory of bucket b's chain from q, as the
   // consolidator enumerates it, includes journal k: the newest record of k on
-  // the chain is a live journal or a tombstone (D42). `liveOnly` enumerates
-  // only live journals, as the live index does.
+  // the chain is a live journal, a tombstone, or an absent marker (D42); the
+  // consolidator lists each link's live index and its marker set, which holds
+  // tombstones and absent markers. `liveOnly` enumerates only live journals,
+  // as the live index does.
   def inInventory(q: int, k: str, liveOnly: bool): bool = {
     val w = walk(q, k)
     or {
       not(w.finished),
       w.err,
       w.rec.kind == "live",
-      not(liveOnly) and w.rec.kind == "tomb",
+      not(liveOnly) and isPresent(w.rec),
     }
   }
 
@@ -514,7 +548,8 @@ module garnetRangeMigration {
       bs.st == "open",
       not(bs.done),
       dones' = dones.set(i, { active: true, p: p, b: b, fence: bs.ver, inv: inv }),
-      views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, reclaims' = reclaims,
+      bkt' = bkt,
+      views' = views, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, reclaims' = reclaims,
     }
   }
 
@@ -538,7 +573,7 @@ module garnetRangeMigration {
       d.inv.forall(k => isPresent(jr.get(d.p).get(k))),
       bkt' = bkt.set(d.p, bkt.get(d.p).set(d.b, { ...bs, done: true })),
       dones' = dones.set(i, NO_DONE),
-      views' = views, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, reclaims' = reclaims,
+      views' = views, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, reclaims' = reclaims,
     }
   }
 
@@ -550,7 +585,7 @@ module garnetRangeMigration {
     dones.get(i).active,
     not(doneApplies(i, true)),
     dones' = dones.set(i, NO_DONE),
-    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, reclaims' = reclaims,
+    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, reclaims' = reclaims,
   }
 
   // Whether a read path can reach partition a's copy of bucket b: a is on the
@@ -571,7 +606,7 @@ module garnetRangeMigration {
       not(cleared(a, b)),
       early or not(reachable(a, b)),
       reclaims' = reclaims.set(i, { active: true, a: a, b: b, ver: localVersion(bs) }),
-      views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, dones' = dones,
+      views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, dones' = dones,
     }
   }
 
@@ -602,7 +637,7 @@ module garnetRangeMigration {
       reclaims' =
         if (keysOf(r.b).forall(k => not(isPresent(jr2.get(k))))) reclaims.set(i, NO_RECLAIM)
         else reclaims,
-      views' = views, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, dones' = dones,
+      views' = views, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, dones' = dones,
     }
   }
 
@@ -613,25 +648,38 @@ module garnetRangeMigration {
     reclaims.get(i).active,
     not(reclaimApplies(i, true)),
     reclaims' = reclaims.set(i, NO_RECLAIM),
-    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, dones' = dones,
+    views' = views, bkt' = bkt, jr' = jr, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, dones' = dones,
   }
 
-  // Drops a tombstone or absent marker once migration is done (D5). A
-  // tombstone names the absence and carries the mutation ids that attempts
-  // rely on, so it is dropped only once no attempt of an op on the journal can
-  // still execute: none awaits a retry, and every lost attempt has expired
-  // (D41). An absent marker names the unnamed absence and carries no ids.
-  action dropMarkerWith(p: int, k: str, waitForAttempts: bool): bool = {
+  // Drops a tombstone or absent marker once migration is done (D5), whatever
+  // retries or attempts are outstanding. A tombstone names the absence after
+  // its deletion and carries the mutation ids that retries and attempts rely
+  // on; dropping it restores the empty absence, so the copy raises its
+  // collection generation past the tombstone's stamp (D25), and the empty
+  // absence at the new generation becomes observable for the bucket's
+  // journals. The implementation retains tombstones for longer than a retry
+  // usually arrives, so retries usually find their ids; the generation keeps
+  // any later retry or attempt from applying again. An absent marker carries
+  // no ids.
+  action dropMarkerWith(p: int, k: str, raiseGeneration: bool): bool = {
     val b = KEY_BUCKET.get(k)
     val bs = bkt.get(p).get(b)
     val r = jr.get(p).get(k)
+    val deletion = r.ver - 1
+    val raise = r.kind == "tomb" and raiseGeneration and r.dgen + 1 > bs.gen
     all {
       bs.st == "open",
       bs.done,
-      r.kind == "absent"
-        or (r.kind == "tomb" and OPS.forall(id => not(ops.get(id).key == k and (outcome.get(id) == "pending" or (waitForAttempts and inflight.get(id)))))),
+      r.kind == "absent" or r.kind == "tomb",
       jr' = jr.set(p, jr.get(p).set(k, NONE)),
-      views' = views, bkt' = bkt, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, dones' = dones, reclaims' = reclaims, seen' = seen, inflight' = inflight, opens' = opens,
+      bkt' = if (raise) bkt.set(p, bkt.get(p).set(b, { ...bs, gen: r.dgen + 1 })) else bkt,
+      seen' =
+        if (raise) seen.keys().mapBy(j =>
+          if (KEY_BUCKET.get(j) == b) seen.get(j).union(Set({ live: false, ver: 0, gen: r.dgen + 1 })) else seen.get(j))
+        else seen,
+      collected' =
+        if (r.kind == "tomb" and deletion > collected.get(k)) collected.set(k, deletion) else collected,
+      views' = views, truth' = truth, ops' = ops, outcome' = outcome, applied' = applied, log' = log, nextOp' = nextOp, pulls' = pulls, inflight' = inflight, opens' = opens, dones' = dones, reclaims' = reclaims,
     }
   }
 
@@ -647,74 +695,80 @@ module garnetRangeMigration {
   // (failure-driven moves) therefore chain only through partitions off the
   // chain. Safety also depends on this rule, because opens are applied after
   // they are authorized: it commits no later move of b until the previous
-  // move's destination has opened, so no authorized open is superseded.
+  // move's destination has opened, so no authorized open is superseded. The
+  // coordinator checks that p holds no copy of b, or has reclaimed it, which
+  // it observes at p; a reclaimed copy is on no read path, and an unreclaimed
+  // one must reclaim before p can reopen.
   def mayMove(b: int, p: int): bool = {
     val last = views[views.length() - 1]
     val cur = currentOpener(b)
+    val mine = bkt.get(p).get(b)
     all {
       last.get(b) == cur,
       bkt.get(cur).get(b).st == "open",
-      not(reachable(p, b)),
+      mine.st == "absent" or mine.reclaimed,
     }
   }
 
-  // Client actions: new writes and retries of writes whose reply was lost.
+  // Client actions: new writes, retries of writes whose reply was lost, and
+  // delayed attempts. Nondeterministic choices have distinct names, so traces
+  // record each one.
   action clientStep = {
-    nondet p = PARTITIONS.oneOf()
-    nondet k = KEYS.oneOf()
-    nondet id = OPS.oneOf()
-    nondet del = Bool.oneOf()
-    nondet obs = seen.get(k).oneOf()
-    nondet lost = Bool.oneOf()
+    nondet cp = PARTITIONS.oneOf()
+    nondet ck = KEYS.oneOf()
+    nondet cid = OPS.oneOf()
+    nondet cdel = Bool.oneOf()
+    nondet cobs = seen.get(ck).oneOf()
+    nondet clost = Bool.oneOf()
     any {
-      writeWith(p, k, del, obs, lost, true),
-      retry(p, id, lost),
-      deliverAttempt(p, id),
-      expire(id),
+      writeWith(cp, ck, cdel, cobs, clost, true),
+      retry(cp, cid, clost),
+      deliverAttempt(cp, cid),
+      expire(cid),
     }
   }
 
   // Partition actions which carry out migrations, each the subject of a
   // fairness condition.
-  action sealAny = { nondet p = PARTITIONS.oneOf() nondet b = BUCKETS.oneOf() seal(p, b) }
+  action sealAny = { nondet sp = PARTITIONS.oneOf() nondet sb = BUCKETS.oneOf() seal(sp, sb) }
   action authorizeAny = {
-    nondet i = OPEN_SLOTS.oneOf()
-    nondet p = PARTITIONS.oneOf()
-    nondet b = BUCKETS.oneOf()
-    nondet v = 0.to(MAX_VIEWS - 1).oneOf()
-    authorize(i, p, b, v)
+    nondet ai = OPEN_SLOTS.oneOf()
+    nondet ap = PARTITIONS.oneOf()
+    nondet ab = BUCKETS.oneOf()
+    nondet av = 0.to(MAX_VIEWS - 1).oneOf()
+    authorize(ai, ap, ab, av)
   }
-  action openAny = { nondet i = OPEN_SLOTS.oneOf() openTicket(i) }
-  action dropTicketAny = { nondet i = OPEN_SLOTS.oneOf() dropTicket(i) }
+  action openAny = { nondet oi = OPEN_SLOTS.oneOf() openTicket(oi) }
+  action dropTicketAny = { nondet ti = OPEN_SLOTS.oneOf() dropTicket(ti) }
   action fetchAny = {
-    nondet i = PULL_SLOTS.oneOf()
-    nondet p = PARTITIONS.oneOf()
-    nondet k = KEYS.oneOf()
-    fetch(i, p, k)
+    nondet fi = PULL_SLOTS.oneOf()
+    nondet fp = PARTITIONS.oneOf()
+    nondet fk = KEYS.oneOf()
+    fetch(fi, fp, fk)
   }
-  action deliverAny = { nondet i = PULL_SLOTS.oneOf() deliver(i) }
-  action dropPullAny = { nondet i = PULL_SLOTS.oneOf() dropPull(i) }
+  action deliverAny = { nondet li = PULL_SLOTS.oneOf() deliver(li) }
+  action dropPullAny = { nondet xi = PULL_SLOTS.oneOf() dropPull(xi) }
   action prepareDoneAny = {
-    nondet i = DONE_SLOTS.oneOf()
-    nondet p = PARTITIONS.oneOf()
-    nondet b = BUCKETS.oneOf()
-    prepareDone(i, p, b)
+    nondet di = DONE_SLOTS.oneOf()
+    nondet dp = PARTITIONS.oneOf()
+    nondet db = BUCKETS.oneOf()
+    prepareDone(di, dp, db)
   }
-  action completeAny = { nondet i = DONE_SLOTS.oneOf() completeDone(i) }
-  action dropDoneAny = { nondet i = DONE_SLOTS.oneOf() dropDone(i) }
+  action completeAny = { nondet ci = DONE_SLOTS.oneOf() completeDone(ci) }
+  action dropDoneAny = { nondet ei = DONE_SLOTS.oneOf() dropDone(ei) }
   action authorizeReclaimAny = {
-    nondet i = RECLAIM_SLOTS.oneOf()
-    nondet p = PARTITIONS.oneOf()
-    nondet b = BUCKETS.oneOf()
-    authorizeReclaim(i, p, b)
+    nondet ri = RECLAIM_SLOTS.oneOf()
+    nondet rp = PARTITIONS.oneOf()
+    nondet rb = BUCKETS.oneOf()
+    authorizeReclaim(ri, rp, rb)
   }
   action reclaimBatchAny = {
-    nondet i = RECLAIM_SLOTS.oneOf()
-    nondet k = KEYS.oneOf()
-    reclaimBatch(i, Set(k))
+    nondet bi = RECLAIM_SLOTS.oneOf()
+    nondet bk = KEYS.oneOf()
+    reclaimBatch(bi, Set(bk))
   }
-  action dropReclaimAny = { nondet i = RECLAIM_SLOTS.oneOf() dropReclaim(i) }
-  action dropMarkerAny = { nondet p = PARTITIONS.oneOf() nondet k = KEYS.oneOf() dropMarker(p, k) }
+  action dropReclaimAny = { nondet gi = RECLAIM_SLOTS.oneOf() dropReclaim(gi) }
+  action dropMarkerAny = { nondet mp = PARTITIONS.oneOf() nondet mk = KEYS.oneOf() dropMarker(mp, mk) }
 
   action protocolStep = any {
     sealAny, authorizeAny, openAny, dropTicketAny, fetchAny, deliverAny, dropPullAny,
@@ -723,16 +777,16 @@ module garnetRangeMigration {
 
   // Views change by the coordinator's rule.
   action step = {
-    nondet bs = BUCKETS.powerset().exclude(Set(Set())).oneOf()
-    nondet p = PARTITIONS.oneOf()
-    any { clientStep, changeViewWith(bs, p, true), protocolStep }
+    nondet vbs = BUCKETS.powerset().exclude(Set(Set())).oneOf()
+    nondet vp = PARTITIONS.oneOf()
+    any { clientStep, changeViewWith(vbs, vp, true), protocolStep }
   }
 
   // As `step`, with views changed freely.
   action uncoordinatedStep = {
-    nondet bs = BUCKETS.powerset().exclude(Set(Set())).oneOf()
-    nondet p = PARTITIONS.oneOf()
-    any { clientStep, changeViews(bs, p), protocolStep }
+    nondet vbs = BUCKETS.powerset().exclude(Set(Set())).oneOf()
+    nondet vp = PARTITIONS.oneOf()
+    any { clientStep, changeViews(vbs, vp), protocolStep }
   }
 
   // ------------------------------------------------------------ Invariants
@@ -768,10 +822,12 @@ module garnetRangeMigration {
   }
 
   // A retry reports the committed outcome while fewer than RECENT later
-  // mutations of its journal have committed; only then may a committed op
-  // report an unknown outcome.
+  // mutations of its journal have committed and no tombstone of a deletion at
+  // or after it has been dropped; only then may a committed op report an
+  // unknown outcome.
   val retryOutcome = OPS.forall(id =>
-    (outcome.get(id) == "ambiguous" and applied.get(id) == 1) implies laterMutations(id) >= RECENT)
+    (outcome.get(id) == "ambiguous" and applied.get(id) == 1)
+      implies (laterMutations(id) >= RECENT or collected.get(ops.get(id).key) >= id))
 
   val safety = singleOpen and durability and exactlyOnce and retryOutcome
 
@@ -791,7 +847,7 @@ module garnetRangeMigration {
 
   val allComplete = BUCKETS.forall(b => complete(b))
 
-  val vars = (views, bkt, jr, truth, ops, outcome, applied, log, nextOp, pulls, seen, inflight, opens, dones, reclaims)
+  val vars = (views, bkt, jr, truth, ops, outcome, applied, log, nextOp, pulls, seen, inflight, opens, dones, reclaims, collected)
 
   temporal fairness = and {
     weakFair(sealAny, vars),
@@ -845,12 +901,27 @@ module garnetRangeMigration {
     any { step, prepareDoneWith(i, p, b, "live") }
   }
 
-  // Drops a tombstone once no op awaits a retry, while a lost attempt may
-  // still execute.
-  action mutantCollectWithAttempt = {
+  // Drops a tombstone without raising the copy's collection generation, so a
+  // retry or delayed attempt of a creation which observed the absence before
+  // the deletion applies again.
+  action mutantDropWithoutHorizon = {
     nondet p = PARTITIONS.oneOf()
     nondet k = KEYS.oneOf()
     any { step, dropMarkerWith(p, k, false) }
+  }
+
+  // Orders retries against collected tombstones by client clocks, which may be
+  // skewed: a write carries its issue time, a deletion stamps its tombstone
+  // with its own client's time, and a retry issued at or before a dropped
+  // deletion's time is rejected. A creator whose clock runs ahead of the
+  // deleter's passes the check, and its retry applies again.
+  action mutantClientClock = {
+    nondet p = PARTITIONS.oneOf()
+    nondet k = KEYS.oneOf()
+    nondet del = Bool.oneOf()
+    nondet lost = Bool.oneOf()
+    nondet skew = Set(-1, 0, 1).oneOf()
+    any { step, writeWithClock(p, k, del, current(p, k), lost, true, if (nextOp + skew < 0) 0 else nextOp + skew) }
   }
 
   // Installs a pulled journal even if the destination already holds a newer one.
@@ -877,14 +948,14 @@ module garnetRangeMigration {
       nextOp < MAX_OPS,
       bs.st == "open",
       isLive(r),
-      ops' = ops.set(id, { key: k, del: true, live: true, expect: r.ver }),
+      ops' = ops.set(id, { key: k, del: true, live: true, expect: r.ver, obs: bs.gen }),
       nextOp' = nextOp + 1,
       jr' = jr.set(p, jr.get(p).set(k, NONE)),
       truth' = truth.set(k, List()),
       applied' = applied.set(id, 1),
       log' = log.set(k, log.get(k).append(id)),
       outcome' = outcome.set(id, "acked"),
-      views' = views, bkt' = bkt, pulls' = pulls, dones' = dones, reclaims' = reclaims, seen' = seen, inflight' = inflight, opens' = opens,
+      views' = views, bkt' = bkt, pulls' = pulls, seen' = seen, inflight' = inflight, opens' = opens, collected' = collected, dones' = dones, reclaims' = reclaims,
     }
   }
 
@@ -966,7 +1037,6 @@ module garnetRangeMigrationSim {
     MAX_RECLAIMS = 2,
     RECENT = 2
   ).*
-
 
   // Completes bucket b's migration at p, and reclaims a's copy of bucket b,
   // each through slot 0 without delay.
@@ -1130,16 +1200,73 @@ module garnetRangeMigrationSim {
       .then(changeViewWith(Set(0), 3, true))
       .fail()
 
-  run coordinatorRuleAllowsReturnAfterDoneTest =
+  // A move back to an earlier owner waits until it has reclaimed its copy.
+  run coordinatorRuleAllowsReturnAfterReclaimTest =
     moveBucket0
       .then(fetch(0, 2, "a")).then(deliver(0))
-      .then(fetch(0, 2, "b")).then(deliver(0))
       .then(markDone(2, 0))
+      .then(reclaim(1, 0))
       .then(changeViewWith(Set(0), 1, true))
       .then(seal(2, 0))
-      .then(reclaim(1, 0))
       .then(authorize(0, 1, 0, 2)).then(openTicket(0))
       .expect(safety and openAt(0) == Set(1))
+
+  run coordinatorRuleWaitsForReclaimTest =
+    moveBucket0
+      .then(fetch(0, 2, "a")).then(deliver(0))
+      .then(markDone(2, 0))
+      .then(changeViewWith(Set(0), 1, true))
+      .fail()
+
+  // Consolidation needs only the journals the chain holds: "b", held by no
+  // partition, needs no absent marker.
+  run markDoneNeedsOnlyChainRecordsTest =
+    moveBucket0
+      .then(fetch(0, 2, "a")).then(deliver(0))
+      .then(markDone(2, 0))
+      .expect(safety and not(isPresent(jr.get(2).get("b"))))
+
+  // A partition opens a bucket only at the view which moved it there.
+  run openAtMovingViewTest =
+    init
+      .then(changeView(0, 2))
+      .then(changeView(1, 1))
+      .then(seal(1, 0))
+      .then(authorize(0, 2, 0, 2))
+      .fail()
+
+  // A creation's reply is lost; another client deletes the journal, and the
+  // tombstone is collected before the creation's retry arrives.
+  run collectedTombstone =
+    init
+      .then(write(1, "a", false, true))
+      .then(write(1, "a", true, false))
+      .then(dropMarker(1, "a"))
+
+  // The retry observed the absence before the deletion, so the copy's
+  // collection generation rejects it: the outcome is unknown, and the
+  // creation applied once.
+  run collectedTombstoneRetryIsRejectedTest =
+    collectedTombstone
+      .then(retry(1, 0, false))
+      .expect(safety and outcome.get(0) == "ambiguous" and applied.get(0) == 1 and truth.get("a") == List())
+
+  // An op which observes the absence after the collection is unaffected.
+  run collectedTombstoneAllowsNewCreateTest =
+    collectedTombstone
+      .then(write(1, "a", false, false))
+      .expect(safety and truth.get("a") == List(2))
+
+  // The generation travels with the bucket to the next opener, where the
+  // pulled journal is an absent marker.
+  run horizonTravelsWithBucketTest =
+    collectedTombstone
+      .then(changeView(0, 2))
+      .then(seal(1, 0))
+      .then(authorize(0, 2, 0, 1)).then(openTicket(0))
+      .then(fetch(0, 2, "a")).then(deliver(0))
+      .then(retry(2, 0, false))
+      .expect(safety and bkt.get(2).get(0).gen == 1 and outcome.get(0) == "ambiguous")
 
   // Every journal of bucket 0 is in 2, but 2's migration is not done: 1's copy
   // stays on 2's chain, so 1 neither reclaims nor takes the bucket back.
@@ -1311,11 +1438,14 @@ module garnetRangeMigrationSim {
       .then(retry(1, 0, false))
       .then(write(1, "a", true, false))
 
-  // The tombstone is kept until the queued attempt expires.
-  run collectWaitsForAttemptsTest =
+  // Collection does not wait for the queued attempt: dropping the tombstone
+  // raises the collection generation past the creation's observation, so the
+  // attempt, delivered later, is rejected.
+  run collectWithAttemptRejectedTest =
     queuedAttemptSetup
       .then(dropMarker(1, "a"))
-      .fail()
+      .then(deliverAttempt(1, 0))
+      .expect(safety and applied.get(0) == 1 and truth.get("a") == List() and bkt.get(1).get(0).gen == 1)
 
   run collectAfterExpiryTest =
     queuedAttemptSetup
@@ -1324,23 +1454,25 @@ module garnetRangeMigrationSim {
       .expect(safety and jr.get(1).get("a").kind == "none")
 
   // A client observed no journal; another writer then created and deleted it,
-  // and its tombstone was collected. The client's creation, conditioned on the
-  // unnamed absence, applies: the journal is absent at that point, so the
-  // creation is linearizable.
+  // and its tombstone was collected. The client's creation names the
+  // generation it observed, which the collection has passed, so it conflicts;
+  // the implementation then observes the absence again, and a creation
+  // conditioned on the new observation applies.
   run staleAbsenceAfterCollectionTest =
     init
       .then(write(1, "a", false, false))
       .then(write(1, "a", true, false))
       .then(dropMarker(1, "a"))
-      .then(writeWith(1, "a", false, { live: false, ver: 0 }, false, true))
-      .expect(safety and outcome.get(2) == "acked" and truth.get("a") == List(2))
+      .then(writeWith(1, "a", false, { live: false, ver: 0, gen: 0 }, false, true))
+      .then(writeWith(1, "a", false, { live: false, ver: 0, gen: 1 }, false, true))
+      .expect(safety and outcome.get(2) == "conflict" and outcome.get(3) == "acked" and truth.get("a") == List(3))
 
   // A condition on a live journal or a tombstone never matches again.
   run staleLiveConditionRejectedTest =
     init
       .then(write(1, "a", false, false))
       .then(write(1, "a", true, false))
-      .then(writeWith(1, "a", false, { live: true, ver: 1 }, false, true))
+      .then(writeWith(1, "a", false, { live: true, ver: 1, gen: 0 }, false, true))
       .expect(safety and outcome.get(2) == "conflict" and truth.get("a") == List())
 
   // A completion of 2's first opening of bucket 0 (slot 1), with an empty
@@ -1480,12 +1612,31 @@ module garnetRangeMigrationSim {
       .then(retry(2, 0, false))
       .expect(not(safety))
 
-  // Collecting the tombstone while the creation's first attempt is queued lets
-  // that attempt apply again.
+  // Collecting the tombstone without raising the generation while the
+  // creation's first attempt is queued lets that attempt apply again.
   run collectWithAttemptResurrectsTest =
     queuedAttemptSetup
       .then(dropMarkerWith(1, "a", false))
       .then(deliverAttempt(1, 0))
+      .expect(not(safety))
+
+  run dropWithoutHorizonAppliesTwiceTest =
+    init
+      .then(write(1, "a", false, true))
+      .then(write(1, "a", true, false))
+      .then(dropMarkerWith(1, "a", false))
+      .then(retry(1, 0, false))
+      .expect(not(safety))
+
+  // The creator's clock runs ahead: its lost creation (op 0) is stamped 1, the
+  // deletion (op 1) 0. Dropping the tombstone admits client times after 0, so
+  // the retry applies again.
+  run clientClockSkewAppliesTwiceTest =
+    init
+      .then(writeWithClock(1, "a", false, current(1, "a"), true, true, 1))
+      .then(writeWithClock(1, "a", true, current(1, "a"), false, true, 0))
+      .then(dropMarker(1, "a"))
+      .then(retry(1, 0, false))
       .expect(not(safety))
 
   // Without the history, the retry of the committed op reports an unknown

@@ -27,7 +27,10 @@ public readonly record struct RangeMapWriteResult(bool Written, RangeMapSnapshot
 /// </param>
 /// <param name="BucketCount">The number of buckets, a power of two, fixed when the map is created.</param>
 /// <param name="Ranges">Contiguous, ordered ranges which together cover buckets <c>[0, BucketCount)</c>.</param>
-/// <param name="Migrations">Migrations in progress. Each migration's buckets are already assigned to its destination.</param>
+/// <param name="Migrations">
+/// Migrations in progress. The migrations of a bucket form a chain, ordered by the versions which started them: each
+/// migrates the bucket from the previous one's destination, and the latest migrates it to the bucket's owner.
+/// </param>
 /// <param name="Partitions">Every partition, with its hosting assignment.</param>
 public sealed record RangeMap(
     string Id,
@@ -127,8 +130,8 @@ public sealed record RangeMap(
     /// <exception cref="InvalidOperationException">The map is invalid.</exception>
     /// <remarks>
     /// A valid map has a valid id and a power-of-two bucket count; ranges which are ordered, contiguous, and cover every bucket, and
-    /// whose owners are known partitions; disjoint migrations between distinct known partitions whose buckets are
-    /// assigned to their destinations; and hosting assignments with a host, a non-negative epoch, and a storage location.
+    /// whose owners are known partitions; migrations between distinct known partitions which form one chain per bucket,
+    /// ending at the bucket's owner; and hosting assignments with a host, a non-negative epoch, and a storage location.
     /// </remarks>
     public void Validate()
     {
@@ -197,10 +200,9 @@ public sealed record RangeMap(
             throw Invalid("its migrations are the default value; use an empty array");
         }
 
-        var migrations = Migrations.OrderBy(migration => migration?.FirstBucket).ToList();
-        for (var i = 0; i < migrations.Count; i++)
+        Dictionary<int, List<Migration>>? chains = null;
+        foreach (var migration in Migrations)
         {
-            var migration = migrations[i];
             if (migration is null
                 || migration.FirstBucket < 0 || migration.LastBucket < migration.FirstBucket || migration.LastBucket >= BucketCount
                 || migration.StartedAtVersion < 0 || !Enum.IsDefined(migration.Phase))
@@ -208,21 +210,40 @@ public sealed record RangeMap(
                 throw Invalid("a migration has an invalid range, version, or phase");
             }
 
-            if (i > 0 && migrations[i - 1].LastBucket >= migration.FirstBucket)
-            {
-                throw Invalid($"migrations of buckets [{migrations[i - 1].FirstBucket}, {migrations[i - 1].LastBucket}] and [{migration.FirstBucket}, {migration.LastBucket}] overlap");
-            }
-
             if (migration.Source == migration.Destination || !Partitions.ContainsKey(migration.Source) || !Partitions.ContainsKey(migration.Destination))
             {
                 throw Invalid($"the migration of buckets [{migration.FirstBucket}, {migration.LastBucket}] requires distinct, known source and destination partitions");
             }
 
-            for (var index = FindRange(migration.FirstBucket); index < Ranges.Length && Ranges[index].FirstBucket <= migration.LastBucket; index++)
+            chains ??= [];
+            for (var bucket = migration.FirstBucket; bucket <= migration.LastBucket; bucket++)
             {
-                if (Ranges[index].Owner != migration.Destination)
+                if (!chains.TryGetValue(bucket, out var chain))
                 {
-                    throw Invalid($"the migration of buckets [{migration.FirstBucket}, {migration.LastBucket}] to '{migration.Destination}' overlaps a range owned by '{Ranges[index].Owner}'");
+                    chains[bucket] = chain = [];
+                }
+
+                chain.Add(migration);
+            }
+        }
+
+        if (chains is not null)
+        {
+            foreach (var (bucket, chain) in chains)
+            {
+                chain.Sort(static (left, right) => left.StartedAtVersion.CompareTo(right.StartedAtVersion));
+                for (var i = 1; i < chain.Count; i++)
+                {
+                    if (chain[i - 1].StartedAtVersion == chain[i].StartedAtVersion || chain[i - 1].Destination != chain[i].Source)
+                    {
+                        throw Invalid($"the migrations of bucket {bucket} do not form a chain: each must start at a later version, from the previous migration's destination");
+                    }
+                }
+
+                var owner = GetOwner(bucket);
+                if (chain[^1].Destination != owner)
+                {
+                    throw Invalid($"the latest migration of bucket {bucket} is to '{chain[^1].Destination}', but the bucket is owned by '{owner}'");
                 }
             }
         }
@@ -267,6 +288,12 @@ public sealed record RangeAssignment(int FirstBucket, int LastBucket, PartitionI
 /// <summary>
 /// A migration of a range of buckets from one partition to another.
 /// </summary>
+/// <remarks>
+/// A migration remains in the map until its source has reclaimed the buckets' data. A bucket moves again once its
+/// latest migration has reached <see cref="MigrationPhase.Opened"/>, so a bucket can have several migrations, which
+/// form a chain: reads in the newest destination which find no record of a journal follow the chain toward older
+/// sources until a destination whose migration is <see cref="MigrationPhase.Done"/>.
+/// </remarks>
 /// <param name="FirstBucket">The first bucket of the range.</param>
 /// <param name="LastBucket">The last bucket of the range, inclusive.</param>
 /// <param name="Source">The partition the buckets move from.</param>
@@ -298,7 +325,10 @@ public enum MigrationPhase
     /// <summary>The destination holds every journal of the range; reads no longer consult the source.</summary>
     Done,
 
-    /// <summary>The source may reclaim the range's data.</summary>
+    /// <summary>
+    /// No read reaches the source's copy of the range, because this migration or a later one of the same buckets is
+    /// done. The source reclaims the range, and the migration is then removed from the map.
+    /// </summary>
     Complete,
 }
 
