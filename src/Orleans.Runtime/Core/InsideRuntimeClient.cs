@@ -380,7 +380,7 @@ namespace Orleans.Runtime
                 // Completing it is the last step, so a failure before it completes the request exactly once.
                 if (message.IsLocalOnly)
                 {
-                    LocalRequests.Complete((ILocalRequest)message.BodyObject!, response, this.logger);
+                    LocalRequests.Complete(message, response, this.logger);
                 }
 
                 if (message.Direction != Message.Directions.OneWay)
@@ -395,7 +395,7 @@ namespace Orleans.Runtime
                 LogWarningInvokeException(this.logger, exc2, message);
                 if (message.IsLocalOnly)
                 {
-                    LocalRequests.Complete((ILocalRequest)message.BodyObject!, Response.FromException(exc2), this.logger);
+                    LocalRequests.Reject(message, exc2, this.logger);
                 }
 
                 if (message.Direction != Message.Directions.OneWay)

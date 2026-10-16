@@ -1733,7 +1733,7 @@ internal sealed partial class ActivationData :
     {
         if (message.IsLocalOnly)
         {
-            LocalRequests.Complete((ILocalRequest)message.BodyObject!, Response.FromException(exception), _shared.Logger);
+            LocalRequests.Reject(message, exception, _shared.Logger);
         }
         else
         {
