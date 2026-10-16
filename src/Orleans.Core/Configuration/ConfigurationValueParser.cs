@@ -13,7 +13,7 @@ namespace Orleans.Configuration;
 /// Orleans.Core and Orleans.Runtime use this instead of <see cref="ConfigurationBinder.GetValue{T}(IConfiguration, string)"/>,
 /// which requires unreferenced code unless the configuration binding source generator is enabled. These assemblies
 /// cannot enable the generator because they bind options types with members the generator does not support.
-/// An absent or empty value leaves the caller's default in place, and an invalid value throws an
+/// An absent or empty value leaves the caller's default in place. An invalid value, including a whitespace-only value, throws an
 /// <see cref="InvalidOperationException"/> in the style of <see cref="ConfigurationBinder"/>.
 /// </remarks>
 internal static class ConfigurationValueParser
