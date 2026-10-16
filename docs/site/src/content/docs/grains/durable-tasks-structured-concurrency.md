@@ -133,13 +133,7 @@ subscription, `Race`, `WhenAny`, or `WaitAsync` completes after the owner's canc
 and only an abort or the tree's deletion ends it. A workflow which waits for a payment
 shields the wait, so a payment which arrives after a cancellation still reaches it:
 
-```csharp
-var payment = await PaymentReceived.WaitAsync().Shielded();
-if (DurableTask.Current.IsCancellationRequested)
-{
-    await payments.RefundAsync(payment).WithId("refund").Shielded();
-}
-```
+:::code source="../snippets/compiled/Grains/DurableTaskConcurrencySnippets.cs" id="durable_tasks_shielded_wait" language="csharp":::
 
 ## Detach the work which outlives its starter
 

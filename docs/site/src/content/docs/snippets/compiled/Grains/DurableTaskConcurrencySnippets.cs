@@ -77,3 +77,35 @@ public sealed class TripGrain : DurableGrain, ITripGrain
     }
 }
 // </durable_tasks_trip_grain>
+
+[GenerateSerializer, Immutable]
+public sealed record TripPayment(string ChargeId, decimal Amount);
+
+public interface ITripPaymentsGrain : IGrainWithStringKey
+{
+    DurableTask<bool> RefundAsync(TripPayment payment);
+}
+
+public interface ITripCheckoutGrain : IGrainWithGuidKey
+{
+    DurableTask<TripPayment> AwaitPaymentAsync();
+}
+
+public sealed class TripCheckoutGrain : DurableGrain, ITripCheckoutGrain
+{
+    private static readonly DurableSignal<TripPayment> PaymentReceived = new("payment-received");
+
+    public async DurableTask<TripPayment> AwaitPaymentAsync()
+    {
+        var payments = GrainFactory.GetGrain<ITripPaymentsGrain>("payments");
+        // <durable_tasks_shielded_wait>
+        var payment = await PaymentReceived.WaitAsync().Shielded();
+        if (DurableTask.Current.IsCancellationRequested)
+        {
+            await payments.RefundAsync(payment).WithId("refund").Shielded();
+        }
+        // </durable_tasks_shielded_wait>
+        DurableTask.Current.CancellationToken.ThrowIfCancellationRequested();
+        return payment;
+    }
+}
