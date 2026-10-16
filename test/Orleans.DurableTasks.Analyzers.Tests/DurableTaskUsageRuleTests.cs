@@ -203,7 +203,7 @@ public class DurableTaskUsageRuleTests
         """);
 
     [Fact]
-    public Task CancellationHandlersFilterByIsCancellationRequested() => AnalyzerVerifier.VerifyAsync($$"""
+    public Task CancellationHandlersFilterByIsTaskCancellationRequested() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
         {{Members}}
@@ -221,7 +221,7 @@ public class DurableTaskUsageRuleTests
                 {
                     await Step(2).WithId("second");
                 }
-                catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+                catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
                 {
                     return 0;
                 }
@@ -229,6 +229,15 @@ public class DurableTaskUsageRuleTests
                 try
                 {
                     await Step(3).WithId("third");
+                }
+                {|ORLEANS0112:catch|} (OperationCanceledException) when (DurableTask.Current.CancellationToken.IsCancellationRequested)
+                {
+                    return 0;
+                }
+
+                try
+                {
+                    await Step(4).WithId("fourth");
                 }
                 catch (Exception)
                 {
@@ -245,7 +254,7 @@ public class DurableTaskUsageRuleTests
 
                 try
                 {
-                    await Step(4).WithId("fourth");
+                    await Step(5).WithId("fifth");
                 }
                 catch (InvalidOperationException)
                 {
