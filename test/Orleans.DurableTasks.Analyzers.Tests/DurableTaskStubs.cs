@@ -2,8 +2,8 @@ namespace Orleans.DurableTasks.Analyzers.Tests;
 
 /// <summary>
 /// Declares the durable task programming model, grain state, and signals by the metadata names which the analyzers match:
-/// <c>DurableTask.Current</c> returning <c>DurableTaskContext</c>, <c>DurableTask.Once</c>, <c>IsReplaying</c>,
-/// <c>ReplaySafe()</c>, the journaled state types, and grains.
+/// <c>DurableTask.Current</c> returning <c>DurableTaskContext</c> with its cancellation members, <c>DurableTask.Once</c>,
+/// <c>IsReplaying</c>, <c>ReplaySafe()</c>, the journaled state types, and grains.
 /// </summary>
 internal static class DurableTaskStubs
 {
@@ -48,10 +48,23 @@ internal static class DurableTaskStubs
             public abstract class DurableTaskContext
             {
                 public abstract DateTimeOffset UtcNow { get; }
-                public bool IsCancellationRequested => false;
-                public string? CancellationReason => null;
+                public bool IsTaskCancellationRequested => false;
+                public string? TaskCancellationReason => null;
                 public CancellationToken CancellationToken => default;
+                public CancellationToken AttemptCancellationToken => default;
                 public virtual bool IsReplaying => false;
+            }
+
+            public enum DurableTaskAttemptCancellationReason
+            {
+                ActivationStopping,
+                TaskAborted,
+                TaskDeleted,
+            }
+
+            public sealed class DurableTaskAttemptCanceledException : OperationCanceledException
+            {
+                public DurableTaskAttemptCancellationReason Reason { get; }
             }
 
             public readonly struct ConfiguredDurableTask
