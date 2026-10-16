@@ -210,7 +210,7 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
 
         // A removed legacy row is recreated only at the canonical encoded ID.
         await collection.UpdateOneAsync(
-            Filter.And(Filter.Eq(x => x.Id, id), IdentityFilter(entry.GrainId, entry.ReminderName)),
+            Filter.Eq(x => x.Id, id),
             update, Upsert, cancellationToken);
 
         return entry.ETag = document.Etag;

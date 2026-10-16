@@ -53,12 +53,9 @@ internal sealed class MultipleDeprecatedMembershipCollection : CollectionBase<Mo
     {
         var collection = GetCollection(cancellationToken);
         var id = MongoMembershipDocument.GetId(deploymentId, entry.SiloAddress);
-        if (id != MongoMembershipDocument.GetLegacyId(deploymentId, entry.SiloAddress))
-        {
-            var existing = await collection.Find(MongoMembershipDocument.IdentityFilter(deploymentId, entry.SiloAddress))
-                .FirstOrDefaultAsync(cancellationToken);
-            id = existing?.Id ?? id;
-        }
+        var existing = await collection.Find(MongoMembershipDocument.IdentityFilter(deploymentId, entry.SiloAddress))
+            .FirstOrDefaultAsync(cancellationToken);
+        id = existing?.Id ?? id;
 
         var document = MongoMembershipDocument.Create(entry, deploymentId, id);
 

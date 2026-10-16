@@ -109,7 +109,8 @@ per-silo membership storage. Provision a replica set for local tests that exerci
 transaction with a fresh session for each operation and an explicit primary read
 preference, including when the shared client prefers secondary reads. Membership async methods
 propagate cancellation to MongoDB commands, cursor reads, and transactions.
-Per-silo document IDs preserve complete native IPv6 addresses. Existing records
+New per-silo document IDs use a versioned encoding for both IPv4 and IPv6,
+separate from the legacy format, and preserve complete native IPv6 addresses. Existing records
 with legacy IPv4-mapped IDs remain readable and are updated in place using the
 stored full silo address to distinguish identities.
 
