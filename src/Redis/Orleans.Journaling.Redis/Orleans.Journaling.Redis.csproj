@@ -4,6 +4,7 @@
     <PackageId>Microsoft.Orleans.Journaling.Redis</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
@@ -26,9 +27,5 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\Orleans.Core\Configuration\ConfigurationValueParser.cs" Link="Configuration\ConfigurationValueParser.cs" />
   </ItemGroup>
 </Project>

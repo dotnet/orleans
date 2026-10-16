@@ -100,9 +100,9 @@ namespace Orleans.Configuration
 
         internal void Bind(IConfiguration cfg)
         {
-            if (ConfigurationValueParser.TryParseValue<int>(cfg, nameof(GatewayPort), out var gwPort))
+            if (ConfigurationValueParser.TryParseValue<int>(cfg, nameof(GatewayPort), out var gatewayPort))
             {
-                GatewayPort = gwPort;
+                GatewayPort = gatewayPort;
             }
 
             if (ConfigurationValueParser.TryParseValue<int>(cfg, nameof(SiloPort), out var siloPort))

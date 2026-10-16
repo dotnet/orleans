@@ -7,12 +7,14 @@ using Microsoft.Extensions.Configuration;
 namespace Orleans.Configuration;
 
 /// <summary>
-/// Parses optional typed values from configuration.
+/// Parses optional typed values from configuration without reflection.
 /// </summary>
 /// <remarks>
-/// Provider packages compile this file as linked source.
-/// An absent or empty value leaves the caller's default in place, and an invalid value throws the same
-/// <see cref="InvalidOperationException"/> message as <see cref="ConfigurationBinder"/>.
+/// Orleans.Core and Orleans.Runtime use this instead of <see cref="ConfigurationBinder.GetValue{T}(IConfiguration, string)"/>,
+/// which requires unreferenced code unless the configuration binding source generator is enabled. These assemblies
+/// cannot enable the generator because they bind options types with members the generator does not support.
+/// An absent or empty value leaves the caller's default in place. An invalid value, including a whitespace-only value, throws an
+/// <see cref="InvalidOperationException"/> in the style of <see cref="ConfigurationBinder"/>.
 /// </remarks>
 internal static class ConfigurationValueParser
 {
@@ -24,7 +26,7 @@ internal static class ConfigurationValueParser
     public static bool TryParseValue<T>(IConfiguration configuration, string key, [MaybeNullWhen(false)] out T value) where T : IParsable<T>
     {
         var text = configuration[key];
-        if (string.IsNullOrWhiteSpace(text))
+        if (string.IsNullOrEmpty(text))
         {
             value = default;
             return false;
@@ -46,7 +48,7 @@ internal static class ConfigurationValueParser
     public static bool TryParseIPEndPoint(IConfiguration configuration, string key, [NotNullWhen(true)] out IPEndPoint? value)
     {
         var text = configuration[key];
-        if (string.IsNullOrWhiteSpace(text))
+        if (string.IsNullOrEmpty(text))
         {
             value = null;
             return false;

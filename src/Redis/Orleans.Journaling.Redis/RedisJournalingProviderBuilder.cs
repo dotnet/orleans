@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Providers;
 using StackExchange.Redis;
@@ -45,20 +44,11 @@ internal sealed class RedisJournalingProviderBuilder : IProviderBuilder<ISiloBui
                 options.KeyPrefix = keyPrefix;
             }
 
-            if (ConfigurationValueParser.TryParseValue<long>(configurationSection, nameof(RedisJournalStorageOptions.CompactionThresholdBytes), out var compactionThresholdBytes))
-            {
-                options.CompactionThresholdBytes = compactionThresholdBytes;
-            }
+            options.CompactionThresholdBytes = configurationSection.GetValue(nameof(RedisJournalStorageOptions.CompactionThresholdBytes), options.CompactionThresholdBytes);
 
-            if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(RedisJournalStorageOptions.ReadChunkSize), out var readChunkSize))
-            {
-                options.ReadChunkSize = readChunkSize;
-            }
+            options.ReadChunkSize = configurationSection.GetValue(nameof(RedisJournalStorageOptions.ReadChunkSize), options.ReadChunkSize);
 
-            if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(RedisJournalStorageOptions.InitStage), out var initStage))
-            {
-                options.InitStage = initStage;
-            }
+            options.InitStage = configurationSection.GetValue(nameof(RedisJournalStorageOptions.InitStage), options.InitStage);
         });
 
         var journalFormatKey = configurationSection[nameof(JournaledStateManagerOptions.JournalFormatKey)];

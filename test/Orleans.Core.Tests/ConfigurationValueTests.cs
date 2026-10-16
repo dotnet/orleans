@@ -1,4 +1,5 @@
 #nullable enable
+using System.Diagnostics;
 using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,6 +47,11 @@ namespace NonSilo.Tests
         [InlineData(nameof(EndpointOptions.AdvertisedIPAddress), "not-an-address", typeof(IPAddress))]
         [InlineData(nameof(EndpointOptions.SiloListeningEndpoint), "not-an-endpoint", typeof(IPEndPoint))]
         [InlineData(nameof(EndpointOptions.GatewayListeningEndpoint), "not-an-endpoint", typeof(IPEndPoint))]
+        [InlineData(nameof(EndpointOptions.SiloPort), "   ", typeof(int))]
+        [InlineData(nameof(EndpointOptions.GatewayPort), "   ", typeof(int))]
+        [InlineData(nameof(EndpointOptions.AdvertisedIPAddress), "   ", typeof(IPAddress))]
+        [InlineData(nameof(EndpointOptions.SiloListeningEndpoint), "   ", typeof(IPEndPoint))]
+        [InlineData(nameof(EndpointOptions.GatewayListeningEndpoint), "   ", typeof(IPEndPoint))]
         public void SiloBuilder_InvalidEndpointValue_Throws(string key, string invalidValue, Type expectedType)
         {
             using var host = BuildSiloHost(($"Orleans:Endpoints:{key}", invalidValue));
@@ -53,25 +59,85 @@ namespace NonSilo.Tests
             var exception = Assert.Throws<InvalidOperationException>(
                 () => host.Services.GetRequiredService<IOptions<EndpointOptions>>().Value);
 
-            Assert.Equal($"Failed to convert configuration value at 'Orleans:Endpoints:{key}' to type '{expectedType}'.", exception.Message);
+            Assert.Contains($"at 'Orleans:Endpoints:{key}'", exception.Message);
+            Assert.Contains($"type '{expectedType}'", exception.Message);
+        }
+
+        [Theory]
+        [InlineData("not-a-boolean")]
+        [InlineData("   ")]
+        public void SiloBuilder_InvalidEnableDistributedTracing_Throws(string invalidValue)
+        {
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => BuildSiloHost(("Orleans:EnableDistributedTracing", invalidValue)));
+
+            Assert.Contains("at 'Orleans:EnableDistributedTracing'", exception.Message);
+            Assert.Contains($"type '{typeof(bool)}'", exception.Message);
+        }
+
+        [Theory]
+        [InlineData("not-a-boolean")]
+        [InlineData("   ")]
+        public void ClientBuilder_InvalidEnableDistributedTracing_Throws(string invalidValue)
+        {
+            var exception = Assert.Throws<InvalidOperationException>(
+                () => BuildClientHost(("Orleans:EnableDistributedTracing", invalidValue)));
+
+            Assert.Contains("at 'Orleans:EnableDistributedTracing'", exception.Message);
+            Assert.Contains($"type '{typeof(bool)}'", exception.Message);
         }
 
         [Fact]
-        public void SiloBuilder_InvalidEnableDistributedTracing_Throws()
+        public void SiloBuilder_EmptyEndpointValues_PreserveDefaults()
         {
-            var exception = Assert.Throws<InvalidOperationException>(
-                () => BuildSiloHost(("Orleans:EnableDistributedTracing", "not-a-boolean")));
+            using var host = BuildSiloHost(
+                ("Orleans:Endpoints:SiloPort", ""),
+                ("Orleans:Endpoints:GatewayPort", ""),
+                ("Orleans:Endpoints:AdvertisedIPAddress", ""),
+                ("Orleans:Endpoints:SiloListeningEndpoint", ""),
+                ("Orleans:Endpoints:GatewayListeningEndpoint", ""));
 
-            Assert.Equal($"Failed to convert configuration value at 'Orleans:EnableDistributedTracing' to type '{typeof(bool)}'.", exception.Message);
+            var options = host.Services.GetRequiredService<IOptions<EndpointOptions>>().Value;
+
+            Assert.Equal(EndpointOptions.DEFAULT_SILO_PORT, options.SiloPort);
+            Assert.Equal(EndpointOptions.DEFAULT_GATEWAY_PORT, options.GatewayPort);
+            Assert.Null(options.SiloListeningEndpoint);
+            Assert.Null(options.GatewayListeningEndpoint);
+        }
+
+        [Theory]
+        [InlineData("", false)]
+        [InlineData("false", false)]
+        [InlineData("true", true)]
+        public void SiloBuilder_EnableDistributedTracing_ConfiguresActivityPropagation(string value, bool expected)
+        {
+            using var host = BuildSiloHost(("Orleans:EnableDistributedTracing", value));
+
+            Assert.Equal(expected, host.Services.GetService<DistributedContextPropagator>() is not null);
+        }
+
+        [Theory]
+        [InlineData("", false)]
+        [InlineData("false", false)]
+        [InlineData("true", true)]
+        public void ClientBuilder_EnableDistributedTracing_ConfiguresActivityPropagation(string value, bool expected)
+        {
+            using var host = BuildClientHost(("Orleans:EnableDistributedTracing", value));
+
+            Assert.Equal(expected, host.Services.GetService<DistributedContextPropagator>() is not null);
         }
 
         [Fact]
-        public void ClientBuilder_InvalidEnableDistributedTracing_Throws()
+        public void ClientBuilder_EmptyStaticClusteringGateway_IsSkipped()
         {
-            var exception = Assert.Throws<InvalidOperationException>(
-                () => BuildClientHost(("Orleans:EnableDistributedTracing", "not-a-boolean")));
+            using var host = BuildClientHost(
+                ("Orleans:Clustering:ProviderType", "Static"),
+                ("Orleans:Clustering:Gateways:0", "10.0.0.1:30000"),
+                ("Orleans:Clustering:Gateways:1", ""));
 
-            Assert.Equal($"Failed to convert configuration value at 'Orleans:EnableDistributedTracing' to type '{typeof(bool)}'.", exception.Message);
+            var options = host.Services.GetRequiredService<IOptions<StaticGatewayListProviderOptions>>().Value;
+
+            Assert.Equal([new IPEndPoint(IPAddress.Parse("10.0.0.1"), 30000).ToGatewayUri()], options.Gateways);
         }
 
         [Fact]
@@ -89,16 +155,19 @@ namespace NonSilo.Tests
                 options.Gateways);
         }
 
-        [Fact]
-        public void ClientBuilder_InvalidStaticClusteringGateway_Throws()
+        [Theory]
+        [InlineData("not-an-endpoint")]
+        [InlineData("   ")]
+        public void ClientBuilder_InvalidStaticClusteringGateway_Throws(string invalidValue)
         {
             var exception = Assert.Throws<InvalidOperationException>(
                 () => BuildClientHost(
                     ("Orleans:Clustering:ProviderType", "Static"),
                     ("Orleans:Clustering:Gateways:0", "10.0.0.1:30000"),
-                    ("Orleans:Clustering:Gateways:1", "not-an-endpoint")));
+                    ("Orleans:Clustering:Gateways:1", invalidValue)));
 
-            Assert.Equal($"Failed to convert configuration value at 'Orleans:Clustering:Gateways:1' to type '{typeof(IPEndPoint)}'.", exception.Message);
+            Assert.Contains("at 'Orleans:Clustering:Gateways:1'", exception.Message);
+            Assert.Contains($"type '{typeof(IPEndPoint)}'", exception.Message);
         }
 
         [Fact]
@@ -111,9 +180,8 @@ namespace NonSilo.Tests
             var exception = Assert.Throws<InvalidOperationException>(
                 () => host.Services.GetRequiredService<IOptionsMonitor<MemoryGrainStorageOptions>>().Get("MyStorage"));
 
-            Assert.Equal(
-                $"Failed to convert configuration value at 'Orleans:GrainStorage:MyStorage:NumStorageGrains' to type '{typeof(int)}'.",
-                exception.Message);
+            Assert.Contains("at 'Orleans:GrainStorage:MyStorage:NumStorageGrains'", exception.Message);
+            Assert.Contains($"type '{typeof(int)}'", exception.Message);
         }
 
         private static IHost BuildSiloHost(params (string Key, string Value)[] settings)

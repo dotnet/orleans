@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Clustering.Cosmos;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
@@ -27,18 +26,12 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                 {
                     options.ContainerName = containerName;
                 }
-                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.IsResourceCreationEnabled), out var irce))
+                options.IsResourceCreationEnabled = configurationSection.GetValue(nameof(options.IsResourceCreationEnabled), options.IsResourceCreationEnabled);
+                if (configurationSection.GetValue<int?>(nameof(options.DatabaseThroughput)) is { } databaseThroughput)
                 {
-                    options.IsResourceCreationEnabled = irce;
+                    options.DatabaseThroughput = databaseThroughput;
                 }
-                if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(options.DatabaseThroughput), out var dt))
-                {
-                    options.DatabaseThroughput = dt;
-                }
-                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.CleanResourcesOnInitialization), out var croi))
-                {
-                    options.CleanResourcesOnInitialization = croi;
-                }
+                options.CleanResourcesOnInitialization = configurationSection.GetValue(nameof(options.CleanResourcesOnInitialization), options.CleanResourcesOnInitialization);
 
                 var serviceKey = configurationSection["ServiceKey"];
                 if (!string.IsNullOrEmpty(serviceKey))
@@ -77,18 +70,12 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                 {
                     options.ContainerName = containerName;
                 }
-                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.IsResourceCreationEnabled), out var irce))
+                options.IsResourceCreationEnabled = configurationSection.GetValue(nameof(options.IsResourceCreationEnabled), options.IsResourceCreationEnabled);
+                if (configurationSection.GetValue<int?>(nameof(options.DatabaseThroughput)) is { } databaseThroughput)
                 {
-                    options.IsResourceCreationEnabled = irce;
+                    options.DatabaseThroughput = databaseThroughput;
                 }
-                if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(options.DatabaseThroughput), out var dt))
-                {
-                    options.DatabaseThroughput = dt;
-                }
-                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.CleanResourcesOnInitialization), out var croi))
-                {
-                    options.CleanResourcesOnInitialization = croi;
-                }
+                options.CleanResourcesOnInitialization = configurationSection.GetValue(nameof(options.CleanResourcesOnInitialization), options.CleanResourcesOnInitialization);
 
                 var serviceKey = configurationSection["ServiceKey"];
                 if (!string.IsNullOrEmpty(serviceKey))

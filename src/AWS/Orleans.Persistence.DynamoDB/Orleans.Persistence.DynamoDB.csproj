@@ -6,6 +6,7 @@
     <Description>Microsoft Orleans persistence providers backed by AWS DynamoDB</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
@@ -32,10 +33,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\..\Orleans.Core\Configuration\ConfigurationValueParser.cs" Link="Configuration\ConfigurationValueParser.cs" />
   </ItemGroup>
 </Project>
 

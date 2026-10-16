@@ -118,33 +118,73 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => GetOptions(services));
 
-        Assert.Equal($"Failed to convert configuration value at 'Storage:{key}' to type '{expectedType}'.", exception.Message);
+        Assert.Contains($"at 'Storage:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
+    }
+
+    // The configuration binding source generator treats an empty value as absent on .NET 10 and rejects it on .NET 8.
+#if NET10_0_OR_GREATER
+    private static readonly bool EmptyValueIsAbsent = true;
+#else
+    private static readonly bool EmptyValueIsAbsent = false;
+#endif
+
+    [Theory]
+    [InlineData(nameof(DynamoDBStorageOptions.ReadCapacityUnits), typeof(int))]
+    [InlineData(nameof(DynamoDBStorageOptions.UseProvisionedThroughput), typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), typeof(TimeSpan))]
+    public void Configure_EmptyTypedValue_FollowsBinderContract(string key, Type expectedType)
+    {
+        var (builder, _) = ConfigureBuilder(PreconfigureNonDefaultValues, (key, ""));
+        using var services = builder.Services.BuildServiceProvider();
+
+        if (EmptyValueIsAbsent)
+        {
+            AssertPreconfiguredValues(GetOptions(services));
+            return;
+        }
+
+        var exception = Assert.Throws<InvalidOperationException>(() => GetOptions(services));
+        Assert.Contains($"at 'Storage:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Configure_BlankTypedValues_PreserveDefaults(string blankValue)
+    [InlineData(nameof(DynamoDBStorageOptions.ReadCapacityUnits), typeof(int))]
+    [InlineData(nameof(DynamoDBStorageOptions.UseProvisionedThroughput), typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), typeof(TimeSpan))]
+    public void Configure_WhitespaceTypedValue_Throws(string key, Type expectedType)
     {
-        var (builder, _) = ConfigureBuilder(
-            (nameof(DynamoDBStorageOptions.ReadCapacityUnits), blankValue),
-            (nameof(DynamoDBStorageOptions.WriteCapacityUnits), blankValue),
-            (nameof(DynamoDBStorageOptions.UseProvisionedThroughput), blankValue),
-            (nameof(DynamoDBStorageOptions.CreateIfNotExists), blankValue),
-            (nameof(DynamoDBStorageOptions.UpdateIfExists), blankValue),
-            (nameof(DynamoDBStorageOptions.DeleteStateOnClear), blankValue),
-            (nameof(DynamoDBStorageOptions.TimeToLive), blankValue));
+        var (builder, _) = ConfigureBuilder(PreconfigureNonDefaultValues, (key, "   "));
         using var services = builder.Services.BuildServiceProvider();
 
-        var options = GetOptions(services);
+        var exception = Assert.Throws<InvalidOperationException>(() => GetOptions(services));
 
-        Assert.Equal(10, options.ReadCapacityUnits);
-        Assert.Equal(5, options.WriteCapacityUnits);
-        Assert.True(options.UseProvisionedThroughput);
-        Assert.True(options.CreateIfNotExists);
-        Assert.True(options.UpdateIfExists);
-        Assert.False(options.DeleteStateOnClear);
-        Assert.Null(options.TimeToLive);
+        Assert.Contains($"at 'Storage:{key}'", exception.Message);
+        Assert.Contains($"type '{expectedType}'", exception.Message);
+    }
+
+    [Fact]
+    public void Configure_AbsentTypedValues_PreservePreconfiguredValues()
+    {
+        var (builder, _) = ConfigureBuilder(PreconfigureNonDefaultValues);
+        using var services = builder.Services.BuildServiceProvider();
+
+        AssertPreconfiguredValues(GetOptions(services));
+    }
+
+    private static void PreconfigureNonDefaultValues(DynamoDBStorageOptions options)
+    {
+        options.ReadCapacityUnits = 23;
+        options.UseProvisionedThroughput = false;
+        options.TimeToLive = TimeSpan.FromHours(1);
+    }
+
+    private static void AssertPreconfiguredValues(DynamoDBStorageOptions options)
+    {
+        Assert.Equal(23, options.ReadCapacityUnits);
+        Assert.False(options.UseProvisionedThroughput);
+        Assert.Equal(TimeSpan.FromHours(1), options.TimeToLive);
     }
 
     [Fact]
@@ -300,6 +340,11 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
 
     private static (TestSiloBuilder Builder, IGrainStorageSerializer DefaultSerializer) ConfigureBuilder(
         params (string Key, string? Value)[] settings)
+        => ConfigureBuilder(_ => { }, settings);
+
+    private static (TestSiloBuilder Builder, IGrainStorageSerializer DefaultSerializer) ConfigureBuilder(
+        Action<DynamoDBStorageOptions> preconfigure,
+        params (string Key, string? Value)[] settings)
     {
         var values = settings.ToDictionary(
             setting => $"Storage:{setting.Key}",
@@ -310,6 +355,7 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
         var builder = new TestSiloBuilder(configuration);
         var defaultSerializer = new FakeGrainStorageSerializer();
         builder.Services.AddSingleton<IGrainStorageSerializer>(defaultSerializer);
+        builder.Services.Configure(ProviderName, preconfigure);
 
         new DynamoDBGrainStorageProviderBuilder().Configure(
             builder,
