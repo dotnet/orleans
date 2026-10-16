@@ -14,7 +14,7 @@ using Xunit;
 namespace Orleans.MongoDB.Tests.Reminders;
 
 [TestProvider("MongoDB"), TestSuite("BVT"), TestArea("Reminders")]
-public sealed class MongoReminderTableTests : IAsyncLifetime
+public sealed class MongoReminderTableTests(ITestOutputHelper output) : IAsyncLifetime
 {
     private MongoDatabase? database;
     private ReminderRunner? runner;
@@ -28,6 +28,13 @@ public sealed class MongoReminderTableTests : IAsyncLifetime
         }
 
     }
+
+    [Fact, TestCategory("ModelBased")]
+    public Task ReminderTable_ModelBasedGeneratedConformance()
+        => new ReminderTableModelBasedTestRunner(
+            Runner.ReminderTable,
+            new ReminderTableModelBasedConformanceOptions { ProviderName = "MongoDB", Seed = 6143 },
+            output.WriteLine).RunGeneratedConformanceTests(Token);
 
     private sealed class ReminderRunner(IReminderTable table)
         : ReminderTableTestRunner(table, "MongoDB", seed: 6143);

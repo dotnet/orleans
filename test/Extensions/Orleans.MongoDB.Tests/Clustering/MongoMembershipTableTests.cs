@@ -41,9 +41,7 @@ public abstract class MongoMembershipTestsBase(ITestOutputHelper output) : IAsyn
             return;
 
         database = await MongoDatabase.CreateAsync();
-        fixture = new MembershipTableTestFixture($"MongoDB/{Strategy}",
-            clusterId => database.CreateMembershipTable(clusterId, Strategy),
-            IsClusterDeletedAsync);
+        fixture = CreateFixture();
         try
         {
             await fixture.InitializeAsync(Token);
@@ -55,6 +53,21 @@ public abstract class MongoMembershipTestsBase(ITestOutputHelper output) : IAsyn
             database = null;
             throw;
         }
+    }
+
+    private MembershipTableTestFixture CreateFixture()
+        => new($"MongoDB/{Strategy}",
+            clusterId => database!.CreateMembershipTable(clusterId, Strategy),
+            IsClusterDeletedAsync);
+
+    [Fact, TestCategory("ModelBased")]
+    public Task MembershipTable_ModelBasedGeneratedConformance()
+    {
+        MongoDatabase.RequireConnection();
+        return new MembershipTableModelBasedTestRunner(
+            CreateFixture,
+            new MembershipTableModelBasedConformanceOptions { ProviderName = $"MongoDB/{Strategy}", Seed = 6143 },
+            output.WriteLine).RunGeneratedConformanceTests(Token);
     }
 
     private async ValueTask<bool> IsClusterDeletedAsync(string clusterId, CancellationToken token)

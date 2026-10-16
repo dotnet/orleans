@@ -17,7 +17,7 @@ namespace Orleans.MongoDB.Tests.Persistence;
 public enum MongoSerializerKind { Json, Bson, Binary }
 
 [TestProvider("MongoDB"), TestSuite("BVT"), TestArea("Persistence")]
-public sealed class MongoJsonGrainStorageTests : MongoGrainStorageTestsBase
+public sealed class MongoJsonGrainStorageTests(ITestOutputHelper output) : MongoGrainStorageTestsBase(output)
 {
     protected override MongoSerializerKind SerializerKind => MongoSerializerKind.Json;
     [Fact] public Task LegacyRawDocument_NullEtagReadAndUpgradePreserveQueryableState() => CheckLegacyRawDocument();
@@ -25,7 +25,7 @@ public sealed class MongoJsonGrainStorageTests : MongoGrainStorageTestsBase
 }
 
 [TestProvider("MongoDB"), TestSuite("BVT"), TestArea("Persistence")]
-public sealed class MongoBsonGrainStorageTests : MongoGrainStorageTestsBase
+public sealed class MongoBsonGrainStorageTests(ITestOutputHelper output) : MongoGrainStorageTestsBase(output)
 {
     protected override MongoSerializerKind SerializerKind => MongoSerializerKind.Bson;
     [Fact] public Task LegacyRawDocument_NullEtagReadAndUpgradePreserveQueryableState() => CheckLegacyRawDocument();
@@ -33,12 +33,12 @@ public sealed class MongoBsonGrainStorageTests : MongoGrainStorageTestsBase
 }
 
 [TestProvider("MongoDB"), TestSuite("BVT"), TestArea("Persistence")]
-public sealed class MongoBinaryGrainStorageTests : MongoGrainStorageTestsBase
+public sealed class MongoBinaryGrainStorageTests(ITestOutputHelper output) : MongoGrainStorageTestsBase(output)
 {
     protected override MongoSerializerKind SerializerKind => MongoSerializerKind.Binary;
 }
 
-public abstract class MongoGrainStorageTestsBase : IAsyncLifetime
+public abstract class MongoGrainStorageTestsBase(ITestOutputHelper output) : IAsyncLifetime
 {
     private MongoDatabase? database;
     private IHost? host;
@@ -104,6 +104,11 @@ public abstract class MongoGrainStorageTestsBase : IAsyncLifetime
     }
 
     private sealed class StorageRunner(IGrainStorage storage) : GrainStorageTestRunner(storage);
+
+    [Fact, TestCategory("ModelBased")]
+    public Task PersistenceStorage_ModelBasedGeneratedConformance()
+        => new GrainStorageModelBasedTestRunner(Storage, $"MongoDB/{SerializerKind}", output.WriteLine)
+            .RunGeneratedConformanceTests(Token);
 
     [Fact] public Task PersistenceStorage_WriteReadIdCyrillic() => Runner.PersistenceStorage_WriteReadIdCyrillicAsync(Token);
     [Fact] public Task PersistenceStorage_WriteDuplicateFailsWithInconsistentStateException() => Runner.PersistenceStorage_WriteDuplicateFailsWithInconsistentStateExceptionAsync(Token);
