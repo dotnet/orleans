@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
-using Orleans.CodeGeneration;
 using Orleans.Runtime.Internal;
 using Orleans.Serialization.Invocation;
 using Orleans.Timers;
@@ -12,15 +11,13 @@ namespace Orleans.Runtime;
 
 internal abstract partial class GrainTimer : IGrainTimer
 {
-    protected static readonly GrainInterfaceType InvokableInterfaceType = GrainInterfaceType.Create("Orleans.Runtime.IGrainTimerInvoker");
     protected static readonly TimerCallback TimerCallback = (state) => ((GrainTimer)state!).ScheduleTickOnActivation();
     protected static readonly MethodInfo InvokableMethodInfo = typeof(IGrainTimerInvoker).GetMethod(nameof(IGrainTimerInvoker.InvokeCallbackAsync), BindingFlags.Instance | BindingFlags.Public)!;
     private readonly CancellationTokenSource _cts = new();
     private readonly ITimer _timer;
     private readonly IGrainContext _grainContext;
     private readonly TimerRegistry _shared;
-    private readonly bool _interleave;
-    private readonly bool _keepAlive;
+    private readonly LocalRequestOptions _options;
     private readonly TimerTickInvoker _invoker;
     private TimerState _state;
     // The current arm while idle; the next delay once a tick is queued. Change replaces it.
@@ -39,8 +36,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         ArgumentNullException.ThrowIfNull(shared);
         ArgumentNullException.ThrowIfNull(grainContext);
 
-        _interleave = interleave;
-        _keepAlive = keepAlive;
+        _options = new() { Interleave = interleave, KeepAlive = keepAlive };
         _shared = shared;
         _grainContext = grainContext;
         _dueTime = Timeout.InfiniteTimeSpan;
@@ -70,6 +66,17 @@ internal abstract partial class GrainTimer : IGrainTimer
     }
 
     private ILogger Logger => _shared.TimerLogger;
+
+    private bool IsDisposed
+    {
+        get
+        {
+            lock (_cts)
+            {
+                return _state == TimerState.Disposed;
+            }
+        }
+    }
 
     [DoesNotReturn]
     private static void ThrowIncorrectGrainContext() => throw new InvalidOperationException("Current grain context differs from specified grain context.");
@@ -107,21 +114,7 @@ internal abstract partial class GrainTimer : IGrainTimer
     {
         try
         {
-            // Timer requests start a new call chain, including ticks queued immediately during registration.
-            var msg = _shared.MessageFactory.CreateMessage(body: _invoker, options: InvokeMethodOptions.OneWay, requestContextData: null);
-            msg.SetInfiniteTimeToLive();
-            msg.SendingGrain = _grainContext.GrainId;
-            msg.TargetGrain = _grainContext.GrainId;
-            msg.SendingSilo = _shared.LocalSiloDetails.SiloAddress;
-            msg.TargetSilo = _shared.LocalSiloDetails.SiloAddress;
-            msg.InterfaceType = InvokableInterfaceType;
-            msg.IsKeepAlive = _keepAlive;
-            msg.IsAlwaysInterleave = _interleave;
-
-            // Prevent the message from being forwarded in the case of deactivation.
-            msg.IsLocalOnly = true;
-
-            _grainContext.ReceiveMessage(msg);
+            _grainContext.ReceiveLocalRequest(_invoker, _options);
         }
         catch (Exception exception)
         {
@@ -177,7 +170,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             GrainTimerEvents.EmitTickStop(GrainContext, this, exc);
             OnTickCompleted();
-            return new(OnCallbackException(exc));
+            return new(Response.FromException(exc));
         }
     }
 
@@ -202,12 +195,6 @@ internal abstract partial class GrainTimer : IGrainTimer
         }
     }
 
-    private Response OnCallbackException(Exception exc)
-    {
-        LogWarningCallbackException(Logger, exc, this);
-        return Response.FromException(exc);
-    }
-
     private async ValueTask<Response> AwaitCallbackTask(Task task)
     {
         try
@@ -224,7 +211,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             GrainTimerEvents.EmitTickStop(GrainContext, this, exc);
 
-            return OnCallbackException(exc);
+            return Response.FromException(exc);
         }
         finally
         {
@@ -307,7 +294,7 @@ internal abstract partial class GrainTimer : IGrainTimer
 
     public override string ToString() => $"[{GetType()}] Grain: '{_grainContext}'";
 
-    private sealed class TimerTickInvoker(GrainTimer timer) : IInvokable, IGrainTimerInvoker
+    private sealed class TimerTickInvoker(GrainTimer timer) : ILocalRequest, IGrainTimerInvoker
     {
         public object? GetTarget() => this;
 
@@ -320,6 +307,16 @@ internal abstract partial class GrainTimer : IGrainTimer
         }
 
         public ValueTask<Response> Invoke() => timer.InvokeGrainTimerCallbackAsync();
+
+        // No caller observes a tick, so the tick logs its failures, including call filter failures.
+        // An activation disposes its timers before it rejects their queued ticks, so a disposed timer's failures are expected.
+        public void Complete(Response response)
+        {
+            if (response.Exception is { } exception && !timer.IsDisposed)
+            {
+                LogWarningCallbackException(timer.Logger, exception, timer);
+            }
+        }
 
         // This method is declared for the sake of IGrainTimerCore, but it is not intended to be called directly.
         // It exists for grain call interceptors which inspect the implementation method.
@@ -374,7 +371,7 @@ internal abstract partial class GrainTimer : IGrainTimer
     [LoggerMessage(
         EventId = (int)ErrorCode.Timer_GrainTimerCallbackError,
         Level = LogLevel.Warning,
-        Message = "Caught and ignored exception thrown from timer callback for timer '{Timer}'."
+        Message = "Caught and ignored exception thrown from timer tick for timer '{Timer}'."
     )]
     private static partial void LogWarningCallbackException(ILogger logger, Exception exception, GrainTimer timer);
 

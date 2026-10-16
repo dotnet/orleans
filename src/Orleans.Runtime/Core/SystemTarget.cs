@@ -375,6 +375,10 @@ namespace Orleans.Runtime
         }
 
         /// <inheritdoc/>
+        void IGrainContext.ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options)
+            => ReceiveMessage(RuntimeClient.CreateLocalRequest(this, request, options));
+
+        /// <inheritdoc/>
         public object? GetTarget() => this;
 
         /// <inheritdoc/>

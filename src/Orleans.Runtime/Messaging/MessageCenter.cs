@@ -270,6 +270,7 @@ namespace Orleans.Runtime.Messaging
             Exception? exc,
             string? rejectInfo = null)
         {
+            Debug.Assert(!message.IsLocalOnly);
             try
             {
                 if (message.Direction == Message.Directions.Request
@@ -541,6 +542,7 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendResponse(Message request, Response response)
         {
+            Debug.Assert(!request.IsLocalOnly);
             // create the response
             var message = this.messageFactory.CreateResponseMessage(request);
             message.BodyObject = response;

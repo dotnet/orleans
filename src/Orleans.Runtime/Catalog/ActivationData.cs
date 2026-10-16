@@ -524,27 +524,6 @@ internal sealed partial class ActivationData :
         }
     }
 
-    internal List<Message> DequeueAllWaitingRequests()
-    {
-        lock (_lock)
-        {
-            var result = new List<Message>(_waitingRequests.Count);
-            foreach (var (message, _) in _waitingRequests)
-            {
-                // Local-only messages are not allowed to escape the activation.
-                if (message.IsLocalOnly)
-                {
-                    continue;
-                }
-
-                result.Add(message);
-            }
-
-            _waitingRequests.Clear();
-            return result;
-        }
-    }
-
     /// <summary>
     /// Returns how long this activation has been idle.
     /// </summary>
@@ -1175,11 +1154,16 @@ internal sealed partial class ActivationData :
 
         void ProcessPendingRequests()
         {
+            // Requests which this activation will not process are removed from the queue under the lock and rejected or forwarded
+            // after it is released, since that can deliver messages to other activations and complete local requests, which can
+            // queue further requests on this activation.
+            List<Message>? unprocessableRequests = null;
             var i = 0;
 
             do
             {
                 Message? message = null;
+                Exception? rejection = null;
                 lock (_lock)
                 {
                     if (_waitingRequests.Count <= i)
@@ -1193,7 +1177,7 @@ internal sealed partial class ActivationData :
                     // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
                     if (State != ActivationState.Valid && !(message.IsLocalOnly && State is ActivationState.Deactivating))
                     {
-                        ProcessRequestsToInvalidActivation();
+                        unprocessableRequests = DequeueUnprocessableRequests();
                         break;
                     }
 
@@ -1249,26 +1233,33 @@ internal sealed partial class ActivationData :
                     }
                     catch (Exception exception)
                     {
-                        if (!message.IsLocalOnly)
-                        {
-                            _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
-                        }
-
-                        _waitingRequests.RemoveAt(i);
-                        continue;
+                        rejection = exception;
                     }
 
-                    // Process this message, removing it from the queue.
+                    // Remove the message from the queue to either process or reject it.
                     _waitingRequests.RemoveAt(i);
+                    if (rejection is null)
+                    {
+                        Debug.Assert(State == ActivationState.Valid || message.IsLocalOnly);
+                        RecordRunning(message, message.IsAlwaysInterleave);
+                    }
+                }
 
-                    Debug.Assert(State == ActivationState.Valid || message.IsLocalOnly);
-                    RecordRunning(message, message.IsAlwaysInterleave);
+                if (rejection is not null)
+                {
+                    RejectRequest(message, rejection);
+                    continue;
                 }
 
                 // Start invoking the message outside of the lock
                 InvokeIncomingRequest(message);
             }
             while (true);
+
+            if (unprocessableRequests is not null)
+            {
+                RejectOrForwardRequests(unprocessableRequests);
+            }
         }
 
         void RecordRunning(Message message, bool isInterleavable)
@@ -1284,12 +1275,14 @@ internal sealed partial class ActivationData :
             _busyDuration = stopwatch;
         }
 
-        void ProcessRequestsToInvalidActivation()
+        // Called with the lock held. Dequeues the waiting requests once this activation can no longer process them,
+        // or returns null while it may still process them.
+        List<Message>? DequeueUnprocessableRequests()
         {
             if (State is ActivationState.Creating or ActivationState.Activating)
             {
                 // Do nothing until the activation becomes either valid or invalid
-                return;
+                return null;
             }
 
             if (State is ActivationState.Deactivating)
@@ -1312,21 +1305,18 @@ internal sealed partial class ActivationData :
                 {
                     // Do not forward messages while the grain is still deactivating and has not been declared stuck, since they
                     // will be forwarded to the same grain instance.
-                    return;
+                    return null;
                 }
             }
 
-            if (DeactivationException is null || ForwardingAddress is { })
+            var requests = new List<Message>(_waitingRequests.Count);
+            foreach (var (message, _) in _waitingRequests)
             {
-                // Either this was a duplicate activation or it was at some point successfully activated
-                // Forward all pending messages
-                RerouteAllQueuedMessages();
+                requests.Add(message);
             }
-            else
-            {
-                // Reject all pending messages
-                RejectAllQueuedMessages();
-            }
+
+            _waitingRequests.Clear();
+            return requests;
         }
 
         void AbandonStuckDeactivatingActivation()
@@ -1695,6 +1685,13 @@ internal sealed partial class ActivationData :
         }
     }
 
+    public void ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options)
+    {
+        var message = _shared.InternalRuntime.RuntimeClient.CreateLocalRequest(this, request, options);
+        _shared.InternalRuntime.MessagingTrace.OnDispatcherReceiveMessage(message);
+        ReceiveRequest(message);
+    }
+
     private void ReceiveResponse(Message message)
     {
         var state = State;
@@ -1730,52 +1727,68 @@ internal sealed partial class ActivationData :
     }
 
     /// <summary>
-    /// Rejects all messages enqueued for the provided activation.
+    /// Rejects a request which this activation removed from its queue without processing it.
     /// </summary>
-    private void RejectAllQueuedMessages()
+    private void RejectRequest(Message message, Exception exception)
     {
-        lock (_lock)
+        if (message.IsLocalOnly)
         {
-            List<Message> msgs = DequeueAllWaitingRequests();
-            if (msgs == null || msgs.Count <= 0) return;
-
-            LogRejectAllQueuedMessages(_shared.Logger, msgs.Count, this);
-            _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
-            _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
-                msgs,
-                Address,
-                forwardingAddress: ForwardingAddress,
-                failedOperation: DeactivationReason.Description,
-                exc: DeactivationException,
-                rejectMessages: true);
+            LocalRequests.Reject(message, exception, _shared.Logger);
+        }
+        else
+        {
+            _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
         }
     }
 
-    private void RerouteAllQueuedMessages()
+    /// <summary>
+    /// Rejects or forwards requests which this activation dequeued once it could no longer process them.
+    /// </summary>
+    /// <remarks>
+    /// Requests are forwarded if this was a duplicate activation or it was at some point successfully activated, and rejected otherwise.
+    /// Local requests never leave the activation, so they are rejected.
+    /// </remarks>
+    private void RejectOrForwardRequests(List<Message> requests)
     {
-        lock (_lock)
+        foreach (var message in requests)
         {
-            List<Message> msgs = DequeueAllWaitingRequests();
-            if (msgs is not { Count: > 0 })
+            if (message.IsLocalOnly)
             {
-                return;
+                RejectRequest(message, new OrleansMessageRejectionException($"Activation {this} is no longer valid."));
             }
-
-            if (_shared.Logger.IsEnabled(LogLevel.Debug))
-            {
-                if (ForwardingAddress is { } address)
-                {
-                    LogReroutingMessages(_shared.Logger, msgs.Count, this, address);
-                }
-                else
-                {
-                    LogReroutingMessagesNoForwarding(_shared.Logger, msgs.Count, this);
-                }
-            }
-
-            _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
-            _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(msgs, Address, ForwardingAddress, DeactivationReason.Description, DeactivationException);
         }
+
+        requests.RemoveAll(static message => message.IsLocalOnly);
+        if (requests.Count == 0)
+        {
+            return;
+        }
+
+        var reject = DeactivationException is not null && ForwardingAddress is null;
+        if (reject)
+        {
+            LogRejectAllQueuedMessages(_shared.Logger, requests.Count, this);
+        }
+        else if (_shared.Logger.IsEnabled(LogLevel.Debug))
+        {
+            if (ForwardingAddress is { } address)
+            {
+                LogReroutingMessages(_shared.Logger, requests.Count, this, address);
+            }
+            else
+            {
+                LogReroutingMessagesNoForwarding(_shared.Logger, requests.Count, this);
+            }
+        }
+
+        _shared.InternalRuntime.GrainLocator.InvalidateCache(Address);
+        _shared.InternalRuntime.MessageCenter.ProcessRequestsToInvalidActivation(
+            requests,
+            Address,
+            ForwardingAddress,
+            DeactivationReason.Description,
+            DeactivationException,
+            rejectMessages: reject);
     }
 
     #region Activation

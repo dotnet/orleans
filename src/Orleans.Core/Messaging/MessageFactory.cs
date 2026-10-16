@@ -52,6 +52,33 @@ namespace Orleans.Runtime
             return new CorrelationId(unchecked((long)id));
         }
 
+        // Incoming grain calls carry an interface type. Local requests share this one, and call filters observe each request's own interface name.
+        private static readonly GrainInterfaceType LocalRequestInterfaceType = GrainInterfaceType.Create("Orleans.Runtime.ILocalRequest");
+
+        /// <summary>
+        /// Creates a one-way request which <paramref name="target"/> queues on itself.
+        /// </summary>
+        /// <remarks>
+        /// The request starts a new call chain, never expires, and completes on <paramref name="target"/> or is rejected with it.
+        /// Local-only messages always carry an <see cref="ILocalRequest"/> body.
+        /// </remarks>
+        public Message CreateLocalRequest(IGrainContext target, ILocalRequest request, LocalRequestOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            var siloAddress = target.Address.SiloAddress;
+            var message = CreateMessage(request, InvokeMethodOptions.OneWay, requestContextData: null);
+            message.SetInfiniteTimeToLive();
+            message.SendingGrain = target.GrainId;
+            message.TargetGrain = target.GrainId;
+            message.SendingSilo = siloAddress;
+            message.TargetSilo = siloAddress;
+            message.InterfaceType = LocalRequestInterfaceType;
+            message.IsKeepAlive = options.KeepAlive;
+            message.IsAlwaysInterleave = options.Interleave;
+            message.IsLocalOnly = true;
+            return message;
+        }
+
         public Message CreateResponseMessage(Message request)
         {
             var response = new Message

@@ -991,6 +991,8 @@ namespace Orleans.Runtime
 
         public void Migrate(System.Collections.Generic.Dictionary<string, object>? requestContext, System.Threading.CancellationToken cancellationToken) { }
 
+        void IGrainContext.ReceiveLocalRequest(ILocalRequest request, LocalRequestOptions options) { }
+
         object? Orleans.Serialization.Invocation.ITargetHolder.GetComponent(System.Type componentType) { throw null; }
 
         public void ReceiveMessage(object message) { }
