@@ -12,30 +12,30 @@ public class DurableTaskCancellationReasonTests
     private static CancellationToken TestCancellation => Xunit.TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task FirstRequestDeterminesTheReason()
+    public void FirstRequestDeterminesTheReason()
     {
         var context = new TestHost(DateTimeOffset.UnixEpoch).CreateContext(TaskId.CreateRoot("root"));
-        Assert.Null(context.CancellationReason);
+        Assert.Null(context.TaskCancellationReason);
 
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "buyer", TestCancellation);
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "operator", TestCancellation);
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, TestCancellation);
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "buyer");
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "operator");
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
 
-        Assert.True(context.IsCancellationRequested);
+        Assert.True(context.IsTaskCancellationRequested);
         Assert.True(context.CancellationToken.IsCancellationRequested);
-        Assert.Equal("buyer", context.CancellationReason);
+        Assert.Equal("buyer", context.TaskCancellationReason);
     }
 
     [Fact]
-    public async Task RequestWithoutReasonKeepsTheReasonEmpty()
+    public void RequestWithoutReasonKeepsTheReasonEmpty()
     {
         var context = new TestHost(DateTimeOffset.UnixEpoch).CreateContext(TaskId.CreateRoot("root"));
 
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, TestCancellation);
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "late", TestCancellation);
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context);
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "late");
 
-        Assert.True(context.IsCancellationRequested);
-        Assert.Null(context.CancellationReason);
+        Assert.True(context.IsTaskCancellationRequested);
+        Assert.Null(context.TaskCancellationReason);
     }
 
     [Fact]
@@ -52,33 +52,27 @@ public class DurableTaskCancellationReasonTests
                     await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                     return "completed";
                 }
-                catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+                catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
                 {
-                    return DurableTask.Current.CancellationReason;
+                    return DurableTask.Current.TaskCancellationReason;
                 }
             }),
             context).AsTask();
         await started.Task.WaitAsync(TestCancellation);
 
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "Cancelled by the buyer", TestCancellation);
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "Cancelled by the buyer");
 
         Assert.Equal("Cancelled by the buyer", (await run.WaitAsync(TestCancellation)).GetResult<string>());
     }
 
     [Fact]
-    public async Task DurableCallbackReadsTheReason()
+    public void TokenObserverReadsTheReason()
     {
         var context = new TestHost(DateTimeOffset.UnixEpoch).CreateContext(TaskId.CreateRoot("root"));
         string? observed = null;
-        await using var registration = await context.RegisterCancellationCallbackAsync(
-            _ =>
-            {
-                observed = DurableTask.Current.CancellationReason;
-                return ValueTask.CompletedTask;
-            },
-            TestCancellation);
+        using var registration = context.CancellationToken.Register(() => observed = context.TaskCancellationReason);
 
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "operator", TestCancellation);
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "operator");
 
         Assert.Equal("operator", observed);
     }
@@ -88,10 +82,10 @@ public class DurableTaskCancellationReasonTests
     {
         // A host replays a canceled task by requesting cancellation with the recorded reason before the body runs.
         var context = new TestHost(DateTimeOffset.UnixEpoch).CreateContext(TaskId.CreateRoot("root"));
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "recorded", TestCancellation);
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "recorded");
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
-            DurableTask.Run(_ => (DurableTask.Current.IsCancellationRequested, DurableTask.Current.CancellationReason)),
+            DurableTask.Run(_ => (DurableTask.Current.IsTaskCancellationRequested, DurableTask.Current.TaskCancellationReason)),
             context);
 
         Assert.Equal((true, "recorded"), response.GetResult<(bool, string?)>());

@@ -107,13 +107,19 @@ internal sealed class CompletedDurableTask<TResult>(TResult value) : DurableTask
 internal sealed class DelayDurableTask(TimeSpan duration) : DurableTask
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
-        => context.ScheduleDelayAsync(context.Id, context.UtcNow + duration, context.CancellationToken);
+    {
+        context.ThrowIfAttemptCanceled();
+        return context.ObserveAttempt(context.ScheduleDelayAsync(context.Id, context.UtcNow + duration, context.CancellationToken));
+    }
 }
 
 internal sealed class DelayUntilDurableTask(DateTimeOffset dueTime) : DurableTask
 {
     protected internal override ValueTask<DurableTaskResponse> RunAsync(DurableTaskContext context)
-        => context.ScheduleDelayAsync(context.Id, dueTime, context.CancellationToken);
+    {
+        context.ThrowIfAttemptCanceled();
+        return context.ObserveAttempt(context.ScheduleDelayAsync(context.Id, dueTime, context.CancellationToken));
+    }
 }
 
 /// <summary>Runs delegate bodies and reports their completion to the execution context.</summary>
@@ -358,6 +364,7 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
 
     internal async Task<DurableTaskResponse> RunAsync(CancellationToken cancellationToken)
     {
+        ParentContext?.ThrowIfAttemptCanceled();
         if (ParentContext is { } parent && !_detached)
         {
             // The shield follows this method's asynchronous flow, and ends when the method returns to its caller.
@@ -379,7 +386,7 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
         }
 
         var started = await StartAsync(DurableTaskStartOptions.None, cancellationToken).ConfigureAwait(false);
-        return started.Response ?? await started.Handle!.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return started.Response ?? await HostHandleOperations.WaitAsync(started.Handle!, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -394,12 +401,14 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
         var taskId = GetOrCreateId();
         if (ParentContext is { } parent)
         {
+            parent.ThrowIfAttemptCanceled();
             if (_shielded)
             {
                 parent.EnterShield();
             }
 
-            var handle = await parent.StartTaskAsync(taskId, Task, options | GetDetachedOption(), cancellationToken).ConfigureAwait(false);
+            var handle = await parent.ObserveAttempt(parent.StartTaskAsync(taskId, Task, options | GetDetachedOption(), cancellationToken))
+                .ConfigureAwait(false);
             return (handle.TaskId, null, handle);
         }
 
@@ -419,6 +428,7 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
             return GetSchedulableTask().Post(taskId);
         }
 
+        parent.ThrowIfAttemptCanceled();
         var previousShield = _shielded ? parent.EnterShield() : null;
         try
         {
@@ -446,7 +456,13 @@ internal readonly struct ConfiguredDurableTaskCore<TTask> where TTask : DurableT
                 "Within a durable execution, a detached task is observed through the handle which ScheduleAsync or Post returns.");
         }
 
-        return ParentContext is { } parent ? parent.GetChildTaskHandle(_taskId) : GetSchedulableTask().GetHandle(_taskId);
+        if (ParentContext is { } parent)
+        {
+            parent.ThrowIfAttemptCanceled();
+            return parent.GetChildTaskHandle(_taskId);
+        }
+
+        return GetSchedulableTask().GetHandle(_taskId);
     }
 
     private DurableTaskStartOptions GetDetachedOption() => _detached ? DurableTaskStartOptions.Detached : DurableTaskStartOptions.None;
@@ -534,22 +550,22 @@ public readonly struct ConfiguredDurableTask
 
     /// <summary>Requests durable cancellation.</summary>
     public ValueTask CancelAsync(CancellationToken cancellationToken = default)
-        => _core.GetHandle().CancelAsync(cancellationToken);
+        => HostHandleOperations.CancelAsync(_core.GetHandle(), cancellationToken);
 
     /// <summary>Requests durable cancellation carrying <paramref name="reason"/>.</summary>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.TaskCancellationReason"/> reports, or
     /// <see langword="null"/> for none. The first request determines the reason.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
     public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken = default)
-        => _core.GetHandle().CancelAsync(reason, cancellationToken);
+        => HostHandleOperations.CancelAsync(_core.GetHandle(), reason, cancellationToken);
 
     /// <summary>Polls the task and returns its current status.</summary>
     public async Task<DurableTaskStatus> PollAsync(
         PollingOptions options = default,
         CancellationToken cancellationToken = default)
-        => (await _core.GetHandle().PollAsync(options, cancellationToken).ConfigureAwait(false)).Status;
+        => (await HostHandleOperations.PollAsync(_core.GetHandle(), options, cancellationToken).ConfigureAwait(false)).Status;
 }
 
 /// <summary>Configures and starts a durable task with a result.</summary>
@@ -593,20 +609,20 @@ public readonly struct ConfiguredDurableTask<TResult>
 
     /// <summary>Requests durable cancellation.</summary>
     public ValueTask CancelAsync(CancellationToken cancellationToken = default)
-        => _core.GetHandle().CancelAsync(cancellationToken);
+        => HostHandleOperations.CancelAsync(_core.GetHandle(), cancellationToken);
 
     /// <summary>Requests durable cancellation carrying <paramref name="reason"/>.</summary>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.TaskCancellationReason"/> reports, or
     /// <see langword="null"/> for none. The first request determines the reason.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
     public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken = default)
-        => _core.GetHandle().CancelAsync(reason, cancellationToken);
+        => HostHandleOperations.CancelAsync(_core.GetHandle(), reason, cancellationToken);
 
     /// <summary>Polls the task and returns its current status.</summary>
     public async Task<DurableTaskStatus> PollAsync(
         PollingOptions options = default,
         CancellationToken cancellationToken = default)
-        => (await _core.GetHandle().PollAsync(options, cancellationToken).ConfigureAwait(false)).Status;
+        => (await HostHandleOperations.PollAsync(_core.GetHandle(), options, cancellationToken).ConfigureAwait(false)).Status;
 }
