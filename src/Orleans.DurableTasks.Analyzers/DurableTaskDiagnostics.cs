@@ -93,10 +93,10 @@ internal static class DurableTaskDiagnostics
 
     public static readonly DiagnosticDescriptor UnfilteredCancellationHandler = Create(
         "ORLEANS0112",
-        "Filter cancellation handlers by IsCancellationRequested",
-        "Add 'when (DurableTask.Current.IsCancellationRequested)' to this handler: the host also stops a run by canceling it",
+        "Filter cancellation handlers by IsTaskCancellationRequested",
+        "Add 'when (DurableTask.Current.IsTaskCancellationRequested)' to this handler: attempt cancellation, such as a stopping activation, also throws OperationCanceledException",
         DiagnosticSeverity.Info,
-        "A host stops a run, for example when its activation deactivates, through the same OperationCanceledException as durable cancellation. A handler which filters by DurableTask.Current.IsCancellationRequested, or which rethrows, compensates for durable cancellation and lets a stopped run end.");
+        "A durable task observes two kinds of cancellation through OperationCanceledException. Task cancellation is durable: a caller requests it, the host records it, and the body decides the task's outcome, for example by compensating. Attempt cancellation stops the current run, for example when its activation deactivates, and the run's later durable operations throw. A handler which filters by DurableTask.Current.IsTaskCancellationRequested, or which rethrows, compensates for task cancellation and lets a canceled attempt end.");
 
     public static readonly DiagnosticDescriptor AsyncVoidInBody = Create(
         "ORLEANS0113",
@@ -125,6 +125,13 @@ internal static class DurableTaskDiagnostics
         "Schedule '{0}' with ScheduleAsync: Post stages the start in the calling grain's durable outbox, and code outside grains and durable task bodies, such as a client, has none",
         DiagnosticSeverity.Warning,
         "Post stages a start in the durable outbox of the grain which runs the calling code, and the start commits with that grain's next journal write. Code outside grains and durable task bodies, such as a client, has no outbox, so Post throws InvalidOperationException there. Schedule the task with ScheduleAsync, which completes once the task's host has accepted it.");
+
+    public static readonly DiagnosticDescriptor CanceledTokenInCleanup = Create(
+        "ORLEANS0117",
+        "Pass AttemptCancellationToken to calls in task-cancellation cleanup",
+        "Pass AttemptCancellationToken instead of CancellationToken: this code runs after task cancellation, which has already canceled CancellationToken, so the call ends at once",
+        DiagnosticSeverity.Warning,
+        "DurableTaskContext.CancellationToken is canceled when task cancellation is requested and when the host cancels the attempt. Code which runs only after task cancellation, such as a catch clause filtered by IsTaskCancellationRequested, receives a canceled token, so the cleanup calls which observe it end at once. DurableTaskContext.AttemptCancellationToken is canceled only when the host cancels the attempt, so cleanup calls which receive it run to completion and still end promptly when the activation stops.");
 
     private static DiagnosticDescriptor Create(
         string id,

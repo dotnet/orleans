@@ -428,7 +428,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
 
         /// <summary>
         /// Reports handlers which catch cancellation around durable operations without filtering by
-        /// <c>IsCancellationRequested</c> and without rethrowing.
+        /// <c>IsTaskCancellationRequested</c> and without rethrowing.
         /// </summary>
         private void AnalyzeCancellationHandlers(IOperation body)
         {
@@ -442,7 +442,7 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
                 foreach (var handler in @try.Catches)
                 {
                     if (CatchesCancellation(handler.ExceptionType)
-                        && !(handler.Filter is { } filter && ReferencesIsCancellationRequested(filter))
+                        && !(handler.Filter is { } filter && ReferencesIsTaskCancellationRequested(filter))
                         && !OperationsOutsideNestedFunctions(handler.Handler).OfType<IThrowOperation>().Any()
                         && handler.Syntax is CatchClauseSyntax clause)
                     {
@@ -478,9 +478,10 @@ public sealed class DurableTaskReplayAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        private static bool ReferencesIsCancellationRequested(IOperation filter) =>
-            DurableTaskSymbols.DescendantsAndSelf(filter).Any(static operation =>
-                operation is IPropertyReferenceOperation { Property.Name: "IsCancellationRequested" });
+        private bool ReferencesIsTaskCancellationRequested(IOperation filter) =>
+            DurableTaskSymbols.DescendantsAndSelf(filter).Any(operation =>
+                operation is IPropertyReferenceOperation { Property: var property }
+                && SymbolEqualityComparer.Default.Equals(property, symbols.IsTaskCancellationRequested));
 
         private static IEnumerable<IOperation> OperationsOutsideNestedFunctions(IOperation root)
         {

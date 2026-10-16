@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -30,6 +31,10 @@ internal sealed class DurableTaskSymbols
         LoggerExtensions = compilation.GetTypeByMetadataName("Microsoft.Extensions.Logging.LoggerExtensions");
         LoggerMessageAttribute = compilation.GetTypeByMetadataName("Microsoft.Extensions.Logging.LoggerMessageAttribute");
         TimerTypes = Resolve(compilation, "System.Threading.Timer", "System.Timers.Timer", "System.Threading.PeriodicTimer");
+
+        var context = compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableTaskContext");
+        IsTaskCancellationRequested = GetProperty(context, "IsTaskCancellationRequested");
+        ContextCancellationToken = GetProperty(context, "CancellationToken");
 
         var stateTypes = Resolve(
             compilation,
@@ -81,6 +86,14 @@ internal sealed class DurableTaskSymbols
     public INamedTypeSymbol? LoggerMessageAttribute { get; }
 
     public ImmutableArray<INamedTypeSymbol> TimerTypes { get; }
+
+    /// <summary>Gets <c>DurableTaskContext.IsTaskCancellationRequested</c>, which reports durable task cancellation.</summary>
+    public IPropertySymbol? IsTaskCancellationRequested { get; }
+
+    /// <summary>
+    /// Gets <c>DurableTaskContext.CancellationToken</c>, which is canceled by task cancellation and by attempt cancellation.
+    /// </summary>
+    public IPropertySymbol? ContextCancellationToken { get; }
 
     public ImmutableArray<INamedTypeSymbol> NonDeterministicTypes { get; }
 
@@ -291,6 +304,9 @@ internal sealed class DurableTaskSymbols
 
         return false;
     }
+
+    private static IPropertySymbol? GetProperty(INamedTypeSymbol? type, string name) =>
+        type?.GetMembers(name).OfType<IPropertySymbol>().FirstOrDefault();
 
     private static ImmutableArray<INamedTypeSymbol> Resolve(Compilation compilation, params string[] names)
     {
