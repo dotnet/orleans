@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Examples for the durable task analyzer pages, ORLEANS0100 to ORLEANS0117. The analyzers run on this project, and the
+    Examples for the durable task analyzer pages, ORLEANS0100 to ORLEANS0118. The analyzers run on this project, and the
     build treats their diagnostics as errors, so each fix compiles cleanly. Each violating example disables the
     diagnostic which it demonstrates around its region.
   -->

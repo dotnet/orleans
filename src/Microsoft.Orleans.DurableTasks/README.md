@@ -461,6 +461,21 @@ synchronously on the activation which makes them, when the runtime stages them: 
   `DurableTask.Once(effect)`, takes the execution's next generated child
   identifier, such as `$child-3`, so an effect and a child which a replay finds
   under the same generated identifier fail as a divergence too.
+- `DurableTask.GetVersion(name, minSupported, maxSupported)` records the version of a
+  change which an execution follows as a terminal entry of its tree,
+  `{taskId}/$version:{name}`, at the execution's first check of the name, staged like
+  an effect's record. An execution records `maxSupported` when it reaches the check
+  first, and `0` when its replay reaches the check while operations which earlier runs
+  recorded remain unreached, because earlier code ran past the check. A step reads an
+  enclosing execution's record within the same invoked task. Version records aren't
+  operations which a replay reaches, so a deployment which removes a check leaves the
+  replay's progress unchanged. An attempt which finds a version outside the supported
+  range stalls: the runtime cancels the attempt for `UnsupportedVersion`, as it
+  cancels the attempts of a stopping activation, so the check and the attempt's later
+  durable operations and journaled state changes throw
+  `DurableTaskAttemptCanceledException`, whose inner exception is a
+  `DurableTaskVersionException`. The attempt's result is discarded, the task stays
+  pending, and the grain keeps a one-minute wake-up so that a later activation replays it.
 - A durable task publishes progress to an `IDurableLog<T>` of its grain. It
   appends an entry with `DurableTask.Once(() => log.Append(item))`, whose entry
   commits with the effect's record. A step which streams content writes it to a
