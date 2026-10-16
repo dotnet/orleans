@@ -109,10 +109,13 @@ per-silo membership storage. Provision a replica set for local tests that exerci
 transaction with a fresh session for each operation and an explicit primary read
 preference, including when the shared client prefers secondary reads. Membership async methods
 propagate cancellation to MongoDB commands, cursor reads, and transactions.
-New per-silo document IDs use a versioned encoding for both IPv4 and IPv6,
-separate from the legacy format, and preserve complete native IPv6 addresses. Existing records
-with legacy IPv4-mapped IDs remain readable and are updated in place using the
-stored full silo address to distinguish identities.
+Per-silo document IDs retain the contributed provider's
+`<ClusterId>@<IPv4-mapped-address>:<port>/<generation>` format. Reads and updates
+validate the full stored silo address. Each member must have a distinct mapped
+address/port/generation combination within its cluster. Two native IPv6 addresses,
+or a native IPv6 and an IPv4 address, can share the same mapped address; a
+conflicting insertion fails explicitly and preserves the stored member.
+`SingleDocument` uses its existing full-address member keys.
 
 ## Select a persistence format
 
@@ -165,32 +168,20 @@ when its outcome is uncertain.
 
 ## Migrate the contributed package
 
-### Coordinate the cluster upgrade
-
-For `Multiple` and `MultipleDeprecated`, **stop every silo using the contributed
-provider before starting any silo using the updated provider**, including IPv4-only
-deployments. Use a coordinated stopped-cluster deployment. New writers read existing
-legacy rows, but old writers address new rows using legacy IDs and can create a
-second membership row with conflicting status or suspicion votes. Pausing reminder
-creation alone is insufficient because silos continue writing membership updates.
-
-Drain client traffic, stop all old-provider silos and wait for them to exit, back up
-the provider collections, then deploy the updated provider across the cluster and
-resume traffic after membership and reminders have loaded successfully. Preserve
-the configured database, prefixes, and cluster identity when retaining membership
-history. For rollback, stop all updated-provider silos first and restore the
-pre-migration membership snapshot or choose a fresh cluster ID; keep grain state
-and reminder collections intact. The single-document strategy keeps its existing
-membership ID format; apply the reminder rollout constraints below whenever
-reminder-table writers overlap.
-
-### Update application configuration
-
 Replace the `Orleans.Providers.MongoDB` package reference with the capability
 packages listed above. The provider retains the `Orleans.Providers.MongoDB.*`
-implementation and serializer namespaces, provider builder method names, collection names, and stored document formats.
+implementation and serializer namespaces, provider builder method names, collection
+names, document IDs, and stored document formats.
 Keep database names, collection prefixes, membership strategies, serializers,
 and key generators unchanged to access existing data.
+
+Old and updated providers address the same membership and reminder records during
+rolling upgrades; deployment sequencing follows the Orleans runtime-version
+compatibility requirements. Back up the collections before upgrading and exercise
+mixed old/new writers against representative data and the selected MongoDB topology.
+The retained identity formats have the address and reminder-key constraints
+described on this page. Updated writers reject collisions explicitly; older writers
+retain their original collision behavior.
 
 Update option imports to the provider-specific namespaces listed above. Replace
 `UseMongoDBClient`, `AddMongoDBClient` service-collection calls, and custom
@@ -208,12 +199,13 @@ representative existing documents before deployment.
 
 Reminders use the `<CollectionPrefix>OrleansReminderV2` collection. The provider
 creates a service-ID/grain-hash index and removes obsolete hash indexes.
-New reminder document IDs encode the service, grain, and reminder components
-separately. Existing underscore-delimited IDs remain readable, updatable in place,
-and removable with their ETags; stored identity fields protect against ambiguous
-legacy IDs. During rollout, pause new reminder creation until every reminder-table
-writer uses the updated provider so point operations consistently understand the
-new ID encoding.
+Reminder document IDs retain the contributed provider's
+`<ServiceId>_<GrainId>_<ReminderName>` format. Choose identity combinations whose
+concatenated keys are distinct: grain `a/b_c` with reminder `d` shares a key with
+grain `a/b` and reminder `c_d` in the same service. Registrations using a key
+owned by a different identity fail explicitly; reads and removals also check the
+full stored identity. Concurrent registrations of the same identity retry a losing
+insert as an identity-guarded update.
 Reads treat contributed-provider documents with `IsDeleted=true` as deleted,
 while absent or false flags represent active registrations. Explicit
 re-registration removes the deletion marker and assigns a new ETag, including

@@ -100,7 +100,7 @@ public sealed class MongoStorageCancellationTests
 
     [Theory]
     [InlineData("Point", "find", 1)]
-    [InlineData("LegacyPoint", "find", 2)]
+    [InlineData("SeededPoint", "find", 1)]
     [InlineData("Grain", "find", 1)]
     [InlineData("Range", "find", 1)]
     [InlineData("Upsert", "update", 1)]
@@ -117,7 +117,7 @@ public sealed class MongoStorageCancellationTests
         var token = TestContext.Current.CancellationToken;
         await table.StartAsync(token);
         var entry = Reminder(GrainId.Create("account", "in-flight"));
-        if (operation == "LegacyPoint")
+        if (operation == "SeededPoint")
         {
             await database.Database.GetCollection<MongoReminderDocument>("OrleansReminderV2")
                 .InsertOneAsync(MongoReminderDocument.Create($"service_{entry.GrainId}_bill", "service", entry, "legacy"), cancellationToken: token);
@@ -129,7 +129,7 @@ public sealed class MongoStorageCancellationTests
         var etag = entry.ETag;
         await AssertCancellation(barrier, cancellationToken => operation switch
         {
-            "Point" or "LegacyPoint" => table.ReadRow(entry.GrainId, "bill", cancellationToken),
+            "Point" or "SeededPoint" => table.ReadRow(entry.GrainId, "bill", cancellationToken),
             "Grain" => table.ReadRows(entry.GrainId, cancellationToken),
             "Range" or "Initialize" or "InitializeCleanup" => table.ReadRows(0, 0, cancellationToken),
             "Upsert" => table.UpsertRow(entry, cancellationToken),

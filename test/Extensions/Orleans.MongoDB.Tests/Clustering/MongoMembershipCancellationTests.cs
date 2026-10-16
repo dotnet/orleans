@@ -34,11 +34,6 @@ public sealed class MongoMembershipCancellationTests
         var transaction = strategy == MongoDBMembershipStrategy.Multiple
             && operation is "ReadAll" or "ReadRow" or "Insert" or "Update" or "Delete";
         var blockAt = transaction || (strategy == MongoDBMembershipStrategy.SingleDocument && operation == "Cleanup") ? 2 : 1;
-        if (strategy != MongoDBMembershipStrategy.SingleDocument && operation is "Insert" or "Update")
-        {
-            // Per-silo writes inspect legacy identities before updating the selected document.
-            blockAt++;
-        }
         var barrier = new CommandBarrier(blockAt);
         await using var database = await MongoDatabase.CreateAsync(settings =>
             settings.ClusterConfigurator = cluster => cluster.Subscribe<CommandStartedEvent>(barrier.OnCommand));
