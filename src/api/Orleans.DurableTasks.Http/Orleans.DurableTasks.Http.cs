@@ -30,19 +30,57 @@ namespace Microsoft.Extensions.DependencyInjection
     public static partial class DurableHttpServiceCollectionExtensions
     {
         public static IServiceCollection AddDurableHttp(this IServiceCollection services, System.Action<Orleans.DurableTasks.Http.DurableHttpOptions>? configureOptions = null) { throw null; }
+
+        public static IHttpClientBuilder AddDurableHttpCallbacks(this IServiceCollection services, System.Action<Orleans.DurableTasks.Http.DurableCallbackOptions>? configureOptions = null) { throw null; }
     }
 }
 
 namespace Orleans.DurableTasks.Http
 {
+    [GenerateSerializer]
+    [Immutable]
+    [Alias("Orleans.DurableTasks.Http.DurableCallback")]
+    public sealed partial record DurableCallback(DurableCallbackProtocol Protocol, Orleans.Runtime.GrainId Operation, string OperationId, System.Uri Url, System.Collections.Generic.SortedDictionary<string, string> Headers, string? OperationLocation)
+    {
+        public string GetCallbackId() { throw null; }
+    }
+
+    [GenerateSerializer]
+    [Alias("Orleans.DurableTasks.Http.DurableCallbackDeliveryException")]
+    public sealed partial class DurableCallbackDeliveryException : System.Exception
+    {
+        public DurableCallbackDeliveryException(string message) { }
+    }
+
+    public sealed partial class DurableCallbackOptions
+    {
+        public const string HttpClientName = "Orleans.DurableTasks.Http.Callbacks";
+        public System.TimeSpan InitialRetryInterval { get { throw null; } set { } }
+
+        public System.TimeSpan MaxRetryInterval { get { throw null; } set { } }
+
+        public System.TimeSpan RetryTimeout { get { throw null; } set { } }
+    }
+
+    [GenerateSerializer]
+    public enum DurableCallbackProtocol
+    {
+        Webhook = 0,
+        Nexus = 1
+    }
+
     public static partial class DurableHttpHeaders
     {
         public const string IdempotencyKey = "Idempotency-Key";
+        public const string OperationCallback = "Operation-Callback";
+        public const string OperationCallbackHeaderPrefix = "Operation-Callback-";
         public const string OperationLocation = "Operation-Location";
     }
 
     public sealed partial class DurableHttpOptions
     {
+        public System.Func<Microsoft.AspNetCore.Http.HttpContext, System.Uri, bool>? AllowCallback { get { throw null; } set { } }
+
         public System.Func<System.Exception, DurableOperationError> CreateError { get { throw null; } set { } }
 
         public System.Func<Microsoft.AspNetCore.Http.HttpContext, string, string> MapOperationId { get { throw null; } set { } }
@@ -80,6 +118,11 @@ namespace Orleans.DurableTasks.Http
         Canceled = 4
     }
 
+    public partial interface IDurableWebhookSigner
+    {
+        string? Sign(DurableCallback callback, string webhookId, long timestamp, System.ReadOnlySpan<byte> body);
+    }
+
     public partial interface INexusOperationTokenFormat
     {
         string Format(string operationId);
@@ -91,5 +134,63 @@ namespace Orleans.DurableTasks.Http
         public string Format(string operationId) { throw null; }
 
         public bool TryParse(string token, out string? operationId) { throw null; }
+    }
+}
+
+namespace OrleansCodeGen.Orleans.DurableTasks.Http
+{
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableCallback : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.Http.DurableCallback>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_DurableCallback(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableTasks.Http.DurableCallback> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableTasks.Http.DurableCallback instance) { }
+
+        public global::Orleans.DurableTasks.Http.DurableCallback ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableTasks.Http.DurableCallback instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.Http.DurableCallback value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableCallbackDeliveryException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.Http.DurableCallbackDeliveryException>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_DurableCallbackDeliveryException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableTasks.Http.DurableCallbackDeliveryException> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableTasks.Http.DurableCallbackDeliveryException instance) { }
+
+        public global::Orleans.DurableTasks.Http.DurableCallbackDeliveryException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableTasks.Http.DurableCallbackDeliveryException instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.Http.DurableCallbackDeliveryException value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableCallbackProtocol : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.Http.DurableCallbackProtocol>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public global::Orleans.DurableTasks.Http.DurableCallbackProtocol ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.Http.DurableCallbackProtocol value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_DurableCallbackDeliveryException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.DurableTasks.Http.DurableCallbackDeliveryException, System.Exception>
+    {
+        public Copier_DurableCallbackDeliveryException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 }

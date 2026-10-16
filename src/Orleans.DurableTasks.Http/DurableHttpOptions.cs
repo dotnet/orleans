@@ -37,6 +37,17 @@ public sealed class DurableHttpOptions
     public Func<HttpContext, string, string> MapOperationId { get; set; } = static (_, operationId) => operationId;
 
     /// <summary>
+    /// Gets or sets the function which decides whether the server accepts a callback URL which a request registers, such
+    /// as with an <c>Operation-Callback</c> header or a Nexus <c>callback</c>, or <see langword="null"/>, the default,
+    /// which accepts none.
+    /// </summary>
+    /// <remarks>
+    /// The silos which run the operations send requests to accepted URLs, so the application restricts them to receivers
+    /// which it trusts, for example by scheme, host, and the authenticated caller, to keep callers from directing those
+    /// requests at internal services.
+    /// </remarks>
+    public Func<HttpContext, Uri, bool>? AllowCallback { get; set; }
+    /// <summary>
     /// Gets or sets the interval which responses for running operations advertise in their <c>Retry-After</c> header, as
     /// the minimum time before a client polls the operation again.
     /// </summary>

@@ -51,6 +51,8 @@ internal static class NexusProtocol
     public const string OperationState = "Nexus-Operation-State";
     public const string RequestTimeout = "Request-Timeout";
     public const string TokenQuery = "token";
+    public const string CallbackQuery = "callback";
+    public const string CallbackHeaderPrefix = "Nexus-Callback-";
 
     public const string Running = "running";
     public const string Succeeded = "succeeded";
