@@ -37,7 +37,7 @@ public static class DurableHttpEndpointRouteBuilderExtensions
     /// <param name="group">The route group, such as <c>app.MapGroup("/orders/{orderId}")</c>.</param>
     /// <param name="scope">
     /// The scope of the group's operations, such as <c>orders</c>, or <see langword="null"/> for the group's route prefix.
-    /// Groups with equal scopes and route values address the same operations.
+    /// Groups, and Nexus services, with equal scopes and route values address the same operations.
     /// </param>
     /// <returns>The group, which maps the group's durable starts and signals, and configures its endpoints.</returns>
     /// <remarks>

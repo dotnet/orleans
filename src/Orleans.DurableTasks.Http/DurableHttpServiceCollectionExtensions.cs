@@ -8,7 +8,8 @@ public static class DurableHttpServiceCollectionExtensions
 {
     /// <summary>
     /// Adds the services which the durable operation endpoints use, which
-    /// <see cref="Microsoft.AspNetCore.Builder.DurableHttpEndpointRouteBuilderExtensions"/> maps.
+    /// <see cref="Microsoft.AspNetCore.Builder.DurableHttpEndpointRouteBuilderExtensions"/> and
+    /// <see cref="Microsoft.AspNetCore.Builder.NexusEndpointRouteBuilderExtensions"/> map.
     /// </summary>
     /// <param name="services">The service collection, which also provides an Orleans <see cref="Orleans.IGrainFactory"/>.</param>
     /// <param name="configureOptions">Configures the operations, or <see langword="null"/> for the defaults.</param>
@@ -25,7 +26,8 @@ public static class DurableHttpServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<DurableOperationService>();
         services.TryAddSingleton<DurableHttpOperations>();
-
+        services.TryAddSingleton<INexusOperationTokenFormat, PlainTextNexusOperationTokenFormat>();
+        services.TryAddSingleton<DurableNexusOperations>();
         return services;
     }
 }
