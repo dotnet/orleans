@@ -64,6 +64,20 @@ public sealed class GarnetJournalConformanceTests
         }
     }
 
+    [Fact]
+    public void FilterCheck_RejectsAFilterOmittingALiveJournalOrTombstone()
+    {
+        byte[] live = [.. "live-journal"u8], tombstone = [.. "deleted-journal"u8];
+        var journals = new[] { ("a", live), ("b", tombstone) };
+        HashSet<string> required = ["a", "b"];
+        Replayer.CheckFilter("test", "filter", GarnetJournalKeyFilter.Create([live, tombstone]), required, required, journals);
+
+        // A present filter which reports nothing, or which omits either journal, fails the check.
+        Assert.Throws<ConformanceException>(() => Replayer.CheckFilter("test", "filter", GarnetJournalKeyFilter.Create([]), required, required, journals));
+        Assert.Throws<ConformanceException>(() => Replayer.CheckFilter("test", "filter", GarnetJournalKeyFilter.Create([live]), required, required, journals));
+        Assert.Throws<ConformanceException>(() => Replayer.CheckFilter("test", "filter", GarnetJournalKeyFilter.Create([tombstone]), required, required, journals));
+    }
+
     private sealed class ConformanceException(string message, Exception? inner = null) : Exception(message, inner);
 
     private sealed class Replayer
@@ -78,6 +92,13 @@ public sealed class GarnetJournalConformanceTests
         private readonly Dictionary<long, (long Partition, int Bucket, long View, long Source, long Generation, byte[]? Filter)> _opens = [];
         private readonly Dictionary<long, (long Partition, int Bucket, long Version, List<GarnetJournalKeySet> Journals)> _dones = [];
         private readonly Dictionary<long, (long Partition, int Bucket, long Version)> _reclaims = [];
+
+        // The journals each key filter must report (D36): the records its copy held when sealed, and its chain's required
+        // journals while its migration was not done. The specification's filters may also report false positives, so
+        // these are tracked separately.
+        private readonly Dictionary<(long Partition, long Bucket), HashSet<string>> _requiredFilters = [];
+        private readonly Dictionary<(long Partition, long Bucket), HashSet<string>> _requiredChains = [];
+        private readonly Dictionary<long, HashSet<string>> _requiredOpens = [];
 
         public Replayer(GarnetTestPartitions partitions)
         {
@@ -146,6 +167,8 @@ public sealed class GarnetJournalConformanceTests
                         // report; the implementation's filters report none in buckets this small.
                         var filters = Itf.Pick(state, "sf")?.GetBoolean() ?? false;
                         Expect(await Migrator.TransitionAsync(P(partition), (int)bucket, GarnetJournalProtocol.BucketSealOperation, version, null, CancellationToken, extra: filters ? "1" : "0"), "seal was refused");
+                        var chain = pre.Buckets[(partition, bucket)].Done ? [] : _requiredChains.GetValueOrDefault((partition, bucket)) ?? [];
+                        _requiredFilters[(partition, bucket)] = [.. Keys.Where(key => _keys[key].Bucket == bucket && pre.Records[(partition, key)].Kind != "none"), .. chain];
                         break;
                     }
 
@@ -157,6 +180,7 @@ public sealed class GarnetJournalConformanceTests
                         var ticket = post.Opens[slot];
                         var source = await Migrator.GetBucketAsync(P(ticket.Source), ticket.Bucket, CancellationToken, withFilter: true);
                         _opens[slot] = (ticket.Partition, ticket.Bucket, ticket.View, ticket.Source, source.CollectionGeneration, source.State == "sealed" ? source.Filter : null);
+                        _requiredOpens[slot] = source.State == "sealed" ? _requiredFilters.GetValueOrDefault((ticket.Source, ticket.Bucket)) ?? [] : [];
                         break;
                     }
 
@@ -165,9 +189,11 @@ public sealed class GarnetJournalConformanceTests
                         var slot = Itf.IntPick(state, "oi");
                         var ticket = _opens[slot];
                         _opens.Remove(slot);
+                        _requiredOpens.Remove(slot, out var required);
                         Expect(
                             await Migrator.TransitionAsync(P(ticket.Partition), ticket.Bucket, GarnetJournalProtocol.BucketOpenOperation, _viewVersions[(int)ticket.View], P(ticket.Source), CancellationToken, ticket.Generation, ticket.Filter),
                             "open was refused");
+                        _requiredChains[(ticket.Partition, ticket.Bucket)] = required!;
                         break;
                     }
 
@@ -178,6 +204,7 @@ public sealed class GarnetJournalConformanceTests
                         var slot = Itf.IntPick(state, "ti");
                         var ticket = _opens[slot];
                         _opens.Remove(slot);
+                        _requiredOpens.Remove(slot);
                         var applied = await Migrator.TransitionAsync(P(ticket.Partition), ticket.Bucket, GarnetJournalProtocol.BucketOpenOperation, _viewVersions[(int)ticket.View], P(ticket.Source), CancellationToken, ticket.Generation, ticket.Filter);
                         var before = pre.Buckets[(ticket.Partition, ticket.Bucket)];
                         Expect(!applied || before.State == "open" && before.Version == ticket.View, "an open the specification rejects was applied");
@@ -230,6 +257,7 @@ public sealed class GarnetJournalConformanceTests
                         var done = _dones[slot];
                         _dones.Remove(slot);
                         Expect(await TryMarkDoneAsync(done) == true, "completion was refused");
+                        _requiredChains.Remove((done.Partition, done.Bucket));
                         break;
                     }
 
@@ -400,14 +428,16 @@ public sealed class GarnetJournalConformanceTests
                     Expect(actual.Reclaimed == spec.Reclaimed, $"{where}: reclaimed {actual.Reclaimed}, expected {spec.Reclaimed}");
                     Expect(actual.CollectionGeneration == spec.Generation, $"{where}: collection generation {actual.CollectionGeneration}, expected {spec.Generation}");
 
-                    // Key filters (D36): present where the specification has them, and reporting no journal the
-                    // specification's filter (its records plus any false positives it chose) omits.
+                    // Key filters (D36): present where the specification has them, reporting every journal they must,
+                    // and no journal the specification's filter (its required journals plus any false positives it
+                    // chose) omits.
                     var fields = (await _partitions.Database(P(partition)).HashGetAllAsync(GarnetJournalKeys.GetBucketKey(_partitions.MapId, (int)bucket)))
                         .ToDictionary(entry => entry.Name.ToString(), entry => (byte[])entry.Value!);
-                    CompareFilter(where, "chain", fields.GetValueOrDefault("chain"), spec.Chain, (int)bucket);
+                    var journals = Keys.Where(key => _keys[key].Bucket == bucket).Select(key => (key, _keys[key].EncodedId)).ToList();
+                    CheckFilter(where, "chain", fields.GetValueOrDefault("chain"), spec.Chain, _requiredChains.GetValueOrDefault((partition, bucket)) ?? [], journals);
                     if (spec.State == "sealed" && !spec.Reclaimed)
                     {
-                        CompareFilter(where, "filter", fields.GetValueOrDefault("filter"), spec.Filter, (int)bucket);
+                        CheckFilter(where, "filter", fields.GetValueOrDefault("filter"), spec.Filter, _requiredFilters.GetValueOrDefault((partition, bucket)) ?? [], journals);
                     }
                 }
 
@@ -444,16 +474,22 @@ public sealed class GarnetJournalConformanceTests
             }
         }
 
-        private void CompareFilter(string where, string name, byte[]? actual, IReadOnlySet<string>? expected, int bucket)
+        /// <summary>
+        /// Checks a key filter against the specification's: present if and only if the specification's is, reporting
+        /// every journal in <paramref name="required"/>, and no journal the specification's omits.
+        /// </summary>
+        public static void CheckFilter(string where, string name, byte[]? actual, IReadOnlySet<string>? expected, IReadOnlySet<string> required, IEnumerable<(string Key, byte[] EncodedId)> journals)
         {
             var present = actual is { Length: > 0 };
             Expect(present == (expected is not null), $"{where}: {name} key filter {(present ? "present" : "absent")}, expected {(expected is null ? "none" : "one")}");
             if (actual is { Length: > 0 } && expected is not null)
             {
-                foreach (var key in Keys.Where(key => _keys[key].Bucket == bucket))
+                Expect(required.IsSubsetOf(expected), $"{where}: the specification's {name} key filter omits a journal it must report");
+                foreach (var (key, id) in journals)
                 {
-                    var reports = !GarnetJournalKeyFilter.ExcludesAll(actual, _keys[key].EncodedId);
+                    var reports = !GarnetJournalKeyFilter.ExcludesAll(actual, id);
                     Expect(!reports || expected.Contains(key), $"{where}: the {name} key filter reports '{key}', which the specification's omits");
+                    Expect(reports || !required.Contains(key), $"{where}: the {name} key filter omits '{key}', which it must report");
                 }
             }
         }
