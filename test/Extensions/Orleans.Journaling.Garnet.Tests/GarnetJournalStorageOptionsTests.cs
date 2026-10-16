@@ -27,6 +27,12 @@ public sealed class GarnetJournalStorageOptionsTests
         ["tombstone retention"] = options => options.TombstoneRetention = TimeSpan.Zero,
         ["migration interval"] = options => options.MigrationInterval = TimeSpan.Zero,
         ["marker collection interval"] = options => options.MarkerCollectionInterval = TimeSpan.Zero,
+        ["hosting interval"] = options => options.HostingInterval = TimeSpan.Zero,
+        ["address-shaped HostId with shared storage"] = options =>
+        {
+            options.HostId = "127.0.0.1:11111@1";
+            options.PartitionBlobContainer = new global::Azure.Storage.Blobs.BlobContainerClient("UseDevelopmentStorage=true", "unused");
+        },
     };
 
     [Theory]

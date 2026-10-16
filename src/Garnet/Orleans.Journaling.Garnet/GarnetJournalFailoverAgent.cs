@@ -5,16 +5,28 @@ namespace Orleans.Journaling;
 
 /// <summary>
 /// Runs in every silo of a cluster whose partitions are on shared storage: assigns each partition whose host Orleans
-/// membership has declared dead, or no longer knows, or which has no silo as its host, to an active silo.
+/// membership has declared dead, or no longer knows, or which no registered host serves, to an active silo registered
+/// for automatic hosting.
 /// </summary>
 /// <remarks>
-/// Hosts are silo addresses (<see cref="SiloAddress.ToParsableString"/>). Every silo runs this agent; the range map's
-/// compare-and-swap lets exactly one assignment of each partition per epoch succeed, and the new host's takeover of the
-/// partition's storage fences the previous host, so the agent needs no election and tolerates a wrong verdict.
+/// <para>
+/// Hosts are silo addresses (<see cref="SiloAddress.ToParsableString"/>), or the explicit identifiers of silos
+/// configured with <see cref="GarnetJournalStorageOptions.HostId"/>. Every host registers in the shared
+/// <see cref="IGarnetJournalHostRegistry"/> before it serves, so the agent assigns partitions only to active silos
+/// registered under their addresses, which serve assignments under those addresses; leaves partitions of registered
+/// explicit hosts in place, since membership cannot judge them; and reassigns a partition whose host is neither, such
+/// as a placeholder in the initial map.
+/// </para>
+/// <para>
+/// Every silo with automatic hosting runs this agent; the range map's compare-and-swap lets exactly one assignment of
+/// each partition per epoch succeed, and the new host's takeover of the partition's storage fences the previous host,
+/// so the agent needs no election and tolerates a wrong verdict.
+/// </para>
 /// </remarks>
 internal sealed class GarnetJournalFailoverAgent(
     GarnetJournalHostingCoordinator coordinator,
     IClusterMembershipService membership,
+    IGarnetJournalHostRegistry registry,
     TimeSpan interval,
     ILogger? logger) : IAsyncDisposable
 {
@@ -48,10 +60,18 @@ internal sealed class GarnetJournalFailoverAgent(
         }
 
         var snapshot = membership.CurrentSnapshot;
-        var active = snapshot.Members.Values.Where(member => member.Status == SiloStatus.Active).Select(member => member.SiloAddress.ToParsableString()).ToList();
+
+        // Read the registry after the snapshot: a silo registers before it becomes active, so every active silo in the
+        // snapshot which serves under its address is in the registry.
+        var registered = await registry.ListAsync(cancellationToken).ConfigureAwait(false);
+        var active = snapshot.Members.Values
+            .Where(member => member.Status == SiloStatus.Active)
+            .Select(member => member.SiloAddress.ToParsableString())
+            .Where(registered.Contains)
+            .ToList();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var dead = new HashSet<string>(StringComparer.Ordinal);
-        var assigned = await coordinator.AssignAsync(host => NeedsHost(snapshot, host, seen, dead), active, cancellationToken).ConfigureAwait(false);
+        var assigned = await coordinator.AssignAsync(host => NeedsHost(snapshot, registered, host, seen, dead), active, cancellationToken).ConfigureAwait(false);
 
         // Forget hosts which no longer host partitions, which membership knows again, or whose partitions were just
         // reassigned: the coordinator returns once every partition of a host it found dead has a new host.
@@ -60,13 +80,23 @@ internal sealed class GarnetJournalFailoverAgent(
             _unknown.Remove(host);
         }
 
+        // Each run of a silo registers a new address; drop the registrations of silos membership has declared dead.
+        foreach (var host in registered)
+        {
+            if (SiloAddress.TryParse(host, out var silo) && snapshot.GetSiloStatus(silo) == SiloStatus.Dead)
+            {
+                await registry.UnregisterAsync(host, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         return assigned;
     }
 
     /// <summary>
-    /// A partition needs a host if its host is not a silo, or is a silo which membership has declared dead, or which
-    /// membership no longer knows, for example because its entry was cleaned up or the cluster was redeployed with a
-    /// new membership table.
+    /// A partition needs a host if its host is a silo which membership has declared dead, or which membership no longer
+    /// knows, for example because its entry was cleaned up or the cluster was redeployed with a new membership table;
+    /// or if no registered host serves it: an active silo address which is not registered, whose silo serves only
+    /// another identifier, or an unregistered identifier, such as a placeholder.
     /// </summary>
     /// <remarks>
     /// A silo which has just joined may be missing from this silo's snapshot, so an unknown host is dead only once a
@@ -74,17 +104,17 @@ internal sealed class GarnetJournalFailoverAgent(
     /// does not know it. A refresh may join a read already in progress, so the second refresh after the host was first
     /// found unknown is the first one guaranteed to read the table afterwards.
     /// </remarks>
-    private bool NeedsHost(ClusterMembershipSnapshot snapshot, string host, HashSet<string> seen, HashSet<string> dead)
+    private bool NeedsHost(ClusterMembershipSnapshot snapshot, IReadOnlySet<string> registered, string host, HashSet<string> seen, HashSet<string> dead)
     {
         if (!SiloAddress.TryParse(host, out var silo))
         {
-            return true;
+            return !registered.Contains(host);
         }
 
         var status = snapshot.GetSiloStatus(silo);
         if (status != SiloStatus.None)
         {
-            return status == SiloStatus.Dead;
+            return status == SiloStatus.Dead || status == SiloStatus.Active && !registered.Contains(host);
         }
 
         seen.Add(host);

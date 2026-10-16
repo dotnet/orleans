@@ -124,6 +124,12 @@ internal sealed class GarnetPartitionBlobStorage
                     $"Garnet journal partition '{partition}' has storage location '{hosting.StorageLocation}', which is not a relative blob path of non-empty segments other than '.' and '..'.");
             }
 
+            if (location.Split('/')[0] == GarnetJournalHostRegistry.ReservedSegment)
+            {
+                throw new InvalidOperationException(
+                    $"Garnet journal partition '{partition}' has storage location '{hosting.StorageLocation}', under '{GarnetJournalHostRegistry.ReservedSegment}', which holds the registry of hosts.");
+            }
+
             locations.Add((partition, location));
         }
 

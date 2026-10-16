@@ -185,6 +185,14 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
                 : string.IsNullOrWhiteSpace(_options.DataDirectory) ? null : GetOrCreateHostId(_options.DataDirectory));
         var canHost = hostId is not null && (shared || !string.IsNullOrWhiteSpace(_options.DataDirectory));
         HostId = canHost ? hostId : null;
+        var registry = _options.PartitionBlobContainer is { } container ? new GarnetJournalHostRegistry(container) : null;
+        if (registry is not null && HostId is not null)
+        {
+            // Register before serving or becoming active, so failover assigns partitions to this silo's address only
+            // if it serves that address, and leaves the partitions of an explicit host in place (D33).
+            await registry.RegisterAsync(HostId, cancellationToken).ConfigureAwait(false);
+        }
+
         var view = await GetRangeMapAsync(metaStore, HostId, cancellationToken).ConfigureAwait(false);
         _partitions = await GarnetJournalPartitionManager.StartAsync(_options, hostId, metaStore, view, _loggerFactory, cancellationToken).ConfigureAwait(false);
         var router = _router = new GarnetJournalRouter(metaStore, _partitions.View, _options.OperationTimeout, _telemetry, _logger, _timeProvider);
@@ -203,11 +211,12 @@ internal sealed class GarnetJournalStorageProvider : IJournalStorageProvider, IJ
         }
 
         // Silos identified by their addresses fail partitions over from silos which membership declares dead.
-        if (shared && _options.HostId is null && _membership is not null)
+        if (registry is not null && _options.HostId is null && _membership is not null)
         {
             _failoverAgent = new GarnetJournalFailoverAgent(
                 new GarnetJournalHostingCoordinator(metaStore, _loggerFactory?.CreateLogger<GarnetJournalHostingCoordinator>()),
                 _membership,
+                registry,
                 _options.HostingInterval,
                 _loggerFactory?.CreateLogger<GarnetJournalFailoverAgent>());
             _failoverAgent.Start();

@@ -97,7 +97,7 @@ silo.AddGarnetJournalStorage(options =>
 | Option | Default | Description |
 | --- | --- | --- |
 | `MetaStore` | none (required) | Store holding the range map, shared by every silo: `AzureBlobRangeMetaStore`, or one `InMemoryRangeMetaStore` instance for tests. |
-| `HostId` | the silo address with `PartitionBlobContainer`; otherwise generated and stored in `DataDirectory` | This silo's identifier in the map's hosting assignments. Set it to name hosts in `InitialRangeMap`; silos with an explicit `HostId` are not failed over automatically. |
+| `HostId` | the silo address with `PartitionBlobContainer`; otherwise generated and stored in `DataDirectory` | This silo's identifier in the map's hosting assignments. Set it to name hosts in `InitialRangeMap`; silos with an explicit `HostId` are not failed over automatically, and with `PartitionBlobContainer` keep their partitions while other silos fail over theirs. It must not have the form of a silo address with `PartitionBlobContainer`. |
 | `InitialRangeMap` | one partition, `p0`, hosted by the first silo with a `DataDirectory` or `PartitionBlobContainer` | Map written to an empty MetaStore. Ignored once the MetaStore holds a map. |
 | `DataDirectory` | none | Directory holding the partitions this silo hosts, each in the subdirectory named by its storage location. Required on silos which host partitions on local disk. |
 | `PartitionBlobContainer` | none | Azure Storage container holding every partition's state as page blobs under its storage location, shared by every silo. Enables failover between silos. |
