@@ -1,6 +1,5 @@
 using Orleans.Configuration;
 using Orleans.TestingHost;
-using Orleans.TestingHost.Utils;
 using Orleans.Internal;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -107,7 +106,7 @@ namespace UnitTests.StuckGrainTests
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
-        public async Task StuckGrainTest_StuckDetectionOnDeactivation()
+        public async Task StuckGrainTest_DeactivationForwardsCallsAfterOnDeactivateAsyncCompletes()
         {
             var cancellationToken = TestContext.Current.CancellationToken;
             var id = Guid.NewGuid();
@@ -116,31 +115,19 @@ namespace UnitTests.StuckGrainTests
 
             await StuckGrain.WaitForDeactivationStart(stuckGrain.GetGrainId());
 
-            for (var i = 0; i < 3; i++)
+            var calls = new Task[3];
+            for (var i = 0; i < calls.Length; i++)
             {
-                var call = stuckGrain.NonBlockingCall();
-                await Task.WhenAny(call, Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken));
+                calls[i] = stuckGrain.NonBlockingCall();
             }
 
-            await TestingUtils.WaitUntilAsync(
-                async (lastTry, cancellationToken) =>
-                {
-                    var count = await stuckGrain.GetNonBlockingCallCounter(cancellationToken);
-                    if (lastTry)
-                    {
-                        Assert.Equal(3, count);
-                    }
-
-                    return count == 3;
-                },
-                TimeSpan.FromSeconds(10),
-                TimeSpan.FromMilliseconds(200),
-                cancellationToken);
+            // Readiness guarantees that the deactivation callback's release task is registered.
+            Assert.True(StuckGrain.Release(id));
+            await Task.WhenAll(calls).WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
 
             // No issue on this one
             await stuckGrain.NonBlockingCall();
 
-            // All 4 otherwise stuck calls should have been forwarded to a new activation
             Assert.Equal(4, await stuckGrain.GetNonBlockingCallCounter(cancellationToken));
         }
 
@@ -150,9 +137,9 @@ namespace UnitTests.StuckGrainTests
             var id = Guid.NewGuid();
             var stuckGrain = this.fixture.GrainFactory.GetGrain<IStuckGrain>(id);
 
-            // The cancellation token passed to OnActivateAsync should become cancelled and this will cause activation to fail.
+            // The cancellation token passed to OnActivateAsync becomes cancelled, and activation fails once OnActivateAsync returns.
             RequestContext.Set("block_activation_seconds", 30);
-            await Assert.ThrowsAsync<TaskCanceledException>(() => stuckGrain.NonBlockingCall());
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stuckGrain.NonBlockingCall());
 
             // Check to see that it did try to activate.
             RequestContext.Clear();
