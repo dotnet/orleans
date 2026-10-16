@@ -129,7 +129,7 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
                     Filter.Gt(x => x.GrainHash, beginHash)
                 )
             );
-        var reminders = await GetCollection(cancellationToken).Find(filter).ToListAsync(cancellationToken);
+        var reminders = await GetCollection(cancellationToken).Find(Filter.And(filter, ActiveRows())).ToListAsync(cancellationToken);
 
         return new ReminderTableData(reminders.Select(x => x.ToEntry()));
     }
@@ -137,9 +137,11 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
     public virtual async Task<ReminderEntry?> ReadRow(GrainId grainId, string reminderName, CancellationToken cancellationToken = default)
     {
         var collection = GetCollection(cancellationToken);
-        var reminder = await collection.Find(Filter.Eq(x => x.Id, ReturnId(serviceId, grainId, reminderName)))
+        var reminder = await collection.Find(Filter.And(
+                Filter.Eq(x => x.Id, ReturnId(serviceId, grainId, reminderName)), ActiveRows()))
             .FirstOrDefaultAsync(cancellationToken)
-            ?? await collection.Find(Filter.Eq(x => x.Id, ReturnLegacyId(serviceId, grainId, reminderName)))
+            ?? await collection.Find(Filter.And(
+                    Filter.Eq(x => x.Id, ReturnLegacyId(serviceId, grainId, reminderName)), ActiveRows()))
                 .FirstOrDefaultAsync(cancellationToken);
 
         var entry = reminder?.ToEntry();
@@ -153,7 +155,8 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
                 Filter.And(
                     Filter.Eq(x => x.ServiceId, serviceId),
                     Filter.Eq(x => x.GrainHash, grainId.GetUniformHashCode()),
-                    Filter.Eq(x => x.GrainId, grainId.ToString())
+                    Filter.Eq(x => x.GrainId, grainId.ToString()),
+                    ActiveRows()
                 )
             ).ToListAsync(cancellationToken);
 
@@ -195,7 +198,10 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
             .Set(x => x.GrainHash, document.GrainHash)
             .Set(x => x.Etag, document.Etag)
             .Set(x => x.Period, document.Period)
-            .Set(x => x.StartAt, document.StartAt);
+            .Set(x => x.StartAt, document.StartAt)
+#pragma warning disable CS0618 // Re-registering a contributed-provider tombstone makes it active again.
+            .Unset(x => x.IsDeleted);
+#pragma warning restore CS0618
 
         if (legacy is not null)
         {
@@ -226,6 +232,13 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
 
     private static string ReturnLegacyId(string serviceId, GrainId grainId, string reminderName)
         => $"{serviceId}_{grainId}_{reminderName}";
+
+    private static FilterDefinition<MongoReminderDocument> ActiveRows()
+    {
+#pragma warning disable CS0618 // Preserve the legacy deletion contract while reading existing collections.
+        return Filter.Ne(x => x.IsDeleted, true);
+#pragma warning restore CS0618
+    }
 
     private FilterDefinition<MongoReminderDocument> IdentityFilter(GrainId grainId, string reminderName)
         => Filter.And(
