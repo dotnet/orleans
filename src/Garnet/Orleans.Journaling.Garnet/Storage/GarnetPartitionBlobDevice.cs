@@ -25,21 +25,37 @@ internal sealed class GarnetPartitionBlobDeviceFactory(GarnetPartitionBlobStorag
 {
     public IDevice Get(FileDescriptor fileInfo) => new GarnetPartitionBlobDevice(storage, Combine(baseName, fileInfo.directoryName, fileInfo.fileName));
 
+    /// <remarks>
+    /// Accepts the logical device names Tsavorite's consumers pass, such as <c>commit.7</c>, whose segments are
+    /// <c>commit.7.0</c>, <c>commit.7.1</c>, and so on; the physical names <see cref="ListContents"/> returns, such as
+    /// <c>commit.7.0</c>; and directories, named by a descriptor without a file name.
+    /// </remarks>
     public void Delete(FileDescriptor fileInfo)
     {
-        // A file's segments are named file.0, file.1, and so on; a descriptor without a file names a whole directory, as
-        // do the descriptors ListContents returns for directories, whose file name is empty.
-        var prefix = string.IsNullOrEmpty(fileInfo.fileName)
-            ? Combine(baseName, fileInfo.directoryName) is { Length: > 0 } directory ? directory + "/" : string.Empty
-            : Combine(baseName, fileInfo.directoryName, fileInfo.fileName) + ".";
-        var names = storage.List(prefix).Select(entry => entry.Name).ToList();
+        List<string> names;
+        if (string.IsNullOrEmpty(fileInfo.fileName))
+        {
+            var prefix = Combine(baseName, fileInfo.directoryName) is { Length: > 0 } directory ? directory + "/" : string.Empty;
+            names = [.. storage.List(prefix).Select(entry => entry.Name)];
+        }
+        else
+        {
+            var name = Combine(baseName, fileInfo.directoryName, fileInfo.fileName);
+            names = [.. storage.List(name).Select(entry => entry.Name).Where(candidate => candidate == name || IsSegmentOf(candidate, name))];
+        }
+
         storage.DeleteAsync(names, CancellationToken.None).GetAwaiter().GetResult();
     }
 
-    /// <remarks>Lists directories, then files, each most recently created first, as the local device factory does.</remarks>
+    /// <remarks>
+    /// Lists directories, then files, each most recently created first, as the local device factory does. Files have
+    /// their physical names, including the segment suffix, from which Tsavorite parses commit numbers. Every descriptor
+    /// names its directory relative to this factory's base, so <see cref="Delete"/> accepts it as listed.
+    /// </remarks>
     public IEnumerable<FileDescriptor> ListContents(string path)
     {
-        var root = Combine(baseName, path);
+        var listed = GarnetPartitionBlobStorage.NormalizePath(path ?? string.Empty);
+        var root = Combine(baseName, listed);
         var prefix = root.Length == 0 ? string.Empty : root + "/";
         var directories = new Dictionary<string, long>(StringComparer.Ordinal);
         var files = new List<(string Name, long Sequence)>();
@@ -60,14 +76,21 @@ internal sealed class GarnetPartitionBlobDeviceFactory(GarnetPartitionBlobStorag
 
         foreach (var (directory, _) in directories.OrderByDescending(entry => entry.Value))
         {
-            yield return new FileDescriptor(directory, string.Empty);
+            yield return new FileDescriptor(Combine(listed, directory), string.Empty);
         }
 
         foreach (var (file, _) in files.OrderByDescending(entry => entry.Sequence))
         {
-            yield return new FileDescriptor(string.Empty, file);
+            yield return new FileDescriptor(listed, file);
         }
     }
+
+    /// <summary>Gets a value indicating whether <paramref name="candidate"/> is a segment, <c>name.N</c>, of the device <paramref name="name"/>.</summary>
+    private static bool IsSegmentOf(string candidate, string name)
+        => candidate.Length > name.Length + 1
+            && candidate.StartsWith(name, StringComparison.Ordinal)
+            && candidate[name.Length] == '.'
+            && candidate.AsSpan(name.Length + 1).IndexOfAnyExceptInRange('0', '9') < 0;
 
     private static string Combine(params string?[] parts)
         => string.Join('/', parts.Select(part => GarnetPartitionBlobStorage.NormalizePath(part ?? string.Empty)).Where(part => part.Length > 0));

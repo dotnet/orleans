@@ -22,23 +22,25 @@ internal interface IGarnetJournalHostRegistry
 /// under that identifier (D33).
 /// </summary>
 /// <remarks>
-/// Each host is one empty blob under <see cref="Prefix"/>, a location no partition may use
-/// (<see cref="GarnetPartitionBlobStorage.ValidateStorageLocations"/>). A host registers before its partitions start
-/// and before it can become active in membership, so a host the failover agent finds active and unregistered does not
-/// serve assignments under that name.
+/// Each host is one empty blob under <c>~hosts/{map id}/</c>, in a location no partition may use
+/// (<see cref="GarnetPartitionBlobStorage.ValidateStorageLocations"/>). The registry is scoped to one range map, so
+/// providers sharing a container each judge eligibility by the hosts of their own map. A host registers before its
+/// partitions start and before it can become active in membership, so a host the failover agent finds active and
+/// unregistered does not serve assignments under that name.
 /// </remarks>
-internal sealed class GarnetJournalHostRegistry(BlobContainerClient container) : IGarnetJournalHostRegistry
+internal sealed class GarnetJournalHostRegistry(BlobContainerClient container, string mapId) : IGarnetJournalHostRegistry
 {
     /// <summary>The first segment of registration blob names, which partition storage locations may not use.</summary>
     internal const string ReservedSegment = "~hosts";
 
-    private const string Prefix = ReservedSegment + "/";
+    // Each range map has its own registry.
+    private readonly string _prefix = $"{ReservedSegment}/{Uri.EscapeDataString(mapId)}/";
 
     /// <summary>Registers <paramref name="host"/>.</summary>
     public async Task RegisterAsync(string host, CancellationToken cancellationToken)
     {
         await container.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-        await container.GetBlobClient(Prefix + Uri.EscapeDataString(host)).UploadAsync(BinaryData.Empty, overwrite: true, cancellationToken).ConfigureAwait(false);
+        await container.GetBlobClient(_prefix + Uri.EscapeDataString(host)).UploadAsync(BinaryData.Empty, overwrite: true, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -46,7 +48,7 @@ internal sealed class GarnetJournalHostRegistry(BlobContainerClient container) :
     {
         try
         {
-            await container.GetBlobClient(Prefix + Uri.EscapeDataString(host)).DeleteIfExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            await container.GetBlobClient(_prefix + Uri.EscapeDataString(host)).DeleteIfExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException exception) when (exception.Status == 404)
         {
@@ -59,9 +61,9 @@ internal sealed class GarnetJournalHostRegistry(BlobContainerClient container) :
         var hosts = new HashSet<string>(StringComparer.Ordinal);
         try
         {
-            await foreach (var item in container.GetBlobsAsync(BlobTraits.None, BlobStates.None, Prefix, cancellationToken).ConfigureAwait(false))
+            await foreach (var item in container.GetBlobsAsync(BlobTraits.None, BlobStates.None, _prefix, cancellationToken).ConfigureAwait(false))
             {
-                hosts.Add(Uri.UnescapeDataString(item.Name[Prefix.Length..]));
+                hosts.Add(Uri.UnescapeDataString(item.Name[_prefix.Length..]));
             }
         }
         catch (RequestFailedException exception) when (exception.Status == 404)
