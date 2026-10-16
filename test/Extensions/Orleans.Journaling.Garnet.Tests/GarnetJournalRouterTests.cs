@@ -292,6 +292,25 @@ public sealed class GarnetJournalRouterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Disposal_WithCommandInFlight_SurfacesObjectDisposedException()
+    {
+        // A command whose reply never arrives, a blocking pop on an empty list, is in flight when the router is disposed.
+        var view = (await CreateRouterAsync()).View;
+        var router = new GarnetJournalRouter(_store, view, TimeSpan.FromSeconds(30));
+        _routers.Add(router);
+        var ambiguous = new StrongBox<bool>();
+        var command = router.ExecuteAsync(0, "BLPOP", [(RedisKey)$"in-flight-{Guid.NewGuid():N}", "0"], CancellationToken, ambiguous).AsTask();
+        await Task.Delay(300, CancellationToken);
+        Assert.False(command.IsCompleted);
+
+        await router.DisposeAsync();
+
+        // Closing the connection cancels the command; disposal, not cancellation, is the reason it fails.
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => WithinWatchdogAsync(command));
+        Assert.Equal(0, router.ConnectionCount);
+    }
+
+    [Fact]
     public async Task PartitionOfAnotherMap_RejectsOperations()
     {
         // A router of another map whose endpoints, for example stale ones, reach this map's partitions.

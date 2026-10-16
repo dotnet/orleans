@@ -95,7 +95,24 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     /// </param>
     /// <returns>The procedure's response, whose status is not <c>WrongPartition</c>.</returns>
     /// <exception cref="TimeoutException">The operation did not complete within the operation timeout.</exception>
+    /// <exception cref="ObjectDisposedException">The router was disposed before the operation completed.</exception>
     public async ValueTask<RedisResult[]> ExecuteAsync(int bucket, string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous = null)
+    {
+        try
+        {
+            return await ExecuteCoreAsync(bucket, procedure, args, cancellationToken, ambiguous).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not ObjectDisposedException && IsStopped && !cancellationToken.IsCancellationRequested)
+        {
+            // Disposal marks the router stopped before it closes connections, so a failure observed once it is stopped
+            // is attributed to disposal. Closing a connection fails the commands in flight on it in several ways,
+            // including cancellation, so the original failure is kept as the inner exception.
+            MarkAmbiguous(ambiguous);
+            throw new ObjectDisposedException($"The {nameof(GarnetJournalRouter)} was disposed while procedure {procedure} was in progress.", exception);
+        }
+    }
+
+    private async ValueTask<RedisResult[]> ExecuteCoreAsync(int bucket, string procedure, object[] args, CancellationToken cancellationToken, StrongBox<bool>? ambiguous)
     {
         // Every wait is bounded by the operation's deadline: a stalled connection, command, or MetaStore refresh ends
         // the operation with a TimeoutException, while caller cancellation still surfaces as cancellation.
@@ -164,6 +181,13 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
                 catch (ObjectDisposedException ex) when (!IsStopped)
                 {
                     // The view changed the partition's endpoint and the old connection was closed.
+                    reason = "connection";
+                    exception = ex;
+                    MarkAmbiguous(ambiguous);
+                }
+                catch (OperationCanceledException ex) when (!IsStopped && !cancellationToken.IsCancellationRequested)
+                {
+                    // Closing a connection retired by a view change cancels the commands still in flight on it.
                     reason = "connection";
                     exception = ex;
                     MarkAmbiguous(ambiguous);
@@ -276,8 +300,9 @@ internal sealed class GarnetJournalRouter : IAsyncDisposable
     }
 
     /// <summary>
-    /// Closes every connection. Operations in progress fail with <see cref="ObjectDisposedException"/> at their next
-    /// attempt, and no connection is opened after disposal begins.
+    /// Closes every connection. Operations whose commands are in flight fail with <see cref="ObjectDisposedException"/>
+    /// at once; other operations in progress fail with it at their next attempt. No connection is opened after
+    /// disposal begins.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
