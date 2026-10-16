@@ -43,7 +43,7 @@ public class DurableTaskReplayRegionTests
                     summary = DurableTask.Once("validate", () => SetStatus(2));
                     confirmed = await DurableTask.WhenAll(lines.Select(line => Reserve(line))).WithId("reserve");
                 }
-                catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+                catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
                 {
                     return await CancelOrderAsync(buyerId);
                 }
