@@ -23,7 +23,7 @@ public readonly struct LocalRequestOptions
 
     /// <summary>
     /// Gets a value indicating whether the request extends the lifetime of the grain activation.
-    /// Defaults to <see langword="true"/>, including for <see langword="default"/>(<see cref="LocalRequestOptions"/>).
+    /// Defaults to <see langword="true"/>.
     /// </summary>
     /// <remarks>
     /// A request which keeps the activation alive restarts the activation's idle collection period when it completes,
