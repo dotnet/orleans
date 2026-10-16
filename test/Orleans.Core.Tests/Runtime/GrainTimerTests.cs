@@ -91,18 +91,23 @@ public sealed class GrainTimerTests
     }
 
     [Fact]
-    public void Tick_Complete_LogsFailuresExceptRejections()
+    public void Tick_Complete_LogsFailuresUntilTimerIsDisposed()
     {
         using var fixture = new TimerFixture();
-        using var timer = fixture.Register<object?>((_, _) => Task.CompletedTask, null, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        var timer = fixture.Register<object?>((_, _) => Task.CompletedTask, null, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
         var tick = Assert.Single(fixture.Requests).Request;
-        var failure = new InvalidOperationException("Filter failed.");
+        var filterFailure = new InvalidOperationException("Filter failed.");
+        var downstreamRejection = new OrleansMessageRejectionException("Downstream call rejected.");
 
-        tick.Complete(Response.FromException(new OrleansMessageRejectionException("Rejected.")));
         tick.Complete(Response.Completed);
-        tick.Complete(Response.FromException(failure));
+        tick.Complete(Response.FromException(filterFailure));
+        tick.Complete(Response.FromException(downstreamRejection));
 
-        Assert.Same(failure, Assert.Single(fixture.LoggedWarnings()));
+        // An activation disposes its timers before it rejects their queued ticks.
+        timer.Dispose();
+        tick.Complete(Response.FromException(new OrleansMessageRejectionException("Activation is no longer valid.")));
+
+        Assert.Equal<Exception>([filterFailure, downstreamRejection], fixture.LoggedWarnings());
     }
 
     [Fact]

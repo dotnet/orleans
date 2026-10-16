@@ -67,6 +67,17 @@ internal abstract partial class GrainTimer : IGrainTimer
 
     private ILogger Logger => _shared.TimerLogger;
 
+    private bool IsDisposed
+    {
+        get
+        {
+            lock (_cts)
+            {
+                return _state == TimerState.Disposed;
+            }
+        }
+    }
+
     [DoesNotReturn]
     private static void ThrowIncorrectGrainContext() => throw new InvalidOperationException("Current grain context differs from specified grain context.");
 
@@ -298,10 +309,10 @@ internal abstract partial class GrainTimer : IGrainTimer
         public ValueTask<Response> Invoke() => timer.InvokeGrainTimerCallbackAsync();
 
         // No caller observes a tick, so the tick logs its failures, including call filter failures.
-        // Ticks dropped by deactivation are expected and are not logged.
+        // An activation disposes its timers before it rejects their queued ticks, so a disposed timer's failures are expected.
         public void Complete(Response response)
         {
-            if (response.Exception is { } exception and not OrleansMessageRejectionException)
+            if (response.Exception is { } exception && !timer.IsDisposed)
             {
                 LogWarningCallbackException(timer.Logger, exception, timer);
             }
