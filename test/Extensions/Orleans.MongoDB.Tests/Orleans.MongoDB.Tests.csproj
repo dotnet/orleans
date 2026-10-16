@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <PackageReference Include="Aspire.MongoDB.Driver" />
     <PackageReference Include="Aspire.Hosting.MongoDB" />
