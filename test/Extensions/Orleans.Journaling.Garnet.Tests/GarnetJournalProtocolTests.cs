@@ -342,6 +342,38 @@ public sealed class GarnetJournalProtocolTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Catalog_RejectsBucketsWithIncompleteMigration()
+    {
+        // The bucket holds a journal locally, but its source may still hold others.
+        var present = (GarnetJournalStorage)Provider.CreateStorage(NewId("catalog-incomplete"));
+        await present.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken);
+        var indexKey = (RedisKey)GarnetJournalKeys.GetIndexKey(present.Bucket);
+        Assert.True(await _fixture.Database.SetLengthAsync(indexKey) > 0);
+        await _fixture.Database.HashSetAsync(present.BucketKey, [new("done", "0"), new("source", "7")]);
+
+        Assert.Equal(["-11", "7"], await ExecuteAsync(GarnetJournalProtocol.Index, [present.BucketKey, indexKey]));
+
+        // The listing fails rather than completing with only the journals this partition holds.
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await foreach (var _ in Provider.ListAsync(cancellationToken: CancellationToken))
+            {
+            }
+        });
+        Assert.Contains($"bucket {present.Bucket}", exception.Message);
+
+        // Once the migration completes, the bucket lists its journals again.
+        await _fixture.Database.HashSetAsync(present.BucketKey, "done", "1");
+        var listed = new HashSet<JournalId>();
+        await foreach (var entry in Provider.ListAsync(cancellationToken: CancellationToken))
+        {
+            listed.Add(entry.Id);
+        }
+
+        Assert.Contains(present.JournalId, listed);
+    }
+
+    [Fact]
     public async Task AcknowledgedWrites_SurviveRestart()
     {
         var ids = Enumerable.Range(0, 16).Select(index => NewId($"restart-{index}")).ToArray();
