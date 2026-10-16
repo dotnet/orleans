@@ -2,7 +2,7 @@ namespace Orleans.CodeGenerator.Model;
 
 /// <summary>
 /// Combined model aggregating all pipeline outputs for metadata class generation.
-/// This is the input to the final <c>RegisterSourceOutput</c> that produces the
+/// This is the input to the final <c>RegisterImplementationSourceOutput</c> that produces the
 /// <c>Metadata_{AssemblyName}</c> class and assembly-level attributes.
 /// </summary>
 internal sealed record class MetadataAggregateModel(

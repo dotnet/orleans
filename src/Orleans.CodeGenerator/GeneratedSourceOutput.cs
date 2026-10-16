@@ -14,14 +14,24 @@ internal static class GeneratedSourceOutput
     private const string GeneratedCodeWarningDisable = "#pragma warning disable";
     private const string GeneratedCodeWarningRestore = "#pragma warning restore";
 
-    internal static void EmitSourceOutputResult(SourceProductionContext context, SourceOutputResult result)
+    internal static void RegisterImplementationSourceOutputs(
+        IncrementalGeneratorInitializationContext context,
+        IncrementalValuesProvider<SourceOutputResult> outputs)
+    {
+        context.RegisterSourceOutput(outputs, ReportDiagnostic);
+        context.RegisterImplementationSourceOutput(outputs, EmitSource);
+    }
+
+    internal static void ReportDiagnostic(SourceProductionContext context, SourceOutputResult result)
     {
         if (result.Diagnostic is { } diagnostic)
         {
             context.ReportDiagnostic(diagnostic);
-            return;
         }
+    }
 
+    internal static void EmitSource(SourceProductionContext context, SourceOutputResult result)
+    {
         if (result.SourceEntry is { } sourceEntry)
         {
             context.AddSource(sourceEntry.HintName, sourceEntry.SourceText);

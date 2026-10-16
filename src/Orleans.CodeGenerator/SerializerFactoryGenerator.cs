@@ -29,7 +29,7 @@ internal static class SerializerFactoryGenerator
         public string ConfigurationStatements { get; } = configurationStatements;
     }
 
-    internal sealed record Failure(ITypeSymbol Type, string Reason);
+    internal sealed record Failure(ITypeSymbol Type, string Reason, bool RequiresImplementation = false);
 
     internal static bool TryCreate(
         IGeneratorServices services,
@@ -56,13 +56,36 @@ internal static class SerializerFactoryGenerator
                 return false;
             }
             var registration = new Registration(type);
-            if (Describe(registration, services, implementationCompilation, cancellationToken) is { } reason)
+            if (Describe(registration, services, implementationCompilation, cancellationToken, out var requiresImplementation) is { } reason)
             {
-                failure = new(type, reason);
-                return false;
+                if (!requiresImplementation)
+                {
+                    failure = new(type, reason);
+                    return false;
+                }
+
+                // Keep checking contracts whose types are available even when runtime metadata is omitted.
+                failure ??= new(type, reason, RequiresImplementation: true);
             }
             registrations.Add(type, registration);
             foreach (var dependency in registration.Dependencies) pending.Enqueue(dependency);
+        }
+
+        if (failure is not null)
+        {
+            var metadata = new StringBuilder();
+            var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+            foreach (var type in registrations.Keys)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (AppendTypeMetadata(metadata, type, services.LibraryTypes, visited) is { } metadataFailure)
+                {
+                    failure = metadataFailure;
+                    break;
+                }
+            }
+
+            return false;
         }
 
         var serializerGenerator = new SerializerGenerator(services);
@@ -179,8 +202,11 @@ internal static class SerializerFactoryGenerator
         return true;
     }
 
-    private static string? Describe(Registration registration, IGeneratorServices services, Compilation implementationCompilation, CancellationToken cancellationToken)
+    private static string? Describe(
+        Registration registration, IGeneratorServices services, Compilation implementationCompilation,
+        CancellationToken cancellationToken, out bool requiresImplementation)
     {
+        requiresImplementation = false;
         var type = registration.Type;
         if (type is INamedTypeSymbol { IsUnboundGenericType: true } || ContainsTypeParameter(type))
             return "use a closed type with explicit generic arguments";
@@ -236,7 +262,7 @@ internal static class SerializerFactoryGenerator
         if (named.IsAbstract || named.TypeKind == TypeKind.Interface)
             return "declare concrete model types";
         if (!SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
-            return DescribeReferenced(registration, named, services, implementationCompilation, cancellationToken);
+            return DescribeReferenced(registration, named, services, implementationCompilation, cancellationToken, out requiresImplementation);
         ISerializableTypeDescription? model;
         try
         {
@@ -307,12 +333,17 @@ internal static class SerializerFactoryGenerator
 
     private static string? DescribeReferenced(
         Registration registration, INamedTypeSymbol named, IGeneratorServices services,
-        Compilation implementationCompilation, CancellationToken cancellationToken)
+        Compilation implementationCompilation, CancellationToken cancellationToken, out bool requiresImplementation)
     {
+        requiresImplementation = false;
         var binding = implementationCompilation.GetSemanticModel(implementationCompilation.SyntaxTrees.First());
         var implementationType = binding.GetSpeculativeTypeInfo(0, named.ToTypeSyntax(),
             SpeculativeBindingOption.BindAsTypeOrNamespace).Type as INamedTypeSymbol;
-        if (implementationType is null) return "provide the referenced model's implementation metadata";
+        if (implementationType is null)
+        {
+            requiresImplementation = true;
+            return "provide the referenced model's implementation metadata";
+        }
         var library = LibraryTypes.FromCompilation(implementationCompilation, services.Options);
         var model = new SerializableTypeDescription(implementationCompilation, implementationType,
             SerializableSourceOutputGenerator.ShouldIncludePrimaryConstructorParameters(implementationType, library), [], library);
@@ -321,14 +352,34 @@ internal static class SerializerFactoryGenerator
         registration.Model = model;
         registration.ReferencedCodec = ResolveImplementation(SerializerGenerator.GetSimpleClassName(named.Name));
         registration.ReferencedCopier = ResolveImplementation(CopierGenerator.GetSimpleClassName(named.Name));
+        var consumerBinding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
         if (registration.ReferencedCodec is null || registration.ReferencedCopier is null && !model.IsShallowCopyable)
+        {
+            requiresImplementation = true;
+            var constructorParameters = SerializableSourceOutputGenerator.ResolveConstructorParameters(
+                implementationType, model.IncludePrimaryConstructorParameters, library);
+            var members = new FieldIdAssignmentHelper(
+                implementationType,
+                constructorParameters,
+                SerializableSourceOutputGenerator.GetGenerateFieldIdsOptionFromType(implementationType, library),
+                library);
+            foreach (var member in SerializableSourceOutputGenerator.GetDataMembers(members))
+            {
+                if (!member.IsSerializable && !member.IsCopyable) continue;
+                cancellationToken.ThrowIfCancellationRequested();
+                var dependency = consumerBinding.GetSpeculativeTypeInfo(0, member.Type.ToTypeSyntax(),
+                    SpeculativeBindingOption.BindAsTypeOrNamespace).Type;
+                if (dependency is null)
+                    return "provide complete referenced model metadata to discover the producer's serialization dependencies";
+                registration.Dependencies.Add(dependency);
+            }
             return "provide the referenced assembly's generated codec and copier implementations";
+        }
         registration.Codec = Name(registration.ReferencedCodec);
         registration.Copier = registration.ReferencedCopier is { } referencedCopier
             ? Name(referencedCopier)
             : Name(services.LibraryTypes.ShallowCopier.Construct(named));
 
-        var consumerBinding = services.Compilation.GetSemanticModel(services.Compilation.SyntaxTrees.First());
         foreach (var implementation in new[] { registration.ReferencedCodec, registration.ReferencedCopier })
         {
             if (implementation is null) continue;
@@ -346,6 +397,7 @@ internal static class SerializerFactoryGenerator
                 }
                 catch (OrleansGeneratorDiagnosticAnalysisException)
                 {
+                    requiresImplementation = true;
                     return "provide complete generated implementation metadata to discover the producer's serialization dependencies";
                 }
             }
