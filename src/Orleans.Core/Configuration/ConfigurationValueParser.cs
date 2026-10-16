@@ -1,39 +1,43 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.Configuration;
 
 namespace Orleans.Configuration;
 
 /// <summary>
-/// Parses optional network address values from configuration, which <see cref="ConfigurationBinder"/> cannot convert.
+/// Parses optional typed values from configuration without reflection.
 /// </summary>
 /// <remarks>
+/// Orleans.Core and Orleans.Runtime use this instead of <see cref="ConfigurationBinder.GetValue{T}(IConfiguration, string)"/>,
+/// which requires unreferenced code unless the configuration binding source generator is enabled. These assemblies
+/// cannot enable the generator because they bind options types with members the generator does not support.
 /// An absent or empty value leaves the caller's default in place, and an invalid value throws an
 /// <see cref="InvalidOperationException"/> in the style of <see cref="ConfigurationBinder"/>.
 /// </remarks>
 internal static class ConfigurationValueParser
 {
     /// <summary>
-    /// Parses the <see cref="IPAddress"/> value at <paramref name="key"/>.
+    /// Parses the value at <paramref name="key"/> using <see cref="CultureInfo.InvariantCulture"/>.
     /// </summary>
     /// <returns><see langword="true"/> when the key has a value; <see langword="false"/> when it is absent or empty.</returns>
-    /// <exception cref="InvalidOperationException">The configured value is not a valid <see cref="IPAddress"/>.</exception>
-    public static bool TryParseIPAddress(IConfiguration configuration, string key, [NotNullWhen(true)] out IPAddress? value)
+    /// <exception cref="InvalidOperationException">The configured value is not a valid <typeparamref name="T"/>.</exception>
+    public static bool TryParseValue<T>(IConfiguration configuration, string key, [MaybeNullWhen(false)] out T value) where T : IParsable<T>
     {
         var text = configuration[key];
         if (string.IsNullOrEmpty(text))
         {
-            value = null;
+            value = default;
             return false;
         }
 
-        if (IPAddress.TryParse(text, out value))
+        if (T.TryParse(text, CultureInfo.InvariantCulture, out value))
         {
             return true;
         }
 
-        throw CreateInvalidValueException(configuration, key, typeof(IPAddress));
+        throw CreateInvalidValueException(configuration, key, typeof(T));
     }
 
     /// <summary>

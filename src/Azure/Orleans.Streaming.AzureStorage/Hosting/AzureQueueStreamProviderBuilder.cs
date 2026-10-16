@@ -47,7 +47,7 @@ public sealed class AzureQueueStreamProviderBuilder : IProviderBuilder<ISiloBuil
         {
             optionsBuilder.Configure<IServiceProvider>((options, services) =>
             {
-                var queueNames = configurationSection.GetSection("QueueNames")?.Get<List<string>>();
+                var queueNames = configurationSection.GetSection("QueueNames").Get<List<string>>();
                 if (queueNames != null)
                 {
                     options.QueueNames = queueNames;

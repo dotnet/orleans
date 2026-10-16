@@ -100,10 +100,17 @@ namespace Orleans.Configuration
 
         internal void Bind(IConfiguration cfg)
         {
-            GatewayPort = cfg.GetValue(nameof(GatewayPort), GatewayPort);
-            SiloPort = cfg.GetValue(nameof(SiloPort), SiloPort);
+            if (ConfigurationValueParser.TryParseValue<int>(cfg, nameof(GatewayPort), out var gatewayPort))
+            {
+                GatewayPort = gatewayPort;
+            }
 
-            if (ConfigurationValueParser.TryParseIPAddress(cfg, nameof(AdvertisedIPAddress), out var aip))
+            if (ConfigurationValueParser.TryParseValue<int>(cfg, nameof(SiloPort), out var siloPort))
+            {
+                SiloPort = siloPort;
+            }
+
+            if (ConfigurationValueParser.TryParseValue<IPAddress>(cfg, nameof(AdvertisedIPAddress), out var aip))
             {
                 AdvertisedIPAddress = aip;
             }
