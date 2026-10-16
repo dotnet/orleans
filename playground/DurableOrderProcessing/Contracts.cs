@@ -41,8 +41,9 @@ public sealed record CatalogItem(
 [GenerateSerializer, Immutable]
 public sealed record BasketItem(int ProductId, string ProductName, decimal UnitPrice, int Quantity);
 
-[GenerateSerializer, Immutable]
-public sealed record CheckoutRequest(Guid RequestId, Address Address, string CardNumber);
+// The body of POST /api/orders, which checks out the buyer's basket as a new order. The request's Idempotency-Key is the
+// order's ID.
+public sealed record CheckoutRequest(string BuyerId, Address Address, string CardNumber);
 
 [GenerateSerializer, Immutable]
 public sealed record OrderState(
@@ -110,6 +111,9 @@ public sealed record OrderDetails(OrderState Order, StockLine[] Stock)
 
 // Durable task arguments and results. The runtime stores them with the Orleans serializer.
 [GenerateSerializer, Immutable]
+public sealed record PlaceOrder(string BuyerId, Address Address, string CardLast4);
+
+[GenerateSerializer, Immutable]
 public sealed record SubmitOrder(string BuyerId, OrderLine[] Lines, Address Address, string CardLast4);
 
 [GenerateSerializer, Immutable]
@@ -121,6 +125,7 @@ public sealed record OrderSummary(
     DateTimeOffset OrderDate,
     string? Description);
 
+// The result of a payment authorization, which the payment gateway's status monitor reports.
 [GenerateSerializer, Immutable]
 public sealed record PaymentResult(bool Succeeded, string? Reason);
 
@@ -128,9 +133,10 @@ public sealed record PaymentResult(bool Succeeded, string? Reason);
 [GenerateSerializer, Immutable]
 public sealed record OrderResult(OrderStatus Status, string? Description);
 
-// The value of an order's Shipped signal. The workflow records the first shipment; another one conflicts with it.
+// The value of an order's shipped signal, which the shipper identifies. The workflow records the first shipment, so a
+// repeated signal with the same shipment succeeds and another shipment conflicts with it.
 [GenerateSerializer, Immutable]
-public sealed record Shipment(DateTimeOffset ShippedAt);
+public sealed record Shipment(Guid ShipmentId);
 
 public sealed class OrderingOptions
 {
@@ -139,6 +145,9 @@ public sealed class OrderingOptions
 
     // The order is cancelled when payment authorization doesn't complete within this time.
     public TimeSpan PaymentTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
+    // The interval between polls of a payment authorization which doesn't advertise one with Retry-After.
+    public TimeSpan PaymentPollInterval { get; set; } = TimeSpan.FromSeconds(1);
 }
 
 // Journaled state is stored as JSON lines, so each persisted type needs source-generated metadata.

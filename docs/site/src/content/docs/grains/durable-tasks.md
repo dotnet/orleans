@@ -95,8 +95,8 @@ a deactivation, the next activation replays `PlaceOrderAsync` from the start: `s
 `grace-period`, `validate`, and the `reserve` inputs return their recorded results, and
 the workflow continues with the first operation which hasn't completed. The
 `playground/DurableOrderProcessing` project in the Orleans repository runs a complete
-version of this workflow with a browser UI, detached projection updates, and diagnostics
-endpoints.
+version of this workflow with a browser UI which places orders through durable HTTP
+operations, detached projection updates, and diagnostics endpoints.
 
 ## Task identity
 
