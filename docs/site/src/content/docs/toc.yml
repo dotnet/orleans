@@ -138,6 +138,8 @@ items:
             href: grains/durable-tasks-idempotency.md
           - name: Replay-safety rules
             href: grains/durable-tasks-replay-rules.md
+          - name: Versioning
+            href: grains/durable-tasks-versioning.md
           - name: Integrate with other systems
             href: grains/durable-tasks-integrations.md
           - name: Practical recipes
@@ -513,6 +515,8 @@ items:
             href: diagnostics/orleans0216.md
           - name: ORLEANS0217
             href: diagnostics/orleans0217.md
+          - name: ORLEANS0218
+            href: diagnostics/orleans0218.md
       - name: API context and examples
         href: resources/api-reference-guide.md
       - name: Best practices

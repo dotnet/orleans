@@ -9,7 +9,7 @@ ms.topic: reference
 
 Orleans analyzers detect unsupported RPC contracts, serialization schema problems, unsafe grain execution patterns, replay hazards in durable tasks, and compatibility changes. Select a diagnostic ID for its cause, impact, remediation, code-fix behavior, and suppression guidance.
 
-Durable task diagnostics ORLEANS0200 to ORLEANS0217 enforce the [replay-safety rules](../grains/durable-tasks-replay-rules.md) for durable task bodies.
+Durable task diagnostics ORLEANS0200 to ORLEANS0218 enforce the [replay-safety rules](../grains/durable-tasks-replay-rules.md) for durable task bodies.
 
 Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic ID as a URL fragment. The single redirect can therefore remain stable while this index and the detailed pages evolve.
 
@@ -192,3 +192,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0217
 
 [Pass AttemptCancellationToken to calls in task-cancellation cleanup](orleans0217.md) — Warning. Code which runs only after task cancellation passes the already-canceled `CancellationToken` to a call.
+
+## ORLEANS0218
+
+[Pass constant version names and ranges](orleans0218.md) — Warning. A `DurableTask.GetVersion` call passes a change name or supported range which isn't a constant.

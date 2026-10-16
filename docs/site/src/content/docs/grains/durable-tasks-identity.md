@@ -67,6 +67,7 @@ Each operation which a body runs is recorded beneath the execution's ID:
 | A timeout's work and delay, `WaitAsync` and `WaitUntilAsync` | `{timeout}/0` and `{timeout}/1` | `quote/0`, `quote/1` |
 | A selection which a durable completion order can't decide | `{combinator}/$winner` for `WhenAny`, `Race`, and timeouts, or `{combinator}/$next-{n}` for `WhenEach` | `first-quote/$winner` |
 | A named recorded effect, `DurableTask.Once(name, effect)` | `$once:name`; later occurrences, `$once:name$2` | `publish-q3/$once:version` |
+| A version decision, `DurableTask.GetVersion(name, ...)` | `$version:name`, once per execution | `publish-q3/$version:carrier-booking` |
 | A detached start | `$detach:{targetGrainId}:{rootId}` | `publish-q3/$detach:archive\/archive:archive-q3` |
 | A signal send from a durable task | `$send:{targetGrainId}:{taskId}:{name}`; repeated sends, `$2`, `$3` | `place-order-42/$send:order\/42:place-order-42:shipped` |
 | A signal's recorded value, beneath the invoked task | `$signal:{name}`; `DurableSignal<T>.For(suffix)` names `{name}/{suffix}` | `publish-q3/$signal:approved`, `publish-q3/$signal:approved\/round-2` |
@@ -135,7 +136,7 @@ A client observes the IDs of its own start through the handle:
 The runtime also uses names which aren't IDs and aren't part of the programming model:
 the journaled state `orleans.durable-tasks.runtime` and the tables inside it, such as
 `$tasks`, `$task-requests`, and `$task-results`, and request fingerprints which begin with
-`$`, such as `$once`, `$subscribe:`, `$signal-send:`, and `$completion-decision:`.
+`$`, such as `$once`, `$version`, `$subscribe:`, `$signal-send:`, and `$completion-decision:`.
 Diagnostics show some of them; their format can change between releases.
 
 ## Stability across replays and deployments
@@ -150,6 +151,7 @@ is stable when every run computes it from the same inputs:
 | `$child-{n}` and `${kind}-{n}` | Every run creates the unnamed operations before it in the same order. |
 | A combinator's input, `{combinator}/{index}` | The combinator's ID and its input order are unchanged. |
 | `$detach:`, `$send:`, and `$signal:` records | Always: they derive from the target, the task, and the name. |
+| `$version:` records | Always: they derive from the change's name, and every check of the name in an execution shares one record. |
 | A derived detached root ID | The starting execution's ID and its `$child-{n}` count before the start are unchanged. |
 | A caller-scoped ID | The caller's child ID is unchanged. |
 
@@ -168,6 +170,8 @@ Changes between deployments affect pending executions as follows:
 
 Name every operation which a later change might move, give new operations new names, and
 follow [Version workflows safely](durable-tasks-operations.md#version-workflows-safely).
+To change operations which pending executions already passed, branch on
+`DurableTask.GetVersion`; see [Version durable tasks](durable-tasks-versioning.md).
 
 ## Address a task from elsewhere
 

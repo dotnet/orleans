@@ -33,6 +33,8 @@ This page describes the programming model and its guarantees. Continue with:
   and the external effects which need idempotency keys.
 - [Replay-safety rules](durable-tasks-replay-rules.md) for the rules which the durable
   task analyzers enforce.
+- [Versioning](durable-tasks-versioning.md) for changing workflow code while executions
+  are pending, and retiring old versions.
 - [Integrate with other systems](durable-tasks-integrations.md) for payment providers,
   databases, HTTP services, webhooks, and where to retry.
 - [Practical recipes](durable-tasks-recipes.md) for fan-out, races, compensation,
@@ -318,8 +320,11 @@ schedules different operations in different runs.
 
 A replay which schedules a different operation under a recorded ID fails with an
 `InvalidOperationException` which names the recorded and the requested operations. See
-[Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence)
-for workflow versioning.
+[Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence).
+To change a workflow while executions are pending, branch on
+`DurableTask.GetVersion`, which gives each execution the version of the change which it
+recorded, and version `0` to executions which earlier code ran past the change; see
+[Version durable tasks](durable-tasks-versioning.md).
 
 ## Combinators and handles
 
