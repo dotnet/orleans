@@ -32,82 +32,42 @@ on this abstractions assembly.
   task IDs without registration.
 - Scheduling the same definition under an existing ID reattaches to the response recorded
   for that ID. Hosts preserve the first definition associated with an ID.
-- A host can supply an execution-abort token when constructing `DurableTaskContext`.
-  `DurableTask.Current.CancellationToken`, which delegate and delay operations receive,
-  combines host abort and durable cancellation. Host abort stops an execution attempt, for example
-  to drain it before replaying it in a new context, or when an operator aborts the task;
-  `IsCancellationRequested` and durable callbacks report the durable request only. An `async
-  DurableTask` method reads the token from `DurableTask.Current`. Hosts discard
-  responses from aborted attempts; a drained task replays from its durable state.
 - A wait cancellation token abandons that scheduling, polling, or wait operation. It does
   not request durable task cancellation.
-- `CancelAsync` requests durable cancellation and completes once the host has recorded the request.
-  The request is monotonic and idempotent, and hosts retain it with task state. Cancellation is
-  cooperative: the durable token is canceled, `IsCancellationRequested` becomes true, the request
-  reaches the task's attached children, and the task's body decides its outcome. When the
-  cancellation escapes the body, for example from awaiting a canceled child, the task is canceled;
-  otherwise it completes with the body's result or failure. The durable token enters the canceled
-  state before cancellation is published to durable callbacks, including callbacks registered
-  concurrently with the request.
+- `CancelAsync` requests durable *task cancellation* and completes once the host has recorded the
+  request. The request is monotonic and idempotent, and hosts retain it with task state. Cancellation
+  is cooperative: `DurableTask.Current.CancellationToken` is canceled,
+  `IsTaskCancellationRequested` becomes true, the request reaches the task's attached children, and
+  the task's body decides its outcome. When the cancellation escapes the body, for example from
+  awaiting a canceled child, the task is canceled; otherwise it completes with the body's result or
+  failure. The body's compensation, such as `DurableTask.Once` effects, shielded children, and
+  journaled state changes, commits.
 - `CancelAsync(reason)` attaches a reason to the request, which the task's code reads from
-  `DurableTask.Current.CancellationReason`, for example in the `catch` block which decides its
+  `DurableTask.Current.TaskCancellationReason`, for example in the `catch` block which decides its
   outcome. The first request determines the reason, the host retains it with the task's cancellation
   and passes it to the task's attached children, and a replay observes the same reason.
-  `CancellationReason` is `null` until cancellation is requested and when the request carries no
-  reason. A host supplies the reason through `DurableTaskRuntimeHelper.RequestCancellationAsync`.
-- `RegisterCancellationCallbackAsync` establishes cancellation-operation causality. Its callbacks
-  execute with their durable context ambient and participate in durable dependency and failure
-  tracking. Causality flows through ordinary awaits and safe `Task.Run` dispatch. Suppressing
-  `ExecutionContext` flow or using unsafe dispatch detaches subsequent asynchronous work according
-  to standard .NET behavior, so that work is external.
-- A durable callback registered while cancellation completion is still open joins that same
-  cancellation operation, even when the durable token has already been canceled. Cancellation
-  completion closes registration atomically and waits for every callback accepted before that
-  boundary. Their failures are included in the shared cancellation result.
-- A durable callback registered after cancellation has completed starts immediately in a new
-  callback causality scope. When registered from another durable callback, the new scope retains
-  that callback's causality for dependency-cycle handling. Its returned registration independently
-  tracks the invocation: asynchronous disposal waits for completion and propagates the callback
-  failure, while the shared cancellation result remains completed.
-- Callbacks registered directly on `CancellationToken` are ordinary synchronous .NET observers,
-  not durable cancellation callbacks. They are for cooperative checks and synchronous cleanup only.
-  They follow standard `CancellationToken` behavior: registration-time `ExecutionContext` capture,
-  optional `SynchronizationContext` dispatch, and current execution-context behavior for unsafe
-  registrations.
-- Ordinary token callbacks must return promptly. They must not call, block on, await, or otherwise
-  orchestrate `RequestCancellationAsync` or durable cancellation of any context. Violating this
-  boundary is outside the contract and has the usual synchronous reentrancy and sync-over-async risks.
-  All cancellation work which requests another durable context, awaits asynchronous work, needs cycle
-  handling, or participates in durable failure aggregation must use
-  `RegisterCancellationCallbackAsync`.
-- Disposing a durable cancellation registration prevents a snapshotted callback which has not
-  started, or waits for an active callback to finish, including when that callback fails. A callback
-  can dispose its own registration without blocking.
+  `TaskCancellationReason` is `null` until cancellation is requested and when the request carries no
+  reason. A host supplies the reason through `DurableTaskRuntimeHelper.RequestTaskCancellation`.
+- A host cancels an *attempt*, one in-memory run of a task's body, with
+  `DurableTaskRuntimeHelper.CancelAttempt` when the attempt's work can't be recorded any more: its
+  grain activation is stopping, or the task was aborted or deleted. From then on, every durable
+  operation of the attempt throws `DurableTaskAttemptCanceledException`, which derives from
+  `OperationCanceledException` and carries the `DurableTaskAttemptCancellationReason`: `Once`, starting
+  or awaiting children, including shielded and detached ones, `Post`, `ScheduleAsync`, signals,
+  delays, handle operations, and combinators. A wait which the attempt's cancellation ends throws it
+  too. The host discards the attempt's response and records nothing which the attempt does; a
+  stopping activation's task replays in a new attempt.
+- `DurableTask.Current.CancellationToken` is canceled by task cancellation and by attempt
+  cancellation, so the calls which ordinary task code makes end promptly in both cases.
+  `DurableTask.Current.AttemptCancellationToken` is canceled only by attempt cancellation. Code which
+  runs durable cleanup after task cancellation, in a `catch` filtered on
+  `IsTaskCancellationRequested`, passes `AttemptCancellationToken` to the calls it makes, because
+  `CancellationToken` is already canceled. In-process cleanup, such as releasing a semaphore or
+  disposing a resource, belongs in `finally` blocks and `using` statements, which run for both.
+- Registrations on either token are ordinary synchronous .NET observers, which run when the token is
+  canceled and return promptly.
 - Delays use `DurableTask.Current.UtcNow`, supplied by the host, so replay observes the
   same logical time. `DurableTask.DelayUntil` waits for an absolute due time.
-
-### Cancellation completion and cycles
-
-`RequestCancellationAsync` starts the durable request once and all callers observe the same
-monotonic completion. Ordinary token observers run synchronously using standard
-`CancellationTokenSource` cancellation semantics. External callers and acyclic durable callback
-dependencies wait until durable observers finish and receive their aggregated failures. Dependency
-edges are created only from cancellation operations established by
-`RegisterCancellationCallbackAsync` and flowed into subsequent asynchronous work by standard
-`ExecutionContext` behavior; there is no global or thread activity inference. Cycle breaking applies
-only to `RequestCancellationAsync` calls made from those durable callbacks or their normally flowed
-asynchronous work. If adding such an edge would close a durable callback cycle, the target
-cancellation is initiated but the cycle-closing call returns without waiting on that edge. Completed
-operations release their graph edges.
-
-Cancellation completion and callback registration have one atomic boundary. Registrations accepted
-before it belong to the shared operation and delay its completion. Registrations accepted after it
-run independently and are observed by disposing their registration, so they never alter a result
-which an existing cancellation observer could already have consumed.
-
-The cancellation token passed to `RequestCancellationAsync` only abandons that caller's wait.
-It cannot reverse or withdraw the durable request.
-
 ## Responses
 
 `DurableTaskResponse` has pending, subscribed, succeeded, canceled, and failed states.
@@ -201,7 +161,7 @@ such as the address under which other parties reach the task.
 `DurableTask.ScheduleAll(inputs)` schedules every input concurrently, so a host can commit the batch in one write, and
 returns their handles in input order without waiting for results. `DurableTask.WhenAllCompleted(inputs)` also waits until
 every input is terminal and returns the handles, each with its observed outcome; an input's failure or cancellation
-doesn't fail it, and host abort of the attempt does. `ScheduledTask.WhenAllCompleted(tasks)` waits for existing handles
+doesn't fail it, and the cancellation of the attempt does. `ScheduledTask.WhenAllCompleted(tasks)` waits for existing handles
 the same way. Their inputs are identified like `WhenAll` inputs, under `$schedule-all-N` or `$when-all-completed-N`, or
 under the segment which `WithId` assigns. The handles belong to the awaiting execution, so these combinators run only
 when awaited within a durable execution, and scheduling one as a task of its own with `ScheduleAsync()` throws
@@ -341,27 +301,28 @@ public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
     {
         return await payment.ChargeAsync(order.Id, order.Total).WithId("charge");
     }
-    catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+    catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
     {
         await inventory.ReleaseAsync(order.Id).WithId("release").Shielded();
-        return OrderResult.Canceled(DurableTask.Current.CancellationReason);
+        return OrderResult.Canceled(DurableTask.Current.TaskCancellationReason);
     }
 }
 ```
 
 - A shielded child, such as a local step, a delay, or a call to another grain, runs even though the
   workflow's cancellation was requested, and the workflow's cancellation doesn't reach it later,
-  including after a replay. The workflow's own token, `IsCancellationRequested`, and
-  `CancellationReason` still report its cancellation. An administrative abort still stops a shielded
-  child, and it is deleted with the workflow's execution tree. Canceling it through its own handle
+  including after a replay. The workflow's own `CancellationToken`, `IsTaskCancellationRequested`, and
+  `TaskCancellationReason` still report its cancellation. An administrative abort still stops a
+  shielded child, and it is deleted with the workflow's execution tree. Canceling it through its own handle
   cancels it and its children.
 - A shielded child's own children are reached only by the child's cancellation, so a shielded
   `DurableTask.Run` step and the work it starts run to completion. A shielded combinator runs as part
   of the workflow and shields each input which it starts.
 - Every awaited durable operation honors `.Shielded()` the same way, whether it runs as a child or as
   part of the workflow: a shielded signal wait, `TryWaitAsync`, delay, `GetDurableTask` subscription,
-  `Race`, `WhenAny`, or `WaitAsync` completes after the workflow's cancellation, and only an abort ends
-  it. A workflow which waits for a payment with `await Paid.WaitAsync().Shielded()` still receives a
+  `Race`, `WhenAny`, or `WaitAsync` completes after the workflow's cancellation, and only the
+  cancellation of the attempt ends it. A workflow which waits for a payment with
+  `await Paid.WaitAsync().Shielded()` still receives a
   payment which arrives after a cancellation, and decides what the payment means.
 - Work which must outlive the workflow, such as cleanup which continues after the workflow's result is
   observed, runs as a detached task, which the workflow's cancellation doesn't reach either:
@@ -376,9 +337,9 @@ public async DurableTask<OrderResult> PlaceOrderAsync(Order order)
 
 `ScheduledTask.AbortAsync(reason)` is for operators, for example when a body ignores cancellation or
 its cleanup is stuck. The host terminalizes the task and its attached descendants as failed with
-`DurableTaskAbortedException`, whose message is the reason, and signals host abort to their running
-attempts, whose responses it discards. Abort runs no task code: neither durable cancellation callbacks
-nor compensation run. Awaiting an aborted task throws `DurableTaskAbortedException`. Aborting a
+`DurableTaskAbortedException`, whose message is the reason, and cancels their running attempts with
+the reason `TaskAborted`, whose responses it discards. The attempts record nothing more, so no
+compensation runs. Awaiting an aborted task throws `DurableTaskAbortedException`. Aborting a
 terminal task leaves it unchanged, and detached tasks, which are independent roots, are aborted
 separately.
 

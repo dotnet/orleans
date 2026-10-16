@@ -10,8 +10,6 @@ namespace Orleans.DurableTasks.Abstractions.Tests;
 [TestCategory("BVT")]
 public class DurableTaskShieldedTests
 {
-    private static CancellationToken TestCancellation => Xunit.TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task ShieldedChildIsShieldedAndItsSiblingsAreNot()
     {
@@ -104,14 +102,14 @@ public class DurableTaskShieldedTests
     {
         var log = new ConcurrentDictionary<string, bool>();
         var context = new RecordingContext(TaskId.CreateRoot("root"), log);
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "buyer", TestCancellation);
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "buyer");
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(async cancellationToken =>
             {
                 await Step("release").Shielded();
                 var current = DurableTask.Current;
-                return (cancellationToken.IsCancellationRequested, current.IsCancellationRequested, current.CancellationReason);
+                return (cancellationToken.IsCancellationRequested, current.IsTaskCancellationRequested, current.TaskCancellationReason);
             }),
             context);
 
@@ -124,7 +122,7 @@ public class DurableTaskShieldedTests
     {
         var log = new ConcurrentDictionary<string, bool>();
         var context = new RecordingContext(TaskId.CreateRoot("root"), log);
-        await DurableTaskRuntimeHelper.RequestCancellationAsync(context, "buyer", TestCancellation);
+        DurableTaskRuntimeHelper.RequestTaskCancellation(context, "buyer");
 
         var response = await DurableTaskRuntimeHelper.RunAsync(
             DurableTask.Run(async _ =>

@@ -257,8 +257,12 @@ public abstract partial class DurableTask
         TaskId effectId,
         TEffect effect,
         Func<TEffect, DurableTaskResponse> run)
-        => context.RunEffect(effectId, (effect, run), static state => Invoke(state));
+    {
+        context.ThrowIfAttemptCanceled();
+        return context.RunEffect(effectId, (effect, run), static state => Invoke(state));
+    }
 
+    // A canceled attempt records nothing, so its cancellation propagates instead of becoming the effect's outcome.
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The effect's failure is recorded as its outcome.")]
     private static DurableTaskResponse Invoke<TEffect>((TEffect Effect, Func<TEffect, DurableTaskResponse> Run) state)
     {
@@ -266,7 +270,7 @@ public abstract partial class DurableTask
         {
             return state.Run(state.Effect);
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not DurableTaskAttemptCanceledException)
         {
             return DurableTaskResponse.FromException(exception);
         }

@@ -13,7 +13,7 @@ public abstract partial class DurableTask
     /// The inputs are scheduled concurrently, and the winner is selected like
     /// <see cref="WhenAny(IReadOnlyList{DurableTask})"/>'s: the input which completed first, which the host selects again on
     /// replay. Every other input then receives a durable cancellation request carrying the reason
-    /// <c>Another task won the race.</c>, which its <see cref="DurableTaskContext.CancellationReason"/> reports when the
+    /// <c>Another task won the race.</c>, which its <see cref="DurableTaskContext.TaskCancellationReason"/> reports when the
     /// request is the input's first. Cancellation is cooperative, so each other input decides its own outcome, and the
     /// combinator completes once every input is terminal: no input outlives the race.
     /// </para>
@@ -82,13 +82,13 @@ public abstract partial class DurableTask
     }
 
     // Cancellation reaches the inputs, which are attached children, so the race waits for their outcomes and stops waiting
-    // only when the host aborts the attempt.
+    // only when the host cancels the attempt.
     internal static async Task<(int Index, DurableTaskResponse Response)> RaceAsync(
         DurableTask[] inputs,
         DurableTaskContext context,
         TaskId operationId)
     {
-        var cancellationToken = context.ExecutionAbortToken;
+        var cancellationToken = context.AttemptCancellationToken;
         var (tasks, index) = await SelectAsync(inputs, context, operationId, cancellationToken).ConfigureAwait(false);
         var responses = await ScheduledTask.SettleRaceAsync(tasks, index, ScheduledTask.RaceLostReason, cancellationToken)
             .ConfigureAwait(false);
@@ -101,7 +101,7 @@ public abstract partial class DurableTask
         TaskId operationId,
         string reason)
     {
-        var cancellationToken = context.ExecutionAbortToken;
+        var cancellationToken = context.AttemptCancellationToken;
         var (tasks, index) = await SelectAsync(inputs, context, operationId, cancellationToken).ConfigureAwait(false);
         return await ScheduledTask.SettleTimeoutAsync(tasks, index, reason, cancellationToken).ConfigureAwait(false);
     }
