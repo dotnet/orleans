@@ -216,6 +216,28 @@ namespace Orleans.DurableTasks
         public DurableTaskAbortedException(string reason) { }
     }
 
+    public sealed partial class DurableTaskAttemptCanceledException : System.OperationCanceledException
+    {
+        public DurableTaskAttemptCanceledException() { }
+
+        public DurableTaskAttemptCanceledException(DurableTaskAttemptCancellationReason reason, System.Threading.CancellationToken token, System.Exception? innerException = null) { }
+
+        public DurableTaskAttemptCanceledException(string? message, System.Exception? innerException, DurableTaskAttemptCancellationReason reason, System.Threading.CancellationToken token) { }
+
+        public DurableTaskAttemptCanceledException(string? message, System.Exception? innerException) { }
+
+        public DurableTaskAttemptCanceledException(string? message) { }
+
+        public DurableTaskAttemptCancellationReason Reason { get { throw null; } }
+    }
+
+    public enum DurableTaskAttemptCancellationReason
+    {
+        ActivationStopping = 0,
+        TaskAborted = 1,
+        TaskDeleted = 2
+    }
+
     public readonly partial struct DurableTaskAwaiter : System.Runtime.CompilerServices.ICriticalNotifyCompletion, System.Runtime.CompilerServices.INotifyCompletion
     {
         public bool IsCompleted { get { throw null; } }
@@ -240,11 +262,9 @@ namespace Orleans.DurableTasks
 
     public abstract partial class DurableTaskContext
     {
-        protected DurableTaskContext(TaskId taskId, System.Threading.CancellationToken executionAbortToken) { }
-
         protected DurableTaskContext(TaskId taskId) { }
 
-        public string? CancellationReason { get { throw null; } }
+        public System.Threading.CancellationToken AttemptCancellationToken { get { throw null; } }
 
         public System.Threading.CancellationToken CancellationToken { get { throw null; } }
 
@@ -252,11 +272,13 @@ namespace Orleans.DurableTasks
 
         public TaskId Id { get { throw null; } }
 
-        public bool IsCancellationRequested { get { throw null; } }
-
         public virtual bool IsReplaying { get { throw null; } }
 
+        public bool IsTaskCancellationRequested { get { throw null; } }
+
         protected internal bool SchedulesShieldedChildren { get { throw null; } }
+
+        public string? TaskCancellationReason { get { throw null; } }
 
         public abstract System.DateTimeOffset UtcNow { get; }
 
@@ -266,8 +288,6 @@ namespace Orleans.DurableTasks
         protected internal virtual void OnBodyCompleted(DurableTaskResponse response) { }
 
         protected internal virtual IScheduledTaskHandle PostTask(TaskId taskId, DurableTask taskDefinition, DurableTaskStartOptions options) { throw null; }
-
-        public System.Threading.Tasks.ValueTask<System.IAsyncDisposable> RegisterCancellationCallbackAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask> callback, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         protected internal virtual DurableTaskResponse RunEffect<TState>(TaskId effectId, TState state, System.Func<TState, DurableTaskResponse> effect) { throw null; }
 
@@ -429,9 +449,9 @@ namespace Orleans.DurableTasks
 
     public static partial class DurableTaskRuntimeHelper
     {
-        public static System.Threading.Tasks.Task RequestCancellationAsync(DurableTaskContext context, string? reason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static void CancelAttempt(DurableTaskContext context, DurableTaskAttemptCancellationReason reason) { }
 
-        public static System.Threading.Tasks.Task RequestCancellationAsync(DurableTaskContext context, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+        public static void RequestTaskCancellation(DurableTaskContext context, string? reason = null) { }
 
         public static System.Threading.Tasks.ValueTask<DurableTaskResponse> RunAsync(DurableTask task, DurableTaskContext context) { throw null; }
     }

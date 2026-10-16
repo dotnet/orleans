@@ -153,7 +153,7 @@ public abstract partial class ScheduledTask
 
     /// <summary>Durably requests cancellation carrying <paramref name="reason"/>.</summary>
     /// <param name="reason">
-    /// The reason which the task's <see cref="DurableTaskContext.CancellationReason"/> reports, or
+    /// The reason which the task's <see cref="DurableTaskContext.TaskCancellationReason"/> reports, or
     /// <see langword="null"/> for none.
     /// </param>
     /// <param name="cancellationToken">A token which abandons waiting for the request to commit.</param>
@@ -180,8 +180,9 @@ public abstract partial class ScheduledTask
     /// <param name="cancellationToken">A token which abandons waiting for the abort to commit.</param>
     /// <remarks>
     /// Abort is for operators, for example when a task's body ignores cancellation or its cleanup is stuck. It runs no
-    /// cancellation callbacks or compensation. The operation completes once the host has durably recorded the abort.
-    /// Aborting a terminal task leaves it unchanged. Detached tasks are independent roots, which are aborted separately.
+    /// compensation: the host cancels the attempt which runs the task, whose later durable operations throw, and discards
+    /// the attempt's response. The operation completes once the host has durably recorded the abort. Aborting a terminal task leaves
+    /// it unchanged. Detached tasks are independent roots, which are aborted separately.
     /// </remarks>
     /// <exception cref="ArgumentException"><paramref name="reason"/> is <see langword="null"/>, empty, or whitespace.</exception>
     /// <exception cref="NotSupportedException">The host doesn't support aborting tasks.</exception>
@@ -306,7 +307,7 @@ public abstract partial class ScheduledTask
         where TTask : ScheduledTask
     {
         using var linked = CreateLinkedWaitCancellation(context, cancellationToken);
-        var waitToken = linked?.Token ?? context.ExecutionAbortToken;
+        var waitToken = linked?.Token ?? context.AttemptCancellationToken;
         var remaining = new List<TTask>(tasks);
         var candidates = new List<TaskId>(tasks.Length);
         foreach (var task in tasks)
@@ -317,7 +318,8 @@ public abstract partial class ScheduledTask
         for (var step = 0; remaining.Count > 0; step++)
         {
             var decisionId = operationId.Child($"$next-{step.ToString(CultureInfo.InvariantCulture)}");
-            var selected = await context.SelectCompletionAsync(decisionId, candidates, waitToken).ConfigureAwait(false);
+            context.ThrowIfAttemptCanceled();
+            var selected = await context.ObserveAttempt(context.SelectCompletionAsync(decisionId, candidates, waitToken)).ConfigureAwait(false);
             var index = candidates.IndexOf(selected);
             if (index < 0)
             {
@@ -472,14 +474,14 @@ public abstract partial class ScheduledTask
         where TTask : ScheduledTask
     {
         using var linked = CreateLinkedWaitCancellation(context, cancellationToken);
-        var waitToken = linked?.Token ?? context.ExecutionAbortToken;
+        var waitToken = linked?.Token ?? context.AttemptCancellationToken;
         try
         {
             var winnerIndex = await SelectIndexAsync(context, operationId, tasks, waitToken).ConfigureAwait(false);
             _ = await tasks[winnerIndex].ObserveTerminalAsync(waitToken).ConfigureAwait(false);
             return winnerIndex;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
         {
             throw new OperationCanceledException(cancellationToken);
         }
@@ -501,7 +503,9 @@ public abstract partial class ScheduledTask
             candidates[index] = tasks[index].Id;
         }
 
-        var selected = await context.SelectCompletionAsync(operationId.Child("$winner"), candidates, cancellationToken).ConfigureAwait(false);
+        context.ThrowIfAttemptCanceled();
+        var selected = await context.ObserveAttempt(context.SelectCompletionAsync(operationId.Child("$winner"), candidates, cancellationToken))
+            .ConfigureAwait(false);
         var winnerIndex = Array.IndexOf(candidates, selected);
         if (winnerIndex < 0)
         {
@@ -512,12 +516,12 @@ public abstract partial class ScheduledTask
     }
 
     /// <summary>
-    /// Links the caller's wait cancellation with the execution's abort token, or returns <see langword="null"/> when the
-    /// caller's token can't be canceled, so the abort token alone applies.
+    /// Links the caller's wait cancellation with the attempt's cancellation token, or returns <see langword="null"/> when the
+    /// caller's token can't be canceled, so the attempt's token alone applies.
     /// </summary>
     internal static CancellationTokenSource? CreateLinkedWaitCancellation(DurableTaskContext context, CancellationToken cancellationToken) =>
         cancellationToken.CanBeCanceled
-            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.ExecutionAbortToken)
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, context.AttemptCancellationToken)
             : null;
 
     private static async Task<int> WaitForAnyIndexAsync<TTask>(
@@ -538,7 +542,7 @@ public abstract partial class ScheduledTask
                 waits.Add(task.ObserveTerminalAsync(waitCancellation.Token).AsTask());
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
         {
             await CancelAndDrainWaitsPreservingFailureAsync(waitCancellation, waits).ConfigureAwait(false);
             throw new OperationCanceledException(cancellationToken);
@@ -556,7 +560,7 @@ public abstract partial class ScheduledTask
             _ = await completed.ConfigureAwait(false);
             return winnerIndex;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (DurableTaskContext.IsCallerCancellation(exception, cancellationToken))
         {
             throw new OperationCanceledException(cancellationToken);
         }
@@ -673,16 +677,19 @@ internal sealed class ScheduledTaskHandle(IScheduledTaskHandle handle) : Schedul
     public override TFeature? GetFeature<TFeature>()
         where TFeature : class => handle.GetFeature<TFeature>();
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
+    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => HostHandleOperations.CancelAsync(handle, cancellationToken);
 
-    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => handle.CancelAsync(reason, cancellationToken);
+    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken)
+        => HostHandleOperations.CancelAsync(handle, reason, cancellationToken);
 
-    protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => handle.AbortAsync(reason, cancellationToken);
+    protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken)
+        => HostHandleOperations.AbortAsync(handle, reason, cancellationToken);
 
-    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => handle.WaitAsync(cancellationToken);
+    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)
+        => HostHandleOperations.WaitAsync(handle, cancellationToken);
 
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken)
-        => handle.PollAsync(options, cancellationToken);
+        => HostHandleOperations.PollAsync(handle, options, cancellationToken);
 }
 
 internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) : ScheduledTask<TResult>
@@ -694,16 +701,82 @@ internal sealed class ScheduledTaskHandle<TResult>(IScheduledTaskHandle handle) 
     public override TFeature? GetFeature<TFeature>()
         where TFeature : class => handle.GetFeature<TFeature>();
 
-    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => handle.CancelAsync(cancellationToken);
+    public override ValueTask CancelAsync(CancellationToken cancellationToken = default) => HostHandleOperations.CancelAsync(handle, cancellationToken);
 
-    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken) => handle.CancelAsync(reason, cancellationToken);
+    protected override ValueTask CancelAsyncCore(string? reason, CancellationToken cancellationToken)
+        => HostHandleOperations.CancelAsync(handle, reason, cancellationToken);
 
-    protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken) => handle.AbortAsync(reason, cancellationToken);
+    protected override ValueTask AbortAsyncCore(string reason, CancellationToken cancellationToken)
+        => HostHandleOperations.AbortAsync(handle, reason, cancellationToken);
 
-    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken) => handle.WaitAsync(cancellationToken);
+    protected internal override ValueTask<DurableTaskResponse> WaitAsyncCore(CancellationToken cancellationToken)
+        => HostHandleOperations.WaitAsync(handle, cancellationToken);
 
     protected override ValueTask<DurableTaskResponse> PollAsyncCore(PollingOptions options, CancellationToken cancellationToken)
-        => handle.PollAsync(options, cancellationToken);
+        => HostHandleOperations.PollAsync(handle, options, cancellationToken);
+}
+
+/// <summary>
+/// Runs the operations of host handles for the durable execution which calls them: a canceled attempt's operations throw
+/// <see cref="DurableTaskAttemptCanceledException"/>, including operations which the attempt's cancellation ends.
+/// </summary>
+/// <remarks>Outside a durable execution, the operations run unchanged.</remarks>
+internal static class HostHandleOperations
+{
+    public static ValueTask<DurableTaskResponse> WaitAsync(IScheduledTaskHandle handle, CancellationToken cancellationToken)
+    {
+        if (DurableTaskContext.Ambient is not { } context)
+        {
+            return handle.WaitAsync(cancellationToken);
+        }
+
+        context.ThrowIfAttemptCanceled();
+        return context.ObserveAttempt(handle.WaitAsync(cancellationToken));
+    }
+
+    public static ValueTask<DurableTaskResponse> PollAsync(IScheduledTaskHandle handle, PollingOptions options, CancellationToken cancellationToken)
+    {
+        if (DurableTaskContext.Ambient is not { } context)
+        {
+            return handle.PollAsync(options, cancellationToken);
+        }
+
+        context.ThrowIfAttemptCanceled();
+        return context.ObserveAttempt(handle.PollAsync(options, cancellationToken));
+    }
+
+    public static ValueTask CancelAsync(IScheduledTaskHandle handle, CancellationToken cancellationToken)
+    {
+        if (DurableTaskContext.Ambient is not { } context)
+        {
+            return handle.CancelAsync(cancellationToken);
+        }
+
+        context.ThrowIfAttemptCanceled();
+        return context.ObserveAttempt(handle.CancelAsync(cancellationToken));
+    }
+
+    public static ValueTask CancelAsync(IScheduledTaskHandle handle, string? reason, CancellationToken cancellationToken)
+    {
+        if (DurableTaskContext.Ambient is not { } context)
+        {
+            return handle.CancelAsync(reason, cancellationToken);
+        }
+
+        context.ThrowIfAttemptCanceled();
+        return context.ObserveAttempt(handle.CancelAsync(reason, cancellationToken));
+    }
+
+    public static ValueTask AbortAsync(IScheduledTaskHandle handle, string reason, CancellationToken cancellationToken)
+    {
+        if (DurableTaskContext.Ambient is not { } context)
+        {
+            return handle.AbortAsync(reason, cancellationToken);
+        }
+
+        context.ThrowIfAttemptCanceled();
+        return context.ObserveAttempt(handle.AbortAsync(reason, cancellationToken));
+    }
 }
 
 internal sealed class CompletedScheduledTask : ScheduledTask
