@@ -41,8 +41,11 @@ public sealed class MongoMembershipCancellationTests
         await table.InitializeMembershipTableAsync(true, token);
         var entry = new MembershipEntry
         {
-            SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1), Status = SiloStatus.Dead,
-            HostName = "blocked", SiloName = "blocked", ProxyPort = 30001,
+            SiloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1),
+            Status = SiloStatus.Dead,
+            HostName = "blocked",
+            SiloName = "blocked",
+            ProxyPort = 30001,
             StartTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             IAmAliveTime = new DateTime(2026, 1, 1, 0, 1, 0, DateTimeKind.Utc)
         };
@@ -51,13 +54,23 @@ public sealed class MongoMembershipCancellationTests
         var row = Assert.Single(before.Members);
         var update = new MembershipEntry
         {
-            SiloAddress = entry.SiloAddress, HostName = "updated", SiloName = "updated", Status = SiloStatus.Active,
-            StartTime = entry.StartTime, IAmAliveTime = entry.IAmAliveTime.AddDays(1), ProxyPort = 40001
+            SiloAddress = entry.SiloAddress,
+            HostName = "updated",
+            SiloName = "updated",
+            Status = SiloStatus.Active,
+            StartTime = entry.StartTime,
+            IAmAliveTime = entry.IAmAliveTime.AddDays(1),
+            ProxyPort = 40001
         };
         var inserted = new MembershipEntry
         {
-            SiloAddress = SiloAddress.New(IPAddress.Loopback, 11112, 2), HostName = "inserted", SiloName = "inserted",
-            Status = SiloStatus.Active, StartTime = entry.StartTime, IAmAliveTime = entry.IAmAliveTime, ProxyPort = 30002
+            SiloAddress = SiloAddress.New(IPAddress.Loopback, 11112, 2),
+            HostName = "inserted",
+            SiloName = "inserted",
+            Status = SiloStatus.Active,
+            StartTime = entry.StartTime,
+            IAmAliveTime = entry.IAmAliveTime,
+            ProxyPort = 30002
         };
         barrier.Armed = true;
         var pending = Task.Run(() => operation switch
