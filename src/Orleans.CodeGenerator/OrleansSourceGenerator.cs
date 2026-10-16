@@ -62,7 +62,11 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
             });
         context.RegisterImplementationSourceOutput(
             serializerContextEntries.Select(static (output, _) => output.Implementation),
-            GeneratedSourceOutput.EmitSource);
+            static (productionContext, output) =>
+            {
+                GeneratedSourceOutput.ReportDiagnostic(productionContext, output);
+                GeneratedSourceOutput.EmitSource(productionContext, output);
+            });
 
         // Incremental discovery of [GenerateSerializer] types
         var serializableTypeContexts = context.SyntaxProvider

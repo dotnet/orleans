@@ -29,7 +29,7 @@ internal static class SerializerFactoryGenerator
         public string ConfigurationStatements { get; } = configurationStatements;
     }
 
-    internal sealed record Failure(ITypeSymbol Type, string Reason);
+    internal sealed record Failure(ITypeSymbol Type, string Reason, bool RequiresImplementation = false);
 
     internal static bool TryCreate(
         IGeneratorServices services,
@@ -56,9 +56,9 @@ internal static class SerializerFactoryGenerator
                 return false;
             }
             var registration = new Registration(type);
-            if (Describe(registration, services, implementationCompilation, cancellationToken) is { } reason)
+            if (Describe(registration, services, implementationCompilation, cancellationToken, out var requiresImplementation) is { } reason)
             {
-                failure = new(type, reason);
+                failure = new(type, reason, requiresImplementation);
                 return false;
             }
             registrations.Add(type, registration);
@@ -179,8 +179,11 @@ internal static class SerializerFactoryGenerator
         return true;
     }
 
-    private static string? Describe(Registration registration, IGeneratorServices services, Compilation implementationCompilation, CancellationToken cancellationToken)
+    private static string? Describe(
+        Registration registration, IGeneratorServices services, Compilation implementationCompilation,
+        CancellationToken cancellationToken, out bool requiresImplementation)
     {
+        requiresImplementation = false;
         var type = registration.Type;
         if (type is INamedTypeSymbol { IsUnboundGenericType: true } || ContainsTypeParameter(type))
             return "use a closed type with explicit generic arguments";
@@ -236,7 +239,7 @@ internal static class SerializerFactoryGenerator
         if (named.IsAbstract || named.TypeKind == TypeKind.Interface)
             return "declare concrete model types";
         if (!SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
-            return DescribeReferenced(registration, named, services, implementationCompilation, cancellationToken);
+            return DescribeReferenced(registration, named, services, implementationCompilation, cancellationToken, out requiresImplementation);
         ISerializableTypeDescription? model;
         try
         {
@@ -307,12 +310,17 @@ internal static class SerializerFactoryGenerator
 
     private static string? DescribeReferenced(
         Registration registration, INamedTypeSymbol named, IGeneratorServices services,
-        Compilation implementationCompilation, CancellationToken cancellationToken)
+        Compilation implementationCompilation, CancellationToken cancellationToken, out bool requiresImplementation)
     {
+        requiresImplementation = false;
         var binding = implementationCompilation.GetSemanticModel(implementationCompilation.SyntaxTrees.First());
         var implementationType = binding.GetSpeculativeTypeInfo(0, named.ToTypeSyntax(),
             SpeculativeBindingOption.BindAsTypeOrNamespace).Type as INamedTypeSymbol;
-        if (implementationType is null) return "provide the referenced model's implementation metadata";
+        if (implementationType is null)
+        {
+            requiresImplementation = true;
+            return "provide the referenced model's implementation metadata";
+        }
         var library = LibraryTypes.FromCompilation(implementationCompilation, services.Options);
         var model = new SerializableTypeDescription(implementationCompilation, implementationType,
             SerializableSourceOutputGenerator.ShouldIncludePrimaryConstructorParameters(implementationType, library), [], library);
@@ -322,7 +330,10 @@ internal static class SerializerFactoryGenerator
         registration.ReferencedCodec = ResolveImplementation(SerializerGenerator.GetSimpleClassName(named.Name));
         registration.ReferencedCopier = ResolveImplementation(CopierGenerator.GetSimpleClassName(named.Name));
         if (registration.ReferencedCodec is null || registration.ReferencedCopier is null && !model.IsShallowCopyable)
+        {
+            requiresImplementation = true;
             return "provide the referenced assembly's generated codec and copier implementations";
+        }
         registration.Codec = Name(registration.ReferencedCodec);
         registration.Copier = registration.ReferencedCopier is { } referencedCopier
             ? Name(referencedCopier)
@@ -346,6 +357,7 @@ internal static class SerializerFactoryGenerator
                 }
                 catch (OrleansGeneratorDiagnosticAnalysisException)
                 {
+                    requiresImplementation = true;
                     return "provide complete generated implementation metadata to discover the producer's serialization dependencies";
                 }
             }

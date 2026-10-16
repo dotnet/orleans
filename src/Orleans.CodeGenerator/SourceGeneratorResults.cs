@@ -29,6 +29,7 @@ internal readonly struct GeneratedSourceEntry(string hintName, string source) : 
     }
 }
 
+// Source can accompany a diagnostic so invalid implementations retain their editor type-checking declarations.
 internal readonly struct SourceOutputResult(GeneratedSourceEntry? sourceEntry, Diagnostic? diagnostic) : IEquatable<SourceOutputResult>
 {
     public GeneratedSourceEntry? SourceEntry { get; } = sourceEntry;

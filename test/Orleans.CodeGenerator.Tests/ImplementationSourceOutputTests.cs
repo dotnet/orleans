@@ -110,6 +110,68 @@ public sealed class ImplementationSourceOutputTests
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
     }
 
+    [Theory]
+    [InlineData(IncrementalGeneratorOutputKind.None)]
+    [InlineData(IncrementalGeneratorOutputKind.Implementation)]
+    public async Task ConsumerContextDeclarationsSurviveProducerImplementationOmission(
+        IncrementalGeneratorOutputKind producerDisabledOutputs)
+    {
+        var producer = await TestCompilationHelper.CreateCompilation(
+            """
+            using Orleans;
+
+            namespace Producer;
+
+            [GenerateSerializer]
+            public sealed class Payload
+            {
+                [Id(0)]
+                public int Value { get; set; }
+            }
+            """,
+            "Producer");
+        var (producerOutput, producerResult) = Generate(producer, producerDisabledOutputs);
+        Assert.Empty(producerResult.Diagnostics);
+        Assert.Empty(producerOutput.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var consumer = await TestCompilationHelper.CreateCompilation(
+            """
+            [Orleans.GenerateSerializerContext<Producer.Payload>]
+            public partial class ConsumerContext : Orleans.Serialization.SerializerContext { }
+            """,
+            "Consumer",
+            producerOutput.ToMetadataReference());
+        var (editorOutput, editorResult) = Generate(consumer, IncrementalGeneratorOutputKind.Implementation);
+        Assert.Empty(editorResult.Diagnostics);
+        Assert.Empty(editorOutput.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        var declaration = Assert.Single(editorResult.GeneratedSources);
+        Assert.Contains(".context-declaration.", declaration.HintName, StringComparison.Ordinal);
+
+        var (buildOutput, buildResult) = Generate(consumer, IncrementalGeneratorOutputKind.None);
+        Assert.Empty(buildOutput.GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Equal(
+            declaration.SourceText.ToString(),
+            Assert.Single(buildResult.GeneratedSources, static source =>
+                source.HintName.Contains(".context-declaration.", StringComparison.Ordinal)).SourceText.ToString());
+        if (producerDisabledOutputs == IncrementalGeneratorOutputKind.Implementation)
+        {
+            var diagnostic = Assert.Single(buildResult.Diagnostics);
+            Assert.Equal(DiagnosticRuleId.UnsupportedSerializerContextType, diagnostic.Id);
+            Assert.Contains("generated codec and copier implementations", diagnostic.GetMessage(), StringComparison.Ordinal);
+            Assert.DoesNotContain(buildResult.GeneratedSources, static source =>
+                source.HintName.Contains(".context.", StringComparison.Ordinal));
+        }
+        else
+        {
+            Assert.Empty(buildResult.Diagnostics);
+            Assert.Contains(buildResult.GeneratedSources, static source =>
+                source.HintName.Contains(".context.", StringComparison.Ordinal));
+        }
+    }
+
     [Fact]
     public async Task ContractDiagnosticsRemainAvailableWithoutImplementationOutputs()
     {
@@ -132,8 +194,8 @@ public sealed class ImplementationSourceOutputTests
             [GenerateSerializerContext<System.IO.Stream>]
             public partial class UnsupportedContext : Orleans.Serialization.SerializerContext { }
             """);
-        var (_, complete) = Generate(compilation, IncrementalGeneratorOutputKind.None);
-        var (_, omitted) = Generate(compilation, IncrementalGeneratorOutputKind.Implementation);
+        var (completeCompilation, complete) = Generate(compilation, IncrementalGeneratorOutputKind.None);
+        var (omittedCompilation, omitted) = Generate(compilation, IncrementalGeneratorOutputKind.Implementation);
 
         Assert.Contains(omitted.Diagnostics, static diagnostic => diagnostic.Id == DiagnosticRuleId.InaccessibleSetter);
         Assert.Contains(omitted.Diagnostics, static diagnostic => diagnostic.Id == DiagnosticRuleId.InvalidRpcMethodReturnType);
@@ -141,6 +203,10 @@ public sealed class ImplementationSourceOutputTests
         Assert.Equal(
             complete.Diagnostics.Select(static diagnostic => diagnostic.ToString()).Order(StringComparer.Ordinal),
             omitted.Diagnostics.Select(static diagnostic => diagnostic.ToString()).Order(StringComparer.Ordinal));
+        Assert.DoesNotContain(completeCompilation.GetDiagnostics(TestContext.Current.CancellationToken),
+            static diagnostic => diagnostic.Id == "CS0534");
+        Assert.DoesNotContain(omittedCompilation.GetDiagnostics(TestContext.Current.CancellationToken),
+            static diagnostic => diagnostic.Id == "CS0534");
     }
 
     [Fact]
