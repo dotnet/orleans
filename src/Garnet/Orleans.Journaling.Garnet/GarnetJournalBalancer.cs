@@ -84,11 +84,7 @@ internal sealed class GarnetJournalBalancer(
             for (var bucket = range.FirstBucket; bucket <= range.LastBucket; bucket++)
             {
                 owners[bucket] = range.Owner;
-                var count = counts[(range.Owner, bucket)];
-
-                // A bucket the owner opened since the previous sample, or an owner which restarted, counts from zero.
-                var before = previous.TryGetValue((range.Owner, bucket), out var earlier) && earlier <= count ? earlier : 0;
-                load[bucket] = (count - before) / elapsed;
+                load[bucket] = Rate(previous, range.Owner, bucket, counts[(range.Owner, bucket)], elapsed);
             }
         }
 
@@ -112,6 +108,25 @@ internal sealed class GarnetJournalBalancer(
             result.View.Version,
             string.Join(", ", moves.GroupBy(move => move.Destination).Select(group => $"{group.Count()} to {group.Key}")));
         return moves;
+    }
+
+    /// <summary>
+    /// Derives a bucket's operation rate at its owner from the owner's cumulative count in this sample and the previous one.
+    /// </summary>
+    /// <remarks>
+    /// A partition's counters persist while it runs, across migrations, and each sample reads only the buckets their
+    /// owners hold. If the owner did not hold the bucket at the previous sample, its count may include an earlier
+    /// tenure's traffic, for example after the bucket moved away and back, so this sample only sets the baseline. An
+    /// owner which restarted since the previous sample counts from zero.
+    /// </remarks>
+    internal static double Rate(IReadOnlyDictionary<(PartitionId Partition, int Bucket), long> previous, PartitionId owner, int bucket, long count, double elapsed)
+    {
+        if (!previous.TryGetValue((owner, bucket), out var earlier))
+        {
+            return 0;
+        }
+
+        return (count - (earlier <= count ? earlier : 0)) / elapsed;
     }
 
     /// <summary>Reads every partition's cumulative operation counts and journal counts for the buckets it owns.</summary>

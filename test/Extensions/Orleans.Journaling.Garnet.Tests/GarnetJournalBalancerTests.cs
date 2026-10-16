@@ -141,6 +141,57 @@ public sealed class GarnetJournalBalancerTests
     }
 
     [Fact]
+    public void Rate_FirstSampleAtAnOwner_OnlySetsTheBaseline()
+    {
+        // The bucket moved P0 → P1 → P0; P0's counter kept its earlier tenure's 300,000 operations, and the previous
+        // sample saw the bucket at P1.
+        var previous = new Dictionary<(PartitionId, int), long> { [(P1, 5)] = 7 };
+        Assert.Equal(0, GarnetJournalBalancer.Rate(previous, P0, 5, 300_000, 30));
+
+        // With a baseline at the same owner, the rate is the difference; an owner which restarted counts from zero.
+        previous[(P0, 5)] = 300_000;
+        Assert.Equal(10, GarnetJournalBalancer.Rate(previous, P0, 5, 300_300, 30));
+        Assert.Equal(1, GarnetJournalBalancer.Rate(previous, P0, 5, 30, 30));
+    }
+
+    [Fact]
+    public async Task Balancer_IgnoresAnEarlierTenuresCount_AfterBucketsMoveAwayAndBack()
+    {
+        await using var partitions = await GarnetTestPartitions.StartAsync(2, 16, owners: 1, CancellationToken);
+        var router = partitions.CreateRouter();
+        var coordinator = new GarnetJournalMigrationCoordinator(router);
+        var balancer = new GarnetJournalBalancer(router, coordinator, Settings with { MaxMoveFraction = 0.5 });
+        int[] buckets = [0, 1, 2, 3];
+
+        // Traffic at P0, then the buckets move to P1, where the balancer takes its first sample, and back to P0.
+        foreach (var id in buckets.SelectMany(bucket => partitions.JournalsInBucket(bucket, "return").Take(2)))
+        {
+            var storage = new GarnetJournalStorage(router, id, "json", compactionThresholdBytes: 0);
+            for (var i = 0; i < 5; i++)
+            {
+                await storage.AppendAsync(new ReadOnlySequence<byte>([(byte)i]), CancellationToken);
+            }
+        }
+
+        await MoveAsync(P1);
+        Assert.Empty(await balancer.RunOnceAsync(CancellationToken));
+        await MoveAsync(P0);
+
+        // No operation has run since the first sample, so P0's retained counts are not load, and nothing moves.
+        Assert.Empty(await balancer.RunOnceAsync(CancellationToken));
+
+        async Task MoveAsync(PartitionId destination)
+        {
+            var result = await coordinator.TryMoveAsync([.. buckets.Select(bucket => (bucket, destination))], requireIdle: true, CancellationToken);
+            Assert.Equal(MoveStatus.Committed, result.Status);
+            await GarnetTestWaits.BoundedAsync(
+                coordinator.CompleteAllAsync(CancellationToken),
+                $"Completing the moves to {destination}",
+                async () => GarnetTestWaits.DescribeMap(await partitions.ReadViewAsync()));
+        }
+    }
+
+    [Fact]
     public async Task Hosting_MovesOnePartitionAtATimeToTheLeastLoadedHost()
     {
         var store = new InMemoryRangeMetaStore();
