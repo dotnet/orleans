@@ -156,9 +156,58 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
                 break;
             }
         }
+
     }
 
-    private async Task<Measurement> RunPhaseAsync(TimeSpan duration, bool isWarmup)
+    public async Task<FixedConcurrencyMeasurement[]> RunFixedConcurrencyAsync(
+        int repetitions,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(repetitions, 1);
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var states = Enumerable.Range(0, _currentConcurrency).Select(_getStateForWorker).ToArray();
+
+        try
+        {
+            await RunPhaseAsync(_warmupDuration, isWarmup: true, states);
+            cancellationToken.ThrowIfCancellationRequested();
+            GC.Collect();
+
+            var results = new FixedConcurrencyMeasurement[repetitions];
+            for (var i = 0; i < results.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var measurement = await RunPhaseAsync(_measurementInterval, isWarmup: false, states);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (measurement.Failures > 0)
+                {
+                    throw new InvalidOperationException($"Measurement completed with {measurement.Failures:N0} failed requests.");
+                }
+
+                results[i] = new(
+                    measurement.Throughput,
+                    measurement.LatencyP50Microseconds,
+                    measurement.LatencyP95Microseconds,
+                    measurement.LatencyP99Microseconds,
+                    measurement.AllocatedBytesPerRequest,
+                    measurement.Gen0CollectionsPerMillionRequests,
+                    measurement.CpuUtilization,
+                    measurement.LockContentionsPerMillionRequests);
+            }
+
+            return results;
+        }
+        finally
+        {
+            await _cts.CancelAsync();
+            _cts.Dispose();
+        }
+    }
+
+    private async Task<Measurement> RunPhaseAsync(
+        TimeSpan duration,
+        bool isWarmup,
+        IReadOnlyList<TState>? workerStates = null)
     {
         _completedBlocks = Channel.CreateUnbounded<WorkBlock>(
             new UnboundedChannelOptions
@@ -171,17 +220,14 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
         var workerTasks = new List<Task>();
         // Link to main cancellation token so Ctrl+C stops workers immediately
         using var workerCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
-        var states = new Dictionary<int, TState>();
+        var aggregator = Task.Run(() => AggregateBlocksAsync(duration, isWarmup, workerCts));
 
         // Start initial workers
         for (int i = 0; i < _currentConcurrency; i++)
         {
-            var state = _getStateForWorker(i);
-            states[i] = state;
+            var state = workerStates is null ? _getStateForWorker(i) : workerStates[i];
             workerTasks.Add(RunWorkerAsync(state, i, workerCts.Token));
         }
-
-        var aggregator = Task.Run(() => AggregateBlocksAsync(duration, isWarmup, workerCts));
 
         var measurement = await aggregator;
 
@@ -220,20 +266,30 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
             completionsBySample.Add(0);
         }
 
-        long totalCompleted = 0;
+        long totalSuccessful = 0;
         long totalFailures = 0;
         long minStartTime = long.MaxValue;
         long maxEndTime = long.MinValue;
+        var latencySamples = new List<long>();
+        var allocatedBytesBefore = GC.GetTotalAllocatedBytes(precise: false);
+        var gen0CollectionsBefore = GC.CollectionCount(0);
+        var lockContentionsBefore = Monitor.LockContentionCount;
+        using var process = Process.GetCurrentProcess();
+        var processorTimeBefore = process.TotalProcessorTime;
 
         void RecordBlock(WorkBlock block)
         {
-            totalCompleted += block.Completed;
+            totalSuccessful += block.Successes;
             totalFailures += block.Failures;
             if (block.StartTimestamp < minStartTime) minStartTime = block.StartTimestamp;
             if (block.EndTimestamp > maxEndTime) maxEndTime = block.EndTimestamp;
+            if (block.FirstRequestEndTimestamp > block.StartTimestamp)
+            {
+                latencySamples.Add(block.FirstRequestEndTimestamp - block.StartTimestamp);
+            }
 
             var sampleIndex = GetSampleIndex(block.EndTimestamp);
-            completionsBySample[sampleIndex] += block.Completed;
+            completionsBySample[sampleIndex] += block.Successes;
         }
 
         int GetSampleIndex(long timestamp)
@@ -286,18 +342,32 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
             RecordBlock(block);
         }
 
-        var totalSeconds = totalCompleted == 0 || maxEndTime <= minStartTime
+        var totalSeconds = totalSuccessful == 0 || maxEndTime <= minStartTime
             ? duration.TotalSeconds
             : (maxEndTime - minStartTime) / StopwatchTickPerSecond;
-        var throughput = totalSeconds > 0 ? totalCompleted / totalSeconds : 0;
+        var throughput = totalSeconds > 0 ? totalSuccessful / totalSeconds : 0;
         var sampleEndTime = maxEndTime > endTime ? maxEndTime : endTime;
         var samples = CreateThroughputSamples(completionsBySample, startTime, sampleEndTime, sampleTicks);
-        var measurement = new Measurement(throughput, samples);
+        var allocatedBytes = GC.GetTotalAllocatedBytes(precise: false) - allocatedBytesBefore;
+        var gen0Collections = GC.CollectionCount(0) - gen0CollectionsBefore;
+        var lockContentions = Monitor.LockContentionCount - lockContentionsBefore;
+        var processorTime = process.TotalProcessorTime - processorTimeBefore;
+        var measurement = new Measurement(
+            throughput,
+            samples,
+            totalFailures,
+            GetPercentileMicroseconds(latencySamples, 0.50),
+            GetPercentileMicroseconds(latencySamples, 0.95),
+            GetPercentileMicroseconds(latencySamples, 0.99),
+            totalSuccessful == 0 ? 0 : allocatedBytes / (double)totalSuccessful,
+            totalSuccessful == 0 ? 0 : gen0Collections * 1_000_000d / totalSuccessful,
+            totalSeconds <= 0 ? 0 : processorTime.TotalSeconds / (totalSeconds * Environment.ProcessorCount) * 100,
+            totalSuccessful == 0 ? 0 : lockContentions * 1_000_000d / totalSuccessful);
 
         if (isWarmup)
         {
             var failureInfo = totalFailures > 0 ? $" ({totalFailures} failures)" : "";
-            Console.WriteLine($"  Warmup: {throughput:N0}/s, {totalCompleted:N0} requests in {totalSeconds:F1}s{failureInfo}");
+            Console.WriteLine($"  Warmup: {throughput:N0}/s, {totalSuccessful:N0} requests in {totalSeconds:F1}s{failureInfo}");
         }
 
         return measurement;
@@ -417,6 +487,18 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
         return samples;
     }
 
+    private static double GetPercentileMicroseconds(List<long> samples, double percentile)
+    {
+        if (samples.Count == 0)
+        {
+            return 0;
+        }
+
+        samples.Sort();
+        var index = (int)Math.Ceiling(percentile * samples.Count) - 1;
+        return samples[Math.Clamp(index, 0, samples.Count - 1)] * 1_000_000d / StopwatchTickPerSecond;
+    }
+
     private bool IsStatisticallySignificantImprovement(Measurement candidate, Measurement baseline)
     {
         if (!baseline.HasValue)
@@ -500,14 +582,42 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
         };
     }
 
+    public readonly record struct FixedConcurrencyMeasurement(
+        double Throughput,
+        double LatencyP50Microseconds,
+        double LatencyP95Microseconds,
+        double LatencyP99Microseconds,
+        double AllocatedBytesPerRequest,
+        double Gen0CollectionsPerMillionRequests,
+        double CpuUtilization,
+        double LockContentionsPerMillionRequests);
+
     private readonly struct Measurement
     {
-        public Measurement(double throughput, double[] samples)
+        public Measurement(
+            double throughput,
+            double[] samples,
+            long failures,
+            double latencyP50Microseconds,
+            double latencyP95Microseconds,
+            double latencyP99Microseconds,
+            double allocatedBytesPerRequest,
+            double gen0CollectionsPerMillionRequests,
+            double cpuUtilization,
+            double lockContentionsPerMillionRequests)
         {
             Throughput = throughput;
             SampleCount = samples.Length;
             SampleMean = SampleCount == 0 ? throughput : samples.Average();
             SampleVariance = CalculateSampleVariance(samples, SampleMean);
+            Failures = failures;
+            LatencyP50Microseconds = latencyP50Microseconds;
+            LatencyP95Microseconds = latencyP95Microseconds;
+            LatencyP99Microseconds = latencyP99Microseconds;
+            AllocatedBytesPerRequest = allocatedBytesPerRequest;
+            Gen0CollectionsPerMillionRequests = gen0CollectionsPerMillionRequests;
+            CpuUtilization = cpuUtilization;
+            LockContentionsPerMillionRequests = lockContentionsPerMillionRequests;
             HasValue = true;
         }
 
@@ -516,6 +626,14 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
         public int SampleCount { get; }
         public double SampleMean { get; }
         public double SampleVariance { get; }
+        public long Failures { get; }
+        public double LatencyP50Microseconds { get; }
+        public double LatencyP95Microseconds { get; }
+        public double LatencyP99Microseconds { get; }
+        public double AllocatedBytesPerRequest { get; }
+        public double Gen0CollectionsPerMillionRequests { get; }
+        public double CpuUtilization { get; }
+        public double LockContentionsPerMillionRequests { get; }
 
         private static double CalculateSampleVariance(double[] samples, double mean)
         {
@@ -558,6 +676,11 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
                 {
                     workBlock.Failures++;
                 }
+
+                if (workBlock.Completed == 1)
+                {
+                    workBlock.FirstRequestEndTimestamp = Stopwatch.GetTimestamp();
+                }
             }
 
             workBlock.EndTimestamp = Stopwatch.GetTimestamp();
@@ -583,6 +706,7 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
     private struct WorkBlock
     {
         public long StartTimestamp;
+        public long FirstRequestEndTimestamp;
         public long EndTimestamp;
         public int Successes;
         public int Failures;
