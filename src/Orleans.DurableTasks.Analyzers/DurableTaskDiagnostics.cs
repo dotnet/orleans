@@ -133,6 +133,13 @@ internal static class DurableTaskDiagnostics
         DiagnosticSeverity.Warning,
         "DurableTaskContext.CancellationToken is canceled when task cancellation is requested and when the host cancels the attempt. Code which runs only after task cancellation, such as a catch clause filtered by IsTaskCancellationRequested, receives a canceled token, so the cleanup calls which observe it end at once. DurableTaskContext.AttemptCancellationToken is canceled only when the host cancels the attempt, so cleanup calls which receive it run to completion and still end promptly when the activation stops.");
 
+    public static readonly DiagnosticDescriptor NonConstantVersion = Create(
+        "ORLEANS0118",
+        "Pass constant version names and ranges",
+        "Pass a constant '{0}' to '{1}': an execution records its version under the change's name, and each deployment states the versions which it supports",
+        DiagnosticSeverity.Warning,
+        "An execution records the version of each change which it checks under the change's name, and every replay of the execution reads it back under the same name. A name which depends on data can differ between replays and deployments, which records a second decision. A deployment states which versions its code supports, so the range is a constant of the code which branches on it.");
+
     private static DiagnosticDescriptor Create(
         string id,
         string title,

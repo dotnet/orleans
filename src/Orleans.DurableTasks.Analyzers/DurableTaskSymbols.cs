@@ -19,6 +19,7 @@ internal sealed class DurableTaskSymbols
     {
         DurableTask = durableTask;
         DurableSignal = compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableSignal`1");
+        DurableVersion = compilation.GetTypeByMetadataName("Orleans.DurableTasks.DurableVersion");
         GrainBase = compilation.GetTypeByMetadataName("Orleans.IGrainBase");
         Task = compilation.GetTypeByMetadataName("System.Threading.Tasks.Task");
         Thread = compilation.GetTypeByMetadataName("System.Threading.Thread");
@@ -62,6 +63,8 @@ internal sealed class DurableTaskSymbols
     public INamedTypeSymbol DurableTask { get; }
 
     public INamedTypeSymbol? DurableSignal { get; }
+
+    public INamedTypeSymbol? DurableVersion { get; }
 
     public INamedTypeSymbol? GrainBase { get; }
 
