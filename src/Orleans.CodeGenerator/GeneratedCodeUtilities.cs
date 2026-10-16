@@ -1,6 +1,5 @@
 using System.Globalization;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
@@ -78,32 +77,27 @@ internal static class GeneratedCodeUtilities
 
     internal static AttributeListSyntax GetGeneratedCodeAttributes() => GeneratedCodeAttributeSyntax;
 
-    internal static AttributeListSyntax GetEditorBrowsableAttribute() => EditorBrowsableAttributeSyntax;
+    internal static AttributeListSyntax GetGeneratedMemberAttributes() => GeneratedMemberAttributeSyntax;
 
-    private static readonly AttributeListSyntax EditorBrowsableAttributeSyntax =
-        AttributeList(SingletonSeparatedList(
-            Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
-                .AddArgumentListArguments(
-                    AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never")))));
+    private static readonly AttributeSyntax GeneratedCodeAttribute =
+        Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
+            .AddArgumentListArguments(
+                AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
+                AttributeArgument(typeof(GeneratedCodeUtilities).Assembly.GetName().Version.ToString().GetLiteralExpression()));
+
+    private static readonly AttributeSyntax ExcludeFromCodeCoverageAttribute =
+        Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"));
 
     private static readonly AttributeListSyntax GeneratedCodeAttributeSyntax =
         AttributeList().AddAttributes(
-            Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
+            GeneratedCodeAttribute,
+            Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
                 .AddArgumentListArguments(
-                    AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
-                    AttributeArgument(typeof(GeneratedCodeUtilities).Assembly.GetName().Version.ToString().GetLiteralExpression())),
-            EditorBrowsableAttributeSyntax.Attributes[0],
-            Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"))
-        );
+                    AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never"))),
+            ExcludeFromCodeCoverageAttribute);
 
-    internal static ClassDeclarationSyntax AddEditorBrowsableAttributes(ClassDeclarationSyntax declaration) =>
-        declaration.WithMembers(List(declaration.Members.Select(static member =>
-            member.Modifiers.Any(SyntaxKind.PublicKeyword)
-            || member.Modifiers.Any(SyntaxKind.ProtectedKeyword)
-            || member.Modifiers.Any(SyntaxKind.InternalKeyword)
-            || member is MethodDeclarationSyntax { ExplicitInterfaceSpecifier: not null }
-                ? member.AddAttributeLists(GetEditorBrowsableAttribute())
-                : member)));
+    private static readonly AttributeListSyntax GeneratedMemberAttributeSyntax =
+        AttributeList().AddAttributes(GeneratedCodeAttribute, ExcludeFromCodeCoverageAttribute);
 
     internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
 

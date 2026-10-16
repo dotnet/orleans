@@ -231,9 +231,7 @@ internal static class GeneratedSourceOutput
             namespacedMembers[namespaceName] = members;
         }
 
-        members.Add(member is ClassDeclarationSyntax declaration
-            ? GeneratedCodeUtilities.AddEditorBrowsableAttributes(declaration)
-            : member);
+        members.Add(member);
     }
 
     internal static string CreateSourceString(CompilationUnitSyntax unit)

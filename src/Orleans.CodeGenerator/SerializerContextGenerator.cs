@@ -67,7 +67,7 @@ internal static class SerializerContextGenerator
     private static GeneratedSourceEntry CreateDeclaration(INamedTypeSymbol symbol, string? assemblyName)
     {
         var result = CreateClassBuilder(symbol);
-        result.AppendLine(GeneratedCodeUtilities.GetGeneratedCodeAttributes().ToFullString());
+        result.AppendLine(GeneratedCodeUtilities.GetGeneratedMemberAttributes().ToFullString());
         result.AppendLine("protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions options) => ConfigureGeneratedSerializerContext(options);");
         // An optional partial hook preserves the concrete context's shape when a host omits implementation outputs.
         result.AppendLine("partial void ConfigureGeneratedSerializerContext(global::Orleans.Serialization.Configuration.TypeManifestOptions options);");

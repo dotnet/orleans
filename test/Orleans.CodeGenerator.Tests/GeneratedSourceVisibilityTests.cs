@@ -18,7 +18,7 @@ public sealed class GeneratedSourceVisibilityTests
     [Theory]
     [InlineData("")]
     [InlineData("namespace TestProject;")]
-    public async Task GeneratedTypesAndBrowsableMembersAreMarkedEditorBrowsableNever(string namespaceDeclaration)
+    public async Task OnlyGeneratedTypesAreMarkedEditorBrowsableNever(string namespaceDeclaration)
     {
         var (compilation, result) = await Generate(namespaceDeclaration);
         Assert.Empty(result.Diagnostics);
@@ -48,18 +48,10 @@ public sealed class GeneratedSourceVisibilityTests
                     AssertEditorBrowsableNever(type);
                 }
 
-                foreach (var member in type.GetMembers().Where(static member =>
-                    !member.IsImplicitlyDeclared
-                    && (member.DeclaredAccessibility is Accessibility.Public or Accessibility.Internal
-                        or Accessibility.Protected or Accessibility.ProtectedOrInternal or Accessibility.ProtectedAndInternal
-                        || member is IMethodSymbol { ExplicitInterfaceImplementations.Length: > 0 })))
+                foreach (var member in type.GetMembers())
                 {
-                    if (member is IMethodSymbol { MethodKind: MethodKind.PropertyGet or MethodKind.PropertySet })
-                    {
-                        continue;
-                    }
-
-                    AssertEditorBrowsableNever(member);
+                    Assert.DoesNotContain(member.GetAttributes(), static attribute =>
+                        attribute.AttributeClass?.ToDisplayString() == "System.ComponentModel.EditorBrowsableAttribute");
                 }
             }
         }
@@ -109,7 +101,7 @@ public sealed class GeneratedSourceVisibilityTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task CompletionHonorsGeneratedBrowsingMetadataOnlyAcrossAssemblyBoundaries(bool referenceAsMetadata)
+    public async Task CompletionHidesGeneratedTypesFromMetadataWhileMembersRemainBrowsable(bool referenceAsMetadata)
     {
         var (compilation, _) = await Generate("namespace TestProject;");
         compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
@@ -131,14 +123,7 @@ public sealed class GeneratedSourceVisibilityTests
         Assert.Contains("ToString", members);
         foreach (var name in new[] { "Serialize", "Deserialize", "WriteField", "ReadValue" })
         {
-            if (referenceAsMetadata)
-            {
-                Assert.DoesNotContain(name, members);
-            }
-            else
-            {
-                Assert.Contains(name, members);
-            }
+            Assert.Contains(name, members);
         }
 
         var types = await GetCompletionNames(project, """
@@ -181,7 +166,9 @@ public sealed class GeneratedSourceVisibilityTests
         var implementation = Assert.Single(implementations, static candidate =>
             candidate.Name == "WriteField"
             && candidate.ContainingType?.ToDisplayString() == "OrleansCodeGen.TestProject.Codec_Payload");
-        AssertEditorBrowsableNever(implementation);
+        AssertEditorBrowsableNever(implementation.ContainingType);
+        Assert.DoesNotContain(implementation.GetAttributes(), static attribute =>
+            attribute.AttributeClass?.ToDisplayString() == "System.ComponentModel.EditorBrowsableAttribute");
     }
 
     [Theory]
