@@ -1177,7 +1177,7 @@ internal sealed partial class ActivationData :
                     // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
                     if (State != ActivationState.Valid && !(message.IsLocalOnly && State is ActivationState.Deactivating))
                     {
-                        TryDequeueUnprocessableRequests(out unprocessableRequests);
+                        unprocessableRequests = DequeueUnprocessableRequests();
                         break;
                     }
 
@@ -1275,14 +1275,14 @@ internal sealed partial class ActivationData :
             _busyDuration = stopwatch;
         }
 
-        // Called with the lock held. Dequeues the waiting requests once this activation can no longer process them.
-        bool TryDequeueUnprocessableRequests([NotNullWhen(true)] out List<Message>? requests)
+        // Called with the lock held. Dequeues the waiting requests once this activation can no longer process them,
+        // or returns null while it may still process them.
+        List<Message>? DequeueUnprocessableRequests()
         {
-            requests = null;
             if (State is ActivationState.Creating or ActivationState.Activating)
             {
                 // Do nothing until the activation becomes either valid or invalid
-                return false;
+                return null;
             }
 
             if (State is ActivationState.Deactivating)
@@ -1305,18 +1305,18 @@ internal sealed partial class ActivationData :
                 {
                     // Do not forward messages while the grain is still deactivating and has not been declared stuck, since they
                     // will be forwarded to the same grain instance.
-                    return false;
+                    return null;
                 }
             }
 
-            requests = new List<Message>(_waitingRequests.Count);
+            var requests = new List<Message>(_waitingRequests.Count);
             foreach (var (message, _) in _waitingRequests)
             {
                 requests.Add(message);
             }
 
             _waitingRequests.Clear();
-            return true;
+            return requests;
         }
 
         void AbandonStuckDeactivatingActivation()
