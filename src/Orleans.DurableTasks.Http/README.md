@@ -8,7 +8,10 @@
 `Microsoft.Orleans.DurableTasks.Http` carries the idempotence of Orleans durable tasks
 across HTTP. Route groups of ASP.NET Core Minimal APIs start durable grain calls as
 long-running HTTP operations, keyed by the request's `Idempotency-Key`, and serve
-their status, results, event streams, cancellation, signals, and webhooks.
+their status, results, event streams, cancellation, signals, and webhooks. An
+`IDurableHttpClient` runs HTTP requests and operations as steps of durable tasks, and
+sends each step's identity as its `Idempotency-Key`, so a task which retries or
+replays a request reaches the operation which its first attempt started.
 
 ## Serving durable operations
 
@@ -178,3 +181,72 @@ Deliveries are at least once: a webhook's `webhook-id` is equal for each attempt
 an `IDurableWebhookSigner`, which holds the application's keys, adds
 `webhook-signature`. `AddDurableHttpCallbacks` returns the builder of the
 `HttpClient` which delivers callbacks, to configure its handlers.
+
+## Calling HTTP APIs from durable tasks
+
+```csharp
+siloBuilder.Services.AddDurableHttpClient("payments")
+    .ConfigureHttpClient(client => client.BaseAddress = paymentsUri)
+    .AddStandardResilienceHandler();
+
+public sealed class OrderGrain([FromKeyedServices("payments")] IDurableHttpClient payments) : DurableGrain, IOrderGrain
+{
+    public async DurableTask<Receipt> PlaceAsync(PlaceOrder order)
+    {
+        var payment = await payments.StartOperationAsync(() => new HttpRequestMessage(HttpMethod.Post, "authorizations")
+        {
+            Content = JsonContent.Create(new Authorization(order.Account, order.Total)),
+        });
+
+        try
+        {
+            var approver = await Approval.WaitAsync();
+            await payments.SignalOperationAsync(payment.Location!, "capture", order.Total);
+            return await payments.WaitForOperationAsync<Receipt>(payment, new() { Mode = DurableHttpWaitMode.Events });
+        }
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+        {
+            await payments.CancelOperationAsync(payment.Location!, DurableTask.Current.TaskCancellationReason).Shielded();
+            throw;
+        }
+    }
+}
+```
+
+`AddDurableHttpClient` registers an `IDurableHttpClient`, which grains inject as a
+keyed service, and returns the builder of the `HttpClient` which it sends requests
+with. Each of its methods which returns a durable task records its responses as steps
+of the calling task, so a replay reads them without sending the requests again. Each
+step's unsafe requests carry an `Idempotency-Key` derived from the service, the grain,
+and the step's identifier, so a step which runs again after a failure or a
+deactivation reaches the same server-side work. The key handler precedes the
+handlers which the builder adds, so their retries carry the key.
+
+- `SendAsync` sends a request and returns the recorded `DurableHttpResponse`.
+- `RunOperationAsync<T>` starts an operation and durably waits for its result;
+  `StartOperationAsync` and `WaitForOperationAsync<T>` do so in two steps, with other
+  work between them.
+- `GetOperationAsync`, `CancelOperationAsync`, and `SignalOperationAsync` read,
+  cancel, and signal an operation by its status monitor's URL.
+- `WatchOperationAsync` streams an operation's statuses from its events, outside
+  durable executions, until it is terminal.
+
+A `200 OK` or `204 No Content` start response carries the result, as does another
+`2xx` response without a status monitor. A `424 Failed Dependency` response reports
+a failed or canceled operation. Any other response which locates the operation runs
+it: an `Operation-Location` or `Azure-AsyncOperation` status monitor, such as this
+package's operations and Azure long-running operations serve, including on an Azure
+`201 Created` response, or a `Location` on a `202 Accepted` response, which answers
+`202 Accepted` until it returns the result. `DurableHttpWaitMode.Poll` polls after the interval which
+`Retry-After` advertises, or `DurableHttpOperationOptions.PollInterval`, with durable
+delays between polls; `DurableHttpWaitMode.Events` reads the status monitor's events
+within one step, which learns the outcome as soon as the server reports it. A failed
+or canceled operation throws `DurableHttpOperationException` with its status, code,
+and message.
+
+`DurableHttpClientOptions.SerializerOptions` serializes request values and results,
+with the Minimal API JSON defaults unless configured. A trimmed or NativeAOT
+application sets options whose resolver handles its request and result types.
+
+`AddDurableIdempotencyKey` adds the key handler to any `HttpClient`, for durable tasks
+which send requests from their own steps with `DurableTask.Run`.

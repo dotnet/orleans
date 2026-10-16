@@ -27,11 +27,18 @@ namespace Microsoft.AspNetCore.Builder
 
 namespace Microsoft.Extensions.DependencyInjection
 {
+    public static partial class DurableHttpClientBuilderExtensions
+    {
+        public static IHttpClientBuilder AddDurableIdempotencyKey(this IHttpClientBuilder builder) { throw null; }
+    }
+
     public static partial class DurableHttpServiceCollectionExtensions
     {
         public static IServiceCollection AddDurableHttp(this IServiceCollection services, System.Action<Orleans.DurableTasks.Http.DurableHttpOptions>? configureOptions = null) { throw null; }
 
         public static IHttpClientBuilder AddDurableHttpCallbacks(this IServiceCollection services, System.Action<Orleans.DurableTasks.Http.DurableCallbackOptions>? configureOptions = null) { throw null; }
+
+        public static IHttpClientBuilder AddDurableHttpClient(this IServiceCollection services, string name, System.Action<Orleans.DurableTasks.Http.DurableHttpClientOptions>? configureOptions = null) { throw null; }
     }
 }
 
@@ -69,12 +76,52 @@ namespace Orleans.DurableTasks.Http
         Nexus = 1
     }
 
+    public static partial class DurableHttpClientExtensions
+    {
+        public static DurableTask<TResult> RunOperationAsync<TResult>(this IDurableHttpClient client, System.Func<System.Net.Http.HttpRequestMessage> createRequest, DurableHttpOperationOptions? options = null) { throw null; }
+    }
+
+    public sealed partial class DurableHttpClientOptions
+    {
+        public System.Text.Json.JsonSerializerOptions SerializerOptions { get { throw null; } set { } }
+    }
+
     public static partial class DurableHttpHeaders
     {
         public const string IdempotencyKey = "Idempotency-Key";
         public const string OperationCallback = "Operation-Callback";
         public const string OperationCallbackHeaderPrefix = "Operation-Callback-";
         public const string OperationLocation = "Operation-Location";
+    }
+
+    [GenerateSerializer]
+    [Immutable]
+    [Alias("Orleans.DurableTasks.Http.DurableHttpOperation")]
+    public sealed partial record DurableHttpOperation(System.Uri? Location, bool IsStatusMonitor, DurableHttpResponse Response)
+    {
+        public bool IsCompleted { get { throw null; } }
+    }
+
+    [GenerateSerializer]
+    [Alias("Orleans.DurableTasks.Http.DurableHttpOperationException")]
+    public sealed partial class DurableHttpOperationException : System.Exception
+    {
+        public DurableHttpOperationException(DurableOperationStatus status, string? code, string? message) { }
+
+        [Id(1)]
+        public string? Code { get { throw null; } }
+
+        [Id(0)]
+        public DurableOperationStatus Status { get { throw null; } }
+    }
+
+    public sealed partial record DurableHttpOperationOptions()
+    {
+        public DurableHttpWaitMode Mode { get { throw null; } init { } }
+
+        public System.TimeSpan PollInterval { get { throw null; } init { } }
+
+        public System.TimeSpan Wait { get { throw null; } init { } }
     }
 
     public sealed partial class DurableHttpOptions
@@ -94,6 +141,38 @@ namespace Orleans.DurableTasks.Http
         public static DurableOperationError DefaultCreateError(System.Exception exception) { throw null; }
     }
 
+    [GenerateSerializer]
+    [Immutable]
+    [Alias("Orleans.DurableTasks.Http.DurableHttpResponse")]
+    public sealed partial record DurableHttpResponse(System.Net.HttpStatusCode StatusCode, System.Uri? RequestUri, System.Collections.Generic.IReadOnlyDictionary<string, string[]> Headers, System.ReadOnlyMemory<byte> Content)
+    {
+        public bool IsSuccessStatusCode { get { throw null; } }
+
+        public DurableHttpResponse EnsureSuccessStatusCode() { throw null; }
+
+        public string? GetHeader(string name) { throw null; }
+
+        public string ReadAsString() { throw null; }
+
+        public T? ReadFromJson<T>(System.Text.Json.JsonSerializerOptions? options = null) { throw null; }
+    }
+
+    public enum DurableHttpWaitMode
+    {
+        Poll = 0,
+        Events = 1
+    }
+
+    public sealed partial class DurableIdempotencyKeyHandler : System.Net.Http.DelegatingHandler
+    {
+        public DurableIdempotencyKeyHandler(Orleans.Runtime.IGrainContextAccessor grainContextAccessor, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions) { }
+
+        protected override System.Net.Http.HttpResponseMessage Send(System.Net.Http.HttpRequestMessage request, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        protected override System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> SendAsync(System.Net.Http.HttpRequestMessage request, System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    [Alias("Orleans.DurableTasks.Http.DurableOperation")]
     public sealed partial record DurableOperation(string Id, DurableOperationStatus Status, System.Text.Json.JsonElement? Result = null, DurableOperationError? Error = null)
     {
         [System.Text.Json.Serialization.JsonIgnore]
@@ -104,11 +183,16 @@ namespace Orleans.DurableTasks.Http
     {
     }
 
+    [GenerateSerializer]
+    [Immutable]
+    [Alias("Orleans.DurableTasks.Http.DurableOperationError")]
     public sealed partial record DurableOperationError(string Code, string Message)
     {
     }
 
     [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<DurableOperationStatus>))]
+    [GenerateSerializer]
+    [Alias("Orleans.DurableTasks.Http.DurableOperationStatus")]
     public enum DurableOperationStatus
     {
         NotStarted = 0,
@@ -116,6 +200,17 @@ namespace Orleans.DurableTasks.Http
         Succeeded = 2,
         Failed = 3,
         Canceled = 4
+    }
+
+    public partial interface IDurableHttpClient
+    {
+        DurableTask<DurableOperation> CancelOperationAsync(System.Uri operationLocation, string? reason = null);
+        DurableTask<DurableOperation> GetOperationAsync(System.Uri operationLocation);
+        DurableTask<DurableHttpResponse> SendAsync(System.Func<System.Net.Http.HttpRequestMessage> createRequest);
+        DurableTask SignalOperationAsync<T>(System.Uri operationLocation, string signalName, T value);
+        DurableTask<DurableHttpOperation> StartOperationAsync(System.Func<System.Net.Http.HttpRequestMessage> createRequest);
+        DurableTask<TResult> WaitForOperationAsync<TResult>(DurableHttpOperation operation, DurableHttpOperationOptions? options = null);
+        System.Collections.Generic.IAsyncEnumerable<DurableOperation> WatchOperationAsync(System.Uri operationLocation, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IDurableWebhookSigner
@@ -189,8 +284,101 @@ namespace OrleansCodeGen.Orleans.DurableTasks.Http
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableHttpOperation : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.Http.DurableHttpOperation>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_DurableHttpOperation(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableTasks.Http.DurableHttpOperation> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableTasks.Http.DurableHttpOperation instance) { }
+
+        public global::Orleans.DurableTasks.Http.DurableHttpOperation ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableTasks.Http.DurableHttpOperation instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.Http.DurableHttpOperation value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableHttpOperationException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.Http.DurableHttpOperationException>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_DurableHttpOperationException(global::Orleans.Serialization.Serializers.IBaseCodec<System.Exception> _baseTypeSerializer, global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableTasks.Http.DurableHttpOperationException> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableTasks.Http.DurableHttpOperationException instance) { }
+
+        public global::Orleans.DurableTasks.Http.DurableHttpOperationException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableTasks.Http.DurableHttpOperationException instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.Http.DurableHttpOperationException value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableHttpResponse : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.Http.DurableHttpResponse>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_DurableHttpResponse(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableTasks.Http.DurableHttpResponse> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableTasks.Http.DurableHttpResponse instance) { }
+
+        public global::Orleans.DurableTasks.Http.DurableHttpResponse ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableTasks.Http.DurableHttpResponse instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.Http.DurableHttpResponse value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableOperationError : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.Http.DurableOperationError>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_DurableOperationError(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableTasks.Http.DurableOperationError> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.DurableTasks.Http.DurableOperationError instance) { }
+
+        public global::Orleans.DurableTasks.Http.DurableOperationError ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.DurableTasks.Http.DurableOperationError instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.Http.DurableOperationError value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_DurableOperationStatus : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.DurableTasks.Http.DurableOperationStatus>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public global::Orleans.DurableTasks.Http.DurableOperationStatus ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.DurableTasks.Http.DurableOperationStatus value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_DurableCallbackDeliveryException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.DurableTasks.Http.DurableCallbackDeliveryException, System.Exception>
     {
         public Copier_DurableCallbackDeliveryException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_DurableHttpOperationException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.DurableTasks.Http.DurableHttpOperationException, System.Exception>
+    {
+        public Copier_DurableHttpOperationException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
+
+        public override void DeepCopy(global::Orleans.DurableTasks.Http.DurableHttpOperationException input, global::Orleans.DurableTasks.Http.DurableHttpOperationException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 }
