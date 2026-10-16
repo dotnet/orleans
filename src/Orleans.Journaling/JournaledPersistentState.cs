@@ -46,11 +46,18 @@ internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateM
     {
         get
         {
-            _hasState = true;
+            if (!_hasState)
+            {
+                // Reading absent state creates it, which the next journal write records.
+                JournaledStateMutationFence.ThrowIfClosed();
+                _hasState = true;
+            }
+
             return _value ??= _activator.Create();
         }
         set
         {
+            JournaledStateMutationFence.ThrowIfClosed();
             _value = value;
             _hasState = true;
             _clearRequested = false;
@@ -154,6 +161,7 @@ internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateM
     Task IStorage.ClearStateAsync() => ((IStorage)this).ClearStateAsync(CancellationToken.None);
     async Task IStorage.ClearStateAsync(CancellationToken cancellationToken)
     {
+        JournaledStateMutationFence.ThrowIfClosed();
         _value = default;
         _hasState = false;
         _clearRequested = true;

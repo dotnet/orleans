@@ -48,6 +48,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IDurabl
         get => _value;
         set
         {
+            JournaledStateMutationFence.ThrowIfClosed();
             _value = value;
             OnModified();
             if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
