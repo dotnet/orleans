@@ -254,6 +254,22 @@ internal interface IDurableTaskGrainRuntime
         throw new NotSupportedException("The durable task runtime does not support recorded effects.");
 
     /// <summary>
+    /// Returns the version of <paramref name="name"/> which <paramref name="executionId"/> or its nearest enclosing
+    /// execution within the same invoked task recorded, or stages a record of <paramref name="version"/> beneath
+    /// <paramref name="executionId"/>, without writing, and returns it.
+    /// </summary>
+    int GetOrRecordVersion(TaskId executionId, string name, int version) =>
+        throw new NotSupportedException("The durable task runtime does not support versions.");
+
+    /// <summary>
+    /// Cancels the attempt which <paramref name="context"/> runs for
+    /// <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/>, keeping its task pending for a later
+    /// activation to replay.
+    /// </summary>
+    void StallAttempt(GrainDurableTaskContext context, DurableTaskVersionException exception) =>
+        throw new NotSupportedException("The durable task runtime does not support versions.");
+
+    /// <summary>
     /// Throws when <paramref name="operationId"/> isn't recorded and an earlier run recorded <paramref name="otherKindId"/>,
     /// the identifier which the other kind of named operation receives for the same occurrence of the same name.
     /// </summary>

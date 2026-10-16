@@ -48,11 +48,20 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     // The number of sends of each signal which this attempt has begun, by marker segment. Guarded by _lock.
     private Dictionary<string, int>? _signalSends;
 
-    // While the attempt replays: the operations which earlier attempts recorded and this attempt hasn't reached yet, and
-    // those which it has reached. Both are released when the replay ends. Guarded by _lock; _unreached is read without it
-    // to report IsReplaying.
+    // The operations which earlier attempts recorded and this attempt hasn't reached yet, released once the attempt has
+    // reached each of them; and, while the attempt replays, those which it has reached, released when the replay ends.
+    // The replay ends earlier than the unreached set empties when the attempt starts an operation which no earlier
+    // attempt recorded. Guarded by _lock; _unreached and _replaying are read without it.
     private HashSet<TaskId>? _unreached;
     private HashSet<TaskId>? _reached;
+    private volatile bool _replaying;
+
+    // The versions which this attempt decided, by change name. Guarded by _lock.
+    private Dictionary<string, int>? _versions;
+
+    // The version which the runtime canceled this attempt for, when its execution recorded one which the running code
+    // doesn't support. Guarded by _lock.
+    private DurableTaskVersionException? _unsupportedVersion;
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -71,6 +80,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         _utcNowTicks = (utcNow ?? runtime.UtcNow).UtcTicks;
         _mutationFence = new(static state => ((GrainDurableTaskContext)state!).CreateAttemptCanceledException(), this);
         _unreached = runtime.GetRecordedOperations(taskId);
+        _replaying = _unreached is not null;
     }
 
     /// <summary>
@@ -99,7 +109,17 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// signals under its marker, selects a completion under its decision, or runs an effect under its name. Starting an
     /// operation which no earlier attempt recorded ends the replay; reaching an operation again doesn't.
     /// </remarks>
-    public override bool IsReplaying => Volatile.Read(ref _unreached) is not null;
+    public override bool IsReplaying => _replaying;
+
+    /// <summary>
+    /// Gets whether earlier attempts recorded operations which this attempt hasn't reached yet, so an earlier run went
+    /// past the attempt's current point.
+    /// </summary>
+    /// <remarks>
+    /// An execution's body runs its durable operations in one logical flow, and concurrent work runs in child executions,
+    /// so a deterministic replay reaches the recorded operations in the order in which the earlier run created them.
+    /// </remarks>
+    private bool HasUnreachedOperations => Volatile.Read(ref _unreached) is not null;
 
     /// <summary>
     /// Gets the grain which runs this execution, which qualifies the root identifiers of the detached tasks which the
@@ -131,17 +151,28 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
             {
                 if (unreached.Count > 0)
                 {
-                    (_reached ??= []).Add(operationId);
+                    if (_replaying)
+                    {
+                        (_reached ??= []).Add(operationId);
+                    }
+
                     return;
                 }
+
+                Volatile.Write(ref _unreached, null);
             }
-            else if (!recordsOperation || _reached?.Contains(operationId) is true)
+            else if (!_replaying || !recordsOperation || _reached?.Contains(operationId) is true)
             {
                 return;
             }
 
-            Volatile.Write(ref _unreached, null);
             _reached = null;
+            if (!_replaying)
+            {
+                return;
+            }
+
+            _replaying = false;
         }
 
         _runtime.OnReplayEnded(Id);
@@ -351,6 +382,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         lock (_lock)
         {
             reason = _attemptCancellationReason;
+            innerException ??= _unsupportedVersion;
         }
 
         Debug.Assert(reason is not null, "Only a canceled attempt throws its cancellation.");
@@ -601,6 +633,62 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
 
         return _runtime.RunEffect(effectId, state, effect);
+    }
+
+    /// <remarks>
+    /// The first call for a name in an attempt decides the version and memoizes it, so loops and helpers which check the
+    /// same change read the same version. A decision which no record holds yet is <c>0</c> while earlier attempts'
+    /// operations remain unreached, rather than while <see cref="IsReplaying"/> reports a replay: an operation which a
+    /// deployment inserted earlier in the body ends the replay without changing how far the earlier run went. The record
+    /// is staged in the work item which calls this on the activation and doesn't end the replay.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
+    /// <exception cref="DurableTaskAttemptCanceledException">
+    /// The runtime canceled the attempt, for example because the execution's version lies outside the supported range,
+    /// whose <see cref="DurableTaskVersionException"/> is then the inner exception.
+    /// </exception>
+    protected override int GetVersion(string name, int minSupported, int maxSupported)
+    {
+        if (TaskScheduler.Current != _scheduler)
+        {
+            throw new InvalidOperationException(
+                $"DurableTask.GetVersion runs on the scheduler of the grain activation which runs durable task '{Id}', so its record commits with the execution's other records. Code which continues elsewhere, for example after ConfigureAwait(false), can't read versions.");
+        }
+
+        ThrowIfAttemptCanceled();
+        int version;
+        lock (_lock)
+        {
+            if (_versions is null || !_versions.TryGetValue(name, out version))
+            {
+                version = -1;
+            }
+        }
+
+        if (version < 0)
+        {
+            version = _runtime.GetOrRecordVersion(Id, name, HasUnreachedOperations ? 0 : maxSupported);
+            lock (_lock)
+            {
+                _versions ??= [];
+                _versions[name] = version;
+            }
+        }
+
+        if (version < minSupported || version > maxSupported)
+        {
+            // The runtime cancels the attempt and keeps its task pending, so code which supports the version replays it.
+            var unsupported = new DurableTaskVersionException(Id, name, version, minSupported, maxSupported);
+            lock (_lock)
+            {
+                _unsupportedVersion ??= unsupported;
+            }
+
+            _runtime.StallAttempt(this, unsupported);
+            throw CreateAttemptCanceledException();
+        }
+
+        return version;
     }
 
     /// <summary>
