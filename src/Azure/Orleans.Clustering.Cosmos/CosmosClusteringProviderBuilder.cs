@@ -27,7 +27,10 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                     options.ContainerName = containerName;
                 }
                 options.IsResourceCreationEnabled = configurationSection.GetValue(nameof(options.IsResourceCreationEnabled), options.IsResourceCreationEnabled);
-                options.DatabaseThroughput = configurationSection.GetValue(nameof(options.DatabaseThroughput), options.DatabaseThroughput);
+                if (configurationSection.GetValue<int?>(nameof(options.DatabaseThroughput)) is { } databaseThroughput)
+                {
+                    options.DatabaseThroughput = databaseThroughput;
+                }
                 options.CleanResourcesOnInitialization = configurationSection.GetValue(nameof(options.CleanResourcesOnInitialization), options.CleanResourcesOnInitialization);
 
                 var serviceKey = configurationSection["ServiceKey"];
@@ -68,7 +71,10 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                     options.ContainerName = containerName;
                 }
                 options.IsResourceCreationEnabled = configurationSection.GetValue(nameof(options.IsResourceCreationEnabled), options.IsResourceCreationEnabled);
-                options.DatabaseThroughput = configurationSection.GetValue(nameof(options.DatabaseThroughput), options.DatabaseThroughput);
+                if (configurationSection.GetValue<int?>(nameof(options.DatabaseThroughput)) is { } databaseThroughput)
+                {
+                    options.DatabaseThroughput = databaseThroughput;
+                }
                 options.CleanResourcesOnInitialization = configurationSection.GetValue(nameof(options.CleanResourcesOnInitialization), options.CleanResourcesOnInitialization);
 
                 var serviceKey = configurationSection["ServiceKey"];
