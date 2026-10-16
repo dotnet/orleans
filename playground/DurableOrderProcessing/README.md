@@ -57,7 +57,7 @@ order waits for its `Shipped` signal, then appends the `Shipped` snapshot and co
 When the buyer cancels, the next durable operation before payment authorization throws `OperationCanceledException`, so
 a cancellation which arrives as validation completes is observed too. The workflow catches it, then runs its
 compensation inline: a shielded `WhenAll`, `.Shielded()`, releases each line concurrently, and the workflow then
-appends the `Cancelled` snapshot, which carries `DurableTask.Current.CancellationReason`. Rejected stock, declined
+appends the `Cancelled` snapshot, which carries `DurableTask.Current.TaskCancellationReason`. Rejected stock, declined
 payments, and payment timeouts run the same compensation; a rejected line keeps its `Rejected` status in the cancelled
 snapshot.
 

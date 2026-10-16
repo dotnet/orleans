@@ -128,7 +128,7 @@ with the grain's next journal write.
 | `TaskCompleted` | The runtime staged a task's terminal result, which the event carries. |
 | `TaskDeleted` | The runtime staged a task's deletion, with its execution tree or when its retention ended. |
 | `ExecutionStarted` | An attempt of a task's body started on the activation. |
-| `ExecutionStopped` | The attempt ended: its body completed, or an abort or deletion ended the task. |
+| `ExecutionStopped` | The attempt ended: its body completed, or an abort or deletion canceled the attempt. |
 | `ReplayEnded` | A replaying attempt started an operation which no earlier attempt recorded, so `IsReplaying` reports `false`. |
 | `SignalWaitStarted`, `SignalWaitEnded` | An execution started or ended a wait for a signal, under the signal's record. |
 | `SelectionWaitStarted` | A selection, such as `DurableTask.WhenAny`'s, found no completed candidate and waits, under its decision. |
@@ -200,9 +200,12 @@ Abort a task whose body ignores cancellation or whose compensation can't complet
 
 Abort commits the task and its execution tree as failed with
 `DurableTaskAbortedException` in one journal write, sends an abort to each pending call
-to another grain, whose callee aborts its own tree, and signals the running attempts,
-whose results are discarded. Abort runs no cancellation callbacks or compensation, so
-undo any partial effects separately. Aborting a terminal task changes nothing, and
+to another grain, whose callee aborts its own tree, and cancels the running attempts,
+whose results are discarded. A canceled attempt records nothing: its durable operations
+and journaled state changes throw `DurableTaskAttemptCanceledException` with the reason
+`TaskAborted`, so abort runs no compensation; undo any partial effects separately. Code
+which runs as the attempt unwinds still releases its in-process resources in `finally`
+blocks. Aborting a terminal task changes nothing, and
 detached tasks are aborted separately. Diagnostics then report the task as `Faulted`
 with `DurableTaskAbortedException: <reason>`.
 
@@ -251,7 +254,8 @@ another task ID, from a start which wasn't accepted, by the exception's type. `D
 
 A client, or an ordinary grain method, waits for a task by polling its grain. A poll
 which can't reach the grain, because a connection drops, the grain's silo stops or
-crashes, the call times out, or the grain deactivates, leaves the task running, so the
+crashes, the call times out, or the grain deactivates, which fails the poll with
+`DurableTaskAttemptCanceledException` and the reason `ActivationStopping`, leaves the task running, so the
 wait retries it with exponential backoff, from 50 ms to 5 s, and the next poll reaches
 the grain's next activation. The wait ends with the task's outcome, with
 `DurableTaskNotFoundException` for a task which the grain doesn't retain, or when the

@@ -130,7 +130,7 @@ public sealed class OrderGrain(IDurableTaskManager tasks) : DurableGrain, IOrder
 ```
 
 A cancellation request can carry a reason, which the canceled workflow reads from
-`DurableTask.Current.CancellationReason`, for example to record why it stopped. The first
+`DurableTask.Current.TaskCancellationReason`, for example to record why it stopped. The first
 request determines the reason; `ScheduledTask.CancelAsync(reason)` and
 `IDurableTaskGrainExtension.CancelAsync(taskId, reason)` carry one from clients and tooling.
 
@@ -311,13 +311,18 @@ synchronously on the activation which makes them, when the runtime stages them: 
   about a second, and recovery resumes the execution. A waiting execution
   resumes when the message it waits for reactivates the grain.
 - Activation shutdown begins when deactivation starts, before the grain's
-  `OnDeactivateAsync` runs. It stops new execution and signals the attempt-scoped
-  execution-abort token observed by delegate and delay operations and
-  adapter-controlled waits. The runtime then drains active execution, before
-  messaging and the journal stop, discards its results, and leaves committed
-  work available for replay in the next activation. A poll or wait on the
-  activation fails with `OperationCanceledException`, as a call which arrives
-  while the runtime stops does, and the task continues in the next activation.
+  `OnDeactivateAsync` runs. It stops new execution and cancels every running
+  attempt with the reason `ActivationStopping`: from then on, the attempt's
+  durable operations and the journaled state changes which its code makes throw
+  `DurableTaskAttemptCanceledException`, and its `AttemptCancellationToken` and
+  `CancellationToken` are canceled. The runtime then drains the attempts, before
+  messaging and the journal stop, discards their results, and leaves committed
+  work available for replay in the next activation. Other grain work, such as
+  `OnDeactivateAsync` and the inbox, keeps committing while the attempts drain,
+  and nothing which a canceled attempt does commits with it. A poll or wait on
+  the activation fails with `DurableTaskAttemptCanceledException`, as a call
+  which arrives while the runtime stops does, and the task continues in the next
+  activation.
 - Each request and result payload is journaled once per grain. The callee's inbox
   accepts invocations, and the caller's inbox accepts completions, directly into
   task state, journaling only the message's processed record alongside it. The
@@ -388,20 +393,21 @@ synchronously on the activation which makes them, when the runtime stages them: 
   runs when its parent's cancellation was already requested, a later request skips it and its
   descendants, and recovery replays it with its own cancellation state. A shielded combinator shields
   each input which it starts. A shielded signal wait which runs as part of the body waits with the
-  attempt's abort token, so the body's cancellation doesn't end it; a shielded subscription, including
-  the record of a detached task, isn't unsubscribed by it. Its own cancellation, an abort of its tree,
-  and deletion of its tree still reach every shielded operation. A body detaches work which must
+  attempt's `AttemptCancellationToken`, so the body's cancellation doesn't end it; a shielded
+  subscription, including the record of a detached task, isn't unsubscribed by it. Its own
+  cancellation and the cancellation of its attempt, by deactivation, an abort of its tree, or
+  deletion of its tree, still reach every shielded operation. A body detaches work which must
   outlive the task itself.
 - A cancellation request's reason commits with the request on each task it reaches, travels with the
   cancellation to each pending call to another grain, and is what a replay of a canceled body reads
-  from `DurableTask.Current.CancellationReason`. Diagnostics report it as the `Response` of a
+  from `DurableTask.Current.TaskCancellationReason`. Diagnostics report it as the `Response` of a
   `Canceling` or `Canceled` task.
 - An administrative abort, through `IDurableTaskManager.AbortAsync`, `IDurableTaskGrainExtension.AbortAsync`,
   or `ScheduledTask.AbortAsync`, commits the task and its execution tree as failed with
   `DurableTaskAbortedException` in one journal write, which also stages an abort to each pending call to
-  another grain; that callee aborts its task's tree in turn. The write's completion signals each running
-  attempt in the tree through its execution-abort token and discards its result. Abort runs no task code,
-  including cancellation callbacks and compensation, and the tree's delays terminalize with it, so their
+  another grain; that callee aborts its task's tree in turn. Each running attempt in the tree is canceled
+  with the reason `TaskAborted` and its result discarded, so nothing which it does afterwards commits:
+  abort runs no compensation. The tree's delays terminalize with it, so their
   resumes are stale. The stored exception's message is the abort reason, and the task's completion time
   records when it was aborted; diagnostics report the task as `Faulted` with
   `DurableTaskAbortedException: <reason>`. A child which a custom scheduler runs receives the abort through its

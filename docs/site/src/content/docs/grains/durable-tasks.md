@@ -253,7 +253,9 @@ the final content in its final synchronous code, after its last `await`:
 After a deactivation or a failure, the next activation replays each pending task: the
 method body runs again from the start, and every recorded operation returns its recorded
 outcome. Replay starts once the grain's `OnActivateAsync` has completed, and a
-deactivation signals running tasks to abort before the grain's `OnDeactivateAsync` runs.
+deactivation cancels the attempts of running tasks before the grain's `OnDeactivateAsync`
+runs, so their code records nothing more; see
+[Task cancellation and attempt cancellation](durable-tasks-structured-concurrency.md#task-cancellation-and-attempt-cancellation).
 A workflow resumes correctly when each replay schedules the same operations, with the
 same IDs and arguments, in the same order.
 
@@ -421,7 +423,7 @@ The request commits before it propagates through the task's execution tree:
   observes the request from the start, so the body takes the same path.
 
 The first request's reason is durable:
-<xref:Orleans.DurableTasks.DurableTaskContext.CancellationReason?displayProperty=nameWithType>
+<xref:Orleans.DurableTasks.DurableTaskContext.TaskCancellationReason?displayProperty=nameWithType>
 returns it in the canceled execution, its descendants, and every replay, and the
 cancellation carries it to pending calls to other grains.
 
@@ -432,16 +434,21 @@ cancellation was requested, and a later request skips it, while the body still o
 and awaits its result. A shielded combinator shields each input which it starts. Every
 awaited operation honors the shield the same way, so a shielded signal wait, delay,
 `GetDurableTask` subscription, `Race`, `WhenAny`, or `WaitAsync` completes after the
-task's cancellation. An abort and the deletion of the task's execution tree still reach
-shielded operations.
+task's cancellation. The cancellation of the attempt, by a deactivation, an abort, or the
+deletion of the task's execution tree, still ends shielded operations.
 
 An administrative abort, through `IDurableTaskManager.AbortAsync(rootId, reason)` or
 <xref:Orleans.DurableTasks.ScheduledTask.AbortAsync*?displayProperty=nameWithType>,
 commits the task and its execution tree as failed with
 <xref:Orleans.DurableTasks.DurableTaskAbortedException> in one journal write, stops
-their running attempts, and sends an abort to each pending call to another grain. Abort
-runs no task code, including cancellation callbacks and compensation, so use it for a
-task whose body ignores cancellation or whose cleanup is stuck.
+cancels their running attempts, and sends an abort to each pending call to another grain.
+A canceled attempt records nothing: its durable operations and journaled state changes
+throw <xref:Orleans.DurableTasks.DurableTaskAttemptCanceledException>, so an abort ends a
+task without compensation. Use it for a task whose body ignores cancellation or whose
+cleanup is stuck.
+
+Task cancellation and attempt cancellation differ in what they record; see
+[Task cancellation and attempt cancellation](durable-tasks-structured-concurrency.md#task-cancellation-and-attempt-cancellation).
 
 ## Starting and observing tasks
 

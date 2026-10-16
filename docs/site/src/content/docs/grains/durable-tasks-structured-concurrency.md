@@ -1,7 +1,7 @@
 ---
 title: Structured concurrency in durable tasks
 description: Understand how durable tasks form ownership trees, how lifetimes and cancellation flow through them, and when to attach, shield, detach, race, or time out work.
-ms.date: 10/15/2026
+ms.date: 10/16/2026
 ms.topic: conceptual
 ---
 
@@ -96,7 +96,7 @@ sequenceDiagram
     Client->>Trip: CancelAsync("Traveler canceled.")
     Trip->>Holds: cancellation, with the reason
     Holds-->>Trip: canceled (or completed)
-    Note over Trip: catch ... when IsCancellationRequested
+    Note over Trip: catch ... when IsTaskCancellationRequested
     Trip->>Release: start, shielded from the cancellation
     Release-->>Trip: released
     Trip-->>Client: canceled, with the reason
@@ -111,13 +111,14 @@ sequenceDiagram
   `OperationCanceledException`, and the task ends canceled when the exception escapes
   the body.
 - The first request's reason is durable, and
-  <xref:Orleans.DurableTasks.DurableTaskContext.CancellationReason?displayProperty=nameWithType>
+  <xref:Orleans.DurableTasks.DurableTaskContext.TaskCancellationReason?displayProperty=nameWithType>
   returns it in the task, its descendants, and every replay.
 
 A handler which compensates for cancellation filters by
-`DurableTask.Current.IsCancellationRequested`, because a host which stops a run, for
-example when its activation deactivates, also throws `OperationCanceledException`; see
-[ORLEANS0112](../diagnostics/orleans0112.md).
+`DurableTask.Current.IsTaskCancellationRequested`, so it runs for task cancellation and not
+for the cancellation of an attempt; see
+[Task cancellation and attempt cancellation](#task-cancellation-and-attempt-cancellation)
+and [ORLEANS0112](../diagnostics/orleans0112.md).
 
 ### Shield the work which must finish
 
@@ -130,10 +131,50 @@ was canceled. A shielded combinator shields each input which it starts.
 Shielding means the same for every awaited durable operation, whether it runs as a child or
 as part of the owner: a shielded signal wait, `TryWaitAsync`, delay, `GetDurableTask`
 subscription, `Race`, `WhenAny`, or `WaitAsync` completes after the owner's cancellation,
-and only an abort or the tree's deletion ends it. A workflow which waits for a payment
+and only the cancellation of the attempt ends it. A workflow which waits for a payment
 shields the wait, so a payment which arrives after a cancellation still reaches it:
 
 :::code source="../snippets/compiled/Grains/DurableTaskConcurrencySnippets.cs" id="durable_tasks_shielded_wait" language="csharp":::
+
+## Task cancellation and attempt cancellation
+
+Durable tasks distinguish two kinds of cancellation:
+
+| | Task cancellation | Attempt cancellation |
+| --- | --- | --- |
+| What it stops | The task: its outcome becomes canceled once the cancellation escapes its body | The current in-memory run of the body, its *attempt* |
+| Caused by | `CancelAsync`, an owner's cancellation, `Race`, or a timeout | The grain activation stopping, an [abort](durable-tasks-operations.md), or the deletion of the task's tree |
+| Recorded | Yes: the request, its reason, and the cleanup which the body runs | No: the attempt's later durable operations and journaled state changes throw |
+| What follows | The body runs its compensation, which commits | A stopping activation's task replays in a new attempt; an aborted or deleted task already has its outcome |
+| `IsTaskCancellationRequested` | `true` | Unchanged |
+| `CancellationToken` | Canceled | Canceled |
+| `AttemptCancellationToken` | Unchanged | Canceled |
+| Exception which durable operations throw | `OperationCanceledException` from the canceled work | <xref:Orleans.DurableTasks.DurableTaskAttemptCanceledException>, with its `Reason` |
+
+Once an attempt is canceled, every durable operation of its code throws
+`DurableTaskAttemptCanceledException`: `DurableTask.Once`, starting or awaiting children,
+including shielded and detached ones, `Post`, `ScheduleAsync`, signal sends and waits,
+delays, subscriptions, and combinators. Changes to the grain's journaled state throw it
+too, before they change memory: durable values and collections,
+`IDurableTaskCompletionSource<T>`, `IPersistentState<T>`, and journal writes. The
+exception derives from `OperationCanceledException`, so the attempt's code unwinds like
+any canceled .NET code, and nothing which it does on the way out commits. A stopping
+activation's task replays from its records in the next activation, which runs any
+compensation again.
+
+The canonical pattern passes `CancellationToken` to the calls which the body makes, runs
+durable cleanup in a `catch` filtered on `IsTaskCancellationRequested`, passes
+`AttemptCancellationToken` to the calls which that cleanup makes, and releases in-process
+resources, such as semaphores and disposables, in `finally` blocks and `using`
+statements, which run for both kinds of cancellation:
+
+:::code source="../snippets/compiled/Grains/DurableTaskConcurrencySnippets.cs" id="durable_tasks_attempt_cancellation" language="csharp":::
+
+Journaled state changes pass through the state's API, which the attempt's cancellation
+stops. A change made in place to a mutable object which a durable value holds bypasses
+that API, so store immutable values, such as records, and assign a new value to change
+it. [ORLEANS0117](../diagnostics/orleans0117.md) reports cleanup which passes the
+already-canceled `CancellationToken`.
 
 ## Detach the work which outlives its starter
 
@@ -157,7 +198,7 @@ and other parties reach the same task.
 | --- | --- | --- | --- | --- |
 | Owner | The awaiting method, while the activation lives | None | The running execution | None: it is a root |
 | Survives deactivation and silo failure | No | No | Yes: it resumes from its records | Yes |
-| Cancellation | A `CancellationToken` which the code passes | None | Durable, flows to descendants, carries a reason | Its own |
+| Cancellation | A `CancellationToken` which the code passes | None | Durable, flows to descendants, carries a reason; a stopped attempt replays | Its own |
 | Failures | Observed by the awaiter | Lost, or reported as unobserved | Recorded and rethrown to the owner in every replay | Recorded, and returned to subscribers |
 | Identity | None | None | A child ID in the owner's tree | A root ID on its grain |
 

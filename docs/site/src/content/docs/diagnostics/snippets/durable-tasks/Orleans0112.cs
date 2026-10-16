@@ -17,10 +17,10 @@ public sealed class BookingGrain : DurableGrain
         }
         catch (OperationCanceledException)
         {
-            // Also runs when the activation deactivates and the host stops this run: the booking is marked as
-            // cancelled although nobody canceled it.
+            // Also runs when the host cancels the attempt, for example when the activation stops: the handler compensates
+            // for a booking which nobody canceled.
             _status.Value = OrderStatus.Cancelled;
-            return new OrderResult(OrderStatus.Cancelled, DurableTask.Current.CancellationReason);
+            return new OrderResult(OrderStatus.Cancelled, DurableTask.Current.TaskCancellationReason);
         }
 
         return await Confirm(room).WithId("confirm");
@@ -36,13 +36,13 @@ public sealed class BookingGrain : DurableGrain
             await Hold(room).WithId("hold");
             await DurableTask.Delay(TimeSpan.FromMinutes(15)).WithId("hold-period");
         }
-        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
-            // Runs for durable cancellation only. When the host stops the run, the exception ends it, and the next
-            // activation replays the task.
+            // Runs for task cancellation only. When the host cancels the attempt, the exception ends it, and the next
+            // attempt replays the task.
             await Release(room).WithId("release").Shielded();
             _status.Value = OrderStatus.Cancelled;
-            return new OrderResult(OrderStatus.Cancelled, DurableTask.Current.CancellationReason);
+            return new OrderResult(OrderStatus.Cancelled, DurableTask.Current.TaskCancellationReason);
         }
 
         return await Confirm(room).WithId("confirm");
@@ -59,7 +59,7 @@ public sealed class BookingGrain : DurableGrain
         }
         catch (OperationCanceledException)
         {
-            // Rethrows after compensating, so the task ends canceled, and a run which the host stops ends too.
+            // Rethrows after compensating, so the task ends canceled, and a canceled attempt ends too.
             await Release(room).WithId("release").Shielded();
             throw;
         }
