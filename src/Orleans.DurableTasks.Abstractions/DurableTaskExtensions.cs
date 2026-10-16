@@ -63,7 +63,7 @@ public static class DurableTaskExtensions
     /// The execution still owns a shielded child and waits for it: the child runs to completion even when the execution's
     /// cancellation was requested before the child started, which suits compensation that a canceled workflow runs. The
     /// execution's own <see cref="DurableTaskContext.CancellationToken"/> and
-    /// <see cref="DurableTaskContext.IsCancellationRequested"/> still report its cancellation. An administrative abort
+    /// <see cref="DurableTaskContext.IsTaskCancellationRequested"/> still report its cancellation. An administrative abort
     /// and deleting the execution's tree still reach the child, and canceling the child through its own handle still
     /// cancels it and its children.
     /// </para>
@@ -123,7 +123,7 @@ public static class DurableTaskExtensions
     /// When the task completes first, the combinator cancels the delay and completes with the task's outcome: its result,
     /// failure, or cancellation. When the timeout elapses first, the combinator requests cancellation of the task carrying
     /// the reason <c>The operation timed out after {timeout}.</c>, which the task's
-    /// <see cref="DurableTaskContext.CancellationReason"/> reports when the request is the task's first, and waits until the
+    /// <see cref="DurableTaskContext.TaskCancellationReason"/> reports when the request is the task's first, and waits until the
     /// task is terminal: nothing which the combinator started outlives it. A task which then ends canceled fails the
     /// combinator with a <see cref="TimeoutException"/> whose inner exception is the task's
     /// <see cref="OperationCanceledException"/>, and any other outcome, such as a result which the task returns after

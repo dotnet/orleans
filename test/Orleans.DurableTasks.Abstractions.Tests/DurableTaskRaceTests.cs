@@ -238,12 +238,15 @@ public class DurableTaskRaceTests
         holder.Settle();
         var definition = DurableTask.Run(async _ => await holder.Definition.WaitAsync(FiveMinutes).WithId("pay"));
 
-        // The host aborts the first attempt while it waits, and replays it three minutes later.
-        using var abort = new CancellationTokenSource();
-        var first = DurableTaskRuntimeHelper.RunAsync(definition, new TestContext(host, RootId, host.UtcNow, abort.Token)).AsTask();
+        // The host cancels the first attempt while it waits, and replays it three minutes later.
+        var firstContext = host.CreateContext(RootId);
+        var first = DurableTaskRuntimeHelper.RunAsync(definition, firstContext).AsTask();
         await delayScheduled.Task.WaitAsync(WaitTimeout, TestCancellation);
-        await abort.CancelAsync();
-        await first.WaitAsync(WaitTimeout, TestCancellation);
+        DurableTaskRuntimeHelper.CancelAttempt(firstContext, DurableTaskAttemptCancellationReason.ActivationStopping);
+        var canceled = await first.WaitAsync(WaitTimeout, TestCancellation);
+        Assert.Equal(
+            DurableTaskAttemptCancellationReason.ActivationStopping,
+            Assert.IsType<DurableTaskAttemptCanceledException>(canceled.Exception).Reason);
         host.UtcNow = DateTimeOffset.UnixEpoch.AddMinutes(3);
         var replay = DurableTaskRuntimeHelper.RunAsync(definition, host.CreateContext(RootId)).AsTask();
         elapsed.SetResult(DurableTaskResponse.Completed);
@@ -314,9 +317,9 @@ public class DurableTaskRaceTests
                 await Task.Delay(Timeout.InfiniteTimeSpan, context.CancellationToken);
                 return DurableTaskResponse.FromResult("completed");
             }
-            catch (OperationCanceledException) when (returnsReason && context.IsCancellationRequested)
+            catch (OperationCanceledException) when (returnsReason && context.IsTaskCancellationRequested)
             {
-                return DurableTaskResponse.FromResult(context.CancellationReason!);
+                return DurableTaskResponse.FromResult(context.TaskCancellationReason!);
             }
         }).WithId("root").ScheduleAsync(TestCancellation);
 
@@ -482,9 +485,9 @@ public class DurableTaskRaceTests
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                 return "completed";
             }
-            catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
             {
-                var reason = DurableTask.Current.CancellationReason;
+                var reason = DurableTask.Current.TaskCancellationReason;
                 _reason.TrySetResult(reason);
                 await _settle.Task;
                 if (returnsReason)
