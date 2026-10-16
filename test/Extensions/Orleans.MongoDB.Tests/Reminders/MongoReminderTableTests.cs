@@ -186,8 +186,10 @@ public sealed class MongoReminderTableTests : IAsyncLifetime
         {
             var entry = new ReminderEntry
             {
-                GrainId = GrainId.Create("account", "index-policy"), ReminderName = "bill",
-                StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), Period = TimeSpan.FromMinutes(3)
+                GrainId = GrainId.Create("account", "index-policy"),
+                ReminderName = "bill",
+                StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Period = TimeSpan.FromMinutes(3)
             };
             var tag = await table.UpsertRow(entry, Token);
             Assert.False(string.IsNullOrWhiteSpace(tag));
@@ -229,7 +231,9 @@ public sealed class MongoReminderTableTests : IAsyncLifetime
         var id = GrainId.Create("account", "invalid-names");
         var entry = new ReminderEntry
         {
-            GrainId = id, ReminderName = "valid", StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            GrainId = id,
+            ReminderName = "valid",
+            StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             Period = TimeSpan.FromMinutes(5)
         };
         var tag = await table.UpsertRow(entry, Token);
@@ -257,8 +261,10 @@ public sealed class MongoReminderTableTests : IAsyncLifetime
         var table = Runner.ReminderTable;
         var entry = new ReminderEntry
         {
-            GrainId = GrainId.Create("account", "malformed"), ReminderName = "bill",
-            StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), Period = TimeSpan.FromMinutes(3)
+            GrainId = GrainId.Create("account", "malformed"),
+            ReminderName = "bill",
+            StartAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            Period = TimeSpan.FromMinutes(3)
         };
         var tag = await table.UpsertRow(entry, Token);
         var collection = database!.Database.GetCollection<BsonDocument>("OrleansReminderV2");
