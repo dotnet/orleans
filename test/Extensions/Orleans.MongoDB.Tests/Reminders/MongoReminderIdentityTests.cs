@@ -1,4 +1,7 @@
+using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Core.Events;
+using Orleans.MongoDB.Tests.Clustering;
 using Orleans.Providers.MongoDB.Reminders.Store;
 using Orleans.Runtime;
 using Xunit;
@@ -8,6 +11,69 @@ namespace Orleans.MongoDB.Tests.Reminders;
 [TestProvider("MongoDB"), TestSuite("BVT"), TestArea("Reminders")]
 public sealed class MongoReminderIdentityTests
 {
+    [Fact]
+    public async Task ConcurrentLegacyRemoveAndReregister_UsesOneEncodedRegistration()
+    {
+        var barrier = new MongoMembershipCancellationTests.CommandBarrier(1, "update");
+        await using var database = await MongoDatabase.CreateAsync(settings =>
+            settings.ClusterConfigurator = cluster => cluster.Subscribe<CommandStartedEvent>(barrier.OnCommand));
+        var firstTable = database.CreateReminderTable("service");
+        var secondTable = database.CreateReminderTable("service");
+        var token = TestContext.Current.CancellationToken;
+        await firstTable.StartAsync(token);
+        await secondTable.StartAsync(token);
+        var first = Entry(GrainId.Create("account", "legacy-race"), "bill");
+        first.Period = TimeSpan.FromMinutes(9);
+        var second = Entry(first.GrainId, first.ReminderName);
+        second.Period = TimeSpan.FromMinutes(7);
+        var legacyId = $"service_{first.GrainId}_{first.ReminderName}";
+        var collection = database.Database.GetCollection<MongoReminderDocument>("OrleansReminderV2");
+        await collection.InsertOneAsync(MongoReminderDocument.Create(legacyId, "service", Entry(first.GrainId, "bill"), "legacy"),
+            cancellationToken: token);
+
+        barrier.Armed = true;
+        var pending = Task.Run(() => firstTable.UpsertRow(first, token), token);
+        string? secondTag = null;
+        try
+        {
+            var entered = await Task.WhenAny(barrier.Entered.Task, pending).WaitAsync(token);
+            if (entered == pending) await pending;
+            Assert.False(pending.IsCompleted);
+            var command = Assert.Single(barrier.Commands);
+            Assert.Equal(legacyId, command["updates"][0]["q"]["_id"].AsString);
+            barrier.Armed = false;
+            Assert.True(await secondTable.RemoveRow(first.GrainId, "bill", "legacy", token));
+            secondTag = await secondTable.UpsertRow(second, token);
+            Assert.Equal(secondTag, Assert.Single((await secondTable.ReadRows(0, 0, token)).Reminders).ETag);
+            Assert.Equal(TimeSpan.FromMinutes(7), (await secondTable.ReadRow(first.GrainId, "bill", token))!.Period);
+        }
+        finally
+        {
+            barrier.Armed = false;
+            barrier.Release();
+            await pending;
+        }
+
+        var firstTag = await pending;
+        Assert.NotEqual(secondTag, firstTag);
+        var stored = Assert.Single(await collection.Find(FilterDefinition<MongoReminderDocument>.Empty).ToListAsync(token));
+        Assert.NotEqual(legacyId, stored.Id);
+        Assert.StartsWith("v2:", stored.Id);
+        Assert.Equal(firstTag, stored.Etag);
+        Assert.Equal(TimeSpan.FromMinutes(9), stored.Period);
+        var row = Assert.Single((await firstTable.ReadRows(0, 0, token)).Reminders);
+        Assert.Equal(firstTag, row.ETag);
+        var point = await firstTable.ReadRow(first.GrainId, "bill", token);
+        Assert.Equal(firstTag, point!.ETag);
+        Assert.Equal(TimeSpan.FromMinutes(9), point.Period);
+        Assert.False(barrier.Commands.First()["updates"][0].AsBsonDocument.GetValue("upsert", false).AsBoolean);
+        Assert.False(await secondTable.RemoveRow(first.GrainId, "bill", secondTag!, token));
+        Assert.True(await firstTable.RemoveRow(first.GrainId, "bill", firstTag!, token));
+        Assert.Null(await firstTable.ReadRow(first.GrainId, "bill", token));
+        Assert.Empty((await firstTable.ReadRows(0, 0, token)).Reminders);
+        Assert.Equal(0, await collection.CountDocumentsAsync(FilterDefinition<MongoReminderDocument>.Empty, cancellationToken: token));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

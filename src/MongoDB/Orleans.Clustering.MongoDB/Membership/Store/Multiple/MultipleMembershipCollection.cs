@@ -12,7 +12,7 @@ namespace Orleans.Providers.MongoDB.Membership.Store.Multiple;
 internal sealed class MultipleMembershipCollection : CollectionBase<MongoMembershipDocument>, IMongoMembershipCollection
 {
     private static readonly TransactionOptions MembershipTransactionOptions =
-        new(readConcern: ReadConcern.Snapshot, writeConcern: WriteConcern.WMajority);
+        new(readConcern: ReadConcern.Snapshot, readPreference: ReadPreference.Primary, writeConcern: WriteConcern.WMajority);
     private readonly TableVersionCollection tableVersionCollection;
     private readonly string? collectionPrefix;
 

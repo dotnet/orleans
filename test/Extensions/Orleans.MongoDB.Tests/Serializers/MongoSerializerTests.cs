@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson;
@@ -204,6 +205,38 @@ public sealed class MongoSerializerTests
         var offset = new DateTimeOffset(2026, 1, 2, 4, 4, 5, TimeSpan.FromHours(1)).AddTicks(1234567);
         Assert.Equal("2026-01-02T03:04:05.1234567Z", JsonBsonConverter.ToBson((JToken)new JValue(offset)).AsString);
         Assert.Equal(date.AddTicks(-1234567), new BsonDateTime(date.AddTicks(-1234567)).ToJToken().Value<DateTime>());
+    }
+
+    [Theory]
+    [InlineData("th-TH")]
+    [InlineData("ar-SA")]
+    public void JsonBsonConverter_DateFormattingUsesInvariantCalendarAndTimeSeparator(string cultureName)
+    {
+        var previous = CultureInfo.CurrentCulture;
+        var culture = (CultureInfo)CultureInfo.GetCultureInfo(cultureName).Clone();
+        culture.DateTimeFormat.TimeSeparator = ".";
+        try
+        {
+            CultureInfo.CurrentCulture = culture;
+            var date = new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc).AddTicks(1234567);
+            var offset = new DateTimeOffset(2026, 1, 2, 4, 4, 5, TimeSpan.FromHours(1)).AddTicks(1234567);
+            var document = new JObject
+            {
+                ["utc"] = new JValue(date),
+                ["offset"] = new JValue(offset)
+            }.ToBson();
+
+            Assert.Equal("2026-01-02T03:04:05.1234567Z", document["utc"].AsString);
+            Assert.Equal("2026-01-02T03:04:05.1234567Z", document["offset"].AsString);
+            using var host = MongoTestHost.Create();
+            var serializer = new JsonGrainStateSerializer(Options.Create(new JsonGrainStateSerializerOptions()), host.Services);
+            Assert.Equal(date, serializer.Deserialize<DateTime>(document["utc"]));
+            Assert.Equal(offset.ToUniversalTime(), serializer.Deserialize<DateTimeOffset>(document["offset"]));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
     }
 
     [Fact]

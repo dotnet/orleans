@@ -187,24 +187,31 @@ internal class MongoReminderCollection : CollectionBase<MongoReminderDocument>
         var legacy = await collection.Find(Filter.And(
             Filter.Eq(x => x.Id, legacyId), IdentityFilter(entry.GrainId, entry.ReminderName)))
             .FirstOrDefaultAsync(cancellationToken);
+        var document = MongoReminderDocument.Create(id, serviceId, entry, Guid.NewGuid().ToString());
+        var update = Update
+            .SetOnInsert(x => x.ServiceId, document.ServiceId)
+            .SetOnInsert(x => x.GrainId, document.GrainId)
+            .SetOnInsert(x => x.ReminderName, document.ReminderName)
+            .Set(x => x.GrainHash, document.GrainHash)
+            .Set(x => x.Etag, document.Etag)
+            .Set(x => x.Period, document.Period)
+            .Set(x => x.StartAt, document.StartAt);
+
         if (legacy is not null)
         {
-            id = legacy.Id;
+            var result = await collection.UpdateOneAsync(
+                Filter.And(Filter.Eq(x => x.Id, legacy.Id), IdentityFilter(entry.GrainId, entry.ReminderName)),
+                update, cancellationToken: cancellationToken);
+            if (result.MatchedCount > 0)
+            {
+                return entry.ETag = document.Etag;
+            }
         }
 
-        var document = MongoReminderDocument.Create(id, serviceId, entry, Guid.NewGuid().ToString());
-
+        // A removed legacy row is recreated only at the canonical encoded ID.
         await collection.UpdateOneAsync(
             Filter.And(Filter.Eq(x => x.Id, id), IdentityFilter(entry.GrainId, entry.ReminderName)),
-            Update
-                .SetOnInsert(x => x.ServiceId, document.ServiceId)
-                .SetOnInsert(x => x.GrainId, document.GrainId)
-                .SetOnInsert(x => x.ReminderName, document.ReminderName)
-                .Set(x => x.GrainHash, document.GrainHash)
-                .Set(x => x.Etag, document.Etag)
-                .Set(x => x.Period, document.Period)
-                .Set(x => x.StartAt, document.StartAt),
-            Upsert, cancellationToken);
+            update, Upsert, cancellationToken);
 
         return entry.ETag = document.Etag;
     }
