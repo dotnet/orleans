@@ -39,8 +39,8 @@ reaches the operation which its first attempt started. An operation identifier h
 1 to 255 printable ASCII characters other than `/`. The operation's key is the path
 of its group, with the request's route values, and its identifier, such as
 `orders/42/{id}`, so each order has its own operations. A scope, such as
-`WithDurableOperations("orders")`, replaces the path: groups of one scope and equal route
-values address the same operations.
+`WithDurableOperations("orders")`, replaces the path: groups and Nexus services of
+one scope and equal route values address the same operations.
 `DurableHttpOptions.MapOperationId` maps identifiers on every request, so the
 application scopes them by what is relevant to its business, such as an account, as
 Stripe scopes keys to accounts.
@@ -113,3 +113,37 @@ The endpoints which serve operations bind requests without reflection, so they s
 trimmed and NativeAOT applications. Signal values and operation results serialize with
 the Minimal API `JsonOptions`, whose resolver, such as a source-generated
 `JsonSerializerContext`, handles those types in such applications.
+
+## Serving durable operations through Nexus
+
+Temporal's Nexus protocol starts and cancels operations by service and operation
+name. Nexus services start durable grain calls as the same operations:
+
+```csharp
+var payments = app.MapGroup("/nexus").MapNexusService("payments.v1", scope: "payments");
+payments.MapNexusOperation("charge", (Charge input, IGrainFactory grains) =>
+    grains.GetGrain<IPaymentGrain>(input.AccountId).ChargeAsync(input));
+
+app.MapGroup("/nexus").WithDurableOperations("payments").MapDurableSignal(PaymentGrain.Capture);
+```
+
+- `POST /nexus/payments.v1/charge` starts the call as the operation which the
+  request's `Nexus-Request-Id` names. It returns `200 OK` with the result and
+  `Nexus-Operation-State: succeeded` for a succeeded operation, `201 Created` with an
+  `OperationInfo` whose `token` addresses the operation while it runs, and
+  `424 Failed Dependency` with an `OperationError` failure for a failed or canceled
+  operation.
+- `POST /nexus/payments.v1/charge/cancel` durably requests cancellation of the
+  operation which its `Nexus-Operation-Token` header or `token` query value names,
+  and returns `202 Accepted`.
+- Invalid, conflicting, and unknown requests receive Nexus handler errors:
+  `400 BAD_REQUEST`, `409 CONFLICT`, and `404 NOT_FOUND`. A start which the
+  operation's host doesn't accept receives `503 UNAVAILABLE`, which the caller retries.
+
+`MapNexusOperation` binds its handler's parameters by reflection, as Minimal APIs bind
+a `MapPost` handler which the request delegate generator doesn't intercept.
+
+A token is the operation's identifier; register an `INexusOperationTokenFormat` to
+sign, encrypt, or otherwise format tokens. A group of the service's scope without
+route parameters addresses the service's operations by their Nexus request
+identifiers, so it streams their status and delivers their signals.

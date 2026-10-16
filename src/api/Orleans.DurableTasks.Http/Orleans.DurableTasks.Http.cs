@@ -14,6 +14,15 @@ namespace Microsoft.AspNetCore.Builder
 
         public static Routing.RouteGroupBuilder WithDurableOperations(this Routing.RouteGroupBuilder group, string? scope = null) { throw null; }
     }
+
+    public static partial class NexusEndpointRouteBuilderExtensions
+    {
+        [System.Diagnostics.CodeAnalysis.RequiresUnreferencedCode("This API may perform reflection on the supplied delegate and its parameters. These types may be trimmed if not directly referenced.")]
+        [System.Diagnostics.CodeAnalysis.RequiresDynamicCode("This API may perform reflection on the supplied delegate and its parameters. These types may require generated code and aren't compatible with native AOT applications.")]
+        public static Routing.RouteGroupBuilder MapNexusOperation(this Routing.IEndpointRouteBuilder service, string operation, System.Delegate handler) { throw null; }
+
+        public static Routing.RouteGroupBuilder MapNexusService(this Routing.IEndpointRouteBuilder endpoints, string service, string? scope = null) { throw null; }
+    }
 }
 
 namespace Microsoft.Extensions.DependencyInjection
@@ -69,5 +78,18 @@ namespace Orleans.DurableTasks.Http
         Succeeded = 2,
         Failed = 3,
         Canceled = 4
+    }
+
+    public partial interface INexusOperationTokenFormat
+    {
+        string Format(string operationId);
+        bool TryParse(string token, out string? operationId);
+    }
+
+    public sealed partial class PlainTextNexusOperationTokenFormat : INexusOperationTokenFormat
+    {
+        public string Format(string operationId) { throw null; }
+
+        public bool TryParse(string token, out string? operationId) { throw null; }
     }
 }
