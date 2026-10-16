@@ -26,7 +26,7 @@ public sealed class GarnetJournalFailoverAgentTests
         var hostings = hosts.Select((host, index) => KeyValuePair.Create(new PartitionId($"p{index}"), new PartitionHosting(host, 3, $"p{index}", "endpoint:1"))).ToArray();
         await store.TryWriteAsync(RangeMap.CreateUniform(16, hostings), 0, CancellationToken);
         var membership = new FakeMembership(Snapshot(1));
-        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, TimeSpan.FromSeconds(1), logger: null);
+        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, new FakeRegistry(Active, Unknown), TimeSpan.FromSeconds(1), logger: null);
 
         // The dead silo's partition and the placeholder's move at once, at the next epoch and without an endpoint. A
         // silo unknown to membership may have just joined, so its partition stays until membership advances.
@@ -51,7 +51,7 @@ public sealed class GarnetJournalFailoverAgentTests
         var store = new InMemoryRangeMetaStore();
         await store.TryWriteAsync(RangeMap.CreateUniform(16, [KeyValuePair.Create(new PartitionId("p0"), new PartitionHosting(Unknown.ToParsableString(), 3, "p0", "endpoint:1"))]), 0, CancellationToken);
         var membership = new FakeMembership(Snapshot(1));
-        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, TimeSpan.FromSeconds(1), logger: null);
+        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, new FakeRegistry(Active, Unknown), TimeSpan.FromSeconds(1), logger: null);
 
         // The first pass finds the host unknown; a refresh may join a table read which started earlier, so the second
         // refresh is the first certain to read the table since.
@@ -75,7 +75,7 @@ public sealed class GarnetJournalFailoverAgentTests
         var store = new InMemoryRangeMetaStore();
         await store.TryWriteAsync(RangeMap.CreateUniform(16, [KeyValuePair.Create(new PartitionId("p0"), new PartitionHosting(Unknown.ToParsableString(), 3, "p0", "endpoint:1"))]), 0, CancellationToken);
         var membership = new FakeMembership(Snapshot(1));
-        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, TimeSpan.FromSeconds(1), logger: null);
+        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, new FakeRegistry(Active, Unknown), TimeSpan.FromSeconds(1), logger: null);
         Assert.Equal(0, await agent.AssignAsync(CancellationToken));
         membership.OnRefresh = () => membership.Current = new(
             Snapshot(1).Members.Add(Unknown, new ClusterMember(Unknown, SiloStatus.Active, "joined")),
@@ -89,6 +89,43 @@ public sealed class GarnetJournalFailoverAgentTests
     }
 
     [Fact]
+    public async Task Agent_AssignsOnlyToSilosRegisteredUnderTheirAddresses_AndKeepsExplicitHostsPartitions()
+    {
+        // A mixed cluster: one silo hosts under its address, another under an explicit HostId and so is registered
+        // only under that identifier. The explicit silo has fewer partitions, so it would win any unrestricted choice.
+        var store = new InMemoryRangeMetaStore();
+        var explicitSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11114), 1);
+        var hostings = new[]
+        {
+            KeyValuePair.Create(new PartitionId("p0"), new PartitionHosting(Dead.ToParsableString(), 3, "p0", "endpoint:1")),
+            KeyValuePair.Create(new PartitionId("p1"), new PartitionHosting("silo-b", 2, "p1", "endpoint:2")),
+            KeyValuePair.Create(new PartitionId("p2"), new PartitionHosting(explicitSilo.ToParsableString(), 5, "p2")),
+            KeyValuePair.Create(new PartitionId("p3"), new PartitionHosting(Active.ToParsableString(), 1, "p3", "endpoint:3")),
+            KeyValuePair.Create(new PartitionId("p4"), new PartitionHosting(Active.ToParsableString(), 1, "p4", "endpoint:4")),
+        };
+        await store.TryWriteAsync(RangeMap.CreateUniform(16, hostings), 0, CancellationToken);
+        var membership = new FakeMembership(new(
+            Snapshot(1).Members.Add(explicitSilo, new ClusterMember(explicitSilo, SiloStatus.Active, "explicit")),
+            new MembershipVersion(1)));
+        var registry = new FakeRegistry(Active, Dead);
+        registry.Hosts.Add("silo-b");
+        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, registry, TimeSpan.FromSeconds(1), logger: null);
+
+        // The dead silo's partition, and the partition stranded on the explicit silo's address, which that silo does not
+        // serve, move to the silo registered under its address. The explicit host keeps its partition.
+        Assert.Equal(2, await agent.AssignAsync(CancellationToken));
+        var map = (await store.ReadAsync(CancellationToken))!.Map;
+        Assert.Equal(new PartitionHosting(Active.ToParsableString(), 4, "p0"), map.Partitions[new("p0")]);
+        Assert.Equal(new PartitionHosting("silo-b", 2, "p1", "endpoint:2"), map.Partitions[new("p1")]);
+        Assert.Equal(new PartitionHosting(Active.ToParsableString(), 6, "p2"), map.Partitions[new("p2")]);
+        Assert.DoesNotContain(map.Partitions.Values, hosting => hosting.Host == explicitSilo.ToParsableString());
+
+        // The dead silo's registration is dropped, and nothing moves again.
+        Assert.DoesNotContain(Dead.ToParsableString(), registry.Hosts);
+        Assert.Equal(0, await agent.AssignAsync(CancellationToken));
+    }
+
+    [Fact]
     public async Task Agent_AssignsNothingWithoutActiveSilos()
     {
         var store = new InMemoryRangeMetaStore();
@@ -96,7 +133,7 @@ public sealed class GarnetJournalFailoverAgentTests
         var membership = new FakeMembership(new ClusterMembershipSnapshot(
             ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(Dead, new ClusterMember(Dead, SiloStatus.Dead, "dead")),
             new MembershipVersion(1)));
-        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, TimeSpan.FromSeconds(1), logger: null);
+        await using var agent = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, new FakeRegistry(Active, Unknown), TimeSpan.FromSeconds(1), logger: null);
         Assert.Equal(0, await agent.AssignAsync(CancellationToken));
     }
 
@@ -105,6 +142,19 @@ public sealed class GarnetJournalFailoverAgentTests
             .Add(Active, new ClusterMember(Active, SiloStatus.Active, "active"))
             .Add(Dead, new ClusterMember(Dead, SiloStatus.Dead, "dead")),
         new MembershipVersion(version));
+
+    private sealed class FakeRegistry(params SiloAddress[] silos) : IGarnetJournalHostRegistry
+    {
+        public HashSet<string> Hosts { get; } = [.. silos.Select(silo => silo.ToParsableString())];
+
+        public Task<IReadOnlySet<string>> ListAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>(Hosts));
+
+        public Task UnregisterAsync(string host, CancellationToken cancellationToken)
+        {
+            Hosts.Remove(host);
+            return Task.CompletedTask;
+        }
+    }
 
     private sealed class FakeMembership(ClusterMembershipSnapshot current) : IClusterMembershipService
     {
