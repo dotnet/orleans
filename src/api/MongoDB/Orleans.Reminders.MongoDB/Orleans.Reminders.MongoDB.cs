@@ -26,17 +26,29 @@ namespace Orleans.Providers.MongoDB.Reminders
     {
         public MongoReminderTable(global::MongoDB.Driver.IMongoClient mongoClient, Microsoft.Extensions.Logging.ILogger<MongoReminderTable> logger, Microsoft.Extensions.Options.IOptions<Orleans.Reminders.MongoDB.MongoDBRemindersOptions> options, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions) { }
 
+        public System.Threading.Tasks.Task<ReminderEntry?> ReadRow(Runtime.GrainId grainId, string reminderName, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task<ReminderEntry?> ReadRow(Runtime.GrainId grainId, string reminderName) { throw null; }
+
+        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(Runtime.GrainId grainId, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<ReminderTableData> ReadRows(Runtime.GrainId grainId) { throw null; }
 
+        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end, System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end) { throw null; }
+
+        public System.Threading.Tasks.Task<bool> RemoveRow(Runtime.GrainId grainId, string reminderName, string eTag, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<bool> RemoveRow(Runtime.GrainId grainId, string reminderName, string eTag) { throw null; }
 
         public System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.Task TestOnlyClearTable() { throw null; }
+
+        public System.Threading.Tasks.Task TestOnlyClearTable(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task<string?> UpsertRow(ReminderEntry entry, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task<string?> UpsertRow(ReminderEntry entry) { throw null; }
     }

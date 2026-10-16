@@ -1,4 +1,8 @@
 {
   "description": "Generated API assemblies which are not currently published as standalone NuGet packages.",
-  "packages": {}
+  "packages": {
+    "Microsoft.Orleans.Clustering.MongoDB": "New MongoDB clustering provider awaiting its first official package publication.",
+    "Microsoft.Orleans.Persistence.MongoDB": "New MongoDB persistence provider awaiting its first official package publication.",
+    "Microsoft.Orleans.Reminders.MongoDB": "New MongoDB reminder provider awaiting its first official package publication."
+  }
 }

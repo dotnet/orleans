@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using MongoDB.Driver;
@@ -52,13 +51,20 @@ internal sealed class MultipleDeprecatedMembershipCollection : CollectionBase<Mo
 
     public async Task<bool> UpsertRow(string deploymentId, MembershipEntry entry, string? etag, TableVersion tableVersion, CancellationToken cancellationToken = default)
     {
-        var id = ReturnId(deploymentId, entry.SiloAddress);
+        var collection = GetCollection(cancellationToken);
+        var id = MongoMembershipDocument.GetId(deploymentId, entry.SiloAddress);
+        if (id != MongoMembershipDocument.GetLegacyId(deploymentId, entry.SiloAddress))
+        {
+            var existing = await collection.Find(MongoMembershipDocument.IdentityFilter(deploymentId, entry.SiloAddress))
+                .FirstOrDefaultAsync(cancellationToken);
+            id = existing?.Id ?? id;
+        }
 
         var document = MongoMembershipDocument.Create(entry, deploymentId, id);
 
         try
         {
-            var result = await GetCollection(cancellationToken).ReplaceOneAsync(x => x.Id == id && x.Etag == etag, document,
+            var result = await collection.ReplaceOneAsync(x => x.Id == id && x.Etag == etag, document,
                 new ReplaceOptions { IsUpsert = etag is null }, cancellationToken);
 
             return result.MatchedCount > 0 || result.UpsertedId is not null;
@@ -93,10 +99,8 @@ internal sealed class MultipleDeprecatedMembershipCollection : CollectionBase<Mo
 
     public async Task<MembershipTableData> ReadRow(string deploymentId, SiloAddress address, CancellationToken cancellationToken = default)
     {
-        var id = ReturnId(deploymentId, address);
-
         var entries =
-            await GetCollection(cancellationToken).Find(x => x.Id == id)
+            await GetCollection(cancellationToken).Find(MongoMembershipDocument.IdentityFilter(deploymentId, address))
                 .ToListAsync(cancellationToken);
 
         return ReturnMembershipTableData(entries);
@@ -104,9 +108,7 @@ internal sealed class MultipleDeprecatedMembershipCollection : CollectionBase<Mo
 
     public Task UpdateIAmAlive(string deploymentId, SiloAddress address, DateTime iAmAliveTime, CancellationToken cancellationToken = default)
     {
-        var id = ReturnId(deploymentId, address);
-
-        return GetCollection(cancellationToken).UpdateOneAsync(x => x.Id == id, Update
+        return GetCollection(cancellationToken).UpdateOneAsync(MongoMembershipDocument.IdentityFilter(deploymentId, address), Update
             .Set(x => x.IAmAliveTime, LogFormatter.PrintDate(iAmAliveTime))
             .Set(x => x.Timestamp, iAmAliveTime), cancellationToken: cancellationToken);
     }
@@ -130,13 +132,4 @@ internal sealed class MultipleDeprecatedMembershipCollection : CollectionBase<Mo
         return new MembershipTableData(membershipList.Select(x => Tuple.Create(x.ToEntry(), x.Etag)).ToList(), tableVersion);
     }
 
-    private static string ReturnAddress(IPAddress address)
-    {
-        return address.MapToIPv4().ToString();
-    }
-
-    private static string ReturnId(string deploymentId, SiloAddress address)
-    {
-        return $"{deploymentId}@{ReturnAddress(address.Endpoint.Address)}:{address.Endpoint.Port}/{address.Generation}";
-    }
 }

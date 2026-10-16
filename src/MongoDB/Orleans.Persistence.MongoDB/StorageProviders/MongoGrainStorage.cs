@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
@@ -45,27 +46,42 @@ public class MongoGrainStorage : IGrainStorage
 
     /// <inheritdoc />
     public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+        => ReadStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return DoAndLog(nameof(ReadStateAsync), () =>
         {
-            return GetCollection<T>(stateName, grainId).ReadAsync(grainId, grainState);
+            return GetCollection<T>(stateName, grainId).ReadAsync(grainId, grainState, cancellationToken);
         });
     }
     /// <inheritdoc />
     public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+        => WriteStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return DoAndLog(nameof(WriteStateAsync), () =>
         {
-            return GetCollection<T>(stateName, grainId).WriteAsync(grainId, grainState);
+            return GetCollection<T>(stateName, grainId).WriteAsync(grainId, grainState, cancellationToken);
         });
     }
 
     /// <inheritdoc />
     public Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
+        => ClearStateAsync(stateName, grainId, grainState, CancellationToken.None);
+
+    /// <inheritdoc />
+    public Task ClearStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         return DoAndLog(nameof(ClearStateAsync), () =>
         {
-            return GetCollection<T>(stateName, grainId).ClearAsync(grainId, grainState);
+            return GetCollection<T>(stateName, grainId).ClearAsync(grainId, grainState, cancellationToken);
         });
     }
 

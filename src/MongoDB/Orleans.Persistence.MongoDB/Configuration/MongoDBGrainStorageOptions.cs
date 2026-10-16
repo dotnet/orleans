@@ -19,8 +19,8 @@ public class MongoDBGrainStorageOptions : MongoDBOptions
     public IGrainStateSerializer GrainStateSerializer { get; set; } = null!;
 
     /// <summary>
-    /// The key generation strategy used by the storage provider. It defaults to calling ToKeyString
-    /// in the grain reference.
+    /// Gets or sets the strategy used to generate persisted grain keys.
+    /// The default calls <see cref="GrainId.ToString"/>.
     /// </summary>
     public GrainStorageKeyGenerator KeyGenerator { get; set; } = x => x.ToString();
 

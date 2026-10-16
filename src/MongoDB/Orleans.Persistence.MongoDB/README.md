@@ -26,6 +26,11 @@ the serializer stable when accessing existing data.
 Missing reads and successful clears recreate the state through the registered
 Orleans activator and reset the ETag and existence metadata.
 
+The JSON serializer supports scalar and array roots. It preserves the legacy
+`$`-to-`__` field-name encoding and reserves JSON property names beginning with
+`__`; such names fail explicitly before persistence. Cancellation-token storage
+overloads propagate cancellation through collection setup and driver operations.
+
 Aspire's MongoDB database resources configure the `MongoDBDatabase` provider.
 Register the matching client with `AddKeyedMongoDBClient`; Orleans consumes
 `ServiceKey` and derives the database name from Aspire's registered `IMongoDatabase`.

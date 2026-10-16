@@ -59,6 +59,44 @@ public sealed class MongoSerializerTests
         Assert.Null(restored.Text);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(42)]
+    [InlineData(-7)]
+    public void JsonSerializer_HandlesPrimitiveRoots(int value)
+    {
+        using var host = MongoTestHost.Create();
+        var serializer = new JsonGrainStateSerializer(Options.Create(new JsonGrainStateSerializerOptions()), host.Services);
+        Assert.Equal(value, serializer.Serialize(value).AsInt32);
+        Assert.Equal(value, serializer.Deserialize<int>(new BsonInt32(value)));
+        Assert.Equal("text", serializer.Serialize("text").AsString);
+        Assert.Equal("independent", serializer.Deserialize<string>(new BsonString("independent")));
+        Assert.True(serializer.Serialize(true).AsBoolean);
+        Assert.False(serializer.Deserialize<bool>(BsonBoolean.False));
+        Assert.True(serializer.Serialize<string?>(null).IsBsonNull);
+        Assert.Null(serializer.Deserialize<string?>(BsonNull.Value));
+        Assert.Equal(new[] { 1, 2 }, serializer.Deserialize<int[]>(serializer.Serialize(new[] { 1, 2 })));
+    }
+
+    [Theory]
+    [InlineData("__")]
+    [InlineData("__type")]
+    [InlineData("___value")]
+    public void JsonSerializer_RejectsReservedPrefixWithoutMutatingState(string key)
+    {
+        using var host = MongoTestHost.Create();
+        var serializer = new JsonGrainStateSerializer(Options.Create(new JsonGrainStateSerializerOptions
+        {
+            ConfigureJsonSerializerSettings = settings => settings.TypeNameHandling = TypeNameHandling.None
+        }), host.Services);
+        var state = new JObject { ["nested"] = new JObject { ["$type"] = "metadata", [key] = "application" } };
+        var exception = Assert.Throws<ArgumentException>(() => serializer.Serialize(state));
+        Assert.Contains("reserved", exception.Message);
+        Assert.Equal("application", state["nested"]![key]!.Value<string>());
+        var legacy = serializer.Deserialize<JObject>(new BsonDocument("nested", new BsonDocument("__type", "legacy")));
+        Assert.Equal("legacy", legacy["nested"]!["$type"]!.Value<string>());
+    }
+
     [Fact]
     public void BsonSerializer_SerializesInspectableDocumentAndDeserializesFixedDocument()
     {
