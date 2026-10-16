@@ -101,7 +101,8 @@ public sealed class AzureTableStorageJournalingProviderBuilderTests
 
         using var services = builder.Services.BuildServiceProvider();
         var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
-        Assert.Equal($"Failed to convert configuration value at 'Provider:{key}' to type '{valueType}'.", exception.Message);
+        Assert.Contains($"'Provider:{key}'", exception.Message);
+        Assert.Contains($"'{valueType}'", exception.Message);
     }
 
     [Fact]

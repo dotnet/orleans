@@ -10,6 +10,7 @@
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
     <OrleansPackageValidationBaselineSuffix>alpha.1</OrleansPackageValidationBaselineSuffix>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
   </PropertyGroup>
 
   <ItemGroup>

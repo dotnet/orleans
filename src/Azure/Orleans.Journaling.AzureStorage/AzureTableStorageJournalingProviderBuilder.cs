@@ -1,4 +1,3 @@
-using System.Globalization;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,35 +22,12 @@ internal sealed class AzureTableStorageJournalingProviderBuilder : IProviderBuil
                 options.TableName = tableName;
             }
 
-            if (TryParseValue<bool>(configurationSection, nameof(options.DeleteOldGenerations), out var deleteOldGenerations))
-            {
-                options.DeleteOldGenerations = deleteOldGenerations;
-            }
-
-            if (TryParseValue<long>(configurationSection, nameof(options.CompactionRowCountThreshold), out var compactionRowCountThreshold))
-            {
-                options.CompactionRowCountThreshold = compactionRowCountThreshold;
-            }
-
-            if (TryParseValue<long>(configurationSection, nameof(options.CompactionSizeThreshold), out var compactionSizeThreshold))
-            {
-                options.CompactionSizeThreshold = compactionSizeThreshold;
-            }
-
-            if (TryParseValue<int>(configurationSection, nameof(options.MaxMetadataOnlyConflictRetries), out var maxMetadataOnlyConflictRetries))
-            {
-                options.MaxMetadataOnlyConflictRetries = maxMetadataOnlyConflictRetries;
-            }
-
-            if (TryParseValue<TimeSpan>(configurationSection, nameof(options.MetadataOnlyConflictInitialBackoff), out var metadataOnlyConflictInitialBackoff))
-            {
-                options.MetadataOnlyConflictInitialBackoff = metadataOnlyConflictInitialBackoff;
-            }
-
-            if (TryParseValue<TimeSpan>(configurationSection, nameof(options.MetadataOnlyConflictMaxBackoff), out var metadataOnlyConflictMaxBackoff))
-            {
-                options.MetadataOnlyConflictMaxBackoff = metadataOnlyConflictMaxBackoff;
-            }
+            options.DeleteOldGenerations = configurationSection.GetValue(nameof(options.DeleteOldGenerations), options.DeleteOldGenerations);
+            options.CompactionRowCountThreshold = configurationSection.GetValue(nameof(options.CompactionRowCountThreshold), options.CompactionRowCountThreshold);
+            options.CompactionSizeThreshold = configurationSection.GetValue(nameof(options.CompactionSizeThreshold), options.CompactionSizeThreshold);
+            options.MaxMetadataOnlyConflictRetries = configurationSection.GetValue(nameof(options.MaxMetadataOnlyConflictRetries), options.MaxMetadataOnlyConflictRetries);
+            options.MetadataOnlyConflictInitialBackoff = configurationSection.GetValue(nameof(options.MetadataOnlyConflictInitialBackoff), options.MetadataOnlyConflictInitialBackoff);
+            options.MetadataOnlyConflictMaxBackoff = configurationSection.GetValue(nameof(options.MetadataOnlyConflictMaxBackoff), options.MetadataOnlyConflictMaxBackoff);
 
             var serviceKey = configurationSection["ServiceKey"];
             if (!string.IsNullOrEmpty(serviceKey))
@@ -89,24 +65,5 @@ internal sealed class AzureTableStorageJournalingProviderBuilder : IProviderBuil
         {
             builder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
         }
-    }
-
-    // Returns false when the key is absent or empty, and throws when a configured value is invalid.
-    private static bool TryParseValue<T>(IConfigurationSection section, string key, out T value) where T : IParsable<T>
-    {
-        var text = section[key];
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            value = default!;
-            return false;
-        }
-
-        if (T.TryParse(text, CultureInfo.InvariantCulture, out var parsed))
-        {
-            value = parsed;
-            return true;
-        }
-
-        throw new InvalidOperationException($"Failed to convert configuration value at '{section.Path}:{key}' to type '{typeof(T)}'.");
     }
 }
