@@ -15,6 +15,15 @@ public static class DurableHttpHeaders
     /// <summary>The response header which locates an operation's status monitor, as Azure long-running operations do.</summary>
     public const string OperationLocation = "Operation-Location";
 
+    /// <summary>
+    /// The request header which registers a callback URL, which receives the operation's status monitor once the operation
+    /// is terminal. Each delivery carries the request's headers which start with <see cref="OperationCallbackHeaderPrefix"/>,
+    /// without the prefix.
+    /// </summary>
+    public const string OperationCallback = "Operation-Callback";
+
+    /// <summary>The prefix of request headers which each callback delivery carries, without the prefix.</summary>
+    public const string OperationCallbackHeaderPrefix = "Operation-Callback-";
     internal const string Prefer = "Prefer";
     internal const string PreferenceApplied = "Preference-Applied";
 }

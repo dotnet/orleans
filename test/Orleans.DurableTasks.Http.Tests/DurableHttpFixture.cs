@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -43,6 +44,11 @@ public sealed class DurableHttpFixture : IAsyncLifetime
             siloBuilder.Services.AddSingleton<IJournalStorageCatalog>(journals);
             siloBuilder.UseInMemoryDurableJobs();
             siloBuilder.AddDurableTasks();
+            siloBuilder.Services.AddDurableHttpCallbacks(static options => options.InitialRetryInterval = TimeSpan.FromMilliseconds(100))
+                .ConfigurePrimaryHttpMessageHandler(() => new RedirectingHandler(Server.CreateHandler()))
+                .ConfigureHttpClient(static client => client.Timeout = TimeSpan.FromMilliseconds(500));
+            siloBuilder.Services.Configure<DurableHttpOptions>(ConfigureOperations);
+            siloBuilder.Services.AddSingleton<IDurableWebhookSigner, TestWebhookSigner>();
             siloBuilder.AddIncomingGrainCallFilter<StartFailureFilter>();
         });
         _cluster = builder.Build();
@@ -106,6 +112,10 @@ public sealed class DurableHttpFixture : IAsyncLifetime
             grains.GetGrain<IDurableHttpTestGrain>(orderId).WaitForShipmentAsync(request.Item));
         orders.MapDurableSignal(DurableHttpTestGrain.Approved);
         orders.MapDurableSignal(DurableHttpTestGrain.Shipped);
+        // Receives callbacks, which tests await through Callbacks.
+        _app.MapPost("/callbacks/{name}", static async (string name, HttpRequest request) =>
+            await Callbacks.ReceiveAsync(name, request));
+
         // Approvals through Nexus, whose request identifiers name operations of the 'approvals' scope, which the
         // '/approvals' group also serves, so its routes stream and signal them.
         var nexus = _app.MapGroup("/nexus").MapNexusService("orders.v1", scope: ApprovalsScope);
@@ -117,6 +127,9 @@ public sealed class DurableHttpFixture : IAsyncLifetime
         _server = _app.GetTestServer();
         Http = _app.GetTestClient();
     }
+
+    /// <summary>Gets the callbacks which the test server received.</summary>
+    public static CallbackReceiver Callbacks { get; } = new();
 
     private static void ConfigureOperations(DurableHttpOptions options)
     {
@@ -131,6 +144,9 @@ public sealed class DurableHttpFixture : IAsyncLifetime
         // Scopes the operations of authenticated users to the user.
         options.MapOperationId = static (context, operationId) =>
             context.User.FindFirst(ClaimTypes.NameIdentifier) is { } user ? $"{user.Value}:{operationId}" : operationId;
+
+        // Accepts callbacks to the test server's receiver only.
+        options.AllowCallback = static (_, url) => url.Host == "localhost" && url.AbsolutePath.StartsWith("/callbacks/", StringComparison.Ordinal);
     }
 
     public async ValueTask DisposeAsync()
@@ -149,6 +165,93 @@ public sealed class DurableHttpFixture : IAsyncLifetime
 public sealed class DurableHttpCollection : ICollectionFixture<DurableHttpFixture>
 {
     public const string Name = "DurableHttp";
+}
+
+/// <summary>Signs webhooks with a value which tests recompute.</summary>
+public sealed class TestWebhookSigner : IDurableWebhookSigner
+{
+    public static string Expected(string webhookId, long timestamp, int bodyLength) => $"v1,test:{webhookId}:{timestamp}:{bodyLength}";
+
+    public string? Sign(DurableCallback callback, string webhookId, long timestamp, ReadOnlySpan<byte> body) =>
+        Expected(webhookId, timestamp, body.Length);
+}
+
+/// <summary>Records the callbacks which the test server receives, and lets tests await them by name.</summary>
+/// <remarks>
+/// A receiver whose name starts with <c>flaky-</c> answers its first attempt with <c>503 Service Unavailable</c>, one
+/// whose name starts with <c>slow-</c> answers its first attempt after the sender's timeout, and one whose name starts with
+/// <c>moved-</c> redirects its first attempt to another receiver; the sender retries each.
+/// </remarks>
+public sealed class CallbackReceiver
+{
+    private readonly ConcurrentDictionary<string, Receiver> _receivers = new();
+
+    /// <summary>Returns a task which completes with the first callback which <paramref name="name"/> accepts.</summary>
+    /// <remarks>Arm the wait before triggering the callback.</remarks>
+    public Task<ReceivedCallback> ExpectAsync(string name) => _receivers.GetOrAdd(name, static _ => new()).Accepted.Task;
+
+    /// <summary>Returns how many attempts <paramref name="name"/> has received.</summary>
+    public int GetAttempts(string name) => _receivers.TryGetValue(name, out var receiver) ? receiver.Attempts : 0;
+
+    internal async Task<IResult> ReceiveAsync(string name, HttpRequest request)
+    {
+        var receiver = _receivers.GetOrAdd(name, static _ => new());
+        if (Interlocked.Increment(ref receiver.Attempts) == 1)
+        {
+            if (name.StartsWith("flaky-", StringComparison.Ordinal))
+            {
+                return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
+            if (name.StartsWith("slow-", StringComparison.Ordinal))
+            {
+                // Outlasts the callback client's timeout; the request's abort ends the wait.
+                await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, request.HttpContext.RequestAborted).ContinueWith(static _ => { });
+                return Results.Empty;
+            }
+
+            if (name.StartsWith("moved-", StringComparison.Ordinal))
+            {
+                return Results.Redirect($"/callbacks/redirected-{name}", permanent: false, preserveMethod: true);
+            }
+        }
+
+        using var reader = new StreamReader(request.Body);
+        var body = await reader.ReadToEndAsync();
+        var headers = request.Headers.ToDictionary(static header => header.Key, static header => header.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+        receiver.Accepted.TrySetResult(new(headers, body));
+        return Results.Ok();
+    }
+
+    private sealed class Receiver
+    {
+        public readonly TaskCompletionSource<ReceivedCallback> Accepted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int Attempts;
+    }
+}
+
+public sealed record ReceivedCallback(IReadOnlyDictionary<string, string> Headers, string Body);
+
+/// <summary>
+/// Follows redirects like an <see cref="HttpClientHandler"/> with <see cref="HttpClientHandler.AllowAutoRedirect"/>, over
+/// the test server, which doesn't follow them, so tests observe whether callback delivery disables them.
+/// </summary>
+public sealed class RedirectingHandler(HttpMessageHandler inner) : HttpClientHandler
+{
+    private readonly HttpMessageInvoker _inner = new(inner);
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var response = await _inner.SendAsync(request, cancellationToken);
+        if (AllowAutoRedirect && response.Headers.Location is { } location && (int)response.StatusCode is 307 or 308)
+        {
+            using var redirected = new HttpRequestMessage(request.Method, new Uri(request.RequestUri!, location)) { Content = request.Content };
+            response.Dispose();
+            return await _inner.SendAsync(redirected, cancellationToken);
+        }
+
+        return response;
+    }
 }
 
 /// <summary>
