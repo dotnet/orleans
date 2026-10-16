@@ -295,6 +295,8 @@ namespace Orleans.Runtime
 
         public async Task Invoke(IGrainContext target, Message message)
         {
+            // Local requests are one-way: they complete themselves on the target instead of sending a response.
+            Debug.Assert(!message.IsLocalOnly || message.Direction == Message.Directions.OneWay);
             try
             {
                 // Don't process messages that have already timed out
@@ -344,7 +346,7 @@ namespace Orleans.Runtime
                     response = Response.FromException(exc1);
                 }
 
-                // A local request owns its outcome, including reporting its failure.
+                // A local request owns its outcome, including reporting its failure, in place of a response.
                 if (message.IsLocalOnly)
                 {
                     ((ILocalRequest)message.BodyObject!).Complete(response);
