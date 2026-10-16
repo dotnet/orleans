@@ -11,6 +11,13 @@ public enum DurableTaskAttemptCancellationReason
 
     /// <summary>The task was deleted together with its execution tree.</summary>
     TaskDeleted,
+
+    /// <summary>
+    /// The task's execution recorded a version of a change which the running code doesn't support. The task stays pending
+    /// until code which supports the version replays it; the <see cref="DurableTaskAttemptCanceledException"/>'s inner
+    /// exception is a <see cref="DurableTaskVersionException"/>.
+    /// </summary>
+    UnsupportedVersion,
 }
 
 /// <summary>
@@ -92,6 +99,7 @@ public sealed class DurableTaskAttemptCanceledException : OperationCanceledExcep
         DurableTaskAttemptCancellationReason.ActivationStopping => "The durable task attempt was canceled because its grain activation is stopping. The task continues in a new attempt.",
         DurableTaskAttemptCancellationReason.TaskAborted => "The durable task attempt was canceled because the task was aborted.",
         DurableTaskAttemptCancellationReason.TaskDeleted => "The durable task attempt was canceled because the task was deleted with its execution tree.",
+        DurableTaskAttemptCancellationReason.UnsupportedVersion => "The durable task attempt was canceled because its execution recorded a version which the running code doesn't support. The task stays pending until code which supports the version replays it.",
         _ => "The durable task attempt was canceled.",
     };
 }

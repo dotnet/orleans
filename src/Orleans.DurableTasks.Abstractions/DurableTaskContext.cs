@@ -622,6 +622,32 @@ public abstract class DurableTaskContext
         Func<TState, DurableTaskResponse> effect)
         => throw new NotSupportedException("The durable task host does not support DurableTask.Once.");
 
+    /// <summary>
+    /// Returns the version of the change <paramref name="name"/> which this execution follows, deciding and recording it
+    /// at the execution's first call for the name.
+    /// </summary>
+    /// <param name="name">The change's validated name.</param>
+    /// <param name="minSupported">The oldest version which the calling code supports, at least <c>0</c>.</param>
+    /// <param name="maxSupported">The newest version, at least <paramref name="minSupported"/>.</param>
+    /// <returns>The execution's version, from <paramref name="minSupported"/> to <paramref name="maxSupported"/>.</returns>
+    /// <remarks>
+    /// <para>
+    /// <see cref="DurableTask.GetVersion(string, int, int)"/> calls this synchronously from the task's body. A host
+    /// returns the version which the execution recorded, or which an enclosing execution recorded; otherwise it decides
+    /// <c>0</c> when earlier attempts recorded operations which this attempt hasn't reached yet, and
+    /// <paramref name="maxSupported"/> when they didn't, and records the decision with the execution.
+    /// </para>
+    /// <para>
+    /// A host cancels the attempt for <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/> when the
+    /// execution's version lies outside the supported range, and throws
+    /// <see cref="DurableTaskAttemptCanceledException"/> whose inner exception is a
+    /// <see cref="DurableTaskVersionException"/>; the task stays pending. Hosts which don't support versions keep this
+    /// default implementation, which throws <see cref="NotSupportedException"/>.
+    /// </para>
+    /// </remarks>
+    protected internal virtual int GetVersion(string name, int minSupported, int maxSupported)
+        => throw new NotSupportedException("The durable task host does not support DurableTask.GetVersion.");
+
     internal static ContextScope Enter(DurableTaskContext context)
     {
         var previous = AmbientContext.Value;

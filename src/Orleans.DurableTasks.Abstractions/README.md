@@ -377,8 +377,9 @@ Follow these rules in re-executed code:
 - Scheduling an existing identifier with different arguments fails, so a replay which diverges
   from the recorded execution surfaces as an error.
   When a deployment changes a workflow while executions are pending, keep the existing steps
-  and identifiers, and give new steps new identifiers. A changed `Once` delegate doesn't affect
-  executions which recorded it.
+  and identifiers, and give new steps new identifiers, or branch the change on
+  `DurableTask.GetVersion`; see [Versioned changes](#versioned-changes). A changed `Once` delegate
+  doesn't affect executions which recorded it.
 - An `async DurableTask` method which completes without awaiting is a normal step whose result the
   parent records. The package's analyzers suppress CS1998 for such methods
   ([ORLEANS0028](https://aka.ms/orleans/diagnostics#orleans0028)). A synchronous state transition
@@ -422,6 +423,33 @@ var paymentId = DurableTask.Once("payment-id", Guid.NewGuid);
   step.
 - The record applies only within a durable task. Outside one, the effect runs every time, so helpers
   which ordinary methods share with durable task bodies can call it.
+
+## Versioned changes
+
+`DurableTask.GetVersion(name, minSupported, maxSupported)` returns the version of a change which the
+running execution follows, so one body holds the code of every version while executions which started
+on earlier code are pending:
+
+```csharp
+var shipping = DurableTask.GetVersion("carrier-booking", minSupported: 0, maxSupported: 1);
+var trackingId = shipping >= 1
+    ? await carrier.BookAsync(orderId).WithId("book")
+    : await warehouse.ShipAsync(orderId).WithId("ship");
+```
+
+- The first check of a name in an execution records the version, and every later check and replay
+  returns it. An execution which reaches the check first records `maxSupported`; one which earlier
+  code ran past records `0`. A step follows the version which an enclosing execution recorded.
+- `DurableVersion` declares a change's name and range once, like `DurableSignal<T>`:
+  `static readonly DurableVersion CarrierBooking = new("carrier-booking", 0, 1);`, read with
+  `CarrierBooking.Get()` or `CarrierBooking.IsAtLeast(1)`.
+- Raising `minSupported` retires a version. An execution which recorded a version outside the range
+  stalls: the host cancels the attempt for `DurableTaskAttemptCancellationReason.UnsupportedVersion`,
+  whose `DurableTaskAttemptCanceledException` carries a `DurableTaskVersionException`, discards the
+  attempt's result, and keeps the task pending until code which supports the version replays it.
+- Outside a durable task, the check returns `maxSupported`. Names don't contain `$`, and
+  [ORLEANS0118](https://aka.ms/orleans/diagnostics#orleans0118) reports names and ranges which
+  aren't constants.
 
 ## Replay diagnostics and logging
 
