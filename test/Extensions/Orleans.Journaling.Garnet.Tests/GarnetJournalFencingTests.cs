@@ -227,7 +227,7 @@ public sealed class GarnetJournalFencingTests : IAsyncDisposable
     [Fact]
     public async Task HostRegistry_RegistersListsAndUnregistersHosts_OutsidePartitionStorage()
     {
-        var registry = new GarnetJournalHostRegistry(_container);
+        var registry = new GarnetJournalHostRegistry(_container, "map");
         Assert.Empty(await registry.ListAsync(CancellationToken));
         await registry.RegisterAsync("127.0.0.1:11111@1", CancellationToken);
         await registry.RegisterAsync("silo/b", CancellationToken);
@@ -241,6 +241,77 @@ public sealed class GarnetJournalFencingTests : IAsyncDisposable
         await registry.UnregisterAsync("silo/b", CancellationToken);
         await registry.UnregisterAsync("absent", CancellationToken);
         Assert.Equal(new[] { "127.0.0.1:11111@1" }, await registry.ListAsync(CancellationToken));
+    }
+
+    [Fact]
+    public async Task HostRegistry_IsScopedToItsRangeMap_WhenProvidersShareAContainer()
+    {
+        // Provider A hosts under the silo's address; provider B, on the same silo and container but another map, hosts
+        // under an explicit HostId. B's failover must not treat the silo's address as one of B's hosts.
+        var silo = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11111), 1);
+        var dead = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11112), 1);
+        var registryA = new GarnetJournalHostRegistry(_container, "map-a");
+        var registryB = new GarnetJournalHostRegistry(_container, "map-b");
+        await registryA.RegisterAsync(silo.ToParsableString(), CancellationToken);
+        await registryB.RegisterAsync("explicit-b", CancellationToken);
+        Assert.Equal(new[] { silo.ToParsableString() }, await registryA.ListAsync(CancellationToken));
+        Assert.Equal(new[] { "explicit-b" }, await registryB.ListAsync(CancellationToken));
+
+        // B's partition was on a dead silo. B's agent finds no silo registered for B under its address, so it leaves the
+        // partition for B's own hosts rather than assigning it to the silo's address, which B's manager would not serve.
+        var store = new InMemoryRangeMetaStore();
+        await store.TryWriteAsync(RangeMap.CreateUniform(16, [KeyValuePair.Create(new PartitionId("b0"), new PartitionHosting(dead.ToParsableString(), 1, "b0"))]) with { Id = "map-b" }, 0, CancellationToken);
+        var membership = new GarnetJournalFailoverAgentTests.FakeMembership(new(
+            System.Collections.Immutable.ImmutableDictionary<SiloAddress, ClusterMember>.Empty
+                .Add(silo, new ClusterMember(silo, SiloStatus.Active, "silo"))
+                .Add(dead, new ClusterMember(dead, SiloStatus.Dead, "dead")),
+            new MembershipVersion(1)));
+        await using (var agentB = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, registryB, TimeSpan.FromSeconds(1), logger: null))
+        {
+            Assert.Equal(0, await agentB.AssignAsync(CancellationToken));
+        }
+
+        Assert.Equal(dead.ToParsableString(), (await store.ReadAsync(CancellationToken))!.Map.Partitions[new("b0")].Host);
+
+        // Removing a registration from one map leaves the other's.
+        await registryB.UnregisterAsync(silo.ToParsableString(), CancellationToken);
+        Assert.Equal(new[] { silo.ToParsableString() }, await registryA.ListAsync(CancellationToken));
+
+        // Once the silo registers for B under its address, B's agent assigns the partition to it.
+        await registryB.RegisterAsync(silo.ToParsableString(), CancellationToken);
+        await using (var agentB = new GarnetJournalFailoverAgent(new GarnetJournalHostingCoordinator(store), membership, registryB, TimeSpan.FromSeconds(1), logger: null))
+        {
+            Assert.Equal(1, await agentB.AssignAsync(CancellationToken));
+        }
+
+        Assert.Equal(silo.ToParsableString(), (await store.ReadAsync(CancellationToken))!.Map.Partitions[new("b0")].Host);
+    }
+
+    [Fact]
+    public async Task DeviceFactory_DeletesFilesWhichItLists_AndLogicalDeviceNames()
+    {
+        var storage = await GarnetPartitionBlobStorage.OpenAsync(_container, "p0", epoch: 1, logger: null, CancellationToken);
+        foreach (var name in new[] { "checkpoint/log-commits/commit.7.0", "checkpoint/log-commits/commit.8.0", "checkpoint/log-commits/commit.80.0", "checkpoint/log-commits/commit.9.0", "checkpoint/log-commits/commit.9.1" })
+        {
+            await storage.EnsureCreatedAsync(name, 1 << 20);
+        }
+
+        var factory = new GarnetPartitionBlobDeviceFactory(storage, "checkpoint");
+
+        // Listed files have physical names, from which Tsavorite parses commit numbers (name.Split('.')[^2]).
+        var listed = factory.ListContents("log-commits").ToList();
+        Assert.Equal(new long[] { 7, 8, 9, 9, 80 }, listed.Select(file => long.Parse(file.fileName.Split('.')[^2])).Order());
+
+        // A listed descriptor deletes exactly its blob.
+        factory.Delete(Assert.Single(listed, file => file.fileName == "commit.7.0"));
+        Assert.DoesNotContain("checkpoint/log-commits/commit.7.0", storage.List("").Select(entry => entry.Name));
+
+        // A logical device name, as Tsavorite's consumers pass it, deletes every segment of that device and no other.
+        factory.Delete(new("log-commits", "commit.9"));
+        factory.Delete(new("log-commits", "commit.8"));
+        Assert.Equal(new[] { "checkpoint/log-commits/commit.80.0" }, storage.List("").Select(entry => entry.Name));
+        Assert.False(await storage.GetPageBlob("checkpoint/log-commits/commit.8.0").ExistsAsync(CancellationToken));
+        Assert.Null(storage.Failure);
     }
 
     public async ValueTask DisposeAsync()
