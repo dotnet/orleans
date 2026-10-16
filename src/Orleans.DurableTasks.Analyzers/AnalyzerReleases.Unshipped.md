@@ -23,3 +23,4 @@ ORLEANS0114 | Usage | Info | DurableTaskReplayAnalyzer, repeated wait for one si
 ORLEANS0115 | Usage | Info | DurableTaskReplayAnalyzer, log in code which a replay re-runs
 ORLEANS0116 | Usage | Warning | DurableTaskDefinitionAnalyzer, durable task posted outside grains and durable task bodies
 ORLEANS0117 | Usage | Warning | DurableTaskCleanupAnalyzer, task-cancellation cleanup passes the already-canceled CancellationToken
+ORLEANS0118 | Usage | Warning | DurableTaskVersionAnalyzer, version check with a non-constant name or range

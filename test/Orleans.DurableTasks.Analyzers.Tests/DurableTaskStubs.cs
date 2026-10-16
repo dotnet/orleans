@@ -33,6 +33,7 @@ internal static class DurableTaskStubs
                 public static void Once(string name, Action effect) => effect();
                 public static T Once<T>(Func<T> effect) => effect();
                 public static void Once(Action effect) => effect();
+                public static int GetVersion(string name, int minSupported, int maxSupported) => maxSupported;
                 public static DurableTask<T[]> WhenAll<T>(IEnumerable<DurableTask<T>> inputs) => null!;
                 public static DurableTask WhenAll(IEnumerable<DurableTask> inputs) => null!;
                 public static DurableTask<int> WhenAny(IEnumerable<DurableTask> inputs) => null!;
@@ -133,6 +134,13 @@ internal static class DurableTaskStubs
                 public DurableSignal(string name) { }
                 public DurableSignal<T> For(string suffix) => this;
                 public DurableTask<T> WaitAsync() => null!;
+            }
+
+            public sealed class DurableVersion
+            {
+                public DurableVersion(string name, int minSupported, int maxSupported) { }
+                public int Get() => 0;
+                public bool IsAtLeast(int version) => true;
             }
 
             public static class DurableTaskLoggerExtensions
