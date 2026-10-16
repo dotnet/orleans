@@ -11,6 +11,7 @@ namespace Orleans.Runtime;
 [SuppressMessage("Performance", "CA1815:Override equals and operator equals on value types", Justification = "Per-call options are passed to the runtime rather than compared.")]
 public readonly struct LocalRequestOptions
 {
+    // Stored inverted so that default(LocalRequestOptions), which callers pass as a default argument, keeps the activation alive.
     private readonly bool _suppressKeepAlive;
 
     /// <summary>
@@ -22,7 +23,7 @@ public readonly struct LocalRequestOptions
 
     /// <summary>
     /// Gets a value indicating whether the request extends the lifetime of the grain activation.
-    /// Defaults to <see langword="true"/>.
+    /// Defaults to <see langword="true"/>, including for <see langword="default"/>(<see cref="LocalRequestOptions"/>).
     /// </summary>
     /// <remarks>
     /// A request which keeps the activation alive restarts the activation's idle collection period when it completes,
