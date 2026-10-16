@@ -39,8 +39,9 @@ jobs:
           quint run "$SPEC" --main=garnetRangeMigrationSim --backend=rust
           --invariant=safety --max-steps=40 --max-samples=20000
       - name: Mutants must violate safety
-        # mutantUnfencedInstall and mutantUnfencedOpen need long, specific sequences which random simulation
-        # rarely reaches; their directed scenarios, unfencedInstallHidesWriteTest and unfencedOpenTest, catch them.
+        # mutantUnfencedInstall, mutantUnfencedOpen, mutantUnfencedDone, and mutantUnfencedReclaim need long, specific
+        # sequences which random simulation rarely reaches; their directed scenarios (unfencedInstallHidesWriteTest,
+        # unfencedOpenTest, unfencedDoneHidesWriteTest, unfencedReclaimLosesWriteTest) catch them.
         run: |
           for step in mutantOpenBeforeSeal mutantUnconditionalInstall mutantDeleteWithoutTombstone \
                       mutantReclaimBeforeDone mutantMarkDoneEarly mutantInventoryLiveOnly mutantCollectWithAttempt \
