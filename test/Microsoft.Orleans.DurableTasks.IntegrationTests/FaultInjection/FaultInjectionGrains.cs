@@ -353,7 +353,7 @@ public sealed class FaultPartnerGrain(
                 .WithId("hold");
             return "released";
         }
-        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
             var compensation = await DurableTask.Run(_ => DurableTask.Once("compensate", () => Increment("compensate")))
                 .WithId("compensate")

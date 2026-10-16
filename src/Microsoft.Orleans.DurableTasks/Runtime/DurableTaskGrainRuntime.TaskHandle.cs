@@ -88,7 +88,7 @@ internal sealed partial class DurableTaskGrainRuntime
 
         /// <summary>Fails the handle's waiters because the activation stops, while the task continues in the next activation.</summary>
         /// <remarks>The handle may have no waiter, so the failure is marked observed.</remarks>
-        public void SetStopping(OperationCanceledException exception)
+        public void SetStopping(DurableTaskAttemptCanceledException exception)
         {
             if (OnCompleted(_responseTcs.TrySetException(exception)))
             {

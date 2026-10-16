@@ -161,9 +161,9 @@ public sealed class DurableTaskRaceWorkerGrain(DurableTaskMessagingProbe probe) 
                 await Task.Delay(System.Threading.Timeout.InfiniteTimeSpan, cancellationToken);
                 return "completed";
             }
-            catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
             {
-                return DurableTask.Current.CancellationReason!;
+                return DurableTask.Current.TaskCancellationReason!;
             }
         });
 

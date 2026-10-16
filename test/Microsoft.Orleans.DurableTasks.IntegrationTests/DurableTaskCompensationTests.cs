@@ -135,7 +135,7 @@ public sealed class DurableTaskCompensatingWorkflowGrain : DurableGrain, IDurabl
             await inventory.HoldAsync().WithId("hold");
             return "completed";
         }
-        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
             // Scheduling returns once the inventory holds the release, so the workflow's result shows that a caller can
             // look the release up by its root ID.

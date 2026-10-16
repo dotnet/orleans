@@ -410,3 +410,29 @@ internal readonly struct DurableTaskAbortedExceptionSurrogate(string reason)
     [Id(0)]
     public string Reason { get; } = reason;
 }
+
+/// <summary>
+/// Serializes <see cref="DurableTaskAttemptCanceledException"/>, whose abstractions assembly has no Orleans serializers,
+/// by its reason, so a poll which a stopping activation fails reaches its caller with the exception's type and reason.
+/// </summary>
+/// <remarks>The attempt's token belongs to the activation which stopped, so the deserialized exception carries none.</remarks>
+[RegisterConverter]
+internal sealed class DurableTaskAttemptCanceledExceptionConverter
+    : IConverter<DurableTaskAttemptCanceledException, DurableTaskAttemptCanceledExceptionSurrogate>
+{
+    public DurableTaskAttemptCanceledException ConvertFromSurrogate(in DurableTaskAttemptCanceledExceptionSurrogate surrogate) =>
+        new(surrogate.Message, innerException: null, surrogate.Reason, CancellationToken.None);
+
+    public DurableTaskAttemptCanceledExceptionSurrogate ConvertToSurrogate(in DurableTaskAttemptCanceledException value) =>
+        new(value.Message, value.Reason);
+}
+
+[GenerateSerializer, Immutable]
+internal readonly struct DurableTaskAttemptCanceledExceptionSurrogate(string message, DurableTaskAttemptCancellationReason reason)
+{
+    [Id(0)]
+    public string Message { get; } = message;
+
+    [Id(1)]
+    public DurableTaskAttemptCancellationReason Reason { get; } = reason;
+}
