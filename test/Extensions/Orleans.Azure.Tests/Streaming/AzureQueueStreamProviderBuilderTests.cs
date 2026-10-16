@@ -103,6 +103,36 @@ public class AzureQueueStreamProviderBuilderTests
         Assert.Equal(TimeSpan.FromSeconds(37), queueOptions.MessageVisibilityTimeout);
     }
 
+    /// <summary>
+    /// Verifies that an invalid message visibility timeout fails options resolution.
+    /// </summary>
+    [Fact]
+    public void Invalid_MessageVisibilityTimeout_Throws()
+    {
+        string json = """
+		{
+			"Orleans": {
+				"Streaming": {
+					"AzureQueueProvider": {
+						"ProviderType": "AzureQueueStorage",
+						"MessageVisibilityTimeout": "not-a-timespan",
+						"QueueNames": [
+							"q1"
+						]
+					}
+				}
+			}
+		}
+		""";
+
+        var services = ConfigureSilo(json).Services.BuildServiceProvider();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.GetOptionsByName<AzureQueueOptions>(null!));
+        Assert.Equal(
+            $"Failed to convert configuration value at 'Orleans:Streaming:AzureQueueProvider:MessageVisibilityTimeout' to type '{typeof(TimeSpan)}'.",
+            exception.Message);
+    }
+
     static TestSiloBuilder ConfigureSilo(string json)
     {
         var siloBuilder = new TestSiloBuilder(json);

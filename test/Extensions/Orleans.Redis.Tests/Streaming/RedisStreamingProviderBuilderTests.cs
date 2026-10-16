@@ -51,6 +51,34 @@ public sealed class RedisStreamingProviderBuilderTests
         Assert.True(isShared);
     }
 
+    [Fact]
+    [TestCategory("BVT")]
+    public void SiloProviderBuilder_InvalidPartitionCount_Throws()
+    {
+        const string providerName = "RedisProvider";
+        var siloBuilder = new TestSiloBuilder(
+            $$"""
+            {
+              "Orleans": {
+                "Streaming": {
+                  "{{providerName}}": {
+                    "ProviderType": "Redis",
+                    "PartitionCount": "not-an-int"
+                  }
+                }
+              }
+            }
+            """);
+        var providerBuilder = new RedisStreamingProviderBuilder();
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => providerBuilder.Configure(siloBuilder, providerName, siloBuilder.Configuration.GetSection($"Orleans:Streaming:{providerName}")));
+
+        Assert.Equal(
+            $"Failed to convert configuration value at 'Orleans:Streaming:{providerName}:PartitionCount' to type '{typeof(int)}'.",
+            exception.Message);
+    }
+
     private sealed class TestSiloBuilder(string json) : ISiloBuilder
     {
         public IServiceCollection Services { get; } = new ServiceCollection();

@@ -38,4 +38,8 @@
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
     <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Orleans.Core\Configuration\ConfigurationValueParser.cs" Link="Configuration\ConfigurationValueParser.cs" />
+  </ItemGroup>
 </Project>

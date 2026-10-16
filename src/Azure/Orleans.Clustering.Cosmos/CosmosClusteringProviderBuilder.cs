@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Clustering.Cosmos;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
@@ -26,15 +27,15 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                 {
                     options.ContainerName = containerName;
                 }
-                if (bool.TryParse(configurationSection[nameof(options.IsResourceCreationEnabled)], out var irce))
+                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.IsResourceCreationEnabled), out var irce))
                 {
                     options.IsResourceCreationEnabled = irce;
                 }
-                if (int.TryParse(configurationSection[nameof(options.DatabaseThroughput)], out var dt))
+                if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(options.DatabaseThroughput), out var dt))
                 {
                     options.DatabaseThroughput = dt;
                 }
-                if (bool.TryParse(configurationSection[nameof(options.CleanResourcesOnInitialization)], out var croi))
+                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.CleanResourcesOnInitialization), out var croi))
                 {
                     options.CleanResourcesOnInitialization = croi;
                 }
@@ -76,15 +77,15 @@ internal sealed class CosmosClusteringProviderBuilder : IProviderBuilder<ISiloBu
                 {
                     options.ContainerName = containerName;
                 }
-                if (bool.TryParse(configurationSection[nameof(options.IsResourceCreationEnabled)], out var irce))
+                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.IsResourceCreationEnabled), out var irce))
                 {
                     options.IsResourceCreationEnabled = irce;
                 }
-                if (int.TryParse(configurationSection[nameof(options.DatabaseThroughput)], out var dt))
+                if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(options.DatabaseThroughput), out var dt))
                 {
                     options.DatabaseThroughput = dt;
                 }
-                if (bool.TryParse(configurationSection[nameof(options.CleanResourcesOnInitialization)], out var croi))
+                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.CleanResourcesOnInitialization), out var croi))
                 {
                     options.CleanResourcesOnInitialization = croi;
                 }

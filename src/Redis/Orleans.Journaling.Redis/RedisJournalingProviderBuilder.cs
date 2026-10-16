@@ -1,6 +1,6 @@
-using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Configuration;
 using Orleans.Journaling;
 using Orleans.Providers;
 using StackExchange.Redis;
@@ -45,25 +45,19 @@ internal sealed class RedisJournalingProviderBuilder : IProviderBuilder<ISiloBui
                 options.KeyPrefix = keyPrefix;
             }
 
-            var compactionThresholdBytes = configurationSection[nameof(RedisJournalStorageOptions.CompactionThresholdBytes)];
-            if (!string.IsNullOrWhiteSpace(compactionThresholdBytes)
-                && long.TryParse(compactionThresholdBytes, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedCompactionThresholdBytes))
+            if (ConfigurationValueParser.TryParseValue<long>(configurationSection, nameof(RedisJournalStorageOptions.CompactionThresholdBytes), out var compactionThresholdBytes))
             {
-                options.CompactionThresholdBytes = parsedCompactionThresholdBytes;
+                options.CompactionThresholdBytes = compactionThresholdBytes;
             }
 
-            var readChunkSize = configurationSection[nameof(RedisJournalStorageOptions.ReadChunkSize)];
-            if (!string.IsNullOrWhiteSpace(readChunkSize)
-                && int.TryParse(readChunkSize, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedReadChunkSize))
+            if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(RedisJournalStorageOptions.ReadChunkSize), out var readChunkSize))
             {
-                options.ReadChunkSize = parsedReadChunkSize;
+                options.ReadChunkSize = readChunkSize;
             }
 
-            var initStage = configurationSection[nameof(RedisJournalStorageOptions.InitStage)];
-            if (!string.IsNullOrWhiteSpace(initStage)
-                && int.TryParse(initStage, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedInitStage))
+            if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(RedisJournalStorageOptions.InitStage), out var initStage))
             {
-                options.InitStage = parsedInitStage;
+                options.InitStage = initStage;
             }
         });
 

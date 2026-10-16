@@ -104,23 +104,40 @@ public sealed class DynamoDBGrainStorageProviderBuilderTests
     }
 
     [Theory]
-    [InlineData(nameof(DynamoDBStorageOptions.ReadCapacityUnits), "not-an-integer")]
-    [InlineData(nameof(DynamoDBStorageOptions.WriteCapacityUnits), "not-an-integer")]
-    [InlineData(nameof(DynamoDBStorageOptions.UseProvisionedThroughput), "not-a-boolean")]
-    [InlineData(nameof(DynamoDBStorageOptions.CreateIfNotExists), "not-a-boolean")]
-    [InlineData(nameof(DynamoDBStorageOptions.UpdateIfExists), "not-a-boolean")]
-    [InlineData(nameof(DynamoDBStorageOptions.DeleteStateOnClear), "not-a-boolean")]
-    [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), "not-a-timespan")]
-    public void Configure_InvalidTypedValue_PreservesDefault(string key, string invalidValue)
+    [InlineData(nameof(DynamoDBStorageOptions.ReadCapacityUnits), "not-an-integer", typeof(int))]
+    [InlineData(nameof(DynamoDBStorageOptions.WriteCapacityUnits), "not-an-integer", typeof(int))]
+    [InlineData(nameof(DynamoDBStorageOptions.UseProvisionedThroughput), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.CreateIfNotExists), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.UpdateIfExists), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.DeleteStateOnClear), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBStorageOptions.TimeToLive), "not-a-timespan", typeof(TimeSpan))]
+    public void Configure_InvalidTypedValue_Throws(string key, string invalidValue, Type expectedType)
     {
         var (builder, _) = ConfigureBuilder((key, invalidValue));
         using var services = builder.Services.BuildServiceProvider();
-        DynamoDBStorageOptions? options = null;
 
-        var exception = Record.Exception(() => options = GetOptions(services));
+        var exception = Assert.Throws<InvalidOperationException>(() => GetOptions(services));
 
-        Assert.Null(exception);
-        Assert.NotNull(options);
+        Assert.Equal($"Failed to convert configuration value at 'Storage:{key}' to type '{expectedType}'.", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Configure_BlankTypedValues_PreserveDefaults(string blankValue)
+    {
+        var (builder, _) = ConfigureBuilder(
+            (nameof(DynamoDBStorageOptions.ReadCapacityUnits), blankValue),
+            (nameof(DynamoDBStorageOptions.WriteCapacityUnits), blankValue),
+            (nameof(DynamoDBStorageOptions.UseProvisionedThroughput), blankValue),
+            (nameof(DynamoDBStorageOptions.CreateIfNotExists), blankValue),
+            (nameof(DynamoDBStorageOptions.UpdateIfExists), blankValue),
+            (nameof(DynamoDBStorageOptions.DeleteStateOnClear), blankValue),
+            (nameof(DynamoDBStorageOptions.TimeToLive), blankValue));
+        using var services = builder.Services.BuildServiceProvider();
+
+        var options = GetOptions(services);
+
         Assert.Equal(10, options.ReadCapacityUnits);
         Assert.Equal(5, options.WriteCapacityUnits);
         Assert.True(options.UseProvisionedThroughput);

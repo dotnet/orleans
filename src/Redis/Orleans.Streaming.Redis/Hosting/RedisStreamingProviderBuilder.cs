@@ -1,6 +1,7 @@
 using Orleans.Providers;
 using Microsoft.Extensions.Configuration;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using StackExchange.Redis;
 using System;
@@ -50,7 +51,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
                     }
                 });
 
-            if (int.TryParse(configurationSection["PartitionCount"], out var partitionCount))
+            if (ConfigurationValueParser.TryParseValue<int>(configurationSection, "PartitionCount", out var partitionCount))
             {
                 streamsBuilder.ConfigurePartitioning(partitionCount);
             }
@@ -91,7 +92,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
                 }
             });
 
-            if (int.TryParse(configurationSection["PartitionCount"], out var partitionCount))
+            if (ConfigurationValueParser.TryParseValue<int>(configurationSection, "PartitionCount", out var partitionCount))
             {
                 streamsBuilder.ConfigurePartitioning(partitionCount);
             }

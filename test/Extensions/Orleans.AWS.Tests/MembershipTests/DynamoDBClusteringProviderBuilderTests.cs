@@ -53,6 +53,51 @@ public sealed class DynamoDBClusteringProviderBuilderTests
         Assert.Equal(profileName, options.ProfileName);
     }
 
+    [Theory]
+    [InlineData(nameof(DynamoDBClusteringOptions.ReadCapacityUnits), "not-an-integer", typeof(int))]
+    [InlineData(nameof(DynamoDBClusteringOptions.WriteCapacityUnits), "not-an-integer", typeof(int))]
+    [InlineData(nameof(DynamoDBClusteringOptions.UseProvisionedThroughput), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBClusteringOptions.CreateIfNotExists), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBClusteringOptions.UpdateIfExists), "not-a-boolean", typeof(bool))]
+    public void Configure_Silo_InvalidTypedValue_Throws(string key, string invalidValue, Type expectedType)
+    {
+        var configuration = CreateSingleValueConfiguration(key, invalidValue);
+        var builder = new TestSiloBuilder(configuration);
+        IProviderBuilder<ISiloBuilder> provider = new DynamoDBClusteringProviderBuilder();
+
+        provider.Configure(builder, null, configuration.GetSection("Clustering"));
+
+        using var services = builder.Services.BuildServiceProvider();
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.GetRequiredService<IOptions<DynamoDBClusteringOptions>>().Value);
+        Assert.Equal($"Failed to convert configuration value at 'Clustering:{key}' to type '{expectedType}'.", exception.Message);
+    }
+
+    [Theory]
+    [InlineData(nameof(DynamoDBGatewayOptions.ReadCapacityUnits), "not-an-integer", typeof(int))]
+    [InlineData(nameof(DynamoDBGatewayOptions.WriteCapacityUnits), "not-an-integer", typeof(int))]
+    [InlineData(nameof(DynamoDBGatewayOptions.UseProvisionedThroughput), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBGatewayOptions.CreateIfNotExists), "not-a-boolean", typeof(bool))]
+    [InlineData(nameof(DynamoDBGatewayOptions.UpdateIfExists), "not-a-boolean", typeof(bool))]
+    public void Configure_Client_InvalidTypedValue_Throws(string key, string invalidValue, Type expectedType)
+    {
+        var configuration = CreateSingleValueConfiguration(key, invalidValue);
+        var builder = new TestClientBuilder(configuration);
+        IProviderBuilder<IClientBuilder> provider = new DynamoDBClusteringProviderBuilder();
+
+        provider.Configure(builder, null, configuration.GetSection("Clustering"));
+
+        using var services = builder.Services.BuildServiceProvider();
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.GetRequiredService<IOptions<DynamoDBGatewayOptions>>().Value);
+        Assert.Equal($"Failed to convert configuration value at 'Clustering:{key}' to type '{expectedType}'.", exception.Message);
+    }
+
+    private static IConfiguration CreateSingleValueConfiguration(string key, string value)
+        => new ConfigurationBuilder()
+            .AddInMemoryCollection([new($"Clustering:{key}", value)])
+            .Build();
+
     private static IConfiguration CreateConfiguration(string? token, string? profileName)
     {
         var values = new Dictionary<string, string?>

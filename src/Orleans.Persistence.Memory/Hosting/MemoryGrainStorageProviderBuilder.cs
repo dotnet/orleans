@@ -19,7 +19,7 @@ internal sealed class MemoryGrainStorageProviderBuilder : IProviderBuilder<ISilo
     {
         builder.AddMemoryGrainStorage(name!, (OptionsBuilder<MemoryGrainStorageOptions> optionsBuilder) => optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
-            if (int.TryParse(configurationSection[nameof(options.NumStorageGrains)], out var nsg))
+            if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(options.NumStorageGrains), out var nsg))
             {
                 options.NumStorageGrains = nsg;
             }

@@ -62,37 +62,37 @@ internal sealed class DynamoDBGrainStorageProviderBuilder : IProviderBuilder<ISi
                     options.TableName = tableName;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.ReadCapacityUnits)], out var rcu))
+                if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(options.ReadCapacityUnits), out var rcu))
                 {
                     options.ReadCapacityUnits = rcu;
                 }
 
-                if (int.TryParse(configurationSection[nameof(options.WriteCapacityUnits)], out var wcu))
+                if (ConfigurationValueParser.TryParseValue<int>(configurationSection, nameof(options.WriteCapacityUnits), out var wcu))
                 {
                     options.WriteCapacityUnits = wcu;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.UseProvisionedThroughput)], out var upt))
+                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.UseProvisionedThroughput), out var upt))
                 {
                     options.UseProvisionedThroughput = upt;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.CreateIfNotExists)], out var cine))
+                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.CreateIfNotExists), out var cine))
                 {
                     options.CreateIfNotExists = cine;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.UpdateIfExists)], out var uie))
+                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.UpdateIfExists), out var uie))
                 {
                     options.UpdateIfExists = uie;
                 }
 
-                if (bool.TryParse(configurationSection[nameof(options.DeleteStateOnClear)], out var dsoc))
+                if (ConfigurationValueParser.TryParseValue<bool>(configurationSection, nameof(options.DeleteStateOnClear), out var dsoc))
                 {
                     options.DeleteStateOnClear = dsoc;
                 }
 
-                if (TimeSpan.TryParse(configurationSection[nameof(options.TimeToLive)], out var ttl))
+                if (ConfigurationValueParser.TryParseValue<TimeSpan>(configurationSection, nameof(options.TimeToLive), out var ttl))
                 {
                     options.TimeToLive = ttl;
                 }

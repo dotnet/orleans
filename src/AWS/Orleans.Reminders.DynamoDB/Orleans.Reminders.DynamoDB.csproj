@@ -36,5 +36,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Orleans.Core\Configuration\ConfigurationValueParser.cs" Link="Configuration\ConfigurationValueParser.cs" />
+  </ItemGroup>
 </Project>
 

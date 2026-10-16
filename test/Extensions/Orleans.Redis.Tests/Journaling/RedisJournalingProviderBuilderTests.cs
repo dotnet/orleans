@@ -136,7 +136,7 @@ public sealed class RedisJournalingProviderBuilderTests
     }
 
     [Fact]
-    public void Configure_BlankAndInvalidValues_PreserveDefaults()
+    public void Configure_BlankValues_PreserveDefaults()
     {
         var expected = new RedisJournalStorageOptions();
         var expectedManagerOptions = new JournaledStateManagerOptions();
@@ -145,9 +145,9 @@ public sealed class RedisJournalingProviderBuilderTests
             ("ConnectionName", ""),
             ("ConnectionString", ""),
             (nameof(RedisJournalStorageOptions.KeyPrefix), " "),
-            (nameof(RedisJournalStorageOptions.CompactionThresholdBytes), "not-a-long"),
-            (nameof(RedisJournalStorageOptions.ReadChunkSize), "not-an-int"),
-            (nameof(RedisJournalStorageOptions.InitStage), "not-an-int"),
+            (nameof(RedisJournalStorageOptions.CompactionThresholdBytes), " "),
+            (nameof(RedisJournalStorageOptions.ReadChunkSize), ""),
+            (nameof(RedisJournalStorageOptions.InitStage), " "),
             (nameof(JournaledStateManagerOptions.JournalFormatKey), " "));
 
         using var services = builder.Services.BuildServiceProvider();
@@ -161,6 +161,20 @@ public sealed class RedisJournalingProviderBuilderTests
         Assert.Equal(expected.ReadChunkSize, options.ReadChunkSize);
         Assert.Equal(expected.InitStage, options.InitStage);
         Assert.Equal(expectedManagerOptions.JournalFormatKey, managerOptions.JournalFormatKey);
+    }
+
+    [Theory]
+    [InlineData(nameof(RedisJournalStorageOptions.CompactionThresholdBytes), "not-a-long", typeof(long))]
+    [InlineData(nameof(RedisJournalStorageOptions.ReadChunkSize), "not-an-int", typeof(int))]
+    [InlineData(nameof(RedisJournalStorageOptions.InitStage), "not-an-int", typeof(int))]
+    public void Configure_InvalidTypedValue_Throws(string key, string invalidValue, Type expectedType)
+    {
+        var builder = ConfigureBuilder((key, invalidValue));
+
+        using var services = builder.Services.BuildServiceProvider();
+        var exception = Assert.Throws<InvalidOperationException>(() => GetStorageOptions(services));
+
+        Assert.Equal($"Failed to convert configuration value at '{ConfigurationSectionName}:{key}' to type '{expectedType}'.", exception.Message);
     }
 
     [Fact]
