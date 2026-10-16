@@ -96,7 +96,7 @@ public sealed class DurableTaskReasonWorkflowGrain : DurableGrain, IDurableTaskR
     public async DurableTask<string> RunAsync(Guid holderKey)
     {
         var holder = await GrainFactory.GetGrain<IDurableTaskReasonHolderGrain>(holderKey).HoldAsync().WithId("hold");
-        return $"workflow: {DurableTask.Current.CancellationReason}; holder: {holder}";
+        return $"workflow: {DurableTask.Current.TaskCancellationReason}; holder: {holder}";
     }
 
     public async DurableTask<string> CompensateInlineAsync(Guid holderKey)
@@ -107,10 +107,10 @@ public sealed class DurableTaskReasonWorkflowGrain : DurableGrain, IDurableTaskR
             await holder.BlockAsync().WithId("block");
             return "completed";
         }
-        catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+        catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
         {
             var released = await holder.ReleaseAsync(2).WithId("release").Shielded();
-            return $"released {released} after {DurableTask.Current.CancellationReason}";
+            return $"released {released} after {DurableTask.Current.TaskCancellationReason}";
         }
     }
 }
@@ -127,9 +127,9 @@ public sealed class DurableTaskReasonHolderGrain(DurableTaskMessagingProbe probe
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                 return "completed";
             }
-            catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
             {
-                return DurableTask.Current.CancellationReason!;
+                return DurableTask.Current.TaskCancellationReason!;
             }
         });
 

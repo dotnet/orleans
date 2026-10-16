@@ -27,13 +27,13 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 await BlockedChild(started).WithId("work");
                 return "completed";
             }
-            catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
             {
                 var release = await DurableTask.Run(async _ => 1 + await DurableTask.Run(_ => 1).WithId("inner")).WithId("release").Shielded();
                 await DurableTask.Delay(TimeSpan.FromMinutes(1)).WithId("pause").Shielded();
                 var batch = await DurableTask.WhenAll<int>([DurableTask.Run(_ => 3), DurableTask.Run(_ => 4)]).Shielded();
                 var outcome = $"{release}{batch[0]}{batch[1]}|{cancellationToken.IsCancellationRequested}";
-                return $"{outcome}|{DurableTask.Current.IsCancellationRequested}";
+                return $"{outcome}|{DurableTask.Current.IsTaskCancellationRequested}";
             }
         })));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -86,7 +86,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 "wait-async" => await ShippedSignal.WaitAsync().WaitAsync(TimeSpan.FromDays(1)).Shielded(),
                 _ => throw new ArgumentOutOfRangeException(nameof(wait)),
             };
-            return $"{value}|{DurableTask.Current.IsCancellationRequested}";
+            return $"{value}|{DurableTask.Current.IsTaskCancellationRequested}";
         })));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await waiting.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
@@ -120,7 +120,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             var shipment = new TestStateManager.TestRemoteDurableTask(detachedRequest).Detached().WithId("shipment").Shielded().Post();
             delaying.TrySetResult();
             await DurableTask.Delay(TimeSpan.FromMinutes(1)).Shielded();
-            return $"{(await shipment.GetResponseAsync(CancellationToken.None)).Status}|{DurableTask.Current.IsCancellationRequested}";
+            return $"{(await shipment.GetResponseAsync(CancellationToken.None)).Status}|{DurableTask.Current.IsTaskCancellationRequested}";
         })));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await delaying.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
@@ -209,7 +209,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                     await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                 }
 
-                return $"{child.IsCancellationRequested}|{cancellationToken.IsCancellationRequested}|{parent.IsCancellationRequested}";
+                return $"{child.IsTaskCancellationRequested}|{cancellationToken.IsCancellationRequested}|{parent.IsTaskCancellationRequested}";
             }).WithId("cleanup").Shielded();
         }));
         await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
@@ -248,7 +248,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 }
                 catch (OperationCanceledException)
                 {
-                    childEnded.TrySetResult((cancellationToken.IsCancellationRequested, DurableTask.Current.IsCancellationRequested));
+                    childEnded.TrySetResult((cancellationToken.IsCancellationRequested, DurableTask.Current.IsTaskCancellationRequested));
                 }
 
                 return 1;

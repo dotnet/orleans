@@ -14,7 +14,7 @@ namespace Orleans.DurableTasks.Protocol;
 /// <remarks>
 /// <para>
 /// A poll is a read, so repeating it is safe. A failure to reach the grain, such as a lost connection, a silo which
-/// stopped or crashed, a call which timed out, or an activation which was deactivating, leaves the task running, and the
+/// stopped or crashed, a call which timed out, or an activation which was stopping, leaves the task running, and the
 /// next poll reaches its grain's next activation. Such failures are retried with exponential backoff, from
 /// <see cref="InitialRetryDelay"/> to <see cref="MaxRetryDelay"/>, until the poll returns or the caller's token ends the
 /// wait. The task's outcome, and <see cref="DurableTaskNotFoundException"/> for a task which the grain doesn't retain,
@@ -66,8 +66,8 @@ internal static class DurableTaskPolling
         OrleansMessageRejectionException => true,
         ConnectionFailedException or GatewayTooBusyException or TimeoutException => true,
 
-        // The grain's runtime rejects calls while its activation deactivates.
-        OperationCanceledException => !cancellationToken.IsCancellationRequested,
+        // The grain's runtime rejects calls, and fails pending waits, while its activation stops.
+        DurableTaskAttemptCanceledException { Reason: DurableTaskAttemptCancellationReason.ActivationStopping } => !cancellationToken.IsCancellationRequested,
         _ => false,
     };
 }

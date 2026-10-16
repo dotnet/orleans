@@ -28,7 +28,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 await BlockedChild(started).WithId("work");
                 return "completed";
             }
-            catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
             {
                 return "compensated";
             }
@@ -76,7 +76,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 await DurableTask.WhenAll([BlockedChild(started), DurableTask.Delay(TimeSpan.FromDays(1))]).WithId("work");
                 return "completed";
             }
-            catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
             {
                 return "canceled";
             }
@@ -181,7 +181,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
             lock (observedCancellation)
             {
-                observedCancellation.Add(context.IsCancellationRequested);
+                observedCancellation.Add(context.IsTaskCancellationRequested);
             }
 
             try
@@ -306,7 +306,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                     }
                     catch (OperationCanceledException)
                     {
-                        workEnded.TrySetResult((cancellationToken.IsCancellationRequested, context.IsCancellationRequested));
+                        workEnded.TrySetResult((cancellationToken.IsCancellationRequested, context.IsTaskCancellationRequested));
                     }
 
                     return 5;

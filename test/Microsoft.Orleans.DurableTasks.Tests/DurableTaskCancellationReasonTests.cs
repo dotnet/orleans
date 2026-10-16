@@ -30,12 +30,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                     await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
                     return "completed";
                 }
-                catch (OperationCanceledException) when (DurableTask.Current.IsCancellationRequested)
+                catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
                 {
-                    return DurableTask.Current.CancellationReason;
+                    return DurableTask.Current.TaskCancellationReason;
                 }
             }).WithId("work");
-            return $"{DurableTask.Current.CancellationReason}|{childReason}";
+            return $"{DurableTask.Current.TaskCancellationReason}|{childReason}";
         })));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
         await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
@@ -154,7 +154,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             }
             catch (OperationCanceledException)
             {
-                return DurableTask.Current.CancellationReason;
+                return DurableTask.Current.TaskCancellationReason;
             }
         })));
         await manager.WriteStateAsync(TestContext.Current.CancellationToken);
@@ -188,7 +188,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
                 await Task.Delay(Timeout.InfiniteTimeSpan, context.CancellationToken);
             }
 
-            return context.CancellationReason;
+            return context.TaskCancellationReason;
         }));
         await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
         await firstAttemptBlocked.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);

@@ -385,6 +385,18 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public void AttemptCanceledExceptionRoundTripsThroughOrleansWithItsReason()
+    {
+        using var attempt = new CancellationTokenSource();
+        var exception = new DurableTaskAttemptCanceledException(DurableTaskAttemptCancellationReason.TaskAborted, attempt.Token);
+
+        var copy = Assert.IsType<DurableTaskAttemptCanceledException>(
+            MessagingTestHelpers.Serializer.Deserialize<Exception>(MessagingTestHelpers.Serializer.SerializeToArray<Exception>(exception)));
+
+        Assert.Equal((exception.Message, DurableTaskAttemptCancellationReason.TaskAborted), (copy.Message, copy.Reason));
+    }
+
+    [Fact]
     public void DurableTaskAddressRoundTripsThroughOrleansAndJson()
     {
         var address = new DurableTaskAddress(GrainId.Create("order", "42"), TaskId.CreateRoot("place/order").Child("step"));
@@ -427,7 +439,8 @@ public sealed class DurableRpcProtocolTests
         var target = GrainId.Create("worker", "one");
         var waitServer = new ScriptedDurableTaskServer(
             new SiloUnavailableException(),
-            new OperationCanceledException("The durable task runtime is stopping."),
+            // A stopping activation's runtime fails calls with this exception.
+            new DurableTaskAttemptCanceledException(DurableTaskAttemptCancellationReason.ActivationStopping, CancellationToken.None),
             new ConnectionFailedException("lost"),
             DurableTaskResponse.Pending,
             DurableTaskResponse.FromResult(7));
@@ -465,6 +478,12 @@ public sealed class DurableRpcProtocolTests
         Assert.Equal("failed", response.Exception!.Message);
         Assert.Equal([1, 1, 1, 1], new[] { notFound.Polls, failure.Polls, failed.Polls, canceled.Polls });
         Assert.False(DurableTaskPolling.IsTransient(new OperationCanceledException(cancellation.Token), cancellation.Token));
+        Assert.False(DurableTaskPolling.IsTransient(new DurableTaskAttemptCanceledException(), cancellation.Token));
+        Assert.False(DurableTaskPolling.IsTransient(new OperationCanceledException(), CancellationToken.None));
+        Assert.False(DurableTaskPolling.IsTransient(
+            new DurableTaskAttemptCanceledException(DurableTaskAttemptCancellationReason.TaskAborted, CancellationToken.None),
+            CancellationToken.None));
+        Assert.True(DurableTaskPolling.IsTransient(new DurableTaskAttemptCanceledException(), CancellationToken.None));
     }
 
     [Fact]

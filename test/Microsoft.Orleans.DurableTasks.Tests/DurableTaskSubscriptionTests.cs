@@ -476,7 +476,7 @@ public sealed class DurableTaskSubscriptionTests
     }
 
     private static async DurableTask<string> AwaitTaskShielded(IAddressable target, string rootId) =>
-        $"{await target.GetDurableTask<string>(rootId).Shielded()}|{DurableTask.Current.IsCancellationRequested}";
+        $"{await target.GetDurableTask<string>(rootId).Shielded()}|{DurableTask.Current.IsTaskCancellationRequested}";
 
     private static async DurableTask<string> AwaitTask(IAddressable target, string rootId) =>
         await target.GetDurableTask<string>(rootId);
