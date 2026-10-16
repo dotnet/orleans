@@ -524,21 +524,6 @@ internal sealed partial class ActivationData :
         }
     }
 
-    private List<Message> DequeueAllWaitingRequests()
-    {
-        lock (_lock)
-        {
-            var result = new List<Message>(_waitingRequests.Count);
-            foreach (var (message, _) in _waitingRequests)
-            {
-                result.Add(message);
-            }
-
-            _waitingRequests.Clear();
-            return result;
-        }
-    }
-
     /// <summary>
     /// Returns how long this activation has been idle.
     /// </summary>
@@ -1172,8 +1157,7 @@ internal sealed partial class ActivationData :
             // Requests which this activation will not process are removed from the queue under the lock and rejected or forwarded
             // after it is released, since that can deliver messages to other activations and complete local requests, which can
             // queue further requests on this activation.
-            List<Message>? invalidRequests = null;
-            var rejectInvalidRequests = false;
+            List<Message>? unprocessableRequests = null;
             var i = 0;
 
             do
@@ -1193,12 +1177,7 @@ internal sealed partial class ActivationData :
                     // Local-only messages are used for internal system operations and should not be rejected while the grain is valid or deactivating.
                     if (State != ActivationState.Valid && !(message.IsLocalOnly && State is ActivationState.Deactivating))
                     {
-                        if (TryDequeueUnprocessableRequests(out invalidRequests))
-                        {
-                            // Forward pending messages if this was a duplicate activation or it was at some point successfully activated. Otherwise, reject them.
-                            rejectInvalidRequests = DeactivationException is not null && ForwardingAddress is null;
-                        }
-
+                        TryDequeueUnprocessableRequests(out unprocessableRequests);
                         break;
                     }
 
@@ -1277,9 +1256,9 @@ internal sealed partial class ActivationData :
             }
             while (true);
 
-            if (invalidRequests is not null)
+            if (unprocessableRequests is not null)
             {
-                ProcessRequestsToInvalidActivation(invalidRequests, rejectInvalidRequests);
+                RejectOrForwardRequests(unprocessableRequests);
             }
         }
 
@@ -1330,7 +1309,13 @@ internal sealed partial class ActivationData :
                 }
             }
 
-            requests = DequeueAllWaitingRequests();
+            requests = new List<Message>(_waitingRequests.Count);
+            foreach (var (message, _) in _waitingRequests)
+            {
+                requests.Add(message);
+            }
+
+            _waitingRequests.Clear();
             return true;
         }
 
@@ -1760,18 +1745,16 @@ internal sealed partial class ActivationData :
     /// Rejects or forwards requests which this activation dequeued once it could no longer process them.
     /// </summary>
     /// <remarks>
+    /// Requests are forwarded if this was a duplicate activation or it was at some point successfully activated, and rejected otherwise.
     /// Local requests never leave the activation, so they are rejected.
     /// </remarks>
-    private void ProcessRequestsToInvalidActivation(List<Message> requests, bool reject)
+    private void RejectOrForwardRequests(List<Message> requests)
     {
         foreach (var message in requests)
         {
             if (message.IsLocalOnly)
             {
-                LocalRequests.Complete(
-                    (ILocalRequest)message.BodyObject!,
-                    Response.FromException(new OrleansMessageRejectionException($"Activation {this} is no longer valid.")),
-                    _shared.Logger);
+                RejectRequest(message, new OrleansMessageRejectionException($"Activation {this} is no longer valid."));
             }
         }
 
@@ -1781,6 +1764,7 @@ internal sealed partial class ActivationData :
             return;
         }
 
+        var reject = DeactivationException is not null && ForwardingAddress is null;
         if (reject)
         {
             LogRejectAllQueuedMessages(_shared.Logger, requests.Count, this);
