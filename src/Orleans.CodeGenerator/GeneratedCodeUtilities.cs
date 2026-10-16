@@ -104,4 +104,10 @@ internal static class GeneratedCodeUtilities
             || member is MethodDeclarationSyntax { ExplicitInterfaceSpecifier: not null }
                 ? member.AddAttributeLists(GetEditorBrowsableAttribute())
                 : member)));
+
+    internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
+
+    private static readonly AttributeSyntax MethodImplAttributeSyntax =
+        Attribute(ParseName("global::System.Runtime.CompilerServices.MethodImplAttribute"))
+            .AddArgumentListArguments(AttributeArgument(ParseName("global::System.Runtime.CompilerServices.MethodImplOptions").Member("AggressiveInlining")));
 }

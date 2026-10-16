@@ -92,6 +92,7 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IBasicGrain_GrainReference_6B0E24A1 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1);
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -99,6 +100,7 @@ namespace OrleansCodeGen.TestProject
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.arg0);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 instance)
         {
@@ -121,6 +123,7 @@ namespace OrleansCodeGen.TestProject
             }
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 @value)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -137,6 +140,7 @@ namespace OrleansCodeGen.TestProject
             writer.WriteEndObject();
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
@@ -153,6 +157,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IBasicGrain_GrainReference_6B0E24A1 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1>
     {
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 DeepCopy(OrleansCodeGen.TestProject.Invokable_IBasicGrain_GrainReference_6B0E24A1 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -175,6 +180,7 @@ namespace OrleansCodeGen.TestProject
             this._baseTypeSerializer = OrleansGeneratedCodeHelper.UnwrapService(this, _baseTypeSerializer);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.BasicGrain instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -183,6 +189,7 @@ namespace OrleansCodeGen.TestProject
             writer.WriteEndBase();
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::TestProject.BasicGrain instance)
         {
@@ -190,6 +197,7 @@ namespace OrleansCodeGen.TestProject
             reader.ConsumeEndBaseOrEndObject();
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::TestProject.BasicGrain @value)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -206,6 +214,7 @@ namespace OrleansCodeGen.TestProject
                 writer.SerializeUnexpectedType(fieldIdDelta, expectedType, @value);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::TestProject.BasicGrain ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
@@ -229,6 +238,7 @@ namespace OrleansCodeGen.TestProject
     public sealed class Copier_BasicGrain : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.BasicGrain>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.BasicGrain>
     {
         private readonly global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Grain> _baseTypeCopier;
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::TestProject.BasicGrain DeepCopy(global::TestProject.BasicGrain original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -248,6 +258,7 @@ namespace OrleansCodeGen.TestProject
             this._baseTypeCopier = OrleansGeneratedCodeHelper.UnwrapService(this, _baseTypeCopier);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void DeepCopy(global::TestProject.BasicGrain input, global::TestProject.BasicGrain output, global::Orleans.Serialization.Cloning.CopyContext context)
         {

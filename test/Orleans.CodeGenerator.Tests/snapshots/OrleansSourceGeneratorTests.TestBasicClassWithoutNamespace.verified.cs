@@ -14,6 +14,7 @@ namespace OrleansCodeGen
     public sealed class Codec_DemoData : global::Orleans.Serialization.Codecs.IFieldCodec<global::DemoData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::DemoData>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::DemoData);
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::DemoData instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -21,6 +22,7 @@ namespace OrleansCodeGen
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.Value);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::DemoData instance)
         {
@@ -43,6 +45,7 @@ namespace OrleansCodeGen
             }
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::DemoData @value)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -59,6 +62,7 @@ namespace OrleansCodeGen
                 writer.SerializeUnexpectedType(fieldIdDelta, expectedType, @value);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::DemoData ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
@@ -81,6 +85,7 @@ namespace OrleansCodeGen
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_DemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::DemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::DemoData>
     {
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::DemoData DeepCopy(global::DemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -94,6 +99,7 @@ namespace OrleansCodeGen
             return result;
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void DeepCopy(global::DemoData input, global::DemoData output, global::Orleans.Serialization.Cloning.CopyContext context)
         {

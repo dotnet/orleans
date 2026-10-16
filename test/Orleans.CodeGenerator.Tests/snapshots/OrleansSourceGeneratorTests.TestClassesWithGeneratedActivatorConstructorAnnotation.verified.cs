@@ -14,6 +14,7 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_ClassWithGeneratedActivatorConstructor : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.ClassWithGeneratedActivatorConstructor>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.ClassWithGeneratedActivatorConstructor>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.ClassWithGeneratedActivatorConstructor);
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.ClassWithGeneratedActivatorConstructor instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -22,6 +23,7 @@ namespace OrleansCodeGen.TestProject
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 1U, instance.Name);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::TestProject.ClassWithGeneratedActivatorConstructor instance)
         {
@@ -53,6 +55,7 @@ namespace OrleansCodeGen.TestProject
             }
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::TestProject.ClassWithGeneratedActivatorConstructor @value)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -69,6 +72,7 @@ namespace OrleansCodeGen.TestProject
                 writer.SerializeUnexpectedType(fieldIdDelta, expectedType, @value);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::TestProject.ClassWithGeneratedActivatorConstructor ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
@@ -91,6 +95,7 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_ClassWithGeneratedActivatorConstructor : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.ClassWithGeneratedActivatorConstructor>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.ClassWithGeneratedActivatorConstructor>
     {
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::TestProject.ClassWithGeneratedActivatorConstructor DeepCopy(global::TestProject.ClassWithGeneratedActivatorConstructor original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -104,6 +109,7 @@ namespace OrleansCodeGen.TestProject
             return result;
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void DeepCopy(global::TestProject.ClassWithGeneratedActivatorConstructor input, global::TestProject.ClassWithGeneratedActivatorConstructor output, global::Orleans.Serialization.Cloning.CopyContext context)
         {

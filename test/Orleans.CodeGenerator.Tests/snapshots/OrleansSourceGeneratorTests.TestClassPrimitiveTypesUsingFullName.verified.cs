@@ -22,6 +22,7 @@ namespace OrleansCodeGen.TestProject
             _codec_Int32_1_BD21C8B2FA9EFF52 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ArrayCodec<int>>(this, codecProvider);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.DemoData instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -46,6 +47,7 @@ namespace OrleansCodeGen.TestProject
             _codec_Int32_1_BD21C8B2FA9EFF52.WriteField(ref writer, 1U, _type_Int32_1_BD21C8B2FA9EFF52, instance.IntArrayProp);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::TestProject.DemoData instance)
         {
@@ -221,6 +223,7 @@ namespace OrleansCodeGen.TestProject
             }
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, global::TestProject.DemoData @value)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -237,6 +240,7 @@ namespace OrleansCodeGen.TestProject
                 writer.SerializeUnexpectedType(fieldIdDelta, expectedType, @value);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::TestProject.DemoData ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
@@ -260,6 +264,7 @@ namespace OrleansCodeGen.TestProject
     public sealed class Copier_DemoData : global::Orleans.Serialization.Cloning.IDeepCopier<global::TestProject.DemoData>, global::Orleans.Serialization.Cloning.IBaseCopier<global::TestProject.DemoData>
     {
         private readonly global::Orleans.Serialization.Codecs.ArrayCopier<int> _copier_Int32_1_BD21C8B2FA9EFF52;
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public global::TestProject.DemoData DeepCopy(global::TestProject.DemoData original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
@@ -279,6 +284,7 @@ namespace OrleansCodeGen.TestProject
             _copier_Int32_1_BD21C8B2FA9EFF52 = OrleansGeneratedCodeHelper.GetService<global::Orleans.Serialization.Codecs.ArrayCopier<int>>(this, codecProvider);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void DeepCopy(global::TestProject.DemoData input, global::TestProject.DemoData output, global::Orleans.Serialization.Cloning.CopyContext context)
         {

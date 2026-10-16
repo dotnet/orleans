@@ -12,6 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
     <PackageReference Include="Microsoft.Testing.Platform.MSBuild" />
   </ItemGroup>

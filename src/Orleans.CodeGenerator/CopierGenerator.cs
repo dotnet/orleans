@@ -477,6 +477,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         return MethodDeclaration(returnType, DeepCopyMethodName)
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
             .AddParameterListParameters(parameters)
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
     }
 
@@ -547,6 +548,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         var method = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), DeepCopyMethodName)
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
             .AddParameterListParameters(parameters)
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
 
         if (isExceptionType)

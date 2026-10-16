@@ -466,6 +466,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
             .AddParameterListParameters(parameters)
             .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
 
         res = type.IsAbstractType
@@ -644,6 +645,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
             .AddParameterListParameters(parameters)
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
 
         if (type.IsAbstractType)
@@ -895,6 +897,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddParameterListParameters(parameters)
             .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
             .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
     }
 
@@ -1008,6 +1011,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
             .AddParameterListParameters(parameters)
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
     }
 
@@ -1056,6 +1060,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddParameterListParameters(parameters)
             .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
             .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
     }
 
@@ -1089,6 +1094,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
             .AddModifiers(Token(SyntaxKind.PublicKeyword))
             .AddParameterListParameters(parameters)
+            .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
             .AddBodyStatements([.. body]);
     }
 

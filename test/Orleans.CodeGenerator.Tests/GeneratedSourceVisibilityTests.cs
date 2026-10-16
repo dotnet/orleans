@@ -2,8 +2,11 @@ using System.ComponentModel;
 using System.IO;
 using System.Xml.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.FindSymbols;
+using Microsoft.CodeAnalysis.Text;
 
 namespace Orleans.CodeGenerator.Tests;
 
@@ -32,9 +35,8 @@ public sealed class GeneratedSourceVisibilityTests
             var tree = source.SyntaxTree;
             var root = tree.GetRoot(TestContext.Current.CancellationToken);
             Assert.DoesNotContain("#line hidden", source.SourceText.ToString(), StringComparison.Ordinal);
-            Assert.DoesNotContain("MethodImplAttribute", source.SourceText.ToString(), StringComparison.Ordinal);
             Assert.All(root.DescendantTokens(), token =>
-                Assert.NotEqual(LineVisibility.Hidden, tree.GetLineVisibility(token.SpanStart)));
+                Assert.NotEqual(LineVisibility.Hidden, tree.GetLineVisibility(token.SpanStart, TestContext.Current.CancellationToken)));
 
             var semanticModel = compilation.GetSemanticModel(tree);
             foreach (var declaration in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
@@ -99,9 +101,87 @@ public sealed class GeneratedSourceVisibilityTests
         var diagnostic = Assert.Single(compilation.GetDiagnostics(TestContext.Current.CancellationToken),
             diagnostic => diagnostic.Id == "CS0246" && diagnostic.Location.SourceTree == tree);
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
-        Assert.NotEqual(LineVisibility.Hidden, tree.GetLineVisibility(diagnostic.Location.SourceSpan.Start));
-        Assert.Equal(tree.FilePath, diagnostic.Location.GetMappedLineSpan().Path);
+        Assert.NotEqual(LineVisibility.Hidden, tree.GetLineVisibility(diagnostic.Location.SourceSpan.Start, TestContext.Current.CancellationToken));
+        Assert.Equal(tree.FilePath, diagnostic.Location.GetMappedLineSpan(TestContext.Current.CancellationToken).Path);
         Assert.Equal("MissingGeneratedType", tree.GetText(TestContext.Current.CancellationToken).ToString(diagnostic.Location.SourceSpan));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CompletionHonorsGeneratedBrowsingMetadataOnlyAcrossAssemblyBoundaries(bool referenceAsMetadata)
+    {
+        var (compilation, _) = await Generate("namespace TestProject;");
+        compilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(
+            "namespace OrleansCodeGen.TestProject { public sealed class VisibleControl { } }",
+            options: (CSharpParseOptions)compilation.SyntaxTrees.First().Options,
+            path: "VisibleControl.cs",
+            cancellationToken: TestContext.Current.CancellationToken));
+        using var workspace = new AdhocWorkspace();
+        var project = CreateEditorProject(workspace, compilation, referenceAsMetadata);
+        var members = await GetCompletionNames(project, """
+            class Consumer
+            {
+                void Use(OrleansCodeGen.TestProject.Codec_Payload codec)
+                {
+                    codec.$$
+                }
+            }
+            """);
+        Assert.Contains("ToString", members);
+        foreach (var name in new[] { "Serialize", "Deserialize", "WriteField", "ReadValue" })
+        {
+            if (referenceAsMetadata)
+            {
+                Assert.DoesNotContain(name, members);
+            }
+            else
+            {
+                Assert.Contains(name, members);
+            }
+        }
+
+        var types = await GetCompletionNames(project, """
+            class Consumer
+            {
+                void Use()
+                {
+                    OrleansCodeGen.TestProject.$$
+                }
+            }
+            """);
+        Assert.Contains("VisibleControl", types);
+        foreach (var name in new[] { "Codec_Payload", "Copier_Payload" })
+        {
+            if (referenceAsMetadata)
+            {
+                Assert.DoesNotContain(name, types);
+            }
+            else
+            {
+                Assert.Contains(name, types);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ImplementationSearchFindsGeneratedCodecMethodsDespiteBrowsingMetadata()
+    {
+        var (generated, _) = await Generate("namespace TestProject;");
+        using var workspace = new AdhocWorkspace();
+        var project = CreateEditorProject(workspace, generated, referenceAsMetadata: false);
+        var compilation = await project.GetCompilationAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(compilation);
+        var fieldCodec = compilation.GetTypeByMetadataName("Orleans.Serialization.Codecs.IFieldCodec`1");
+        Assert.NotNull(fieldCodec);
+        var writeField = Assert.Single(fieldCodec.GetMembers("WriteField"));
+
+        var implementations = await SymbolFinder.FindImplementationsAsync(
+            writeField, project.Solution, cancellationToken: TestContext.Current.CancellationToken);
+        var implementation = Assert.Single(implementations, static candidate =>
+            candidate.Name == "WriteField"
+            && candidate.ContainingType?.ToDisplayString() == "OrleansCodeGen.TestProject.Codec_Payload");
+        AssertEditorBrowsableNever(implementation);
     }
 
     [Theory]
@@ -139,6 +219,44 @@ public sealed class GeneratedSourceVisibilityTests
         var attribute = Assert.Single(symbol.GetAttributes(), static attribute =>
             attribute.AttributeClass?.ToDisplayString() == "System.ComponentModel.EditorBrowsableAttribute");
         Assert.Equal((int)EditorBrowsableState.Never, attribute.ConstructorArguments[0].Value);
+    }
+
+    private static Project CreateEditorProject(AdhocWorkspace workspace, Compilation compilation, bool referenceAsMetadata)
+    {
+        var project = workspace.AddProject("EditorProject", LanguageNames.CSharp)
+            .WithCompilationOptions(compilation.Options)
+            .WithParseOptions(compilation.SyntaxTrees.First().Options)
+            .WithMetadataReferences(compilation.References);
+        if (referenceAsMetadata)
+        {
+            using var image = new MemoryStream();
+            var emitted = compilation.Emit(image, cancellationToken: TestContext.Current.CancellationToken);
+            Assert.True(emitted.Success, string.Join(Environment.NewLine, emitted.Diagnostics));
+            return project.AddMetadataReference(MetadataReference.CreateFromImage(image.ToArray()));
+        }
+
+        var index = 0;
+        foreach (var tree in compilation.SyntaxTrees)
+        {
+            var path = string.IsNullOrEmpty(tree.FilePath) ? $"Input{index++}.cs" : tree.FilePath;
+            project = project.AddDocument(Path.GetFileName(path), tree.GetText(TestContext.Current.CancellationToken), filePath: path).Project;
+        }
+
+        return project;
+    }
+
+    private static async Task<string[]> GetCompletionNames(Project project, string source)
+    {
+        const string marker = "$$";
+        var position = source.IndexOf(marker, StringComparison.Ordinal);
+        Assert.NotEqual(-1, position);
+        var document = project.AddDocument("Consumer.cs", SourceText.From(source.Remove(position, marker.Length)));
+        var service = CompletionService.GetService(document);
+        Assert.NotNull(service);
+        var completions = await service.GetCompletionsAsync(
+            document, position, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotNull(completions);
+        return completions.ItemsList.Select(static item => item.DisplayText).ToArray();
     }
 
     private static async Task<(Compilation Compilation, GeneratorRunResult Result)> Generate(string namespaceDeclaration)

@@ -92,6 +92,7 @@ namespace OrleansCodeGen
     public sealed class Codec_Invokable_IMyGrain_GrainReference_6D39E404 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404);
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -99,6 +100,7 @@ namespace OrleansCodeGen
             global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.arg0);
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 instance)
         {
@@ -121,6 +123,7 @@ namespace OrleansCodeGen
             }
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, global::System.Type expectedType, OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 @value)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -137,6 +140,7 @@ namespace OrleansCodeGen
             writer.WriteEndObject();
         }
 
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
@@ -153,6 +157,7 @@ namespace OrleansCodeGen
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IMyGrain_GrainReference_6D39E404 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404>
     {
+        [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never)]
         public OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 DeepCopy(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
