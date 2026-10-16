@@ -1,0 +1,148 @@
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
+using Orleans.Runtime.Dissemination;
+using Orleans.Serialization;
+using Xunit;
+
+namespace UnitTests.Dissemination;
+
+public partial class DisseminationProtocolTests
+{
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OlderFullMembershipValueDoesNotReachOwner(bool antiEntropy)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var local = CreateSilo(41011);
+        var peer = CreateSilo(41012);
+        var current = CreateMembershipSnapshot(100, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        var notification = CreateMembershipSnapshot(2, current.Entries.Values.ToArray());
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var manager = new FakeMembershipManager(current);
+        var validations = 0;
+        manager.ProcessGossipSnapshotHandler = (snapshot, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+            validations++;
+            return Task.CompletedTask;
+        };
+        var ns = CreateMembershipNamespace(manager, serializer);
+        var transport = new FakeTransport(local, peer);
+        var protocol = CreateProtocol(transport, [ns]);
+        var values = CreateValueGroups(ns.Name, CreateDisseminationValue(peer, new(
+            DisseminationKey.Default, 0, 2,
+            serializer.SerializeToArray(new MembershipTableSnapshotUpdate { Snapshot = notification }))));
+        try
+        {
+            if (antiEntropy)
+            {
+                transport.ExchangeAntiEntropyHandler = (_, _, _) => ValueTask.FromResult(
+                    new DisseminationAntiEntropyResponse { Sender = peer, Values = values });
+                await protocol.RunAntiEntropyRound(cancellationToken);
+            }
+            else
+            {
+                var response = await protocol.ReceiveBroadcast(new() { Sender = peer, Values = values }, cancellationToken);
+                Assert.Equal(100, Assert.Single(response.Acknowledgments[ns.Name]).Version);
+            }
+
+            Assert.Equal(0, validations);
+            Assert.Same(current, manager.CurrentSnapshot);
+        }
+        finally
+        {
+            ns.Options.Enabled = false;
+            await protocol.StopAsync(cancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task AntiEntropyDoesNotSendOlderMembershipToAnAheadPeer()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var local = CreateSilo(41013);
+        var peer = CreateSilo(41014);
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var ns = CreateMembershipNamespace(new FakeMembershipManager(CreateMembershipSnapshot(
+            2, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch))), serializer);
+        var protocol = CreateProtocol(new FakeTransport(local, peer), [ns]);
+        try
+        {
+            var response = await protocol.ReceiveAntiEntropy(new()
+            {
+                Sender = peer,
+                SupportedNamespaces = [ns.Name],
+                Digests = new() { [ns.Name] = [new(DisseminationKey.Default, 100)] },
+            }, cancellationToken);
+
+            Assert.Empty(GetAntiEntropyResponseValues(response));
+        }
+        finally
+        {
+            await protocol.StopAsync(cancellationToken);
+        }
+    }
+
+    [Fact]
+    public void MembershipRepairMaterializesTheCurrentOwnerSnapshot()
+    {
+        var local = CreateSilo(41001);
+        var snapshot = CreateMembershipSnapshot(2, CreateMembershipEntry(local, SiloStatus.Active, DateTime.UnixEpoch));
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var ns = CreateMembershipNamespace(new FakeMembershipManager(snapshot), serializer);
+
+        var repair = ns.CreateRepair(new(
+            DisseminationKey.Default, 100, 1024 * 1024, 1024 * 1024));
+
+        Assert.Equal(DisseminationRepairStatus.Produced, repair.Status);
+        Assert.Equal(2, repair.Version);
+        var value = repair.Value;
+        Assert.Equal(0, value.FromVersion);
+        Assert.Equal(2, value.ToVersion);
+        var update = Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload));
+        var repaired = Assert.IsType<MembershipTableSnapshot>(update.Snapshot);
+        Assert.Equal(snapshot.Version, repaired.Version);
+        Assert.Equal(local, Assert.Single(repaired.Entries).Key);
+    }
+
+    [Fact]
+    public async Task MembershipCurrentViewSupersedesDelayedPublication()
+    {
+        var members = CreateSilos(20);
+        var old = CreateMembershipSnapshot(1, members.Select(
+            member => CreateMembershipEntry(member, SiloStatus.Active, DateTime.UnixEpoch)).ToArray());
+        using var services = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = services.GetRequiredService<Serializer>();
+        var manager = new FakeMembershipManager(old);
+        var ns = CreateMembershipNamespace(manager, serializer);
+        Assert.Equal(1, Assert.Single(ns.Digests).Version);
+        var current = CreateMembershipSnapshot(100, old.Entries.Values.Select(entry =>
+        {
+            var result = entry.Copy();
+            result.HostName = "current-view";
+            return result;
+        }).ToArray());
+        manager.CurrentSnapshot = current;
+        Assert.Equal(100, Assert.Single(ns.Digests).Version);
+
+        var publications = new FakeDisseminationService();
+        Assert.True(await ns.PublishAsync(publications, old, TestContext.Current.CancellationToken));
+        Assert.Equal(100, Assert.Single(publications.Values).ToVersion);
+        var repair = ns.CreateRepair(new(
+            DisseminationKey.Default, 1, 1024 * 1024, 1024 * 1024));
+        Assert.Equal(DisseminationRepairStatus.Produced, repair.Status);
+        var value = repair.Value;
+        Assert.Equal(0, value.FromVersion);
+        Assert.Equal(100, value.ToVersion);
+        var payload = Assert.IsType<MembershipTableSnapshotUpdate>(
+            serializer.Deserialize<MembershipTableSnapshotUpdate>(value.Payload));
+        var repaired = Assert.IsType<MembershipTableSnapshot>(payload.Snapshot);
+        Assert.Equal(members.Length, repaired.Entries.Count);
+        Assert.All(repaired.Entries.Values, entry => Assert.Equal("current-view", entry.HostName));
+    }
+}

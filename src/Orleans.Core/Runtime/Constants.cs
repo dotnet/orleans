@@ -17,6 +17,7 @@ namespace Orleans.Runtime
         public static readonly GrainType MembershipServiceType = SystemTargetGrainId.CreateGrainType("clustering");
         public static readonly GrainType SystemMembershipTableType = SystemTargetGrainId.CreateGrainType("clustering.dev");
         public static readonly GrainType DeploymentLoadPublisherSystemTargetType = SystemTargetGrainId.CreateGrainType("load-publisher");
+        public static readonly GrainType DisseminationSystemTargetType = SystemTargetGrainId.CreateGrainType("dissemination");
         public static readonly GrainType TestHooksSystemTargetType = SystemTargetGrainId.CreateGrainType("test.hooks");
         public static readonly GrainType TransactionAgentSystemTargetType = SystemTargetGrainId.CreateGrainType("txn.agent");
         public static readonly GrainType StreamProviderManagerAgentSystemTargetType = SystemTargetGrainId.CreateGrainType("stream.provider-manager");
@@ -46,6 +47,7 @@ namespace Orleans.Runtime
             {CatalogType,"Catalog"},
             {MembershipServiceType,"MembershipService"},
             {DeploymentLoadPublisherSystemTargetType, "DeploymentLoadPublisherSystemTarget"},
+            {DisseminationSystemTargetType, "DisseminationSystemTarget"},
             {StreamProviderManagerAgentSystemTargetType,"StreamProviderManagerAgent"},
             {TestHooksSystemTargetType,"TestHooksSystemTargetType"},
             {TransactionAgentSystemTargetType,"TransactionAgentSystemTarget"},
