@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.TestKit;
+using Orleans.Serialization.Configuration;
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -31,6 +32,11 @@ public sealed class JsonCodecTests : IDisposable
                     options.SerializerOptions.Converters.Add(_converter);
                     options.ReaderOptions = new JsonReaderOptions { MaxDepth = 8 };
                 })))
+            .Configure<TypeManifestOptions>(options =>
+            {
+                options.AddAllowedType(typeof(JsonPayload));
+                options.AddAllowedType(typeof(TrackedValue));
+            })
             .BuildServiceProvider();
         _serializer = _serviceProvider.GetRequiredService<Serializer>();
     }

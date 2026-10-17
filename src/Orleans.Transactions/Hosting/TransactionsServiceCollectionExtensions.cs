@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions;
+using Orleans.Serialization.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Hosting
@@ -29,6 +30,7 @@ namespace Orleans.Hosting
         internal static IServiceCollection AddTransactionsBaseline(this IServiceCollection services)
         {
             services.AddMetrics();
+            services.Configure<TypeManifestOptions>(static options => options.AddAllowedType(typeof(TransactionalStatus)));
             services.TryAddSingleton<OrleansInstruments>();
             services.TryAddSingleton<IClock, Clock>();
             services.AddSingleton<ITransactionAgent, TransactionAgent>();

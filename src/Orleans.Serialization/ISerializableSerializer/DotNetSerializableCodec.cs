@@ -39,6 +39,7 @@ namespace Orleans.Serialization
         private readonly SerializationEntryCodec _entrySerializer;
         private readonly TypeConverter _typeConverter;
         private readonly ValueTypeSerializerFactory _valueTypeSerializerFactory;
+        private readonly Action<object, SerializationInfo, StreamingContext> _baseExceptionConstructor;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DotNetSerializableCodec"/> class.
@@ -56,6 +57,7 @@ namespace Orleans.Serialization
             _formatterConverter = new FormatterConverter();
 #pragma warning restore SYSLIB0050 // Type or member is obsolete
             var constructorFactory = new SerializationConstructorFactory();
+            _baseExceptionConstructor = constructorFactory.GetSerializationConstructorDelegate(typeof(Exception));
             _createConstructorDelegate = constructorFactory.GetSerializationConstructorDelegate;
 
             _valueTypeSerializerFactory = new ValueTypeSerializerFactory(
@@ -109,8 +111,18 @@ namespace Orleans.Serialization
             if (header.FieldIdDelta == 1)
             {
                 // This is an exception type, so deserialize it as an exception.
-                var typeName = StringCodec.ReadValue(ref reader, header);
-                if (!_typeConverter.TryParse(typeName!, out type))
+                var typeName = StringCodec.ReadTypeName(ref reader, header);
+                if (!_typeConverter.TryParseForDeserialization(typeName!, out type))
+                {
+                    return ReadFallbackException(ref reader, typeName!, placeholderReferenceId);
+                }
+
+                if (!typeof(Exception).IsAssignableFrom(type) || type.IsAbstract || type.ContainsGenericParameters)
+                {
+                    throw new SerializationException($"Type \"{type}\" is not a concrete, closed exception type.");
+                }
+
+                if (!_typeConverter.IsExceptionTypeAdmitted(type))
                 {
                     return ReadFallbackException(ref reader, typeName!, placeholderReferenceId);
                 }
@@ -131,9 +143,77 @@ namespace Orleans.Serialization
 
         private object ReadFallbackException<TInput>(ref Reader<TInput> reader, string typeName, uint placeholderReferenceId)
         {
-            // Deserialize into a fallback type for unknown exceptions. This means that missing fields will not be represented.
-            var result = (UnavailableExceptionFallbackException)ReadObject(ref reader, typeof(UnavailableExceptionFallbackException), placeholderReferenceId);
-            result.ExceptionType = typeName;
+            var result = new UnavailableExceptionFallbackException { ExceptionType = typeName };
+            ReferenceCodec.RecordObject(reader.Session, result, placeholderReferenceId);
+            string? message = null;
+            string? stackTrace = null;
+            string? remoteStackTrace = null;
+            var hResult = 0;
+            uint fieldId = 0;
+            while (true)
+            {
+                var header = reader.ReadFieldHeader();
+                if (header.IsEndBaseOrEndObject) break;
+                fieldId += header.FieldIdDelta;
+                if (fieldId != 1)
+                {
+                    reader.ConsumeDiscardedField(header);
+                    continue;
+                }
+
+                header.EnsureWireTypeTagDelimited();
+                ReferenceCodec.MarkValueField(reader.Session);
+                string? name = null;
+                uint entryFieldId = 0;
+                while (true)
+                {
+                    var entryHeader = reader.ReadFieldHeader();
+                    if (entryHeader.IsEndBaseOrEndObject) break;
+                    entryFieldId += entryHeader.FieldIdDelta;
+                    if (entryFieldId == 0)
+                    {
+                        if (name is not null) throw new SerializationException("A serialization entry must contain exactly one name.");
+                        name = StringCodec.ReadValue(ref reader, entryHeader);
+                        if (string.IsNullOrEmpty(name)) throw new SerializationException("A serialization entry must contain a name.");
+                    }
+                    else if (entryFieldId == 1)
+                    {
+                        if (name is null) throw new SerializationException("A serialization entry must begin with its name.");
+                        switch (name)
+                        {
+                            case "Message":
+                                message = StringCodec.ReadValue(ref reader, entryHeader);
+                                result.Properties[name] = message;
+                                break;
+                            case "StackTraceString":
+                                stackTrace = StringCodec.ReadValue(ref reader, entryHeader);
+                                result.Properties[name] = stackTrace;
+                                break;
+                            case "RemoteStackTraceString":
+                                remoteStackTrace = StringCodec.ReadValue(ref reader, entryHeader);
+                                result.Properties[name] = remoteStackTrace;
+                                break;
+                            case "HResult":
+                                hResult = Int32Codec.ReadValue(ref reader, entryHeader);
+                                result.Properties[name] = hResult;
+                                break;
+                            default:
+                                reader.ConsumeDiscardedField(entryHeader);
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        reader.ConsumeDiscardedField(entryHeader);
+                    }
+                }
+
+                if (name is null) throw new SerializationException("A serialization entry must contain a name.");
+            }
+
+            ExceptionCodec.RestoreBaseProperties(result, message,
+                remoteStackTrace is null ? stackTrace : remoteStackTrace + stackTrace, innerException: null,
+                hResult, data: null, _baseExceptionConstructor, _streamingContext, _formatterConverter);
             return result;
         }
 

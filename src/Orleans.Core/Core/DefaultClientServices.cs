@@ -132,7 +132,6 @@ namespace Orleans
                     ct => sp.GetRequiredService<OutsideRuntimeClient>().StopObserverInvocationsAsync().WaitAsync(ct)));
 
             services.AddSerializer();
-            services.AddSingleton<ITypeNameFilter, AllowOrleansTypes>();
             services.AddSingleton<ISpecializableCodec, GrainReferenceCodecProvider>();
             services.AddSingleton<ISpecializableCopier, GrainReferenceCopierProvider>();
             services.AddSingleton<OnDeserializedCallbacks>();
@@ -257,23 +256,6 @@ namespace Orleans
         internal partial class RootConfiguration
         {
             public IConfigurationSection? Clustering { get; set; }
-        }
-
-        /// <summary>
-        /// A <see cref="ITypeNameFilter"/> which allows any type from an assembly containing "Orleans" in its name to be allowed for the purposes of serialization and deserialization.
-        /// </summary>
-        private class AllowOrleansTypes : ITypeNameFilter
-        {
-            /// <inheritdoc />
-            public bool? IsTypeNameAllowed(string typeName, string assemblyName)
-            {
-                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
-                {
-                    return true;
-                }
-
-                return null;
-            }
         }
 
         /// <summary>
