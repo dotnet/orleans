@@ -68,6 +68,8 @@ namespace Orleans
 
         internal ClientMessageCenter? MessageCenter { get; private set; }
 
+        internal ClientGrainLocationCache GrainLocations { get; } = new();
+
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(
@@ -301,6 +303,11 @@ namespace Orleans
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
             }
+            else if (message.IsRelocatableRequest && GrainLocations.TryGetLocation(targetGrainId, out var location))
+            {
+                // The gateway uses the grain's cached location as a routing hint.
+                message.TargetSilo = location;
+            }
 
             if (this.clientMessagingOptions.DropExpiredMessages && message.IsExpirableMessage())
             {
@@ -345,6 +352,7 @@ namespace Orleans
             OrleansOutsideRuntimeClientEvent.Instance.ReceiveResponse(response);
 
             LogReceivedMessage(logger, response);
+            GrainLocations.OnResponse(response);
 
             if (response.Result is Message.ResponseTypes.Status)
             {
