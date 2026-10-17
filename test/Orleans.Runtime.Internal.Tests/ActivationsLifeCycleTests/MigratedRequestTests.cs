@@ -70,27 +70,6 @@ public sealed class MigratedRequestTests
         Assert.Null(request.ToMessage(GrainId.Create("test", "target"), SiloAddress.FromParsableString("127.0.0.1:11111@1"), Pool).TimeToLive);
     }
 
-    [Theory]
-    [InlineData(60_000L)]
-    [InlineData(1L)]
-    [InlineData(0L)]
-    [InlineData(-8_000L)]
-    public void TimeToLiveEncodingGrowth_IsWithinTheReservedAllowance(long measuredTimeToLive)
-    {
-        // A migration measures its requests, then sends them later, while their time to live keeps aging toward and past expiry.
-        // However long that takes, the request's serialized size grows by no more than the allowance which the migration reserves.
-        var serializer = Services.GetRequiredService<Serializer>();
-        var request = MigratedRequest.FromMessage(CreateRequest(timeToLive: null), Pool);
-        request.TimeToLiveMilliseconds = measuredTimeToLive;
-        var measured = serializer.SerializeToArray(request).Length;
-
-        // A year past expiry stands in for any delay; a 64-bit value encodes in at most ten bytes, so growth is bounded regardless.
-        request.TimeToLiveMilliseconds = -(long)TimeSpan.FromDays(365).TotalMilliseconds;
-        var sent = serializer.SerializeToArray(request).Length;
-
-        Assert.InRange(sent - measured, 0, ActivationMigrationManager.TimeToLiveEncodingGrowthAllowance);
-    }
-
     [Fact]
     public void PooledRequestContextValue_SurvivesMeasuringAndSending()
     {

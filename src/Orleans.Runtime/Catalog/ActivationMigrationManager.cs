@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -272,13 +271,19 @@ internal struct GrainMigrationPackage
     public MigrationContext MigrationContext { get; set; }
 
     /// <summary>
-    /// The requests which were queued for the grain when it migrated, if any.
+    /// The requests which were queued for the grain when it migrated, if any, serialized as a list of <see cref="MigratedRequest"/>.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Only <see cref="IMigratingRequestsSystemTarget"/> carries requests.
+    /// </para>
+    /// <para>
+    /// The requests are serialized once, when the package is created, which fixes their remaining time to live and the package's size.
+    /// Time which the package spends in transit does not count against the requests' time to live.
+    /// </para>
     /// </remarks>
     [Id(2)]
-    public List<MigratedRequest>? Requests { get; set; }
+    public byte[]? Requests { get; set; }
 }
 
 /// <summary>
@@ -342,10 +347,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private const int MessageBodyFramingAllowance = 1_024;
     private const int PackageFramingAllowance = 64;
 
-    /// <summary>
-    /// The most that a request's serialized time to live can grow after it is measured, since it keeps aging until it is sent and is variable-length encoded.
-    /// </summary>
-    internal const int TimeToLiveEncodingGrowthAllowance = 10;
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<MigrationWorkItem> WorkItemChannel)> _workers = new();
     private readonly ObjectPool<MigrationWorkItem> _workItemPool = ObjectPool.Create(new MigrationWorkItem.ObjectPoolPolicy());
     private readonly CancellationTokenSource _shuttingDownCts = new();
@@ -428,7 +429,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         {
             cancellationToken.ThrowIfCancellationRequested();
             var package = migratingGrains[i];
-            var requests = package.Requests is { Count: > 0 } migratedRequests ? ToMessages(package.GrainId, migratedRequests) : null;
+            var requests = package.Requests is { Length: > 0 } migratedRequests ? ToMessages(package.GrainId, migratedRequests) : null;
 
             // The new activation reads its previous address when it rehydrates, which happens after it queues the requests, so it is read here.
             GrainAddress? previousAddress = null;
@@ -464,11 +465,13 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         }
     }
 
-    private List<Message>? ToMessages(GrainId grainId, List<MigratedRequest> requests)
+    private List<Message>? ToMessages(GrainId grainId, byte[] serializedRequests)
     {
-        var messages = new List<Message>(requests.Count);
+        List<MigratedRequest>? requests = null;
         try
         {
+            requests = _serializer.Deserialize<List<MigratedRequest>>(serializedRequests)!;
+            var messages = new List<Message>(requests.Count);
             foreach (var request in requests)
             {
                 messages.Add(request.ToMessage(grainId, Silo, _serializer.SessionPool));
@@ -479,7 +482,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         catch (Exception exception)
         {
             // The source forwards the requests with their original bodies instead.
-            LogDebugMigratedRequestsNotDeserializable(exception, requests.Count, grainId);
+            LogDebugMigratedRequestsNotDeserializable(exception, requests?.Count ?? 0, grainId);
             return null;
         }
     }
@@ -499,12 +502,13 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         var package = new GrainMigrationPackage { GrainId = grainId, MigrationContext = migrationContext };
         long size = 0;
         List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes = null;
+        List<MigratedRequest>? packaged = null;
         carriesRequests = requests is { Count: > 0 }
             && AcceptsMigratedRequests(targetSilo)
-            && TryPackageRequests(targetSilo, ref package, requests, out routes, out size);
+            && TryPackageRequests(targetSilo, ref package, requests, out packaged, out routes, out size);
 
         var workItem = _workItemPool.Get();
-        workItem.Initialize(package, carriesRequests ? requests : null, routes, size, _serializer.SessionPool);
+        workItem.Initialize(package, carriesRequests ? requests : null, packaged, routes, size, _serializer.SessionPool);
         var workItemWriter = GetOrCreateWorker(targetSilo);
         if (!workItemWriter.TryWrite(workItem))
         {
@@ -527,6 +531,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     /// <param name="target">The migration target.</param>
     /// <param name="package">The migration package, which carries the requests when this returns <see langword="true"/>.</param>
     /// <param name="requests">The queued requests.</param>
+    /// <param name="packaged">The captured requests, from which requests which stay with this silo are restored.</param>
     /// <param name="routes">The routes for retargeting the requests' callers.</param>
     /// <param name="size">The serialized size of the complete package, including its framing within a batch.</param>
     /// <returns><see langword="false"/> if the requests cannot be serialized or the package does not fit in a message.</returns>
@@ -534,6 +539,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         SiloAddress target,
         ref GrainMigrationPackage package,
         List<Message> requests,
+        out List<MigratedRequest>? packaged,
         out List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes,
         out long size)
     {
@@ -543,7 +549,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         // which a later migration of the same request can retarget while this one awaits acceptance.
         routes = null;
         size = 0;
-        var packaged = new List<MigratedRequest>(requests.Count);
+        packaged = new List<MigratedRequest>(requests.Count);
 
         // Serializing the migration context releases its buffer, so the package's size is bounded using the context's size bound rather than measured.
         var fixedSize = PackageFramingAllowance + package.MigrationContext.GetMaxSerializedSize() + grainId.Type.AsSpan().Length + grainId.Key.AsSpan().Length;
@@ -561,13 +567,13 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                 if (capturedBytes > maxSize)
                 {
                     LogDebugMigratedRequestsTooLarge(requests.Count, grainId, target);
-                    return Decline(requests, packaged, out routes);
+                    return Decline(requests, ref packaged, out routes);
                 }
             }
             catch (Exception exception)
             {
                 LogDebugMigratedRequestsNotSerializable(exception, requests.Count, grainId);
-                return Decline(requests, packaged, out routes);
+                return Decline(requests, ref packaged, out routes);
             }
 
             // One-way requests have no pending callback to retarget.
@@ -579,23 +585,33 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             (routes ??= []).Add((callerSilo, new(request.SendingGrain, request.Id, target, request.ForwardCount + 1)));
         }
 
+        // The requests are serialized once, here, which fixes their size and their remaining time to live.
         // Requests which fit in their own messages can exceed the message size limit together, or with the migration context and its keys.
-        // Each request's time to live can encode larger by the time the package is sent, so that growth is reserved.
-        var agingAllowance = (long)packaged.Count * TimeToLiveEncodingGrowthAllowance;
-        var requestsSize = MeasureRequests(grainId, packaged, maxSize - agingAllowance);
-        if (requestsSize < 0)
+        byte[] serializedRequests;
+        try
         {
-            LogDebugMigratedRequestsTooLarge(requests.Count, grainId, target);
-            return Decline(requests, packaged, out routes);
+            serializedRequests = _serializer.SerializeToArray(packaged);
+        }
+        catch (Exception exception)
+        {
+            LogDebugMigratedRequestsNotSerializable(exception, requests.Count, grainId);
+            return Decline(requests, ref packaged, out routes);
         }
 
-        package.Requests = packaged;
-        size = fixedSize + requestsSize + agingAllowance;
+        if (serializedRequests.Length > maxSize)
+        {
+            LogDebugMigratedRequestsTooLarge(requests.Count, grainId, target);
+            return Decline(requests, ref packaged, out routes);
+        }
+
+        package.Requests = serializedRequests;
+        size = fixedSize + serializedRequests.Length;
         return true;
 
-        bool Decline(List<Message> requests, List<MigratedRequest> packaged, out List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes)
+        bool Decline(List<Message> requests, ref List<MigratedRequest>? packaged, out List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes)
         {
-            RestoreRequests(requests, packaged, _serializer.SessionPool);
+            RestoreRequests(requests, packaged!, _serializer.SessionPool);
+            packaged = null;
             routes = null;
             return false;
         }
@@ -613,69 +629,6 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     }
 
     private int MaxBatchBodySize => _maxMessageBodySize - MessageBodyFramingAllowance;
-
-    /// <summary>
-    /// Returns the serialized size of <paramref name="requests"/>, or -1 if it exceeds <paramref name="limit"/> or they cannot be serialized.
-    /// </summary>
-    private long MeasureRequests(GrainId grainId, List<MigratedRequest> requests, long limit)
-    {
-        // Count the serialized bytes without retaining them, stopping once they exceed the limit.
-        using var counter = new SizeLimitedCountingStream(limit);
-        using var session = _serializer.SessionPool.GetSession();
-        var writer = Writer.CreatePooled(counter, session);
-        try
-        {
-            session.CodecProvider.GetCodec<List<MigratedRequest>>().WriteField(ref writer, 0, typeof(List<MigratedRequest>), requests);
-            writer.Commit();
-            return counter.Length;
-        }
-        catch (Exception exception)
-        {
-            if (!counter.LimitExceeded)
-            {
-                LogDebugMigratedRequestsNotSerializable(exception, requests.Count, grainId);
-            }
-
-            return -1;
-        }
-        finally
-        {
-            writer.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Counts the bytes written to it, failing the write which exceeds its limit.
-    /// </summary>
-    private sealed class SizeLimitedCountingStream(long limit) : Stream
-    {
-        private long _length;
-
-        public bool LimitExceeded { get; private set; }
-
-        public override bool CanRead => false;
-        public override bool CanSeek => false;
-        public override bool CanWrite => true;
-        public override long Length => _length;
-        public override long Position { get => _length; set => throw new NotSupportedException(); }
-
-        public override void Write(byte[] buffer, int offset, int count) => Write(buffer.AsSpan(offset, count));
-
-        public override void Write(ReadOnlySpan<byte> buffer)
-        {
-            _length += buffer.Length;
-            if (_length > limit)
-            {
-                LimitExceeded = true;
-                throw new InvalidOperationException("The requests exceed the message size limit.");
-            }
-        }
-
-        public override void Flush() { }
-        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
-    }
 
     private async Task ProcessMembershipUpdates()
     {
@@ -962,17 +915,20 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         private GrainMigrationPackage _migrationPackage;
 
         private List<Message>? _requests;
+        private List<MigratedRequest>? _packaged;
         private SerializerSessionPool? _sessionPool;
 
         public void Initialize(
             GrainMigrationPackage package,
             List<Message>? requests,
+            List<MigratedRequest>? packaged,
             List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes,
             long size,
             SerializerSessionPool sessionPool)
         {
             _migrationPackage = package;
             _requests = requests;
+            _packaged = packaged;
             _sessionPool = sessionPool;
             Routes = routes;
             Size = size;
@@ -983,6 +939,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             _core.Reset();
             _migrationPackage = default;
             _requests = null;
+            _packaged = null;
             _sessionPool = null;
             Routes = null;
             Size = 0;
@@ -996,14 +953,14 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         public List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? Routes { get; private set; }
 
         /// <summary>
-        /// The approximate serialized size of the package.
+        /// The serialized size of the package, bounded from above for its migration context.
         /// </summary>
         public long Size { get; private set; }
 
         public void SetResult(MigrationResult result)
         {
             // Requests which the migration carried but which remain with the source are restored before the source forwards them.
-            if (result.Requests is MigratedRequestsOutcome.Retained && _requests is not null && _migrationPackage.Requests is { } packaged)
+            if (result.Requests is MigratedRequestsOutcome.Retained && _requests is not null && _packaged is { } packaged)
             {
                 RestoreRequests(_requests, packaged, _sessionPool!);
             }
