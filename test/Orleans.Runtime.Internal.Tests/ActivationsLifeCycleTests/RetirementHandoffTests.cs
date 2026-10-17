@@ -299,7 +299,7 @@ public sealed class RetirementHandoffTests
         {
             GrainId = grain.GetGrainId(),
             MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
-            Requests = [new() { Id = new CorrelationId(1), SendingGrain = GrainId.Create("test", "caller"), TimeToLiveMilliseconds = 60_000 }],
+            Requests = SerializeRequests(silo, [new() { Id = new CorrelationId(1), SendingGrain = GrainId.Create("test", "caller"), TimeToLiveMilliseconds = 60_000 }]),
         };
         var requestsAccepted = await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
         Assert.False(Assert.Single(requestsAccepted));
@@ -324,7 +324,7 @@ public sealed class RetirementHandoffTests
         {
             GrainId = grainId,
             MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
-            Requests = [CreateMigratedRequest(1), CreateMigratedRequest(2), CreateMigratedRequest(3)],
+            Requests = SerializeRequests(silo, [CreateMigratedRequest(1), CreateMigratedRequest(2), CreateMigratedRequest(3)]),
         };
         var requestsAccepted = await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
         Assert.False(Assert.Single(requestsAccepted));
@@ -483,7 +483,8 @@ public sealed class RetirementHandoffTests
             if (context.Request.GetMethodName() == nameof(IMigratingRequestsSystemTarget.AcceptMigratingGrainsWithRequests))
             {
                 var package = Assert.Single((List<GrainMigrationPackage>)context.Request.GetArgument(0)!);
-                accepted.TrySetResult(Assert.Single(package.Requests!));
+                var requests = context.TargetContext.ActivationServices.GetRequiredService<Orleans.Serialization.Serializer>().Deserialize<List<MigratedRequest>>(package.Requests!)!;
+                accepted.TrySetResult(Assert.Single(requests));
                 await releaseAcceptance.Task;
             }
         })));
@@ -1284,6 +1285,9 @@ public sealed class RetirementHandoffTests
             }
         }
     }
+
+    private static byte[] SerializeRequests(InProcessSiloHandle silo, List<MigratedRequest> requests)
+        => silo.ServiceProvider.GetRequiredService<Orleans.Serialization.Serializer>().SerializeToArray(requests);
 
     private static IGrainContext? FindActivation(InProcessSiloHandle silo, GrainId grainId)
         => silo.ServiceProvider.GetRequiredService<ActivationDirectory>().FindTarget(grainId);
