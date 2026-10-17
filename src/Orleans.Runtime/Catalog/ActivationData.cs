@@ -39,7 +39,7 @@ internal sealed partial class ActivationData :
     IAsyncDisposable,
     IDisposable
 {
-    private const string GrainAddressMigrationContextKey = "sys.addr";
+    internal const string GrainAddressMigrationContextKey = "sys.addr";
 #if NET10_0_OR_GREATER
     private readonly Lock _lock = new();
 #else

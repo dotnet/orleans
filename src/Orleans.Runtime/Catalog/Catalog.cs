@@ -135,7 +135,7 @@ namespace Orleans.Runtime
             in GrainId grainId,
             Dictionary<string, object>? requestContextData,
             MigrationContext? rehydrationContext)
-            => GetOrCreateActivation(grainId, requestContextData, rehydrationContext, migratedRequests: null, out _);
+            => GetOrCreateActivation(grainId, requestContextData, rehydrationContext, migratedRequests: null, previousAddress: null, out _);
 
         /// <summary>
         /// If activation already exists, return it.
@@ -145,12 +145,14 @@ namespace Orleans.Runtime
         /// <param name="requestContextData">Optional request context data.</param>
         /// <param name="rehydrationContext">Optional rehydration context.</param>
         /// <param name="migratedRequests">Requests which were queued for the grain's previous activation, which a new activation queues ahead of any other request.</param>
+        /// <param name="previousAddress">The address of the activation which <paramref name="migratedRequests"/> were queued for, which their callers replace in their caches.</param>
         /// <param name="requestsAccepted">Whether this call created the activation and it took ownership of <paramref name="migratedRequests"/>.</param>
         public IGrainContext? GetOrCreateActivation(
             in GrainId grainId,
             Dictionary<string, object>? requestContextData,
             MigrationContext? rehydrationContext,
             List<Message>? migratedRequests,
+            GrainAddress? previousAddress,
             out bool requestsAccepted)
         {
             requestsAccepted = false;
@@ -224,7 +226,7 @@ namespace Orleans.Runtime
             // Migrated requests are queued before activation, so they precede any request which reaches the new activation directly.
             if (migratedRequests is not null && result is ActivationData activation)
             {
-                requestsAccepted = activation.TryEnqueueMigratedRequests(migratedRequests);
+                requestsAccepted = activation.TryEnqueueMigratedRequests(migratedRequests, previousAddress);
             }
 
             // Initialize the new activation asynchronously.
