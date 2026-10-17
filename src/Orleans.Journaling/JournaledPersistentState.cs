@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
+using Orleans.Serialization.Activators;
+using Orleans.Serialization.Serializers;
 
 namespace Orleans.Journaling;
 
@@ -8,6 +10,7 @@ namespace Orleans.Journaling;
 internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateMachine, IPersistentStateCommandHandler<T>
 {
     private readonly IPersistentStateCommandCodec<T> _codec;
+    private readonly IActivator<T> _activator;
     private readonly IJournaledStateManager _manager;
     private T? _value;
     private ulong _version;
@@ -24,14 +27,16 @@ internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateM
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IPersistentStateCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _activator = serviceProvider.GetRequiredService<IActivatorProvider>().GetActivator<T>();
         _manager = manager;
         manager.RegisterStateMachine(key, this);
     }
 
-    internal JournaledPersistentState(string key, IJournaledStateManager manager, IPersistentStateCommandCodec<T> codec)
+    internal JournaledPersistentState(string key, IJournaledStateManager manager, IPersistentStateCommandCodec<T> codec, IActivator<T> activator)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
+        _activator = activator;
         _manager = manager;
         manager.RegisterStateMachine(key, this);
     }
@@ -42,7 +47,7 @@ internal sealed class JournaledPersistentState<T> : IPersistentState<T>, IStateM
         get
         {
             _hasState = true;
-            return _value ??= Activator.CreateInstance<T>();
+            return _value ??= _activator.Create();
         }
         set
         {

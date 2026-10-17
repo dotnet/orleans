@@ -541,7 +541,11 @@ namespace Orleans.Serialization.Serializers
 
             if (!TrySelectImplementation(typeof(IActivator<>), concreteType, searchType, out var activatorType))
             {
-                if (searchType.IsValueType)
+                if (Nullable.GetUnderlyingType(concreteType) is { } underlyingType)
+                {
+                    activatorType = ConstructGenericImplementation(typeof(DefaultNullableActivator<>), underlyingType);
+                }
+                else if (searchType.IsValueType)
                 {
                     activatorType = ConstructGenericImplementation(typeof(DefaultValueTypeActivator<>), concreteType);
                 }
@@ -594,6 +598,7 @@ namespace Orleans.Serialization.Serializers
 #if NET5_0_OR_GREATER
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultReferenceTypeActivator<>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultValueTypeActivator<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(DefaultNullableActivator<>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ConcreteTypeSerializer<,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ValueSerializer<,>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(ArrayCodec<>))]

@@ -154,7 +154,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var queue = new DurableQueue<string>("queue", sut.Manager, new JsonDurableQueueCommandCodec<string>(jsonOptions));
         var set = new DurableSet<string>("set", sut.Manager, new JsonDurableSetCommandCodec<string>(jsonOptions));
-        var state = new JournaledPersistentState<string>("state", sut.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions));
+        var state = new JournaledPersistentState<string>("state", sut.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions), CodecProvider.GetActivator<string>());
         var tcs = new DurableTaskCompletionSource<int>(
             "tcs",
             sut.Manager,
@@ -174,7 +174,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
         var queue2 = new DurableQueue<string>("queue", sut2.Manager, new JsonDurableQueueCommandCodec<string>(jsonOptions));
         var set2 = new DurableSet<string>("set", sut2.Manager, new JsonDurableSetCommandCodec<string>(jsonOptions));
-        var state2 = new JournaledPersistentState<string>("state", sut2.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions));
+        var state2 = new JournaledPersistentState<string>("state", sut2.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions), CodecProvider.GetActivator<string>());
         var tcs2 = new DurableTaskCompletionSource<int>(
             "tcs",
             sut2.Manager,

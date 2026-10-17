@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Orleans.Journaling;
 using Orleans.Runtime;
@@ -37,7 +38,7 @@ internal static class DurableJobsEvents
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(SiloAddress siloAddress, JournalId journalId)
         {
-            Listener.Write(nameof(ShardOpenJoined), new ShardOpenJoined(siloAddress, journalId));
+            Write(nameof(ShardOpenJoined), new ShardOpenJoined(siloAddress, journalId));
         }
     }
 
@@ -53,9 +54,14 @@ internal static class DurableJobsEvents
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void Emit(SiloAddress siloAddress, JournalId journalId)
         {
-            Listener.Write(nameof(ShardOpenRetryAfterCancellation), new ShardOpenRetryAfterCancellation(siloAddress, journalId));
+            Write(nameof(ShardOpenRetryAfterCancellation), new ShardOpenRetryAfterCancellation(siloAddress, journalId));
         }
     }
+
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Event payloads are sealed types whose public fields and properties the generic annotation preserves, and subscribers consume the typed payload rather than reflecting over the members of the values it carries.")]
+    private static void Write<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicFields | DynamicallyAccessedMemberTypes.PublicProperties)] TEvent>(string name, TEvent payload)
+        where TEvent : DurableJobEvent
+        => Listener.Write(name, payload);
 
     private sealed class Observable : IObservable<DurableJobEvent>
     {
