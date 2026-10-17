@@ -1,7 +1,7 @@
 ---
 title: Use durable state
 description: Build an experimental Orleans Journaling grain with durable values and collections.
-ms.date: 08/21/2026
+ms.date: 10/16/2026
 ms.topic: how-to
 ---
 
@@ -53,6 +53,12 @@ Coordination with another grain or an external service requires an application p
 An <xref:Orleans.Journaling.IDurableTaskCompletionSource`1> changes status in memory when `TrySetResult`, `TrySetException`, or `TrySetCanceled` succeeds. Its `Task` completes after a write acknowledges that status or recovery replays it, allowing waiters to observe a durable completion.
 
 To stream changes to callers, or to stream volatile drafts from a durable log, see [Observe state and stream drafts](observe-state.md).
+
+## Access durable state from durable tasks
+
+A durable task body reads and changes durable values and collections directly, and sends through the Messaging outbox directly. Each access passes through the running execution's access log, which records the access's outcome with the change it makes. When the body replays after a deactivation or a failure, each read returns the value which the recording run read, and each committed write or send returns its recorded result without applying again, so the body makes the same decisions and changes state once. Durable values and collections hold values which the body changes by writing them back. Journal-backed persistent state holds a value which the grain changes in place, so durable task bodies read and change it in recorded effects, steps, or after their last durable operation. See [Journaled state in durable task bodies](../durable-tasks.md#journaled-state-in-durable-task-bodies).
+
+Code which runs outside a durable task body, such as an ordinary grain method, accesses the same state without a record.
 
 ## Keep state names and schemas stable
 

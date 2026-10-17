@@ -24,9 +24,10 @@ The analyzers divide each durable task body into regions:
 
 - **Recorded operations** run once per execution, and a replay returns their outcomes:
   awaits of durable calls, local steps, `DurableTask.Run` delegates, delays, signal
-  waits, combinators, and handles; `DurableTask.RunInline` effects; and `Post`. An await of a
-  `Task`-returning helper in the same project which performs durable operations counts
-  as one.
+  waits, combinators, and handles; `DurableTask.RunInline` effects; `Post`; and reads and
+  writes of journaled state, such as `IDurableValue<T>`, the durable collections, and
+  sends through the Messaging outbox. An await of a `Task`-returning helper in the same
+  project which performs durable operations counts as one.
 - **Replayed code** is code from which a recorded operation is still reachable. A
   replay runs it again, after later operations committed their results and state
   changes.
@@ -67,10 +68,10 @@ awaiting, or helpers in other assemblies.
 
 | Rule | Failure which it prevents | Diagnostic |
 | --- | --- | --- |
-| Read and change grain state in recorded effects, steps, or the tail. | A replay applies a change again, or decides from state which later operations wrote. | [ORLEANS0200](../diagnostics/orleans0200.md) |
+| Read and change persistent state in recorded effects, steps, or the tail. | A replay applies a change again, or decides from state which later operations wrote. | [ORLEANS0200](../diagnostics/orleans0200.md) |
 | Produce clock, random, and environment values in recorded effects, steps, or the tail, and read time from `DurableTask.Current.UtcNow`. Produce a value which the tail sends to an external service, such as an idempotency key, in a recorded effect or a step, because a tail whose result didn't commit runs again. | A replay computes other arguments, IDs, keys, or deadlines, and diverges or repeats an external effect. | [ORLEANS0201](../diagnostics/orleans0201.md) |
 | Await external operations in steps or the tail. | A replay repeats the operation, observes another result, or fails while the service is unavailable. | [ORLEANS0202](../diagnostics/orleans0202.md) |
-| Change state after the last external await of a step or the tail. | The change commits without the result, and the next run applies it again. | [ORLEANS0203](../diagnostics/orleans0203.md) |
+| Change persistent state after the last external await of a step or the tail. | The change commits without the result, and the next run applies it again. | [ORLEANS0203](../diagnostics/orleans0203.md) |
 | Return the outputs of a `DurableTask.RunInline` effect. | A replay skips the effect, and the body's variables keep their initial values. | [ORLEANS0204](../diagnostics/orleans0204.md) |
 | Await, schedule, or post every durable task definition. | The task never runs. | [ORLEANS0205](../diagnostics/orleans0205.md) |
 | Run each `async DurableTask` definition once. | The second run throws `InvalidOperationException`. | [ORLEANS0206](../diagnostics/orleans0206.md) |
@@ -97,8 +98,12 @@ which are ordinary steps; see [ORLEANS0224](../diagnostics/orleans0224.md).
 
 ### State, values, and external work
 
-The first four rules keep each side effect in exactly one run. Grain state holds every
-committed change, so replayed code reads newer state and applies its writes again. A
+The first four rules keep each side effect in exactly one run. Journaled state records
+each access of a body, and a replay returns the recorded outcomes, so a body reads and
+changes it anywhere; see
+[Journaled state in durable task bodies](durable-tasks.md#journaled-state-in-durable-task-bodies).
+Persistent state, `IPersistentState<TState>`, holds every committed change and changes in
+place, so replayed code reads newer state and applies its writes again. A
 `DurableTask.RunInline` effect, a step's final code, and the tail each commit their changes
 with a record, so no replay repeats them. External calls run in steps, whose results the
 replay returns, and they send an idempotency key derived from the task, because a step
@@ -148,9 +153,15 @@ These rules depend on data or deployment history which the analyzers can't obser
   branch changes to operations which pending executions passed on
   `DurableTask.GetVersion`, and add new workflow shapes as new methods. See
   [Version durable tasks](durable-tasks-versioning.md).
+- **Access journaled state in the same order.** Each replay makes the accesses which the
+  access log recorded, in the recorded order, and changes a value by writing it back
+  rather than in place, because a replay returns recorded values as copies. A replay
+  which makes another access at a recorded position stalls until code which makes the
+  recorded accesses replays it.
 - **Bound the history.** Every recorded operation stays in the task's tree until the
-  tree is deleted. A workflow which loops indefinitely ends each generation and starts
-  its successor as a detached task, such as `subscription-{id}-{generation}`.
+  tree is deleted, and the access log keeps a record for each access in re-executed code
+  until the execution completes. A workflow which loops indefinitely ends each generation
+  and starts its successor as a detached task, such as `subscription-{id}-{generation}`.
 
 ## Configure the analyzers
 

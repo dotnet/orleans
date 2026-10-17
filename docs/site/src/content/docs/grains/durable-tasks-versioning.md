@@ -38,7 +38,8 @@ and every replay, returns the recorded version:
 | A step whose enclosing execution on the same grain recorded a version | The enclosing execution's version |
 
 A replay identifies an execution which ran past the check from its history: the replay
-reaches the check while operations which the earlier run recorded remain ahead of it.
+reaches the check while operations or accesses to journaled state which the earlier run
+recorded remain ahead of it.
 Place the check before the first operation which the change adds, removes, or alters, so
 that every execution reaches it with the operations which its version expects.
 
