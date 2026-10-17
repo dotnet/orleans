@@ -117,7 +117,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0200
 
-[Access grain state in recorded effects or after the last durable operation](orleans0200.md) — Warning. Durable task code reads or changes grain state where a replay runs it again.
+[Access persistent grain state in recorded effects or after the last durable operation](orleans0200.md) — Warning. Durable task code reads or changes persistent grain state where a replay runs it again.
 
 ## ORLEANS0201
 
@@ -129,7 +129,7 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 
 ## ORLEANS0203
 
-[Change grain state after the last external await](orleans0203.md) — Warning. A step or a body's tail changes grain state before an external await, so the change can commit without the result.
+[Change persistent grain state after the last external await](orleans0203.md) — Warning. A step or a body's tail changes persistent grain state before an external await, so the change can commit without the result.
 
 ## ORLEANS0204
 

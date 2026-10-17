@@ -10,17 +10,19 @@ public sealed class TicketGrain : DurableGrain
     // <orleans0204_violation>
     public async DurableTask<string> IssueAsync()
     {
-        var number = 0;
+        // The grain records the increment, so a replay returns the recorded number.
+        var number = ++_lastNumber.Value;
         var reference = Guid.Empty;
+        var issuedAt = DateTimeOffset.MinValue;
         DurableTask.RunInline("allocate", () =>
         {
             // A replay returns the recorded result without running the effect, so these assignments don't happen.
-            number = ++_lastNumber.Value;
             reference = Guid.NewGuid();
+            issuedAt = DateTimeOffset.UtcNow;
         });
 
         await Print(number, reference).WithId("print");
-        return $"{number}-{reference:N}";
+        return $"{number}-{reference:N}-{issuedAt:yyyyMMdd}";
     }
     // </orleans0204_violation>
 #pragma warning restore ORLEANS0204
@@ -28,11 +30,13 @@ public sealed class TicketGrain : DurableGrain
     // <orleans0204_fix>
     public async DurableTask<string> IssueOnceAsync()
     {
+        var number = ++_lastNumber.Value;
+
         // The effect returns its outputs, so every replay receives the recorded values.
-        var (number, reference) = DurableTask.RunInline("allocate", () => (++_lastNumber.Value, Guid.NewGuid()));
+        var (reference, issuedAt) = DurableTask.RunInline("allocate", () => (Guid.NewGuid(), DateTimeOffset.UtcNow));
 
         await Print(number, reference).WithId("print");
-        return $"{number}-{reference:N}";
+        return $"{number}-{reference:N}-{issuedAt:yyyyMMdd}";
     }
     // </orleans0204_fix>
 
@@ -42,9 +46,10 @@ public sealed class TicketGrain : DurableGrain
 
     public async DurableTask<Allocation> IssueAllocationAsync()
     {
+        var number = ++_lastNumber.Value;
         var allocation = DurableTask.RunInline(
             "allocate",
-            () => new Allocation(++_lastNumber.Value, Guid.NewGuid(), DateTimeOffset.UtcNow));
+            () => new Allocation(number, Guid.NewGuid(), DateTimeOffset.UtcNow));
 
         await Print(allocation.Number, allocation.Reference).WithId("print");
         return allocation;
