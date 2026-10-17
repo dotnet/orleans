@@ -1,0 +1,5 @@
+is_global = true
+
+dotnet_diagnostic.ORLEANS0112.severity = warning
+dotnet_diagnostic.ORLEANS0114.severity = warning
+dotnet_diagnostic.ORLEANS0115.severity = warning
