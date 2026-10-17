@@ -52,6 +52,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// Stage mutations only after establishing that they are safe to commit. Pending changes are shared
     /// by all callers using this manager. Storage acknowledgement establishes durability.
     /// A failed journal operation fences the manager; recovery requires a new manager and state machine instances.
+    /// Before capture, the manager prepares each registered state through <see cref="IStateMachine.PrepareWriteAsync"/>.
+    /// A preparation failure reports <see cref="JournaledStatePreCommitException"/> and retains pending changes
+    /// for an explicit retry.
     /// Cancellation stops the caller's wait; an already queued write continues to its storage outcome.
     /// </remarks>
     /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
@@ -80,4 +83,15 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// concurrent writers and should not be used for correctness decisions.
     /// </remarks>
     long PendingWriteByteCount => -1;
+
+    /// <summary>
+    /// Gets the registered state machines with their stable names.
+    /// </summary>
+    /// <remarks>
+    /// Diagnostic tools use this snapshot to discover registered state, such as the built-in durable collections,
+    /// and watch the instances which support observation. The snapshot excludes placeholders for retired state.
+    /// Implementations which do not track registrations return an empty collection.
+    /// </remarks>
+    /// <returns>A snapshot of the registered state machines in no particular order.</returns>
+    IReadOnlyList<KeyValuePair<string, IStateMachine>> GetStateMachines() => [];
 }

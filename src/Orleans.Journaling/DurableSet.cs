@@ -40,11 +40,13 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSetCommandHandler<T>
+internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSetCommandHandler<T>, IResyncSource<SetChange<T>>
 {
     private readonly IDurableSetCommandCodec<T> _codec;
     private readonly HashSet<T> _items = [];
+    private readonly JournaledStateManager? _manager;
     private JournalStreamWriter _writer;
+    private bool _hasStagedEntries;
 
     public DurableSet(
         [ServiceKey] string key,
@@ -54,6 +56,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableSetCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _manager = manager as JournaledStateManager;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -61,6 +64,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
+        _manager = manager as JournaledStateManager;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -74,22 +78,30 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     {
         _items.Clear();
         _writer = writer;
+        _hasStagedEntries = false;
+        PublishResync(isDurable: true);
     }
+
+    void IStateMachine.OnRecoveryCompleted() => PublishResync(isDurable: true);
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
         // This state implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
+        // The write being captured contains every staged entry.
+        _hasStagedEntries = false;
     }
 
     void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
+        _hasStagedEntries = false;
     }
 
     public void Clear()
     {
         _codec.WriteClear(GetWriter());
         ApplyClear();
+        Publish(SetChangeKind.Cleared, item: default);
     }
 
     public bool Contains(T item) => _items.Contains(item);
@@ -104,6 +116,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
 
         _codec.WriteAdd(item, GetWriter());
         _ = ApplyAdd(item);
+        Publish(SetChangeKind.Added, item);
         return true;
     }
 
@@ -116,6 +129,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
 
         _codec.WriteRemove(item, GetWriter());
         _ = ApplyRemove(item);
+        Publish(SetChangeKind.Removed, item);
         return true;
     }
 
@@ -141,6 +155,8 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
     private JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
+        JournaledStateMutationFence.ThrowIfClosed();
+        _hasStagedEntries = true;
         return _writer;
     }
 
@@ -169,6 +185,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
             WriteSnapshot(next);
             _items.Clear();
             _items.UnionWith(next);
+            PublishResync(isDurable: false);
         }
     }
 
@@ -181,6 +198,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
             WriteSnapshot(next);
             _items.Clear();
             _items.UnionWith(next);
+            PublishResync(isDurable: false);
         }
     }
 
@@ -189,6 +207,29 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IStateMachine, IDurableSet
         foreach (var item in other)
         {
             Add(item);
+        }
+    }
+
+    internal IAsyncEnumerable<SetChange<T>> WatchAsync(DurableWatchMode mode, int capacity, CancellationToken cancellationToken) =>
+        DurableStateObservation.WatchChanges<DurableSet<T>, SetChange<T>>(_manager, this, mode, capacity, cancellationToken);
+
+    bool IResyncSource<SetChange<T>>.HasStagedEntries => _hasStagedEntries;
+
+    SetChange<T> IResyncSource<SetChange<T>>.CreateResync() => new() { Kind = SetChangeKind.Resync, Snapshot = _items.ToArray() };
+
+    private void Publish(SetChangeKind kind, T? item)
+    {
+        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+        {
+            topic.Publish(new SetChange<T> { Kind = kind, Item = item });
+        }
+    }
+
+    private void PublishResync(bool isDurable)
+    {
+        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+        {
+            topic.Publish(((IResyncSource<SetChange<T>>)this).CreateResync(), isDurable);
         }
     }
 }

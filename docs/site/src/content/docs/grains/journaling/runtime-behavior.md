@@ -54,7 +54,10 @@ Durable collections encode their operation before applying it to the in-memory c
 - **Append** adds the encoded operation batch atomically.
 - **Snapshot replacement** writes the current state of every registered stream and atomically publishes it as the new journal generation.
 
-Concurrent calls made while the same kind of write is queued can share that queued operation. Each caller observes its completion or failure. Calls made after a storage operation starts are processed by a later operation.
+Concurrent calls made while a write is queued share that queued operation. A storage compaction
+request or a pending migration selects a snapshot; the requirement remains until a snapshot succeeds.
+Each caller observes its completion or failure. Calls made after a storage operation starts are
+processed by a later operation.
 
 > [!IMPORTANT]
 > In-memory mutation is visible before storage acknowledgement. Return success to a caller only after the required `WriteStateAsync` completes. Recovery reconstructs durable state in a new activation.
@@ -67,6 +70,20 @@ preconditions and apply the complete safe-to-commit update synchronously, then r
 Orleans executes that synchronous block on a single activation thread. Another grain turn can run when
 the operation awaits, so keep shared state safe to commit at each await. Any caller's write can include
 staged mutations from other calls.
+
+State implementations establish asynchronous persistence prerequisites through
+<xref:Orleans.Journaling.IStateMachine.PrepareWriteAsync*>. The manager invokes this
+callback before append or snapshot capture. Preparation is idempotent: prepared
+prerequisites complete synchronously and remain valid through capture. After an
+asynchronous completion, the manager rechecks all states to include mutations staged
+on interleaved turns. A complete synchronous ready pass flows directly into capture.
+The <xref:Orleans.Journaling.IStateMachine.OnWriteCompleted> callback then publishes
+effects which depend on storage acknowledgement.
+
+A failed preparation reports <xref:Orleans.Journaling.JournaledStatePreCommitException>
+with the original failure as its inner exception. Pending state is retained, the manager
+stays usable, and a later write retries preparation. Shutdown closes work admission and
+cancels queued operations while the current operation drains to its actual storage outcome.
 
 ## Consistency and competing writers
 

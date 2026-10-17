@@ -102,6 +102,8 @@ items:
             href: grains/journaling/durable-jobs-migration.md
           - name: Use durable state
             href: grains/journaling/durable-state.md
+          - name: Observe state and stream drafts
+            href: grains/journaling/observe-state.md
           - name: Runtime behavior and consistency
             href: grains/journaling/runtime-behavior.md
           - name: Configuration and formats
@@ -114,6 +116,36 @@ items:
             href: grains/journaling/operations.md
           - name: Samples
             href: grains/journaling/samples.md
+      - name: Messaging
+        items:
+          - name: Runtime model and guarantees
+            href: grains/messaging.md
+          - name: Idempotency and hierarchical keys
+            href: grains/messaging-idempotency.md
+          - name: Practical recipes
+            href: grains/messaging-recipes.md
+          - name: Operations and throughput
+            href: grains/messaging-operations.md
+      - name: Durable tasks
+        items:
+          - name: Programming model and guarantees
+            href: grains/durable-tasks.md
+          - name: Task identity and references
+            href: grains/durable-tasks-identity.md
+          - name: Structured concurrency
+            href: grains/durable-tasks-structured-concurrency.md
+          - name: Idempotency
+            href: grains/durable-tasks-idempotency.md
+          - name: Replay-safety rules
+            href: grains/durable-tasks-replay-rules.md
+          - name: Versioning
+            href: grains/durable-tasks-versioning.md
+          - name: Integrate with other systems
+            href: grains/durable-tasks-integrations.md
+          - name: Practical recipes
+            href: grains/durable-tasks-recipes.md
+          - name: Operations and troubleshooting
+            href: grains/durable-tasks-operations.md
       - name: Transactions
         href: grains/transactions.md
   - name: Serialization and code generation
@@ -445,6 +477,46 @@ items:
             href: diagnostics/orleans0026.md
           - name: ORLEANS0027
             href: diagnostics/orleans0027.md
+          - name: ORLEANS0028
+            href: diagnostics/orleans0028.md
+          - name: ORLEANS0100
+            href: diagnostics/orleans0100.md
+          - name: ORLEANS0101
+            href: diagnostics/orleans0101.md
+          - name: ORLEANS0102
+            href: diagnostics/orleans0102.md
+          - name: ORLEANS0103
+            href: diagnostics/orleans0103.md
+          - name: ORLEANS0104
+            href: diagnostics/orleans0104.md
+          - name: ORLEANS0105
+            href: diagnostics/orleans0105.md
+          - name: ORLEANS0106
+            href: diagnostics/orleans0106.md
+          - name: ORLEANS0107
+            href: diagnostics/orleans0107.md
+          - name: ORLEANS0108
+            href: diagnostics/orleans0108.md
+          - name: ORLEANS0109
+            href: diagnostics/orleans0109.md
+          - name: ORLEANS0110
+            href: diagnostics/orleans0110.md
+          - name: ORLEANS0111
+            href: diagnostics/orleans0111.md
+          - name: ORLEANS0112
+            href: diagnostics/orleans0112.md
+          - name: ORLEANS0113
+            href: diagnostics/orleans0113.md
+          - name: ORLEANS0114
+            href: diagnostics/orleans0114.md
+          - name: ORLEANS0115
+            href: diagnostics/orleans0115.md
+          - name: ORLEANS0116
+            href: diagnostics/orleans0116.md
+          - name: ORLEANS0117
+            href: diagnostics/orleans0117.md
+          - name: ORLEANS0118
+            href: diagnostics/orleans0118.md
       - name: API context and examples
         href: resources/api-reference-guide.md
       - name: Best practices
