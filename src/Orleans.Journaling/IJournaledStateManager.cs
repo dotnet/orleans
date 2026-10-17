@@ -52,6 +52,9 @@ public interface IJournaledStateManager : IAsyncDisposable
     /// Stage mutations only after establishing that they are safe to commit. Pending changes are shared
     /// by all callers using this manager. Storage acknowledgement establishes durability.
     /// A failed journal operation fences the manager; recovery requires a new manager and state machine instances.
+    /// Before capture, the manager prepares each registered state through <see cref="IStateMachine.PrepareWriteAsync"/>.
+    /// A preparation failure reports <see cref="JournaledStatePreCommitException"/> and retains pending changes
+    /// for an explicit retry.
     /// Cancellation stops the caller's wait; an already queued write continues to its storage outcome.
     /// </remarks>
     /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
