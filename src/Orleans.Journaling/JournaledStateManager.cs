@@ -282,6 +282,31 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 "The journaled state operation was queued before deletion reset its state.");
                         }
 
+                        if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem)
+                        {
+                            try
+                            {
+                                for (var prepared = false; !prepared;)
+                                {
+                                    await PrepareStates(ref prepared, _shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+
+                                _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                            }
+                            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                            {
+                                workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                return;
+                            }
+                            catch (Exception exception)
+                            {
+                                LogStatePreparationFailed(_shared.Logger, exception);
+                                storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal state preparation failed.");
+                                workItem.SetException(new JournaledStatePreCommitException(exception));
+                                continue;
+                            }
+                        }
+
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         switch (workItem)
@@ -594,6 +619,28 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                 return;
             }
         }
+    }
+
+    // Completes when every state is synchronously ready; otherwise returns the first incomplete preparation.
+    private ValueTask PrepareStates(ref bool prepared, CancellationToken cancellationToken)
+    {
+        prepared = true;
+        lock (_lock)
+        {
+            foreach (var state in _states.Values)
+            {
+                var preparation = state.PrepareWriteAsync(cancellationToken);
+                if (!preparation.IsCompletedSuccessfully)
+                {
+                    prepared = false;
+                    return preparation;
+                }
+
+                preparation.GetAwaiter().GetResult();
+            }
+        }
+
+        return ValueTask.CompletedTask;
     }
 
     private void Fence(Exception exception)
@@ -1351,6 +1398,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal state preparation failed; pending changes remain staged.")]
+    private static partial void LogStatePreparationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Information,
