@@ -647,7 +647,15 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     {
         if (request.Direction is Message.Directions.Request)
         {
-            _runtimeClient.SendResponse(request, Response.FromException(exception));
+            try
+            {
+                _runtimeClient.SendResponse(request, Response.FromException(exception));
+            }
+            finally
+            {
+                // A request which this silo received still holds its serialized body. A request from a caller on this silo shares its body with the caller's pending call, so it is left intact.
+                request.ReleaseBodyBuffer();
+            }
         }
         else
         {
