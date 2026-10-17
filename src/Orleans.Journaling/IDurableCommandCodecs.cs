@@ -254,3 +254,60 @@ public interface IDurableTaskCompletionSourceCommandHandler<T>
     /// <summary>Applies a canceled command.</summary>
     void ApplyCanceled();
 }
+
+/// <summary>
+/// Serializes one durable log command and applies one decoded command.
+/// </summary>
+public interface IDurableLogCommandCodec<T>
+{
+    /// <summary>Writes one command which appends <paramref name="items"/>, in order.</summary>
+    /// <remarks>
+    /// The command is one journal entry, so replay applies all of the items or none of them. <paramref name="items"/> is not empty.
+    /// </remarks>
+    void WriteAppend(ReadOnlySpan<T> items, JournalStreamWriter writer);
+
+    /// <summary>Writes a command which discards entries before <paramref name="sequence"/>.</summary>
+    void WriteTrimBefore(long sequence, JournalStreamWriter writer);
+
+    /// <summary>Writes a command which discards every entry and consumes one sequence number.</summary>
+    void WriteClear(JournalStreamWriter writer);
+
+    /// <summary>Writes a command which ends the log.</summary>
+    void WriteSeal(JournalStreamWriter writer);
+
+    /// <summary>Writes a snapshot command containing the log's state and its retained entries, which begin at <paramref name="firstSequence"/>.</summary>
+    /// <param name="firstSequence">The sequence number of the first retained entry.</param>
+    /// <param name="resetSequence">The first sequence number after the most recent clear, or zero.</param>
+    /// <param name="isSealed">Whether the log is sealed.</param>
+    /// <param name="items">The retained entries.</param>
+    /// <param name="writer">The writer.</param>
+    void WriteSnapshot(long firstSequence, long resetSequence, bool isSealed, IReadOnlyCollection<T> items, JournalStreamWriter writer);
+
+    /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
+    void Apply(JournalBufferReader input, IDurableLogCommandHandler<T> consumer);
+}
+
+/// <summary>
+/// Receives decoded durable log commands from a codec implementation.
+/// </summary>
+public interface IDurableLogCommandHandler<T>
+{
+    /// <summary>Applies one appended item. An append command applies each of its items in order.</summary>
+    void ApplyAppend(T item);
+
+    /// <summary>Applies a command which discards entries before <paramref name="sequence"/>.</summary>
+    void ApplyTrimBefore(long sequence);
+
+    /// <summary>Applies a command which discards every entry and consumes one sequence number.</summary>
+    void ApplyClear();
+
+    /// <summary>Applies a command which ends the log.</summary>
+    void ApplySeal();
+
+    /// <summary>Resets the receiver to a snapshot's state before applying its entries, which begin at <paramref name="firstSequence"/>.</summary>
+    /// <param name="firstSequence">The sequence number of the first retained entry.</param>
+    /// <param name="resetSequence">The first sequence number after the most recent clear, or zero.</param>
+    /// <param name="isSealed">Whether the log is sealed.</param>
+    /// <param name="capacityHint">The number of entries which follow.</param>
+    void Reset(long firstSequence, long resetSequence, bool isSealed, int capacityHint);
+}

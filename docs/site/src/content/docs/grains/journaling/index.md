@@ -23,6 +23,7 @@ Orleans currently provides:
 - <xref:Orleans.Journaling.IDurableList`1>
 - <xref:Orleans.Journaling.IDurableQueue`1>
 - <xref:Orleans.Journaling.IDurableSet`1>
+- <xref:Orleans.Journaling.IDurableLog`1>, an append-only log with sequence numbers and streaming drafts
 - <xref:Orleans.Journaling.IDurableTaskCompletionSource`1>
 - <xref:Orleans.Runtime.IPersistentState`1> backed by the grain's journal
 
@@ -35,6 +36,8 @@ calls share the pending journal. A failed journal operation fences the manager a
 a fresh activation reconstructs the durable outcome before processing resumes.
 
 Each named state has a stable stream identity within the grain journal. Keep those names stable across deployments so recovery can bind stored operations to the intended state.
+
+Grains can expose watch streams over their durable state. Committed-mode streams deliver changes after their journal write is acknowledged; speculative streams also deliver staged changes and volatile log drafts. See [Observe state and stream drafts](observe-state.md).
 
 ## Journal lifecycle
 
@@ -69,6 +72,7 @@ Choose Journaling when evaluating operation-based persistence for built-in mutab
 ## Articles
 
 - [Use durable state](durable-state.md)
+- [Observe state and stream drafts](observe-state.md)
 - [Runtime behavior and consistency](runtime-behavior.md)
 - [Configure Journaling](configuration.md)
 - [Azure Storage providers](azure-storage.md)
