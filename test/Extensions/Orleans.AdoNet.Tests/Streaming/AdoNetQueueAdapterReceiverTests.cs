@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using MySql.Data.MySqlClient;
 using Orleans.Configuration;
+using Orleans.Providers.Streams.Common;
 using Orleans.Streaming.AdoNet;
+using Orleans.Streams;
 using Orleans.Tests.SqlUtils;
 using System.Runtime.CompilerServices;
 using TestExtensions;
@@ -231,6 +233,30 @@ public class AdoNetQueueAdapterReceiverLifecycleTests(TestEnvironmentFixture fix
         Assert.Equal(0, queries.DequeueCalls);
         Assert.Equal(0, queries.ConfirmationCalls);
         Assert.Equal(0, queries.ReleaseCalls);
+    }
+
+    [Fact]
+    public async Task AdoNetQueueAdapterReceiver_GetQueueMessages_ReturnsMessagesInSequenceOrder()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (receiver, queries, message) = CreateReceiver();
+        queries.Dequeue.SetResult([message with { MessageId = 12 }, message with { MessageId = 10 }, message with { MessageId = 11 }]);
+
+        var dequeued = await receiver.GetQueueMessagesAsync(3).WaitAsync(cancellationToken);
+
+        Assert.Equal([10L, 11L, 12L], dequeued.Select(static batch => batch.SequenceToken.SequenceNumber));
+
+        IQueueCache cache = new SimpleQueueCache(new SimpleQueueCacheOptions().CacheSize, NullLogger.Instance);
+        using var cursor = cache.TryGetCacheCursor(dequeued[0].StreamId, null).Cursor!;
+        cache.AddToCache(dequeued);
+        cursor.Refresh(dequeued[0].SequenceToken);
+        var delivered = new List<long>();
+        while (cursor.MoveNextWithResult().Kind == QueueCacheCursorMoveResultKind.Success)
+        {
+            delivered.Add(cursor.GetCurrent(out _)!.SequenceToken.SequenceNumber);
+        }
+
+        Assert.Equal([10L, 11L, 12L], delivered);
     }
 
     private (AdoNetQueueAdapterReceiver Receiver, BlockingStreamMessageQueries Queries, AdoNetStreamMessage Message) CreateReceiver()

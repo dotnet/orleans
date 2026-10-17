@@ -136,8 +136,8 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
                 }
             }
 
-            // convert the messages into standard batch containers
-            return messages.Select(x => AdoNetBatchContainer.FromMessage(serializer, x)).Cast<IBatchContainer>().ToList();
+            // the queue cache requires batches in ascending sequence order, which SQL Server OUTPUT and PostgreSQL RETURNING do not guarantee
+            return messages.OrderBy(static x => x.MessageId).Select(x => AdoNetBatchContainer.FromMessage(serializer, x)).Cast<IBatchContainer>().ToList();
         }
         catch (Exception ex)
         {
