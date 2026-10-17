@@ -159,6 +159,54 @@ public class DurableTaskCombinatorTests
     }
 
     [Fact]
+    public async Task ExtensionCombinatorsComposeCollectionsAndQueries()
+    {
+        var host = new TestHost(DateTimeOffset.UnixEpoch);
+        var root = host.CreateRootDefinition<(int[] All, (int Index, int Result) Any, int Race, int Completed, int Each)>(async _ =>
+        {
+            DurableTask<int>[] inputs = [DurableTask.Run(static _ => 1), DurableTask.Run(static _ => 2)];
+            var all = await inputs.WhenAll().WithId("all");
+            await Enumerable.Range(0, 2).Select(static _ => (DurableTask)DurableTask.Run(static _ => { })).WhenAll().WithId("untyped");
+            var any = await new[] { 3 }.Select(static value => DurableTask.Run(_ => value)).WhenAny().WithId("any");
+            var race = await new List<DurableTask> { DurableTask.Run(static _ => { }) }.Race().WithId("race");
+            var completed = await new[] { DurableTask.Run(static _ => 4) }.WhenAllCompleted().WithId("completed");
+            var scheduled = await new[] { DurableTask.Run(static _ => 5) }.ScheduleAll().WithId("scheduled");
+            await scheduled.WhenAll();
+            var each = 0;
+            await foreach (var handle in scheduled.WhenEach())
+            {
+                each += await handle;
+            }
+
+            return DurableTaskResponse.FromResult((all, any, race, await completed[0], each));
+        });
+
+        var result = await await root.WithId("root").ScheduleAsync(TestCancellation);
+
+        Assert.Equal([1, 2], result.All);
+        Assert.Equal((0, 3), result.Any);
+        Assert.Equal(0, result.Race);
+        Assert.Equal(4, result.Completed);
+        Assert.Equal(5, result.Each);
+        Assert.True(host.Contains(TaskId.Parse("root/all/1")));
+        Assert.True(host.Contains(TaskId.Parse("root/untyped/1")));
+        Assert.True(host.Contains(TaskId.Parse("root/any/0")));
+        Assert.True(host.Contains(TaskId.Parse("root/race/0")));
+        Assert.True(host.Contains(TaskId.Parse("root/completed/0")));
+        Assert.True(host.Contains(TaskId.Parse("root/scheduled/0")));
+    }
+
+    [Fact]
+    public void ExtensionCombinatorsValidateTheirInputs()
+    {
+        Assert.Throws<ArgumentNullException>(() => ((IEnumerable<DurableTask>)null!).WhenAll());
+        Assert.Throws<ArgumentNullException>(() => ((IEnumerable<DurableTask<int>>)null!).WhenAll());
+        Assert.Throws<ArgumentNullException>(() => ((IEnumerable<DurableTask<int>>)null!).WhenAny());
+        Assert.Throws<ArgumentNullException>(() => ((IEnumerable<DurableTask<int>>)null!).ScheduleAll());
+        Assert.Throws<ArgumentOutOfRangeException>(() => Enumerable.Empty<DurableTask<int>>().WhenAny());
+    }
+
+    [Fact]
     public async Task WithIdNamesTheOperationOfAnAwaitedCombinator()
     {
         var host = new TestHost(DateTimeOffset.UnixEpoch);
