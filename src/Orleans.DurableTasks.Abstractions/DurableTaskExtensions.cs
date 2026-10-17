@@ -1,7 +1,7 @@
 namespace Orleans.DurableTasks;
 
-/// <summary>Provides awaiting, identification, scheduling, and timeout operations for durable task definitions.</summary>
-public static class DurableTaskExtensions
+/// <summary>Provides awaiting, identification, scheduling, timeout, and combinator operations for durable task definitions and handles.</summary>
+public static partial class DurableTaskExtensions
 {
     /// <summary>Gets an awaiter for a durable task in the current execution context.</summary>
     public static DurableTaskAwaiter GetAwaiter(this DurableTask task) => new ConfiguredDurableTask(task).GetAwaiter();
