@@ -261,6 +261,8 @@ internal static class SerializerFactoryGenerator
             return "apply GenerateSerializerAttribute to the model, or use List<T>, Dictionary<TKey, TValue>, Nullable<T>, or T[]";
         if (named.IsAbstract || named.TypeKind == TypeKind.Interface)
             return "declare concrete model types";
+        if (LanguageFeatureSymbols.IsUnion(named))
+            return "use a model which is not a union type";
         if (!SymbolEqualityComparer.Default.Equals(named.ContainingAssembly, services.Compilation.Assembly))
             return DescribeReferenced(registration, named, services, implementationCompilation, cancellationToken, out requiresImplementation);
         ISerializableTypeDescription? model;

@@ -281,6 +281,11 @@ internal static class SerializableSourceOutputGenerator
             return new FSharpUtilities.FSharpRecordTypeDescription(compilation, symbol, libraryTypes);
         }
 
+        if (UnionCaseResolver.GetUnionTypeCases(symbol, compilation, libraryTypes) is { } unionCases)
+        {
+            return new SerializableTypeDescription(compilation, symbol, supportsPrimaryConstructorParameters: false, [], libraryTypes) { UnionCases = unionCases };
+        }
+
         var includePrimaryConstructorParameters = ShouldIncludePrimaryConstructorParameters(symbol, libraryTypes);
         var constructorParameters = ResolveConstructorParameters(symbol, includePrimaryConstructorParameters, libraryTypes);
         var implicitMemberSelectionStrategy = (options.GenerateFieldIds, GetGenerateFieldIdsOptionFromType(symbol, libraryTypes)) switch
