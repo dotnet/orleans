@@ -148,10 +148,11 @@ public sealed class PublisherGrain : DurableGrain, IPublisherGrain
         _archive.Value = address;
     }
 
-    // A durable task subscribes to the stored task, and the subscription is recorded for replay.
+    // A durable task subscribes to the stored task, and the subscription is recorded for replay. The runtime records the
+    // read of the stored address, so a replay subscribes to the address which the first run read.
     public async DurableTask<bool> AwaitArchiveAsync()
     {
-        var archive = DurableTask.RunInline("archive", () => _archive.Value);
+        var archive = _archive.Value;
         return archive is { } address && await GrainFactory.GetDurableTask<bool>(address).WithId("archived");
     }
 

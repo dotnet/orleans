@@ -1,7 +1,7 @@
 ---
 title: Idempotency in durable tasks
 description: Understand which effects durable tasks apply exactly once, which effects at external boundaries run at least once, and how idempotency keys derived from task IDs and receiver-side deduplication make them safe.
-ms.date: 10/15/2026
+ms.date: 10/16/2026
 ms.topic: conceptual
 ---
 
@@ -22,6 +22,7 @@ replay finds the record and doesn't apply the effect again:
 | Work | Commits with |
 | --- | --- |
 | A `DurableTask.RunInline` effect's state changes | The effect's record, in the task's next durable write. |
+| A body's write to journaled state, or send through the outbox | The write's record in the execution's access log, in the same work item. |
 | A local step's final synchronous code | The step's result. |
 | The body's synchronous tail | The task's result. |
 | A call to another grain, a delay, a signal send, a detached start, `Post` | The execution's record of the operation, in one journal write with the outgoing message. |
@@ -33,9 +34,9 @@ signal reaches the record which it already created. A task ID deduplicates start
 start of the same method under an existing task ID reattaches to that task, whatever its
 arguments, and a start of a different method fails with `DurableTaskConflictException`.
 
-Reads are recorded too. A step's result, an effect's result, a signal's value, and the
-logical time `DurableTask.Current.UtcNow` are the same in every replay, so the decisions
-which the body makes from them are the same.
+Reads are recorded too. A step's result, an effect's result, a signal's value, a read of
+journaled state, and the logical time `DurableTask.Current.UtcNow` are the same in every
+replay, so the decisions which the body makes from them are the same.
 
 ## Effects which run at least once
 
@@ -125,8 +126,8 @@ number in the request, and skips the change when it finds one.
 
 | Guarantee | Scope |
 | --- | --- |
-| Exactly once | Journaled state changes in effects, steps' final code, and tails; operation records; grain-to-grain messages; task starts under one ID while the grain retains the task. |
-| Same value in every replay | Recorded results, signal values, logical time, cancellation state and reason, and the operation at which the body observes its cancellation. |
+| Exactly once | Journaled state changes and outbox sends in bodies, effects, steps' final code, and tails; operation records; grain-to-grain messages; task starts under one ID while the grain retains the task. |
+| Same value in every replay | Recorded results, reads of journaled state, signal values, logical time, cancellation state and reason, and the operation at which the body observes its cancellation. |
 | At least once | External calls in steps and tails; ordinary grain calls; logs outside a replay-safe logger. |
 | Deduplicated by the receiver | Whatever the receiver keys: durable tasks by task ID, external systems by the key which the task supplies. |
 

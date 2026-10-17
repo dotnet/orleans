@@ -1,7 +1,7 @@
 ---
 title: Durable tasks
 description: Understand the durable task programming model, its replay and commit guarantees, cancellation, signals, and task lifecycle.
-ms.date: 10/14/2026
+ms.date: 10/16/2026
 ms.topic: conceptual
 ---
 
@@ -144,6 +144,64 @@ A durable task calls its own grain's durable methods directly, as local steps, s
 `await RefreshPricesAsync().WithId("refresh")`. A durable call through a reference to the
 task's own grain is rejected.
 
+## Journaled state in durable task bodies
+
+A durable task body reads and changes its grain's journaled state directly:
+<xref:Orleans.Journaling.IDurableValue`1>, <xref:Orleans.Journaling.IDurableDictionary`2>,
+<xref:Orleans.Journaling.IDurableList`1>, <xref:Orleans.Journaling.IDurableQueue`1>,
+<xref:Orleans.Journaling.IDurableSet`1>, <xref:Orleans.Journaling.IDurableLog`1>, and
+<xref:Orleans.Journaling.IDurableTaskCompletionSource`1>, and it sends messages through
+the Messaging <xref:Orleans.Messaging.IOutbox>. The runtime records each access in the
+execution's access log, in order, and a replay returns the recorded outcomes:
+
+- A read returns the value which the recording run read, including after other grain
+  work changed the state, so a replay takes the same branches and schedules the same
+  operations with the same arguments. An enumeration returns the recorded items.
+- A committed write isn't applied again, and returns its recorded result, such as the
+  `bool` which `Remove` returned or the sequence number which `Append` returned. A
+  committed send isn't sent again.
+- An access which threw records its exception, and a replay throws it again.
+- A write's record is staged in the work item which makes the write, so every journal
+  write which commits the change also commits its record. A read's record is staged
+  with the execution's next write or durable operation, which are the ways a decision
+  based on the read becomes durable. A run which ends before a journal write commits a
+  change loses the change with its record, so the next run makes the change again.
+
+The order workflow changes its status this way:
+
+:::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_state" language="csharp":::
+
+- A replay returns a recorded value decoded from the log, so the body changes a value by
+  writing it back, such as `orders[id] = order with { Status = OrderStatus.Paid }`. Values
+  and exceptions are recorded with the Orleans serializer in every journal format, as
+  `DurableTask.RunInline` results are, so the state's types are Orleans-serializable.
+- Every run accesses the same state in the same order. A replay which makes a different
+  access, such as reading other state at a recorded position, or whose recorded value no
+  longer decodes, stalls: the runtime cancels the attempt for `Diverged`, discards its
+  result, and keeps the task pending until code which makes the recorded accesses replays
+  it. The attempt's handlers can't continue the task: its durable operations throw
+  `DurableTaskAttemptCanceledException`, whose inner exception names the recorded and the
+  requested access, and the `ExecutionStalled` event reports the stall.
+- The body accesses state on the activation's scheduler, as it records other operations.
+- The body awaits durable operations, such as signals and children, rather than observing
+  state as it changes: `IDurableTaskCompletionSource<T>.Task`, `IDurableLog<T>.ReadAsync`,
+  and `WatchAsync` report changes as they happen, unrecorded, so a replay can observe
+  different changes.
+- Once the runtime cancels an attempt, or the body completes, the attempt's later code,
+  such as cleanup in a `catch` or `finally` block and work which the body started without
+  awaiting it, accesses state directly, unrecorded, as other grain code does. Its changes
+  commit with the grain's next journal write. A canceled attempt's task replays in a new
+  attempt, which runs the cleanup again.
+- A `DurableTask.RunInline` effect records the accesses which it makes with its own result.
+- The access log holds one record for each access in re-executed code and is deleted when
+  the execution completes. A workflow which loops indefinitely bounds its history as
+  [Replay-safety rules](durable-tasks-replay-rules.md#rules-which-the-analyzers-dont-check)
+  describes.
+- <xref:Orleans.Runtime.IPersistentState`1> holds a value which the grain changes in
+  place, and plain fields hold values outside the journal, so the body reads and changes
+  them in recorded effects, steps, or the synchronous tail; analyzer
+  [ORLEANS0200](../diagnostics/orleans0200.md) reports other accesses.
+
 ## Recorded effects, local steps, and calls to other grains
 
 A *recorded effect*,
@@ -152,13 +210,13 @@ synchronous code in the caller's current work item before it returns, with no
 suspension and no child execution, and records its result, or the exception it threw,
 in the task's tree under its name. The record commits in the same journal write as the
 journaled state which the effect changed, and a replay returns the recorded result
-without running the effect again. The order workflow changes its status this way:
+without running the effect again. The ticket grain draws a reference and reads the clock this way:
 
 :::code source="../snippets/compiled/Grains/DurableTaskSnippets.cs" id="durable_tasks_run_inline" language="csharp":::
 
-- An effect changes grain state exactly once, reads state which later operations change,
-  and produces identifiers, random values, and wall-clock times which every replay
-  observes.
+- An effect produces identifiers, random values, and wall-clock times which every replay
+  observes, changes persistent state exactly once, and groups several accesses to
+  journaled state under one record.
 - The effect passes data to the workflow through its result: assignments to captured
   variables don't happen in later runs.
 - A failure is recorded too, because journaled state has no rollback: changes made
@@ -170,6 +228,8 @@ without running the effect again. The order workflow changes its status this way
   them. Returning from an effect doesn't mean that its record has committed: it commits
   with the task's next journal write. The effect runs after task cancellation too, so
   compensation records its effects.
+- An effect within another effect runs as part of the outer effect, whose record
+  covers it.
 - A name identifies an effect as `WithId` identifies a step: `pay`, then `pay$2` for a
   later occurrence in the same run.
 - `DurableTask.RunInline(effect)` omits the name, such as
@@ -241,13 +301,10 @@ A workflow publishes progress to observers through a journaled
 `IAsyncEnumerable<T>` grain method. [Observe journaled state](journaling/observe-state.md)
 describes reading, resuming, and trimming logs.
 
-To publish an entry, append it in a recorded effect,
-`DurableTask.RunInline(() => log.Append(item))`. The effect appends once for its position in
-the task, and the entry commits together with the effect's record in the task's next
-durable write. A replay returns the recorded sequence number without appending again, so
-a reader in the committed mode receives each entry once, in the order in which the task
-appended it. Compute each entry from the task's arguments, recorded results, and logical
-time, so each replay makes the same appends at the same positions. Entries suit progress
+To publish an entry, append it, `log.Append(item)`. The runtime records the append, and
+the entry commits together with its record. A replay returns the recorded sequence
+number without appending again, so a reader in the committed mode receives each entry
+once, in the order in which the task appended it. Entries suit progress
 which callers and user interfaces watch, such as each status of an order or each
 completed partition of an export:
 
@@ -278,10 +335,10 @@ the final content in its final synchronous code, after its last `await`:
   both, so the next run runs the step, which streams and commits the content.
 - A step which throws, including after cancellation, disposes the draft, which abandons
   it, and the step's failure is recorded, so a replay rethrows it without streaming again.
-- Journaled changes inside a step belong in its final synchronous code. A change which
-  the step makes before an `await`, such as an `Append`, can commit with a journal write
-  which other grain work requests before the step completes, and a replay which runs the
-  step again makes the change again.
+- A journaled change which the step makes before an `await`, such as an `Append`, commits
+  with its record. A step which runs again returns the recorded outcome without making
+  the change again. A draft's items are volatile, so a step which runs again streams them
+  again.
 
 ## Replay and determinism
 
@@ -294,14 +351,16 @@ runs, so their later durable operations throw; see
 A workflow resumes correctly when each replay schedules the same operations, with the
 same IDs and arguments, in the same order.
 
-Replay doesn't rebuild the grain's journaled state, which holds the latest committed
-changes, including changes which later operations made. A durable body therefore has
-three kinds of code:
+Replay doesn't rebuild the grain's state, which holds the latest committed changes,
+including changes which later operations made. Journaled state returns the outcomes
+which the execution's access log recorded, as
+[Journaled state in durable task bodies](#journaled-state-in-durable-task-bodies)
+describes. A durable body has three kinds of code:
 
 - **Recorded operations** run once per execution, and a replay returns their recorded
   outcomes: durable calls to other grains, local steps, `DurableTask.Run` delegates,
-  delays, signal waits and sends, detached and posted starts, and `DurableTask.RunInline`
-  effects.
+  delays, signal waits and sends, detached and posted starts, `DurableTask.RunInline`
+  effects, and accesses to journaled state.
 - **Re-executed code** precedes the body's last recorded operation and runs again in
   every replay. It computes values from the method's arguments, recorded results, the
   execution's logical time and cancellation state, and configuration which stays the
@@ -321,9 +380,10 @@ Follow these rules in re-executed code:
 - Put each side effect in a recorded operation or in the synchronous tail. Code between
   recorded operations computes values from the method's arguments, earlier results, and
   other values which are the same on every replay.
-- Read and change grain state in recorded effects, steps, or the synchronous tail. Grain
-  state holds every committed change, so code which replays reads the state which later
-  operations wrote.
+- Read and change journaled state anywhere in the body, and persistent state and plain
+  fields in recorded effects, steps, or the synchronous tail. Persistent state holds
+  every committed change, so code which replays reads the state which later operations
+  wrote.
 - Read time from `DurableTask.Current.UtcNow`, the execution's logical time, which
   <xref:Orleans.DurableTasks.DurableTask.Current?displayProperty=nameWithType> exposes.
   The runtime persists it before the execution's effects commit and advances it to the
@@ -686,7 +746,9 @@ describes which tasks have addresses and how long they resolve.
 - A body's result is staged in the work item which runs the body's final code on the
   activation, so it commits in the same journal write as the state which that code
   changed, whichever operation requests the write. A `DurableTask.RunInline` record is
-  staged in the same work item as the effect's state changes, and commits with them.
+  staged in the same work item as the effect's state changes, and commits with them. A
+  write to journaled state, including a send through the outbox, is recorded in the same
+  work item, and commits with its record.
 
 Durability covers state and messages which participate in Orleans Journaling and
 Messaging commits. External side effects, such as calls to a payment provider, need

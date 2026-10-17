@@ -168,9 +168,11 @@ statements, which run for both kinds of cancellation:
 
 :::code source="../snippets/compiled/Grains/DurableTaskConcurrencySnippets.cs" id="durable_tasks_attempt_cancellation" language="csharp":::
 
-Journaled state changes pass through the state's API, which records each one. A change made in place to a mutable object which a durable value holds bypasses
-that API, so store immutable values, such as records, and assign a new value to change
-it. [ORLEANS0217](../diagnostics/orleans0217.md) reports cleanup which passes the
+Journaled state accesses and outbox sends pass through the attempt's record of its state
+accesses, which the attempt's cancellation closes: from then on, reads return the state's
+current values and changes apply, unrecorded. A change made in place to a mutable object
+which a durable value holds bypasses that record, so store immutable values, such as
+records, and assign a new value to change it. [ORLEANS0217](../diagnostics/orleans0217.md) reports cleanup which passes the
 already-canceled `CancellationToken`.
 
 ## Detach the work which outlives its starter

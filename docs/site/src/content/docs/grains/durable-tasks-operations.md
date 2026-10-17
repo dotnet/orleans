@@ -163,6 +163,11 @@ and the requested one. A call names its method by its generated invokable type, 
 fingerprint is a hash of its serialized arguments, which tells calls apart in diagnostics
 but doesn't decide whether they match. Typical causes:
 
+- A deployment changed which journaled state a body reads or writes, or in which order,
+  before existing operations. The runtime stalls the execution instead of throwing into
+  the body: the `ExecutionStalled` event, with the reason `Diverged`, carries an
+  exception which names the recorded and the requested access. Deploy code which makes
+  the recorded accesses, or abort the task.
 - A deployment replaced a step's call with a call to another method or grain, reordered
   unnamed children, or added an unnamed child or combinator before existing ones. Branch
   such changes on `DurableTask.GetVersion`, so pending executions keep their recorded
@@ -194,7 +199,8 @@ When a deployment changes a workflow while executions are pending, those executi
 replay under the new code:
 
 - Keep existing steps, `RunInline` effects, and detached starts, with their IDs, methods,
-  and targets. A call or detached start whose arguments a deployment changes returns, in
+  and targets, and keep accesses to journaled state in their order and with their
+  arguments. A call or detached start whose arguments a deployment changes returns, in
   executions which recorded it, the outcome recorded for its original arguments. A
   changed `RunInline` delegate doesn't affect executions which recorded it: they return the
   recorded result. An effect and a step with the same name share an ID, so turning a
@@ -308,6 +314,12 @@ caller's token or the wait's timeout ends it.
 - A recorded effect, `DurableTask.RunInline`, adds no journal write: its record and the state
   it changed commit with the task's next durable write. Each effect retains one record,
   holding its result, until the task's tree is deleted.
+- An access to journaled state adds no journal write either. Each write records about
+  6 bytes plus its serialized result, if any, and each read records its serialized value,
+  staged with the execution's next write or durable operation; reads in the synchronous
+  tail aren't recorded. Each journal write appends one access-log entry per execution
+  which accessed state, and the log is deleted when the execution completes. Accesses on an
+  activation without a running durable task pay a few field reads.
 - A local step costs one journal write: its record commits with its first durable
   write, so a step which changes state and returns without awaiting commits its state
   change and result together.
