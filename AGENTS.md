@@ -80,4 +80,5 @@ correctness, security, compatibility, concurrency, and reliability.
 - After changing public API in a packable source project, regenerate that project's API file using the same restore configuration and GenAPI target as CI:
   `dotnet restore <project> --configfile .github/NuGet.GenAPI.Config -p:GenerateOrleansApiSource=true`,
   then `dotnet build <project> --framework net8.0 --configuration Release --no-incremental --no-restore -p:GenerateOrleansApiSource=true /t:"Build;GenAPIGenerateReferenceAssemblySource"`.
+  For a project which does not target `net8.0`, pass its first target framework instead, as CI does.
 - Review and commit the generated `src/api` change with the implementation. The `GenerateOrleansApiSource` property activates the GenAPI package, and the dedicated NuGet config maps that package to its public transport feed; ordinary restores use only the repository's CFS source.

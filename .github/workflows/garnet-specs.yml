@@ -1,0 +1,98 @@
+name: Garnet specs
+
+on:
+  pull_request:
+    paths: [specs/garnet-range-migration/**, .github/workflows/garnet-specs.yml]
+  push:
+    branches: [main]
+    paths: [specs/garnet-range-migration/**, .github/workflows/garnet-specs.yml]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  QUINT_VERSION: 0.33.0
+  SPEC: garnetRangeMigration.qnt
+
+jobs:
+  simulate:
+    name: Quint tests, simulation, and mutants
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: specs/garnet-range-migration
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - run: npm install -g "@informalsystems/quint@$QUINT_VERSION"
+      - run: quint typecheck "$SPEC" && quint typecheck garnetRangeMigrationTraces.qnt
+      - name: Directed scenarios
+        run: quint test "$SPEC" --main=garnetRangeMigrationSim --match=Test
+      - name: Random simulation
+        run: >-
+          quint run "$SPEC" --main=garnetRangeMigrationSim --backend=rust
+          --invariant=safety --max-steps=40 --max-samples=20000
+      - name: Mutants must violate safety
+        # mutantUnfencedInstall, mutantUnfencedOpen, mutantUnfencedDone, and mutantUnfencedReclaim need long, specific
+        # sequences which random simulation rarely reaches; their directed scenarios (unfencedInstallHidesWriteTest,
+        # unfencedOpenTest, unfencedDoneHidesWriteTest, unfencedReclaimLosesWriteTest) catch them.
+        run: |
+          for step in mutantOpenBeforeSeal mutantUnconditionalInstall mutantDeleteWithoutTombstone \
+                      mutantReclaimBeforeDone mutantMarkDoneEarly mutantInventoryLiveOnly mutantDropWithoutHorizon \
+                      mutantClientClock mutantRetryWithoutIdempotence mutantRetryAnyAbsence mutantWriteAfterSeal; do
+            if quint run "$SPEC" --main=garnetRangeMigrationSim --backend=rust --step="$step" \
+                 --invariant=safety --max-steps=30 --max-samples=5000 --seed=7 > "$step.log" 2>&1; then
+              echo "::error::$step was not caught by the safety invariant"
+              exit 1
+            fi
+            if ! grep -q '\[violation\]' "$step.log"; then
+              cat "$step.log"
+              echo "::error::$step failed without a safety violation"
+              exit 1
+            fi
+            echo "$step: violation found, as expected"
+          done
+
+  model-check:
+    name: Exhaustive model checking (TLC)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    defaults:
+      run:
+        working-directory: specs/garnet-range-migration
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm install -g "@informalsystems/quint@$QUINT_VERSION"
+      - name: Safety
+        run: quint verify "$SPEC" --main=garnetRangeMigrationTlc --backend=tlc --invariant=safety
+      - name: Liveness under the coordinator's rule
+        run: >-
+          quint verify "$SPEC" --main=garnetRangeMigrationLive --backend=tlc
+          --temporal=migrationsComplete
+      - name: Liveness fails without the coordinator's rule
+        run: |
+          if quint verify "$SPEC" --main=garnetRangeMigrationLive --backend=tlc \
+               --step=uncoordinatedStep --temporal=migrationsComplete > uncoordinated.log 2>&1; then
+            echo "::error::migrationsComplete holds without the coordinator's rule, so it does not test the rule"
+            exit 1
+          fi
+          if ! grep -q 'Temporal property .* was violated' uncoordinated.log; then
+            cat uncoordinated.log
+            echo "::error::TLC failed without a liveness violation"
+            exit 1
+          fi
+          echo "migrationsComplete violated without the coordinator's rule, as expected"
