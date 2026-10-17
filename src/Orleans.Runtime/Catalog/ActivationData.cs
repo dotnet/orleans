@@ -39,7 +39,7 @@ internal sealed partial class ActivationData :
     IAsyncDisposable,
     IDisposable
 {
-    private const string GrainAddressMigrationContextKey = "sys.addr";
+    internal const string GrainAddressMigrationContextKey = "sys.addr";
 #if NET10_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -2218,6 +2218,15 @@ internal sealed partial class ActivationData :
                     encounteredError = true;
                 }
 
+                // When its silo retires, an activation which still has queued requests migrates, carrying the requests with it.
+                if (!encounteredError
+                    && DehydrationContext is null
+                    && WaitingCount > 0
+                    && MigratesOnRetirement())
+                {
+                    DehydrationContext = new(_shared.SerializerSessionPool, requestContext: null);
+                }
+
                 if (!encounteredError
                     && DehydrationContext is { } context
                     && _shared.MigrationManager is { } migrationManager
@@ -2273,8 +2282,6 @@ internal sealed partial class ActivationData :
                 _shared.CatalogInstruments.ActivationShutdownViaCollection(_shared.GrainTypeMetricName);
             }
 
-            UnregisterMessageTarget();
-
             try
             {
                 await DisposeAsync();
@@ -2292,8 +2299,36 @@ internal sealed partial class ActivationData :
 
             deactivationMetrics = deactivationMetrics.Record();
 
-            // Signal deactivation
-            GetDeactivationCompletionSource().TrySetResult(true);
+            // The activation leaves the catalog only now, so the catalog awaits all of its deactivation, and no new local activation of the grain is created before it completes.
+            // Leaving, forwarding queued requests, and signaling deactivation are synchronous, and forwarding follows leaving so that forwarded requests do not return to this activation.
+            UnregisterMessageTarget();
+            try
+            {
+                List<Message>? queued = null;
+                lock (_lock)
+                {
+                    if (_waitingRequests.Count > 0)
+                    {
+                        queued = new List<Message>(_waitingRequests.Count);
+                        foreach (var (message, _) in _waitingRequests)
+                        {
+                            queued.Add(message);
+                        }
+
+                        _waitingRequests.Clear();
+                    }
+                }
+
+                if (queued is not null)
+                {
+                    RejectOrForwardRequests(queued);
+                }
+            }
+            finally
+            {
+                GetDeactivationCompletionSource().TrySetResult(true);
+            }
+
             _workSignal.Signal();
         }
         finally
@@ -2303,6 +2338,8 @@ internal sealed partial class ActivationData :
 
         async ValueTask<bool> StartMigrationAsync(DehydrationContextHolder context, IActivationMigrationManager migrationManager, CancellationToken cancellationToken)
         {
+            List<Message>? requests = null;
+            var requestsOutcome = MigratedRequestsOutcome.Retained;
             try
             {
                 if (ForwardingAddress is null)
@@ -2324,8 +2361,29 @@ internal sealed partial class ActivationData :
 
                 OnDehydrate(context.MigrationContext);
 
-                // Send the dehydration context to the target host.
-                await migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext).AsTask().WaitAsync(cancellationToken);
+                // Send the dehydration context to the target host, together with the queued requests, which the new activation runs before any other request.
+                requests = TakeRequestsForMigration();
+                var migration = migrationManager.MigrateAsync(ForwardingAddress, GrainId, context.MigrationContext, requests, out var carriesRequests);
+                if (!carriesRequests)
+                {
+                    // The requests stay queued and are forwarded.
+                    EndRequestMigration(requests, MigratedRequestsOutcome.Retained);
+                    requests = null;
+                }
+                else
+                {
+                    // Until the target answers, it may own the requests.
+                    requestsOutcome = MigratedRequestsOutcome.Unknown;
+                }
+
+                var result = await migration.AsTask().WaitAsync(cancellationToken);
+                requestsOutcome = result.Requests;
+                if (!result.Migrated)
+                {
+                    LogFailedToMigrateActivation(_shared.Logger, result.Exception!, this);
+                    return false;
+                }
+
                 _shared.InternalRuntime.GrainLocator.UpdateCache(GrainId, ForwardingAddress);
                 return true;
             }
@@ -2333,6 +2391,10 @@ internal sealed partial class ActivationData :
             {
                 LogFailedToMigrateActivation(_shared.Logger, exception, this);
                 return false;
+            }
+            finally
+            {
+                EndRequestMigration(requests, requestsOutcome);
             }
         }
     }
@@ -2454,108 +2516,6 @@ internal sealed partial class ActivationData :
         return tracker.IsReentrantSectionActive(reentrancyId);
     }
 
-    ValueTask IGrainCallCancellationExtension.CancelRequestAsync(
-        GrainId senderGrainId,
-        CorrelationId messageId,
-        CancellationToken cancellationToken)
-        => this.RunOrQueueTask(
-            static state => state.self.CancelRequestAsyncCore(state.senderGrainId, state.messageId, state.cancellationToken),
-            (self: this, senderGrainId, messageId, cancellationToken));
-
-    private ValueTask CancelRequestAsyncCore(
-        GrainId senderGrainId,
-        CorrelationId messageId,
-        CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!TryCancelRequest())
-        {
-            // The message being canceled may not have arrived yet, so retry a few times.
-            return RetryCancellationAfterDelay();
-        }
-
-        return ValueTask.CompletedTask;
-
-        async ValueTask RetryCancellationAfterDelay()
-        {
-            var attemptsRemaining = 3;
-            do
-            {
-                await Task.Delay(1_000, cancellationToken);
-            } while (!TryCancelRequest() && --attemptsRemaining > 0);
-        }
-
-        bool TryCancelRequest()
-        {
-            Message? message = null;
-            var wasWaiting = false;
-            lock (_lock)
-            {
-                // Check the running requests.
-                foreach (var candidate in _runningRequests.Keys)
-                {
-                    if (candidate.Id == messageId && candidate.SendingGrain == senderGrainId)
-                    {
-                        message = candidate;
-                        break;
-                    }
-                }
-
-                if (message is null)
-                {
-                    // Check the waiting requests.
-                    for (var i = 0; i < _waitingRequests.Count; i++)
-                    {
-                        var candidate = _waitingRequests[i].Message;
-                        if (candidate.Id == messageId && candidate.SendingGrain == senderGrainId)
-                        {
-                            message = candidate;
-                            _waitingRequests.RemoveAt(i);
-                            wasWaiting = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            var didCancel = false;
-            if (message is not null && message.BodyObject is IInvokable request)
-            {
-                if (wasWaiting)
-                {
-                    // If the request was waiting, then we necessarily did manage to cancel it, so send the response now.
-                    _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-                    didCancel = true;
-                }
-                else
-                {
-                    didCancel = TryCancelInvokable(request) || !request.IsCancellable;
-                }
-            }
-
-            return didCancel;
-        }
-
-        bool TryCancelInvokable(IInvokable request)
-        {
-            try
-            {
-                return request.TryCancel();
-            }
-            catch (Exception exception)
-            {
-                LogErrorCancellationCallbackFailed(Shared.Logger, exception);
-                return true;
-            }
-        }
-    }
-
-    [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "One or more cancellation callbacks failed."
-    )]
-    private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
-
     #endregion
 
     /// <summary>
@@ -2566,6 +2526,9 @@ internal sealed partial class ActivationData :
         private const int IsStuckProcessingMessageFlag = 1 << 0;
         private const int IsStuckDeactivatingFlag = 1 << 1;
         private const int IsDisposingFlag = 1 << 2;
+        private const int IsMigratingRequestsFlag = 1 << 3;
+        private const int HasMigratedRequestsFlag = 1 << 4;
+
         private byte _flags;
 
         /// <summary>
@@ -2584,6 +2547,11 @@ internal sealed partial class ActivationData :
         /// If State == Invalid, this may contain a forwarding address for incoming messages
         /// </summary>
         public SiloAddress? ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
+
+        /// <summary>
+        /// Cancellations which arrived while this activation's queued requests were in transit with its migration.
+        /// </summary>
+        public HashSet<(GrainId SendingGrain, CorrelationId MessageId)>? InTransitCancellations { get => GetValueOrDefault<HashSet<(GrainId, CorrelationId)>>(nameof(InTransitCancellations)); set => SetOrRemoveValue(nameof(InTransitCancellations), value); }
 
         /// <summary>
         /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.
@@ -2612,6 +2580,18 @@ internal sealed partial class ActivationData :
         public bool IsStuckProcessingMessage { get => GetFlag(IsStuckProcessingMessageFlag); set => SetFlag(IsStuckProcessingMessageFlag, value); }
         public bool IsStuckDeactivating { get => GetFlag(IsStuckDeactivatingFlag); set => SetFlag(IsStuckDeactivatingFlag, value); }
         public bool IsDisposing { get => GetFlag(IsDisposingFlag); set => SetFlag(IsDisposingFlag, value); }
+
+        /// <summary>
+        /// Whether requests which were taken from this activation's queue are in transit with its migration.
+        /// </summary>
+        public bool IsMigratingRequests { get => GetFlag(IsMigratingRequestsFlag); set => SetFlag(IsMigratingRequestsFlag, value); }
+
+        /// <summary>
+        /// Whether this activation's queued requests migrated, or may have migrated, to its forwarding address.
+        /// </summary>
+        public bool HasMigratedRequests { get => GetFlag(HasMigratedRequestsFlag); set => SetFlag(HasMigratedRequestsFlag, value); }
+
+
 
         private void SetFlag(int flag, bool value)
         {

@@ -44,6 +44,7 @@ namespace Orleans.Runtime
         private readonly DeepCopier _deepCopier;
         private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager _cancellationManager = null!;
+        private Func<SiloAddress, bool> _isDeadSilo = null!;
         private HostedClient hostedClient = null!;
 
         private HostedClient HostedClient => this.hostedClient;
@@ -118,7 +119,9 @@ namespace Orleans.Runtime
 
         private List<IIncomingGrainCallFilter> GrainCallFilters => this.grainCallFilters;
 
-        private MessageCenter MessageCenter => this.messageCenter;
+        internal MessageCenter MessageCenter => this.messageCenter;
+
+        internal IGrainCallCancellationManager CancellationManager => _cancellationManager;
 
         public IGrainReferenceRuntime GrainReferenceRuntime => this.grainReferenceRuntime;
 
@@ -130,6 +133,7 @@ namespace Orleans.Runtime
             this.grainReferenceRuntime = this.ServiceProvider.GetRequiredService<IGrainReferenceRuntime>();
             this.hostedClient = this.ServiceProvider.GetRequiredService<HostedClient>();
             _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
+            _isDeadSilo = this.ServiceProvider.GetRequiredService<ISiloStatusOracle>().IsDeadSilo;
             sharedCallbackData.CancellationManager = _cancellationManager;
             systemSharedCallbackData.CancellationManager = _cancellationManager;
         }
@@ -639,8 +643,19 @@ namespace Orleans.Runtime
             {
                 if (deadSilo.Equals(callback.Value.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.Value.OnTargetSiloFail(deadSilo);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Moves a pending call to the silo which accepted its request, so the call survives the original silo's departure.
+        /// </summary>
+        internal void RetargetCallback(GrainId sendingGrain, CorrelationId messageId, SiloAddress targetSilo, int forwardCount)
+        {
+            if (callbacks.TryGetValue((sendingGrain, messageId), out var callback))
+            {
+                callback.TryRetarget(targetSilo, forwardCount, _isDeadSilo);
             }
         }
 

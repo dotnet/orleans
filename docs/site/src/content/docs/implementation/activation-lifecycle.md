@@ -55,6 +55,8 @@ A deactivation reason distinguishes normal collection, application-requested dea
 
 Migration moves an activation while preserving its grain identity. `ActivationMigrationManager` starts migration by creating a `MigrationContext`, asking registered migration participants to dehydrate state, and deactivating with the `Migrating` reason. The target creates the activation, rehydrates participants, runs activation, and waits until the activation reaches a stable state.
 
+The migration package also carries the requests which are queued for the source activation. The target queues them in the new activation before it registers in the grain directory, so they run before any request which reaches the new activation directly. The target reports for each grain whether its new activation took ownership of the requests. The source then retargets their callers' pending calls to the target, so the calls survive the source silo's departure. A source sends queued requests only to silos whose manifest lists `IMigratingRequestsSystemTarget`, and it forwards requests which the target does not take.
+
 ```mermaid
 sequenceDiagram
     participant Source as Source activation
@@ -65,11 +67,12 @@ sequenceDiagram
     Manager->>Source: Begin migration
     Source->>Source: OnDehydrate(MigrationContext)
     Source->>Directory: Remove or transfer registration
-    Manager->>Target: AcceptMigratingGrains
-    Target->>Target: Create and OnRehydrate
+    Manager->>Target: AcceptMigratingGrainsWithRequests
+    Target->>Target: Create, OnRehydrate, and queue requests
     Target->>Directory: Register target activation
     Target->>Target: OnActivateAsync
-    Target-->>Manager: Stable activation
+    Target-->>Manager: Stable activation, requests accepted
+    Manager->>Manager: Retarget callers' pending calls
 ```
 
 Migration state is not the same as persisted grain state. <xref:Orleans.Runtime.IGrainMigrationParticipant> is intended for runtime or application components whose in-memory state must accompany a live move. Participants write versionable data to the migration context and must tolerate rehydration on another silo.
