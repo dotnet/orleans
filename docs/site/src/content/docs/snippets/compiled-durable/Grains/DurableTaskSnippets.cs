@@ -165,8 +165,8 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
             DurableTask.Once("validate", () => SetStatus(OrderStatus.AwaitingValidation));
 
             // Reserves every line concurrently, as the children reserve/0, reserve/1, and so on.
-            reserved = await DurableTask.WhenAll(
-                    order.Lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units)))
+            reserved = await order.Lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units))
+                .WhenAll()
                 .WithId("reserve");
         }
         catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
@@ -227,7 +227,8 @@ public sealed class OrderGrain : DurableGrain, IOrderGrain
     private async Task<OrderResult> CancelOrderAsync(OrderLine[] lines, string? reason)
     {
         // The release is shielded, so it runs to completion after the cancellation which ended the workflow.
-        await DurableTask.WhenAll(lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
+        await lines.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId))
+            .WhenAll()
             .WithId("release")
             .Shielded();
         DurableTask.Once("cancel", () => SetStatus(OrderStatus.Cancelled));
@@ -407,7 +408,8 @@ public sealed partial class ShippingGrain
     // <durable_tasks_when_each>
     public async DurableTask<ShippingQuote[]> CollectQuotesAsync(string route, string[] carriers, int count)
     {
-        var requests = await DurableTask.ScheduleAll(carriers.Select(carrier => Carrier(carrier).QuoteAsync(route)))
+        var requests = await carriers.Select(carrier => Carrier(carrier).QuoteAsync(route))
+            .ScheduleAll()
             .WithId("quotes");
 
         var quotes = new List<ShippingQuote>();
@@ -446,8 +448,8 @@ public sealed class AllocationGrain : DurableGrain, IAllocationGrain
 
     public async DurableTask<bool> AllocateAsync(OrderLine[] lines)
     {
-        var reservations = await DurableTask.WhenAllCompleted(
-                lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units)))
+        var reservations = await lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units))
+            .WhenAllCompleted()
             .WithId("reserve");
         if (reservations.All(reservation => reservation.TryGetResult(out var reserved) && reserved))
         {
@@ -456,7 +458,8 @@ public sealed class AllocationGrain : DurableGrain, IAllocationGrain
 
         // Releases exactly the lines whose reservation succeeded, including after a cancellation request.
         var held = lines.Where((_, i) => reservations[i].TryGetResult(out var reserved) && reserved);
-        await DurableTask.WhenAll(held.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId)))
+        await held.Select(line => Catalog(line.ProductId).ReleaseAsync(OrderId))
+            .WhenAll()
             .WithId("release")
             .Shielded();
 
@@ -491,8 +494,8 @@ public sealed class FulfillmentGrain : DurableGrain, IFulfillmentGrain
     public async DurableTask<string[]> FulfillAsync(Package[] packages)
     {
         // Starts printing every label, as the children labels/0, labels/1, and so on, without waiting for them.
-        var labels = await DurableTask.ScheduleAll(
-                packages.Select(package => GrainFactory.GetGrain<ILabelGrain>(package.PackageId).PrintAsync(package)))
+        var labels = await packages.Select(package => GrainFactory.GetGrain<ILabelGrain>(package.PackageId).PrintAsync(package))
+            .ScheduleAll()
             .WithId("labels");
 
         await MarkPicked().WithId("pick");

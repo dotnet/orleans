@@ -49,7 +49,7 @@ public sealed class ReportGrain(IDurableTaskManager tasks) : DurableGrain, IRepo
 
         // publish-{reportId}/render/0, render/1, and so on: a named combinator's inputs, in input order. Each renderer
         // stores its call under the caller's scope, $caller/{reportGrainId}/publish-{reportId}/render/{i}.
-        await DurableTask.WhenAll(sections.Select(section => Renderer(section).RenderAsync(section))).WithId("render");
+        await sections.Select(section => Renderer(section).RenderAsync(section)).WhenAll().WithId("render");
 
         // publish-{reportId}/check, then check$2, check$3, and so on: one name which this run repeats.
         foreach (var section in sections)
