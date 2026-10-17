@@ -8,8 +8,8 @@ public class DurableTaskReplayRegionTests
 {
     private const string Members = """
             private static readonly DurableSignal<string> Shipped = new("shipped");
-            private readonly IDurableValue<int> _status = null!;
-            private readonly IDurableDictionary<int, bool> _stock = null!;
+            private readonly Orleans.Runtime.IPersistentState<int> _status = null!;
+            private readonly Orleans.Runtime.IPersistentState<Dictionary<int, bool>> _stock = null!;
 
             private static DurableTask<int> Step(int value) => DurableTask.FromResult(value);
 
@@ -17,7 +17,7 @@ public class DurableTaskReplayRegionTests
 
             private int SetStatus(int status)
             {
-                _status.Value = status;
+                _status.State = status;
                 return status;
             }
         """;
@@ -58,13 +58,13 @@ public class DurableTaskReplayRegionTests
                 Record(buyerId, summary);
 
                 // The tail runs once, with the run which completes the body.
-                _status.Value = summary;
+                _status.State = summary;
                 return summary;
             }
 
             public async Task<bool> ShipAsync()
             {
-                if (_status.Value != 3)
+                if (_status.State != 3)
                 {
                     return false;
                 }
@@ -95,17 +95,17 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<int> RunAsync()
             {
-                var status = {|ORLEANS0200:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.State;
                 await Step(status).WithId("first");
-                if ({|ORLEANS0200:_stock|}.ContainsKey(1))
+                if ({|ORLEANS0200:_stock|}.State.ContainsKey(1))
                 {
                     await Step(2).WithId("second");
                 }
 
-                {|ORLEANS0200:_status|}.Value = 2;
-                var recorded = DurableTask.RunInline("read", () => _status.Value);
+                {|ORLEANS0200:_status|}.State = 2;
+                var recorded = DurableTask.RunInline("read", () => _status.State);
                 await Step(recorded).WithId("third");
-                return _status.Value;
+                return _status.State;
             }
         }
         """);
@@ -117,14 +117,14 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<string> RunAsync()
             {
-                var status = {|ORLEANS0200:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.State;
                 var id = DurableTask.RunInline(Guid.NewGuid);
-                var read = DurableTask.{|ORLEANS0220:RunInline|}(() => _status.Value);
+                var read = DurableTask.{|ORLEANS0220:RunInline|}(() => _status.State);
                 var now = DurableTask.{|ORLEANS0220:RunInline|}(() => DateTime.UtcNow);
                 DurableTask.{|ORLEANS0220:RunInline|}(() => SetStatus(status + read));
 
                 // The tail follows the last recorded effect.
-                return $"{id} {now} {_status.Value}";
+                return $"{id} {now} {_status.State}";
             }
         }
         """);
@@ -139,7 +139,7 @@ public class DurableTaskReplayRegionTests
                 for (var i = 0; i < 3; i++)
                 {
                     await Step(i).WithId($"step-{i}");
-                    {|ORLEANS0200:_stock|}[i] = true;
+                    {|ORLEANS0200:_stock|}.State = new() { [i] = true };
                 }
             }
         }
@@ -183,12 +183,14 @@ public class DurableTaskReplayRegionTests
         """);
 
     [Fact]
-    public Task EveryJournaledCollectionIsGrainState() => AnalyzerVerifier.VerifyAsync($$"""
+    public Task JournaledStateIsRecordedAndPersistentStateIsGrainState() => AnalyzerVerifier.VerifyAsync($$"""
         using Orleans.Runtime;
 
         public class C
         {
         {{Members}}
+            private readonly IDurableValue<int> _value = null!;
+            private readonly IDurableDictionary<int, bool> _dictionary = null!;
             private readonly IDurableList<int> _list = null!;
             private readonly IDurableQueue<int> _queue = null!;
             private readonly IDurableSet<int> _set = null!;
@@ -197,13 +199,15 @@ public class DurableTaskReplayRegionTests
 
             public async DurableTask<int> RunAsync()
             {
-                {|ORLEANS0200:_list|}.Add(1);
-                {|ORLEANS0200:_queue|}.Enqueue(1);
-                {|ORLEANS0200:_set|}.Add(1);
-                {|ORLEANS0200:_completion|}.TrySetResult(1);
+                // The runtime records the accesses of journaled state, so a replay returns their recorded outcomes.
+                _value.Value = _value.Value + 1;
+                _dictionary[1] = !_dictionary.ContainsKey(1);
+                _list.Add(1);
+                _queue.Enqueue(1);
+                _set.Add(1);
+                _completion.TrySetResult(1);
                 {|ORLEANS0200:_state|}.State = 1;
 
-                // A recorded effect enqueues once, and the tail enqueues with the task's result.
                 var count = DurableTask.RunInline("progress", () => { _queue.Enqueue(2); return _queue.Count; });
                 await Step(1).WithId("step");
                 _queue.Enqueue(3);
@@ -213,7 +217,7 @@ public class DurableTaskReplayRegionTests
         """);
 
     [Fact]
-    public Task CollectionChangesBeforeAnExternalAwaitInTheTailAreReported() => AnalyzerVerifier.VerifyAsync($$"""
+    public Task JournaledStateChangesBeforeAnExternalAwaitAreRecorded() => AnalyzerVerifier.VerifyAsync($$"""
         public class C
         {
         {{Members}}
@@ -223,11 +227,11 @@ public class DurableTaskReplayRegionTests
 
             public async DurableTask<int> StepAsync()
             {
-                {|ORLEANS0203:_list.AddRange(new[] { 1, 2 })|};
-                {|ORLEANS0203:_set.UnionWith(new[] { 1, 2 })|};
-                {|ORLEANS0203:_set.ExceptWith(new[] { 3 })|};
-                {|ORLEANS0203:_queue.Enqueue(1)|};
-                {|ORLEANS0203:_queue.Dequeue()|};
+                _list.AddRange(new[] { 1, 2 });
+                _set.UnionWith(new[] { 1, 2 });
+                _set.ExceptWith(new[] { 3 });
+                _queue.Enqueue(1);
+                _queue.Dequeue();
                 await FetchAsync();
                 _queue.Enqueue(2);
                 return _queue.Count;
@@ -242,11 +246,11 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<int> StepAsync()
             {
-                {|ORLEANS0203:_status.Value = 1|};
-                {|ORLEANS0203:_status.Value++|};
+                {|ORLEANS0203:_status.State = 1|};
+                {|ORLEANS0203:_status.State++|};
                 await FetchAsync();
-                _status.Value = 2;
-                _status.Value--;
+                _status.State = 2;
+                _status.State--;
                 return 2;
             }
 
@@ -254,8 +258,7 @@ public class DurableTaskReplayRegionTests
             {
                 await Step(1).WithId("first");
                 var fetched = await FetchAsync();
-                {|ORLEANS0203:_status.Value = fetched|};
-                {|ORLEANS0203:_stock.Add(1, true)|};
+                {|ORLEANS0203:_status.State = fetched|};
                 await FetchAsync();
                 return fetched;
             }
@@ -287,7 +290,7 @@ public class DurableTaskReplayRegionTests
 
                 async DurableTask<int> Local()
                 {
-                    var status = {|ORLEANS0200:_status|}.Value;
+                    var status = {|ORLEANS0200:_status|}.State;
                     await Step(status).WithId("local");
                     return status;
                 }
@@ -302,7 +305,7 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<int> RunAsync(int[] items)
             {
-                var status = {|ORLEANS0200:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.State;
                 await foreach (var completed in DurableTask.WhenEach(items.Select(item => (DurableTask)Step(item))))
                 {
                 }
@@ -319,20 +322,20 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async DurableTask<int> RaceAsync()
             {
-                var status = {|ORLEANS0200:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.State;
                 var (index, value) = await DurableTask.Race(new[] { Step(status), Step(2) }).WithId("race");
                 return index + value;
             }
 
             public async DurableTask<int> TimeoutAsync()
             {
-                var status = {|ORLEANS0200:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.State;
                 return await Step(status).WaitAsync(TimeSpan.FromMinutes(1)).WithId("pay");
             }
 
             public async DurableTask<int> HandleTimeoutAsync(ScheduledTask<int> payment)
             {
-                var status = {|ORLEANS0200:_status|}.Value;
+                var status = {|ORLEANS0200:_status|}.State;
                 return status + await payment.WaitUntilAsync(DurableTask.Current.UtcNow.AddMinutes(1));
             }
         }
@@ -345,7 +348,7 @@ public class DurableTaskReplayRegionTests
         {{Members}}
             public async Task<int> RunAsync()
             {
-                var status = _status.Value;
+                var status = _status.State;
                 var id = Guid.NewGuid();
                 await FetchAsync();
                 await Step(status).WithId(id.ToString()).ScheduleAsync();
