@@ -1275,6 +1275,45 @@ public sealed class RetirementHandoffTests
         }
     }
 
+    [Fact]
+    public async Task ReceivedRequestWhichCannotBeCaptured_ReleasesItsBodyBuffer()
+    {
+        await using var cluster = await DeployAsync();
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var migrationManager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        RetirementHandoffState.Create(key);
+        var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
+
+        // A request which this silo received holds its serialized body in a pooled read request. Its context cannot be serialized.
+        using var bodyWriter = new Orleans.Serialization.Buffers.ArcBufferWriter();
+        bodyWriter.Write([0x01]);
+        var readRequest = new Orleans.Runtime.Messaging.MessageReadRequest(source.ServiceProvider.GetRequiredService<Orleans.Runtime.Messaging.MessageHandlerShared>());
+        readRequest.Body = bodyWriter.ConsumeSlice(1);
+        typeof(Orleans.Runtime.Messaging.MessageReadRequest).GetField("_bodyLength", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(readRequest, 1);
+        var request = new Message
+        {
+            Direction = Message.Directions.Request,
+            Id = new CorrelationId(1),
+            SendingGrain = GrainId.Create("test", "caller"),
+            SendingSilo = cluster.Silos[0].SiloAddress,
+            TargetGrain = grainId,
+            RequestContextData = new() { ["unserializable"] = new UnserializableValue() },
+        };
+        request.SetMessageReadRequest(readRequest);
+
+        // The request fails, and its body buffer returns to its pool rather than remaining with the failed request.
+        var context = new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>());
+        List<Message> requests = [request];
+        var migration = migrationManager.MigrateAsync(target.SiloAddress, grainId, context, requests, out var carriesRequests);
+        Assert.False(carriesRequests);
+        Assert.Empty(requests);
+        Assert.Null(request._bodyObject);
+        await migration.AsTask().WaitAsync(Timeout, Cancellation);
+    }
+
     private sealed class UnserializableValue;
 
     [Fact]
