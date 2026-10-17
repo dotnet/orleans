@@ -334,6 +334,13 @@ records no result of its own; each input runs as a child identified by its input
 under the combinator's operation ID. Name the operation with `WithId`, so its inputs
 keep their IDs when a later deployment adds or removes earlier combinators.
 
+Each combinator is also an extension method on a sequence of tasks, so a list, an
+array, or a query composes in place, as in
+`lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units)).WhenAll().WithId("reserve")`.
+Lists of handles compose the same way, for example `handles.WhenAny(cancellationToken)`.
+A collection expression has no type of its own, so `[a, b]` goes to the static form:
+`DurableTask.WhenAll([a, b])`.
+
 - <xref:Orleans.DurableTasks.DurableTask.WhenAll*?displayProperty=nameWithType> follows
   `Task.WhenAll`. It completes after every input is terminal, including inputs which
   durable cancellation reaches. It then throws the first failure in input order;
