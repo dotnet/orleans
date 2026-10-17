@@ -14,8 +14,6 @@
 
   <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0'">
     <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
-    <!-- The generated binder skips client instances, pipeline policies, and delegates, which are configured in code. -->
-    <NoWarn>$(NoWarn);SYSLIB1100;SYSLIB1101</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
