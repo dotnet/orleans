@@ -31,7 +31,7 @@ internal interface IStreamMessageQueries
 /// <summary>
 /// Receives message batches from an individual queue of an ADO.NET provider.
 /// </summary>
-internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, IStreamMessageQueries queries, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
+internal partial class AdoNetQueueAdapterReceiver(string providerId, string queueId, AdoNetStreamOptions streamOptions, ClusterOptions clusterOptions, SimpleQueueCacheOptions cacheOptions, IStreamMessageQueries queries, AdoNetStreamPositions positions, Serializer<AdoNetBatchContainer> serializer, ILogger<AdoNetQueueAdapterReceiver> logger) : IQueueAdapterReceiver
 {
     private readonly ILogger<AdoNetQueueAdapterReceiver> _logger = logger;
     private readonly AdmissionGate _admissionGate = new();
@@ -45,9 +45,10 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
         ClusterOptions clusterOptions,
         SimpleQueueCacheOptions cacheOptions,
         RelationalOrleansQueries queries,
+        AdoNetStreamPositions positions,
         Serializer<AdoNetBatchContainer> serializer,
         ILogger<AdoNetQueueAdapterReceiver> logger)
-        : this(providerId, queueId, streamOptions, clusterOptions, cacheOptions, new RelationalStreamMessageQueries(queries), serializer, logger)
+        : this(providerId, queueId, streamOptions, clusterOptions, cacheOptions, new RelationalStreamMessageQueries(queries), positions, serializer, logger)
     {
     }
 
@@ -80,9 +81,12 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
                 return;
             }
 
-            pending = _pendingMessages
-                .Select(static item => new AdoNetStreamConfirmation(item.Key, item.Value.Dequeued))
-                .ToList();
+            pending = new(_pendingMessages.Count);
+            foreach (var (messageId, message) in _pendingMessages)
+            {
+                positions.Remove(message.Position);
+                pending.Add(new(messageId, message.Dequeued));
+            }
         }
 
         try
@@ -127,17 +131,26 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
                 streamOptions.EvictionInterval.TotalSecondsCeiling(),
                 streamOptions.EvictionBatchSize);
 
+            // the queue cache requires sequence tokens which increase across reads, so tokens are assigned positions rather than message identifiers
+            var dequeued = new List<(AdoNetStreamMessage Message, long Position)>(messages.Count);
             lock (_lock)
             {
                 RemoveExpiredPendingMessages();
-                foreach (var message in messages)
+                foreach (var message in messages.OrderBy(static x => x.MessageId))
                 {
-                    _pendingMessages[message.MessageId] = new(message.Dequeued, message.ExpiresOn);
+                    if (_pendingMessages.TryGetValue(message.MessageId, out var previous))
+                    {
+                        positions.Remove(previous.Position);
+                    }
+
+                    var position = positions.Add(message.MessageId);
+                    _pendingMessages[message.MessageId] = new(message.Dequeued, message.ExpiresOn, position);
+                    dequeued.Add((message, position));
                 }
             }
 
-            // the queue cache requires batches in ascending sequence order, which SQL Server OUTPUT and PostgreSQL RETURNING do not guarantee
-            return messages.OrderBy(static x => x.MessageId).Select(x => AdoNetBatchContainer.FromMessage(serializer, x)).Cast<IBatchContainer>().ToList();
+            // convert the messages into standard batch containers
+            return dequeued.Select(x => AdoNetBatchContainer.FromMessage(serializer, x.Message, x.Position)).Cast<IBatchContainer>().ToList();
         }
         catch (Exception ex)
         {
@@ -161,8 +174,13 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
             return;
         }
 
-        // get the identifiers for the messages to confirm
-        var items = messages.Cast<AdoNetBatchContainer>().Select(x => new AdoNetStreamConfirmation(x.SequenceToken.SequenceNumber, x.Dequeued)).ToList();
+        // get the identifiers for the messages to confirm and release the positions of messages which have left the cache
+        var items = new List<AdoNetStreamConfirmation>(messages.Count);
+        foreach (AdoNetBatchContainer message in messages)
+        {
+            positions.Remove(message.SequenceToken.SequenceNumber);
+            items.Add(new(message.MessageId, message.Dequeued));
+        }
 
         try
         {
@@ -197,11 +215,14 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
             .ToList();
         foreach (var messageId in expired)
         {
-            _pendingMessages.Remove(messageId);
+            if (_pendingMessages.Remove(messageId, out var message))
+            {
+                positions.Remove(message.Position);
+            }
         }
     }
 
-    private readonly record struct PendingMessage(int Dequeued, DateTime ExpiresOn);
+    private readonly record struct PendingMessage(int Dequeued, DateTime ExpiresOn, long Position);
 
     private sealed class RelationalStreamMessageQueries(RelationalOrleansQueries queries) : IStreamMessageQueries
     {
