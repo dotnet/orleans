@@ -23,6 +23,12 @@ internal sealed partial class DashboardHost(
 {
     private MeterProvider? _meterProvider;
 
+    /// <summary>
+    /// Gets the interval between periodic telemetry exports. <see cref="Timeout.Infinite"/> disables periodic export,
+    /// so only explicit flushes collect telemetry.
+    /// </summary>
+    internal int ExportIntervalMilliseconds { get; init; } = 1000;
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await Task.WhenAll(
@@ -80,7 +86,7 @@ internal sealed partial class DashboardHost(
                     ? new ExplicitBucketHistogramConfiguration { TagKeys = [], Boundaries = [], RecordMinMax = false }
                     : null;
             })
-            .AddReader(new PeriodicExportingMetricReader(dashboardTelemetryExporter, 1000, 1000))
+            .AddReader(new PeriodicExportingMetricReader(dashboardTelemetryExporter, ExportIntervalMilliseconds, 1000))
             .Build();
         return Task.CompletedTask;
     }

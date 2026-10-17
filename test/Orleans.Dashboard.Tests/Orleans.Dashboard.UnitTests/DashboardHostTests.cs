@@ -5,6 +5,7 @@ using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -63,7 +64,7 @@ public class DashboardHostTests
         clients.Add(2);
         await host.StartAsync(TestContext.Current.CancellationToken);
         Assert.True(GetMeterProvider(host).ForceFlush());
-        AssertCounter(fixture.CounterReports.Last(), clients.Name, "2", "2");
+        AssertCounter(Assert.Single(fixture.CounterReports), clients.Name, "2", "2");
     }
 
     [Fact]
@@ -104,7 +105,7 @@ public class DashboardHostTests
         ownHistogram.Record(456, new KeyValuePair<string, object?>("direction", "response"));
         otherHistogram.Record(999);
         Assert.True(GetMeterProvider(host).ForceFlush());
-        AssertCounter(fixture.CounterReports.Last(), ownHistogram.Name, "579", "579");
+        AssertCounter(Assert.Single(fixture.CounterReports), ownHistogram.Name, "579", "579");
 
         await host.DisposeAsync();
         Assert.False(ownHistogram.Enabled);
@@ -125,9 +126,10 @@ public class DashboardHostTests
         await StartHostAsync(host);
 
         Assert.True(GetMeterProvider(host).ForceFlush());
-        AssertCounter(fixture.CounterReports.Last(), "dashboard.test.tagged-gauge", "5", "5");
+        AssertCounter(Assert.Single(fixture.CounterReports), "dashboard.test.tagged-gauge", "5", "5");
         count = 7;
         Assert.True(GetMeterProvider(host).ForceFlush());
+        Assert.Equal(2, fixture.CounterReports.Count);
         AssertCounter(fixture.CounterReports.Last(), "dashboard.test.tagged-gauge", "10", "5");
     }
 
@@ -519,7 +521,10 @@ public class DashboardHostTests
         public ConcurrentQueue<StatCounter[]> CounterReports { get; } = new();
 
         public DashboardHost CreateHost() =>
-            new(Logger, LocalSiloDetails, Instruments, _grainFactory, _telemetryExporter, _siloGrainClient);
+            new(Logger, LocalSiloDetails, Instruments, _grainFactory, _telemetryExporter, _siloGrainClient)
+            {
+                ExportIntervalMilliseconds = Timeout.Infinite,
+            };
 
         public void Dispose() => _services.Dispose();
     }
