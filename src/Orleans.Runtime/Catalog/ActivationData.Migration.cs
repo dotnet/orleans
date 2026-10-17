@@ -88,6 +88,7 @@ internal sealed partial class ActivationData
             lock (_lock)
             {
                 cancellations = EndInTransitCancellations();
+                _extras!.HasMigratedRequests = true;
                 target = ForwardingAddress;
             }
 

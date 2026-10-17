@@ -2527,6 +2527,7 @@ internal sealed partial class ActivationData :
         private const int IsStuckDeactivatingFlag = 1 << 1;
         private const int IsDisposingFlag = 1 << 2;
         private const int IsMigratingRequestsFlag = 1 << 3;
+        private const int HasMigratedRequestsFlag = 1 << 4;
 
         private byte _flags;
 
@@ -2584,6 +2585,11 @@ internal sealed partial class ActivationData :
         /// Whether requests which were taken from this activation's queue are in transit with its migration.
         /// </summary>
         public bool IsMigratingRequests { get => GetFlag(IsMigratingRequestsFlag); set => SetFlag(IsMigratingRequestsFlag, value); }
+
+        /// <summary>
+        /// Whether this activation's queued requests migrated, or may have migrated, to its forwarding address.
+        /// </summary>
+        public bool HasMigratedRequests { get => GetFlag(HasMigratedRequestsFlag); set => SetFlag(HasMigratedRequestsFlag, value); }
 
 
 

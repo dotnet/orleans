@@ -132,26 +132,42 @@ internal sealed class MigratedRequest
     /// The request context and any decoded body are serialized once, here. Serializing some values, such as <see cref="PooledBuffer"/>,
     /// releases their storage, so the captured request holds only serialized data, which can be measured and sent repeatedly.
     /// If the request is not migrated, <see cref="RestoreTo"/> restores the message from that data.
+    /// If capturing fails, the values which were already serialized are restored before the exception propagates.
     /// </para>
     /// </remarks>
-    public static MigratedRequest FromMessage(Message message, SerializerSessionPool sessionPool) => new()
+    public static MigratedRequest FromMessage(Message message, SerializerSessionPool sessionPool)
     {
-        Headers = (uint)message.Headers,
-        Id = message.Id,
-        SendingGrain = message.SendingGrain,
-        SendingSilo = message.SendingSilo,
-        _timeToExpiry = message._timeToExpiry,
-        InterfaceType = message.InterfaceType,
-        InterfaceVersion = message.InterfaceVersion,
-        CacheInvalidationHeader = message.CacheInvalidationHeader,
-        RequestContext = message.RequestContextData is { } requestContext ? SerializeBody(requestContext, sessionPool) : null,
-        Body = message._bodyObject switch
+        var result = new MigratedRequest
         {
-            Orleans.Runtime.Messaging.MessageReadRequest readRequest => readRequest.Body.ToArray(),
-            null => null,
-            var body => SerializeBody(body, sessionPool),
-        },
-    };
+            Headers = (uint)message.Headers,
+            Id = message.Id,
+            SendingGrain = message.SendingGrain,
+            SendingSilo = message.SendingSilo,
+            _timeToExpiry = message._timeToExpiry,
+            InterfaceType = message.InterfaceType,
+            InterfaceVersion = message.InterfaceVersion,
+            CacheInvalidationHeader = message.CacheInvalidationHeader,
+        };
+
+        try
+        {
+            result.RequestContext = message.RequestContextData is { } requestContext ? SerializeBody(requestContext, sessionPool) : null;
+            result.Body = message._bodyObject switch
+            {
+                Orleans.Runtime.Messaging.MessageReadRequest readRequest => readRequest.Body.ToArray(),
+                null => null,
+                var body => SerializeBody(body, sessionPool),
+            };
+        }
+        catch
+        {
+            // Values which were serialized before the failure may have released their storage. Decoding the bytes which the same codecs just wrote restores them.
+            result.RestoreTo(message, sessionPool);
+            throw;
+        }
+
+        return result;
+    }
 
     /// <summary>
     /// Restores the values which <see cref="FromMessage"/> serialized to <paramref name="message"/>, so that the message can be delivered in another way.
@@ -527,7 +543,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         // Serializing the migration context releases its buffer, so the package's size is bounded using the context's size bound rather than measured.
         var fixedSize = PackageFramingAllowance + package.MigrationContext.GetMaxSerializedSize() + grainId.Type.AsSpan().Length + grainId.Key.AsSpan().Length;
         var maxSize = MaxBatchBodySize - fixedSize;
-        long bodyBytes = 0;
+        long capturedBytes = 0;
         foreach (var request in requests)
         {
             try
@@ -535,9 +551,9 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
                 var migratedRequest = MigratedRequest.FromMessage(request, _serializer.SessionPool);
                 packaged.Add(migratedRequest);
 
-                // The bodies alone bound the requests' size from below, so stop copying them once they exceed the limit.
-                bodyBytes += migratedRequest.Body?.Length ?? 0;
-                if (bodyBytes > maxSize)
+                // The serialized bodies and request contexts alone bound the requests' size from below, so stop capturing requests once they exceed the limit.
+                capturedBytes += (migratedRequest.Body?.Length ?? 0) + (migratedRequest.RequestContext?.Length ?? 0);
+                if (capturedBytes > maxSize)
                 {
                     LogDebugMigratedRequestsTooLarge(requests.Count, grainId, target);
                     return Decline(requests, packaged, out routes);
