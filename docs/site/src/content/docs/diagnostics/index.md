@@ -1,13 +1,13 @@
 ---
 title: Orleans analyzer diagnostics
 description: Reference for Orleans compiler analyzer diagnostic IDs, impacts, fixes, code fixes, and suppression guidance.
-ms.date: 08/25/2026
+ms.date: 10/15/2026
 ms.topic: reference
 ---
 
 # Orleans analyzer diagnostics
 
-Orleans analyzers detect unsupported RPC contracts, serialization schema problems, unsafe grain execution patterns, and compatibility changes. Select a diagnostic ID for its cause, impact, remediation, code-fix behavior, and suppression guidance.
+Orleans analyzers detect unsupported RPC contracts, serialization schema problems, unsafe grain execution patterns, replay hazards in durable tasks, and compatibility changes. Select a diagnostic ID for its cause, impact, remediation, code-fix behavior, and suppression guidance.
 
 Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic ID as a URL fragment. The single redirect can therefore remain stable while this index and the detailed pages evolve.
 
@@ -114,3 +114,75 @@ Analyzer help links use `https://aka.ms/orleans/diagnostics` with the diagnostic
 ## ORLEANS0027
 
 [Grain interface member removed from source](orleans0027.md) — Warning. The manifest retains an RPC signature which is absent from source.
+
+## ORLEANS0028
+
+[Suppress CS1998 for async durable task methods](orleans0028.md) — Suppressor. An `async DurableTask` method which completes without awaiting is a normal durable step.
+
+## ORLEANS0100
+
+[Access grain state in recorded effects or after the last durable operation](orleans0100.md) — Warning. Durable task code reads or changes grain state where a replay runs it again.
+
+## ORLEANS0101
+
+[Produce non-deterministic values in recorded effects](orleans0101.md) — Warning. Durable task code produces a clock, random, or environment value where a replay runs it again.
+
+## ORLEANS0102
+
+[Await external operations in steps or after the last durable operation](orleans0102.md) — Warning. Durable task code awaits a service or other external work where a replay runs it again.
+
+## ORLEANS0103
+
+[Change grain state after the last external await](orleans0103.md) — Warning. A step or a body's tail changes grain state before an external await, so the change can commit without the result.
+
+## ORLEANS0104
+
+[Return the outputs of a DurableTask.Once effect](orleans0104.md) — Warning. A `DurableTask.Once` effect assigns a variable of the body, which a replay doesn't assign.
+
+## ORLEANS0105
+
+[Await, schedule, or post durable task definitions](orleans0105.md) — Warning. Durable task code creates a durable task definition and never runs it.
+
+## ORLEANS0106
+
+[Run each durable task definition once](orleans0106.md) — Warning. Durable task code runs a single-use durable task definition more than once.
+
+## ORLEANS0107
+
+[Use durable operation names without '$'](orleans0107.md) — Error. A `WithId` or `DurableTask.Once` name contains `$`, which the runtime rejects.
+
+## ORLEANS0108
+
+[Give each durable operation call site its own name](orleans0108.md) — Warning. Two call sites in one body name their durable operations alike, so their identifiers depend on order.
+
+## ORLEANS0109
+
+[Keep durable task bodies on their scheduler](orleans0109.md) — Warning. Durable task code starts threads, timers, or thread-pool work off the activation's scheduler.
+
+## ORLEANS0110
+
+[Run concurrent durable work through durable combinators](orleans0110.md) — Warning. Durable task code combines durable work with a `Task` combinator instead of a durable combinator.
+
+## ORLEANS0111
+
+[Wait with durable delays](orleans0111.md) — Warning. Durable task code waits with `Task.Delay` or `Thread.Sleep`, which a replay restarts.
+
+## ORLEANS0112
+
+[Filter cancellation handlers by IsCancellationRequested](orleans0112.md) — Info. Durable task code catches cancellation without telling durable cancellation from a host stop.
+
+## ORLEANS0113
+
+[Return a task from asynchronous code in durable task bodies](orleans0113.md) — Warning. A durable task body contains `async void` code, which the body can't observe.
+
+## ORLEANS0114
+
+[Derive a signal name for each repeated wait](orleans0114.md) — Info. Durable task code waits for one signal name in a loop, so every wait returns the first value.
+
+## ORLEANS0115
+
+[Log through a replay-safe logger](orleans0115.md) — Info. Durable task code logs through a logger which logs again on replay.
+
+## ORLEANS0116
+
+[Post durable tasks from grains or durable task bodies](orleans0116.md) — Warning. Code outside grains and durable task bodies posts a durable task, which throws.
