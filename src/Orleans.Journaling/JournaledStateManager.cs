@@ -339,6 +339,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                     var hasCommittedBuffer = false;
                                     var hasBufferToConsume = false;
                                     var bufferToConsumeIsCommittedBuffer = false;
+                                    var capturedAllStates = isSnapshot;
+                                    var writeVersion = 0L;
 
                                     lock (_lock)
                                     {
@@ -387,6 +389,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                         else
                                         {
                                             var flushCommittedOnly = _journalWriter.HasActiveEntry;
+                                            capturedAllStates = !flushCommittedOnly;
                                             if (!flushCommittedOnly)
                                             {
                                                 // The map of state ids is itself stored as a durable state with the id 0.
@@ -426,6 +429,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             {
                                                 hasBufferToConsume = true;
                                             }
+
+                                            writeVersion = OnWriteCaptured(capturedAllStates);
                                         }
                                     }
 
@@ -496,6 +501,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                 state.OnWriteCompleted();
                                             }
 
+                                            OnWriteAcknowledged(writeVersion);
                                             if (isSnapshot)
                                             {
                                                 _migrationSnapshotRequired = false;
@@ -667,6 +673,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
         finally
         {
+            CompleteObservers(_shutdownCancellation.IsCancellationRequested ? null : exception);
             lock (_lock)
             {
                 FaultQueuedWorkItemsUnderLock(exception);
@@ -933,6 +940,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
     {
+        JournaledStateMutationFence.ThrowIfClosed();
         cancellationToken.ThrowIfCancellationRequested();
 
         Task pendingWrite;
@@ -1125,6 +1133,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         finally
         {
             CancelQueuedWorkItems(_shutdownCancellation.Token);
+            CompleteObservers(failure: null);
         }
     }
 

@@ -46,4 +46,7 @@ public interface IDurableStateManager
     /// <param name="cancellationToken">The token used to cancel the caller's wait.</param>
     /// <returns>A task representing the write acknowledgement.</returns>
     ValueTask WriteStateAsync(CancellationToken cancellationToken = default);
+
+    /// <inheritdoc cref="IJournaledStateManager.GetStateMachines"/>
+    IReadOnlyList<KeyValuePair<string, IStateMachine>> GetStateMachines() => [];
 }

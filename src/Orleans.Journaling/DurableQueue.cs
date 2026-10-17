@@ -65,11 +65,13 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurableQueueCommandHandler<T>
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurableQueueCommandHandler<T>, IResyncSource<QueueChange<T>>
 {
     private readonly IDurableQueueCommandCodec<T> _codec;
     private readonly Queue<T> _items = new();
+    private readonly JournaledStateManager? _manager;
     private JournalStreamWriter _writer;
+    private bool _hasStagedEntries;
 
     public DurableQueue(
         [ServiceKey] string key,
@@ -79,6 +81,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableQueueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _manager = manager as JournaledStateManager;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -86,6 +89,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
+        _manager = manager as JournaledStateManager;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -98,22 +102,30 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     {
         _items.Clear();
         _writer = writer;
+        _hasStagedEntries = false;
+        PublishResync();
     }
+
+    void IStateMachine.OnRecoveryCompleted() => PublishResync();
 
     void IStateMachine.WritePendingEntries(JournalStreamWriter writer)
     {
         // This state implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
+        // The write being captured contains every staged entry.
+        _hasStagedEntries = false;
     }
 
     void IStateMachine.WriteSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
+        _hasStagedEntries = false;
     }
 
     public void Clear()
     {
         _codec.WriteClear(GetWriter());
         ApplyClear();
+        Publish(QueueChangeKind.Cleared, item: default);
     }
 
     public T Peek() => _items.Peek();
@@ -125,6 +137,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     {
         _codec.WriteEnqueue(item, GetWriter());
         ApplyEnqueue(item);
+        Publish(QueueChangeKind.Enqueued, item);
     }
 
     public T Dequeue()
@@ -132,6 +145,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
         var result = _items.Peek();
         _codec.WriteDequeue(GetWriter());
         _ = ApplyDequeue();
+        Publish(QueueChangeKind.Dequeued, result);
         return result;
     }
 
@@ -144,10 +158,34 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
 
         _codec.WriteDequeue(GetWriter());
         _ = ApplyTryDequeue(out _);
+        Publish(QueueChangeKind.Dequeued, item);
         return true;
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
+
+    internal IAsyncEnumerable<QueueChange<T>> WatchAsync(DurableWatchMode mode, int capacity, CancellationToken cancellationToken) =>
+        DurableStateObservation.WatchChanges<DurableQueue<T>, QueueChange<T>>(_manager, this, mode, capacity, cancellationToken);
+
+    bool IResyncSource<QueueChange<T>>.HasStagedEntries => _hasStagedEntries;
+
+    QueueChange<T> IResyncSource<QueueChange<T>>.CreateResync() => new() { Kind = QueueChangeKind.Resync, Snapshot = _items.ToArray() };
+
+    private void Publish(QueueChangeKind kind, T? item)
+    {
+        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+        {
+            topic.Publish(new QueueChange<T> { Kind = kind, Item = item });
+        }
+    }
+
+    private void PublishResync()
+    {
+        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+        {
+            topic.Publish(((IResyncSource<QueueChange<T>>)this).CreateResync(), isDurable: true);
+        }
+    }
 
     private void ApplyEnqueue(T item) => _items.Enqueue(item);
     private T ApplyDequeue() => _items.Dequeue();
@@ -165,6 +203,8 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IDurabl
     private JournalStreamWriter GetWriter()
     {
         Debug.Assert(_writer.IsInitialized);
+        JournaledStateMutationFence.ThrowIfClosed();
+        _hasStagedEntries = true;
         return _writer;
     }
 
