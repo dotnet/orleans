@@ -282,6 +282,31 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                 "The journaled state operation was queued before deletion reset its state.");
                         }
 
+                        if (workItem is AppendJournalWorkItem or WriteSnapshotWorkItem)
+                        {
+                            try
+                            {
+                                for (var prepared = false; !prepared;)
+                                {
+                                    await PrepareStates(ref prepared, _shutdownCancellation.Token).ConfigureAwait(true);
+                                }
+
+                                _shutdownCancellation.Token.ThrowIfCancellationRequested();
+                            }
+                            catch (OperationCanceledException) when (_shutdownCancellation.IsCancellationRequested)
+                            {
+                                workItem.TrySetCanceled(_shutdownCancellation.Token);
+                                return;
+                            }
+                            catch (Exception exception)
+                            {
+                                LogStatePreparationFailed(_shared.Logger, exception);
+                                storageActivity?.SetStatus(ActivityStatusCode.Error, "Journal state preparation failed.");
+                                workItem.SetException(new JournaledStatePreCommitException(exception));
+                                continue;
+                            }
+                        }
+
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         switch (workItem)
@@ -314,6 +339,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                     var hasCommittedBuffer = false;
                                     var hasBufferToConsume = false;
                                     var bufferToConsumeIsCommittedBuffer = false;
+                                    var capturedAllStates = isSnapshot;
+                                    var writeVersion = 0L;
 
                                     lock (_lock)
                                     {
@@ -362,6 +389,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                         else
                                         {
                                             var flushCommittedOnly = _journalWriter.HasActiveEntry;
+                                            capturedAllStates = !flushCommittedOnly;
                                             if (!flushCommittedOnly)
                                             {
                                                 // The map of state ids is itself stored as a durable state with the id 0.
@@ -401,6 +429,8 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                             {
                                                 hasBufferToConsume = true;
                                             }
+
+                                            writeVersion = OnWriteCaptured(capturedAllStates);
                                         }
                                     }
 
@@ -471,6 +501,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
                                                 state.OnWriteCompleted();
                                             }
 
+                                            OnWriteAcknowledged(writeVersion);
                                             if (isSnapshot)
                                             {
                                                 _migrationSnapshotRequired = false;
@@ -596,6 +627,28 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
     }
 
+    // Completes when every state is synchronously ready; otherwise returns the first incomplete preparation.
+    private ValueTask PrepareStates(ref bool prepared, CancellationToken cancellationToken)
+    {
+        prepared = true;
+        lock (_lock)
+        {
+            foreach (var state in _states.Values)
+            {
+                var preparation = state.PrepareWriteAsync(cancellationToken);
+                if (!preparation.IsCompletedSuccessfully)
+                {
+                    prepared = false;
+                    return preparation;
+                }
+
+                preparation.GetAwaiter().GetResult();
+            }
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
     private void Fence(Exception exception)
     {
         lock (_lock)
@@ -620,6 +673,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         }
         finally
         {
+            CompleteObservers(_shutdownCancellation.IsCancellationRequested ? null : exception);
             lock (_lock)
             {
                 FaultQueuedWorkItemsUnderLock(exception);
@@ -886,6 +940,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken = default)
     {
+        JournaledStateMutationFence.ThrowIfClosed();
         cancellationToken.ThrowIfCancellationRequested();
 
         Task pendingWrite;
@@ -1078,6 +1133,7 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         finally
         {
             CancelQueuedWorkItems(_shutdownCancellation.Token);
+            CompleteObservers(failure: null);
         }
     }
 
@@ -1351,6 +1407,11 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
         Level = LogLevel.Error,
         Message = "Error processing work items.")]
     private static partial void LogErrorProcessingWorkItems(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Journal state preparation failed; pending changes remain staged.")]
+    private static partial void LogStatePreparationFailed(ILogger logger, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Information,

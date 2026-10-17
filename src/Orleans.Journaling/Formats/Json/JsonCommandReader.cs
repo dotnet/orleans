@@ -136,6 +136,17 @@ internal ref struct JsonCommandReader
         return value;
     }
 
+    public bool ReadBoolean(int index, string operandName)
+    {
+        ReadOperand(index, operandName);
+        return _reader.TokenType switch
+        {
+            JsonTokenType.True => true,
+            JsonTokenType.False => false,
+            _ => throw new JsonException($"JSON journal command operand '{operandName}' must be a Boolean."),
+        };
+    }
+
     public string? ReadString(int index, string operandName)
     {
         ReadOperand(index, operandName);
@@ -267,6 +278,31 @@ internal ref struct JsonCommandReader
         {
             throw new JsonException("Additional JSON content was found after the journal entry.");
         }
+    }
+
+    /// <summary>
+    /// Advances to the next operand of a command with a variable number of operands.
+    /// </summary>
+    /// <returns><see langword="true"/> when the reader is positioned on the next operand; <see langword="false"/> at the end of the command.</returns>
+    public bool TryReadNextOperand()
+    {
+        if (!_reader.Read())
+        {
+            throw new JsonException("JSON journal command array is incomplete.");
+        }
+
+        if (_reader.TokenType is JsonTokenType.EndArray)
+        {
+            if (_reader.Read())
+            {
+                throw new JsonException("Additional JSON content was found after the journal entry.");
+            }
+
+            return false;
+        }
+
+        _nextIndex++;
+        return true;
     }
 
     public void SkipToEnd()
