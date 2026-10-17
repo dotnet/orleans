@@ -341,6 +341,11 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private const int MaxBatchSize = 1_000;
     private const int MessageBodyFramingAllowance = 1_024;
     private const int PackageFramingAllowance = 64;
+
+    /// <summary>
+    /// The most that a request's serialized time to live can grow after it is measured, since it keeps aging until it is sent and is variable-length encoded.
+    /// </summary>
+    internal const int TimeToLiveEncodingGrowthAllowance = 10;
     private readonly ConcurrentDictionary<SiloAddress, (Task PumpTask, Channel<MigrationWorkItem> WorkItemChannel)> _workers = new();
     private readonly ObjectPool<MigrationWorkItem> _workItemPool = ObjectPool.Create(new MigrationWorkItem.ObjectPoolPolicy());
     private readonly CancellationTokenSource _shuttingDownCts = new();
@@ -575,7 +580,9 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         }
 
         // Requests which fit in their own messages can exceed the message size limit together, or with the migration context and its keys.
-        var requestsSize = MeasureRequests(grainId, packaged, maxSize);
+        // Each request's time to live can encode larger by the time the package is sent, so that growth is reserved.
+        var agingAllowance = (long)packaged.Count * TimeToLiveEncodingGrowthAllowance;
+        var requestsSize = MeasureRequests(grainId, packaged, maxSize - agingAllowance);
         if (requestsSize < 0)
         {
             LogDebugMigratedRequestsTooLarge(requests.Count, grainId, target);
@@ -583,7 +590,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         }
 
         package.Requests = packaged;
-        size = fixedSize + requestsSize;
+        size = fixedSize + requestsSize + agingAllowance;
         return true;
 
         bool Decline(List<Message> requests, List<MigratedRequest> packaged, out List<(SiloAddress CallerSilo, MigratedRequestRoute Route)>? routes)
