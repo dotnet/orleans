@@ -32,5 +32,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Messaging.Tests" />
+    <InternalsVisibleTo Include="Orleans.NativeAotSmoke" />
   </ItemGroup>
 </Project>
