@@ -308,6 +308,43 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
+    public async Task MigratedRequests_AreDeclinedWhenTheirInterfaceVersionIsIncompatible()
+    {
+        await using var cluster = await DeployAsync();
+        var silo = cluster.Silos[1];
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var migrationManager = silo.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var key = Guid.NewGuid();
+        RetirementHandoffState.Create(key);
+        var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
+
+        // The request targets a later version of the interface than this silo runs, which backward compatibility does not admit.
+        // Its body decodes, so only the version check keeps this silo from decoding it with an earlier version's types.
+        var request = MigratedRequest.FromMessage(new Message
+        {
+            Direction = Message.Directions.OneWay,
+            Id = new CorrelationId(1),
+            SendingGrain = GrainId.Create("test", "caller"),
+            TargetGrain = grainId,
+            InterfaceType = silo.ServiceProvider.GetRequiredService<Orleans.Metadata.GrainInterfaceTypeResolver>().GetGrainInterfaceType(typeof(IRetirementHandoffGrain)),
+            InterfaceVersion = 5,
+            BodyObject = new List<string> { "field" },
+        }, silo.ServiceProvider.GetRequiredService<SerializerSessionPool>());
+        GrainMigrationPackage package = new()
+        {
+            GrainId = grainId,
+            MigrationContext = new MigrationContext(silo.ServiceProvider.GetRequiredService<SerializerSessionPool>()),
+            Requests = SerializeRequests(silo, [request]),
+        };
+
+        // The new activation is created without the requests, which stay with the source, which forwards their original bytes.
+        var requestsAccepted = await migrationManager.AcceptMigratingGrainsWithRequests([package], Cancellation);
+        Assert.False(Assert.Single(requestsAccepted));
+        var activation = Assert.IsType<ActivationData>(FindActivation(silo, grainId));
+        Assert.Equal(0, activation.GetRequestCount());
+    }
+
+    [Fact]
     public async Task MigratedRequests_AreDeclinedWhenTheyWouldExceedTheHardLimit()
     {
         await using var cluster = await DeployAsync(builder => builder.ConfigureSilo((_, silo) =>
@@ -1191,6 +1228,54 @@ public sealed class RetirementHandoffTests
         Assert.True(result.Migrated);
         Assert.Equal(MigratedRequestsOutcome.Retained, result.Requests);
     }
+
+    [Fact]
+    public async Task RequestWhichCannotBeCaptured_FailsAndTheOthersAreRetained()
+    {
+        await using var cluster = await DeployAsync();
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var migrationManager = source.ServiceProvider.GetRequiredService<ActivationMigrationManager>();
+        var grainFactory = cluster.Silos[0].ServiceProvider.GetRequiredService<IGrainFactory>();
+        var key = Guid.NewGuid();
+        RetirementHandoffState.Create(key);
+        var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
+
+        // The second request's context holds a pooled value, which serialization releases, followed by a value which cannot be serialized.
+        var payload = Enumerable.Repeat((byte)0x5A, 20_000).ToArray();
+        var retained = CreateRequest(1, new() { ["pooled"] = CreatePooledBuffer(payload) });
+        var failed = CreateRequest(2, new() { ["pooled"] = CreatePooledBuffer(payload), ["unserializable"] = new UnserializableValue() });
+        List<Message> requests = [retained, failed];
+
+        // The migration carries neither request. The request which cannot be captured can no longer be delivered, so it fails rather than staying queued,
+        // and the other request is restored for forwarding.
+        var context = new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>());
+        var migration = migrationManager.MigrateAsync(target.SiloAddress, grainId, context, requests, out var carriesRequests);
+        Assert.False(carriesRequests);
+        Assert.Same(retained, Assert.Single(requests));
+        Assert.Equal(payload, ((Orleans.Serialization.Buffers.PooledBuffer)retained.RequestContextData!["pooled"]).ToArray());
+
+        var result = await migration.AsTask().WaitAsync(Timeout, Cancellation);
+        Assert.True(result.Migrated);
+
+        Message CreateRequest(long id, Dictionary<string, object> requestContext) => new()
+        {
+            Direction = Message.Directions.OneWay,
+            Id = new CorrelationId(id),
+            SendingGrain = GrainId.Create("test", "caller"),
+            TargetGrain = grainId,
+            RequestContextData = requestContext,
+        };
+
+        static Orleans.Serialization.Buffers.PooledBuffer CreatePooledBuffer(byte[] contents)
+        {
+            var buffer = new Orleans.Serialization.Buffers.PooledBuffer();
+            buffer.Write(contents);
+            return buffer;
+        }
+    }
+
+    private sealed class UnserializableValue;
 
     [Fact]
     public async Task Migration_RetainsRequestsWhichExceedTheMessageSizeLimitTogether()

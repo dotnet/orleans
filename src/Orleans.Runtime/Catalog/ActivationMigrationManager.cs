@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
 using Microsoft.Extensions.Options;
@@ -15,9 +16,12 @@ using Orleans.Internal;
 using Orleans.Metadata;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
+using Orleans.Runtime.Versions;
+using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Runtime;
@@ -131,7 +135,7 @@ internal sealed class MigratedRequest
     /// The request context and any decoded body are serialized once, here. Serializing some values, such as <see cref="PooledBuffer"/>,
     /// releases their storage, so the captured request holds only serialized data, which can be measured and sent repeatedly.
     /// If the request is not migrated, <see cref="RestoreTo"/> restores the message from that data.
-    /// If capturing fails, the values which were already serialized are restored before the exception propagates.
+    /// If capturing fails, serialization may have consumed some of the message's values, so the message cannot be delivered.
     /// </para>
     /// </remarks>
     public static MigratedRequest FromMessage(Message message, SerializerSessionPool sessionPool)
@@ -148,22 +152,13 @@ internal sealed class MigratedRequest
             CacheInvalidationHeader = message.CacheInvalidationHeader,
         };
 
-        try
+        result.RequestContext = message.RequestContextData is { } requestContext ? SerializeBody(requestContext, sessionPool) : null;
+        result.Body = message._bodyObject switch
         {
-            result.RequestContext = message.RequestContextData is { } requestContext ? SerializeBody(requestContext, sessionPool) : null;
-            result.Body = message._bodyObject switch
-            {
-                Orleans.Runtime.Messaging.MessageReadRequest readRequest => readRequest.Body.ToArray(),
-                null => null,
-                var body => SerializeBody(body, sessionPool),
-            };
-        }
-        catch
-        {
-            // Values which were serialized before the failure may have released their storage. Decoding the bytes which the same codecs just wrote restores them.
-            result.RestoreTo(message, sessionPool);
-            throw;
-        }
+            Orleans.Runtime.Messaging.MessageReadRequest readRequest => readRequest.Body.ToArray(),
+            null => null,
+            var body => SerializeBody(body, sessionPool),
+        };
 
         return result;
     }
@@ -326,7 +321,9 @@ internal interface IActivationMigrationManager
     /// <param name="target">The migration target.</param>
     /// <param name="grainId">The grain being migrated.</param>
     /// <param name="migrationContext">Information about the grain being migrated, which will be consumed by the new activation.</param>
-    /// <param name="requests">The requests which were queued for the grain, if any.</param>
+    /// <param name="requests">
+    /// The requests which were queued for the grain, if any. A request which cannot be serialized is removed and failed, since it cannot be delivered.
+    /// </param>
     /// <param name="carriesRequests">
     /// Whether the migration carries <paramref name="requests"/>. A migration carries them only when <paramref name="target"/> accepts queued requests
     /// and they fit in a message. Otherwise, the caller retains them.
@@ -471,6 +468,18 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         try
         {
             requests = _serializer.Deserialize<List<MigratedRequest>>(serializedRequests)!;
+
+            // Placement does not consider request versions, so this silo may run an earlier version of the grain than a request targets.
+            // Decoding such a request could drop fields, which forwarding it to a compatible silo would then lose, so the requests stay with the source.
+            foreach (var request in requests)
+            {
+                if (!IsCompatible(request))
+                {
+                    LogDebugMigratedRequestsIncompatible(requests.Count, grainId, request.InterfaceType, request.InterfaceVersion);
+                    return null;
+                }
+            }
+
             var messages = new List<Message>(requests.Count);
             foreach (var request in requests)
             {
@@ -485,6 +494,19 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             LogDebugMigratedRequestsNotDeserializable(exception, requests?.Count ?? 0, grainId);
             return null;
         }
+    }
+
+    private bool IsCompatible(MigratedRequest request)
+    {
+        if (request.InterfaceVersion == 0)
+        {
+            return true;
+        }
+
+        var services = _runtimeClient.ServiceProvider;
+        var director = services.GetRequiredService<CompatibilityDirectorManager>().GetDirector(request.InterfaceType);
+        var localVersion = services.GetRequiredService<GrainVersionManifest>().GetLocalVersion(request.InterfaceType);
+        return director.IsCompatible(request.InterfaceVersion, localVersion);
     }
 
     public ValueTask RetargetMigratedRequests(List<MigratedRequestRoute> routes, CancellationToken cancellationToken = default)
@@ -572,7 +594,11 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             }
             catch (Exception exception)
             {
+                // Capturing the request may have consumed some of its values. Forwarding it would serialize the same values with the same codecs,
+                // so it could not be delivered either way, and it fails instead.
                 LogDebugMigratedRequestsNotSerializable(exception, requests.Count, grainId);
+                requests.RemoveAt(packaged!.Count);
+                FailRequest(request, exception);
                 return Decline(requests, ref packaged, out routes);
             }
 
@@ -614,6 +640,18 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             packaged = null;
             routes = null;
             return false;
+        }
+    }
+
+    private void FailRequest(Message request, Exception exception)
+    {
+        if (request.Direction is Message.Directions.Request)
+        {
+            _runtimeClient.SendResponse(request, Response.FromException(exception));
+        }
+        else
+        {
+            request.Dispose();
         }
     }
 
@@ -1063,6 +1101,12 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
         Message = "{Count} queued requests for migrating grain {GrainId} cannot be serialized together, so they are forwarded instead of migrating with it."
     )]
     private partial void LogDebugMigratedRequestsNotSerializable(Exception exception, int count, GrainId grainId);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Declined {Count} migrated requests for grain {GrainId} because a request for interface {InterfaceType} version {InterfaceVersion} is incompatible with this silo. The source forwards them instead."
+    )]
+    private partial void LogDebugMigratedRequestsIncompatible(int count, GrainId grainId, GrainInterfaceType interfaceType, ushort interfaceVersion);
 
     [LoggerMessage(
         Level = LogLevel.Debug,
