@@ -81,15 +81,16 @@ then apply state changes, send messages, and complete in one synchronous block.
 
 `IOutbox.Send(OutboxMessage)` stages a message. `OutboxExtensions` adds typed helpers:
 
-- `Send(type, messageId, receiver, body)` encodes and stages one message; a batch
-  overload stages several.
+- `Send(type, messageId, receiver, body, deliverAt)` encodes and stages one
+  message, optionally scheduled; a batch overload stages several.
 - `SendReply(type, context, destination, body)` stages a reply whose ID is the
   received message ID's `result` child, sent to a destination the application
   carries in its request.
 
 `MessageType<T>.Create` and `OutboxMessage.ToInboxMessage()` build messages for direct
-inbox delivery. Sending equivalent content with a pending ID coalesces with the
-original message; different content throws `InvalidOperationException`.
+inbox delivery. Sending equivalent content (destination, subject, payload, and
+`DeliverAt`) with a pending ID coalesces with the original message; different content
+throws `InvalidOperationException`.
 
 When the receiver is the sending grain, `Send` stages the message's acceptance in
 the grain's own inbox instead of the outbox, applying the inbox's identity rules: an
@@ -169,7 +170,11 @@ construction or activation setup, before journal recovery.
 
 Staged outgoing messages are delivered only after the sender's journal write
 completes. Accepted inbox messages are processed only after the receiver's journal
-write completes. Each receiver returns a `DeliveryResult`:
+write completes and, for a message with `DeliverAt`, once the Durable Jobs clock
+reaches that time. Scheduled messages are delivered and accepted immediately, and a
+scheduled message a grain sends to itself is accepted in the sending write; each
+stays in the receiver's journal until it is due. Each receiver returns a
+`DeliveryResult`:
 
 - `Accepted`: the message is durable in the inbox, or, for a message an inbox sink
   accepted, in the sink's state together with its processed record.
@@ -193,9 +198,11 @@ failed attempt since the last `Backpressured` answer. Each attempt runs through 
 circuit breaker. Delivery order is unspecified.
 
 Each activation runs one messaging pump on its scheduler, processing inbox batches
-and delivering outbox batches. One durable job per grain wakes the pump while either
-queue or a registered work source holds work. Journaled state determines which
-messages are due, so each wake-up processes exactly the ready work.
+and delivering outbox batches. One durable job per grain wakes the pump while
+either queue or a registered work source holds work, rescheduling itself for the
+next retry, `DeliverAt` time, or work-source delay.
+Journaled state determines which messages are due, so each wake-up processes exactly
+the ready work.
 
 ## State
 
@@ -230,3 +237,9 @@ stages a delivered message, `OutboxRetryScheduled` when a failed delivery is res
 and `OutboxMessageRetired` when a message retires. Each event carries the activation's
 `IGrainContext`. Tests use the events as barriers, and inject a delivery fault by throwing
 from an `InboxMessageReceiving` observer, which fails the attempt like a sink exception.
+
+## Learn more
+
+See the [messaging guide](https://dotnet.github.io/orleans/docs/grains/messaging/)
+for guarantees, recipes, idempotency, and operations. Compiled examples live in the
+[documentation snippets](../../docs/site/src/content/docs/snippets/compiled/Grains/).
