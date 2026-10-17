@@ -75,11 +75,9 @@ Each `PersistentStreamPullingAgent` is a system target with single-threaded Orle
 
 The default maximum adapter batch-container batch size is 1 and the empty-poll period is 100 ms. These defaults are runtime behavior, not a universal throughput recommendation.
 
-### Shutdown and queue handoff
+### Shutdown and admitted work
 
-When an agent stops, it closes admission for new background work and stops its polling timer. It waits for receiver initialization, the active queue pump, and accepted producer registrations, subscription handshakes, and deliveries to finish. Accepted work completes its token bookkeeping and releases registration pins and batch protection while the cache and receiver remain available. Outstanding calls retain their existing messaging timeouts and retry limits while accepted work drains.
-
-The agent then reports final delivery progress to the cache, disposes subscription cursors, and shuts down the receiver so provider-specific checkpoint flushing observes the completed progress. Registrations pending when shutdown starts keep the existing checkpoint, since their subscriber positions are still uncertain. Producer unregistration follows receiver cleanup. When the manager reuses an agent for a reassigned queue, initialization waits for that full cleanup and opens admission for the new run.
+Each pulling-agent run owns admission for queue reads, producer registrations, subscription handshakes, and consumer delivery. Shutdown closes processing admission, stops polling, and drains admitted work and actual receiver initialization. Accepted calls retain their messaging timeouts and retry limits while completing token bookkeeping and releasing registration pins and batch protection with the cache and receiver still available. Repeated shutdown calls share the same completion. Initialization waits for the prior run's full cleanup before opening fresh admission and cancellation scopes.
 
 Explicit subscription notifications receive an immediate acknowledgement while the agent tracks their asynchronous handshake through completion. This lets the subscribing consumer finish its current call and respond to the handshake.
 
@@ -87,7 +85,11 @@ A completed handshake establishes the subscription's current cursor and replay p
 
 A failed re-handshake leaves the subscription's position uncertain even when it was previously registered. The agent retains the stream entry across idle cleanup and keeps the existing checkpoint until a successful handshake reconciles that position.
 
-Subscription removal revokes in-flight handshake and delivery ownership. A terminal pub-sub action issued under valid ownership completes cleanup for that subscription identity, including when a cursor reconciliation overlaps its persistence.
+Subscription removal revokes in-flight handshake and delivery ownership. A terminal pub-sub action issued under valid ownership completes cleanup for that subscription identity, including when a cursor reconciliation overlaps its persistence. Once fault persistence starts, it uses the cleanup lifetime so shutdown drains the durable operation.
+
+An unavailable client is detached locally immediately. Durable subscription retirement has its own admission and cancellation lifetime, allowing a finishing delivery to start cleanup after processing admission closes. Once processing drains, shutdown closes retirement admission and waits for persistence and notification retries to finish. Producer-initiated retirement persists the removal and notifies the other producers; the requesting producer has already detached that subscription. Ordinary consumer unregistration notifies every registered producer.
+
+The final delivery-progress scan preserves the checkpoint barrier for producer registrations which were pending when shutdown began. Accepted handshakes establish their final position during the drain; unresolved handshakes keep the existing checkpoint. The agent disposes subscription cursors before receiver shutdown flushes the safe checkpoint and releases its resources. Producer unregistration follows receiver cleanup. Operation failures remain observable through their lifecycle outcomes and correlated diagnostics.
 
 ## Cache and cursor invariants <a name="queue-cache"></a>
 
@@ -95,7 +97,9 @@ Subscription removal revokes in-flight handshake and delivery ownership. A termi
 
 An <xref:Orleans.Streams.IQueueCache> decouples queue reads from consumer delivery. Each subscription has an <xref:Orleans.Streams.IQueueCacheCursor>, so a slow consumer does not directly block a fast consumer at a later cursor.
 
-The cache tracks the earliest delivery progress across active subscriptions. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
+The cache tracks the earliest contiguous partition position which is safe across active subscriptions. A matching record becomes safe after delivery or intentional filtering. A cursor also advances safely across records for other streams when no earlier matching delivery is pending, so a quiet stream does not pin an otherwise busy partition. Purging must not remove an item still needed by any cursor. <xref:Orleans.Providers.Streams.Common.SimpleQueueCache> uses pressure buckets to stop or slow reads as lag grows instead of discarding undelivered events. Its default capacity is 4,096 batch containers.
+
+A `Latest` subscription attached to a populated recoverable cache starts after its current partition tail. That excluded prefix contributes safe scan progress immediately, allowing a byte-bounded cache to reclaim it once the other subscriptions have also advanced. The first included record remains pending until delivery succeeds or filtering accepts it. A `Latest` cursor created while the cache is empty starts with the first subsequently admitted record.
 
 ```mermaid
 flowchart TB
@@ -111,11 +115,13 @@ flowchart TB
 
 Cache capacity is not durability. The queue remains the durable boundary, subject to the adapter's acknowledgement contract.
 
+Recoverable partitioned stream providers can compose a stream partition pipeline from <xref:Orleans.Providers.Streams.Common.RecoverableStreamReceiver%601>, a partition source, and a data adapter. The pipeline admits immutable stream records into pooled storage, reconstructs batches lazily, reconciles the earliest safe subscription scan/delivery watermark, and persists a checkpoint which resumes strictly after that position.
+
 ## Pub-sub handshake
 
 The agent registers as a producer for each stream and obtains subscription records from stream pub-sub. It holds a pin cursor while subscription handshakes complete so cache cleanup cannot pass the requested start token. New subscription notifications update the agent's local pub-sub cache.
 
-Sequence tokens allow a rewindable adapter to start from a supported historical position. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
+Sequence tokens allow a rewindable adapter to start from a supported historical position. A start token is inclusive and remains unsafe until its record is delivered or intentionally filtered. A delivery handshake token confirms that its position was already processed. Exact `EventSequenceToken` and `EventSequenceTokenV2` values interoperate for legacy compatibility. Derived tokens compare only with the same concrete type unless the provider overrides equality, ordering, and hashing together. An adapter whose <xref:Orleans.Streams.IQueueAdapter.IsRewindable?displayProperty=nameWithType> property is `false` must reject unsupported tokens rather than pretending to honor them.
 
 ## Delivery and failure semantics
 

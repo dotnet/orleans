@@ -80,6 +80,18 @@ namespace Orleans.Streaming.Kinesis
         public string StreamName { get; set; } = "OrleansTestStream";
 
         /// <summary>
+        /// Gets or sets the per-shard budget for retained encoded cache segments, in bytes.
+        /// The default is 64 MiB.
+        /// </summary>
+        /// <remarks>
+        /// The budget includes payload framing and encoded shard sequence numbers. Records are admitted
+        /// in order, and an empty cache admits one oversized record so delivery can make progress.
+        /// Additional memory includes one fetched batch of up to 1,000 records, buffer slack and pool
+        /// retention, metadata, and deserialized delivery objects.
+        /// </remarks>
+        public long MaxCacheSizeBytes { get; set; } = 64 * 1024 * 1024;
+
+        /// <summary>
         /// Gets or sets the minimum interval between calls to Kinesis <c>GetRecords</c> for a shard.
         /// </summary>
         /// <remarks>
@@ -112,6 +124,12 @@ namespace Orleans.Streaming.Kinesis
             {
                 throw new OrleansConfigurationException(
                     $"The {nameof(KinesisStreamOptions.GetRecordsInterval)} must be at least {MinimumGetRecordsInterval} for the Kinesis stream provider '{name}'.");
+            }
+
+            if (options.MaxCacheSizeBytes <= 0)
+            {
+                throw new OrleansConfigurationException(
+                    $"The {nameof(KinesisStreamOptions.MaxCacheSizeBytes)} must be greater than zero for the Kinesis stream provider '{name}'.");
             }
 
             if (options.TopologyCheckInterval <= TimeSpan.Zero)

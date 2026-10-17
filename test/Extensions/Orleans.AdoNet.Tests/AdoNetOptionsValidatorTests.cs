@@ -5,6 +5,7 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory.AdoNet;
 using Orleans.Runtime;
 using Orleans.Storage;
+using Orleans.Streaming.AdoNet;
 using Orleans.Tests.SqlUtils;
 using UnitTests.StorageTests.Relational;
 
@@ -203,6 +204,184 @@ public sealed class AdoNetOptionsValidatorTests
         var options = new AdoNetStreamOptions { ConnectionString = "configured", Invariant = " " };
 
         AssertInvariantRequired(new AdoNetStreamOptionsValidator(options, "stream").ValidateConfiguration);
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Streaming_ValidatesMaxMessagesPerRead(int maxMessagesPerRead, bool valid)
+    {
+        var options = ValidStreamOptions();
+        options.MaxMessagesPerRead = maxMessagesPerRead;
+
+        AssertStreamingValidation(valid, options, nameof(AdoNetStreamOptions.MaxMessagesPerRead));
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Streaming_ValidatesCheckpointPersistInterval(int seconds, bool valid)
+    {
+        var options = ValidStreamOptions();
+        options.CheckpointPersistInterval = TimeSpan.FromSeconds(seconds);
+
+        AssertStreamingValidation(valid, options, nameof(AdoNetStreamOptions.CheckpointPersistInterval));
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Streaming_ValidatesRetentionPeriod(int seconds, bool valid)
+    {
+        var options = ValidStreamOptions();
+        options.RetentionPeriod = TimeSpan.FromSeconds(seconds);
+
+        AssertStreamingValidation(valid, options, nameof(AdoNetStreamOptions.RetentionPeriod));
+    }
+
+    [Fact]
+    public void Streaming_RejectsSubSecondRetentionPeriod()
+    {
+        var options = ValidStreamOptions();
+        options.RetentionPeriod = TimeSpan.FromMilliseconds(500);
+
+        AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.RetentionPeriod));
+    }
+
+    [Theory]
+    [InlineData(1.1)]
+    [InlineData(1.9)]
+    public void Streaming_AllowsFractionalRetentionWhichRoundsUp(double seconds)
+    {
+        var options = ValidStreamOptions();
+        options.RetentionPeriod = TimeSpan.FromSeconds(seconds);
+
+        new AdoNetStreamOptionsValidator(options, "stream").ValidateConfiguration();
+        Assert.Equal(2, AdoNetStreamTime.ToSqlSeconds(options.RetentionPeriod));
+    }
+
+    [Fact]
+    public void Streaming_AllowsNullMaximumRetentionPeriod()
+    {
+        var options = ValidStreamOptions();
+        options.RetentionPeriod = TimeSpan.FromSeconds(30);
+        options.MaximumRetentionPeriod = null;
+
+        // Should not throw: a null hard ceiling means no hard-retention diagnostics are ever produced.
+        new AdoNetStreamOptionsValidator(options, "stream").ValidateConfiguration();
+    }
+
+    [Theory]
+    [InlineData(30, 30, true)] // equal to the normal retention period is allowed
+    [InlineData(30, 31, true)] // greater than the normal retention period is allowed
+    [InlineData(30, 29, false)] // a hard ceiling tighter than normal retention is invalid
+    public void Streaming_ValidatesMaximumRetentionPeriodAgainstRetentionPeriod(int retentionSeconds, int maximumRetentionSeconds, bool valid)
+    {
+        var options = ValidStreamOptions();
+        options.RetentionPeriod = TimeSpan.FromSeconds(retentionSeconds);
+        options.MaximumRetentionPeriod = TimeSpan.FromSeconds(maximumRetentionSeconds);
+
+        if (valid)
+        {
+            new AdoNetStreamOptionsValidator(options, "stream").ValidateConfiguration();
+        }
+        else
+        {
+            var exception = Assert.Throws<OrleansConfigurationException>(() => new AdoNetStreamOptionsValidator(options, "stream").ValidateConfiguration());
+            Assert.Contains(nameof(AdoNetStreamOptions.MaximumRetentionPeriod), exception.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Streaming_ValidatesCleanupInterval(int seconds, bool valid)
+    {
+        var options = ValidStreamOptions();
+        options.CleanupInterval = TimeSpan.FromSeconds(seconds);
+
+        AssertStreamingValidation(valid, options, nameof(AdoNetStreamOptions.CleanupInterval));
+    }
+
+    [Fact]
+    public void Streaming_RejectsSubSecondCleanupInterval()
+    {
+        var options = ValidStreamOptions();
+        options.CleanupInterval = TimeSpan.FromMilliseconds(500);
+
+        AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.CleanupInterval));
+    }
+
+    [Fact]
+    public void Streaming_RejectsRetentionWhoseCeilingExceedsSqlIntegerRange()
+    {
+        var options = ValidStreamOptions();
+        options.RetentionPeriod = TimeSpan.FromSeconds(int.MaxValue) + TimeSpan.FromTicks(1);
+
+        AssertStreamingValidation(false, options, nameof(AdoNetStreamOptions.RetentionPeriod));
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Streaming_ValidatesCleanupBatchSize(int cleanupBatchSize, bool valid)
+    {
+        var options = ValidStreamOptions();
+        options.CleanupBatchSize = cleanupBatchSize;
+
+        AssertStreamingValidation(valid, options, nameof(AdoNetStreamOptions.CleanupBatchSize));
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Streaming_ValidatesInitializationTimeout(int seconds, bool valid)
+    {
+        var options = ValidStreamOptions();
+        options.InitializationTimeout = TimeSpan.FromSeconds(seconds);
+
+        AssertStreamingValidation(valid, options, nameof(AdoNetStreamOptions.InitializationTimeout));
+    }
+
+    [Fact]
+    public void Streaming_Options_HaveRetentionSafeDefaults()
+    {
+        var options = new AdoNetStreamOptions();
+
+        Assert.False(options.StartFromNow);
+        Assert.Equal(TimeSpan.FromDays(1), options.RetentionPeriod);
+        Assert.Null(options.MaximumRetentionPeriod);
+    }
+
+    private static AdoNetStreamOptions ValidStreamOptions() => new()
+    {
+        Invariant = AdoNetInvariants.InvariantNameSqlLite,
+        ConnectionString = "Data Source=:memory:",
+        MaxMessagesPerRead = 100,
+        CheckpointPersistInterval = TimeSpan.FromSeconds(5),
+        RetentionPeriod = TimeSpan.FromMinutes(1),
+        MaximumRetentionPeriod = TimeSpan.FromMinutes(5),
+        CleanupInterval = TimeSpan.FromMinutes(1),
+        CleanupBatchSize = 1000,
+    };
+
+    private static void AssertStreamingValidation(bool valid, AdoNetStreamOptions options, string propertyName)
+    {
+        if (valid)
+        {
+            new AdoNetStreamOptionsValidator(options, "stream").ValidateConfiguration();
+        }
+        else
+        {
+            var exception = Assert.Throws<OrleansConfigurationException>(() => new AdoNetStreamOptionsValidator(options, "stream").ValidateConfiguration());
+            Assert.Contains(propertyName, exception.Message, StringComparison.Ordinal);
+        }
     }
 
     private static void AssertValidation(bool valid, Action validate)

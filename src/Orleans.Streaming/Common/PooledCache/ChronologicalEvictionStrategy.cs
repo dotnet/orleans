@@ -112,7 +112,17 @@ namespace Orleans.Providers.Streams.Common
             if (itemsPurged == 0)
                 return;
 
-            //items got purged, time to conduct follow up actions
+            OnPurgeCompleted(lastMessagePurged, itemsPurged);
+        }
+
+        /// <inheritdoc />
+        public void OnPurgeCompleted(CachedMessage? lastMessagePurged, int itemsPurged)
+        {
+            if (itemsPurged <= 0)
+            {
+                return;
+            }
+
             this.cacheMonitor?.TrackMessagesPurged(itemsPurged);
             OnPurged?.Invoke(lastMessagePurged, this.PurgeObservable.Newest);
             FreePurgedBuffers(lastMessagePurged, this.PurgeObservable.Oldest);
