@@ -78,12 +78,17 @@ internal sealed partial class ActivationData
                     }
                 }
 
-                if (message is null && ForwardingAddress is { } forwardingAddress)
+                if (message is null
+                    && _extras is { } extras
+                    && (extras.IsMigratingRequests || extras.HasMigratedRequests)
+                    && ForwardingAddress is { } forwardingAddress)
                 {
-                    // Requests which this activation forwarded, including requests which migrated with it, are canceled where they were sent.
+                    // Requests which migrated with this activation are canceled where they migrated.
                     // The new activation queues migrated requests before it activates, so a cancellation which reaches it then cancels the request before it runs.
+                    // Only a migration source forwards cancellations. Its target holds a new activation, which a migration source cannot forward back to
+                    // while this activation remains, so forwarding cannot cycle. Other activations, such as duplicates, retry briefly and then drop the cancellation.
                     forwardTo = forwardingAddress;
-                    if (_extras?.IsMigratingRequests == true)
+                    if (extras.IsMigratingRequests)
                     {
                         // The cancellation can reach the target before the migration does. It is kept until the migration's outcome is known,
                         // then applied here if the requests stay, or sent again if they migrated.

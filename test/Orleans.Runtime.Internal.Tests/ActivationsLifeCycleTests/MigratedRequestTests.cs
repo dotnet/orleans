@@ -106,6 +106,23 @@ public sealed class MigratedRequestTests
         Assert.Equal(expectedContext, ((PooledBuffer)request.RequestContextData!["pooled"]).ToArray());
     }
 
+    [Fact]
+    public void FailedCapture_RestoresTheRequestContext()
+    {
+        var expected = CreatePayload(0x44);
+        var request = CreateRequest(timeToLive: null);
+        request.RequestContextData = new() { ["pooled"] = CreatePooledBuffer(expected) };
+        request.BodyObject = new UnserializableBody();
+
+        // The request context is serialized, returning its pooled storage to the pool, before serializing the body fails.
+        Assert.ThrowsAny<Exception>(() => MigratedRequest.FromMessage(request, Pool));
+
+        // The request stays with the source, which forwards it with its context restored.
+        Assert.Equal(expected, ((PooledBuffer)request.RequestContextData!["pooled"]).ToArray());
+    }
+
+    private sealed class UnserializableBody;
+
     private static byte[] CreatePayload(byte value) => Enumerable.Repeat(value, 20_000).ToArray();
 
     private static PooledBuffer CreatePooledBuffer(byte[] contents)
