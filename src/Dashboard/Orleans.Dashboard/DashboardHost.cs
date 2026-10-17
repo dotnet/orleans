@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.Metrics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,18 +16,30 @@ namespace Orleans.Dashboard;
 internal sealed partial class DashboardHost(
     ILogger<DashboardHost> logger,
     ILocalSiloDetails localSiloDetails,
+    OrleansInstruments instruments,
     IGrainFactory grainFactory,
     DashboardTelemetryExporter dashboardTelemetryExporter,
-    ISiloGrainClient siloGrainClient) : IHostedService, IAsyncDisposable, IDisposable
+    ISiloGrainClient siloGrainClient) : IHostedService, ILifecycleParticipant<ISiloLifecycle>, IAsyncDisposable, IDisposable
 {
     private MeterProvider? _meterProvider;
+
+    /// <summary>
+    /// Gets the interval between periodic telemetry exports. <see cref="Timeout.Infinite"/> disables periodic export,
+    /// so only explicit flushes collect telemetry.
+    /// </summary>
+    internal int ExportIntervalMilliseconds { get; init; } = 1000;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         await Task.WhenAll(
             ActivateDashboardGrainAsync(cancellationToken),
-            ActivateSiloGrainAsync(cancellationToken),
-            StartOpenTelemetryConsumerAsync()).ConfigureAwait(false);
+            ActivateSiloGrainAsync(cancellationToken)).ConfigureAwait(false);
+    }
+
+    public void Participate(ISiloLifecycle lifecycle)
+    {
+        // Observe client connections from the moment the gateway opens at the Active stage.
+        lifecycle.Subscribe<DashboardHost>(ServiceLifecycleStage.BecomeActive, _ => StartOpenTelemetryConsumerAsync());
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -60,8 +73,20 @@ internal sealed partial class DashboardHost(
     private Task StartOpenTelemetryConsumerAsync()
     {
         _meterProvider = Sdk.CreateMeterProviderBuilder()
-            .AddMeter("Orleans")
-            .AddReader(new PeriodicExportingMetricReader(dashboardTelemetryExporter, 1000, 1000))
+            .AddMeter(instruments.Meter.Name)
+            .AddView(instrument =>
+            {
+                if (!ReferenceEquals(instrument.Meter, instruments.Meter))
+                {
+                    return MetricStreamConfiguration.Drop;
+                }
+
+                // The dashboard displays silo-wide totals, so collect a single stream with histogram sums only.
+                return instrument.GetType().IsGenericType && instrument.GetType().GetGenericTypeDefinition() == typeof(Histogram<>)
+                    ? new ExplicitBucketHistogramConfiguration { TagKeys = [], Boundaries = [], RecordMinMax = false }
+                    : null;
+            })
+            .AddReader(new PeriodicExportingMetricReader(dashboardTelemetryExporter, ExportIntervalMilliseconds, 1000))
             .Build();
         return Task.CompletedTask;
     }

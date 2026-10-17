@@ -128,6 +128,7 @@ namespace UnitTests.Runtime
                 recentlyUsedActivationCount: recentlyUsedActivationCount,
                 environmentStatisticsProvider,
                 Options.Create(new LoadSheddingOptions { LoadSheddingEnabled = overloaded }),
+                clientCount: 0,
                 DateTime.UtcNow);
         }
 
