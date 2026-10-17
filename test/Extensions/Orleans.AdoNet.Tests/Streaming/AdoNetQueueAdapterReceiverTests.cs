@@ -294,6 +294,36 @@ public class AdoNetQueueAdapterReceiverLifecycleTests(TestEnvironmentFixture fix
             queries.Confirmed.OrderBy(static item => item.MessageId));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AdoNetQueueAdapterReceiver_MessagesDelivered_ConfirmsRedeliveredMessageOnceWithLatestReceipt(bool latestAttemptDelivered)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var (receiver, queries, message) = CreateReceiver();
+        var redelivered = message with { Dequeued = message.Dequeued + 1 };
+        queries.Dequeue.SetResult([message]);
+        var first = await receiver.GetQueueMessagesAsync(1).WaitAsync(cancellationToken);
+        queries.Dequeue = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        queries.Dequeue.SetResult([redelivered]);
+        var second = await receiver.GetQueueMessagesAsync(1).WaitAsync(cancellationToken);
+        queries.Confirmation.SetResult([new(message.ServiceId, message.ProviderId, message.QueueId, message.MessageId)]);
+
+        await receiver.MessagesDeliveredAsync(latestAttemptDelivered ? [first[0], second[0]] : [first[0]]).WaitAsync(cancellationToken);
+        await receiver.Shutdown(TimeSpan.FromSeconds(10)).WaitAsync(cancellationToken);
+
+        var expectedReceipt = latestAttemptDelivered ? redelivered.Dequeued : message.Dequeued;
+        Assert.Equal([new AdoNetStreamConfirmation(message.MessageId, expectedReceipt)], queries.Confirmed);
+        if (latestAttemptDelivered)
+        {
+            Assert.Equal(0, queries.ReleaseCalls);
+        }
+        else
+        {
+            Assert.Equal([new AdoNetStreamConfirmation(redelivered.MessageId, redelivered.Dequeued)], queries.Released);
+        }
+    }
+
     private static List<long> ReadMessageIds(IQueueCacheCursor cursor)
     {
         var messageIds = new List<long>();
@@ -677,6 +707,60 @@ public abstract class AdoNetQueueAdapterReceiverTests(string invariant, TestEnvi
         Assert.DoesNotContain(
             await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage", cancellationToken),
             message => message.ServiceId == serviceId);
+    }
+
+    /// <summary>
+    /// Tests that a message redelivered while its earlier attempt remains cached is confirmed once both attempts are purged.
+    /// </summary>
+    [Fact]
+    public async Task AdoNetQueueAdapterReceiver_CachedRedeliveryOfSameMessage_IsConfirmed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var serviceId = $"Service-{Guid.NewGuid()}";
+        var providerId = $"Provider-{Guid.NewGuid()}";
+        var queueId = $"Queue-{Guid.NewGuid()}";
+        var clusterOptions = new ClusterOptions { ServiceId = serviceId };
+        var streamOptions = new AdoNetStreamOptions
+        {
+            Invariant = invariant,
+            ConnectionString = _storage.ConnectionString,
+            VisibilityTimeout = TimeSpan.Zero,
+            EvictionBatchSize = 0
+        };
+        var cacheOptions = new SimpleQueueCacheOptions();
+        var serializer = _fixture.Serializer.GetSerializer<AdoNetBatchContainer>();
+        var streamId = StreamId.Create("MyNamespace", "MyKey");
+        var ack = await _queries.QueueStreamMessageAsync(serviceId, providerId, queueId, serializer.SerializeToArray(new AdoNetBatchContainer(streamId, [new TestModel(1)], null)), 100);
+        var receiver = new AdoNetQueueAdapterReceiver(providerId, queueId, streamOptions, clusterOptions, cacheOptions, _queries, new AdoNetStreamPositions(), serializer, NullLogger<AdoNetQueueAdapterReceiver>.Instance);
+        IQueueCache cache = new SimpleQueueCache(cacheOptions.CacheSize, NullLogger.Instance);
+
+        var first = await receiver.GetQueueMessagesAsync(1).WaitAsync(cancellationToken);
+        cache.AddToCache(first);
+        var cursor = cache.TryGetCacheCursor(streamId, first[0].SequenceToken).Cursor!;
+        var second = await receiver.GetQueueMessagesAsync(1).WaitAsync(cancellationToken);
+        cache.AddToCache(second);
+
+        Assert.Equal([ack.MessageId, ack.MessageId], ReadMessageIds(cursor));
+        Assert.Equal([1, 2], new[] { first[0], second[0] }.Cast<AdoNetBatchContainer>().Select(static batch => batch.Dequeued));
+        cursor.Dispose();
+        Assert.True(cache.TryPurgeFromCache(out var purged));
+        Assert.Equal(2, purged.Count);
+        await receiver.MessagesDeliveredAsync(purged).WaitAsync(cancellationToken);
+
+        Assert.DoesNotContain(
+            await _storage.ReadAsync<AdoNetStreamMessage>("SELECT * FROM OrleansStreamMessage", cancellationToken),
+            message => message.ServiceId == serviceId);
+    }
+
+    private static List<long> ReadMessageIds(IQueueCacheCursor cursor)
+    {
+        var messageIds = new List<long>();
+        while (cursor.MoveNextWithResult().Kind == QueueCacheCursorMoveResultKind.Success)
+        {
+            messageIds.Add(Assert.IsType<AdoNetBatchContainer>(cursor.GetCurrent(out _)).MessageId);
+        }
+
+        return messageIds;
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;

@@ -174,18 +174,22 @@ internal partial class AdoNetQueueAdapterReceiver(string providerId, string queu
             return;
         }
 
-        // get the identifiers for the messages to confirm and release the positions of messages which have left the cache
-        var items = new List<AdoNetStreamConfirmation>(messages.Count);
+        // release the positions of messages which have left the cache and confirm each message once with its latest receipt,
+        // as redelivery can cache several attempts of the same message and only the latest receipt matches storage
+        var receipts = new Dictionary<long, int>(messages.Count);
         foreach (AdoNetBatchContainer message in messages)
         {
             positions.Remove(message.SequenceToken.SequenceNumber);
-            items.Add(new(message.MessageId, message.Dequeued));
+            receipts[message.MessageId] = receipts.TryGetValue(message.MessageId, out var receipt)
+                ? Math.Max(receipt, message.Dequeued)
+                : message.Dequeued;
         }
+
+        var items = receipts.Select(static item => new AdoNetStreamConfirmation(item.Key, item.Value)).ToList();
 
         try
         {
             var confirmed = await queries.ConfirmStreamMessagesAsync(clusterOptions.ServiceId, providerId, queueId, items);
-            var receipts = items.ToDictionary(static item => item.MessageId, static item => item.Dequeued);
             lock (_lock)
             {
                 foreach (var message in confirmed)
