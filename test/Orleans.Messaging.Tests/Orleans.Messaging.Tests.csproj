@@ -13,6 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="$(SourceRoot)docs\site\src\content\docs\snippets\compiled\Grains\MessagingSnippets.cs" Link="Documentation\MessagingSnippets.cs" />
+    <Compile Include="$(SourceRoot)docs\site\src\content\docs\snippets\compiled\Grains\MessagingRecipes.cs" Link="Documentation\MessagingRecipes.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Messaging\Orleans.Messaging.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
