@@ -53,6 +53,12 @@ public sealed class DurableStateManagerTests
             () => owner.RegisterStateMachine("explicit", new InertState()));
         Assert.Contains("explicit", duplicate.Message);
         AssertExisting(manager, "explicit", explicitState);
+
+        // The grain-facing interface lists the same state as its owning manager.
+        Assert.Equal(
+            owner.GetStateMachines().Select(static pair => pair.Key).Order(StringComparer.Ordinal),
+            manager.GetStateMachines().Select(static pair => pair.Key).Order(StringComparer.Ordinal));
+        Assert.Contains(manager.GetStateMachines(), pair => pair.Key == "explicit" && ReferenceEquals(pair.Value, explicitState));
     }
 
     [Theory]
