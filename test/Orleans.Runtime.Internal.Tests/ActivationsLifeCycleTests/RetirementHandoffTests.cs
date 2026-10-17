@@ -250,6 +250,38 @@ public sealed class RetirementHandoffTests
     }
 
     [Fact]
+    public async Task MigratedRequestResponse_UpdatesTheCallersCacheToTheNewActivation()
+    {
+        await using var cluster = await DeployAsync();
+        var caller = cluster.Silos[0];
+        var source = cluster.Silos[1];
+        var target = cluster.Silos[2];
+        var grainFactory = caller.ServiceProvider.GetRequiredService<IGrainFactory>();
+        var locator = caller.ServiceProvider.GetRequiredService<Orleans.Runtime.GrainDirectory.GrainLocator>();
+        var key = Guid.NewGuid();
+        var state = RetirementHandoffState.Create(key);
+        var grain = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName);
+        await PlaceOnAsync(source, () => grain.GetLocation());
+        Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out var cached));
+        Assert.Equal(source.SiloAddress, cached.SiloAddress);
+
+        var running = grain.Block().AsTask();
+        await state.BlockEntered.Task.WaitAsync(Timeout, Cancellation);
+        var queued = grain.Record("queued").AsTask();
+        await WaitUntilAsync(() => GetWaitingCount(source, grain.GetGrainId()) == 1);
+
+        // The grain migrates with its queued request, and the source stays in the cluster.
+        await grain.MigrateOnIdleTo(target.SiloAddress);
+        state.ReleaseBlock.TrySetResult();
+        await running.WaitAsync(Timeout, Cancellation);
+        await queued.WaitAsync(Timeout, Cancellation);
+
+        // The response to the migrated request replaces the old activation in the caller's cache, so its next call goes directly to the new activation.
+        Assert.True(locator.TryLookupInCache(grain.GetGrainId(), out cached));
+        Assert.Equal(target.SiloAddress, cached.SiloAddress);
+    }
+
+    [Fact]
     public async Task MigratedRequests_AreDeclinedWhenTheGrainIsAlreadyActive()
     {
         await using var cluster = await DeployAsync();
@@ -328,7 +360,7 @@ public sealed class RetirementHandoffTests
             SendingGrain = GrainId.Create("test", "caller"),
             TargetGrain = grain.GetGrainId(),
         };
-        Assert.False(activation.TryEnqueueMigratedRequests([request]));
+        Assert.False(activation.TryEnqueueMigratedRequests([request], previousAddress: null));
         Assert.Equal(0, activation.WaitingCount);
     }
 
@@ -1081,25 +1113,35 @@ public sealed class RetirementHandoffTests
         var grainId = grainFactory.GetGrain<IRetirementHandoffGrain>(key, typeof(RetirementHandoffGrain).FullName).GetGrainId();
 
         // Each request fits in its own message, but not together with the other, so the migration carries neither and the source retains them.
+        // Their bodies are pooled buffers from callers on this silo, which capturing the requests for migration serializes, returning their storage to the pool.
+        var payload = Enumerable.Repeat((byte)0x5A, MaxMessageBodySize * 3 / 5).ToArray();
         List<Message> requests = [CreateRequest(1), CreateRequest(2)];
         var context = new MigrationContext(source.ServiceProvider.GetRequiredService<SerializerSessionPool>());
         var migration = migrationManager.MigrateAsync(target.SiloAddress, grainId, context, requests, out var carriesRequests);
         Assert.False(carriesRequests);
+
+        // The retained requests are restored, so that forwarding them sends their original bodies.
+        Assert.All(requests, request => Assert.Equal(payload, ((Orleans.Serialization.Buffers.PooledBuffer)request.BodyObject!).ToArray()));
 
         // The grain migrates without them.
         var result = await migration.AsTask().WaitAsync(Timeout, Cancellation);
         Assert.True(result.Migrated);
         Assert.Equal(MigratedRequestsOutcome.Retained, result.Requests);
 
-        Message CreateRequest(long id) => new()
+        Message CreateRequest(long id)
         {
-            Direction = Message.Directions.Request,
-            Id = new CorrelationId(id),
-            SendingGrain = GrainId.Create("test", "caller"),
-            SendingSilo = cluster.Silos[0].SiloAddress,
-            TargetGrain = grainId,
-            BodyObject = new byte[MaxMessageBodySize * 3 / 5],
-        };
+            var body = new Orleans.Serialization.Buffers.PooledBuffer();
+            body.Write(payload);
+            return new()
+            {
+                Direction = Message.Directions.Request,
+                Id = new CorrelationId(id),
+                SendingGrain = GrainId.Create("test", "caller"),
+                SendingSilo = cluster.Silos[0].SiloAddress,
+                TargetGrain = grainId,
+                BodyObject = body,
+            };
+        }
     }
 
     /// <summary>

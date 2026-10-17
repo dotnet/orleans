@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 using Xunit;
 
@@ -67,6 +68,51 @@ public sealed class MigratedRequestTests
 
         Assert.Null(request.TimeToLiveMilliseconds);
         Assert.Null(request.ToMessage(GrainId.Create("test", "target"), SiloAddress.FromParsableString("127.0.0.1:11111@1"), Pool).TimeToLive);
+    }
+
+    [Fact]
+    public void PooledRequestContextValue_SurvivesMeasuringAndSending()
+    {
+        var serializer = Services.GetRequiredService<Serializer>();
+        var expected = CreatePayload(0x11);
+        var request = CreateRequest(timeToLive: null);
+        request.RequestContextData = new() { ["pooled"] = CreatePooledBuffer(expected) };
+        var migrated = MigratedRequest.FromMessage(request, Pool);
+
+        // A migration serializes the captured request once to measure it and once to send it. Serializing a pooled buffer returns its storage to the pool,
+        // clearing it, so the captured request must hold serialized data rather than the value itself.
+        serializer.SerializeToArray(migrated);
+        var received = serializer.Deserialize<MigratedRequest>(serializer.SerializeToArray(migrated))!;
+
+        var delivered = received.ToMessage(GrainId.Create("test", "target"), SiloAddress.FromParsableString("127.0.0.1:11111@1"), Pool);
+        Assert.Equal(expected, ((PooledBuffer)delivered.RequestContextData!["pooled"]).ToArray());
+    }
+
+    [Fact]
+    public void RetainedRequest_IsRestoredWithItsPooledValues()
+    {
+        var expectedBody = CreatePayload(0x22);
+        var expectedContext = CreatePayload(0x33);
+        var request = CreateRequest(timeToLive: null);
+        request.BodyObject = CreatePooledBuffer(expectedBody);
+        request.RequestContextData = new() { ["pooled"] = CreatePooledBuffer(expectedContext) };
+
+        // Capturing the request serializes its body and context, which returns their pooled storage to the pool, clearing it.
+        var migrated = MigratedRequest.FromMessage(request, Pool);
+
+        // A request which stays with the source is restored from the captured data before it is forwarded.
+        migrated.RestoreTo(request, Pool);
+        Assert.Equal(expectedBody, ((PooledBuffer)request.BodyObject!).ToArray());
+        Assert.Equal(expectedContext, ((PooledBuffer)request.RequestContextData!["pooled"]).ToArray());
+    }
+
+    private static byte[] CreatePayload(byte value) => Enumerable.Repeat(value, 20_000).ToArray();
+
+    private static PooledBuffer CreatePooledBuffer(byte[] contents)
+    {
+        var buffer = new PooledBuffer();
+        buffer.Write(contents);
+        return buffer;
     }
 
     private static Message CreateRequest(TimeSpan? timeToLive) => new()

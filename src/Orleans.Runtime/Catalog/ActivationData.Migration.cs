@@ -144,6 +144,8 @@ internal sealed partial class ActivationData
     /// <summary>
     /// Queues the requests which were queued for this grain's previous activation when it migrated here, ahead of any other request.
     /// </summary>
+    /// <param name="messages">The requests.</param>
+    /// <param name="previousAddress">The previous activation's address, which the requests' callers replace with this activation's address in their caches.</param>
     /// <returns>
     /// <see langword="true"/> if this activation took ownership of the requests; <see langword="false"/> if it has begun deactivating
     /// or would reject some of the requests as overloaded, in which case none of the requests were queued.
@@ -151,7 +153,7 @@ internal sealed partial class ActivationData
     /// <remarks>
     /// The catalog calls this before the activation begins activating, so no request runs before these.
     /// </remarks>
-    internal bool TryEnqueueMigratedRequests(List<Message> messages)
+    internal bool TryEnqueueMigratedRequests(List<Message> messages, GrainAddress? previousAddress)
     {
         Debug.Assert(!IsStatelessWorker, "Stateless workers do not migrate.");
         lock (_lock)
@@ -170,7 +172,6 @@ internal sealed partial class ActivationData
             }
 
             var queuedTime = CoarseStopwatch.StartNew();
-            var previousAddress = PreviousRegistration;
             var migrated = new List<(Message, CoarseStopwatch)>(messages.Count);
             foreach (var message in messages)
             {
