@@ -85,6 +85,19 @@ child identified by its input index under the combinator's operation identifier,
 across replay when the input order is stable. The combinators schedule their inputs concurrently, so a host
 can commit the batch together.
 
+Each combinator is also an extension method on its input collection, so a list, an array, or a query composes in
+place:
+
+```csharp
+var reserved = await lines.Select(line => Catalog(line.ProductId).ReserveAsync(OrderId, line.Units))
+    .WhenAll()
+    .WithId("reserve");
+```
+
+Handles compose the same way: `handles.WhenAll(cancellationToken)`, `handles.WhenAny()`, `handles.Race()`, and
+`handles.WhenEach()`. A collection expression such as `[a, b]` has no type of its own, so pass it to the static form,
+`DurableTask.WhenAll([a, b])`.
+
 `WhenAll` follows `Task.WhenAll`: it completes only after every input is terminal, including inputs which
 durable cancellation reaches. Awaiting it then throws the first failure in input order when any input failed;
 otherwise it throws the first input's `OperationCanceledException` in input order when any input was canceled;

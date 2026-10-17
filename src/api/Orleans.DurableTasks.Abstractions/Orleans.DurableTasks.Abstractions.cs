@@ -318,6 +318,18 @@ namespace Orleans.DurableTasks
 
         public static ScheduledTask<TResult> Post<TResult>(this DurableTask<TResult> task) { throw null; }
 
+        public static DurableTask<int> Race(this System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static System.Threading.Tasks.Task<ScheduledTask> Race(this System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static DurableTask<(int Index, TResult Result)> Race<TResult>(this System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static System.Threading.Tasks.Task<ScheduledTask<TResult>> Race<TResult>(this System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static DurableTask<ScheduledTask[]> ScheduleAll(this System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static DurableTask<ScheduledTask<TResult>[]> ScheduleAll<TResult>(this System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
         public static System.Threading.Tasks.Task<ScheduledTask> ScheduleAsync(this DurableTask task, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public static System.Threading.Tasks.Task<ScheduledTask<TResult>> ScheduleAsync<TResult>(this DurableTask<TResult> task, System.Threading.CancellationToken cancellationToken = default) { throw null; }
@@ -333,6 +345,38 @@ namespace Orleans.DurableTasks
         public static DurableTask WaitUntilAsync(this DurableTask task, System.DateTimeOffset dueTime) { throw null; }
 
         public static DurableTask<TResult> WaitUntilAsync<TResult>(this DurableTask<TResult> task, System.DateTimeOffset dueTime) { throw null; }
+
+        public static DurableTask WhenAll(this System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static System.Threading.Tasks.Task WhenAll(this System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static DurableTask<TResult[]> WhenAll<TResult>(this System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static System.Threading.Tasks.Task WhenAll<TResult>(this System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static DurableTask<ScheduledTask[]> WhenAllCompleted(this System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static System.Threading.Tasks.Task<ScheduledTask[]> WhenAllCompleted(this System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static DurableTask<ScheduledTask<TResult>[]> WhenAllCompleted<TResult>(this System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static System.Threading.Tasks.Task<ScheduledTask<TResult>[]> WhenAllCompleted<TResult>(this System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static DurableTask<int> WhenAny(this System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static System.Threading.Tasks.Task<ScheduledTask> WhenAny(this System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static DurableTask<(int Index, TResult Result)> WhenAny<TResult>(this System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static System.Threading.Tasks.Task<ScheduledTask<TResult>> WhenAny<TResult>(this System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask> WhenEach(this System.Collections.Generic.IEnumerable<DurableTask> tasks) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask> WhenEach(this System.Collections.Generic.IReadOnlyList<ScheduledTask> tasks) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask<TResult>> WhenEach<TResult>(this System.Collections.Generic.IEnumerable<DurableTask<TResult>> tasks) { throw null; }
+
+        public static System.Collections.Generic.IAsyncEnumerable<ScheduledTask<TResult>> WhenEach<TResult>(this System.Collections.Generic.IReadOnlyList<ScheduledTask<TResult>> tasks) { throw null; }
 
         public static ConfiguredDurableTask WithId(this DurableTask task, string name) { throw null; }
 
