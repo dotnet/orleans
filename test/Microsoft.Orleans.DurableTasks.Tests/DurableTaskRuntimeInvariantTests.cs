@@ -2312,7 +2312,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         var (runtime, storage, manager, transport) = CreateRuntime();
         var taskId = TaskId.Parse("root");
-        var effectId = TaskId.Parse("root/$once:effect");
+        var effectId = TaskId.Parse("root/effect");
         var runs = 0;
         var observed = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var request = CreateRequest(
@@ -2492,7 +2492,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         Assert.IsType<InvalidOperationException>(response.Exception);
         Assert.Equal(0, runs);
-        Assert.False(storage.Contains(TaskId.Parse("root/local/$once:effect")));
+        Assert.False(storage.Contains(TaskId.Parse("root/local/effect")));
     });
 
     [Fact]
@@ -2500,7 +2500,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     {
         var (runtime, storage, _, _) = CreateRuntime();
         var taskId = TaskId.Parse("root/local");
-        var effectId = TaskId.Parse("root/local/$once:effect");
+        var effectId = TaskId.Parse("root/local/effect");
         storage.SetRequestFingerprint(effectId, storage.GetOrCreate(effectId), "$detach:other");
         var runs = 0;
 

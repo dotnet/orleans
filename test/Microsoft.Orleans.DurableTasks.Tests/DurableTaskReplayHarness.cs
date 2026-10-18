@@ -27,11 +27,13 @@ namespace Microsoft.Orleans.DurableTasks.Tests;
 /// Ending an activation stops its runtime without a further write, as a crash or a deactivation does, so state which
 /// no write committed is lost. The next activation recovers the journal and replays the pending workflow.
 /// </remarks>
-internal sealed class DurableTaskReplayHarness(Func<ReplayGrain, DurableTask> workflow) : IAsyncDisposable
+internal sealed class DurableTaskReplayHarness(
+    Func<ReplayGrain, DurableTask> workflow,
+    string journalFormatKey = DurableTaskJournalHarness.OrleansBinary) : IAsyncDisposable
 {
     public static readonly GrainId GrainId = GrainId.Create("replay", "one");
 
-    private readonly DurableTaskJournalHarness _journal = new(DurableTaskJournalHarness.OrleansBinary);
+    private readonly DurableTaskJournalHarness _journal = new(journalFormatKey);
     private int _effectRuns;
 
     /// <summary>Gets or sets the workflow which each activation runs, such as a later version after a deployment.</summary>

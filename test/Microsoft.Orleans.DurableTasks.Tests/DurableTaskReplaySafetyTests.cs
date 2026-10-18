@@ -80,7 +80,7 @@ public sealed class DurableTaskReplaySafetyTests
     [Fact]
     public Task OnceCommitsItsRecordWithItsStateChangesAndReplayReturnsTheRecordedValue() => ActivationScheduler.RunAsync(async () =>
     {
-        var effectId = WorkflowId.Child("$once:increment");
+        var effectId = WorkflowId.Child("increment");
         await using var harness = new DurableTaskReplayHarness(IncrementOnce);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
@@ -179,10 +179,11 @@ public sealed class DurableTaskReplaySafetyTests
         }
     });
 
-    [Fact]
-    public Task ReplayWhichSchedulesAChildUnderAnEffectsNameFails() => ActivationScheduler.RunAsync(async () =>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task ReplayWhichSchedulesAChildUnderAnEffectsNameFails(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
-        await using var harness = new DurableTaskReplayHarness(IncrementOnce);
+        await using var harness = new DurableTaskReplayHarness(IncrementOnce, journalFormatKey);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
@@ -191,22 +192,24 @@ public sealed class DurableTaskReplaySafetyTests
             await activation.Grain.UnrelatedWrites;
         }
 
-        // A later version schedules a step under the name which the effect recorded.
+        // A later version schedules a step under the name which the effect recorded, which is the effect's identifier.
         harness.Workflow = static grain => Changed(grain);
         await using var replay = await harness.ActivateAsync(TestCancellation);
 
         var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
+        Assert.Contains("'workflow/increment'", exception.Message, StringComparison.Ordinal);
         Assert.Contains("It records a DurableTask.Once effect, and this attempt requested a local child task.", exception.Message, StringComparison.Ordinal);
 
         static async DurableTask<int> Changed(ReplayGrain grain) =>
             await DurableTask.Run(_ => grain.Counter.Value + 1).WithId("increment");
     });
 
-    [Fact]
-    public Task ReplayWhichRunsAnEffectUnderAStepsNameFails() => ActivationScheduler.RunAsync(async () =>
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task ReplayWhichRunsAnEffectUnderAStepsNameFails(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
-        await using var harness = new DurableTaskReplayHarness(static grain => Original(grain));
+        await using var harness = new DurableTaskReplayHarness(static grain => Original(grain), journalFormatKey);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
@@ -243,14 +246,14 @@ public sealed class DurableTaskReplaySafetyTests
         }
 
         // A later version keeps the first step and turns the name's second occurrence into an effect. Names count their
-        // occurrences across kinds, so the effect's identifier, $once:increment$2, pairs with the recorded increment$2
-        // rather than with the first step.
+        // occurrences across kinds, so the effect's identifier is the recorded increment$2, which holds the step or the
+        // combinator's input, rather than the first step's.
         harness.Workflow = static grain => Changed(grain);
         await using var replay = await harness.ActivateAsync(TestCancellation);
 
         var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
         var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("'workflow/$once:increment$2'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("'workflow/increment$2'", exception.Message, StringComparison.Ordinal);
         Assert.Contains("this attempt requested a DurableTask.Once effect.", exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, harness.EffectRuns);
         Assert.Equal(2, replay.Grain.Counter.Value);
@@ -279,6 +282,35 @@ public sealed class DurableTaskReplaySafetyTests
                 grain.Harness.CountEffectRun();
                 return ++grain.Counter.Value;
             });
+        }
+    });
+
+    [Fact]
+    public Task ReplayWhichRunsACombinatorInputBeneathAnEffectsNameFails() => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var harness = new DurableTaskReplayHarness(IncrementOnce);
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
+        }
+
+        // A later version turns the effect into a combinator of the same name, whose input would run beneath the effect.
+        harness.Workflow = static grain => Changed(grain);
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+
+        var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
+        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
+        Assert.Contains("'workflow/increment/0' runs beneath 'workflow/increment'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.Once effect, and this attempt requested a local child task.", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(1, replay.Grain.Counter.Value);
+
+        static async DurableTask<int> Changed(ReplayGrain grain)
+        {
+            await DurableTask.WhenAll([DurableTask.Run(_ => ++grain.Counter.Value)]).WithId("increment");
+            return grain.Counter.Value;
         }
     });
 

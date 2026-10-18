@@ -803,6 +803,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     // Fingerprints of operations in an execution tree begin with '$', so they never equal a hexadecimal request fingerprint.
     private const string EffectFingerprint = "$once";
 
+    private static bool IsEffectRecord(IDurableTaskState state) =>
+        string.Equals(state.RequestFingerprint, EffectFingerprint, StringComparison.Ordinal);
+
     /// <summary>
     /// Returns the outcome which <paramref name="effectId"/> records, or runs <paramref name="effect"/> and stages a
     /// record of its outcome, without writing.
@@ -812,6 +815,7 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// same work item and commit in the next journal write, whichever operation requests it. The record is a terminal
     /// entry of the execution's tree and is deleted with the tree. The outcome is serialized as task results are, and a
     /// result which doesn't serialize is recorded and returned as that failure, so every run observes the same failure.
+    /// Another kind of record under the effect's identifier, or a named combinator's inputs beneath it, is a divergence.
     /// </remarks>
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A result which can't be recorded is recorded as that failure.")]
     DurableTaskResponse IDurableTaskGrainRuntime.RunEffect<TState>(
@@ -822,8 +826,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         ThrowIfStopping();
         if (_storage.TryGetTask(effectId, out var record))
         {
-            if (!string.Equals(record.RequestFingerprint, EffectFingerprint, StringComparison.Ordinal)
-                || record.Result is not { IsCompleted: true } outcome)
+            if (!IsEffectRecord(record) || record.Result is not { IsCompleted: true } outcome)
             {
                 throw CreateDivergenceException(
                     $"Durable child task '{effectId}' is already associated with a different operation.",
@@ -832,6 +835,15 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             return outcome;
+        }
+
+        // A named combinator records only its inputs, beneath its identifier.
+        if (_storage.GetChildren(effectId).FirstOrDefault() is (var inputId, { } input))
+        {
+            throw CreateDivergenceException(
+                $"Durable child task '{effectId}' holds '{inputId}', which an earlier run recorded.",
+                input,
+                "a DurableTask.Once effect");
         }
 
         var response = effect(state);
@@ -889,30 +901,15 @@ internal sealed partial class DurableTaskGrainRuntime(
     private static bool IsVersionRecord(IDurableTaskState state) =>
         string.Equals(state.RequestFingerprint, VersionFingerprint, StringComparison.Ordinal);
 
-    /// <remarks>
-    /// A record of the other kind is the operation itself or, for a named combinator, which records only its inputs, a
-    /// descendant of it.
-    /// </remarks>
-    void IDurableTaskGrainRuntime.ThrowIfRecordedAsOtherKind(TaskId operationId, TaskId otherKindId, string requested)
+    void IDurableTaskGrainRuntime.ThrowIfRecordedAsEffect(TaskId operationId, TaskId effectId, string requested)
     {
-        if (_storage.TryGetTask(operationId, out _))
+        if (_storage.TryGetTask(effectId, out var recorded) && IsEffectRecord(recorded))
         {
-            return;
+            throw CreateDivergenceException(
+                $"Durable task '{operationId}' runs beneath '{effectId}', which an earlier run recorded.",
+                recorded,
+                requested);
         }
-
-        if (!_storage.TryGetTask(otherKindId, out var recorded))
-        {
-            (_, recorded) = _storage.GetChildren(otherKindId).FirstOrDefault();
-            if (recorded is null)
-            {
-                return;
-            }
-        }
-
-        throw CreateDivergenceException(
-            $"Durable task '{operationId}' uses the same name and occurrence as '{otherKindId}', which an earlier run recorded.",
-            recorded,
-            requested);
     }
 
     public async ValueTask CancelRemoteAsync(TaskId taskId, GrainId target, string? reason, CancellationToken cancellationToken)
