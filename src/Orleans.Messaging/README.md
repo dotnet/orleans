@@ -29,7 +29,10 @@ to navigate them.
 ## Handle messages
 
 `IInbox.Register(IInboxHandler)` adds a handler. Each message goes to the first
-registered handler whose `CanHandle` returns `true`.
+registered handler whose `CanHandle(InboxMessage)` returns `true`. Selection reads
+only the message; the selected handler finishes it in `HandleAsync`. Handlers can be
+registered at any time; registering during construction or activation makes them
+available to recovered messages.
 
 `InboxExtensions.Register` binds a `MessageType<T>` subject to a typed method:
 

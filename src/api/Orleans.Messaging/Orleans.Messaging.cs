@@ -155,7 +155,7 @@ namespace Orleans.Messaging
 
     public partial interface IInboxHandler
     {
-        bool CanHandle(IInboxHandlerContext context);
+        bool CanHandle(InboxMessage message);
         System.Threading.Tasks.ValueTask HandleAsync(IInboxHandlerContext context, System.Threading.CancellationToken cancellationToken);
     }
 
