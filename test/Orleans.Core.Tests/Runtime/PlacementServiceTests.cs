@@ -59,7 +59,7 @@ namespace UnitTests.Runtime
             var messaging = new MessagingInstruments(instruments);
             var processing = new MessagingProcessingInstruments(instruments);
             var cachedAddress = new GrainAddress { GrainId = grainId, SiloAddress = fixture.Target.LocalSilo };
-            localGrainDirectory.TryLocalLookup(grainId, out Arg.Any<GrainAddress>()).Returns(call =>
+            localGrainDirectory.TryLocalLookup(grainId, out Arg.Any<GrainAddress?>()).Returns(call =>
             {
                 call[1] = cachedAddress;
                 return true;
@@ -98,7 +98,7 @@ namespace UnitTests.Runtime
                 Assert.Equal(cachedAddress.SiloAddress, message.TargetSilo);
                 Assert.Null(message.CacheInvalidationHeader);
                 fixture.SiloStatusOracle.Received(expectedStatusLookups).GetApproximateSiloStatus(target);
-                localGrainDirectory.Received(1).TryLocalLookup(grainId, out Arg.Any<GrainAddress>());
+                localGrainDirectory.Received(1).TryLocalLookup(grainId, out Arg.Any<GrainAddress?>());
             }
             finally
             {
