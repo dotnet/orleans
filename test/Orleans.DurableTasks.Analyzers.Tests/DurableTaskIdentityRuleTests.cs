@@ -22,27 +22,27 @@ public class DurableTaskIdentityRuleTests
             public async DurableTask RunAsync(bool condition, int[] items)
             {
                 await Step(1);
-                await {|ORLEANS0120:Step(2)|};
+                await {|ORLEANS0220:Step(2)|};
                 if (condition)
                 {
-                    await {|ORLEANS0120:Step(3)|};
+                    await {|ORLEANS0220:Step(3)|};
                 }
 
                 foreach (var item in items)
                 {
-                    await {|ORLEANS0120:Step(item)|};
+                    await {|ORLEANS0220:Step(item)|};
                     await Step(item).WithId("item");
                 }
 
-                var chosen = condition ? await {|ORLEANS0120:Step(4)|} : 0;
-                DurableTask.{|ORLEANS0120:RunInline|}(() => chosen);
+                var chosen = condition ? await {|ORLEANS0220:Step(4)|} : 0;
+                DurableTask.{|ORLEANS0220:RunInline|}(() => chosen);
                 DurableTask.RunInline("named", () => chosen);
-                {|ORLEANS0120:Step(5)|}.Detached().Post();
+                {|ORLEANS0220:Step(5)|}.Detached().Post();
                 await Approved.WaitAsync();
 
                 // Awaited combinators count their own identifiers, and their inputs are identified by index.
                 await DurableTask.WhenAll(items.Select(item => Step(item)));
-                await {|ORLEANS0120:DurableTask.WhenAny(items.Select(item => Step(item)))|};
+                await {|ORLEANS0220:DurableTask.WhenAny(items.Select(item => Step(item)))|};
                 await Approved.TryWaitAsync(DateTimeOffset.MaxValue).WithId("approval");
             }
 
@@ -69,7 +69,7 @@ public class DurableTaskIdentityRuleTests
                 }).WithId("step");
 
                 // A query can run its lambda any number of times.
-                foreach (var _ in items.Select(item => {|ORLEANS0120:Step(item)|}.Post()))
+                foreach (var _ in items.Select(item => {|ORLEANS0220:Step(item)|}.Post()))
                 {
                 }
             }
@@ -98,12 +98,12 @@ public class DurableTaskIdentityRuleTests
                 await Step(1).WithId("step");
                 foreach (var item in items)
                 {
-                    await {|ORLEANS0120:Step(item)|};
+                    await {|ORLEANS0220:Step(item)|};
                 }
 
-                await {|ORLEANS0120:ChargeAsync()|}.Shielded();
-                await {|ORLEANS0120:ChargeAsync()|};
-                DurableTask.{|ORLEANS0120:RunInline|}(() => 1);
+                await {|ORLEANS0220:ChargeAsync()|}.Shielded();
+                await {|ORLEANS0220:ChargeAsync()|};
+                DurableTask.{|ORLEANS0220:RunInline|}(() => 1);
             }
         }
         """,

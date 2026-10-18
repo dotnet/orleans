@@ -13,7 +13,7 @@ using Xunit;
 namespace Orleans.DurableTasks.Analyzers.Tests;
 
 /// <summary>
-/// Runs the durable task analyzers over source which marks each expected diagnostic as <c>{|ORLEANS0100:text|}</c>, and
+/// Runs the durable task analyzers over source which marks each expected diagnostic as <c>{|ORLEANS0200:text|}</c>, and
 /// verifies code fixes for them.
 /// </summary>
 /// <remarks>

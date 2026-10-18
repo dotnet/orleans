@@ -31,17 +31,17 @@ public class DurableTaskStateMutationRuleTests
 
             public async DurableTask RunAsync(string line)
             {
-                DurableTask.RunInline("effect", () => {|ORLEANS0123:_order.Value!.Count = 4|});
+                DurableTask.RunInline("effect", () => {|ORLEANS0223:_order.Value!.Count = 4|});
                 await Step(1).WithId("step");
 
-                {|ORLEANS0123:_order.Value!.Lines.Add(line)|};
-                {|ORLEANS0123:_order.Value!.Count++|};
-                {|ORLEANS0123:_order.Value!.Totals[0] = 1|};
-                {|ORLEANS0123:_state.State.Count = 2|};
-                {|ORLEANS0123:_orders["a"].Count += 1|};
-                {|ORLEANS0123:_list[0].Parent!.Count = 3|};
+                {|ORLEANS0223:_order.Value!.Lines.Add(line)|};
+                {|ORLEANS0223:_order.Value!.Count++|};
+                {|ORLEANS0223:_order.Value!.Totals[0] = 1|};
+                {|ORLEANS0223:_state.State.Count = 2|};
+                {|ORLEANS0223:_orders["a"].Count += 1|};
+                {|ORLEANS0223:_list[0].Parent!.Count = 3|};
                 var alias = _order.Value!;
-                {|ORLEANS0123:alias.Lines.Clear()|};
+                {|ORLEANS0223:alias.Lines.Clear()|};
 
                 _order.Value = new Order();
                 _snapshot.Value = _snapshot.Value! with { Lines = _snapshot.Value.Lines.Add(line), Count = 5 };
