@@ -30,6 +30,12 @@ internal partial class JournaledStateManager : IJournaledStateManager, IJournalS
     private readonly CancellationTokenSource _shutdownCancellation = new();
     private readonly StateDirectory _journalStreamDirectory;
     private readonly RetiredStateTracker _retirementTracker;
+
+    /// <summary>
+    /// Gets or sets the provider of the context in which code accesses this manager's states, which a host installs, or
+    /// <see langword="null"/> when every access runs against the state directly.
+    /// </summary>
+    internal JournaledStateContextProvider? ContextProvider { get; set; }
     private Task? _workLoop;
     private ManagerState _state;
     private long _deletionGeneration;

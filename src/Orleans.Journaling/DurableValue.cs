@@ -23,6 +23,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
 {
     private readonly IDurableValueCommandCodec<T> _codec;
     private readonly JournaledStateManager? _manager;
+    private readonly JournaledStateAccessTarget _accessTarget;
     private T? _value;
     private bool _isDirty;
     private JournalStreamWriter _writer;
@@ -39,6 +40,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -47,20 +49,34 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IStateMachine, IReport
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
     public T? Value
     {
-        get => _value;
+        get => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+            ? context.Read(_accessTarget, JournaledStateOperation.ValueGet, this, static self => self._value)
+            : _value;
         set
         {
-            _value = value;
-            OnModified();
-            if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+            if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
             {
-                topic.PublishStaged(value);
+                context.Write(_accessTarget, JournaledStateOperation.ValueSet, (Self: this, Value: value), static state => state.Self.SetValue(state.Value));
+                return;
             }
+
+            SetValue(value);
+        }
+    }
+
+    private void SetValue(T? value)
+    {
+        _value = value;
+        OnModified();
+        if (DurableStateObservation.TryGetTopic(_manager, this, out var topic))
+        {
+            topic.PublishStaged(value);
         }
     }
 

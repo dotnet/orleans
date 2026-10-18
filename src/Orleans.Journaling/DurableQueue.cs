@@ -73,6 +73,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
     private readonly IDurableQueueCommandCodec<T> _codec;
     private readonly Queue<T> _items = new();
     private readonly JournaledStateManager? _manager;
+    private readonly JournaledStateAccessTarget _accessTarget;
     private JournalStreamWriter _writer;
     private bool _hasStagedEntries;
 
@@ -85,6 +86,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableQueueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -93,10 +95,13 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
-    public int Count => _items.Count;
+    public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.QueueCount, this, static self => self._items.Count)
+        : _items.Count;
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
@@ -126,18 +131,73 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
 
     public void Clear()
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.QueueClear, this, static self => self.ClearCore());
+            return;
+        }
+
+        ClearCore();
+    }
+
+    private void ClearCore()
+    {
         _codec.WriteClear(GetWriter());
         _hasStagedEntries = true;
         ApplyClear();
         Publish(QueueChangeKind.Cleared, item: default);
     }
 
-    public T Peek() => _items.Peek();
-    public bool TryPeek([MaybeNullWhen(false)] out T item) => _items.TryPeek(out item);
-    public bool Contains(T item) => _items.Contains(item);
-    public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
-    public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
+    public T Peek() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.QueuePeek, this, static self => self._items.Peek())
+        : _items.Peek();
+
+    public bool TryPeek([MaybeNullWhen(false)] out T item)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            (var found, item) = context.Read(
+                _accessTarget,
+                JournaledStateOperation.QueueTryPeek,
+                this,
+                static self => self._items.TryPeek(out var item) ? (true, item) : (false, default(T)!));
+            return found;
+        }
+
+        return _items.TryPeek(out item);
+    }
+
+    public bool Contains(T item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget, JournaledStateOperation.QueueContains, (Self: this, Item: item), static state => state.Self._items.Contains(state.Item))
+        : _items.Contains(item);
+
+    public void CopyTo(T[] array, int arrayIndex)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            ReadSnapshot(context).CopyTo(array, arrayIndex);
+            return;
+        }
+
+        _items.CopyTo(array, arrayIndex);
+    }
+
+    public IEnumerator<T> GetEnumerator() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? ((IEnumerable<T>)ReadSnapshot(context)).GetEnumerator()
+        : _items.GetEnumerator();
+
     public void Enqueue(T item)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget, JournaledStateOperation.QueueEnqueue, (Self: this, Item: item), static state => state.Self.EnqueueCore(state.Item));
+            return;
+        }
+
+        EnqueueCore(item);
+    }
+
+    private void EnqueueCore(T item)
     {
         _codec.WriteEnqueue(item, GetWriter());
         _hasStagedEntries = true;
@@ -145,7 +205,11 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
         Publish(QueueChangeKind.Enqueued, item);
     }
 
-    public T Dequeue()
+    public T Dequeue() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget, JournaledStateOperation.QueueDequeue, this, static self => self.DequeueCore())
+        : DequeueCore();
+
+    private T DequeueCore()
     {
         var result = _items.Peek();
         _codec.WriteDequeue(GetWriter());
@@ -156,6 +220,21 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
     }
 
     public bool TryDequeue([MaybeNullWhen(false)] out T item)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            (var found, item) = context.Write(
+                _accessTarget,
+                JournaledStateOperation.QueueTryDequeue,
+                this,
+                static self => self.TryDequeueCore(out var item) ? (true, item) : (false, default(T)!));
+            return found;
+        }
+
+        return TryDequeueCore(out item);
+    }
+
+    private bool TryDequeueCore([MaybeNullWhen(false)] out T item)
     {
         if (!_items.TryPeek(out item))
         {
@@ -169,7 +248,11 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IStateMachine, IReport
         return true;
     }
 
-    IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    // A context records the items which the code enumerates, so a replay enumerates the same items.
+    private T[] ReadSnapshot(JournaledStateContext context) =>
+        context.Read(_accessTarget, JournaledStateOperation.QueueSnapshot, this, static self => self._items.ToArray());
 
     internal IAsyncEnumerable<QueueChange<T>> WatchAsync(DurableWatchMode mode, int capacity, CancellationToken cancellationToken) =>
         DurableStateObservation.WatchChanges<DurableQueue<T>, QueueChange<T>>(_manager, this, mode, capacity, cancellationToken);

@@ -25,6 +25,8 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
     private readonly Dictionary<TKey, TValue> _items = [];
     private readonly JournaledStateManager? _manager;
+    // Null for the manager's own bookkeeping dictionary, whose accesses always run directly.
+    private readonly JournaledStateAccessTarget? _accessTarget;
     private JournalStreamWriter _writer;
     private bool _hasStagedEntries;
 
@@ -43,6 +45,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
@@ -50,28 +53,48 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _manager = manager as JournaledStateManager;
+        _accessTarget = new(key, manager);
         manager.RegisterStateMachine(key, this);
     }
 
     public TValue this[TKey key]
     {
-        get => _items[key];
+        get => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+            ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryGet, (Self: this, Key: key), static state => state.Self._items[state.Key])
+            : _items[key];
 
         set
         {
-            WriteSet(key, value);
-            ApplySet(key, value);
-            PublishSet(key, value);
+            if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+            {
+                context.Write(_accessTarget!, JournaledStateOperation.DictionarySet, (Self: this, Key: key, Value: value), static state => state.Self.SetCore(state.Key, state.Value));
+                return;
+            }
+
+            SetCore(key, value);
         }
     }
 
-    public int Count => _items.Count;
+    public int Count => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryCount, this, static self => self._items.Count)
+        : _items.Count;
 
-    public ICollection<TKey> Keys => _items.Keys;
+    public ICollection<TKey> Keys => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryKeys, this, static self => self._items.Keys.ToArray())
+        : _items.Keys;
 
-    public ICollection<TValue> Values => _items.Values;
+    public ICollection<TValue> Values => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryValues, this, static self => self._items.Values.ToArray())
+        : _items.Values;
 
     public bool IsReadOnly => ((ICollection<KeyValuePair<TKey, TValue>>)_items).IsReadOnly;
+
+    private void SetCore(TKey key, TValue value)
+    {
+        WriteSet(key, value);
+        ApplySet(key, value);
+        PublishSet(key, value);
+    }
 
     void IStateMachine.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
@@ -101,6 +124,17 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     public void Clear()
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget!, JournaledStateOperation.DictionaryClear, this, static self => self.ClearCore());
+            return;
+        }
+
+        ClearCore();
+    }
+
+    private void ClearCore()
+    {
         _codec.WriteClear(GetWriter());
         _hasStagedEntries = true;
         ApplyClear();
@@ -110,9 +144,13 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         }
     }
 
-    public bool Contains(TKey key) => _items.ContainsKey(key);
+    public bool Contains(TKey key) => ContainsKey(key);
 
-    public bool Remove(TKey key)
+    public bool Remove(TKey key) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget!, JournaledStateOperation.DictionaryRemove, (Self: this, Key: key), static state => state.Self.RemoveCore(state.Key))
+        : RemoveCore(key);
+
+    private bool RemoveCore(TKey key)
     {
         if (!_items.ContainsKey(key))
         {
@@ -131,7 +169,7 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         _hasStagedEntries = true;
     }
 
-    IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     private void WriteSet(TKey key, TValue value)
     {
@@ -166,6 +204,17 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
 
     public void Add(TKey key, TValue value)
     {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            context.Write(_accessTarget!, JournaledStateOperation.DictionaryAdd, (Self: this, Key: key, Value: value), static state => state.Self.AddCore(state.Key, state.Value));
+            return;
+        }
+
+        AddCore(key, value);
+    }
+
+    private void AddCore(TKey key, TValue value)
+    {
         if (_items.ContainsKey(key))
         {
             ThrowDuplicateKey(key);
@@ -177,12 +226,47 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         PublishSet(key, value);
     }
 
-    public bool ContainsKey(TKey key) => _items.ContainsKey(key);
-    public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TValue value) => _items.TryGetValue(key, out value);
+    public bool ContainsKey(TKey key) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryContainsKey, (Self: this, Key: key), static state => state.Self._items.ContainsKey(state.Key))
+        : _items.ContainsKey(key);
+
+    public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TValue value)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            (var found, value) = context.Read(
+                _accessTarget!,
+                JournaledStateOperation.DictionaryTryGetValue,
+                (Self: this, Key: key),
+                static state => state.Self._items.TryGetValue(state.Key, out var value) ? (true, value) : (false, default(TValue)!));
+            return found;
+        }
+
+        return _items.TryGetValue(key, out value);
+    }
+
     public void Add(KeyValuePair<TKey, TValue> item) => Add(item.Key, item.Value);
-    public bool Contains(KeyValuePair<TKey, TValue> item) => _items.Contains(item);
-    public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) => ((ICollection<KeyValuePair<TKey, TValue>>)_items).CopyTo(array, arrayIndex);
-    public bool Remove(KeyValuePair<TKey, TValue> item)
+
+    public bool Contains(KeyValuePair<TKey, TValue> item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Read(_accessTarget!, JournaledStateOperation.DictionaryContainsPair, (Self: this, Item: item), static state => ((ICollection<KeyValuePair<TKey, TValue>>)state.Self._items).Contains(state.Item))
+        : ((ICollection<KeyValuePair<TKey, TValue>>)_items).Contains(item);
+
+    public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+    {
+        if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
+        {
+            ReadSnapshot(context).CopyTo(array, arrayIndex);
+            return;
+        }
+
+        ((ICollection<KeyValuePair<TKey, TValue>>)_items).CopyTo(array, arrayIndex);
+    }
+
+    public bool Remove(KeyValuePair<TKey, TValue> item) => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? context.Write(_accessTarget!, JournaledStateOperation.DictionaryRemovePair, (Self: this, Item: item), static state => state.Self.RemoveCore(state.Item))
+        : RemoveCore(item);
+
+    private bool RemoveCore(KeyValuePair<TKey, TValue> item)
     {
         if (!((ICollection<KeyValuePair<TKey, TValue>>)_items).Contains(item))
         {
@@ -194,6 +278,10 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         PublishRemove(item.Key);
         return true;
     }
+
+    // A context records the entries which the code enumerates, so a replay enumerates the same entries.
+    private KeyValuePair<TKey, TValue>[] ReadSnapshot(JournaledStateContext context) =>
+        context.Read(_accessTarget!, JournaledStateOperation.DictionarySnapshot, this, static self => self._items.ToArray());
 
     internal IAsyncEnumerable<DictionaryChange<TKey, TValue>> WatchAsync(DurableWatchMode mode, int capacity, CancellationToken cancellationToken) =>
         DurableStateObservation.WatchChanges<DurableDictionary<TKey, TValue>, DictionaryChange<TKey, TValue>>(_manager, this, mode, capacity, cancellationToken);
@@ -219,7 +307,9 @@ internal class DurableDictionary<TKey, TValue> : IDurableDictionary<TKey, TValue
         }
     }
 
-    public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => ((IEnumerable<KeyValuePair<TKey, TValue>>)_items).GetEnumerator();
+    public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => JournaledStateContext.TryGetCurrent(_accessTarget, out var context)
+        ? ((IEnumerable<KeyValuePair<TKey, TValue>>)ReadSnapshot(context)).GetEnumerator()
+        : ((IEnumerable<KeyValuePair<TKey, TValue>>)_items).GetEnumerator();
 
     [DoesNotReturn]
     private static void ThrowDuplicateKey(TKey key) => throw new ArgumentException($"An item with the same key has already been added. Key: {key}", nameof(key));
