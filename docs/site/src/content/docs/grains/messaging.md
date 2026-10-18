@@ -294,7 +294,8 @@ The inbox processes up to
 <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.InboxBatchSize> durable, due
 messages per pass, one at a time, then writes the journal once for the batch. The
 outbox sends up to <xref:Orleans.Messaging.Configuration.DurableMessagingOptions.OutboxBatchSize>
-durable, due messages per pass concurrently. The outbox never holds messages
+durable, due messages per pass concurrently. Messages that an outbox message source
+withdrew or could not provide count toward the same limit. The outbox never holds messages
 addressed to the grain itself; a handler that sends one stages its acceptance with
 the batch's write, and a later pass processes it.
 

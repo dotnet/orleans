@@ -47,7 +47,7 @@ behavior through `AddMessaging`, and is validated at startup.
 | `DeadLetterRetentionPeriod` | 30 days | Removes dead letters older than this age. |
 | `MaxRetainedDeadLetters` | 1,000 | Bounds the inbox and the outbox dead letters separately, removing the oldest first. |
 | `InboxBatchSize` | 32 | Bounds the inbox messages processed per pump pass. |
-| `OutboxBatchSize` | 32 | Bounds the outbox messages delivered concurrently per pump pass. |
+| `OutboxBatchSize` | 32 | Bounds the outbox messages delivered concurrently, withdrawn, or dead-lettered per pump pass. |
 
 Dead-letter retention applies when an activation starts and whenever a new dead
 letter is added. Expired completed IDs are removed from storage when the journal
