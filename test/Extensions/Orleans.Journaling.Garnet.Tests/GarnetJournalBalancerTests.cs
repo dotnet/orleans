@@ -83,6 +83,25 @@ public sealed class GarnetJournalBalancerTests
     }
 
     [Fact]
+    public void Plan_SplitsInteriorLoadBeyondTheEndRunBudget()
+    {
+        const int BucketCount = 4096;
+        var owners = Enumerable.Repeat(P0, BucketCount).ToArray();
+        var load = new double[BucketCount];
+        load[2000] = load[2001] = 1000;
+        var settings = Settings with { MaxMoveFraction = 0.09 };
+
+        var move = Assert.Single(GarnetJournalBalancer.Plan(owners, load, new long[BucketCount], [P0, P1], settings));
+        Assert.Contains(move.Bucket, new[] { 2000, 2001 });
+        Assert.Equal(P1, move.Destination);
+        var after = Apply(owners, [move]);
+        Assert.Equal(1000, Enumerable.Range(0, BucketCount).Where(bucket => after[bucket] == P0).Sum(bucket => load[bucket]));
+        Assert.Equal(1000, Enumerable.Range(0, BucketCount).Where(bucket => after[bucket] == P1).Sum(bucket => load[bucket]));
+        Assert.Equal(3, Runs(after));
+        Assert.Empty(GarnetJournalBalancer.Plan(after, load, new long[BucketCount], [P0, P1], settings));
+    }
+
+    [Fact]
     public void Plan_MergesColdRangesIntoANeighbor()
     {
         // P2 owns one cold bucket inside P1's range; P0 is overloaded, so the round also merges the island.

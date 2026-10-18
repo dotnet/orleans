@@ -23,6 +23,7 @@ namespace Orleans.Journaling;
 /// partition, choosing the run with the greatest reduction in the pair's maximum load per unit of churn (one plus the
 /// bucket's journal count, since every moved journal is pulled or consolidated), until imbalance is within half the
 /// threshold's margin or the round has moved <see cref="GarnetJournalBalancerSettings.MaxMoveFraction"/> of the buckets.
+/// When no end run improves balance within the budget, it considers individual interior buckets.
 /// </description></item>
 /// </list>
 /// <para>
@@ -261,6 +262,18 @@ internal sealed class GarnetJournalBalancer(
             {
                 Consider(run.First, run.Last, forward: true);
                 Consider(run.First, run.Last, forward: false);
+            }
+
+            // Cold edges can hide movable load beyond the budget. Split out an interior bucket to make progress.
+            if (best is null)
+            {
+                for (var bucket = 0; bucket < bucketCount; bucket++)
+                {
+                    if (owner[bucket] == hot)
+                    {
+                        Consider(bucket, bucket, forward: true);
+                    }
+                }
             }
 
             if (best is not { } move)
