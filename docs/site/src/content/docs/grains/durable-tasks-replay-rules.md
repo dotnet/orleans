@@ -43,8 +43,15 @@ in a later turn, as a child execution. Consecutive effects in one synchronous bl
 therefore commit in the same journal write with the state which they change, and no
 other turn of the grain runs between them, while each step has its own
 `DurableTask.Current`, cancellation scope, and journal write. An effect and a step with
-the same name share an identifier, so changing one into the other is a divergence for
+the same name share an identifier, so changing one into the other diverges for
 executions which recorded it; branch the change on `DurableTask.GetVersion`.
+
+A replay which diverges from its record, by scheduling another operation under a
+recorded ID or by finding a recorded outcome which no longer decodes, doesn't fail into
+the body: the runtime stalls the execution with `DurableTaskAttemptCancellationReason.Diverged`
+and keeps the task pending until code which matches the record replays it. See
+[Diagnose replay divergence](durable-tasks-operations.md#diagnose-replay-divergence) and
+[Stalled executions](durable-tasks-versioning.md#stalled-executions).
 
 The following grain shows each region:
 

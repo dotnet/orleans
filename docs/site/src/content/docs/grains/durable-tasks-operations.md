@@ -22,12 +22,13 @@ metadata for task state, and requests, results, and signal values are stored as
 Orleans-serialized payloads. `AddVolatileDurableTaskStorage` replaces journal-backed task
 state with in-memory state for tests.
 
-`DurableTaskOptions` configures retention through the `AddDurableTasks` callback, and is
-validated at startup.
+`DurableTaskOptions` configures retention and stalled executions through the
+`AddDurableTasks` callback, and is validated at startup.
 
 | Setting | Default | Operational effect |
 | --- | --- | --- |
 | `ResultRetentionPeriod` | 1 day | Retains the terminal result of a task which has no calling grain, such as a client-scheduled or detached task, for polling, and for this period after a dead-lettered completion. A task ID deduplicates schedules for this period after completion. Must not be negative. |
+| `StalledExecutionRetryInterval` | 1 minute | How often a grain which holds a [stalled execution](durable-tasks-versioning.md#stalled-executions) wakes, so that once its activation ends, a later activation replays the execution on the code it runs. Must be positive. |
 
 Messaging settings in `DurableMessagingOptions` govern the transport; see
 [Capacity, retries, and retention](messaging-operations.md#capacity-retries-and-retention).
@@ -133,7 +134,7 @@ with the grain's next journal write.
 | `SignalWaitStarted`, `SignalWaitEnded` | An execution started or ended a wait for a signal, under the signal's record. |
 | `SelectionWaitStarted` | A selection, such as `DurableTask.WhenAny`'s, found no completed candidate and waits, under its decision. |
 | `VersionRecorded` | An execution recorded the version of a change which it follows, which the event carries with the change's name. |
-| `ExecutionStalled` | An attempt stalled on a recorded version which the running code doesn't support; the task stays pending. See [Stalled executions](durable-tasks-versioning.md#stalled-executions). |
+| `ExecutionStalled` | An attempt stalled because the running code can't replay its execution; the task stays pending. `Reason` is `UnsupportedVersion` or `Diverged`, and `Exception` describes the stall. See [Stalled executions](durable-tasks-versioning.md#stalled-executions). |
 
 Tests subscribe to `DurableTaskEvents.AllEvents`, or use `DiagnosticEventCollector`, to
 wait for a transition instead of polling. Messaging reports deliveries, retries, and
@@ -143,8 +144,11 @@ delivery faults; see [Observe progress and size the system](messaging-operations
 ## Diagnose replay divergence
 
 A replay must schedule the same operation, with the same arguments, under each recorded
-ID. When it schedules a different one, the operation throws an
-`InvalidOperationException` such as:
+ID, and must decode each recorded outcome. When it schedules a different operation, or
+a recorded outcome no longer decodes, the execution stalls: the runtime cancels the
+attempt with `DurableTaskAttemptCancellationReason.Diverged`, discards its result, and
+keeps the task pending. The runtime logs a warning and raises `ExecutionStalled`, whose
+`Exception` describes the divergence, such as:
 
 ```text
 Durable task 'place-order-…/authorize-payment' is already associated with a different request.
@@ -166,9 +170,14 @@ and the requested one. Typical causes:
 - A loop or condition schedules children under IDs which depend on a nondeterministic
   value.
 
-The failure propagates through the workflow like other exceptions. Once the code is
-fixed, abort the affected task and schedule it again under a new root ID, or let the
-caller observe the failure.
+The body observes the divergence as the attempt's `DurableTaskAttemptCanceledException`,
+whose inner exception is the divergence, and the attempt's later durable operations
+throw it too. Callers which await the task keep waiting. The grain keeps a wake-up every
+`StalledExecutionRetryInterval`, so once its activation ends, a later activation replays
+the task: deploy code which matches the record, such as code which branches the change on
+`DurableTask.GetVersion`, and the execution resumes. To end the task instead, abort it;
+see [Abort stuck tasks](#abort-stuck-tasks). Watch `ExecutionStalled` to find stalled
+executions.
 
 ### Version workflows safely
 
@@ -178,8 +187,8 @@ replay under the new code:
 - Keep existing steps, `RunInline` effects, and detached starts, with their IDs and arguments. A
   changed `RunInline` delegate doesn't affect executions which recorded it: they return the
   recorded result. An effect and a step with the same name share an ID, so turning a
-  recorded step into an effect, or the reverse, fails as a divergence; branch that
-  change on `DurableTask.GetVersion`.
+  recorded step into an effect, or the reverse, diverges; branch that change on
+  `DurableTask.GetVersion`.
 - Give new steps new IDs, and place steps which depend on new behavior after the
   existing ones.
 - Name every child and combinator which a later change might move, so generated IDs
@@ -188,7 +197,8 @@ replay under the new code:
   from the execution's unnamed operations, so name it with `WithId` when a later change
   might move it.
 - Keep argument, result, and signal types decodable by the Orleans serializer, adding
-  members with new `[Id(n)]` values.
+  members with new `[Id(n)]` values. A replay which can't decode a recorded outcome
+  diverges.
 - A changed delay duration applies to new delays. A replayed delay keeps its recorded
   due time, and the runtime logs a warning.
 

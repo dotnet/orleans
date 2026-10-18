@@ -132,7 +132,8 @@ public sealed class VersionMonitor : IObserver<DurableTaskEvents.DurableTaskEven
 
                 break;
             case DurableTaskEvents.ExecutionStalled stalled:
-                Console.WriteLine($"{stalled.GrainContext.GrainId} {stalled.TaskId}: {stalled.Exception.Message}");
+                // Reason is UnsupportedVersion or Diverged; the task stays pending until code which can replay it runs.
+                Console.WriteLine($"{stalled.GrainContext.GrainId} {stalled.TaskId} stalled ({stalled.Reason}): {stalled.Exception.Message}");
                 break;
         }
     }

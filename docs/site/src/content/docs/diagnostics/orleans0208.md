@@ -26,7 +26,7 @@ A name which one run repeats identifies its later occurrences by their order: th
 When a deployment removes the welcome email while executions are pending, the replay of an execution which already sent both emails names the tips email `email`. That identifier holds the welcome email's record:
 
 - For a local step, the replay returns the welcome email's recorded completion, and the tips email's own record, `email$2`, is never reached.
-- For a call to another grain, the replay finds another request under the identifier and fails with a divergence error.
+- For a call to another grain, the replay finds another request under the identifier, diverges, and stalls the execution.
 
 Distinct names keep each call site's identifier when other call sites are added, removed, or reordered. For how identifiers are constructed, see [Task identity and references](../grains/durable-tasks-identity.md).
 

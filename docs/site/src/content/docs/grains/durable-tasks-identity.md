@@ -74,8 +74,8 @@ Each operation which a body runs is recorded beneath the execution's ID:
 - Named children, named combinators, and named effects share one identifier per
   occurrence of a name: `DurableTask.RunInline("x", f)` and `await DurableTask.Run(g).WithId("x")`
   both record under `x`. A replay which finds the other kind recorded under an
-  identifier fails as a divergence which names both kinds, instead of running the work
-  again.
+  identifier diverges instead of running the work again: its execution stalls, and the
+  divergence names both kinds.
 - Unnamed children, unnamed effects, unnamed subscriptions, and the segment of an
   unnamed detached root share the `$child-{n}` count. Unnamed combinators and timeouts
   share the `${kind}-{n}` count.
@@ -163,7 +163,7 @@ Changes between deployments affect pending executions as follows:
   the tree until the tree is deleted.
 - **Adding an unnamed operation** before existing unnamed ones shifts their generated
   IDs. A replay then finds another operation's record under a shifted ID: a call to
-  another grain with another request fails as a divergence, and a local step returns the
+  another grain with another request diverges and stalls the execution, and a local step returns the
   other step's result.
 - **Adding a named operation** with a new name leaves every other ID unchanged.
 - **Adding or removing an occurrence of a repeated name** before existing ones renumbers
