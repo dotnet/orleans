@@ -64,9 +64,10 @@ public interface IOutboxMessageSource
     /// <param name="retirement">How the message retired, and the dead letter's reason for a dead-lettered message.</param>
     /// <remarks>
     /// Stage the release synchronously in journaled state; it commits in the journal write which removes the entry.
-    /// A dead-lettered message is materialized into the outbox dead letter before this call, unless the source failed to
-    /// provide it. Don't depend on decoding the payload here: this call also retires a message whose payload the source
-    /// can no longer provide. An exception fails the activation's messaging, which deactivates the grain.
+    /// Before this call, the outbox copies a dead-lettered message's payload and header values into its dead letter,
+    /// unless the source failed to provide the message, so the source can release or reuse its buffers here. Don't depend
+    /// on decoding the payload here: this call also retires a message whose payload the source can no longer provide. An
+    /// exception fails the activation's messaging, which deactivates the grain.
     /// </remarks>
     void OnRetired(MessageId messageId, OutboxMessageRetirement retirement);
 }

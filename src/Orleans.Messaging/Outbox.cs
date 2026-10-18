@@ -199,6 +199,20 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
     private static OutboxMessage CreateUnmaterializedMessage(MessageId messageId) =>
         new() { Envelope = new() { MessageId = messageId, Payload = [] }, ReceiverId = default };
 
+    /// <summary>Copies the payload and header values of a message which a source owns.</summary>
+    private static OutboxMessage CopySourceMessage(OutboxMessage message)
+    {
+        var envelope = message.Envelope;
+        Dictionary<string, byte[]>? headers = null;
+        if (envelope.Headers is { } sourceHeaders)
+        {
+            headers = new(sourceHeaders.Count, sourceHeaders.Comparer);
+            foreach (var (name, value) in sourceHeaders) headers.Add(name, value.AsSpan().ToArray());
+        }
+
+        return message with { Envelope = envelope with { Payload = envelope.Payload.AsSpan().ToArray(), Headers = headers } };
+    }
+
     private static bool IsUnmaterialized(OutboxMessage message) =>
         message.ReceiverId.IsDefault
         && message.Envelope is { Payload.Length: 0, Subject: null, Headers: null, DeliverAt: null };
@@ -594,7 +608,8 @@ internal sealed partial class Outbox : IStateMachine, IDurableValueCommandHandle
         {
             var letter = new OutboxDeadLetter
             {
-                Message = outcome.Message,
+                // The source may release a reference entry's payload and headers when it retires, so the dead letter keeps a copy.
+                Message = outcome.Entry.Reference is null ? outcome.Message : CopySourceMessage(outcome.Message),
                 DeadLetteredAt = now,
                 Reason = error,
                 AttemptCount = attemptCount

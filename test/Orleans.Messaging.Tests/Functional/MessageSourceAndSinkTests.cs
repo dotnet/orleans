@@ -128,6 +128,45 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     }
 
     [Fact]
+    public async Task SourceMessage_DeadLetteredByTheOutbox_KeepsItsPayloadAndHeadersWhenTheSourceReleasesThem()
+    {
+        var sender = NewGrain();
+        var receiver = Cluster.Client.GetGrain<INoHandlerGrain>(Guid.NewGuid());
+        await receiver.PingAsync();
+        var messageId = NewMessageId("released-dead-letter");
+        var payload = NewPayload();
+
+        // The source shares its payload array as a header value and clears that array in OnRetired.
+        Probe.For(sender).ReleaseBuffersOnRetired = true;
+        await sender.StageFromSourceAsync(receiver.GetGrainId(), messageId, payload, write: true);
+
+        await WaitUntilAsync(sender, context => Outbox(context).Count == 0 && Grain(context).GetState().Retired.Count == 1);
+        AssertCarriesPayload(Assert.Single(await OnGrainAsync(sender, context =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters)));
+
+        // The source state journals the payload once, and the dead letter journals it as its payload and its header.
+        await WaitUntilAsync(sender, _ => Storage.CountPayloadOccurrences(Journal(sender), payload) == 3);
+
+        // A snapshot written after the retirement journals the dead letter's own copy, which a new activation recovers.
+        Storage.RequestSnapshot(Journal(sender));
+        await sender.WriteAsync();
+        Assert.Equal(5, Storage.CountPayloadOccurrences(Journal(sender), payload));
+        Assert.True(Cluster.TryGetGrainContext(sender.GetGrainId(), out var activation));
+        await sender.DeactivateAsync();
+        await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), Token);
+        Assert.Equal(0, await sender.GetOutboxCountAsync());
+        AssertCarriesPayload(Assert.Single(await OnGrainAsync(sender, context =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().OutboxDeadLetters)));
+
+        void AssertCarriesPayload(DeadLetter<OutboxMessage> letter)
+        {
+            Assert.Equal(messageId, letter.Message.Envelope.MessageId);
+            Assert.Equal(payload, letter.Message.Envelope.Payload);
+            Assert.Equal(payload, Assert.Single(letter.Message.Envelope.Headers!, header => header.Key == SourceSinkGrain.PayloadHeader).Value);
+        }
+    }
+
+    [Fact]
     public async Task SourceMessage_DeadLetteredByTheReceiver_RetiresAsRejectedWithTheReceiversReasonAndCode()
     {
         const string code = SourceSinkGrain.RejectionCode;
@@ -958,6 +997,9 @@ public sealed class SourceSinkProbe
         private int _failuresRemaining;
 
         public volatile SinkMode Mode;
+
+        /// <summary>Makes the source share its payload array as a header value, and clear that array when the message retires.</summary>
+        public volatile bool ReleaseBuffersOnRetired;
         public ConcurrentDictionary<MessageId, SourceFault> Faults { get; } = new();
         public int Activations => Volatile.Read(ref _activations);
         public int Materializations => Volatile.Read(ref _materializations);
@@ -994,6 +1036,7 @@ public interface ISourceSinkGrain : IGrainWithGuidKey
 public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, IOutboxMessageSource, IInboxMessageSink
 {
     internal const string Subject = "source-sink/payload";
+    internal const string PayloadHeader = "source-sink/payload-copy";
     internal const string Rejection = "The sink rejected the message.";
     internal const string RejectionCode = "source-sink/rejected";
     internal const string SinkFailure = "The sink failed before deciding the message's outcome.";
@@ -1110,7 +1153,13 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
         _probe.OnMaterialized();
         message = new()
         {
-            Envelope = new() { MessageId = messageId, Payload = payload, Subject = Subject },
+            Envelope = new()
+            {
+                MessageId = messageId,
+                Payload = payload,
+                Subject = Subject,
+                Headers = _probe.ReleaseBuffersOnRetired ? new() { [PayloadHeader] = payload } : null
+            },
             ReceiverId = GrainId.Parse(_receivers[key])
         };
         if (_probe.Faults.TryGetValue(messageId, out var fault))
@@ -1129,6 +1178,7 @@ public sealed class SourceSinkGrain : Grain, ISourceSinkGrain, IMessagingGrain, 
     void IOutboxMessageSource.OnRetired(MessageId messageId, OutboxMessageRetirement retirement)
     {
         var key = messageId.ToString();
+        if (_probe.ReleaseBuffersOnRetired) Array.Clear(_outgoing[key]);
         Assert.True(_outgoing.Remove(key));
         Assert.True(_receivers.Remove(key));
         _retired[key] = retirement.Status.ToString();

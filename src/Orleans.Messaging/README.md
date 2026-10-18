@@ -121,8 +121,9 @@ construction or activation setup, before journal recovery.
   dead-lettered it) or `DeadLettered` (the outbox dead-lettered it), whose
   `Reason` carries the dead letter's reason, and whose `Code` carries the code of a
   `Rejected` message's receiver, while it stages the removal, so the
-  source's changes commit in the same journal write. An outbox dead letter stores the
-  materialized message. After the send, a source that throws or returns an invalid
+  source's changes commit in the same journal write. An outbox dead letter stores its
+  own copy of the materialized message, so the source can release its payload in
+  `OnRetired`. After the send, a source that throws or returns an invalid
   message, such as one with a different ID, dead-letters that entry alone in the
   same journal write as its `DeadLettered` retirement; the grain keeps processing its
   other messages. That dead letter carries only the message ID, with an empty payload
