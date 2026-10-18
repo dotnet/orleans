@@ -17,7 +17,7 @@ namespace Orleans.DurableTasks.Analyzers;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class DurableTaskAsyncMethodLacksAwaitSuppressor : DiagnosticSuppressor
 {
-    public const string SuppressionId = "ORLEANS0028";
+    public const string SuppressionId = "ORLEANS0224";
     public const string SuppressedDiagnosticId = "CS1998";
 
     private static readonly SuppressionDescriptor Rule = new(

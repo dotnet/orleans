@@ -19,8 +19,8 @@ public class DurableTaskVersionRuleTests
             {
                 var constant = DurableTask.GetVersion("change", 0, 1);
                 var named = DurableTask.GetVersion(Carrier, minSupported: 1, maxSupported: CarrierVersion);
-                var derived = DurableTask.GetVersion({|ORLEANS0118:$"carrier-{region}"|}, 0, 1);
-                var ranged = DurableTask.GetVersion("change", 0, {|ORLEANS0118:newest|});
+                var derived = DurableTask.GetVersion({|ORLEANS0218:$"carrier-{region}"|}, 0, 1);
+                var ranged = DurableTask.GetVersion("change", 0, {|ORLEANS0218:newest|});
                 return await Step(constant + named + derived + ranged).WithId("step");
             }
         }
@@ -36,7 +36,7 @@ public class DurableTaskVersionRuleTests
 
             public async DurableTask<int> RunAsync(string region, int newest)
             {
-                var regional = new DurableVersion({|ORLEANS0118:"carrier-" + region|}, 0, {|ORLEANS0118:newest|});
+                var regional = new DurableVersion({|ORLEANS0218:"carrier-" + region|}, 0, {|ORLEANS0218:newest|});
                 var version = CarrierApi.IsAtLeast(1) ? 1 : 0;
                 return await Step(version + regional.Get()).WithId("step");
             }

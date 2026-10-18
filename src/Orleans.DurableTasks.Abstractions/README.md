@@ -66,7 +66,7 @@ on this abstractions assembly.
   runs durable cleanup after task cancellation, in a `catch` filtered on
   `IsTaskCancellationRequested`, passes `AttemptCancellationToken` to the calls it makes, because
   `CancellationToken` is already canceled, and
-  [ORLEANS0117](https://aka.ms/orleans/diagnostics#orleans0117) reports cleanup which passes
+  [ORLEANS0217](https://aka.ms/orleans/diagnostics#orleans0217) reports cleanup which passes
   `CancellationToken`. In-process cleanup, such as releasing a semaphore or
   disposing a resource, belongs in `finally` blocks and `using` statements, which run for both.
 - Registrations on either token are ordinary synchronous .NET observers, which run when the token is
@@ -409,7 +409,7 @@ Follow these rules in re-executed code:
   doesn't affect executions which recorded it.
 - An `async DurableTask` method which completes without awaiting is a normal step whose result the
   parent records. The package's analyzers suppress CS1998 for such methods
-  ([ORLEANS0028](https://aka.ms/orleans/diagnostics#orleans0028)). A synchronous state transition
+  ([ORLEANS0224](https://aka.ms/orleans/diagnostics#orleans0224)). A synchronous state transition
   runs as a `DurableTask.RunInline` effect, which commits with the next durable write without a write of
   its own.
 - Logs in re-executed code repeat on replay. `logger.ReplaySafe()` writes each event once; see
@@ -487,7 +487,7 @@ var trackingId = shipping >= 1
   whose `DurableTaskAttemptCanceledException` carries a `DurableTaskVersionException`, discards the
   attempt's result, and keeps the task pending until code which supports the version replays it.
 - Outside a durable task, the check returns `maxSupported`. Names don't contain `$`, and
-  [ORLEANS0118](https://aka.ms/orleans/diagnostics#orleans0118) reports names and ranges which
+  [ORLEANS0218](https://aka.ms/orleans/diagnostics#orleans0218) reports names and ranges which
   aren't constants.
 
 ## Replay diagnostics and logging
@@ -522,7 +522,7 @@ ordinary grain methods. Logs inside a `DurableTask.RunInline` effect, or inside 
 don't repeat without it, because a replay returns their recorded results without running them.
 
 The package carries analyzers which report code that a replay would run differently, or which
-doesn't run as written, as diagnostics ORLEANS0100 to ORLEANS0123. Each diagnostic links to a page
+doesn't run as written, as diagnostics ORLEANS0200 to ORLEANS0223. Each diagnostic links to a page
 which describes the hazard and its fix.
 
 ## Host responsibilities

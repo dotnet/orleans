@@ -21,9 +21,9 @@ public class DurableTaskDelegateRuleTests
         {{Members}}
             public async DurableTask<int> RunAsync(int[] items)
             {
-                var sum = await DurableTask.{|ORLEANS0121:Run|}(_ => items.Sum()).WithId("sum");
-                await DurableTask.{|ORLEANS0121:Run|}(_ => { _status.Value = sum; }).WithId("set").Shielded();
-                await DurableTask.{|ORLEANS0121:Run|}(async () => { _status.Value = 2; }).WithId("async-without-await");
+                var sum = await DurableTask.{|ORLEANS0221:Run|}(_ => items.Sum()).WithId("sum");
+                await DurableTask.{|ORLEANS0221:Run|}(_ => { _status.Value = sum; }).WithId("set").Shielded();
+                await DurableTask.{|ORLEANS0221:Run|}(async () => { _status.Value = 2; }).WithId("async-without-await");
 
                 await DurableTask.Run(cancellationToken => Compute(cancellationToken)).WithId("token");
                 await DurableTask.Run(async () => await FetchAsync()).WithId("awaits");
@@ -48,17 +48,17 @@ public class DurableTaskDelegateRuleTests
 
             public async DurableTask RunAsync()
             {
-                DurableTask.RunInline("cast", {|ORLEANS0122:(Action)(async () => await FetchAsync())|});
-                await DurableTask.Run({|ORLEANS0122:(Action<CancellationToken>)(async _ => await FetchAsync())|}).WithId("run");
-                DurableTask.RunInline("method", {|ORLEANS0122:FireAsync|});
-                Action handler = {|ORLEANS0113:async () => await Task.Yield()|};
-                DurableTask.RunInline("alias", {|ORLEANS0122:handler|});
+                DurableTask.RunInline("cast", {|ORLEANS0222:(Action)(async () => await FetchAsync())|});
+                await DurableTask.Run({|ORLEANS0222:(Action<CancellationToken>)(async _ => await FetchAsync())|}).WithId("run");
+                DurableTask.RunInline("method", {|ORLEANS0222:FireAsync|});
+                Action handler = {|ORLEANS0213:async () => await Task.Yield()|};
+                DurableTask.RunInline("alias", {|ORLEANS0222:handler|});
 
                 DurableTask.RunInline("synchronous", () => { });
                 await DurableTask.Run(async () => await FetchAsync()).WithId("task");
             }
 
-            public static DurableTask Define() => DurableTask.Run({|ORLEANS0122:(Action<CancellationToken>)(async _ => await FetchAsync())|});
+            public static DurableTask Define() => DurableTask.Run({|ORLEANS0222:(Action<CancellationToken>)(async _ => await FetchAsync())|});
         }
         """);
 }
