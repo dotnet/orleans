@@ -147,10 +147,10 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine("        // Null references and values which encode their runtime type are read as case values, so payloads written for a closed type");
         source.AppendLine("        // hierarchy with the same cases, including payloads written before that hierarchy used case identifiers, are readable.");
         source.AppendLine("        if (field.IsReference)");
-        source.AppendLine("            return FromCaseValue(global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<object, TReaderInput>(ref reader, field));");
+        source.AppendLine("            return ReadCaseValue(ref reader, ref field);");
         source.AppendLine();
         source.AppendLine($"        if (field.FieldType is {{ }} fieldType && fieldType != {CodecFieldTypeFieldName})");
-        source.AppendLine($"            return FromCaseValue({Helper}.DeserializeUnexpectedType<TReaderInput, object>(ref reader, ref field));");
+        source.AppendLine("            return ReadCaseValue(ref reader, ref field);");
         source.AppendLine();
         source.AppendLine($"        {Helper}.ReadStartUnion(ref reader, field);");
         source.AppendLine($"        {typeName} result = default;");
@@ -158,10 +158,13 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine("        return result;");
         source.AppendLine("    }");
 
-        source.AppendLine($"    private {typeName} FromCaseValue(object value)");
+        source.AppendLine($"    private {typeName} ReadCaseValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, ref global::Orleans.Serialization.WireProtocol.Field field)");
         source.AppendLine("    {");
         source.AppendLine($"        {typeName} instance = default;");
         AppendSerializationCallbacks(source, type, "OnDeserializing");
+        source.AppendLine("        var value = field.IsReference");
+        source.AppendLine("            ? global::Orleans.Serialization.Codecs.ReferenceCodec.ReadReference<object, TReaderInput>(ref reader, field)");
+        source.AppendLine($"            : {Helper}.DeserializeUnexpectedType<TReaderInput, object>(ref reader, ref field);");
         source.AppendLine("        switch (value)");
         source.AppendLine("        {");
         source.AppendLine("            case null: instance = default; break;");
