@@ -2307,11 +2307,8 @@ internal sealed partial class ActivationData :
             try
             {
                 List<Message>? queued = null;
-                HashSet<(GrainId SendingGrain, CorrelationId MessageId)>? heldCancellations;
                 lock (_lock)
                 {
-                    // Disposal made this activation invalid, so it holds no further cancellations.
-                    Debug.Assert(State is ActivationState.Invalid);
                     if (_waitingRequests.Count > 0)
                     {
                         queued = new List<Message>(_waitingRequests.Count);
@@ -2322,20 +2319,9 @@ internal sealed partial class ActivationData :
 
                         _waitingRequests.Clear();
                     }
-
-                    heldCancellations = _extras?.HeldCancellations;
-                    if (heldCancellations is not null)
-                    {
-                        _extras!.HeldCancellations = null;
-                    }
                 }
 
-                if (heldCancellations is not null)
-                {
-                    ApplyHeldCancellations(heldCancellations, queued);
-                }
-
-                if (queued is { Count: > 0 })
+                if (queued is not null)
                 {
                     RejectOrForwardRequests(queued);
                 }
@@ -2562,10 +2548,6 @@ internal sealed partial class ActivationData :
         /// </summary>
         public SiloAddress? ForwardingAddress { get => GetValueOrDefault<SiloAddress>(nameof(ForwardingAddress)); set => SetOrRemoveValue(nameof(ForwardingAddress), value); }
 
-        /// <summary>
-        /// Cancellations which arrived while this activation was deactivating and did not find their request.
-        /// </summary>
-        public HashSet<(GrainId SendingGrain, CorrelationId MessageId)>? HeldCancellations { get => GetValueOrDefault<HashSet<(GrainId, CorrelationId)>>(nameof(HeldCancellations)); set => SetOrRemoveValue(nameof(HeldCancellations), value); }
 
         /// <summary>
         /// A <see cref="TaskCompletionSource{TResult}"/> which completes when a grain has deactivated.

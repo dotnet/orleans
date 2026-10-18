@@ -49,7 +49,7 @@ internal sealed partial class ActivationData
         {
             Message? message = null;
             var wasWaiting = false;
-            SiloAddress? forwardTo = null;
+            var sendAsRequest = false;
             lock (_lock)
             {
                 // Check the running requests.
@@ -78,28 +78,14 @@ internal sealed partial class ActivationData
                     }
                 }
 
-                if (message is null)
-                {
-                    if (State is ActivationState.Deactivating)
-                    {
-                        // A deactivating activation holds cancellations as it holds requests. When it finishes deactivating, it applies them to its queued requests,
-                        // which include requests which stayed when it migrated, and forwards the rest with its requests.
-                        _extras ??= new();
-                        (_extras.HeldCancellations ??= []).Add((senderGrainId, messageId));
-                        return true;
-                    }
-
-                    if (State is ActivationState.Invalid && ForwardingAddress is { } forwardingAddress)
-                    {
-                        // This activation has forwarded its requests, so the cancellation follows them.
-                        forwardTo = forwardingAddress;
-                    }
-                }
+                // An activation which is not processing requests may not hold the request yet, or may have sent it elsewhere, such as with its migration.
+                // The cancellation is then sent to the grain as a request, which an activation holds and forwards as it does any other request until it can process it.
+                sendAsRequest = message is null && State is not ActivationState.Valid;
             }
 
-            if (forwardTo is not null)
+            if (sendAsRequest)
             {
-                _shared.InternalRuntime.RuntimeClient.CancellationManager.SignalCancellation(forwardTo, GrainId, senderGrainId, messageId);
+                _shared.InternalRuntime.RuntimeClient.CancellationManager.SignalCancellation(targetSilo: null, GrainId, senderGrainId, messageId);
                 return true;
             }
 
@@ -131,62 +117,6 @@ internal sealed partial class ActivationData
             {
                 LogErrorCancellationCallbackFailed(Shared.Logger, exception);
                 return true;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Completes a request which was canceled while it was queued, without invoking it.
-    /// </summary>
-    private void CompleteCanceledRequest(Message message)
-    {
-        if (message.Direction is Message.Directions.Request)
-        {
-            try
-            {
-                _shared.InternalRuntime.RuntimeClient.SendResponse(message, Response.FromException(new OperationCanceledException()));
-            }
-            finally
-            {
-                // A request which this silo received still holds its serialized body. A request from a caller on this silo shares its body with the caller's pending call, so it is left intact.
-                message.ReleaseBodyBuffer();
-            }
-        }
-        else
-        {
-            message.Dispose();
-        }
-    }
-
-    /// <summary>
-    /// Applies the cancellations which this activation held while deactivating to the requests which it is about to forward or reject,
-    /// then forwards the remaining cancellations to wherever its requests are now sent.
-    /// </summary>
-    /// <remarks>
-    /// Called with the requests which deactivation removed from the queue, after this activation became invalid, so that it holds no further cancellations.
-    /// Without a forwarding address, the remaining cancellations are dropped, as cancellations which do not find their request are on other activations.
-    /// </remarks>
-    private void ApplyHeldCancellations(HashSet<(GrainId SendingGrain, CorrelationId MessageId)> cancellations, List<Message>? requests)
-    {
-        if (requests is not null)
-        {
-            for (var i = requests.Count - 1; i >= 0; i--)
-            {
-                var request = requests[i];
-                if (cancellations.Remove((request.SendingGrain, request.Id)))
-                {
-                    requests.RemoveAt(i);
-                    CompleteCanceledRequest(request);
-                }
-            }
-        }
-
-        if (ForwardingAddress is { } forwardingAddress)
-        {
-            var cancellationManager = _shared.InternalRuntime.RuntimeClient.CancellationManager;
-            foreach (var (sendingGrain, messageId) in cancellations)
-            {
-                cancellationManager.SignalCancellation(forwardingAddress, GrainId, sendingGrain, messageId);
             }
         }
     }
