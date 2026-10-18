@@ -184,10 +184,20 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         if (JournaledStateContext.TryGetCurrent(_accessTarget, out var context))
         {
             context.Write(_accessTarget, JournaledStateOperation.LogSeal, this, static self => self.SealCore());
-            return;
+        }
+        else
+        {
+            SealCore();
         }
 
-        SealCore();
+        // Every successful attempt closes its own drafts, including when the context replays the durable seal.
+        if (_drafts is { } drafts)
+        {
+            while (drafts.Open.Count > 0)
+            {
+                CloseDraft(drafts.Open[^1], DraftOutcome.Abandoned(LogDraftAbandonReason.Sealed, message: null));
+            }
+        }
     }
 
     private void SealCore()
@@ -200,13 +210,6 @@ internal sealed class DurableLog<T> : IDurableLog<T>, IStateMachine, IReportsSta
         EnsureEpoch();
         _codec.WriteSeal(GetWriter());
         _isSealed = true;
-        if (_drafts is { } drafts)
-        {
-            while (drafts.Open.Count > 0)
-            {
-                CloseDraft(drafts.Open[^1], DraftOutcome.Abandoned(LogDraftAbandonReason.Sealed, message: null));
-            }
-        }
     }
 
     public IDurableLogDraft<T> BeginDraft()
