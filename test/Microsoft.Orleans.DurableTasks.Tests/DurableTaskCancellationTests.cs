@@ -16,6 +16,61 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 {
     private static readonly TimeSpan CancellationTestTimeout = TimeSpan.FromSeconds(5);
 
+    [Theory]
+    [InlineData("timeout")]
+    [InlineData("when-any")]
+    [InlineData("race")]
+    public Task CancellationBeforeCompletionSelectionStartsPreservesTheCancellationOutcome(string operation) => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, _) = CreateRuntime();
+        var rootId = TaskId.CreateRoot("root");
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var request = CreateRequest(1, () => DurableTask.Run(async _ =>
+        {
+            started.SetResult();
+            await resume.Task;
+            try
+            {
+                DurableTask wait = operation switch
+                {
+                    "timeout" => DurableTask.Delay(TimeSpan.FromDays(1)).WaitAsync(TimeSpan.FromDays(2)),
+                    "when-any" => DurableTask.WhenAny([DurableTask.Delay(TimeSpan.FromDays(1)), DurableTask.Delay(TimeSpan.FromDays(2))]),
+                    "race" => DurableTask.Race([DurableTask.Delay(TimeSpan.FromDays(1)), DurableTask.Delay(TimeSpan.FromDays(2))]),
+                    _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+                };
+                await wait.WithId("wait");
+                return "completed";
+            }
+            catch (OperationCanceledException) when (DurableTask.Current.IsTaskCancellationRequested)
+            {
+                return $"compensated: {DurableTask.Current.TaskCancellationReason}";
+            }
+        }));
+
+        await ((IDurableTaskServer)runtime).ScheduleAsync(rootId, request, TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(CancellationTestTimeout, TestContext.Current.CancellationToken);
+        await ((IDurableTaskServer)runtime).CancelAsync(rootId, "buyer", TestContext.Current.CancellationToken);
+        resume.SetResult();
+
+        Assert.Equal("compensated: buyer", (await WaitForResponseAsync(runtime, rootId)).GetResult<string>());
+        Assert.False(storage.Contains(rootId.Child("wait").Child("0")));
+        Assert.False(storage.Contains(rootId.Child("wait").Child("1")));
+    });
+
+    [Fact]
+    public Task CompletionSelectionRejectsAnUnscheduledCandidateWithoutAncestorCancellation() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, _, _, _) = CreateRuntime();
+        var decisionId = TaskId.Parse("root/selection");
+        var candidate = TaskId.Parse("root/missing");
+
+        var exception = await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            runtime.SelectCompletionAsync(decisionId, [candidate], TestContext.Current.CancellationToken).AsTask());
+
+        Assert.Equal($"A task with the identifier '{candidate}' was not found.", exception.Message);
+    });
+
     [Fact]
     public Task CanceledBodyWhichCatchesTheCancellationCompletesWithItsOwnResult() => ActivationScheduler.RunAsync(async () =>
     {

@@ -345,7 +345,7 @@ internal sealed partial class DurableTaskGrainRuntime(
             // When several candidates have completed, the first in candidate order wins.
             foreach (var candidate in candidates)
             {
-                var response = await GetScheduledTaskHandle(candidate).PollAsync(
+                var response = await GetCompletionCandidateHandle(candidate).PollAsync(
                     new PollingOptions { PollTimeout = TimeSpan.Zero },
                     cancellationToken);
                 if (!response.IsCompleted)
@@ -370,7 +370,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var waits = new Task<DurableTaskResponse>[candidates.Count];
         for (var index = 0; index < waits.Length; index++)
         {
-            waits[index] = GetScheduledTaskHandle(candidates[index]).WaitAsync(waitCancellation.Token).AsTask();
+            waits[index] = GetCompletionCandidateHandle(candidates[index]).WaitAsync(waitCancellation.Token).AsTask();
         }
 
         try
@@ -384,6 +384,19 @@ internal sealed partial class DurableTaskGrainRuntime(
             await ((Task)Task.WhenAll(waits)).ConfigureAwait(
                 ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
         }
+    }
+
+    private IScheduledTaskHandle GetCompletionCandidateHandle(TaskId taskId)
+    {
+        if (TryGetScheduledTaskHandle(taskId, out var handle))
+        {
+            return handle;
+        }
+
+        // Selection receives scheduled inputs. An ancestor's cancellation refuses their starts without storing them.
+        return IsAncestorCancellationRequested(taskId, state: null, shielded: false)
+            ? new CompletedTaskHandle(taskId, DurableTaskResponse.Canceled)
+            : GetScheduledTaskHandle(taskId);
     }
 
     // A request fingerprint is a hexadecimal hash, so it never has this prefix.
