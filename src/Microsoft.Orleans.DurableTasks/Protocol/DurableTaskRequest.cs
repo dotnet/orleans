@@ -435,11 +435,13 @@ internal sealed class GrainScheduledTaskHandle(
 
     public ValueTask CancelAsync(CancellationToken cancellationToken) => CancelAsync(reason: null, cancellationToken);
 
-    public async ValueTask CancelAsync(string? reason, CancellationToken cancellationToken)
-    {
-        // TODO: Add resilience via Polly
-        await RequestCancellationAsync(grain, TaskId, reason).AsTask().WaitAsync(cancellationToken);
-    }
+    /// <remarks>Cancellation is idempotent, so failures to reach the grain are retried as polls are.</remarks>
+    public ValueTask CancelAsync(string? reason, CancellationToken cancellationToken) =>
+        DurableTaskPolling.SendAsync(
+            grain,
+            (TaskId, reason),
+            static (grain, state) => RequestCancellationAsync(grain, state.TaskId, state.reason),
+            cancellationToken);
 
     /// <summary>Requests cancellation of <paramref name="taskId"/> on <paramref name="grain"/>, carrying <paramref name="reason"/>.</summary>
     /// <remarks>A request without a reason uses the original operation, which every version of the grain serves.</remarks>
@@ -448,8 +450,13 @@ internal sealed class GrainScheduledTaskHandle(
             ? grain.CancelAsync(taskId, CancellationToken.None)
             : grain.CancelAsync(taskId, reason, CancellationToken.None);
 
-    public async ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
-        await grain.AbortAsync(TaskId, reason, CancellationToken.None).AsTask().WaitAsync(cancellationToken);
+    /// <remarks>Abort is idempotent, so failures to reach the grain are retried as polls are.</remarks>
+    public ValueTask AbortAsync(string reason, CancellationToken cancellationToken) =>
+        DurableTaskPolling.SendAsync(
+            grain,
+            (TaskId, reason),
+            static (grain, state) => grain.AbortAsync(state.TaskId, state.reason, CancellationToken.None),
+            cancellationToken);
 
     public async ValueTask<DurableTaskResponse> PollAsync(PollingOptions options, CancellationToken cancellationToken)
     {

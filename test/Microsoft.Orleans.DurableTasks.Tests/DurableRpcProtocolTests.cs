@@ -457,6 +457,48 @@ public sealed class DurableRpcProtocolTests
     }
 
     [Fact]
+    public async Task ClientCancellationsAndAbortsRetryFailuresToReachTheTasksGrain()
+    {
+        var taskId = TaskId.CreateRoot("root");
+        var target = GrainId.Create("worker", "one");
+        var cancelServer = new ScriptedDurableTaskServer(
+            new SiloUnavailableException(),
+            new DurableTaskAttemptCanceledException(DurableTaskAttemptCancellationReason.ActivationStopping, CancellationToken.None),
+            new ConnectionFailedException("lost"),
+            DurableTaskResponse.Completed);
+        var abortServer = new ScriptedDurableTaskServer(new TimeoutException(), new GatewayTooBusyException(), DurableTaskResponse.Completed);
+
+        await new GrainScheduledTaskHandle(taskId, target, request: null, cancelServer, lastResponse: null)
+            .CancelAsync("stop", TestContext.Current.CancellationToken);
+        await new GrainScheduledTaskHandle(taskId, target, request: null, abortServer, lastResponse: null)
+            .AbortAsync("broken", TestContext.Current.CancellationToken);
+
+        // Cancellation and abort are idempotent, so each failure to reach the grain is retried with the same request.
+        Assert.Equal(Enumerable.Repeat(("cancel", (string?)"stop"), 4), cancelServer.Requests);
+        Assert.Equal(Enumerable.Repeat(("abort", (string?)"broken"), 3), abortServer.Requests);
+    }
+
+    [Fact]
+    public async Task ClientCancellationsAndAbortsSurfaceOtherFailuresAndTheCallersCancellationAtOnce()
+    {
+        var taskId = TaskId.CreateRoot("root");
+        var target = GrainId.Create("worker", "one");
+        using var cancellation = new CancellationTokenSource();
+        var notFound = new ScriptedDurableTaskServer(new DurableTaskNotFoundException(taskId));
+        var failure = new ScriptedDurableTaskServer(new InvalidOperationException("bug"));
+        var canceled = new ScriptedDurableTaskServer(new TimeoutException()) { OnPoll = cancellation.Cancel };
+
+        await Assert.ThrowsAsync<DurableTaskNotFoundException>(
+            async () => await new GrainScheduledTaskHandle(taskId, target, null, notFound, null).CancelAsync(TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await new GrainScheduledTaskHandle(taskId, target, null, failure, null).AbortAsync("broken", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await new GrainScheduledTaskHandle(taskId, target, null, canceled, null).CancelAsync(cancellation.Token));
+
+        Assert.Equal([1, 1, 1], new[] { notFound.Requests.Count, failure.Requests.Count, canceled.Requests.Count });
+    }
+
+    [Fact]
     public async Task ClientWaitsSurfaceUnknownTasksApplicationFailuresAndTheCallersCancellationAtOnce()
     {
         var taskId = TaskId.CreateRoot("root");
