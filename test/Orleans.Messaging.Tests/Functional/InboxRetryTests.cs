@@ -150,16 +150,15 @@ public sealed class InboxRetryTests() : MessagingBehaviorTestBase(new RetryFixtu
         Assert.Equal(1, withoutHandler.InboxCount);
         Assert.Empty(withoutHandler.Effects);
         Assert.Empty(withoutHandler.InboxDeadLetters);
-        Assert.NotEqual(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
+
+        // Without a handler, the pending message holds no wake-up.
+        Assert.Equal(DurableJobRunStatus.Completed, (await Fixture.RunPumpAsync(receiver)).Status);
         Assert.Equal(1, (await receiver.GetSnapshotAsync()).InboxCount);
 
+        // Registering a handler on the same activation resumes the pending message.
         await receiver.ConfigureHandlerAsync(true);
-        var noHandlerContext = Fixture.GetGrainContext(receiver);
-        await receiver.RequestDeactivationAsync();
-        await noHandlerContext.Deactivated.WaitAsync(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken);
-        _ = await receiver.GetSnapshotAsync();
-        _ = await Fixture.RunPumpAsync(receiver);
         var completed = await Fixture.WaitForEffectCountAsync(receiver, 1);
+        Assert.Equal(withoutHandler.ActivationId, completed.ActivationId);
         Assert.Equal("awaits-handler", Assert.Single(completed.Effects).Value);
         Assert.Equal(DeliveryStatus.Duplicate, (await DeliverAsync(receiver, envelope)).Status);
     }

@@ -13,7 +13,8 @@ namespace Orleans.Messaging;
 /// </summary>
 /// <remarks>
 /// A single loop runs on the activation scheduler and services the inbox whenever it is signaled.
-/// One durable job keeps waking the grain while the inbox or a registered <see cref="IInboxWorkSource"/> holds work.
+/// One durable job keeps waking the grain while the inbox or a registered <see cref="IInboxWorkSource"/> holds work
+/// which the activation can perform; inbox messages wait for a handler without a wake-up.
 /// Wake-ups may be early, late, or duplicated: every pass derives the work to perform from current state.
 /// The loop keeps the activation alive while a pass runs over queued work.
 /// Work which only becomes due later relies on the durable job, so the activation can be collected while it waits.
@@ -72,6 +73,14 @@ internal sealed partial class MessagingPump : IDurableJobFeatureHandler, ILifecy
     public void Signal()
     {
         if (!_shutdown.IsCancellationRequested) _signal.Signal();
+    }
+
+    /// <summary>Requests a processing pass and ensures a durable wake-up for work which has become processable.</summary>
+    public void RequestWakeup()
+    {
+        if (_shutdown.IsCancellationRequested) return;
+        _signal.Signal();
+        RepairWakeupAsync().Ignore();
     }
 
     /// <summary>Starts the loop once the activation is servicing grain calls.</summary>
