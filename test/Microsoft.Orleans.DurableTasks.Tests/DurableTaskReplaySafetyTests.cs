@@ -1,5 +1,7 @@
 using Orleans.DurableTasks;
+using Orleans.DurableTasks.Diagnostics;
 using Orleans.DurableTasks.Protocol;
+using Orleans.Messaging;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
@@ -181,9 +183,10 @@ public sealed class DurableTaskReplaySafetyTests
 
     [Theory]
     [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
-    public Task ReplayWhichSchedulesAChildUnderAnEffectsNameFails(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
+    public Task ReplayWhichSchedulesAChildUnderAnEffectsNameStallsUntilCodeWhichMatchesTheRecordRuns(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(IncrementOnce, journalFormatKey);
+        harness.Options.StalledExecutionRetryInterval = TimeSpan.FromSeconds(7);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
         {
             await activation.ScheduleAsync(WorkflowId, TestCancellation);
@@ -193,13 +196,13 @@ public sealed class DurableTaskReplaySafetyTests
         }
 
         // A later version schedules a step under the name which the effect recorded, which is the effect's identifier.
-        harness.Workflow = static grain => Changed(grain);
-        await using var replay = await harness.ActivateAsync(TestCancellation);
+        var stalled = await AssertReplayStallsAsync(harness, static grain => Changed(grain));
+        Assert.Contains("'workflow/increment'", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a local child task.", stalled.Exception.Message, StringComparison.Ordinal);
 
-        var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
-        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("'workflow/increment'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a local child task.", exception.Message, StringComparison.Ordinal);
+        // Code which matches the record replays the execution, which completes without running the effect again.
+        Assert.Equal(1, await CompleteAtGateAsync(harness));
+        Assert.Equal(1, harness.EffectRuns);
 
         static async DurableTask<int> Changed(ReplayGrain grain) =>
             await DurableTask.Run(_ => grain.Counter.Value + 1).WithId("increment");
@@ -207,7 +210,7 @@ public sealed class DurableTaskReplaySafetyTests
 
     [Theory]
     [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
-    public Task ReplayWhichRunsAnEffectUnderAStepsNameFails(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
+    public Task ReplayWhichRunsAnEffectUnderAStepsNameStallsUntilCodeWhichMatchesTheRecordRuns(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(static grain => Original(grain), journalFormatKey);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
@@ -217,13 +220,11 @@ public sealed class DurableTaskReplaySafetyTests
         }
 
         // A later version replaces the recorded step with an effect of the same name.
-        harness.Workflow = IncrementOnce;
-        await using var replay = await harness.ActivateAsync(TestCancellation);
-
-        var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
-        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("It records a local child task, and this attempt requested a DurableTask.RunInline effect.", exception.Message, StringComparison.Ordinal);
+        var stalled = await AssertReplayStallsAsync(harness, IncrementOnce);
+        Assert.Contains("It records a local child task, and this attempt requested a DurableTask.RunInline effect.", stalled.Exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, harness.EffectRuns);
+
+        Assert.Equal(1, await CompleteAtGateAsync(harness));
 
         static async DurableTask<int> Original(ReplayGrain grain)
         {
@@ -236,7 +237,7 @@ public sealed class DurableTaskReplaySafetyTests
     [Theory]
     [InlineData("step")]
     [InlineData("combinator")]
-    public Task ReplayWhichRunsAnEffectUnderTheSameOccurrenceOfANameFails(string original) => ActivationScheduler.RunAsync(async () =>
+    public Task ReplayWhichRunsAnEffectUnderTheSameOccurrenceOfANameStalls(string original) => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(grain => Original(grain, original == "combinator"));
         await using (var activation = await harness.ActivateAsync(TestCancellation))
@@ -248,15 +249,12 @@ public sealed class DurableTaskReplaySafetyTests
         // A later version keeps the first step and turns the name's second occurrence into an effect. Names count their
         // occurrences across kinds, so the effect's identifier is the recorded increment$2, which holds the step or the
         // combinator's input, rather than the first step's.
-        harness.Workflow = static grain => Changed(grain);
-        await using var replay = await harness.ActivateAsync(TestCancellation);
-
-        var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
-        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("'workflow/increment$2'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("this attempt requested a DurableTask.RunInline effect.", exception.Message, StringComparison.Ordinal);
+        var stalled = await AssertReplayStallsAsync(harness, static grain => Changed(grain));
+        Assert.Contains("'workflow/increment$2'", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.Contains("this attempt requested a DurableTask.RunInline effect.", stalled.Exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, harness.EffectRuns);
-        Assert.Equal(2, replay.Grain.Counter.Value);
+
+        Assert.Equal(2, await CompleteAtGateAsync(harness));
 
         static async DurableTask<int> Original(ReplayGrain grain, bool combinator)
         {
@@ -286,7 +284,7 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
-    public Task ReplayWhichRunsACombinatorInputBeneathAnEffectsNameFails() => ActivationScheduler.RunAsync(async () =>
+    public Task ReplayWhichRunsACombinatorInputBeneathAnEffectsNameStalls() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(IncrementOnce);
         await using (var activation = await harness.ActivateAsync(TestCancellation))
@@ -298,19 +296,59 @@ public sealed class DurableTaskReplaySafetyTests
         }
 
         // A later version turns the effect into a combinator of the same name, whose input would run beneath the effect.
-        harness.Workflow = static grain => Changed(grain);
-        await using var replay = await harness.ActivateAsync(TestCancellation);
+        var stalled = await AssertReplayStallsAsync(harness, static grain => Changed(grain));
+        Assert.Contains("'workflow/increment/0' runs beneath 'workflow/increment'", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a local child task.", stalled.Exception.Message, StringComparison.Ordinal);
 
-        var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
-        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("'workflow/increment/0' runs beneath 'workflow/increment'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a local child task.", exception.Message, StringComparison.Ordinal);
-        Assert.Equal(1, replay.Grain.Counter.Value);
+        Assert.Equal(1, await CompleteAtGateAsync(harness));
+        Assert.Equal(1, harness.EffectRuns);
 
         static async DurableTask<int> Changed(ReplayGrain grain)
         {
             await DurableTask.WhenAll([DurableTask.Run(_ => ++grain.Counter.Value)]).WithId("increment");
             return grain.Counter.Value;
+        }
+    });
+
+    [Theory]
+    [MemberData(nameof(DurableTaskJournalHarness.Formats), MemberType = typeof(DurableTaskJournalHarness))]
+    public Task ReplayWhoseRecordedOutcomeNoLongerDecodesStallsUntilCodeWhichDecodesItRuns(string journalFormatKey) => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain), journalFormatKey);
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await activation.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+            activation.Grain.RequestUnrelatedWrite();
+            await activation.Grain.UnrelatedWrites;
+        }
+
+        // A deployment whose code no longer decodes the recorded value replays the execution.
+        DecodingProbe.FailsDecoding = true;
+        try
+        {
+            var stalled = await AssertReplayStallsAsync(harness, static grain => Workflow(grain));
+            Assert.Contains("'workflow/reading' no longer decodes", stalled.Exception.Message, StringComparison.Ordinal);
+            Assert.IsType<InvalidOperationException>(stalled.Exception.InnerException, exactMatch: false);
+        }
+        finally
+        {
+            DecodingProbe.FailsDecoding = false;
+        }
+
+        // Code which decodes the value replays the execution, which completes without running the effect again.
+        Assert.Equal(7, await CompleteAtGateAsync(harness));
+        Assert.Equal(1, harness.EffectRuns);
+
+        static async DurableTask<int> Workflow(ReplayGrain grain)
+        {
+            var reading = DurableTask.RunInline("reading", () =>
+            {
+                grain.Harness.CountEffectRun();
+                return new DecodingProbe { Value = 7 };
+            });
+            await grain.WaitAtGateAsync();
+            return reading.Value;
         }
     });
 
@@ -404,7 +442,7 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
-    public Task ReplayWhichRunsAnUnnamedEffectWhereAnUnnamedChildWasRecordedFails() => ActivationScheduler.RunAsync(async () =>
+    public Task ReplayWhichRunsAnUnnamedEffectWhereAnUnnamedChildWasRecordedStalls() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(static grain => Original(grain));
         await using (var activation = await harness.ActivateAsync(TestCancellation))
@@ -414,15 +452,12 @@ public sealed class DurableTaskReplaySafetyTests
         }
 
         // A later version replaces the unnamed step with an unnamed effect, which takes the step's generated identifier.
-        harness.Workflow = static grain => Changed(grain);
-        await using var replay = await harness.ActivateAsync(TestCancellation);
-
-        var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
-        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("'workflow/$child-1'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("It records a local child task, and this attempt requested a DurableTask.RunInline effect.", exception.Message, StringComparison.Ordinal);
+        var stalled = await AssertReplayStallsAsync(harness, static grain => Changed(grain));
+        Assert.Contains("'workflow/$child-1'", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a local child task, and this attempt requested a DurableTask.RunInline effect.", stalled.Exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, harness.EffectRuns);
-        Assert.Equal(1, replay.Grain.Counter.Value);
+
+        Assert.Equal(1, await CompleteAtGateAsync(harness));
 
         static async DurableTask<int> Original(ReplayGrain grain)
         {
@@ -444,7 +479,7 @@ public sealed class DurableTaskReplaySafetyTests
     });
 
     [Fact]
-    public Task ReplayWhichSchedulesAnUnnamedChildWhereAnUnnamedEffectWasRecordedFails() => ActivationScheduler.RunAsync(async () =>
+    public Task ReplayWhichSchedulesAnUnnamedChildWhereAnUnnamedEffectWasRecordedStalls() => ActivationScheduler.RunAsync(async () =>
     {
         var childRuns = 0;
         await using var harness = new DurableTaskReplayHarness(static grain => Original(grain));
@@ -457,16 +492,13 @@ public sealed class DurableTaskReplaySafetyTests
         }
 
         // A later version replaces the unnamed effect with an unnamed step, which takes the effect's generated identifier.
-        harness.Workflow = grain => Changed(grain, () => childRuns++);
-        await using var replay = await harness.ActivateAsync(TestCancellation);
-
-        var response = await replay.GetResponseAsync(WorkflowId, TestCancellation);
-        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("'workflow/$child-1'", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("It records a DurableTask.RunInline effect", exception.Message, StringComparison.Ordinal);
+        var stalled = await AssertReplayStallsAsync(harness, grain => Changed(grain, () => childRuns++));
+        Assert.Contains("'workflow/$child-1'", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.Contains("It records a DurableTask.RunInline effect", stalled.Exception.Message, StringComparison.Ordinal);
         Assert.Equal(0, childRuns);
+
+        Assert.Equal(1, await CompleteAtGateAsync(harness));
         Assert.Equal(1, harness.EffectRuns);
-        Assert.Equal(1, replay.Grain.Counter.Value);
 
         static async DurableTask<int> Original(ReplayGrain grain)
         {
@@ -588,6 +620,68 @@ public sealed class DurableTaskReplaySafetyTests
         });
         await grain.WaitAtGateAsync();
         return value;
+    }
+
+    /// <summary>
+    /// Replays the recorded workflow with <paramref name="changed"/> code, asserts that the attempt stalls as diverged and
+    /// keeps the task pending, and restores the harness's workflow, so the next activation runs code which matches the
+    /// record.
+    /// </summary>
+    private static async Task<DurableTaskEvents.ExecutionStalled> AssertReplayStallsAsync(
+        DurableTaskReplayHarness harness,
+        Func<ReplayGrain, DurableTask> changed)
+    {
+        var original = harness.Workflow;
+        using var stalls = new StallRecorder(WorkflowId);
+        harness.Workflow = changed;
+        DurableTaskEvents.ExecutionStalled stalled;
+        await using (var replay = await harness.ActivateAsync(TestCancellation))
+        {
+            stalled = await stalls.Stalled.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+            Assert.Equal(DurableTaskAttemptCancellationReason.Diverged, stalled.Reason);
+            Assert.IsAssignableFrom<InvalidOperationException>(stalled.Exception);
+            Assert.True(replay.Storage.TryGetTask(WorkflowId, out var state));
+            Assert.False(state.Result is { IsCompleted: true });
+
+            // The grain keeps a wake-up at the configured interval, so a later activation replays the stalled execution.
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+            while (((IInboxWorkSource)replay.Runtime).GetWakeupDelay() != harness.Options.StalledExecutionRetryInterval)
+            {
+                Assert.True(DateTime.UtcNow < deadline, "The stalled execution keeps the configured wake-up.");
+                await Task.Delay(10, TestCancellation);
+            }
+        }
+
+        harness.Workflow = original;
+        return stalled;
+    }
+
+    /// <summary>Activates the grain, lets the recovered workflow pass its gate, and returns the workflow's result.</summary>
+    private static async Task<int> CompleteAtGateAsync(DurableTaskReplayHarness harness)
+    {
+        await using var activation = await harness.ActivateAsync(TestCancellation);
+        await activation.Grain.AtGate.WaitAsync(TimeSpan.FromSeconds(10), TestCancellation);
+        activation.Grain.OpenGate();
+        return (await activation.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<int>();
+    }
+
+    /// <summary>A recorded value whose decoding fails while <see cref="FailsDecoding"/> is set, as after a deployment.</summary>
+    [GenerateSerializer]
+    [Alias("Microsoft.Orleans.DurableTasks.Tests.DecodingProbe")]
+    internal sealed class DecodingProbe
+    {
+        [NonSerialized]
+        private int _value;
+
+        /// <summary>Gets or sets whether decoding fails, which one test sets.</summary>
+        public static volatile bool FailsDecoding;
+
+        [Id(0)]
+        public int Value
+        {
+            get => _value;
+            set => _value = FailsDecoding ? throw new InvalidOperationException("The deployed code can't decode this value.") : value;
+        }
     }
 
     /// <summary>A result type which has no serializer.</summary>

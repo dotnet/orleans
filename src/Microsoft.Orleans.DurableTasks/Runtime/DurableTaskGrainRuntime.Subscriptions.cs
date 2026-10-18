@@ -94,7 +94,7 @@ internal sealed partial class DurableTaskGrainRuntime
                 requested);
         }
 
-        if (state.Result is { IsCompleted: true } recorded)
+        if (ReadRecordedResult(taskId, state) is { IsCompleted: true } recorded)
         {
             return new(new CompletedTaskHandle(taskId, recorded), RequiresWrite: false);
         }

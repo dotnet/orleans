@@ -39,6 +39,9 @@ internal sealed class DurableTaskReplayHarness(
     /// <summary>Gets or sets the workflow which each activation runs, such as a later version after a deployment.</summary>
     public Func<ReplayGrain, DurableTask> Workflow { get; set; } = workflow;
 
+    /// <summary>Gets the options which each activation's runtime reads.</summary>
+    public DurableTaskOptions Options { get; } = new() { ResultRetentionPeriod = TimeSpan.FromHours(1) };
+
     /// <summary>Gets how many times effects ran, across every activation.</summary>
     public int EffectRuns => Volatile.Read(ref _effectRuns);
 
@@ -66,8 +69,8 @@ internal sealed class DurableTaskReplayHarness(
                 new TestGrainContextAccessor(grainContext),
                 TimeProvider.System,
                 NullLogger<DurableTaskGrainRuntime>.Instance,
-                Options.Create(new DurableTaskOptions { ResultRetentionPeriod = TimeSpan.FromHours(1) }),
-                Options.Create(new DurableMessagingOptions()),
+                Microsoft.Extensions.Options.Options.Create(Options),
+                Microsoft.Extensions.Options.Options.Create(new DurableMessagingOptions()),
                 _journal.Serializer);
             var runtime = new DurableTaskGrainRuntime(storage, logicalTimes, invocations, shared, [new RecordingDurableTaskMessageTransport()]);
             var probe = new WriteProbe(() => (counter.Value, log.Count, CompletedTasks(storage)));

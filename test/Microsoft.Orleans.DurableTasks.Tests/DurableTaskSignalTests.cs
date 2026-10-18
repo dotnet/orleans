@@ -379,7 +379,7 @@ public sealed partial class DurableTaskSignalTests
 
         await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, throwOnRejection: true, TestCancellation);
         await harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, value, throwOnRejection: true, TestCancellation);
-        var reuse = await Assert.ThrowsAsync<InvalidOperationException>(
+        var reuse = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => harness.Runtime.SendSignalAsync(markerId, target, TaskId.CreateRoot("order"), Approved.Name, DurableTaskResponse.FromResult("grace"), throwOnRejection: true, TestCancellation).AsTask());
 
         Assert.Contains("another operation", reuse.Message, StringComparison.Ordinal);

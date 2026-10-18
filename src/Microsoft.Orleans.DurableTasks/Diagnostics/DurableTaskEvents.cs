@@ -154,17 +154,28 @@ public static class DurableTaskEvents
     }
 
     /// <summary>
-    /// Event payload for an attempt which stalled because its execution recorded a version which the running code doesn't
-    /// support: the runtime discarded the attempt's result and keeps the task pending, and a later activation replays it.
+    /// Event payload for an attempt which stalled because the running code can't replay its execution: the execution
+    /// recorded a version which the code doesn't support, or the code diverged from the recorded execution. The runtime
+    /// discarded the attempt's result and keeps the task pending, and a later activation replays it.
     /// </summary>
     /// <param name="grainContext">The activation whose runtime raised the event.</param>
     /// <param name="taskId">The stalled execution.</param>
-    /// <param name="exception">The exception which describes the recorded version and the supported range.</param>
-    public sealed class ExecutionStalled(IGrainContext grainContext, TaskId taskId, DurableTaskVersionException exception)
+    /// <param name="reason">
+    /// Why the attempt stalled: <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/> or
+    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/>.
+    /// </param>
+    /// <param name="exception">
+    /// The exception which describes the stall: a <see cref="DurableTaskVersionException"/> for an unsupported version, or
+    /// an <see cref="InvalidOperationException"/> which describes the divergence.
+    /// </param>
+    public sealed class ExecutionStalled(IGrainContext grainContext, TaskId taskId, DurableTaskAttemptCancellationReason reason, Exception exception)
         : DurableTaskEvent(grainContext, taskId)
     {
-        /// <summary>The exception which describes the recorded version and the supported range.</summary>
-        public readonly DurableTaskVersionException Exception = exception;
+        /// <summary>Why the attempt stalled.</summary>
+        public readonly DurableTaskAttemptCancellationReason Reason = reason;
+
+        /// <summary>The exception which describes the stall.</summary>
+        public readonly Exception Exception = exception;
     }
 
     internal static void EmitTaskCreated(IGrainContext grainContext, TaskId taskId)
@@ -307,18 +318,18 @@ public static class DurableTaskEvents
             Write(nameof(VersionRecorded), new VersionRecorded(grainContext, taskId, name, version));
     }
 
-    internal static void EmitExecutionStalled(IGrainContext grainContext, TaskId taskId, DurableTaskVersionException exception)
+    internal static void EmitExecutionStalled(IGrainContext grainContext, TaskId taskId, DurableTaskAttemptCancellationReason reason, Exception exception)
     {
         if (!Listener.IsEnabled(nameof(ExecutionStalled)))
         {
             return;
         }
 
-        Emit(grainContext, taskId, exception);
+        Emit(grainContext, taskId, reason, exception);
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Emit(IGrainContext grainContext, TaskId taskId, DurableTaskVersionException exception) =>
-            Write(nameof(ExecutionStalled), new ExecutionStalled(grainContext, taskId, exception));
+        static void Emit(IGrainContext grainContext, TaskId taskId, DurableTaskAttemptCancellationReason reason, Exception exception) =>
+            Write(nameof(ExecutionStalled), new ExecutionStalled(grainContext, taskId, reason, exception));
     }
 
     private sealed class Observable : IObservable<DurableTaskEvent>

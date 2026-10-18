@@ -1,6 +1,8 @@
 using Orleans.DurableTasks;
+using Orleans.DurableTasks.Diagnostics;
 using Orleans.DurableTasks.Protocol;
 using Orleans.Messaging;
+using Orleans.Runtime;
 using Xunit;
 
 namespace Microsoft.Orleans.DurableTasks.Tests;
@@ -41,35 +43,81 @@ public sealed partial class DurableTaskRuntimeInvariantTests
     public Task CallUnderAnEffectsIdentifierDiverges() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/local");
         ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/charge"), "$effect", DurableTaskResponse.FromResult(1));
+        using var stalls = new StallRecorder(taskId);
 
         var handle = await runtime.ScheduleChildAsync(
-            TaskId.Parse("root/local"),
+            taskId,
             DurableTask.Run(async () => await CreateRemoteChild(1).WithId("charge")),
             TestContext.Current.CancellationToken);
-        var response = await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a call to grain", exception.Message, StringComparison.Ordinal);
+        var stalled = await stalls.Stalled.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(DurableTaskAttemptCancellationReason.Diverged, stalled.Reason);
+        Assert.Contains("It records a DurableTask.RunInline effect, and this attempt requested a call to grain", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.False(storage.Get(taskId).Result is { IsCompleted: true });
         Assert.Empty(transport.Invocations);
     });
 
     [Fact]
+    public Task CallWithOtherArgumentsUnderARecordedCallStallsTheAttempt() => ActivationScheduler.RunAsync(async () =>
+    {
+        var (runtime, storage, _, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/local");
+        var callId = TaskId.Parse("root/local/charge");
+        var recorded = storage.GetOrCreate(callId);
+        ((IDurableTaskGrainStorage)storage).SetRemoteRequest(callId, recorded, GrainId.Create("target", "one"), "recorded-fingerprint");
+        using var stalls = new StallRecorder(taskId);
+
+        // A deployment changed the call's arguments, so the replay requests another call under the recorded identifier.
+        _ = await runtime.ScheduleChildAsync(
+            taskId,
+            DurableTask.Run(async () => await CreateRemoteChild(2).WithId("charge")),
+            TestContext.Current.CancellationToken);
+
+        var stalled = await stalls.Stalled.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(DurableTaskAttemptCancellationReason.Diverged, stalled.Reason);
+        Assert.Contains("'root/local/charge' is already associated with a different request", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.False(storage.Get(taskId).Result is { IsCompleted: true });
+        Assert.Empty(transport.Invocations);
+    });
+    [Fact]
     public Task DelayUnderAnEffectsIdentifierDiverges() => ActivationScheduler.RunAsync(async () =>
     {
         var (runtime, storage, _, transport) = CreateRuntime();
+        var taskId = TaskId.Parse("root/local");
         ((IDurableTaskGrainStorage)storage).AddRecord(TaskId.Parse("root/local/wait"), "$effect", DurableTaskResponse.FromResult(1));
+        using var stalls = new StallRecorder(taskId);
 
         var handle = await runtime.ScheduleChildAsync(
-            TaskId.Parse("root/local"),
+            taskId,
             DurableTask.Run(async () => await DurableTask.Delay(TimeSpan.FromDays(1)).WithId("wait")),
             TestContext.Current.CancellationToken);
-        var response = await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("It records a DurableTask.RunInline effect", exception.Message, StringComparison.Ordinal);
+        var stalled = await stalls.Stalled.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(DurableTaskAttemptCancellationReason.Diverged, stalled.Reason);
+        Assert.Contains("It records a DurableTask.RunInline effect", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.False(storage.Get(taskId).Result is { IsCompleted: true });
         Assert.Empty(transport.Resumes);
     });
+}
+
+/// <summary>Records the first <see cref="DurableTaskEvents.ExecutionStalled"/> event of a task.</summary>
+internal sealed class StallRecorder : IDisposable
+{
+    private readonly TaskCompletionSource<DurableTaskEvents.ExecutionStalled> _stalled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly IDisposable _subscription;
+
+    public StallRecorder(TaskId taskId) =>
+        _subscription = DurableTaskEvents.AllEvents.Subscribe(new EventObserver(evt =>
+        {
+            if (evt is DurableTaskEvents.ExecutionStalled stalled && stalled.TaskId == taskId)
+            {
+                _stalled.TrySetResult(stalled);
+            }
+        }));
+
+    public Task<DurableTaskEvents.ExecutionStalled> Stalled => _stalled.Task;
+
+    public void Dispose() => _subscription.Dispose();
 }

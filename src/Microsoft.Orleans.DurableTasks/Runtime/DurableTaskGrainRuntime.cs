@@ -122,11 +122,8 @@ internal sealed partial class DurableTaskGrainRuntime(
     // while they run; see GetWakeupDelay.
     private static readonly TimeSpan RunnableWakeupDelay = TimeSpan.FromSeconds(1);
 
-    // How often a grain which holds a stalled execution wakes, so that once its activation ends, a later activation
-    // replays the execution, typically on a deployment whose code supports the execution's recorded versions.
-    private static readonly TimeSpan StalledWakeupDelay = TimeSpan.FromMinutes(1);
-
-    // The executions whose attempts stalled on a version which the running code doesn't support, and which stay pending.
+    // The executions whose attempts stalled because the running code can't replay them, and which stay pending. The grain
+    // wakes every DurableTaskOptions.StalledExecutionRetryInterval while it holds one, so a later activation replays it.
     private readonly ConcurrentDictionary<TaskId, byte> _stalledExecutions = [];
 
     // The attempts which run, and those of them which are parked on a message-driven wait.
@@ -319,12 +316,12 @@ internal sealed partial class DurableTaskGrainRuntime(
                 _storage.SetRequestFingerprint(decisionId, decision, fingerprint);
             }
 
-            if (decision.Result is { IsCompleted: true } recorded)
+            if (ReadRecordedResult(decisionId, decision) is { IsCompleted: true } recorded)
             {
                 var winner = recorded.GetResult<TaskId>();
                 if (!candidates.Contains(winner))
                 {
-                    throw new InvalidOperationException(
+                    throw new DurableTaskDivergenceException(
                         $"Durable completion decision '{decisionId}' was recorded for candidate '{winner}', which is not in the supplied candidate set.");
                 }
 
@@ -388,10 +385,29 @@ internal sealed partial class DurableTaskGrainRuntime(
 
     /// <summary>
     /// Creates the error for scheduling an operation under an identifier which records another operation, which is how a
-    /// replay which diverges from its recorded execution surfaces.
+    /// replay which diverges from its recorded execution surfaces. The attempt's context stalls the attempt with it.
     /// </summary>
-    private static InvalidOperationException CreateDivergenceException(string message, IDurableTaskState recorded, string requested) =>
+    private static DurableTaskDivergenceException CreateDivergenceException(string message, IDurableTaskState recorded, string requested) =>
         new(DescribeDivergence(message, recorded, requested));
+
+    /// <summary>
+    /// Returns the outcome which an earlier attempt recorded under <paramref name="taskId"/>, decoding it on first access.
+    /// </summary>
+    /// <exception cref="DurableTaskDivergenceException">The recorded outcome no longer decodes.</exception>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Any decoding failure is a divergence from the record.")]
+    private static DurableTaskResponse? ReadRecordedResult(TaskId taskId, IDurableTaskState state)
+    {
+        try
+        {
+            return state.Result;
+        }
+        catch (Exception exception)
+        {
+            throw new DurableTaskDivergenceException(
+                $"The outcome which an earlier attempt recorded for durable task '{taskId}' no longer decodes: {exception.Message} A replay reads every recorded outcome; code which decodes it replays the execution.",
+                exception);
+        }
+    }
 
     /// <summary>Creates the error for scheduling a request under a task identifier which records another operation.</summary>
     private static DurableTaskConflictException CreateScheduleConflictException(
@@ -775,7 +791,7 @@ internal sealed partial class DurableTaskGrainRuntime(
                     $"a call to grain '{context.TargetId}' ({AbbreviateFingerprint(fingerprint)})");
             }
 
-            if (state.Result is { IsCompleted: true } completed)
+            if (ReadRecordedResult(taskId, state) is { IsCompleted: true } completed)
             {
                 return completed;
             }
@@ -826,7 +842,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         ThrowIfStopping();
         if (_storage.TryGetTask(effectId, out var record))
         {
-            if (!IsEffectRecord(record) || record.Result is not { IsCompleted: true } outcome)
+            if (!IsEffectRecord(record) || ReadRecordedResult(effectId, record) is not { IsCompleted: true } outcome)
             {
                 throw CreateDivergenceException(
                     $"Durable child task '{effectId}' is already associated with a different operation.",
@@ -879,11 +895,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         {
             if (_storage.TryGetTask(execution.Child(segment), out var recorded))
             {
+                var decision = ReadRecordedResult(execution.Child(segment), recorded);
                 Debug.Assert(
                     string.Equals(recorded.RequestFingerprint, VersionFingerprint, StringComparison.Ordinal)
-                    && recorded.Result is { IsCompleted: true },
+                    && decision is { IsCompleted: true },
                     "Only version decisions are recorded under version segments.");
-                return recorded.Result!.GetResult<int>();
+                return decision!.GetResult<int>();
             }
 
             if (_storage.TryGetTask(execution, out var state) && IsInvoked(state))
@@ -985,7 +1002,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         var transport = MessageTransport;
         if (_storage.TryGetTask(taskId, out var state))
         {
-            if (state.Result is { IsCompleted: true } completed)
+            if (ReadRecordedResult(taskId, state) is { IsCompleted: true } completed)
             {
                 return completed;
             }
@@ -1525,9 +1542,9 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// wake-up job finds no work on its first run and ends.
     /// </para>
     /// <para>
-    /// A stalled execution waits for code which supports its recorded versions, which only a later activation runs, so it
-    /// keeps a slow wake-up: once the activation ends, such as when a rolling deployment stops its silo, the wake-up
-    /// reactivates the grain and recovery replays the execution.
+    /// A stalled execution waits for code which can replay it, which only a later activation runs, so it keeps a slow
+    /// wake-up, <see cref="Orleans.Configuration.DurableTaskOptions.StalledExecutionRetryInterval"/>: once the activation ends, such as when a
+    /// rolling deployment stops its silo, the wake-up reactivates the grain and recovery replays the execution.
     /// </para>
     /// </remarks>
     TimeSpan? IInboxWorkSource.GetWakeupDelay() =>
@@ -1538,7 +1555,7 @@ internal sealed partial class DurableTaskGrainRuntime(
         || !_backgroundTasks.IsEmpty
         || Volatile.Read(ref _recoveredStarts) is not null
             ? RunnableWakeupDelay
-            : HasStalledExecutions() ? StalledWakeupDelay : null;
+            : HasStalledExecutions() ? _shared.Options.StalledExecutionRetryInterval : null;
 
     /// <summary>Returns whether a stalled execution is still pending, forgetting those which ended, such as by an abort.</summary>
     private bool HasStalledExecutions()
@@ -1557,24 +1574,27 @@ internal sealed partial class DurableTaskGrainRuntime(
     }
 
     /// <summary>
-    /// Cancels the attempt of an execution which recorded a version that the running code doesn't support, keeps its
-    /// task pending, and reports the stall.
+    /// Cancels the attempt of an execution which the running code can't replay, keeps its task pending, and reports the
+    /// stall.
     /// </summary>
     /// <remarks>
-    /// The attempt is canceled as deactivation, an abort, or a deletion cancels it, so nothing which it does afterwards
-    /// commits and its result is discarded. The task keeps no outcome, and the grain's slow wake-up lets a later
+    /// The attempt is canceled as deactivation, an abort, or a deletion cancels it, so its later durable operations throw
+    /// and its result is discarded. The task keeps no outcome, and the grain's slow wake-up lets a later
     /// activation replay it.
     /// </remarks>
-    void IDurableTaskGrainRuntime.StallAttempt(GrainDurableTaskContext context, DurableTaskVersionException exception)
+    void IDurableTaskGrainRuntime.StallAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason, Exception exception)
     {
-        if (!CancelAttempt(context, DurableTaskAttemptCancellationReason.UnsupportedVersion))
+        Debug.Assert(
+            reason is DurableTaskAttemptCancellationReason.UnsupportedVersion or DurableTaskAttemptCancellationReason.Diverged,
+            "An attempt stalls when the running code can't replay its execution.");
+        if (!CancelAttempt(context, reason))
         {
             return;
         }
 
         _stalledExecutions[context.Id] = 0;
-        _shared.Logger.LogWarning(exception, "{Id} durable task '{TaskId}' stalled on an unsupported version.", GrainId, context.Id);
-        DurableTaskEvents.EmitExecutionStalled(GrainContext, context.Id, exception);
+        _shared.Logger.LogWarning(exception, "{Id} durable task '{TaskId}' stalled: {Reason}.", GrainId, context.Id, reason);
+        DurableTaskEvents.EmitExecutionStalled(GrainContext, context.Id, reason, exception);
     }
 
 
@@ -1743,6 +1763,12 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         var stateExisted = _storage.TryGetTask(taskId, out var state);
+        if (stateExisted)
+        {
+            // Decodes the recorded outcome once, so the handle which the replay receives holds it.
+            ReadRecordedResult(taskId, state!);
+        }
+
         IScheduledTaskHandle? handle = null;
         IScheduledTaskHandle? existingScheduledHandle = null;
         if (stateExisted && TryGetScheduledTaskHandle(taskId, out var existingHandle))
@@ -1921,6 +1947,11 @@ internal sealed partial class DurableTaskGrainRuntime(
         CancellationToken cancellationToken)
     {
         var stateExisted = _storage.TryGetTask(taskId, out var state);
+        if (state is not null)
+        {
+            ReadRecordedResult(taskId, state);
+        }
+
         if (state is not null
             && (state.Request is not null
                 || state.RequestFingerprint is not null

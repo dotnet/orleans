@@ -1238,7 +1238,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var taskId = TaskId.Parse("identity");
         runtime.ScheduleFromInbox(taskId, CreateRequest(1));
 
-        var remoteException = await Assert.ThrowsAsync<InvalidOperationException>(
+        var remoteException = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.ScheduleChildAsync(taskId, new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)), TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("different request", remoteException.Message, StringComparison.Ordinal);
 
@@ -1252,7 +1252,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
         var delayTaskId = TaskId.Parse("delay-identity");
         await runtime.ScheduleDelayAsync(delayTaskId, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
-        var delayException = await Assert.ThrowsAsync<InvalidOperationException>(
+        var delayException = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.ScheduleChildAsync(delayTaskId, new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(5)), TestContext.Current.CancellationToken).AsTask());
         Assert.Contains("different request", delayException.Message, StringComparison.Ordinal);
     });
@@ -1266,7 +1266,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             static (_, _) => new(DurableTaskResponse.Pending));
         _ = await runtime.ScheduleChildAsync(taskId, localTask, TestContext.Current.CancellationToken);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.ScheduleChildAsync(taskId, new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(2)), TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains("different request", exception.Message, StringComparison.Ordinal);
@@ -1973,7 +1973,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             recordedWinner,
             await runtime.SelectCompletionAsync(decisionId, [recordedWinner], TestContext.Current.CancellationToken));
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.SelectCompletionAsync(decisionId, [TaskId.Parse("root/two")], TestContext.Current.CancellationToken).AsTask());
 
         Assert.Equal(
@@ -1989,7 +1989,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await runtime.ScheduleDelayAsync(decisionId, TimeSpan.FromMinutes(1), TestContext.Current.CancellationToken);
         var dueTime = storage.Get(decisionId).DueTime!.Value;
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.SelectCompletionAsync(
                 decisionId,
                 [TaskId.Parse("root/candidate/0"), TaskId.Parse("root/candidate/1")],
@@ -2010,7 +2010,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         await runtime.SelectCompletionAsync(decisionId, [winner], TestContext.Current.CancellationToken);
 
         // The workflow changed: a replay schedules a local step where the first execution recorded a race's selection.
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.ScheduleChildAsync(decisionId, DurableTask.FromResult(1), TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains(
@@ -2503,16 +2503,17 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         var effectId = TaskId.Parse("root/local/effect");
         storage.SetRequestFingerprint(effectId, storage.GetOrCreate(effectId), "$detach:other");
         var runs = 0;
+        using var stalls = new StallRecorder(taskId);
 
         var handle = await runtime.ScheduleChildAsync(
             taskId,
             DurableTask.Run(_ => DurableTask.RunInline("effect", () => ++runs)),
             TestContext.Current.CancellationToken);
-        var response = await handle.WaitAsync(TestContext.Current.CancellationToken).AsTask()
-            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        var exception = Assert.IsType<InvalidOperationException>(response.Exception);
-        Assert.Contains("a DurableTask.RunInline effect", exception.Message, StringComparison.Ordinal);
+        var stalled = await stalls.Stalled.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.Equal(DurableTaskAttemptCancellationReason.Diverged, stalled.Reason);
+        Assert.Contains("a DurableTask.RunInline effect", stalled.Exception.Message, StringComparison.Ordinal);
+        Assert.False(storage.Get(taskId).Result is { IsCompleted: true });
         Assert.Equal(0, runs);
     });
 
@@ -3117,7 +3118,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             IDurableTaskRequest.GetFingerprint(originalTask, CreateSerializer()));
         storage.RequestCancellation(rootId, storage.GetOrCreate(rootId));
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.ScheduleChildAsync(
                 childId,
                 new TestStateManager.TestRemoteDurableTask(CreateRemoteRequest(18)),
@@ -3140,7 +3141,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         storage.SetRemoteRequest(childId, storage.GetOrCreate(childId), target, "0123456789ABCDEF0123");
 
         // The workflow changed: a replay schedules a local step where the first execution recorded a grain call.
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<DurableTaskDivergenceException>(
             () => runtime.ScheduleChildAsync(
                 childId,
                 DurableTask.FromResult(1),
@@ -3850,7 +3851,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         runtime.PostDetached(recordId, TaskId.CreateRoot("first"), CreateRemoteRequest(1), shielded: false);
         Assert.Single(transport.DetachedInvocations);
 
-        var exception = Assert.Throws<InvalidOperationException>(
+        var exception = Assert.Throws<DurableTaskDivergenceException>(
             () => runtime.PostDetached(recordId, TaskId.CreateRoot("second"), CreateRemoteRequest(1), shielded: false));
 
         Assert.Contains("different operation", exception.Message, StringComparison.Ordinal);

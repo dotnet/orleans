@@ -21,6 +21,8 @@ namespace Orleans.Configuration
     public sealed partial class DurableTaskOptions
     {
         public System.TimeSpan ResultRetentionPeriod { get { throw null; } set { } }
+
+        public System.TimeSpan StalledExecutionRetryInterval { get { throw null; } set { } }
     }
 }
 
@@ -238,8 +240,9 @@ namespace Orleans.DurableTasks.Diagnostics
 
         public sealed partial class ExecutionStalled : DurableTaskEvent
         {
-            public readonly DurableTaskVersionException Exception;
-            public ExecutionStalled(Orleans.Runtime.IGrainContext grainContext, TaskId taskId, DurableTaskVersionException exception) : base(default!, default) { }
+            public readonly System.Exception Exception;
+            public readonly DurableTaskAttemptCancellationReason Reason;
+            public ExecutionStalled(Orleans.Runtime.IGrainContext grainContext, TaskId taskId, DurableTaskAttemptCancellationReason reason, System.Exception exception) : base(default!, default) { }
         }
 
         public sealed partial class ExecutionStarted : DurableTaskEvent

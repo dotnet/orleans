@@ -16,11 +16,20 @@ namespace Orleans.DurableTasks.Runtime;
 /// Executes one attempt of a durable task within a grain activation.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The runtime cancels the attempt when the activation stops, or when the task is aborted or deleted with its execution
 /// tree, through <see cref="CancelAttempt"/>. From then on, the attempt's durable operations throw
 /// <see cref="DurableTaskAttemptCanceledException"/>, and the changes which its code makes to the grain's journaled state,
 /// such as cleanup, commit with the grain's next journal write. The runtime drains the canceled attempt and discards its
 /// response; after the activation stops, the next activation replays the task in a new context.
+/// </para>
+/// <para>
+/// An attempt which the running code can't replay stalls: the runtime cancels it for
+/// <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/> when the execution recorded a version which
+/// the code doesn't support, and for <see cref="DurableTaskAttemptCancellationReason.Diverged"/> when an operation
+/// diverges from the execution's record, such as another operation under a recorded identifier or a recorded outcome
+/// which no longer decodes. The task stays pending until code which can replay it runs.
+/// </para>
 /// </remarks>
 internal sealed class GrainDurableTaskContext : DurableTaskContext
 {
@@ -53,9 +62,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     // The versions which this attempt decided, by change name. Guarded by _lock.
     private Dictionary<string, int>? _versions;
 
-    // The version which the runtime canceled this attempt for, when its execution recorded one which the running code
-    // doesn't support. Guarded by _lock.
-    private DurableTaskVersionException? _unsupportedVersion;
+    // Why the running code can't replay the execution, when the runtime stalled this attempt: a version which the code
+    // doesn't support, or a divergence from the execution's record. Guarded by _lock.
+    private Exception? _stallException;
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -353,6 +362,26 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         }
     }
 
+    /// <summary>
+    /// Stalls this attempt for <paramref name="reason"/>: the runtime cancels it and keeps its task pending, so code which
+    /// can replay the execution runs it later.
+    /// </summary>
+    /// <returns>The exception which the stalled operation throws.</returns>
+    private DurableTaskAttemptCanceledException Stall(DurableTaskAttemptCancellationReason reason, Exception cause)
+    {
+        lock (_lock)
+        {
+            _stallException ??= cause;
+        }
+
+        _runtime.StallAttempt(this, reason, cause);
+        return CreateAttemptCanceledException();
+    }
+
+    /// <summary>Stalls this attempt because an operation diverged from the execution's record.</summary>
+    private DurableTaskAttemptCanceledException Diverge(DurableTaskDivergenceException divergence) =>
+        Stall(DurableTaskAttemptCancellationReason.Diverged, divergence);
+
     /// <summary>Throws <see cref="DurableTaskAttemptCanceledException"/> when the runtime canceled this attempt.</summary>
     private void ThrowIfAttemptCanceled()
     {
@@ -368,7 +397,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         lock (_lock)
         {
             reason = _attemptCancellationReason;
-            innerException ??= _unsupportedVersion;
+            innerException ??= _stallException;
         }
 
         Debug.Assert(reason is not null, "Only a canceled attempt throws its cancellation.");
@@ -377,7 +406,7 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
     /// <summary>
     /// Completes an operation of this attempt with its outcome, or with the attempt's cancellation once the runtime
-    /// canceled the attempt.
+    /// canceled the attempt. An operation which diverged from the execution's record stalls the attempt.
     /// </summary>
     /// <remarks>
     /// The runtime cancels an attempt before it signals the attempt's tokens, so an operation which completes in between,
@@ -394,6 +423,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         {
             throw CreateAttemptCanceledException(exception);
         }
+        catch (DurableTaskDivergenceException divergence)
+        {
+            throw Diverge(divergence);
+        }
 
         ThrowIfAttemptCanceled();
         return result;
@@ -409,6 +442,10 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         catch (Exception exception) when (exception is not DurableTaskAttemptCanceledException && IsAttemptCanceled)
         {
             throw CreateAttemptCanceledException(exception);
+        }
+        catch (DurableTaskDivergenceException divergence)
+        {
+            throw Diverge(divergence);
         }
 
         ThrowIfAttemptCanceled();
@@ -449,7 +486,15 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         bool waitForAcceptance,
         CancellationToken cancellationToken)
     {
-        ValidateChild(taskId, task);
+        try
+        {
+            ValidateChild(taskId, task);
+        }
+        catch (DurableTaskDivergenceException divergence)
+        {
+            throw Diverge(divergence);
+        }
+
         using var operationCts = CreateOperationCancellationSource(cancellationToken);
         var handle = await CompleteOperationAsync(_runtime.ScheduleChildAsync(taskId, task, shielded, waitForAcceptance, operationCts.Token));
         return CreateExecutionHandle(handle);
@@ -485,15 +530,22 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         ThrowIfAttemptCanceled();
         var shielded = SchedulesShieldedChildren;
-        if (options.HasFlag(DurableTaskStartOptions.Detached))
+        try
         {
-            var (recordId, request) = GetDetachedRecord(taskId, task);
-            return CreateExecutionHandle(_runtime.PostDetached(recordId, taskId, request, shielded));
-        }
+            if (options.HasFlag(DurableTaskStartOptions.Detached))
+            {
+                var (recordId, request) = GetDetachedRecord(taskId, task);
+                return CreateExecutionHandle(_runtime.PostDetached(recordId, taskId, request, shielded));
+            }
 
-        ObserveOperation(taskId, recordsOperation: true);
-        ValidateChild(taskId, task);
-        return CreateExecutionHandle(_runtime.PostChild(taskId, task, shielded));
+            ObserveOperation(taskId, recordsOperation: true);
+            ValidateChild(taskId, task);
+            return CreateExecutionHandle(_runtime.PostChild(taskId, task, shielded));
+        }
+        catch (DurableTaskDivergenceException divergence)
+        {
+            throw Diverge(divergence);
+        }
     }
 
     /// <summary>Returns the identifier which records a detached start in this execution, and the started request.</summary>
@@ -600,11 +652,13 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
     /// The effect runs, and its record is staged, in the work item which calls this on the activation, so the record
     /// commits in the same journal write as the journaled state which the effect changed. Effects and children share
     /// identifiers, so an effect where an earlier run recorded a child, or a child where an earlier run recorded an
-    /// effect, fails as a divergence which names both kinds instead of running again.
+    /// effect, diverges: the attempt stalls with <see cref="DurableTaskAttemptCancellationReason.Diverged"/>, whose
+    /// divergence names both kinds, instead of running the effect again.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">
-    /// The caller isn't running on the activation's scheduler, or an earlier run recorded another kind of operation under
-    /// the effect's identifier.
+    /// <exception cref="InvalidOperationException">The caller isn't running on the activation's scheduler.</exception>
+    /// <exception cref="DurableTaskAttemptCanceledException">
+    /// The attempt was canceled, or stalled because an earlier run recorded another kind of operation under the effect's
+    /// identifier.
     /// </exception>
     protected override DurableTaskResponse RunEffect<TState>(
         TaskId effectId,
@@ -620,7 +674,14 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         ThrowIfNotChildTaskId(effectId);
         ThrowIfAttemptCanceled();
         ObserveOperation(effectId, recordsOperation: true);
-        return _runtime.RunEffect(effectId, state, effect);
+        try
+        {
+            return _runtime.RunEffect(effectId, state, effect);
+        }
+        catch (DurableTaskDivergenceException divergence)
+        {
+            throw Diverge(divergence);
+        }
     }
 
     /// <remarks>
@@ -655,7 +716,15 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
 
         if (version < 0)
         {
-            version = _runtime.GetOrRecordVersion(Id, name, HasUnreachedOperations ? 0 : maxSupported);
+            try
+            {
+                version = _runtime.GetOrRecordVersion(Id, name, HasUnreachedOperations ? 0 : maxSupported);
+            }
+            catch (DurableTaskDivergenceException divergence)
+            {
+                throw Diverge(divergence);
+            }
+
             lock (_lock)
             {
                 _versions ??= [];
@@ -666,14 +735,9 @@ internal sealed class GrainDurableTaskContext : DurableTaskContext
         if (version < minSupported || version > maxSupported)
         {
             // The runtime cancels the attempt and keeps its task pending, so code which supports the version replays it.
-            var unsupported = new DurableTaskVersionException(Id, name, version, minSupported, maxSupported);
-            lock (_lock)
-            {
-                _unsupportedVersion ??= unsupported;
-            }
-
-            _runtime.StallAttempt(this, unsupported);
-            throw CreateAttemptCanceledException();
+            throw Stall(
+                DurableTaskAttemptCancellationReason.UnsupportedVersion,
+                new DurableTaskVersionException(Id, name, version, minSupported, maxSupported));
         }
 
         return version;
