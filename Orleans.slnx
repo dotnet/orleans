@@ -41,6 +41,7 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/Microsoft.Orleans.DurableTasks/Microsoft.Orleans.DurableTasks.csproj" />
+    <Project Path="src/Microsoft.Orleans.DurableTasks.Testing/Microsoft.Orleans.DurableTasks.Testing.csproj" />
     <Project Path="src/Orleans.Analyzers/Orleans.Analyzers.csproj" />
     <Project Path="src/Orleans.Analyzers.Contracts/Orleans.Analyzers.Contracts.csproj" />
     <Project Path="src/Orleans.BroadcastChannel/Orleans.BroadcastChannel.csproj" />
