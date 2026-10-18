@@ -24,6 +24,7 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
     internal const string CodecFieldTypeFieldName = "_codecFieldType";
 
     private LibraryTypes LibraryTypes => generatorServices.LibraryTypes;
+    private bool HotReloadSafe => generatorServices.Options.HotReloadSafe;
 
     /// <summary>
     /// Describes how generated code reads and writes the values of one case.
@@ -53,9 +54,10 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
                 continue;
             }
 
-            var fieldName = $"_caseCodec{i}";
-            var field = new SerializerGenerator.CodecFieldDescription(GetCodecType(valueType), fieldName, valueType);
-            result.Add(new(unionCase, caseTypeName, valueTypeName, field, fieldName));
+            // Case identifiers preserve field identities when hot reload inserts a case earlier in the list.
+            var fieldName = $"_caseCodec{unionCase.Id}";
+            var field = new SerializerGenerator.CodecFieldDescription(GetCodecType(valueType), fieldName, valueType, HotReloadSafe);
+            result.Add(new(unionCase, caseTypeName, valueTypeName, field, SerializerGenerator.GetCodecExpression(field).NormalizeWhitespace().ToFullString()));
         }
 
         return result;
@@ -89,12 +91,11 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine($"public sealed class {className} : global::Orleans.Serialization.Codecs.IFieldCodec<{typeName}>, global::Orleans.Serialization.Serializers.IValueSerializer<{typeName}>");
         source.AppendLine("{");
         source.AppendLine($"    private readonly global::System.Type {CodecFieldTypeFieldName} = typeof({typeName});");
-        AppendCodecFields(source, codecs);
-        AppendConstructor(source, className, codecs.Where(static c => c.CodecField is not null).Select(static c => (c.CodecField!.FieldName, c.CodecField.FieldType.ToString(), Optional: false)));
 
         source.AppendLine(MethodImpl);
         source.AppendLine($"    public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref {typeName} instance) {BufferWriterConstraint}");
         source.AppendLine("    {");
+        AppendSerializationCallbacks(source, type, "OnSerializing");
         source.AppendLine("        switch (instance)");
         source.AppendLine("        {");
         for (var i = 0; i < codecs.Count; i++)
@@ -103,15 +104,18 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         }
 
         source.AppendLine("        }");
+        AppendSerializationCallbacks(source, type, "OnSerialized");
         source.AppendLine("    }");
 
         source.AppendLine(MethodImpl);
         source.AppendLine($"    public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, scoped ref {typeName} instance)");
         source.AppendLine("    {");
+        AppendSerializationCallbacks(source, type, "OnDeserializing");
         source.AppendLine($"        var header = {FieldHeaderCodec}.ReadFieldHeader(ref reader);");
         source.AppendLine("        if (header.IsEndBaseOrEndObject)");
         source.AppendLine("        {");
         source.AppendLine("            instance = default;");
+        AppendSerializationCallbacks(source, type, "OnDeserialized");
         source.AppendLine("            return;");
         source.AppendLine("        }");
         source.AppendLine();
@@ -126,6 +130,7 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine("        }");
         source.AppendLine();
         source.AppendLine($"        {Helper}.ConsumeEndBaseOrEndObject(ref reader);");
+        AppendSerializationCallbacks(source, type, "OnDeserialized");
         source.AppendLine("    }");
 
         source.AppendLine(MethodImpl);
@@ -153,22 +158,26 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
         source.AppendLine("        return result;");
         source.AppendLine("    }");
 
-        source.AppendLine($"    private static {typeName} FromCaseValue(object value)");
+        source.AppendLine($"    private {typeName} FromCaseValue(object value)");
         source.AppendLine("    {");
+        source.AppendLine($"        {typeName} instance = default;");
+        AppendSerializationCallbacks(source, type, "OnDeserializing");
         source.AppendLine("        switch (value)");
         source.AppendLine("        {");
-        source.AppendLine("            case null: return default;");
+        source.AppendLine("            case null: instance = default; break;");
         for (var i = 0; i < codecs.Count; i++)
         {
-            source.AppendLine($"            case {codecs[i].ValueTypeName} case{i}: return ({codecs[i].CaseTypeName})case{i};");
+            source.AppendLine($"            case {codecs[i].ValueTypeName} case{i}: instance = ({codecs[i].CaseTypeName})case{i}; break;");
         }
 
-        source.AppendLine($"            default: {Helper}.ThrowUnsupportedUnionValue<{typeName}>(value); return default;");
+        source.AppendLine($"            default: {Helper}.ThrowUnsupportedUnionValue<{typeName}>(value); break;");
         source.AppendLine("        }");
+        AppendSerializationCallbacks(source, type, "OnDeserialized");
+        source.AppendLine("        return instance;");
         source.AppendLine("    }");
         source.AppendLine("}");
 
-        return FinishClass(type, source);
+        return AddDependencies(FinishClass(type, source), type, codecs.Where(static c => c.CodecField is not null).Select(static c => c.CodecField!).ToList<SerializerGenerator.GeneratedFieldDescription>(), isCopier: false);
     }
 
     /// <summary>
@@ -234,13 +243,13 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
     }
 
     /// <summary>
-    /// Generates a copier for a struct union type which has at least one case that is not shallow-copyable.
+    /// Generates a copier for a struct union type with deep-copyable cases or serialization callbacks.
     /// </summary>
     public ClassDeclarationSyntax GenerateUnionCopier(ISerializableTypeDescription type, List<UnionCaseDescription> cases)
     {
         var typeName = type.TypeSyntax.ToString();
         var className = CopierGenerator.GetSimpleClassName(type);
-        var copierFields = new List<(string FieldName, string FieldType, bool Optional)>();
+        var copierFields = new List<SerializerGenerator.GeneratedFieldDescription>();
         var source = new StringBuilder();
         source.AppendLine($"public sealed class {className} : global::Orleans.Serialization.Cloning.IDeepCopier<{typeName}>");
         source.AppendLine("{");
@@ -255,58 +264,68 @@ internal sealed class UnionCodecGenerator(IGeneratorServices generatorServices)
 
             var caseTypeName = unionCase.CaseType.ToTypeSyntax().ToString();
             var valueTypeName = unionCase.ValueType.ToTypeSyntax().ToString();
-            var fieldName = $"_caseCopier{i}";
-            var fieldType = $"global::Orleans.Serialization.Cloning.IDeepCopier<{valueTypeName}>";
-            copierFields.Add((fieldName, fieldType, Optional: true));
-            source.AppendLine($"    private readonly {fieldType} {fieldName};");
-            copyCases.AppendLine($"            case {valueTypeName} case{i}: return {fieldName} is null ? original : ({caseTypeName}){fieldName}.DeepCopy(case{i}, context);");
+            var fieldName = $"_caseCopier{unionCase.Id}";
+            var field = new CopierGenerator.CopierFieldDescription(LibraryTypes.DeepCopier_1.ToTypeSyntax(unionCase.ValueType.ToTypeSyntax()), fieldName, unionCase.ValueType, HotReloadSafe);
+            copierFields.Add(field);
+            var copier = SerializerGenerator.GetCodecExpression(field).NormalizeWhitespace().ToFullString();
+            copyCases.AppendLine($"            case {valueTypeName} case{i}: result = ({caseTypeName}){copier}.DeepCopy(case{i}, context); break;");
         }
 
-        AppendConstructor(source, className, copierFields);
         source.AppendLine(MethodImpl);
         source.AppendLine($"    public {typeName} DeepCopy({typeName} original, global::Orleans.Serialization.Cloning.CopyContext context)");
         source.AppendLine("    {");
+        source.AppendLine($"        {typeName} result = default;");
+        AppendCopyCallbacks(source, type, "OnCopying");
         source.AppendLine("        switch (original)");
         source.AppendLine("        {");
         source.Append(copyCases);
-        source.AppendLine("            default: return original;");
+        source.AppendLine("            default: result = original; break;");
         source.AppendLine("        }");
+        AppendCopyCallbacks(source, type, "OnCopied");
+        source.AppendLine("        return result;");
         source.AppendLine("    }");
         source.AppendLine("}");
 
-        return FinishClass(type, source);
+        return AddDependencies(FinishClass(type, source), type, copierFields, isCopier: true);
     }
 
-    private static void AppendCodecFields(StringBuilder source, List<CaseCodec> codecs)
+    private ClassDeclarationSyntax AddDependencies(ClassDeclarationSyntax declaration, ISerializableTypeDescription type, List<SerializerGenerator.GeneratedFieldDescription> fields, bool isCopier)
     {
-        foreach (var codec in codecs)
+        if (HotReloadSafe)
         {
-            if (codec.CodecField is { } field)
-            {
-                source.AppendLine($"    private readonly {field.FieldType} {field.FieldName};");
-            }
+            fields.Insert(0, new SerializerGenerator.CodecProviderFieldDescription(LibraryTypes.ICodecProvider.ToTypeSyntax()));
+        }
+
+        for (var i = 0; i < type.SerializationHooks.Count; i++)
+        {
+            fields.Add(new SerializerGenerator.SerializationHookFieldDescription(type.SerializationHooks[i].ToTypeSyntax(), $"_hook{i}"));
+        }
+
+        var constructor = isCopier
+            ? new CopierGenerator(generatorServices).GenerateConstructor(declaration.Identifier.Text, fields, isExceptionType: false)
+            : new SerializerGenerator(generatorServices).GenerateConstructor(declaration.Identifier.Text, fields);
+        declaration = declaration.AddMembers(SerializerGenerator.GetFieldDeclarations(fields));
+        return constructor is null ? declaration : declaration.AddMembers(constructor);
+    }
+
+    private static void AppendSerializationCallbacks(StringBuilder source, ISerializableTypeDescription type, string methodName)
+    {
+        var statements = new List<StatementSyntax>();
+        SerializerGenerator.AddSerializationCallbacks(type, IdentifierName("instance"), methodName, statements);
+        foreach (var statement in statements)
+        {
+            source.AppendLine(statement.NormalizeWhitespace().ToFullString());
         }
     }
 
-    private void AppendConstructor(StringBuilder source, string className, IEnumerable<(string FieldName, string FieldType, bool Optional)> fields)
+    private static void AppendCopyCallbacks(StringBuilder source, ISerializableTypeDescription type, string methodName)
     {
-        var fieldList = fields.ToList();
-        if (fieldList.Count == 0)
+        var statements = new List<StatementSyntax>();
+        CopierGenerator.AddSerializationCallbacks(type, IdentifierName("original"), IdentifierName("result"), methodName, statements);
+        foreach (var statement in statements)
         {
-            return;
+            source.AppendLine(statement.NormalizeWhitespace().ToFullString());
         }
-
-        source.AppendLine($"    public {className}({LibraryTypes.ICodecProvider.ToTypeSyntax()} codecProvider)");
-        source.AppendLine("    {");
-        foreach (var (fieldName, fieldType, optional) in fieldList)
-        {
-            var service = $"{Helper}.GetService<{fieldType}>(this, codecProvider)";
-            source.AppendLine(optional
-                ? $"        {fieldName} = {Helper}.GetOptionalCopier({service});"
-                : $"        {fieldName} = {service};");
-        }
-
-        source.AppendLine("    }");
     }
 
     private static string GetWriteCase(CaseCodec codec, string value) => codec.IsStatic

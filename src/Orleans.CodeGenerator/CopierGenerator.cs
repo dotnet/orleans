@@ -145,7 +145,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType)
+    internal ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions, bool isExceptionType)
     {
         var codecProviderAdded = false;
         var parameters = new List<ParameterSyntax>();
@@ -647,7 +647,7 @@ internal class CopierGenerator(IGeneratorServices generatorServices)
         return getValueExpression;
     }
 
-    private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
+    internal static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax originalInstance, IdentifierNameSyntax resultInstance, string callbackMethodName, List<StatementSyntax> body)
     {
         var serializationHooks = type.SerializationHooks;
         for (var hookIndex = 0; hookIndex < serializationHooks.Count; ++hookIndex)

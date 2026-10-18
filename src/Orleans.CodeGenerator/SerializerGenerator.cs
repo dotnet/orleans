@@ -162,7 +162,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             ? ParenthesizedExpression(AssignmentExpression(SyntaxKind.CoalesceAssignmentExpression, IdentifierName(field.FieldName), GetServiceExpression(field.FieldType, IdentifierName(CodecProviderFieldName))))
             : IdentifierName(field.FieldName);
 
-    private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+    internal static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
     {
         return [.. fieldDescriptions.Select(GetFieldDeclaration)];
 
@@ -236,7 +236,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
     }
 
-    private ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
+    internal ConstructorDeclarationSyntax? GenerateConstructor(string simpleClassName, List<GeneratedFieldDescription> fieldDescriptions)
     {
         var codecProviderAdded = false;
         var parameters = new List<ParameterSyntax>();
@@ -772,7 +772,7 @@ internal class SerializerGenerator(IGeneratorServices generatorServices)
         }
     }
 
-    private static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
+    internal static void AddSerializationCallbacks(ISerializableTypeDescription type, IdentifierNameSyntax instanceParam, string callbackMethodName, List<StatementSyntax> body)
     {
         for (var hookIndex = 0; hookIndex < type.SerializationHooks.Count; ++hookIndex)
         {
