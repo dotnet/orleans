@@ -131,6 +131,11 @@ namespace Orleans.Serialization
             {
                 type = TypeSerializerCodec.ReadValue(ref reader, header)!;
 
+                if (typeof(Exception).IsAssignableFrom(type))
+                {
+                    throw new SerializationException("An exception must be encoded using its type-name field.");
+                }
+
                 if (type.IsValueType)
                 {
                     var serializer = _valueTypeSerializerFactory.GetSerializer(type);

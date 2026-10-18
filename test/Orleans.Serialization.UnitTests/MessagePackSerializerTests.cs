@@ -43,6 +43,7 @@ public class MessagePackCodecTests : FieldCodecTester<MyMessagePackClass?, IFiel
         builder.AddMessagePackSerializer();
         builder.Configure(options =>
         {
+            options.AddAllowedType(typeof(MyMessagePackClass));
             options.AddAllowedType(typeof(MyMessagePackUnionVariant1));
             options.AddAllowedType(typeof(MyMessagePackUnionVariant2));
         });
@@ -155,6 +156,7 @@ public class MessagePackCodecCopierTests : CopierTester<MyMessagePackClass?, IDe
         builder.AddMessagePackSerializer();
         builder.Configure(options =>
         {
+            options.AddAllowedType(typeof(MyMessagePackClass));
             options.AddAllowedType(typeof(MyMessagePackUnionVariant1));
             options.AddAllowedType(typeof(MyMessagePackUnionVariant2));
         });

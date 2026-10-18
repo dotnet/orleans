@@ -99,6 +99,7 @@ public static class SerializationHostingExtensions
             serializerBuilder.Configure(options =>
             {
                 options.WellKnownTypeAliases[NewtonsoftJsonCodec.WellKnownAlias] = typeof(NewtonsoftJsonCodec);
+                options.AddAllowedType(typeof(NewtonsoftJsonCodec));
                 options.AddAllowedType(typeof(JObject));
                 options.AddAllowedType(typeof(JArray));
                 options.AddAllowedType(typeof(JValue));

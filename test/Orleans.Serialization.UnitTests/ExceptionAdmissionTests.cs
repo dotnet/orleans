@@ -370,6 +370,44 @@ public sealed class ExceptionAdmissionTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SerializableTypeEncodedExceptionFailsBeforeInitializationCallbacksOrNestedConstruction(bool admitted)
+    {
+        var factories = 0;
+        using var probeServices = new ServiceCollection()
+            .AddSerializer(builder => builder.Configure(options => options.AddAllowedType(typeof(SerializableProbeException))))
+            .Configure<ExceptionSerializationOptions>(options =>
+            {
+                options.AddExceptionType(() =>
+                {
+                    factories++;
+                    return new AdmittedException();
+                });
+                if (admitted)
+                {
+                    options.AddExceptionType(() =>
+                    {
+                        factories++;
+                        return new SerializableProbeException();
+                    });
+                }
+            })
+            .AddSingleton<Serializers.IGeneralizedCodec, DotNetSerializableCodec>()
+            .BuildServiceProvider();
+        var payload = CreateSerializablePayload(probeServices,
+            RuntimeTypeNameFormatter.Format(typeof(SerializableProbeException)), typeof(SerializableProbeException));
+
+        var error = Assert.Throws<SerializationException>(() => Deserialize(probeServices, payload));
+
+        Assert.Contains("type-name field", error.Message);
+        Assert.Equal(0, SerializableEffects.Initializers);
+        Assert.Equal(0, SerializableEffects.Constructors);
+        Assert.Equal(0, SerializableEffects.Callbacks);
+        Assert.Equal(0, factories);
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData(" ")]
@@ -465,14 +503,15 @@ public sealed class ExceptionAdmissionTests
     private static Exception Deserialize(ServiceProvider services, byte[] payload) =>
         Assert.IsAssignableFrom<Exception>(services.GetRequiredService<Serializer>().Deserialize<Exception>(payload));
 
-    private static byte[] CreateSerializablePayload(ServiceProvider services, string name)
+    private static byte[] CreateSerializablePayload(ServiceProvider services, string name, Type? encodedType = null)
     {
         var output = new ArrayBufferWriter<byte>();
         using var session = services.GetRequiredService<SerializerSessionPool>().GetSession();
         var writer = Writer.Create(output, session);
         ReferenceCodec.CreateRecordPlaceholder(session);
         writer.WriteStartObject(0, typeof(Exception), typeof(DotNetSerializableCodec));
-        StringCodec.WriteField(ref writer, 1, name);
+        if (encodedType is null) StringCodec.WriteField(ref writer, 1, name);
+        else TypeSerializerCodec.WriteField(ref writer, 0, encodedType);
         var entries = new SerializationEntryCodec();
         entries.WriteField(ref writer, 1, typeof(SerializationEntrySurrogate),
             new SerializationEntrySurrogate { Name = "Message", Value = "message", ObjectType = typeof(string) });
@@ -567,6 +606,26 @@ public sealed class ExceptionAdmissionTests
     private sealed class AdmittedException : Exception;
     private abstract class AbstractException : Exception;
     private sealed class GenericException<T> : Exception;
+
+    private static class SerializableEffects
+    {
+        public static int Initializers;
+        public static int Constructors;
+        public static int Callbacks;
+    }
+
+    [Serializable]
+    private sealed class SerializableProbeException : Exception, IDeserializationCallback
+    {
+        static SerializableProbeException() => SerializableEffects.Initializers++;
+        public SerializableProbeException() => SerializableEffects.Constructors++;
+        private SerializableProbeException(SerializationInfo info, StreamingContext context) => SerializableEffects.Constructors++;
+        [OnDeserializing]
+        private void OnDeserializing(StreamingContext context) => SerializableEffects.Callbacks++;
+        [OnDeserialized]
+        private void OnDeserialized(StreamingContext context) => SerializableEffects.Callbacks++;
+        void IDeserializationCallback.OnDeserialization(object? sender) => SerializableEffects.Callbacks++;
+    }
 
     private sealed class DenyingExceptionNameFilter : ITypeNameFilter
     {

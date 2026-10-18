@@ -85,6 +85,7 @@ public static class SerializationHostingExtensions
             serializerBuilder.Configure(options =>
             {
                 options.WellKnownTypeAliases[JsonCodec.WellKnownAlias] = typeof(JsonCodec);
+                options.AddAllowedType(typeof(JsonCodec));
                 options.AddAllowedType(typeof(JsonNode));
                 options.AddAllowedType(typeof(JsonObject));
                 options.AddAllowedType(typeof(JsonArray));

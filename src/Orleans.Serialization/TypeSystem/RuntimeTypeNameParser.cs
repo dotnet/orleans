@@ -17,6 +17,7 @@ public static class RuntimeTypeNameParser
     private static readonly char[] InvalidWireNameCharacters = "[]*&(),\"".ToCharArray();
 #endif
     internal const int MaxAllowedGenericArity = 64;
+    internal const int MaxWireTypeNesting = 64;
     internal const char CompoundAliasStartIndicator = '(';
     internal const char CompoundAliasEndIndicator = ')';
     internal const char CompoundAliasElementSeparator = ',';
@@ -61,17 +62,22 @@ public static class RuntimeTypeNameParser
         }
 
         var remaining = input.AsSpan();
-        var result = ParseInternal(ref remaining);
+        var result = ParseInternal(ref remaining, MaxWireTypeNesting);
         if (!remaining.Trim().IsEmpty)
         {
             throw new FormatException($"Unexpected trailing content in type name \"{input}\".");
         }
 
-        Validate(result);
+        Validate(result, 1);
         return result;
 
-        static void Validate(TypeSpec type)
+        static void Validate(TypeSpec type, int depth)
         {
+            if (depth > MaxWireTypeNesting)
+            {
+                ThrowWireTypeNestingTooDeep();
+            }
+
             switch (type)
             {
                 case NamedTypeSpec named:
@@ -80,27 +86,27 @@ public static class RuntimeTypeNameParser
                         throw new FormatException("A wire type name must contain a valid named type.");
                     }
 
-                    if (named.ContainingType is { } containing) Validate(containing);
+                    if (named.ContainingType is { } containing) Validate(containing, depth + 1);
                     break;
                 case AssemblyQualifiedTypeSpec qualified:
                     _ = new AssemblyName(qualified.Assembly!);
-                    Validate(qualified.Type);
+                    Validate(qualified.Type, depth + 1);
                     break;
                 case ConstructedGenericTypeSpec generic:
-                    Validate(generic.UnconstructedType);
-                    foreach (var argument in generic.Arguments) Validate(argument);
+                    Validate(generic.UnconstructedType, depth + 1);
+                    foreach (var argument in generic.Arguments) Validate(argument, depth + 1);
                     break;
                 case ArrayTypeSpec array:
-                    Validate(array.ElementType);
+                    Validate(array.ElementType, depth + 1);
                     break;
                 case PointerTypeSpec pointer:
-                    Validate(pointer.ElementType);
+                    Validate(pointer.ElementType, depth + 1);
                     break;
                 case ReferenceTypeSpec reference:
-                    Validate(reference.ElementType);
+                    Validate(reference.ElementType, depth + 1);
                     break;
                 case TupleTypeSpec tuple:
-                    foreach (var element in tuple.Elements) Validate(element);
+                    foreach (var element in tuple.Elements) Validate(element, depth + 1);
                     break;
             }
         }
@@ -113,10 +119,16 @@ public static class RuntimeTypeNameParser
         name.IndexOfAny(InvalidWireNameCharacters) >= 0;
 #endif
 
-    private static TypeSpec ParseInternal(ref ReadOnlySpan<char> input)
+    private static TypeSpec ParseInternal(ref ReadOnlySpan<char> input, int maxDepth = int.MaxValue)
     {
+        if (maxDepth <= 0)
+        {
+            ThrowWireTypeNestingTooDeep();
+        }
+
         BufferReader s = default;
         s.Input = input;
+        s.MaxDepth = maxDepth;
         var result = ParseInternal(ref s);
         input = s.Remaining;
         return result;
@@ -220,7 +232,7 @@ public static class RuntimeTypeNameParser
                 // Parse the argument type
                 input.ConsumeCharacter(ArrayStartIndicator);
                 var remaining = input.Remaining;
-                arguments[i] = ParseInternal(ref remaining);
+                arguments[i] = ParseInternal(ref remaining, input.MaxDepth - 1);
                 var consumed = input.Remaining.Length - remaining.Length;
                 input.Consume(consumed);
                 input.ConsumeCharacter(ArrayEndIndicator);
@@ -375,7 +387,7 @@ public static class RuntimeTypeNameParser
                 // Parse the argument type
                 input.ConsumeCharacter(ArrayStartIndicator);
                 var remaining = input.Remaining;
-                var result = ParseInternal(ref remaining);
+                var result = ParseInternal(ref remaining, input.MaxDepth - 1);
                 var consumed = input.Remaining.Length - remaining.Length;
                 input.Consume(consumed);
                 input.ConsumeCharacter(ArrayEndIndicator);
@@ -392,11 +404,14 @@ public static class RuntimeTypeNameParser
 
     private static void ThrowGenericArityTooLarge(int arity) => throw new NotSupportedException($"An arity of {arity} is not supported.");
 
+    private static void ThrowWireTypeNestingTooDeep() => throw new FormatException($"Wire type-name nesting exceeds the limit of {MaxWireTypeNesting}.");
+
     private ref struct BufferReader
     {
         public ReadOnlySpan<char> Input;
         public int Index;
         public int TotalGenericArity;
+        public int MaxDepth;
 
         public readonly ReadOnlySpan<char> Remaining => Input[Index..];
 

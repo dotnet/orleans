@@ -339,6 +339,85 @@ public sealed class WireTypeResolutionTests
         Assert.ThrowsAny<Exception>(() => CreateConverter(new TypeManifestOptions()).ParseForDeserialization(name));
     }
 
+    [Theory]
+    [InlineData("", "[]")]
+    [InlineData("", "*")]
+    [InlineData("", "&")]
+    [InlineData("Outer+", "")]
+    [InlineData("List`1[[", "]]")]
+    [InlineData("(\"alias\",[", "])")]
+    [InlineData("List`1[[", "]][]")]
+    [InlineData("List`1[[", ", System.Private.CoreLib]]")]
+    public void ExcessiveWireTypeNestingFailsBeforeFiltersOrBinding(string prefix, string suffix)
+    {
+        var name = CreateNestedTypeName(prefix, suffix, 10_000);
+        var resolver = new CountingResolver();
+        var extension = new CountingConverter();
+        var filterCalls = 0;
+        var converter = CreateConverter(new TypeManifestOptions(), resolver, [extension],
+            [new NameFilter((_, _) =>
+            {
+                filterCalls++;
+                return null;
+            })]);
+
+        var error = Assert.Throws<FormatException>(() => converter.ParseForDeserialization(name));
+
+        Assert.Contains("nesting", error.Message);
+        Assert.Equal(0, filterCalls);
+        Assert.Equal(0, resolver.Calls);
+        Assert.Equal(0, extension.ParseCalls);
+    }
+
+    [Theory]
+    [InlineData("", "[]")]
+    [InlineData("", "*")]
+    [InlineData("", "&")]
+    [InlineData("Outer+", "")]
+    [InlineData("List`1[[", "]]")]
+    [InlineData("(\"alias\",[", "])")]
+    public void WireTypeNestingLimitAcceptsCompleteGraphAtBoundary(string prefix, string suffix)
+    {
+        var name = CreateNestedTypeName(prefix, suffix, RuntimeTypeNameParser.MaxWireTypeNesting - 1);
+
+        Assert.Equal(name, RuntimeTypeNameParser.ParseForDeserialization(name).Format());
+        Assert.Throws<FormatException>(() => RuntimeTypeNameParser.ParseForDeserialization(
+            CreateNestedTypeName(prefix, suffix, RuntimeTypeNameParser.MaxWireTypeNesting)));
+    }
+
+    [Theory]
+    [InlineData(typeof(JsonCodec), JsonCodec.WellKnownAlias)]
+    [InlineData(typeof(NewtonsoftJsonCodec), NewtonsoftJsonCodec.WellKnownAlias)]
+    [InlineData(typeof(MessagePackCodec), MessagePackCodec.WellKnownAlias)]
+    [InlineData(typeof(ProtobufCodec), ProtobufCodec.WellKnownAlias)]
+    public void ExternalSerializerHostingGrantsCodecMarkerAndRequiresSeparatePayloadIdentity(Type marker, string alias)
+    {
+        var registrations = new ServiceCollection();
+        registrations.AddSerializer(builder =>
+        {
+            if (marker == typeof(JsonCodec)) builder.AddJsonSerializer(_ => true);
+            else if (marker == typeof(NewtonsoftJsonCodec)) builder.AddNewtonsoftJsonSerializer(_ => true);
+            else if (marker == typeof(MessagePackCodec)) builder.AddMessagePackSerializer(_ => true);
+            else builder.AddProtobufSerializer(_ => true, _ => true);
+        });
+        using var services = registrations.BuildServiceProvider();
+        var converter = services.GetRequiredService<TypeConverter>();
+        var options = services.GetRequiredService<IOptions<TypeManifestOptions>>().Value;
+
+        Assert.Contains(marker, options.AllowedTypeIdentities);
+        Assert.Same(marker, converter.ParseForDeserialization(alias));
+        Assert.False(converter.TryParseForDeserialization(RuntimeTypeNameFormatter.Format(typeof(UnregisteredType)), out _));
+    }
+
+    private static string CreateNestedTypeName(string prefix, string suffix, int count)
+    {
+        var builder = new StringBuilder();
+        for (var i = 0; i < count; i++) builder.Append(prefix);
+        builder.Append("int");
+        for (var i = 0; i < count; i++) builder.Append(suffix);
+        return builder.ToString();
+    }
+
     private static TypeConverter CreateConverter(TypeManifestOptions options, TypeResolver? resolver = null,
         ITypeConverter[]? converters = null, ITypeNameFilter[]? filters = null, ITypeFilter[]? typeFilters = null) =>
         new(converters ?? [], filters ?? [new DefaultTypeFilter()], typeFilters ?? [], Options.Create(options), resolver ?? new CachedTypeResolver());

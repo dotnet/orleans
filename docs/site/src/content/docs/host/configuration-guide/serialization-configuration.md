@@ -12,7 +12,7 @@ Serialization configuration in Orleans is a crucial part of the overall system d
 
 ## Configure Orleans to use `Newtonsoft.Json`
 
-To configure Orleans to serialize certain types using `Newtonsoft.Json`, first reference the [Microsoft.Orleans.Serialization.NewtonsoftJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.NewtonsoftJson) NuGet package. Then, configure the serializer, specifying which types it will be responsible for. In the following example, we specify that the `Newtonsoft.Json` serializer is responsible for all types in the `Example.Namespace` namespace.
+To configure Orleans to serialize certain types using `Newtonsoft.Json`, first reference the [Microsoft.Orleans.Serialization.NewtonsoftJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.NewtonsoftJson) NuGet package. Then, select the payload types and register their identities. The following example selects and authorizes `ApplicationPayload`.
 
 :::code language="csharp" source="snippets/serialization/TypeNameResolutionExamples.cs" id="configure_newtonsoft_json":::
 
@@ -22,7 +22,7 @@ For types marked with <xref:Orleans.GenerateSerializerAttribute>, Orleans prefer
 
 ## Configure Orleans to use `System.Text.Json`
 
-Alternatively, to configure Orleans to use `System.Text.Json` to serialize your types, reference the [Microsoft.Orleans.Serialization.SystemTextJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.SystemTextJson) NuGet package. Then, configure the serializer, specifying which types it will be responsible for. In the following example, we specify that the `System.Text.Json` serializer is responsible for all types in the `Example.Namespace` namespace.
+Alternatively, to configure Orleans to use `System.Text.Json` to serialize your types, reference the [Microsoft.Orleans.Serialization.SystemTextJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.SystemTextJson) NuGet package. The following example selects and authorizes `ApplicationPayload`.
 
 - Install the [Microsoft.Orleans.Serialization.SystemTextJson](https://nuget.org/packages/Microsoft.Orleans.Serialization.SystemTextJson) NuGet package.
 - Configure the serializer using the <xref:Orleans.Serialization.SerializationHostingExtensions.AddJsonSerializer*> method.
@@ -35,7 +35,7 @@ Consider the following example when interacting with the <xref:Orleans.Hosting.I
 
 Registering an external serializer selects which codec handles a value. Wire type-name resolution binds host-established CLR identities, then authorizes the complete type graph. <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowAllTypes?displayProperty=nameWithType> defaults to `false`.
 
-The JSON integrations register the concrete JSON document and node identities provided by their libraries. Register application payload identities separately, including concrete MessagePack union variants and persisted-state types, on each reader and writer.
+External serializer integrations authorize their codec schema markers. The JSON integrations also register the concrete JSON document and node identities provided by their libraries. Register application payload identities separately, including concrete MessagePack union variants and persisted-state types, on each reader and writer. The examples above use <xref:Orleans.Serialization.Configuration.TypeManifestOptions.AllowedTypes> to register each payload's assembly-qualified identity.
 
 This distinction is especially visible for polymorphic signatures such as `IReadOnlyList<TriggerRule>`, where `TriggerRule` is abstract and values are handled by `System.Text.Json`. Register the JSON serializer and explicitly trust the application type:
 
