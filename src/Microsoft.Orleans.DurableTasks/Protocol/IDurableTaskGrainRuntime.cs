@@ -262,12 +262,12 @@ internal interface IDurableTaskGrainRuntime
         throw new NotSupportedException("The durable task runtime does not support versions.");
 
     /// <summary>
-    /// Cancels the attempt which <paramref name="context"/> runs for
-    /// <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/>, keeping its task pending for a later
-    /// activation to replay.
+    /// Cancels the attempt which <paramref name="context"/> runs for <paramref name="reason"/>,
+    /// <see cref="DurableTaskAttemptCancellationReason.UnsupportedVersion"/> or
+    /// <see cref="DurableTaskAttemptCancellationReason.Diverged"/>, keeping its task pending for a later activation to replay.
     /// </summary>
-    void StallAttempt(GrainDurableTaskContext context, DurableTaskVersionException exception) =>
-        throw new NotSupportedException("The durable task runtime does not support versions.");
+    void StallAttempt(GrainDurableTaskContext context, DurableTaskAttemptCancellationReason reason, Exception exception) =>
+        throw new NotSupportedException("The durable task runtime does not support stalled executions.");
 
     /// <summary>
     /// Throws when an earlier run recorded a <c>DurableTask.RunInline</c> effect under <paramref name="effectId"/>, which holds

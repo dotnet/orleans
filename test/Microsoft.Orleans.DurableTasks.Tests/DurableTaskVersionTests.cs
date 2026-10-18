@@ -290,7 +290,7 @@ public sealed class DurableTaskVersionTests
         var stalled = new TaskCompletionSource<DurableTaskVersionException>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var subscription = DurableTaskEvents.AllEvents.Subscribe(new EventObserver(evt =>
         {
-            if (evt is DurableTaskEvents.ExecutionStalled { Exception: var exception } && evt.TaskId == workflowId)
+            if (evt is DurableTaskEvents.ExecutionStalled { Reason: DurableTaskAttemptCancellationReason.UnsupportedVersion, Exception: DurableTaskVersionException exception } && evt.TaskId == workflowId)
             {
                 stalled.TrySetResult(exception);
             }

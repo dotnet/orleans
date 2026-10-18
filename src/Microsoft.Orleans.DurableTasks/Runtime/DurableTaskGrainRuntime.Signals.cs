@@ -49,7 +49,7 @@ internal sealed partial class DurableTaskGrainRuntime
             if (_storage.TryGetTask(recordId, out var record) && !_pendingHandleResponses.ContainsKey(recordId))
             {
                 Debug.Assert(record.CompletedAt.HasValue, "A signal record holds its value.");
-                return (record.Result!, record.CompletedAt.Value);
+                return (ReadRecordedResult(recordId, record)!, record.CompletedAt.Value);
             }
 
             var waiter = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -144,7 +144,7 @@ internal sealed partial class DurableTaskGrainRuntime
 
             // The marker commits with the send, possibly in a write which an earlier attempt is still awaiting.
             await WriteStateAsync(cancellationToken);
-            result = recorded.Result!.Result is DurableSignalResult recordedResult ? recordedResult : DurableSignalResult.Accepted;
+            result = ReadRecordedResult(markerId, recorded)!.Result is DurableSignalResult recordedResult ? recordedResult : DurableSignalResult.Accepted;
             if (throwOnRejection && CreateSignalRejection(taskId, name, result) is { } recordedRejection)
             {
                 throw recordedRejection;
