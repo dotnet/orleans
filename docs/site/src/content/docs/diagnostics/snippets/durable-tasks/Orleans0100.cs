@@ -38,7 +38,7 @@ public sealed class ReminderGrain : DurableGrain
     public async DurableTask<int> RemindOnceAsync(string recipient)
     {
         // The effect runs once, and its change commits with its record. A replay returns the recorded count.
-        var sent = DurableTask.Once("count", () => ++_remindersSent.Value);
+        var sent = DurableTask.RunInline("count", () => ++_remindersSent.Value);
         await SendReminderAsync(recipient).WithId("send");
         return sent;
     }
@@ -46,7 +46,7 @@ public sealed class ReminderGrain : DurableGrain
     public async DurableTask ShipWhenPaidOnceAsync()
     {
         // A replay returns the status which the first run read, so it takes the same branch.
-        var status = DurableTask.Once("read-status", () => _status.Value);
+        var status = DurableTask.RunInline("read-status", () => _status.Value);
         if (status == OrderStatus.Paid)
         {
             await MarkShipped().WithId("ship");

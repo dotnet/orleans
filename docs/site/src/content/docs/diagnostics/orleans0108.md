@@ -15,7 +15,7 @@ ms.topic: reference
 
 ## Cause
 
-Two call sites of `WithId`, or two call sites of `DurableTask.Once`, in one durable task body pass the same constant name, and one run can reach both. Call sites in mutually exclusive branches, such as the two arms of an `if` statement, and one call site which a loop repeats aren't reported:
+Two call sites of `WithId`, or two call sites of `DurableTask.RunInline`, in one durable task body pass the same constant name, and one run can reach both. Call sites in mutually exclusive branches, such as the two arms of an `if` statement, and one call site which a loop repeats aren't reported:
 
 :::code source="snippets/durable-tasks/Orleans0108.cs" id="orleans0108_violation" language="csharp":::
 

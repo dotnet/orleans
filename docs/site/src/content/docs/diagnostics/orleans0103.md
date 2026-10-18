@@ -33,7 +33,7 @@ For the commit model, see [Writing replay-safe workflows](https://github.com/dot
 
 :::code source="snippets/durable-tasks/Orleans0103.cs" id="orleans0103_fix_reorder" language="csharp":::
 
-**Record each change separately.** Split the work into a step for the external call and `DurableTask.Once` effects for the state changes. Each effect commits its change with its own record:
+**Record each change separately.** Split the work into a step for the external call and `DurableTask.RunInline` effects for the state changes. Each effect commits its change with its own record:
 
 :::code source="snippets/durable-tasks/Orleans0103.cs" id="orleans0103_fix_split" language="csharp":::
 
