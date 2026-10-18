@@ -250,6 +250,47 @@ public sealed class DurableTaskJournaledStateAccessTests
     });
 
     [Fact]
+    public Task ReplayedSealClosesTheDraftBeforeAnIsOpenGuardedCommit() => ActivationScheduler.RunAsync(async () =>
+    {
+        await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));
+        await using (var activation = await harness.ActivateAsync(TestCancellation))
+        {
+            await activation.ScheduleAsync(WorkflowId, TestCancellation);
+            await CommitAtGateAsync(activation);
+            Assert.True(activation.Grain.Log.IsSealed);
+            Assert.Empty(activation.Grain.Log);
+            Assert.Equal(1, activation.Grain.Counter.Value);
+        }
+
+        await using var replay = await harness.ActivateAsync(TestCancellation);
+        await replay.Grain.AtGate.WaitAsync(Timeout, TestCancellation);
+        replay.Grain.OpenGate();
+
+        Assert.False((await replay.GetResponseAsync(WorkflowId, TestCancellation)).GetResult<bool>());
+        Assert.True(replay.Grain.Log.IsSealed);
+        Assert.Empty(replay.Grain.Log);
+        Assert.Equal(1, replay.Grain.Counter.Value);
+        Assert.Equal(1, harness.EffectRuns);
+
+        static async DurableTask<bool> Workflow(ReplayGrain grain)
+        {
+            using var draft = grain.Log.BeginDraft();
+            draft.Write(7);
+            grain.Log.Seal();
+            var isOpen = draft.IsOpen;
+            if (isOpen)
+            {
+                draft.Commit(7);
+            }
+
+            grain.Counter.Value++;
+            await DurableTask.Run(_ => grain.Harness.CountEffectRun()).WithId("after-seal");
+            await grain.WaitAtGateAsync();
+            return isOpen;
+        }
+    });
+
+    [Fact]
     public Task ReadsStageOnlyWithALaterWriteOrOperation() => ActivationScheduler.RunAsync(async () =>
     {
         await using var harness = new DurableTaskReplayHarness(static grain => Workflow(grain));

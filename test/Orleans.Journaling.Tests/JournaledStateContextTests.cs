@@ -165,6 +165,41 @@ public sealed class JournaledStateContextTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task ReplayedSealClosesEveryRecreatedDraft()
+    {
+        var sut = CreateTestSystem();
+        var provider = new TestProvider();
+        ((JournaledStateManager)sut.Manager).ContextProvider = provider;
+        var log = new DurableLog<string>("log", sut.Manager, new OrleansBinaryDurableLogCommandCodec<string>(CodecProvider.GetCodec<string>(), SessionPool));
+        await sut.Lifecycle.OnStart(TestContext.Current.CancellationToken);
+        log.Seal();
+
+        var context = provider.Context = new RecordingContext();
+        context.Recorded.Enqueue(false);
+        using var first = log.BeginDraft();
+        context.Recorded.Enqueue(false);
+        using var second = log.BeginDraft();
+        first.Write("first");
+        second.Write("second");
+
+        // A failed recorded seal leaves drafts open; a successful one closes the attempt's recreated drafts.
+        context.Recorded.Enqueue(new InvalidOperationException("recorded seal failure"));
+        Assert.Equal("recorded seal failure", Assert.Throws<InvalidOperationException>(log.Seal).Message);
+        Assert.True(first.IsOpen);
+        Assert.True(second.IsOpen);
+
+        context.Recorded.Enqueue(default(JournaledStateAccessNoResult));
+        log.Seal();
+
+        Assert.False(first.IsOpen);
+        Assert.False(second.IsOpen);
+        Assert.Equal(0, first.Count);
+        Assert.Equal(0, second.Count);
+        Assert.Empty(context.Accesses);
+        Assert.Empty(context.Recorded);
+    }
+
+    [Fact]
     public void TargetIdentifiersAreStableHashesOfTheirNames()
     {
         var manager = CreateTestSystem().Manager;
