@@ -219,10 +219,10 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         Assert.False(handler.TryAccept(raw, out _));
         Assert.Empty(storage.Tasks);
         Assert.True(handler.TryAccept(cancellation, out _));
-        Assert.True(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(resume)));
-        Assert.False(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(cancellation)));
-        Assert.False(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(other)));
-        Assert.False(handler.CanHandle(MessagingTestHelpers.CreateHandlerContext(raw)));
+        Assert.True(handler.CanHandle(resume));
+        Assert.False(handler.CanHandle(cancellation));
+        Assert.False(handler.CanHandle(other));
+        Assert.False(handler.CanHandle(raw));
     }
 
     [Fact]
@@ -4330,7 +4330,7 @@ public sealed partial class DurableTaskRuntimeInvariantTests
 
     private static async Task HandleAsync(IInboxHandler handler, IInboxHandlerContext context)
     {
-        Assert.True(handler.CanHandle(context));
+        Assert.True(handler.CanHandle(context.Message));
         var handling = handler.HandleAsync(context, TestContext.Current.CancellationToken);
 
         // Handlers stage their changes synchronously; the inbox owns the batch write.

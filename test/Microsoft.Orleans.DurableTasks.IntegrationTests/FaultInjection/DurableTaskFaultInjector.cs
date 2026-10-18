@@ -402,9 +402,9 @@ public sealed class FaultInjectingInboxParticipant(DurableTaskFaultInjector inje
         return false;
     }
 
-    public bool CanHandle(IInboxHandlerContext context)
+    public bool CanHandle(InboxMessage message)
     {
-        _dispatchFault = injector.OnOperation(FaultPoint.InboxHandlerThrows, grainContext.GrainId.ToString(), context.Message.Envelope.Subject);
+        _dispatchFault = injector.OnOperation(FaultPoint.InboxHandlerThrows, grainContext.GrainId.ToString(), message.Envelope.Subject);
         return _dispatchFault is not null;
     }
 
