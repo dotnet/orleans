@@ -33,7 +33,7 @@ For ownership and lifetimes, see [Structured concurrency](../grains/durable-task
 
 :::code source="snippets/durable-tasks/Orleans0119.cs" id="orleans0119_fix_await" language="csharp":::
 
-**Detach work which outlives the execution.** A detached task is an independent root, which continues after its starter completes and which its starter's deletion doesn't reach. Name it with `WithId`, so other parties can address it:
+**Detach work which outlives the execution.** `Detached()` applies to durable grain calls. A detached task is an independent root, which continues after its starter completes and which its starter's deletion doesn't reach. Name it with `WithId`, so other parties can address it:
 
 :::code source="snippets/durable-tasks/Orleans0119.cs" id="orleans0119_fix_detach" language="csharp":::
 
