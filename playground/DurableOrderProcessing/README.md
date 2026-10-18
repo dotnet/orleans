@@ -61,6 +61,10 @@ appends the `Cancelled` snapshot, which carries `DurableTask.Current.TaskCancell
 payments, and payment timeouts run the same compensation; a rejected line keeps its `Rejected` status in the cancelled
 snapshot.
 
+Each catalog grain retains reservation outcomes by order ID, independently of task retention. Repeating a reservation
+returns its recorded outcome, including after release or commit, and a different quantity for that order conflicts.
+Committing or releasing removes the active reservation once, so repeated workflows preserve the product's stock totals.
+
 ## Observe an order
 
 `IOrderGrain.WatchAsync` streams the order's committed history from its submission: it reads the log with
@@ -89,7 +93,8 @@ observes it, compensates, and appends the `Cancelled` snapshot. Ship sends the t
 - `GET /api/orders/{orderId}/workflow` polls the order's PlaceOrder task. The task is pending until the order is
   cancelled or ships, and the order then retains its result for `DurableTaskOptions.ResultRetentionPeriod`.
 - `GET /api/orders/{orderId}/tasks`, `/api/buyers/{buyerId}/tasks`, and `/api/catalog/{productId}/tasks` list the
-  tasks a grain retains, such as the buyer's detached projection updates. The UI's order history links the selected order to its task list.
+  tasks a grain retains, with their IDs, status, timestamps, and due time. The UI's order history links the selected
+  order to its task list.
 - `POST /api/orders/{orderId}/deactivate` deactivates an order, so its next activation replays the pending workflow.
 
 ## Compare with OrderProcessing
@@ -106,7 +111,7 @@ observes it, compensates, and appends the `Cancelled` snapshot. Ship sends the t
 | Projection | `StatusChanged` messages carry a version; the buyer keeps the highest. | The workflow posts one `RecordOrderAsync` call per version as a detached task, `.Detached().Post()`, whose root ID derives from the order grain and the workflow's ID, such as `order/{orderId}/place-order-{orderId}:$child-4`. The update commits with the workflow's next journal write and runs independently of the workflow, which continues without waiting for the buyer. The buyer keeps the highest version and retains the detached task. |
 | Idempotency | Message IDs derived from the order ID, such as `orders/{orderId}/stock/{productId}`; each inbox processes a message ID once. | Task IDs derived from the order ID, such as `place-order-{orderId}/reserve/0` and `place-order-{orderId}/authorize-payment/0`; `(grain, task ID)` identifies one execution, and a reused ID with different arguments fails while the task exists. |
 | Recovery | The inbox and outbox resume pending messages; each handler runs from the state it finds. | The next activation replays pending tasks from the start; completed children and recorded effects return their recorded results, so the workflow resumes where it stopped and the history holds each version once. Durable Jobs wakes the order when the delay is due or a completion arrives. |
-| Observability | Order state and the dashboard. | The order's history as a server-sent event stream, the dashboard, and per-grain task lists with each task's status, timestamps, due time, remote target, and result. |
+| Observability | Order state and the dashboard. | The order's history as a server-sent event stream, the dashboard, and per-grain task lists with each task's status, timestamps, and due time. |
 | Non-blank lines of code | Grains 414, contracts 112, host 49. | Grains 365, contracts 126, host 125, including the event stream and diagnostics endpoints. |
 
 Both samples produce the same outcomes for a successful order, a cancellation during the grace period, a rejected line,

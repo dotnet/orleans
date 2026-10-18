@@ -17,15 +17,18 @@ public interface ICatalogItemGrain : IGrainWithIntegerKey
 
 // One grain per product owns its stock. Orders reserve stock while they await validation,
 // commit it once paid, and release it when cancelled. Each operation's state change commits with its result.
+// Reservation outcomes retain each order's effect independently of durable-task retention.
 public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
 {
     private readonly IDurableValue<CatalogItem> _item;
     private readonly IDurableDictionary<Guid, int> _reservations;
+    private readonly IDurableDictionary<Guid, StockReservation> _reservationOutcomes;
 
     public CatalogItemGrain()
     {
         _item = StateManager.GetOrAddValue<CatalogItem>("item");
         _reservations = StateManager.GetOrAddDictionary<Guid, int>("reservations");
+        _reservationOutcomes = StateManager.GetOrAddDictionary<Guid, StockReservation>("reservation-outcomes");
     }
 
     private int ProductId => (int)this.GetPrimaryKeyLong();
@@ -37,6 +40,16 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
 
     public async DurableTask<bool> ReserveAsync(Guid orderId, int units)
     {
+        if (_reservationOutcomes.TryGetValue(orderId, out var outcome))
+        {
+            if (outcome.Units != units)
+            {
+                throw new InvalidOperationException($"Order {orderId} already requested a different reservation quantity.");
+            }
+
+            return outcome.Confirmed;
+        }
+
         var item = Item;
         var confirmed = item is not null && units > 0 && item.AvailableStock >= units;
         if (confirmed)
@@ -49,6 +62,7 @@ public sealed class CatalogItemGrain : DurableGrain, ICatalogItemGrain
             _reservations[orderId] = units;
         }
 
+        _reservationOutcomes[orderId] = new(units, confirmed);
         return confirmed;
     }
 
