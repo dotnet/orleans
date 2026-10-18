@@ -72,8 +72,11 @@ public abstract partial class DurableTask
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="effect"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException"><paramref name="name"/> is empty or contains <c>$</c>.</exception>
     /// <exception cref="InvalidOperationException">
-    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>, or an
-    /// earlier run recorded another kind of operation, such as a step, under the effect's identifier.
+    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>.
+    /// </exception>
+    /// <exception cref="DurableTaskAttemptCanceledException">
+    /// The host canceled the attempt, for example with <see cref="DurableTaskAttemptCancellationReason.Diverged"/>
+    /// because an earlier run recorded another kind of operation, such as a step, under the effect's identifier.
     /// </exception>
     /// <exception cref="NotSupportedException">
     /// <typeparamref name="TResult"/> is an asynchronous operation, such as a <see cref="Task"/>, a
@@ -109,8 +112,11 @@ public abstract partial class DurableTask
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="effect"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException"><paramref name="name"/> is empty or contains <c>$</c>.</exception>
     /// <exception cref="InvalidOperationException">
-    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>, or an
-    /// earlier run recorded another kind of operation, such as a step, under the effect's identifier.
+    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>.
+    /// </exception>
+    /// <exception cref="DurableTaskAttemptCanceledException">
+    /// The host canceled the attempt, for example with <see cref="DurableTaskAttemptCancellationReason.Diverged"/>
+    /// because an earlier run recorded another kind of operation, such as a step, under the effect's identifier.
     /// </exception>
     /// <exception cref="NotSupportedException">The host doesn't support recorded effects.</exception>
     public static void RunInline(string name, Action effect)
@@ -193,8 +199,11 @@ public abstract partial class DurableTask
     /// </example>
     /// <exception cref="ArgumentNullException"><paramref name="effect"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">
-    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>, or an
-    /// earlier run recorded another kind of operation, such as a step, under the effect's generated identifier.
+    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>.
+    /// </exception>
+    /// <exception cref="DurableTaskAttemptCanceledException">
+    /// The host canceled the attempt, for example with <see cref="DurableTaskAttemptCancellationReason.Diverged"/>
+    /// because an earlier run recorded another kind of operation, such as a step, under the effect's generated identifier.
     /// </exception>
     /// <exception cref="NotSupportedException">
     /// <typeparamref name="TResult"/> is an asynchronous operation, such as a <see cref="Task"/>, a
@@ -226,8 +235,11 @@ public abstract partial class DurableTask
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="effect"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">
-    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>, or an
-    /// earlier run recorded another kind of operation, such as a step, under the effect's generated identifier.
+    /// The host can't record the effect from the calling code, for example after <c>ConfigureAwait(false)</c>.
+    /// </exception>
+    /// <exception cref="DurableTaskAttemptCanceledException">
+    /// The host canceled the attempt, for example with <see cref="DurableTaskAttemptCancellationReason.Diverged"/>
+    /// because an earlier run recorded another kind of operation, such as a step, under the effect's generated identifier.
     /// </exception>
     /// <exception cref="NotSupportedException">The host doesn't support recorded effects.</exception>
     public static void RunInline(Action effect)
