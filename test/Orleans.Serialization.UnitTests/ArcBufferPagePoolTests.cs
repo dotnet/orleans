@@ -125,7 +125,7 @@ public sealed class ArcBufferPagePoolTests
         using var writer = new ArcBufferWriter();
         writer.Write(expected);
         var slice = writer.PeekSlice(expected.Length);
-        var active = slice.First;
+        var active = Assert.IsType<ArcBufferPage>(slice.First);
         var array = active.Array;
         var version = active.Version;
         try
