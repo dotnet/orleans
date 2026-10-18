@@ -69,12 +69,14 @@ public sealed class MessagingCommandSerializationTests
     private static InboxCommand[] CreateInboxCommands()
     {
         var deadLetter = new InboxDeadLetter { Message = InboxMessage("dead"), DeadLetteredAt = Now, Reason = "failed", AttemptCount = 3 };
+        var rejection = new InboxRejection { Reason = "failed" };
         return
         [
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("accept"), State = new() },
             new() { Kind = InboxCommandKind.Accept, Message = InboxMessage("scheduled", Now), State = new() },
             new() { Kind = InboxCommandKind.Retry, MessageId = MessageId.Create("orders", "retry"), State = new() { AttemptCount = 2, NextAttemptAt = Now, LastError = "boom" } },
             new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "done"), ProcessedAt = Now, DeadLetter = deadLetter },
+            new() { Kind = InboxCommandKind.Complete, MessageId = MessageId.Create("orders", "dead"), ProcessedAt = Now, DeadLetter = deadLetter, Rejection = rejection },
             new() { Kind = InboxCommandKind.RemoveDeadLetters, RemovedKeys = [MessageId.Create("orders", "dead")] },
             new()
             {
@@ -82,7 +84,11 @@ public sealed class MessagingCommandSerializationTests
                 Snapshot = new()
                 {
                     Messages = [new() { Message = InboxMessage("pending"), State = new() { AttemptCount = 1 } }, new() { Message = InboxMessage("scheduled", Now), State = new() }],
-                    Processed = [new() { MessageId = MessageId.Create("orders", "done"), ProcessedAt = Now }],
+                    Processed =
+                    [
+                        new() { MessageId = MessageId.Create("orders", "done"), ProcessedAt = Now },
+                        new() { MessageId = MessageId.Create("orders", "dead"), ProcessedAt = Now, Rejection = rejection }
+                    ],
                     DeadLetters = [deadLetter]
                 }
             }
