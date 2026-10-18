@@ -142,8 +142,9 @@ internal sealed class MongoGrainStorageCollection : CollectionBase<BsonDocument>
             filter &= Filter.Eq<BsonValue>(FieldEtag, string.IsNullOrEmpty(etag) ? BsonNull.Value : new BsonString(etag));
         }
 
-        var result = await GetCollection(cancellationToken).DeleteOneAsync(filter, cancellationToken);
-        if (result.DeletedCount == 0)
+        // Only an observed legacy record authorizes a null/empty-ETag delete.
+        if ((string.IsNullOrEmpty(etag) && !grainState.RecordExists)
+            || (await GetCollection(cancellationToken).DeleteOneAsync(filter, cancellationToken)).DeletedCount == 0)
         {
             var existing = await GetCollection(cancellationToken).WithReadPreference(ReadPreference.Primary).Find(Filter.Eq(FieldId, grainKey))
                 .Project<BsonDocument>(Project.Include(FieldEtag)).FirstOrDefaultAsync(cancellationToken);
