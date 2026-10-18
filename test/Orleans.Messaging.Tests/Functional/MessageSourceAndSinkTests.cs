@@ -51,7 +51,7 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
     [InlineData(SinkMode.Throw, SourceSinkGrain.Rejection)]
     [InlineData(SinkMode.DeadLetter, SourceSinkGrain.Rejection)]
     [InlineData(SinkMode.UnsupportedStatus, "The inbox message sink reported the unsupported delivery status 'HandlerNotFound'.")]
-    public async Task SinkRejection_DeadLettersTheMessageAndRecordsItAsProcessed(SinkMode mode, string reason)
+    public async Task SinkRejection_DeadLettersTheMessageAndAnswersItsDuplicatesWithTheSameRejection(SinkMode mode, string reason)
     {
         var receiver = NewGrain();
         Probe.For(receiver).Mode = mode;
@@ -80,10 +80,28 @@ public abstract class MessageSourceAndSinkTests(MessageSourceAndSinkFixture fixt
         Assert.Equal(1, letter.AttemptCount);
         Assert.Equal(1, Storage.CountPayloadOccurrences(Journal(receiver), payload));
 
+        // A duplicate receives the rejection from the processed record, which outlives the dead letter, without
+        // reaching the sink.
         Probe.For(receiver).Mode = SinkMode.Accept;
-        Assert.Equal(DeliveryStatus.Duplicate, (await extension.DeliverAsync(message, Token)).Status);
+        AssertRejected(await extension.DeliverAsync(message, Token));
+        Assert.True(await OnGrainAsync(receiver, context =>
+            context.ActivationServices.GetRequiredService<IMessagingDiagnostics>().RemoveInboxDeadLetter(message.Envelope.MessageId)));
+        AssertRejected(await extension.DeliverAsync(message, Token));
+        Assert.Equal(1, Probe.For(receiver).SinkOffers);
         Assert.Equal(0, Probe.For(receiver).SinkAcceptances);
         Assert.Equal(0, Probe.For(receiver).Handled);
+
+        // Once the processed record leaves the deduplication window, the message is offered to the sink again.
+        fixture.Clock.Advance(MessageSourceAndSinkFixture.DeduplicationWindow);
+        Assert.Equal(DeliveryStatus.Accepted, (await extension.DeliverAsync(message, Token)).Status);
+        Assert.Equal(2, Probe.For(receiver).SinkOffers);
+        Assert.Equal(1, Probe.For(receiver).SinkAcceptances);
+
+        void AssertRejected(DeliveryResult duplicate)
+        {
+            Assert.Equal(DeliveryStatus.DeadLettered, duplicate.Status);
+            Assert.Equal(reason, duplicate.Message);
+        }
     }
 
     [Fact]

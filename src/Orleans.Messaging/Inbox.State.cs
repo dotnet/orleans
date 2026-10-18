@@ -12,6 +12,9 @@ internal sealed partial class Inbox
 {
     private readonly Dictionary<MessageId, InboxEntry> _messages = [];
     private readonly Dictionary<MessageId, DateTimeOffset> _processed = [];
+
+    // The rejections which sinks reported on delivery, by processed message, so a duplicate receives the same answer.
+    private readonly Dictionary<MessageId, InboxRejection> _rejections = [];
     private readonly Dictionary<MessageId, InboxDeadLetter> _deadLetters = [];
     private JournalStreamWriter _writer;
 
@@ -77,6 +80,7 @@ internal sealed partial class Inbox
         _writer = writer;
         _messages.Clear();
         _processed.Clear();
+        _rejections.Clear();
         _deadLetters.Clear();
         _scheduledCount = 0;
         _stagedWakeup = null;
@@ -117,7 +121,11 @@ internal sealed partial class Inbox
         var now = TimeProvider.GetUtcNow();
         foreach (var (key, processedAt) in _processed)
         {
-            if (MessagingTime.IsExpired(now, processedAt, Options.DeduplicationWindow)) _processed.Remove(key);
+            if (MessagingTime.IsExpired(now, processedAt, Options.DeduplicationWindow))
+            {
+                _processed.Remove(key);
+                _rejections.Remove(key);
+            }
         }
 
         Shared.InboxCodec.WriteSet(new()
@@ -126,7 +134,12 @@ internal sealed partial class Inbox
             Snapshot = new()
             {
                 Messages = _messages.Values.ToArray(),
-                Processed = _processed.Select(static pair => new InboxProcessedEntry { MessageId = pair.Key, ProcessedAt = pair.Value }).ToArray(),
+                Processed = _processed.Select(pair => new InboxProcessedEntry
+                {
+                    MessageId = pair.Key,
+                    ProcessedAt = pair.Value,
+                    Rejection = _rejections.GetValueOrDefault(pair.Key)
+                }).ToArray(),
                 DeadLetters = _deadLetters.Values.ToArray()
             }
         }, writer);
@@ -143,6 +156,7 @@ internal sealed partial class Inbox
                 var message = command.Message ?? throw new InvalidOperationException("An accept command requires its message.");
                 _messages.Add(message.Envelope.MessageId, new InboxEntry { Message = message, State = new(), Sequence = ++_lastSequence });
                 _processed.Remove(message.Envelope.MessageId);
+                _rejections.Remove(message.Envelope.MessageId);
                 if (message.Envelope.DeliverAt is not null) _scheduledCount++;
                 ReportDepth(1);
                 break;
@@ -158,6 +172,7 @@ internal sealed partial class Inbox
 
                 _processed[command.MessageId] = command.ProcessedAt;
                 _lastCompletionSequence = ++_lastSequence;
+                if (command.Rejection is { } rejection) _rejections[command.MessageId] = rejection;
                 if (command.DeadLetter is { } letter) _deadLetters[command.MessageId] = letter;
                 break;
             case InboxCommandKind.RemoveDeadLetters:
@@ -168,6 +183,7 @@ internal sealed partial class Inbox
                 var previousCount = _messages.Count;
                 _messages.Clear();
                 _processed.Clear();
+                _rejections.Clear();
                 _deadLetters.Clear();
                 _scheduledCount = 0;
                 foreach (var restored in snapshot.Messages)
@@ -178,7 +194,12 @@ internal sealed partial class Inbox
 
                 ReportDepth(_messages.Count - previousCount);
 
-                foreach (var processed in snapshot.Processed) _processed.Add(processed.MessageId, processed.ProcessedAt);
+                foreach (var processed in snapshot.Processed)
+                {
+                    _processed.Add(processed.MessageId, processed.ProcessedAt);
+                    if (processed.Rejection is { } restoredRejection) _rejections.Add(processed.MessageId, restoredRejection);
+                }
+
                 foreach (var restored in snapshot.DeadLetters) _deadLetters.Add(restored.Message.Envelope.MessageId, restored);
                 break;
             default:
@@ -207,6 +228,7 @@ internal sealed class InboxCommand
     [Id(5)] public InboxDeadLetter? DeadLetter { get; init; }
     [Id(6)] public MessageId[]? RemovedKeys { get; init; }
     [Id(7)] public InboxSnapshot? Snapshot { get; init; }
+    [Id(8)] public InboxRejection? Rejection { get; init; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxSnapshot")]
@@ -222,6 +244,14 @@ internal sealed class InboxProcessedEntry
 {
     [Id(0)] public MessageId MessageId { get; init; }
     [Id(1)] public DateTimeOffset ProcessedAt { get; init; }
+    [Id(2)] public InboxRejection? Rejection { get; init; }
+}
+
+/// <summary>The answer which an inbox sink gave when it rejected a message on delivery.</summary>
+[GenerateSerializer, Alias("Orleans.Messaging.InboxRejection")]
+internal sealed class InboxRejection
+{
+    [Id(0)] public required string Reason { get; init; }
 }
 
 [GenerateSerializer, Alias("Orleans.Messaging.InboxEntry")]
