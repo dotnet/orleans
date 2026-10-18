@@ -4876,6 +4876,12 @@ public sealed partial class DurableTaskRuntimeInvariantTests
         /// </summary>
         public bool WritesAreEmpty { get; set; }
 
+        /// <summary>
+        /// Resumes each writer in a later work item than the write's acknowledgements to state machines, as Journaling
+        /// does, rather than synchronously with them.
+        /// </summary>
+        public bool ResumesWritersAsynchronously { get; set; }
+
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
         public void RegisterStateMachine(string name, IStateMachine stateMachine) => _stateMachines[name] = stateMachine;
@@ -4954,6 +4960,11 @@ public sealed partial class DurableTaskRuntimeInvariantTests
             finally
             {
                 _writeGate.Release();
+            }
+
+            if (ResumesWritersAsynchronously)
+            {
+                await Task.Yield();
             }
         }
         internal sealed class PendingDurableTask : DurableTask

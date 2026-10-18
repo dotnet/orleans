@@ -136,6 +136,10 @@ internal sealed partial class DurableTaskGrainRuntime(
     private KeyValuePair<TaskId, DurableTaskResponse>[] _committingHandleResponses = [];
     private long[] _committingCancellationPropagations = [];
 
+    // The committed effects which wait for the task cancellation of attempts which an earlier or the same write committed,
+    // in commit order, or null when none waits; see RunCommittedEffects.
+    private List<CommittedEffects>? _orderedCommittedEffects;
+
     // The executions which recovery found and which start once the activation has completed.
     private List<TaskId>? _recoveredStarts;
     private Task? _stopTask;
@@ -975,8 +979,9 @@ internal sealed partial class DurableTaskGrainRuntime(
         }
 
         var propagation = StageCancellationTree(taskId, callerId: default, reason);
+        var propagated = StagePropagation(propagation.Contexts, propagation.Handles, reason);
         await CommitResponseAsync(taskId, DurableTaskResponse.Canceled, cancellationToken);
-        await PropagateCancellationAsync(propagation.Contexts, propagation.Handles, reason, cancellationToken);
+        await propagated.WaitAsync(cancellationToken);
     }
 
     /// <summary>Returns whether a task's body has started, which records the execution's logical time.</summary>
@@ -1605,6 +1610,12 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         _pendingStarts.Clear();
         _pendingHandleResponses.Clear();
+        foreach (var propagation in _pendingCancellationPropagations.Values)
+        {
+            // The cancellation which the propagation follows didn't commit.
+            propagation.Completion?.TrySetCanceled();
+        }
+
         _pendingCancellationPropagations.Clear();
         _preStagedCancellations.Clear();
         _pendingCompletions = null;
@@ -1651,7 +1662,36 @@ internal sealed partial class DurableTaskGrainRuntime(
         foreach (var entry in handleResponses)
         {
             _pendingHandleResponses.TryRemove(entry);
-            CompleteTaskHandle(entry.Key, entry.Value);
+        }
+
+        List<CancellationPropagation>? committedPropagations = null;
+        foreach (var id in propagations)
+        {
+            if (_pendingCancellationPropagations.TryRemove(id, out var propagation))
+            {
+                (committedPropagations ??= []).Add(propagation);
+            }
+        }
+
+        if (committedPropagations is null && _orderedCommittedEffects is null)
+        {
+            foreach (var entry in handleResponses)
+            {
+                CompleteTaskHandle(entry.Key, entry.Value);
+            }
+        }
+        else
+        {
+            // An attempt observes its task's cancellation before any outcome which this or a later write commits, such as a
+            // child which the cancellation ended. The attempts' task cancellation runs their tokens' registrations, so it
+            // runs after this write's acknowledgement, and the handles which this write completes wait for it.
+            if (_orderedCommittedEffects is null)
+            {
+                _orderedCommittedEffects = [];
+                TrackBackgroundTask(RunOrderedCommittedEffectsAsync(), "propagating committed durable task cancellation");
+            }
+
+            _orderedCommittedEffects.Add(new(committedPropagations ?? [], handleResponses));
         }
 
         if (!_stopping)
@@ -1662,16 +1702,101 @@ internal sealed partial class DurableTaskGrainRuntime(
                 QueueBackgroundWrite();
             }
         }
+    }
 
-        foreach (var id in propagations)
+    /// <summary>The cancellation propagations and handle completions which one write committed.</summary>
+    private readonly record struct CommittedEffects(
+        List<CancellationPropagation> Propagations,
+        KeyValuePair<TaskId, DurableTaskResponse>[] HandleResponses);
+
+    /// <summary>
+    /// Runs the committed effects which wait for task cancellation, in commit order: each write's cancellation of
+    /// attempts, then its handle completions, then its cancellation or abort of scheduler-owned children.
+    /// </summary>
+    /// <remarks>Effects which writes commit while this runs join it, so their handles complete after the earlier cancellations.</remarks>
+    private async Task RunOrderedCommittedEffectsAsync()
+    {
+        await Task.Yield();
+        while (_orderedCommittedEffects is { Count: > 0 } batches)
         {
-            if (_pendingCancellationPropagations.TryRemove(id, out var propagation))
+            _orderedCommittedEffects = [];
+            foreach (var (committedPropagations, handleResponses) in batches)
             {
-                TrackBackgroundTask(
-                    PropagateCancellationAfterWriteAsync(propagation),
-                    "propagating committed durable task cancellation");
+                var failures = new List<Exception>?[committedPropagations.Count];
+                for (var index = 0; index < committedPropagations.Count; index++)
+                {
+                    failures[index] = RequestTaskCancellation(committedPropagations[index]);
+                }
+
+                foreach (var entry in handleResponses)
+                {
+                    CompleteTaskHandle(entry.Key, entry.Value);
+                }
+
+                for (var index = 0; index < committedPropagations.Count; index++)
+                {
+                    TrackBackgroundTask(
+                        PropagateToSchedulerOwnedChildrenAsync(committedPropagations[index], failures[index]),
+                        "propagating committed durable task cancellation to scheduler-owned children");
+                }
             }
         }
+
+        _orderedCommittedEffects = null;
+    }
+
+    /// <summary>Requests the task cancellation of a committed propagation's attempts, and returns their registrations' failures.</summary>
+    private static List<Exception>? RequestTaskCancellation(CancellationPropagation propagation)
+    {
+        Debug.Assert(propagation.AbortReason is null || propagation.Contexts.Count == 0, "An abort cancels the attempts of its tree when it stages.");
+        List<Exception>? failures = null;
+        foreach (var context in propagation.Contexts)
+        {
+            try
+            {
+                DurableTaskRuntimeHelper.RequestTaskCancellation(context, propagation.CancellationReason);
+            }
+            catch (AggregateException exception)
+            {
+                // A registration's failure leaves the other attempts' cancellation unaffected.
+                (failures ??= []).Add(exception);
+            }
+        }
+
+        return failures;
+    }
+
+    /// <summary>
+    /// Cancels, or for an abort aborts, the scheduler-owned children of a committed propagation, then completes the
+    /// propagation with every failure.
+    /// </summary>
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Every failure is reported through the propagation's completion.")]
+    private static async Task PropagateToSchedulerOwnedChildrenAsync(CancellationPropagation propagation, List<Exception>? failures)
+    {
+        try
+        {
+            await Task.WhenAll(propagation.Handles.Select(handle => propagation.AbortReason is { } reason
+                ? AbortSchedulerOwnedChildAsync(handle, reason)
+                : handle.CancelAsync(propagation.CancellationReason, CancellationToken.None).AsTask()));
+        }
+        catch (Exception exception)
+        {
+            (failures ??= []).Add(exception);
+        }
+
+        if (failures is not null)
+        {
+            var exception = new AggregateException(failures);
+            if (propagation.Completion is not { } completion)
+            {
+                throw exception;
+            }
+
+            completion.TrySetException(exception);
+            return;
+        }
+
+        propagation.Completion?.TrySetResult();
     }
 
     /// <summary>Starts a child which its ancestors' durable cancellation reaches.</summary>
@@ -2261,13 +2386,14 @@ internal sealed partial class DurableTaskGrainRuntime(
     /// <summary>
     /// The cancellation which a committed write propagates: task cancellation, carrying <see cref="CancellationReason"/>,
     /// of running attempts and of scheduler-owned children, or, for an abort with <see cref="AbortReason"/>, the
-    /// children's abort.
+    /// children's abort. <see cref="Completion"/>, when supplied, completes once the propagation has run.
     /// </summary>
     private sealed record CancellationPropagation(
         List<GrainDurableTaskContext> Contexts,
         List<IScheduledTaskHandle> Handles,
         string? AbortReason = null,
-        string? CancellationReason = null);
+        string? CancellationReason = null,
+        TaskCompletionSource? Completion = null);
 
     private async Task SetResponseAsync(
         TaskId taskId,
@@ -2421,18 +2547,6 @@ internal sealed partial class DurableTaskGrainRuntime(
         await WriteStateAsync(CancellationToken.None);
     }
 
-    private static async Task PropagateCancellationAfterWriteAsync(CancellationPropagation propagation)
-    {
-        await Task.Yield();
-        if (propagation.AbortReason is { } reason)
-        {
-            Debug.Assert(propagation.Contexts.Count == 0, "An abort cancels the attempts of its tree when it stages.");
-            await Task.WhenAll(propagation.Handles.Select(handle => AbortSchedulerOwnedChildAsync(handle, reason)));
-            return;
-        }
-
-        await PropagateCancellationAsync(propagation.Contexts, propagation.Handles, propagation.CancellationReason, CancellationToken.None);
-    }
 
     /// <summary>Aborts a child which a custom scheduler runs, or requests its cancellation when the scheduler can't abort.</summary>
     private static async Task AbortSchedulerOwnedChildAsync(IScheduledTaskHandle handle, string reason)
@@ -2819,12 +2933,31 @@ internal sealed partial class DurableTaskGrainRuntime(
     {
         // Cancellation is persisted before it propagates.
         var propagation = StageCancellationTree(taskId, callerId, reason);
-        if (propagation.Changed)
+        if (!propagation.Changed)
         {
-            await WriteStateAsync(cancellationToken);
+            return;
         }
 
-        await PropagateCancellationAsync(propagation.Contexts, propagation.Handles, reason, cancellationToken);
+        var propagated = StagePropagation(propagation.Contexts, propagation.Handles, reason);
+        await WriteStateAsync(cancellationToken);
+        await propagated.WaitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Stages the propagation of a cancellation to the attempts and scheduler-owned children which it reaches, which the
+    /// write that commits the cancellation runs, and returns its completion.
+    /// </summary>
+    private Task StagePropagation(List<GrainDurableTaskContext> contexts, List<IScheduledTaskHandle> handles, string? reason)
+    {
+        if (contexts.Count == 0 && handles.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingCancellationPropagations[Interlocked.Increment(ref _cancellationPropagationId)] =
+            new(contexts, handles, CancellationReason: reason, Completion: completion);
+        return completion.Task;
     }
 
     /// <remarks>
@@ -2911,40 +3044,6 @@ internal sealed partial class DurableTaskGrainRuntime(
             }
 
             return true;
-        }
-    }
-
-    private static async Task PropagateCancellationAsync(
-        List<GrainDurableTaskContext> canceledContexts,
-        List<IScheduledTaskHandle> canceledHandles,
-        string? reason,
-        CancellationToken cancellationToken)
-    {
-        // Requesting an attempt's task cancellation runs the registrations on its token, whose failure leaves the other
-        // requests unaffected.
-        List<Exception>? failures = null;
-        foreach (var context in canceledContexts)
-        {
-            try
-            {
-                DurableTaskRuntimeHelper.RequestTaskCancellation(context, reason);
-            }
-            catch (AggregateException exception)
-            {
-                (failures ??= []).Add(exception);
-            }
-        }
-
-        var tasks = new List<Task>(canceledHandles.Count);
-        foreach (var handle in canceledHandles)
-        {
-            tasks.Add(handle.CancelAsync(reason, CancellationToken.None).AsTask());
-        }
-
-        await Task.WhenAll(tasks).WaitAsync(cancellationToken);
-        if (failures is not null)
-        {
-            throw new AggregateException(failures);
         }
     }
 
