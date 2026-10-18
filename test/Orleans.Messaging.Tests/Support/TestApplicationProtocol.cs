@@ -96,7 +96,8 @@ internal static class TestApplicationProtocol
                 MessageId = messageId ?? message.Envelope.MessageId,
                 Payload = payload ?? message.Envelope.Payload,
                 Subject = removeSubject ? null : subject ?? message.Envelope.Subject,
-                Headers = headers
+                Headers = headers,
+                DeliverAt = message.Envelope.DeliverAt
             }
         };
     }

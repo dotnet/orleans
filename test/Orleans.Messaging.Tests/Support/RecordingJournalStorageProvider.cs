@@ -43,6 +43,11 @@ public sealed class RecordingJournalStorageProvider : IJournalStorageProvider, I
 
     private static int CountOccurrences(ReadOnlySpan<byte> data, ReadOnlySpan<byte> value)
     {
+        if (value.IsEmpty)
+        {
+            return 0;
+        }
+
         var count = 0;
         for (var index = data.IndexOf(value); index >= 0; index = data.IndexOf(value))
         {
