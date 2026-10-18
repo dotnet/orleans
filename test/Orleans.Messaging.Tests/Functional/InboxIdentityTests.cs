@@ -440,7 +440,7 @@ public sealed class InboxIdentityTests : MessagingBehaviorTestBase
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public int Calls { get; private set; }
-        public bool CanHandle(IInboxHandlerContext context) => true;
+        public bool CanHandle(InboxMessage message) => true;
 
         public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {

@@ -441,7 +441,7 @@ public sealed class MessagingTestGrain : DurableGrain, IMessagingTestGrain, IDur
 
     private sealed class ApplicationDispatcher(MessagingTestGrain owner) : IInboxHandler
     {
-        public bool CanHandle(IInboxHandlerContext context) => true;
+        public bool CanHandle(InboxMessage message) => true;
 
         public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {

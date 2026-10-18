@@ -231,7 +231,7 @@ public sealed class InboxHeaderBehaviorTests : MessagingBehaviorTestBase
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public bool CanHandle(IInboxHandlerContext context) => true;
+        public bool CanHandle(InboxMessage message) => true;
 
 
         public async ValueTask HandleAsync(IInboxHandlerContext handler, CancellationToken cancellationToken)

@@ -140,7 +140,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         {
             public int Attempts { get; private set; }
 
-            public bool CanHandle(IInboxHandlerContext context) => true;
+            public bool CanHandle(InboxMessage message) => true;
 
 
             public ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
@@ -692,7 +692,7 @@ public sealed class InboxHandlerCompletionTests : MessagingBehaviorTestBase
         public OutboxMessage Output { get; private set; }
         public Func<TestHandler, CancellationToken, ValueTask> Body { get; set; } =
             static (self, _) => { self.Mutate(); self.Context.Complete(); return default; };
-        public bool CanHandle(IInboxHandlerContext context) => true;
+        public bool CanHandle(InboxMessage message) => true;
 
         public async ValueTask HandleAsync(IInboxHandlerContext context, CancellationToken cancellationToken)
         {
